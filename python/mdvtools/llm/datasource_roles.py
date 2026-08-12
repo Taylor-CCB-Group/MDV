@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from mdvtools.llm.dataset_scale import ProjectScale
 
 
 @dataclass(frozen=True)
@@ -36,23 +40,463 @@ class InferredDatasourceRoles:
         return self.expressions[0]
 
 
-def _pick_obs_datasource(project: Any) -> str:
-    names = []
+_TABULAR_OBS_FALLBACK_NAMES = ("qc_runs", "qc_sessions", "runs", "sessions", "observations", "metadata")
+
+
+def _project_datasource_names(project: Any) -> list[str]:
     try:
-        names = list(project.get_datasource_names())
+        return list(project.get_datasource_names())
     except Exception:
-        # Fallback: MDVProject.datasources property
         try:
-            names = [ds.get("name") for ds in (project.datasources or []) if ds.get("name")]
+            return [str(ds.get("name")) for ds in (project.datasources or []) if ds.get("name")]
         except Exception:
-            names = []
+            return []
+
+
+def _pick_obs_datasource(project: Any) -> str:
+    names = _project_datasource_names(project)
 
     if "cells" in names:
         return "cells"
-    # last-resort: first datasource
+    if len(names) > 1:
+        names_lower = {n.lower(): n for n in names}
+        for preferred in _TABULAR_OBS_FALLBACK_NAMES:
+            if preferred in names_lower:
+                return names_lower[preferred]
     if names:
         return str(names[0])
     raise ValueError("Project has no datasources; cannot infer roles")
+
+
+def _field_set_from_column_dicts(columns: list[dict[str, Any]]) -> set[str]:
+    out: set[str] = set()
+    for col in columns:
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field", col.get("name"))
+        if field is not None and str(field).strip():
+            out.add(str(field))
+    return out
+
+
+def build_datasource_field_index(project: Any) -> dict[str, set[str]]:
+    """Map each datasource name to its field ids (for preflight and question routing)."""
+    index: dict[str, set[str]] = {}
+    for ds in project.datasources or []:
+        if not isinstance(ds, dict):
+            continue
+        ds_name = ds.get("name")
+        if not isinstance(ds_name, str):
+            continue
+        fields: set[str] = set()
+        try:
+            md = project.get_datasource_metadata(ds_name)
+            if isinstance(md, dict):
+                md_cols = md.get("columns")
+                if isinstance(md_cols, list):
+                    fields |= _field_set_from_column_dicts(md_cols)
+        except Exception:
+            pass
+        cols = ds.get("columns")
+        if isinstance(cols, list):
+            fields |= _field_set_from_column_dicts(cols)
+        if fields:
+            index[ds_name] = fields
+    return index
+
+
+def _question_word_tokens(question: str) -> set[str]:
+    """Lowercased whole-word tokens from the question (underscore names stay one token)."""
+    return {t.lower() for t in re.findall(r"[\w_]+", question)}
+
+
+def _datasource_names_mentioned_in_question(
+    names: list[str], question: str
+) -> list[str]:
+    """
+    Datasource names explicitly mentioned as whole tokens in the question.
+
+    Uses token boundaries so ``genes`` does not match inside ``n_genes``.
+    """
+    tokens = _question_word_tokens(question)
+    return [n for n in names if n.lower() in tokens]
+
+
+def _question_field_tokens(question: str, field_index: dict[str, set[str]]) -> set[str]:
+    """Field ids mentioned in the question (whole-token match against project fields)."""
+    all_fields = {f for fields in field_index.values() for f in fields}
+    tokens = set(re.findall(r"[\w_]+", question))
+    return {t for t in tokens if t in all_fields}
+
+
+def _resolve_by_field_overlap(
+    project: Any,
+    mentioned: set[str],
+    field_index: dict[str, set[str]],
+) -> str | None:
+    """Pick datasource from field-id overlap; prefer tables that own all mentioned fields."""
+    full_matches = [
+        ds for ds, fields in field_index.items() if mentioned <= fields
+    ]
+    if full_matches:
+        if len(full_matches) == 1:
+            return full_matches[0]
+        try:
+            obs = infer_datasource_roles(project).obs_datasource
+            if obs in full_matches:
+                return obs
+        except Exception:
+            pass
+        return max(full_matches, key=lambda ds: (len(mentioned & field_index[ds]), ds))
+
+    scores: dict[str, int] = {}
+    for ds_name, fields in field_index.items():
+        overlap = len(mentioned & fields)
+        if overlap > 0:
+            scores[ds_name] = overlap
+    if not scores:
+        return None
+    return max(scores, key=lambda ds: (scores[ds], ds))
+
+
+@dataclass(frozen=True)
+class ResolvedDatasources:
+    """Datasource routing for a single ChatMDV request."""
+
+    primary: str
+    selected: list[str]
+    source: str  # "user" | "auto" | "question" | "default"
+
+
+_EXPRESSION_QUESTION_KEYWORDS = frozenset(
+    {
+        "gene",
+        "genes",
+        "marker",
+        "markers",
+        "expression",
+        "express",
+        "protein",
+        "rna",
+        "enrichment",
+        "signature",
+        "deg",
+        "degs",
+        "differential",
+    }
+)
+
+
+def _order_datasources(names: list[str], selected: set[str]) -> list[str]:
+    """Stable catalog order for a subset of datasource names."""
+    return [n for n in names if n in selected]
+
+
+def _pick_primary_datasource(
+    project: Any,
+    selected: list[str],
+    *,
+    mentioned_fields: set[str],
+    field_index: dict[str, set[str]],
+) -> str:
+    if not selected:
+        raise ValueError("Cannot pick primary from empty selection")
+    if len(selected) == 1:
+        return selected[0]
+    scores = {
+        ds: len(mentioned_fields & field_index.get(ds, set()))
+        for ds in selected
+    }
+    best_score = max(scores.values())
+    top = [ds for ds in selected if scores[ds] == best_score]
+    if len(top) == 1:
+        return top[0]
+    try:
+        obs = infer_datasource_roles(project).obs_datasource
+        if obs in top:
+            return obs
+    except Exception:
+        pass
+    return top[0]
+
+
+def _question_suggests_expression(question: str) -> bool:
+    tokens = _question_word_tokens(question)
+    return bool(tokens & _EXPRESSION_QUESTION_KEYWORDS)
+
+
+def _resolved_datasources(
+    primary: str, selected: list[str], *, source: str
+) -> ResolvedDatasources:
+    """Keep primary aligned with the first selected datasource."""
+    if primary in selected:
+        selected = [primary] + [ds for ds in selected if ds != primary]
+    return ResolvedDatasources(primary=primary, selected=selected, source=source)
+
+
+def resolve_datasources_from_question_auto(
+    project: Any,
+    question: str,
+    *,
+    field_index: dict[str, set[str]] | None = None,
+) -> ResolvedDatasources:
+    """
+    Infer one or more datasources from the question text and project field metadata.
+    """
+    names = _project_datasource_names(project)
+    if not names:
+        raise ValueError("Project has no datasources")
+
+    if field_index is None:
+        field_index = build_datasource_field_index(project)
+
+    name_matches = _datasource_names_mentioned_in_question(names, question)
+    if name_matches:
+        ordered = sorted(name_matches, key=len, reverse=True)
+        primary = ordered[0]
+        stable = _order_datasources(names, set(ordered))
+        return _resolved_datasources(primary, stable, source="auto")
+
+    mentioned = _question_field_tokens(question, field_index)
+    if mentioned:
+        owners_by_field = find_datasources_for_fields(field_index, sorted(mentioned))
+        owner_set = {ds for owners in owners_by_field.values() for ds in owners}
+        if owner_set:
+            stable = _order_datasources(names, owner_set)
+            primary = _pick_primary_datasource(
+                project,
+                stable,
+                mentioned_fields=mentioned,
+                field_index=field_index,
+            )
+            return _resolved_datasources(primary, stable, source="auto")
+
+    if "cells" in names and _question_suggests_expression(question):
+        roles = infer_datasource_roles(project)
+        expr = roles.preferred_expression()
+        if expr is not None:
+            selected = _order_datasources(
+                names, {roles.obs_datasource, expr.datasource_name}
+            )
+            return _resolved_datasources(
+                roles.obs_datasource, selected, source="auto"
+            )
+
+    catalog = build_chat_datasource_catalog(project)
+    default_names = [
+        n for n in catalog.get("default_datasource_names", []) if n in names
+    ]
+    if default_names:
+        return ResolvedDatasources(
+            primary=default_names[0],
+            selected=default_names,
+            source="auto",
+        )
+
+    default = str(names[0])
+    return ResolvedDatasources(primary=default, selected=[default], source="default")
+
+
+def _datasource_role_for_name(
+    name: str,
+    roles: InferredDatasourceRoles,
+    expression_names: set[str],
+) -> str:
+    if name == roles.obs_datasource:
+        return "obs"
+    if name in expression_names:
+        return "expression"
+    return "table"
+
+
+def build_chat_datasource_catalog(project: Any) -> dict[str, Any]:
+    """
+    Structured datasource list for ChatMDV init (UI picker) and default selection.
+    """
+    roles = infer_datasource_roles(project)
+    names = _project_datasource_names(project)
+    expression_names = {e.datasource_name for e in roles.expressions}
+    datasources: list[dict[str, Any]] = []
+    for name in names:
+        row_count: int | None = None
+        try:
+            md = project.get_datasource_metadata(name)
+            if isinstance(md, dict) and md.get("size") is not None:
+                row_count = int(md["size"])
+        except Exception:
+            pass
+        datasources.append(
+            {
+                "name": name,
+                "role": _datasource_role_for_name(name, roles, expression_names),
+                "row_count": row_count,
+            }
+        )
+
+    if len(names) == 1:
+        default_names = [names[0]]
+    elif "cells" in names:
+        default_names = [roles.obs_datasource]
+        expr = roles.preferred_expression()
+        if expr is not None:
+            default_names.append(expr.datasource_name)
+    else:
+        default_names = [roles.obs_datasource]
+
+    return {
+        "datasources": datasources,
+        "default_datasource_names": default_names,
+    }
+
+
+def resolve_datasources_for_request(
+    project: Any,
+    *,
+    question: str,
+    user_datasource_names: list[str] | None = None,
+    field_index: dict[str, set[str]] | None = None,
+) -> ResolvedDatasources:
+    """
+    Resolve primary and selected datasources for a chat request.
+
+    User selection takes precedence; otherwise fall back to question-based routing,
+    then the first project datasource.
+    """
+    names = _project_datasource_names(project)
+    if not names:
+        raise ValueError("Project has no datasources")
+
+    if user_datasource_names:
+        valid = [n for n in user_datasource_names if n in names]
+        if not valid:
+            raise ValueError(
+                f"No valid datasources in {user_datasource_names!r}; "
+                f"available: {names}"
+            )
+        return ResolvedDatasources(primary=valid[0], selected=valid, source="user")
+
+    if field_index is None:
+        field_index = build_datasource_field_index(project)
+
+    return resolve_datasources_from_question_auto(
+        project, question, field_index=field_index
+    )
+
+
+def format_selected_datasources_cross_table_policy(
+    selected_datasources: list[str],
+    *,
+    auto_resolved: bool = False,
+) -> str:
+    """Prompt text when multiple datasources are in scope for one analysis."""
+    if len(selected_datasources) < 2:
+        return ""
+    names = ", ".join(f"`{n}`" for n in selected_datasources)
+    primary = selected_datasources[0]
+    scope_label = (
+        "Auto-resolved datasources"
+        if auto_resolved
+        else "Selected datasources"
+    )
+    return (
+        f"- **{scope_label}:** "
+        f"{names}. Primary chart target: `{primary}` (first in scope).\n"
+        "- Load each table with `project.get_datasource_as_dataframe(<datasource>, columns=[...])` "
+        "using only field ids from that datasource's metadata.\n"
+        "- For cross-table questions, merge in pandas on shared keys (`run_id`, `cell_id`, etc.) "
+        "discovered from Project Data Context — do not invent join columns.\n"
+        "- Chart `initialCharts` keys and `params` must use field ids from the datasource that owns each column.\n"
+    )
+
+
+def resolve_datasource_from_question(
+    project: Any,
+    question: str,
+    *,
+    field_index: dict[str, set[str]] | None = None,
+) -> str | None:
+    """
+    Pick the datasource the user is asking about.
+
+    Priority: explicit datasource name (whole-token match), then a datasource that
+    contains all mentioned field ids, then partial field overlap.
+    """
+    names = _project_datasource_names(project)
+    if not names:
+        return None
+
+    if field_index is None:
+        field_index = build_datasource_field_index(project)
+
+    name_matches = _datasource_names_mentioned_in_question(names, question)
+    if name_matches:
+        return max(name_matches, key=len)
+
+    mentioned = _question_field_tokens(question, field_index)
+    if not mentioned:
+        return None
+
+    return _resolve_by_field_overlap(project, mentioned, field_index)
+
+
+def find_datasources_for_fields(
+    field_index: dict[str, set[str]],
+    fields: list[str],
+) -> dict[str, list[str]]:
+    """Map each field id to datasource name(s) that contain it."""
+    result: dict[str, list[str]] = {}
+    for field in fields:
+        owners = sorted(ds for ds, flds in field_index.items() if field in flds)
+        if owners:
+            result[field] = owners
+    return result
+
+
+def format_field_index_hint(
+    field_index: dict[str, set[str]],
+    *,
+    fields: list[str] | None = None,
+    max_datasources: int = 12,
+) -> str:
+    """Compact cross-datasource field map for preflight retry prompts."""
+    if not field_index:
+        return ""
+    lines: list[str] = ["Cross-datasource field index (use the datasource that owns each column):"]
+    shown = 0
+    for ds_name in sorted(field_index):
+        if shown >= max_datasources:
+            break
+        ds_fields = field_index[ds_name]
+        if fields is not None:
+            subset = sorted(f for f in fields if f in ds_fields)
+            if not subset:
+                continue
+            lines.append(f"- `{ds_name}`: {subset}")
+        else:
+            preview = sorted(ds_fields)[:20]
+            suffix = "..." if len(ds_fields) > 20 else ""
+            lines.append(f"- `{ds_name}`: {preview}{suffix}")
+        shown += 1
+    return "\n".join(lines)
+
+
+def is_multi_table_tabular_project(project: Any, roles: InferredDatasourceRoles) -> bool:
+    """True when the project has several independent tables and no expression link."""
+    names = _project_datasource_names(project)
+    return len(names) > 2 and "cells" not in names and not roles.expressions
+
+
+def format_multi_table_tabular_policy() -> str:
+    """Prompt text for projects with multiple independent tabular datasources."""
+    return (
+        "- **Multi-table tabular projects:** Each datasource is an independent table. "
+        "When the user names a datasource (e.g. `qc_field_uniformity`, `qc_runs`), use **that** "
+        "datasource for `get_datasource_as_dataframe(...)`, chart `initialCharts` keys, and "
+        "`datasource_name` — do **not** substitute `CHATMDV_OBS_DATASOURCE` or the first project table.\n"
+        "- Match every column in `columns=[...]` and chart `params` to field ids on **the same** "
+        "datasource. If a column is missing on one table, check Project Data Context for which table owns it.\n"
+        "- Do not invent column names (e.g. `assay_type` when the field is `assay` on `qc_runs`).\n"
+    )
 
 
 def _pick_default_subgroup(subgroups: dict[str, Any]) -> tuple[str, str]:
@@ -181,16 +625,27 @@ def collect_wrapper_subgroup_keys_for_project(project: Any) -> set[str]:
     return keys
 
 
-def build_chatmdv_roles_constants_block(project: Any) -> str:
+def build_chatmdv_roles_constants_block(
+    project: Any,
+    *,
+    selected_datasources: list[str] | None = None,
+) -> str:
     """
     Python source injected into ChatMDV-generated scripts so the LLM does not
     rediscover rows-as-columns metadata at runtime.
     """
     roles = infer_datasource_roles(project)
     expr = roles.preferred_expression()
+    primary = (
+        selected_datasources[0]
+        if selected_datasources
+        else roles.obs_datasource
+    )
     lines = [
         "# --- ChatMDV project roles (derived from project metadata; do not edit) ---",
         f"CHATMDV_OBS_DATASOURCE = {json.dumps(roles.obs_datasource)}",
+        f"CHATMDV_PRIMARY_DATASOURCE = {json.dumps(primary)}",
+        f"CHATMDV_SELECTED_DATASOURCES = {json.dumps(selected_datasources or [])}",
     ]
     if expr is None:
         lines.extend(
@@ -378,7 +833,170 @@ def format_obs_table_chart_param_policy() -> str:
     )
 
 
-def format_marker_gene_scanpy_fallback_policy(path_to_data: str) -> str:
+def format_obs_annadata_alignment_policy() -> str:
+    """Prompt text: never align MDV obs tables to AnnData via default DataFrame index."""
+    return (
+        "- **No hybrid MDV + AnnData alignment for chart views:** Do not subset `adata` using "
+        "`get_datasource_as_dataframe(...)` row positions or default `DataFrame.index` — MDV observation "
+        "tables use a positional index, not cell barcodes.\n"
+        "- If a join is unavoidable, use explicit id fields (`cell_id`, `cellbarcode`) present in both "
+        "MDV metadata and `adata.obs`; never use `obs_df.index`.\n"
+        "- Prefer avoiding AnnData entirely on existing MDV projects; use MDV charts and column-subset loads.\n"
+    )
+
+
+def format_gene_signature_chart_policy() -> str:
+    """Prompt text: gene signature / enrichment questions via MDV wrappers, not Scanpy means."""
+    return (
+        "- **Gene signatures / enrichment across cell types:** Use **DotPlot** or **HeatmapPlot** on the "
+        "observation datasource with expression **wrapper** `params` plus a categorical field id "
+        "(e.g. `sub_bucket`, `bucket`, `major`).\n"
+        "- Add **SelectionDialogPlot** filters for `Remission_status`, `Treatment`, `bucket`, or `sub_bucket` "
+        "instead of subsetting AnnData or pandas tables.\n"
+        "- Do **not** compute per-group Scanpy/pandas means solely to populate MDV charts; wrappers read the "
+        "project expression matrix directly.\n"
+        "- Use field ids from Project Data Context / `CHATMDV_CATEGORICAL_FIELD_IDS`; do **not** invent "
+        "category literals (e.g. do not guess `Monocyte` in `bucket` — use real values via selection UI).\n"
+    )
+
+
+def format_proportion_chart_policy() -> str:
+    """Prompt text: proportion / frequency questions via StackedRowChart or PieChart."""
+    return (
+        "- **Proportions, frequencies, relative abundance, before/after comparisons:** Prefer "
+        "**`StackedRowChart`** with two or three categorical field ids in `params` "
+        "(e.g. `Treatment`, `Remission_status`, `sub_bucket`).\n"
+        "- Import: `from mdvtools.charts.stacked_row_plot import StackedRowChart` "
+        "(not `mdvtools.charts.stacked_row_chart`).\n"
+        "- **`PieChart`** uses constructor kwarg **`param=`** (singular), not `params=`.\n"
+        "- Pair with **SelectionDialogPlot** on `major`, `bucket`, or `sub_bucket` to focus a cell type; "
+        "do not compute proportions in pandas/Scanpy when MDV charts aggregate in the view.\n"
+    )
+
+
+def format_column_subset_completeness_policy() -> str:
+    """Prompt text: every referenced field id must be listed in get_datasource_as_dataframe columns."""
+    return (
+        "- **Column-subset completeness:** Every field id you reference (`df['col']`, chart `params`, filters) "
+        "must appear in the `columns=[...]` list passed to `project.get_datasource_as_dataframe(...)`.\n"
+    )
+
+
+def format_targeted_chart_policies(*, compact: bool = False) -> str:
+    """Combined policies for signature, proportion, alignment, and column-subset codegen."""
+    if compact:
+        return (
+            "## Chart recipes (mandatory)\n"
+            "- Proportions / frequency / before-after → `StackedRowChart` from `mdvtools.charts.stacked_row_plot`; "
+            "`PieChart` uses `param=` not `params=`.\n"
+            "- Gene signatures / enrichment → `DotPlot` or `HeatmapPlot` + expression wrappers + "
+            "`SelectionDialogPlot` filters; no Scanpy means for charts.\n"
+            "- Never align `obs_df.index` to AnnData; avoid hybrid h5ad + MDV loads for chart-only views.\n"
+            "- Every `df['field']` used must be listed in `get_datasource_as_dataframe(..., columns=[...])`.\n"
+        )
+    return (
+        "## Observation / AnnData alignment (ChatMDV)\n"
+        + format_obs_annadata_alignment_policy()
+        + "\n## Gene signature / enrichment charts (ChatMDV)\n"
+        + format_gene_signature_chart_policy()
+        + "\n## Proportion / frequency charts (ChatMDV)\n"
+        + format_proportion_chart_policy()
+        + "\n## Column-subset completeness (ChatMDV)\n"
+        + format_column_subset_completeness_policy()
+    )
+
+
+def format_mdv_first_data_access_policy(
+    scale: ProjectScale,
+    path_to_data: str,
+    *,
+    compact: bool = False,
+) -> str:
+    """
+    Prompt text: MDV-first data access with Scanpy as last resort.
+
+    ``compact=True`` returns a shorter block for Ollama/local models.
+    """
+    from mdvtools.llm.dataset_scale import format_scale_context_block
+
+    scale_block = format_scale_context_block(scale)
+    large_rules = ""
+    if scale.is_large:
+        large_rules = (
+            "- **Large-project rules (mandatory):**\n"
+            "  - Do **not** call `sc.read_h5ad(data_path)` without `backed='r'`.\n"
+            "  - Do **not** call `project.get_datasource_as_dataframe(<name>)` without "
+            "`columns=[...]` listing only the Field IDs you need.\n"
+            "  - Do **not** materialize `pd.DataFrame(adata.obs)` — observation columns already exist on "
+            f"`{scale.obs_datasource}` in the MDV project.\n"
+            "  - Do **not** open `.h5ad` for chart-only questions (scatter/UMAP, proportions, stacked rows, "
+            "selection dialogs).\n"
+        )
+
+    scanpy_last_resort = (
+        "- **Scanpy last resort only** when MDV cannot answer: marker ranking (`sc.tl.rank_genes_groups`), "
+        "or DE stats missing from the expression feature table, and `data_path` is a `.h5ad` file.\n"
+    )
+    hybrid_bans = (
+        "- Do **not** combine `read_h5ad` with `get_datasource_as_dataframe` filtering for chart-only views.\n"
+        "- Do **not** invent `bucket` / `major` / `sub_bucket` category literals — use field ids from context "
+        "and `SelectionDialogPlot` for interactive filtering.\n"
+        "- Gene expression on subsets: expression wrappers + `SelectionDialogPlot`, not AnnData `[:, gene].X.mean()`.\n"
+    )
+    if scale.is_large:
+        scanpy_last_resort += (
+            "  - On large projects use `adata = sc.read_h5ad(data_path, backed='r')`; filter with obs masks "
+            "before any heavy step; never `.copy()` the full expression matrix.\n"
+        )
+    else:
+        scanpy_last_resort += (
+            "  - Prefer `backed='r'` when loading AnnData; avoid full in-memory loads unless necessary.\n"
+        )
+
+    if compact:
+        return (
+            "## Project scale and memory\n"
+            + scale_block
+            + "\n\n## MDV-first data access (mandatory)\n"
+            "- **1.** Use `MDVProject(project_path, delete_existing=False)`, chart classes, `CHATMDV_*` wrappers, "
+            "and `SelectionDialogPlot` for filtering — no Scanpy for chart-only views.\n"
+            "- **2.** Load tables with `project.get_datasource_as_dataframe(<ds>, columns=[field_ids...])` only.\n"
+            "- **3.** Gene expression on embeddings: expression wrapper tokens via `build_expression_wrapper_token`.\n"
+            "- **4.** Scanpy only for marker/DE workflows when MDV tables lack required columns.\n"
+            + large_rules
+            + hybrid_bans
+            + scanpy_last_resort
+            + "- Do **not** `add_datasource` for datasources that already exist (except "
+            f"`{CHAT_RANK_GENES_DATASOURCE_NAME}` for optional in-view marker tables).\n"
+        )
+
+    return (
+        "## Project scale and memory\n"
+        + scale_block
+        + "\n\n## MDV-first data access (default for existing projects)\n"
+        "Follow this priority order before writing any data-loading code:\n"
+        "- **1. MDV chart APIs (preferred):** `MDVProject`, mdvtools chart classes, injected `CHATMDV_*` constants, "
+        "expression wrapper `params`, and `SelectionDialogPlot` for interactive filters. This path is fast and "
+        "memory-efficient on large projects.\n"
+        "- **2. Column-subset MDV tables:** When you need a pandas preview or aggregate, call "
+        "`project.get_datasource_as_dataframe(<datasource>, columns=[<field_id>, ...])` with only the Field IDs "
+        "required for the chart or printout.\n"
+        "- **3. Expression without AnnData:** For gene expression on embeddings, build wrapper tokens with "
+        "`build_expression_wrapper_token` — do not load `.h5ad`.\n"
+        "- **4. Scanpy last resort:** Use Scanpy only when steps 1–3 cannot answer the question (marker genes, "
+        "DE ranking, or expression stats absent from MDV metadata) and a `.h5ad` exists at `data_path`.\n"
+        + large_rules
+        + hybrid_bans
+        + scanpy_last_resort
+        + "- Do **not** call `project.add_datasource(...)` for observation or expression datasources that already "
+        "exist in this project.\n"
+    )
+
+
+def format_marker_gene_scanpy_fallback_policy(
+    path_to_data: str,
+    scale: ProjectScale | None = None,
+) -> str:
     """
     Prompt text: marker-gene requests must not assume cluster/DE columns exist on the ``genes`` table.
 
@@ -400,14 +1018,21 @@ def format_marker_gene_scanpy_fallback_policy(path_to_data: str) -> str:
     )
 
     ds = CHAT_RANK_GENES_DATASOURCE_NAME
+    is_large = scale is not None and scale.is_large
+    h5ad_load = (
+        "`adata = sc.read_h5ad(data_path, backed='r')`"
+        if is_large
+        else "`adata = sc.read_h5ad(data_path)` (prefer `backed='r'` on large datasets)"
+    )
     if has_h5ad:
         return (
             semantic
             + "- If the MDV `genes` table lacks columns needed for ranking (or you need full expression), and "
-            "`data_path` is a `.h5ad` file: load `adata = sc.read_h5ad(data_path)`, pick the cluster column from "
+            f"`data_path` is a `.h5ad` file: load {h5ad_load}, pick the cluster column from "
             "`adata.obs.columns`, then compute markers with Scanpy (e.g. `sc.tl.rank_genes_groups` with "
-            "`groupby=<cluster_key>`, or mean expression per group). Print a **bounded** table (top 5 per cluster) "
-            "via `print(...)` as the **primary** answer.\n"
+            "`groupby=<cluster_key>`, or mean expression per group). On large projects filter `adata` with obs "
+            "masks before heavy steps; avoid `.copy()` on the full matrix. Print a **bounded** table (top 5 per "
+            "cluster) via `print(...)` as the **primary** answer.\n"
             + "- **In-view table (optional):** When the user clearly needs the marker table **in the saved view**, you may "
             "call "
             f"`project.add_datasource('{ds}', marker_df, replace_data=True, add_to_view=view_name)` "

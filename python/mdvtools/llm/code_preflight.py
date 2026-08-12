@@ -62,6 +62,7 @@ _CHART_LIKE_SUFFIXES = ("Chart", "Plot", "Box")
 _CHART_NAME_HINTS: dict[str, str] = {
     "Histogram": "HistogramPlot",
     "MultilineChart": "MultiLinePlot",
+    "MultiLineChart": "MultiLinePlot",
 }
 
 
@@ -638,12 +639,26 @@ def validate_generated_code_preflight(
             if not missing:
                 continue
             available_preview = sorted(list(available))[:30]
+            hint_parts: list[str] = []
+            for col in missing:
+                owners = sorted(
+                    ds
+                    for ds, flds in datasource_fields.items()
+                    if ds != datasource_name and col in flds
+                )
+                if owners:
+                    hint_parts.append(
+                        f"Column `{col}` exists on datasource(s): {owners}"
+                    )
+            hint_suffix = ""
+            if hint_parts:
+                hint_suffix = " " + " ".join(hint_parts) + "."
             issues.append(
                 PreflightIssue(
                     code="unknown_datasource_column",
                     message=(
                         f"Datasource `{datasource_name}` does not contain column(s) {missing}. "
-                        f"Available fields include: {available_preview}"
+                        f"Available fields include: {available_preview}.{hint_suffix}"
                     ),
                     line=getattr(call, "lineno", None),
                     column=getattr(call, "col_offset", None),

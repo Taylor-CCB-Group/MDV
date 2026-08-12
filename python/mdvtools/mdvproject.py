@@ -21,7 +21,7 @@ import scipy.sparse
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any, cast
-from pandas.api.types import is_bool_dtype
+from pandas.api.types import is_bool_dtype, is_datetime64_any_dtype
 import polars as pl
 # from mdvtools.charts.view import View 
 import time
@@ -94,6 +94,82 @@ numpy_dtypes = {
     # unique created in fly (depends on string length)
 }
 
+_UNIX_EPOCH_UTC = pandas.Timestamp("1970-01-01", tz="UTC")
+_SECONDS_PER_DAY = 86400.0
+
+
+def _pandas_series_to_day_doubles(series: pandas.Series) -> pandas.Series:
+    """Convert a datetime-like pandas Series to float days since Unix epoch (UTC)."""
+    ts = pandas.to_datetime(series, utc=True, errors="coerce")
+    days = (ts - _UNIX_EPOCH_UTC).dt.total_seconds() / _SECONDS_PER_DAY
+    return days.astype("float64")
+
+
+def _object_column_looks_like_dates(series: pandas.Series, sample_size: int = 50) -> bool:
+    """Heuristic: uniformly parseable ISO-like strings in a sample of non-null values."""
+    sample = series.dropna()
+    if sample.empty:
+        return False
+    sample = sample.head(sample_size)
+    parsed = pandas.to_datetime(sample, utc=True, errors="coerce", format="mixed")
+    return bool(parsed.notna().mean() >= 0.8)
+
+
+def convert_pandas_datetime_columns(
+    dataframe: pandas.DataFrame,
+    *,
+    parse_object_dates: bool = True,
+) -> tuple[pandas.DataFrame, set[str]]:
+    """
+    Convert datetime columns (and optionally date-like object columns) to float64
+    days since Unix epoch. Returns the (possibly copied) dataframe and the set of
+    field names that were converted.
+    """
+    date_fields: set[str] = set()
+    out = dataframe
+    for col_name in list(dataframe.columns):
+        series = dataframe[col_name]
+        if not isinstance(series, pandas.Series):
+            continue
+        converted: Optional[pandas.Series] = None
+        if is_datetime64_any_dtype(series):
+            converted = _pandas_series_to_day_doubles(series)
+        elif parse_object_dates and (
+            series.dtype == object or str(series.dtype) == "string"
+        ):
+            if _object_column_looks_like_dates(series):
+                converted = _pandas_series_to_day_doubles(series)
+        if converted is not None:
+            if out is dataframe:
+                out = dataframe.copy()
+            out[col_name] = converted
+            date_fields.add(col_name)
+    return out, date_fields
+
+
+def apply_date_column_metadata(
+    columns: list[dict] | None, date_fields: set[str]
+) -> list[dict] | None:
+    """Mark converted date fields as double + is_date metadata."""
+    if not columns:
+        return columns
+    for col in columns:
+        field = col.get("field") or col.get("name")
+        if field in date_fields:
+            col["datatype"] = "double"
+            col["is_date"] = True
+            col["date_unit"] = "days"
+    return columns
+
+
+def map_polars_datetime_to_day_doubles(series: "pl.Series") -> "pl.Series":
+    """Convert Polars Date/Datetime to float days since Unix epoch (UTC)."""
+    # Cast to datetime[ms, UTC] then to epoch ms, then divide.
+    as_dt = series.cast(pl.Datetime("ms", "UTC"), strict=False)
+    ms = as_dt.dt.epoch(time_unit="ms")
+    days = ms / (86400.0 * 1000.0)
+    return days.cast(pl.Float64)
+
 
 class MDVProject:
     def __init__(
@@ -144,12 +220,14 @@ class MDVProject:
         This is independent of any permissions set in db etc,
         but can be used to guard against inappropriate admin actions
         """
+        # check if project has a h5 file or write permissions, newly created project doesn't have a h5 file which blocks file upload
+        h5_writable_or_not_created = (not exists(self.h5file)) or os.access(self.h5file, os.W_OK)
         return (
             # belt and braces
             os.access(self.statefile, os.W_OK)
             and os.access(self.dir, os.W_OK | os.X_OK)
             and os.access(self.viewsfile, os.W_OK)
-            and os.access(self.h5file, os.W_OK)
+            and h5_writable_or_not_created
         )
 
     @property
@@ -1341,9 +1419,12 @@ class MDVProject:
         try:
             if isinstance(dataframe, str):
                 dataframe = pandas.read_csv(dataframe, sep=separator)
+
+            dataframe, date_fields = convert_pandas_datetime_columns(dataframe)
             
             # Get columns to add
             columns = get_column_info(columns, dataframe, supplied_columns_only)
+            columns = apply_date_column_metadata(columns, date_fields)
             
             # Check if the datasource already exists
             try:
@@ -1489,7 +1570,9 @@ class MDVProject:
 
             # Get columns to add using polars-compatible function.
             # Pass num_rows to avoid recalculating it for LazyFrames.
+            date_fields = get_polars_date_fields(dataframe)
             columns = get_column_info_polars(columns, dataframe, supplied_columns_only, num_rows)
+            columns = apply_date_column_metadata(columns, date_fields)
 
             has_existing_datasources = len(self.datasources) > 0
             
@@ -1547,6 +1630,19 @@ class MDVProject:
                         polars_series = dataframe.select(col["field"]).collect().get_columns()[0]
                     else:
                         polars_series = dataframe[col["field"]]
+
+                    # Only convert Date/Datetime dtypes. Already-numeric day doubles
+                    # (e.g. re-import with is_date metadata) must not be remapped —
+                    # casting floats as datetime epoch-ms would destroy values.
+                    if _is_polars_datetime_dtype(polars_series.dtype):
+                        polars_series = map_polars_datetime_to_day_doubles(polars_series)
+                        col["datatype"] = "double"
+                        col["is_date"] = True
+                        col["date_unit"] = "days"
+                    elif col.get("is_date"):
+                        col["datatype"] = "double"
+                        col["is_date"] = True
+                        col["date_unit"] = "days"
 
                     add_column_to_group_from_polars(col, polars_series, gr, num_rows, self.skip_column_clean)
                 except Exception as e:
@@ -2785,9 +2881,24 @@ def map_polars_to_mdv_type(polars_dtype):
         return "text"
     elif polars_dtype in [pl.Utf8, pl.String]:
         return "text"  # Default to text, might change to unique based on cardinality
+    elif _is_polars_datetime_dtype(polars_dtype):
+        return "double"
     else:
         # Default to text for any other types
         return "text"
+
+
+def _is_polars_datetime_dtype(polars_dtype) -> bool:
+    dtype_name = str(polars_dtype)
+    return dtype_name == "Date" or dtype_name.startswith("Datetime")
+
+
+def get_polars_date_fields(dataframe: "pl.DataFrame | pl.LazyFrame") -> set[str]:
+    return {
+        name
+        for name, dtype in dataframe.collect_schema().items()
+        if _is_polars_datetime_dtype(dtype)
+    }
 
 def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows, skip_column_clean):
     """Add a column to HDF5 group using Polars Series data"""

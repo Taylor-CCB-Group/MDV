@@ -1,4 +1,4 @@
-from typing import Optional, Protocol, Any, TypedDict, Union
+from typing import Literal, NotRequired, Optional, Protocol, Any, TypedDict, Union
 from mdvtools.mdvproject import MDVProject
 
 
@@ -9,7 +9,9 @@ class AskQuestionResult(TypedDict):
     message: str
     verification: Optional[str]
     data_preview: Optional[str]
+    guidance: Optional[str]
     needs_refresh: bool
+    resolved_datasource_names: NotRequired[list[str] | None]
 
 
 class HandleError(Protocol):
@@ -23,6 +25,9 @@ class ChatRequest(TypedDict):
     conversation_id: str
     room: str
     handle_error: HandleError
+    model_id: NotRequired[str]
+    datasource_mode: NotRequired[Literal["auto", "manual"]]
+    datasource_names: NotRequired[list[str]]
 
 class ProjectChatProtocol(Protocol):
     def __init__(self, project: MDVProject): ...
@@ -69,7 +74,9 @@ except Exception as e:
                 message=f"Sorry, I can't help you right now\n\n{msg}",
                 verification=None,
                 data_preview=None,
+                guidance=None,
                 needs_refresh=False,
+                resolved_datasource_names=None,
             )
 
 # Tell the type checker we’re exposing a ProjectChat conforming to the protocol

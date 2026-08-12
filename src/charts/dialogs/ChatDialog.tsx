@@ -13,7 +13,7 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import type { ChatMessage, ChatProgress, ConversationMap } from "./ChatAPI";
+import type { ChatMessage, ChatModelOption, ChatDatasourceOption, DatasourceMode, ChatProgress, ConversationMap } from "./ChatAPI";
 import {
     Close as CloseIcon,
     Launch as LaunchIcon,
@@ -40,6 +40,14 @@ export type ChatDialogProps = {
     conversationMap: ConversationMap;
     conversationId: string;
     suggestedQuestions: string[];
+    availableModels: ChatModelOption[];
+    selectedModelId: string;
+    onModelChange: (modelId: string) => void;
+    availableDatasources: ChatDatasourceOption[];
+    selectedDatasourceNames: string[];
+    onDatasourcesChange: (names: string[]) => void;
+    datasourceMode: DatasourceMode;
+    onDatasourceModeChange: (mode: DatasourceMode) => void;
     onPopout?: () => void;
     isPopout?: boolean;
     fullscreen?: boolean;
@@ -60,6 +68,14 @@ const ChatDialog = ({
     conversationMap,
     conversationId,
     suggestedQuestions,
+    availableModels,
+    selectedModelId,
+    onModelChange,
+    availableDatasources,
+    selectedDatasourceNames,
+    onDatasourcesChange,
+    datasourceMode,
+    onDatasourceModeChange,
     onPopout,
     isPopout,
     fullscreen = false,
@@ -258,6 +274,14 @@ const ChatDialog = ({
                                     verboseProgress={verboseProgress}
                                     onClose={onClose}
                                     suggestedQuestions={suggestedQuestions}
+                                    availableModels={availableModels}
+                                    selectedModelId={selectedModelId}
+                                    onModelChange={onModelChange}
+                                    availableDatasources={availableDatasources}
+                                    selectedDatasourceNames={selectedDatasourceNames}
+                                    onDatasourcesChange={onDatasourcesChange}
+                                    datasourceMode={datasourceMode}
+                                    onDatasourceModeChange={onDatasourceModeChange}
                                 />
                             </Suspense>
                         )}

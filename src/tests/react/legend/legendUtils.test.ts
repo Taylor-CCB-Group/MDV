@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
+    formatContinuousTick,
     formatLegendLabel,
+    getContinuousLegendContainerHeight,
     getContinuousLegendLayout,
     measureLegendLabelWidth,
 } from "@/react/legend/shared/legendUtils";
@@ -32,5 +34,40 @@ describe("legendUtils", () => {
         expect(layout.axisWidth).toBeLessThan(layout.layoutWidth);
         expect(layout.labelMaxWidth).toBeGreaterThan(0);
         expect(layout.tickCount).toBeGreaterThanOrEqual(2);
+    });
+
+    test("continuous legend height grows for longer tick labels", () => {
+        const options = { width: 180, hasLabel: true };
+        expect(
+            getContinuousLegendContainerHeight([0, 10], options),
+        ).toBeLessThan(
+            getContinuousLegendContainerHeight(
+                [-0.123456789, 123456789],
+                options,
+            ),
+        );
+    });
+
+    test("continuous legend height fits rotated scientific notation ticks", () => {
+        const layout = getContinuousLegendLayout(180, true);
+        const height = getContinuousLegendContainerHeight([0, 1e10], {
+            width: 180,
+            hasLabel: true,
+        });
+
+        expect(height).toBeGreaterThan(
+            layout.barY + layout.barHeight + 30,
+        );
+        expect(height).toBeGreaterThan(
+            getContinuousLegendContainerHeight([0, 10], {
+                width: 180,
+                hasLabel: true,
+            }),
+        );
+    });
+
+    test("formatContinuousTick formats date columns as YYYY-MM-DD", () => {
+        expect(formatContinuousTick(18262, true)).toBe("2020-01-01");
+        expect(formatContinuousTick(20000, false)).toBe("2.0e4");
     });
 });

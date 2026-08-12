@@ -8,13 +8,6 @@ export interface User {
     avatarUrl: string;
 }
 
-const mockUser: User = {
-    name: "John Doe",
-    email: "john.doe@example.com",
-    association: "Example Corp",
-    avatarUrl: "",
-};
-
 const useUser = () => {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -23,27 +16,23 @@ const useUser = () => {
     useEffect(() => {
         const fetchUser = async () => {
             setIsLoading(true);
+            setError(null);
             try {
-                // Endpoint yet to be implemented
                 const response = await apiFetch("profile");
                 if (!response.ok) {
-                    throw new Error("Failed to fetch user data");
+                    throw new Error("Unable to fetch user data");
                 }
                 const userData: User = await response.json();
 
-                // Check if the response is empty (you might need to adjust this condition based on your API response)
+                // Check if the response is empty
                 if (Object.keys(userData).length === 0) {
-                    console.warn(
-                        "Received empty user data, using mock data instead.",
-                    );
-                    setUser(mockUser);
-                } else {
-                    setUser(userData);
+                    throw new Error("Received empty user data");
                 }
+                setUser(userData);
             } catch (err) {
                 console.error("Error fetching user data:", err);
-                console.warn("Using mock data due to error.");
-                setUser(mockUser);
+                setUser(null);
+                setError("Unable to fetch user data");
             } finally {
                 setIsLoading(false);
             }

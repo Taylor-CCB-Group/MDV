@@ -40,6 +40,14 @@ const ChatProvider: React.FC<ChatProviderProps> = ({
         conversationId,
         isLoadingInit,
         suggestedQuestions,
+        availableModels,
+        selectedModelId,
+        onModelChange,
+        availableDatasources,
+        selectedDatasourceNames,
+        onDatasourcesChange,
+        datasourceMode,
+        onDatasourceModeChange,
     } = useChat();
 
     const chatDialogProps = {
@@ -55,6 +63,14 @@ const ChatProvider: React.FC<ChatProviderProps> = ({
         conversationId,
         isLoadingInit,
         suggestedQuestions,
+        availableModels,
+        selectedModelId,
+        onModelChange,
+        availableDatasources,
+        selectedDatasourceNames,
+        onDatasourcesChange,
+        datasourceMode,
+        onDatasourceModeChange,
     };
 
     const dialog = (

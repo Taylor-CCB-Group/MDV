@@ -7,6 +7,7 @@ import {
 import { select } from "d3-selection";
 import { scaleLinear } from "d3-scale";
 import { axisBottom } from "d3-axis";
+import { dateTickFormat } from "@/lib/dateFormat";
 import { getRandomString } from "./Utilities";
 
 /**
@@ -238,8 +239,12 @@ function getColorBar(colors, config = {}) {
             .domain([c.range[0], c.range[1]])
             .range([0, width - 20]);
         const axis = axisBottom(scale)
-            .tickFormat((v, i) =>
-                v >= 10000 ? Number.parseFloat(v).toPrecision(2) : v,
+            .tickFormat((v) =>
+                c.is_date || c.date_unit === "days"
+                    ? dateTickFormat(Number(v))
+                    : Number(v) >= 10000
+                      ? Number.parseFloat(String(v)).toPrecision(2)
+                      : v,
             )
             .ticks(Math.ceil(width / 20));
 

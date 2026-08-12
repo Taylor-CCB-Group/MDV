@@ -77,13 +77,19 @@ export const ChartColorConfigSchema = z.object({
             display: z.boolean().optional().describe("Whether the color legend is visible"),
             pos: z.tuple([z.number(), z.number()]).optional().describe("Legend position in pixels [left, top]"),
             filter: z
-                .object({
-                    kind: z.literal("categorical"),
-                    column: z.string(),
-                    value: z.string(),
-                })
+                .discriminatedUnion("kind", [
+                    z.object({
+                        kind: z.literal("categorical"),
+                        column: z.string(),
+                        value: z.string(),
+                    }),
+                    z.object({
+                        kind: z.literal("continuous"),
+                        column: z.string(),
+                        range: z.tuple([z.number(), z.number()]),
+                    }),
+                ])
                 .optional()
-                // Add a numeric range variant when continuous legend filtering is implemented.
                 .describe("Active color legend filter"),
         })
         .optional()
@@ -209,6 +215,12 @@ export const HeatmapConfigSchema = BaseConfigSchema.extend({
     type: z.literal("heatmap").describe("Heatmap chart type"),
     // Additional heatmap specific properties
 }).describe("Configuration for heatmap charts displaying matrix data with color intensity");
+
+export const CategoryHeatmapConfigSchema = BaseConfigSchema.extend({
+    type: z.literal("category_heatmap").describe("Category heatmap chart type"),
+    x_display_categories: z.array(z.string()).optional().describe("Optional x-axis categories to display in the heatmap"),
+    y_display_categories: z.array(z.string()).optional().describe("Optional y-axis categories to display in the heatmap"),
+}).describe("Configuration for category heatmaps showing categorical co-occurrence counts");
 
 export const DotPlotConfigSchema = BaseConfigSchema.extend({
     type: z.literal("dot_plot").describe("Dot plot chart type"),
@@ -343,6 +355,7 @@ registerChartConfigSchema("scatter_plot", ScatterPlotConfigSchema, { version: "1
 registerChartConfigSchema("bar_chart", BarChartConfigSchema, { version: "1" });
 registerChartConfigSchema("histogram", HistogramConfigSchema, { version: "1" });
 registerChartConfigSchema("heatmap", HeatmapConfigSchema, { version: "1" });
+registerChartConfigSchema("category_heatmap", CategoryHeatmapConfigSchema, { version: "1" });
 registerChartConfigSchema("dot_plot", DotPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("box_plot", BoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("violin_plot", ViolinPlotConfigSchema, { version: "1" });

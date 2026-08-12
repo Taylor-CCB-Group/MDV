@@ -6,6 +6,7 @@ import pandas as pd
 import regex as re
 from mdvtools.llm.templates import packages_functions
 from mdvtools.llm.datasource_roles import build_chatmdv_roles_constants_block
+from mdvtools.llm.code_preflight import CHART_CLASS_MODULES
 import json
 import ast
 import subprocess
@@ -50,6 +51,18 @@ def extract_code_from_response(response: str):
     # return matches[-1].strip()
 
 
+def _chart_import_autofix_map() -> dict[str, str]:
+    """Map common hallucinated chart module paths to canonical preflight modules."""
+    fixes: dict[str, str] = {
+        "mdvtools.charts.stacked_row_chart": "mdvtools.charts.stacked_row_plot",
+    }
+    for class_name, module_path in CHART_CLASS_MODULES.items():
+        wrong = f"mdvtools.charts.{class_name}"
+        if wrong != module_path:
+            fixes.setdefault(wrong, module_path)
+    return fixes
+
+
 def _autofix_generated_code(code: str, log=print) -> str:
     """Best-effort fixes for common ChatMDV codegen mistakes before execution."""
     if "project.get_datasource_roles()" in code:
@@ -62,12 +75,23 @@ def _autofix_generated_code(code: str, log=print) -> str:
         if bad_attr in code:
             log(f"# Autofix: expr{bad_attr} -> expr.datasource_name")
             code = code.replace(bad_attr, ".datasource_name")
+    for wrong_module, correct_module in _chart_import_autofix_map().items():
+        if wrong_module in code:
+            log(f"# Autofix: chart import {wrong_module} -> {correct_module}")
+            code = code.replace(wrong_module, correct_module)
     return code
 
 
-def _prepend_chatmdv_roles_block(code: str, project: Any) -> str:
+def _prepend_chatmdv_roles_block(
+    code: str,
+    project: Any,
+    *,
+    selected_datasources: list[str] | None = None,
+) -> str:
     try:
-        roles_block = build_chatmdv_roles_constants_block(project)
+        roles_block = build_chatmdv_roles_constants_block(
+            project, selected_datasources=selected_datasources
+        )
     except Exception:
         return code
     if not roles_block.strip():
@@ -89,6 +113,8 @@ def prepare_code(
     log=print,
     modify_existing_project=False,
     view_name="default",
+    *,
+    selected_datasources: list[str] | None = None,
 ):
     """Given a response from the LLM, extract the code and post-process it, 
     attempting to ensure that 
@@ -145,7 +171,9 @@ if __name__ == "__main__":
     else:
         body = captured_lines
     final_code = f"{packages_functions}\n{body}"
-    final_code = _prepend_chatmdv_roles_block(final_code, project)
+    final_code = _prepend_chatmdv_roles_block(
+        final_code, project, selected_datasources=selected_datasources
+    )
     final_code = _autofix_generated_code(final_code, log=log)
     final_code = final_code.replace("project.serve()", "# project.serve()")
     if modify_existing_project:

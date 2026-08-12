@@ -68,6 +68,10 @@ def test_convert_spatial_cli_forwards_x_umap_options(monkeypatch):
             "--compute-x-umap",
             "--leiden-resolution",
             "1.25",
+            "--table-handling",
+            "per-table",
+            "--point-transform",
+            "identity",
         ],
     )
 
@@ -77,3 +81,20 @@ def test_convert_spatial_cli_forwards_x_umap_options(monkeypatch):
     assert captured["args"].link_name_column == "display_name"
     assert captured["args"].compute_x_umap is True
     assert captured["args"].leiden_resolution == 1.25
+    assert captured["args"].table_handling == "per-table"
+    assert captured["args"].point_transform == "identity"
+
+
+def test_convert_spatial_cli_defaults_to_by_region_table_handling(monkeypatch):
+    captured = {}
+
+    def fake_convert_spatialdata_to_mdv(args):
+        captured["args"] = args
+
+    monkeypatch.setattr(spatial_conversion_module, "convert_spatialdata_to_mdv", fake_convert_spatialdata_to_mdv)
+
+    runner = CliRunner()
+    result = runner.invoke(cli_module.cli, ["convert-spatial", "out", "spatial"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["args"].table_handling == "by-region"

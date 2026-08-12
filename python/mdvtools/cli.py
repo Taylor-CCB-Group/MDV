@@ -3,6 +3,12 @@ import shutil
 import zipfile
 import os
 from os.path import exists, join, basename
+from .spatial.conversion_options import (
+    DEFAULT_POINT_TRANSFORM,
+    DEFAULT_TABLE_HANDLING,
+    POINT_TRANSFORM_CHOICES,
+    TABLE_HANDLING_CHOICES,
+)
 
 def zip_and_remove(folder):
     """Zip a directory and delete the original."""
@@ -107,7 +113,13 @@ def convert_vcf(folder, vcf_filename, zip_output):
 @cli.command()
 @click.argument('folder')
 @click.option('--port', default=5050, help='Port to serve on.')
-def serve(folder, port):
+@click.option(
+    '--track-dir',
+    'track_directories',
+    multiple=True,
+    help='Extra track directory searched by /tracks after the default track folder. Repeat to add multiple directories.',
+)
+def serve(folder, port, track_directories):
     """Serve MDV project."""
     from .serverlite import serve_project
     from .mdvproject import MDVProject
@@ -116,7 +128,11 @@ def serve(folder, port):
     ds_path = join(folder, "datasources.json")
     if not exists(ds_path):
         raise FileNotFoundError(f"{folder} does not contain a valid MDV project.")
-    serve_project(MDVProject(folder), port=port)
+    serve_project(
+        MDVProject(folder),
+        port=port,
+        track_directories=list(track_directories),
+    )
 
 
 @cli.command("merge-project")
@@ -188,8 +204,22 @@ def patch_spatial_annotations(project_dir, annotation_csv, datasource, spatialda
     help='Compute neighbors, UMAP, and Leiden clusters separately for each source table from that table\'s adata.X before merge. These per-table helper embeddings are not globally comparable.',
 )
 @click.option('--leiden-resolution', default=1.0, type=float, show_default=True, help='Leiden resolution used with --compute-x-umap.')
+@click.option(
+    '--table-handling',
+    type=click.Choice(TABLE_HANDLING_CHOICES),
+    default=DEFAULT_TABLE_HANDLING,
+    show_default=True,
+    help='How SpatialData tables become MDV datasource pairs.',
+)
+@click.option(
+    '--point-transform',
+    type=click.Choice(POINT_TRANSFORM_CHOICES),
+    default=DEFAULT_POINT_TRANSFORM,
+    show_default=True,
+    help='Strategy for transforming table point coordinates to image coordinates.',
+)
 @click.option('--verbose', is_flag=True, help='Show detailed per-dataset conversion output, transform decisions, and merged summaries.')
-def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, output_geojson, density, serve, obs_datasource_name, var_datasource_name, link_name_column, compute_x_umap, leiden_resolution, verbose):
+def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, output_geojson, density, serve, obs_datasource_name, var_datasource_name, link_name_column, compute_x_umap, leiden_resolution, table_handling, point_transform, verbose):
     """Convert one SpatialData store to MDV format, or use --batch for a directory of stores."""
     import tempfile
     from .spatial.conversion import convert_spatialdata_to_mdv, SpatialDataConversionArgs
@@ -211,6 +241,8 @@ def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, l
             link_name_column=link_name_column,
             compute_x_umap=compute_x_umap,
             leiden_resolution=leiden_resolution,
+            table_handling=table_handling,
+            point_transform=point_transform,
         )
         convert_spatialdata_to_mdv(args)
 

@@ -6,6 +6,7 @@ import pytest
 
 from mdvtools.llm.verification import (
     build_verification_summary,
+    collect_saved_view_charts,
     format_charts_from_saved_view,
 )
 
@@ -29,6 +30,28 @@ class FakeProject:
     def get_datasource_metadata(self, name: str):
         assert name == "cells"
         return {"name": name, "size": self._size}
+
+
+def test_collect_saved_view_charts_skips_text_box():
+    view = {
+        "initialCharts": {
+            "cells": [
+                {"title": "TB", "type": "text_box_chart", "text": "x"},
+                {
+                    "title": "S1",
+                    "type": "wgl_scatter_plot",
+                    "param": ["x_field", "y_field"],
+                    "color_by": "color_field",
+                },
+            ]
+        }
+    }
+    proj = FakeProject(view=view, column_names={})
+    charts = collect_saved_view_charts(proj, view)
+    assert len(charts) == 1
+    assert charts[0].chart_type == "wgl_scatter_plot"
+    assert charts[0].param_tokens == ("x_field", "y_field")
+    assert charts[0].color_by == "color_field"
 
 
 def test_format_charts_scatter_includes_roles_and_color_by():

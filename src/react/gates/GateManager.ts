@@ -10,7 +10,7 @@ const GATE_NONE_VALUE = "N/A";
 const GATES_COLUMN_STRING_LENGTH = 24;
 /**
  * Class which manages the gating operations
- * Creates a gates column if it doesn't exist, loads the gates column if it's not loaded
+ * Attaches an existing gates column and creates/loads it lazily when membership data is needed
  * Contains the gate lifecycle methods for adding, updating and deleting
  */
 export class GateManager {
@@ -143,43 +143,48 @@ export class GateManager {
     }
 
     /**
-     * Get or create the gate column
-     * Initialise the gate column with empty value initially
+     * Attach an existing gate column if present.
+     *
+     * The gates column is intentionally not created during manager construction:
+     * for large datasets, the dense multitext buffer is expensive even when
+     * there are no gates. It is created lazily when membership data is needed.
      */
     private initializeGateColumn() {
         const existingCol = this.dataStore.columnIndex[GATES_COLUMN_NAME];
         if (existingCol && existingCol.datatype === "multitext") {
             // Get the existing column
             this.gateColumn = existingCol as LoadedDataColumn<"multitext">;
-        } else {
-            // Create a new column
-            const column = {
-                name: "gates",
-                field: GATES_COLUMN_NAME,
-                datatype: "multitext" as const,
-                editable: false, // as of now
-                delimiter: "," as const,
-                values: [GATE_NONE_VALUE] as string[],
-                stringLength: GATES_COLUMN_STRING_LENGTH,
-            };
-
-            const data = new SharedArrayBuffer(this.dataStore.size * column.stringLength * 2);
-            const dataArray = new Uint16Array(data);
-
-            dataArray.fill(65535);
-
-            // Mark the first value of all cells as 'N/A' initially
-            for (let i = 0; i < this.dataStore.size; i++) {
-                dataArray[i * column.stringLength] = 0;
-            }
-
-            // Add the column to datastore
-            this.dataStore.addColumn(column, data, true);
-
-            this.gateColumn = this.dataStore.columnIndex[GATES_COLUMN_NAME] as LoadedDataColumn<"multitext">;
         }
 
         this.loadGatesFromConfig();
+    }
+
+    /**
+     * Create the dense gate-membership column on demand.
+     */
+    private createGateColumn() {
+        const column = {
+            name: "gates",
+            field: GATES_COLUMN_NAME,
+            datatype: "multitext" as const,
+            editable: false, // as of now
+            delimiter: "," as const,
+            values: [GATE_NONE_VALUE] as string[],
+            stringLength: GATES_COLUMN_STRING_LENGTH,
+        };
+
+        const data = new SharedArrayBuffer(this.dataStore.size * column.stringLength * 2);
+        const dataArray = new Uint16Array(data);
+
+        dataArray.fill(65535);
+
+        // Mark the first value of all cells as 'N/A' initially
+        for (let i = 0; i < this.dataStore.size; i++) {
+            dataArray[i * column.stringLength] = 0;
+        }
+
+        this.dataStore.addColumn(column, data, true);
+        this.gateColumn = this.dataStore.columnIndex[GATES_COLUMN_NAME] as LoadedDataColumn<"multitext">;
     }
 
     /**
@@ -225,8 +230,7 @@ export class GateManager {
         if (!this.gateColumn) {
             this.gateColumn = this.dataStore.columnIndex[GATES_COLUMN_NAME] as LoadedDataColumn<"multitext">;
             if (!this.gateColumn) {
-                console.error("No gates column in the dataStore");
-                return false;
+                this.createGateColumn();
             }
         }
 

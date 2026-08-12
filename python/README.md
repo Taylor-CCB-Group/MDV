@@ -93,7 +93,14 @@ Because the JavaScript uses WebWorkers and SharedArrayBuffers, the app must run 
 "Cross-Origin-Opener-Policy":"same-origin",
 "Cross-Origin-Embedder-Policy":"require-corp"
 ```
-The dev server and Flask helpers in this repository already add these headers. If your deployment uses a different web server or reverse proxy, it must send the same headers consistently for pages using MDV, and any cross-origin assets must be served in a way that remains compatible with `require-corp`/CORS. If your server already adds these headers then the `convert_to_static_page` function can be invoked with `include_sab_headers=False`, which will exclude the service worker. In this case the project does not have to be served over https.
+Binary columns, tracks, and SpatialData assets (parquet / OME-TIFF / zarr) also use HTTP Range requests. Cross-origin clients (for example SpatialData.js against a separate Flask or static origin, or the Vite dev server) need CORS to allow and expose those headers:
+```
+"Access-Control-Allow-Origin":"*",
+"Access-Control-Allow-Headers":"Content-Type, Range",
+"Access-Control-Expose-Headers":"Content-Range, Content-Length, Accept-Ranges",
+"Cross-Origin-Resource-Policy":"cross-origin"
+```
+The Vite dev server (`vite.config.mts`) and Flask helpers (`add_safe_headers` in `mdvtools/server_utils.py`) already add these headers. If your deployment uses a different web server or reverse proxy, it must send the same headers consistently for pages using MDV, and any cross-origin assets must be served in a way that remains compatible with `require-corp`/CORS. If your server already adds these headers then the `convert_to_static_page` function can be invoked with `include_sab_headers=False`, which will exclude the service worker. In this case the project does not have to be served over https.
 
 ### To convert CSV data for a simple file server
 
@@ -122,7 +129,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, responsetype')
+        # Range: binary columns, tracks, parquet / OME-TIFF / zarr (SpatialData.js)
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Range, responsetype')
+        self.send_header('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges')
+        self.send_header('Access-Control-Max-Age', '86400')
         self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
         self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
         self.send_header('Cross-Origin-Resource-Policy', 'cross-origin')
@@ -132,7 +142,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, responsetype')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Range, responsetype')
+        self.send_header('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges')
+        self.send_header('Access-Control-Max-Age', '86400')
         self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
         self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
         self.send_header('Cross-Origin-Resource-Policy', 'cross-origin')

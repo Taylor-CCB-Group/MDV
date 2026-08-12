@@ -9,6 +9,8 @@ export const DEFAULT_CONTINUOUS_LEGEND_HEIGHT = 80;
 export const CONTINUOUS_MIN_LAYOUT_WIDTH = 40;
 export const CONTINUOUS_HORIZONTAL_PADDING = 28;
 export const CONTINUOUS_TICK_TARGET_SPACING = 55;
+export const CONTINUOUS_TITLE_HEIGHT = 20;
+export const CONTINUOUS_TITLE_GRADIENT_GAP = 6;
 
 /** Matches Tailwind `text-xs` used on legend labels. */
 export const LEGEND_LABEL_FONT = "12px sans-serif";

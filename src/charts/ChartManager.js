@@ -1839,7 +1839,13 @@ export class ChartManager {
         //check if columns need loading
         const neededCols = this._getColumnsRequiredForChart(config);
         //check which columns need loading
-        if (config.location) {
+        if (
+            config.location &&
+            typeof config.location.x === "number" &&
+            typeof config.location.y === "number" &&
+            typeof config.location.width === "number" &&
+            typeof config.location.height === "number"
+        ) {
             const l = config.location;
             const b = 5;
             config.size = [
@@ -2544,15 +2550,6 @@ export class ChartManager {
         popoutChart(chart);
     }
 
-    _sendAllChartsToBack(ds) {
-        for (const id in this.charts) {
-            const c = this.charts[id];
-            if (ds === c.dataSource) {
-                c.chart.div.style.zIndex = "";
-            }
-        }
-    }
-
     /**
      * @param {BaseChart} chart 
      * @param {import("@/charts/charts").DataSource} ds
@@ -2569,19 +2566,18 @@ export class ChartManager {
             return;
         }
         const div = chart.getDiv();
+        const stack = {
+            container: this.contentDiv,
+            group: ds?.name ?? "chart",
+            baseZ: 1,
+        };
         makeDraggable(div, {
             handle: ".ciview-chart-title",
             contain: "topleft",
-            ondragstart: (e) => {
-                this._sendAllChartsToBack(ds);
-                div.style.zIndex = 2;
-            },
+            stack: stack,
         });
         makeResizable(div, {
-            onResizeStart: () => {
-                this._sendAllChartsToBack(ds);
-                div.style.zIndex = 2;
-            },
+            stack: stack,
             onresizeend: (width, height) => chart.setSize(width, height),
         });
     }

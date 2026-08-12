@@ -1,6 +1,6 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from 'lucide-react';
-import { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
+import { type ChatProgress, type ChatMessage, type ChatModelOption, type ChatDatasourceOption, type DatasourceMode, navigateToView } from './ChatAPI';
 import { forwardRef, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
@@ -17,9 +17,18 @@ import {
     Divider,
     IconButton,
     InputAdornment,
+    FormControl,
+    Checkbox,
+    FormControlLabel,
+    FormGroup,
+    InputLabel,
+    MenuItem,
+    Select,
     Skeleton,
     TextField,
     Typography,
+    ToggleButton,
+    ToggleButtonGroup,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import _ from 'lodash';
@@ -143,7 +152,11 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
     view,
     verification,
     data_preview,
+    guidance,
     needs_refresh,
+    datasource_names,
+    datasource_mode,
+    resolved_datasource_names,
     onClose,
     error,
     updateInput,
@@ -176,6 +189,7 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
     const handleCopy = async () => {
         try {
             const parts: string[] = [];
+            if (guidance?.trim()) parts.push(guidance.trim());
             if (data_preview?.trim()) parts.push(data_preview.trim());
             if (verification?.trim()) parts.push(verification.trim());
             if (markdownContent) parts.push(markdownContent);
@@ -206,6 +220,28 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                         )}
                     </IconButton>
                 )}
+                {isUser && datasource_mode === 'manual' && datasource_names && datasource_names.length > 0 && (
+                    <Typography variant="caption" color="text.secondary" className="block mb-2">
+                        Datasources: {datasource_names.join(', ')}
+                    </Typography>
+                )}
+                {isUser && datasource_mode === 'auto' && (
+                    <Typography variant="caption" color="text.secondary" className="block mb-2">
+                        Datasources: Auto
+                    </Typography>
+                )}
+                {sender === 'bot' && !error && resolved_datasource_names && resolved_datasource_names.length > 0 && (
+                    <Typography variant="caption" color="text.secondary" className="block mb-2">
+                        Resolved datasources: {resolved_datasource_names.join(', ')}
+                    </Typography>
+                )}
+                {sender === 'bot' && !error && guidance?.trim() && (
+                    <ChatPreviewBlock
+                        title="Analysis summary"
+                        content={guidance.trim()}
+                        defaultExpandedWhenLong
+                    />
+                )}
                 {sender === 'bot' && !error && data_preview?.trim() && (
                     <ChatPreviewBlock
                         variant="data"
@@ -215,14 +251,12 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                 )}
                 {sender === 'bot' && !error && verification?.trim() && (
                     <ChatPreviewBlock
-                        //title="What you can verify"
-                        //title='xxxxx'
-                        title=""
+                        title="What you can verify"
                         content={verification.trim()}
                         defaultExpandedWhenLong
                     />
                 )}
-                {sender === 'bot' && !error && (data_preview?.trim() || verification?.trim()) ? (
+                {sender === 'bot' && !error && (guidance?.trim() || data_preview?.trim() || verification?.trim()) ? (
                     <Accordion
                         defaultExpanded={false}
                         disableGutters
@@ -243,7 +277,7 @@ const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
                 {view && sender === 'bot' && !error && (
                     <Box sx={{ mt: 2 }}>
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                            Review the data preview and verification above, then open the view.
+                            Review the analysis summary and data preview above, then open the view.
                         </Typography>
                         <Button
                             variant="contained"
@@ -442,6 +476,12 @@ const Progress = (props: ChatProgress & {verboseProgress: string[]}) => {
     );
 }
 
+function datasourceRoleLabel(role: ChatDatasourceOption['role']): string {
+    if (role === 'obs') return 'obs';
+    if (role === 'expression') return 'expr';
+    return 'table';
+}
+
 export type ChatBotProps = {
     messages: ChatMessage[];
     isSending: boolean;
@@ -450,10 +490,34 @@ export type ChatBotProps = {
     verboseProgress: string[];
     onClose: () => void;
     suggestedQuestions: string[];
+    availableModels: ChatModelOption[];
+    selectedModelId: string;
+    onModelChange: (modelId: string) => void;
+    availableDatasources: ChatDatasourceOption[];
+    selectedDatasourceNames: string[];
+    onDatasourcesChange: (names: string[]) => void;
+    datasourceMode: DatasourceMode;
+    onDatasourceModeChange: (mode: DatasourceMode) => void;
 };
 
 
-const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress, onClose, suggestedQuestions}: ChatBotProps) => {
+const Chatbot = ({
+    messages,
+    isSending,
+    sendAPI,
+    requestProgress,
+    verboseProgress,
+    onClose,
+    suggestedQuestions,
+    availableModels,
+    selectedModelId,
+    onModelChange,
+    availableDatasources,
+    selectedDatasourceNames,
+    onDatasourcesChange,
+    datasourceMode,
+    onDatasourceModeChange,
+}: ChatBotProps) => {
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const lastMessageRef = useRef<HTMLDivElement>(null);
@@ -502,7 +566,7 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
         const hasPreview =
             last?.sender === 'bot' &&
             !last?.error &&
-            (Boolean(last.verification?.trim()) || Boolean(last.data_preview?.trim()));
+            (Boolean(last.guidance?.trim()) || Boolean(last.verification?.trim()) || Boolean(last.data_preview?.trim()));
 
         if (!isSending && hasPreview && lastMessageRef.current) {
             lastMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -542,7 +606,101 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                 <RobotPandaSVG />
             </Box> */}
             <Divider />
-            <Box className="flex p-4 w-full">
+            <Box className="flex flex-col p-4 w-full gap-2">
+                {availableModels.length > 1 ? (
+                    <FormControl size="small" fullWidth disabled={isSending}>
+                        <InputLabel id="chatmdv-model-label">Model</InputLabel>
+                        <Select
+                            labelId="chatmdv-model-label"
+                            label="Model"
+                            value={selectedModelId}
+                            onChange={(e) => onModelChange(e.target.value)}
+                        >
+                            {availableModels.map((model) => (
+                                <MenuItem key={model.id} value={model.id}>
+                                    {model.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                ) : availableModels.length === 1 ? (
+                    <Typography variant="caption" color="text.secondary">
+                        Model: {availableModels[0].label}
+                    </Typography>
+                ) : null}
+                {availableDatasources.length > 1 ? (
+                    <Box>
+                        <Typography variant="caption" color="text.secondary" className="block mb-1">
+                            Datasource mode
+                        </Typography>
+                        <ToggleButtonGroup
+                            size="small"
+                            exclusive
+                            value={datasourceMode}
+                            onChange={(_e, value: DatasourceMode | null) => {
+                                if (value) onDatasourceModeChange(value);
+                            }}
+                            aria-label="datasource mode"
+                            disabled={isSending}
+                            sx={{ mb: 1 }}
+                        >
+                            <ToggleButton value="auto" sx={{ textTransform: 'none' }}>
+                                Auto
+                            </ToggleButton>
+                            <ToggleButton value="manual" sx={{ textTransform: 'none' }}>
+                                Manual
+                            </ToggleButton>
+                        </ToggleButtonGroup>
+                        {datasourceMode === 'auto' ? (
+                            <Typography variant="caption" color="text.secondary" className="block">
+                                Datasources inferred from your question (table names and column fields).
+                            </Typography>
+                        ) : (
+                            <>
+                                <Typography variant="caption" color="text.secondary" className="block mb-1">
+                                    Datasources (first selected is the primary chart target)
+                                </Typography>
+                                <FormGroup row sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                                    {availableDatasources.map((ds) => {
+                                        const checked = selectedDatasourceNames.includes(ds.name);
+                                        return (
+                                            <FormControlLabel
+                                                key={ds.name}
+                                                disabled={isSending || (checked && selectedDatasourceNames.length <= 1)}
+                                                control={
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={checked}
+                                                        onChange={() => {
+                                                            const nameSet = new Set(
+                                                                checked
+                                                                    ? selectedDatasourceNames.filter((n) => n !== ds.name)
+                                                                    : [...selectedDatasourceNames, ds.name],
+                                                            );
+                                                            const next = availableDatasources
+                                                                .map((d) => d.name)
+                                                                .filter((n) => nameSet.has(n));
+                                                            if (next.length > 0) {
+                                                                onDatasourcesChange(next);
+                                                            }
+                                                        }}
+                                                    />
+                                                }
+                                                label={`${ds.name} (${datasourceRoleLabel(ds.role)})`}
+                                                sx={{ mr: 1 }}
+                                            />
+                                        );
+                                    })}
+                                </FormGroup>
+                            </>
+                        )}
+                    </Box>
+                ) : availableDatasources.length === 1 ? (
+                    <Typography variant="caption" color="text.secondary">
+                        Datasource: {availableDatasources[0].name}
+                    </Typography>
+                ) : null}
+            <Box className="flex w-full">
                 <TextField
                     type="text"
                     // disabled={isSending} //we can still type while it's processing
@@ -570,6 +728,7 @@ const Chatbot = ({messages, isSending, sendAPI, requestProgress, verboseProgress
                 className="p-2 bg-blue-500 text-white rounded-lg" variant='contained'>
                     Send
                 </Button>
+            </Box>
             </Box>
         </Box>
     );

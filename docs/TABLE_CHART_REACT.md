@@ -11,6 +11,10 @@ The React Table Chart provides:
 - Find & Replace functionality
 - Cross-chart highlighting/selection
 
+### Date columns (`is_date`)
+
+Numeric columns with `is_date: true` store **days since Unix epoch** as `double`. Table cells, Find, Replace, and cell edit use ISO `YYYY-MM-DD` via `getValue` / date-aware string helpers. Sorting uses the raw day numbers (chronological), not lexicographic string order. Row filtering comes from DataStore filters (e.g. Selection Dialog range filters on the same column).
+
 ## File Structure
 
 | File | Purpose |

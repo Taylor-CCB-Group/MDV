@@ -16,6 +16,7 @@ import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
 import tippy, {type Instance as TippyInstance} from "tippy.js";
 import 'tippy.js/dist/tippy.css';
+import { isDateColumn } from "@/lib/dateFormat";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import ColorLegend from "@/react/components/legend/ColorLegend";
@@ -26,7 +27,9 @@ import {
     clearColorLegendFilter,
     destroyColorLegendFilter,
     getActiveCategoricalColorLegendValue,
+    getActiveContinuousColorLegendRange,
     restoreColorLegendFilter,
+    setContinuousColorLegendFilter,
     toggleCategoricalColorLegendFilter,
     type ColorLegendFilter,
 } from "@/react/legend/color_legend/colorLegendFilter";
@@ -100,6 +103,7 @@ class BaseChart<T extends BaseConfig> {
     legend: HTMLDivElement | undefined;
     colorLegendWrapper: LegendWrapper<ColorLegendSpec, T>;
     colorLegendFilterDimension: Dimension | null = null;
+    colorLegendFilterDimensionKind: ColorLegendFilter["kind"] | null = null;
     colorLegendFilter: ColorLegendFilter | null = null;
     isFullscreen = false;
     fullscreenIcon: HTMLSpanElement;
@@ -566,9 +570,13 @@ class BaseChart<T extends BaseConfig> {
         if (!colorBy || typeof colorBy !== "string") {
             return null;
         }
+        const colorCol = this.dataStore.columnIndex[colorBy];
         const conf = {
             overideValues: {
-                colorLogScale: this.config.log_color_scale,
+                // Log color scales are not meaningful for calendar day numbers.
+                colorLogScale: isDateColumn(colorCol)
+                    ? false
+                    : this.config.log_color_scale,
             },
         };
         this._addTrimmedColor(colorBy, conf);
@@ -633,6 +641,7 @@ class BaseChart<T extends BaseConfig> {
         const spec = this.getColorLegendSpec();
         if (!spec) {
             console.warn("no color legend");
+            this.colorLegendWrapper.unmount();
             this.legend = undefined;
             return;
         }
@@ -648,6 +657,12 @@ class BaseChart<T extends BaseConfig> {
                 ),
                 onCategoricalItemClick: (value: string) =>
                     toggleCategoricalColorLegendFilter(this, spec, value),
+                activeContinuousRange: getActiveContinuousColorLegendRange(
+                    this,
+                    spec,
+                ),
+                onContinuousRangeChange: (range: [number, number] | null) =>
+                    setContinuousColorLegendFilter(this, spec, range),
             });
         this.colorLegendWrapper.render(
             spec,
@@ -658,7 +673,9 @@ class BaseChart<T extends BaseConfig> {
                       dragHandle: ".legend-drag-handle",
                       resizable: true,
                   }
-                : { resizable: true },
+                : {
+                      dragHandle: ".legend-continuous-drag-handle",
+                  },
         );
         this.legend = this.colorLegendWrapper.getWrapperElement() ?? undefined;
         if (!this.legend) {

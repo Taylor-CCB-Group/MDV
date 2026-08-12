@@ -1,5 +1,6 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import {
+    getCellValueAsString,
     replaceMatches,
     replaceValueInString,
     setCellValueFromString,
@@ -106,6 +107,50 @@ describe("valueReplacementUtils", () => {
 
                 expect(() => setCellValueFromString(column, 0, "")).toThrowError(
                     `Invalid number value "" for ${column.datatype} column: ${column.field}`,
+                );
+            });
+        });
+
+        describe("date column", () => {
+            test("reads and writes ISO dates as day doubles", () => {
+                column = {
+                    field: "when",
+                    data: [18262, 0],
+                    datatype: "double",
+                    is_date: true,
+                    date_unit: "days",
+                } as any;
+
+                expect(getCellValueAsString(column, 0)).toBe("2020-01-01");
+                setCellValueFromString(column, 0, "2020-01-11");
+                expect(column.data[0]).toBe(18272);
+                expect(getCellValueAsString(column, 0)).toBe("2020-01-11");
+            });
+
+            test("accepts raw day numbers when writing", () => {
+                column = {
+                    field: "when",
+                    data: [0],
+                    datatype: "double",
+                    is_date: true,
+                    date_unit: "days",
+                } as any;
+
+                setCellValueFromString(column, 0, "18262");
+                expect(column.data[0]).toBe(18262);
+            });
+
+            test("throw error for invalid date value", () => {
+                column = {
+                    field: "when",
+                    data: [0],
+                    datatype: "double",
+                    is_date: true,
+                    date_unit: "days",
+                } as any;
+
+                expect(() => setCellValueFromString(column, 0, "not-a-date")).toThrowError(
+                    `Invalid date value "not-a-date" for date column: ${column.field}`,
                 );
             });
         });

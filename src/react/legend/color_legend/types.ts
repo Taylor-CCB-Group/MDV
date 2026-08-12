@@ -21,10 +21,13 @@ export type ColorLegendCategoricalSpec = {
 export type ColorLegendContinuousSpec = {
     kind: "continuous";
     label: string;
+    column: string;
     colors: string[];
     range: [number, number];
     width?: number;
     height?: number;
+    /** When true, axis ticks format as YYYY-MM-DD (days since Unix epoch). */
+    isDate?: boolean;
 };
 
 export type ColorLegendSpec =

@@ -55,6 +55,7 @@ describe("buildColorLegendSpec", () => {
         expect(spec).toMatchObject({
             kind: "continuous",
             label: "Expression",
+            column: "expression",
             colors: ["#000000", "#ffffff"],
             range: [0, 10],
         });

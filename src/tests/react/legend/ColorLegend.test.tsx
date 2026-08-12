@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import ColorLegend from "@/react/components/legend/ColorLegend";
 
 describe("ColorLegend", () => {
@@ -226,6 +226,7 @@ describe("ColorLegend", () => {
                     spec={{
                         kind: "continuous",
                         label: "Expression",
+                        column: "expression",
                         colors: ["#000000", "#ffffff"],
                         range: [0, 1],
                     }}
@@ -241,5 +242,57 @@ describe("ColorLegend", () => {
         expect(container.querySelector("svg")?.getAttribute("height")).toBe(
             "100%",
         );
+    });
+
+    test("renders continuous brush over the gradient bar when interactive", async () => {
+        const onContinuousRangeChange = vi.fn();
+        const { container } = render(
+            <div className="legend-container">
+                <ColorLegend
+                    spec={{
+                        kind: "continuous",
+                        label: "Expression",
+                        column: "expression",
+                        colors: ["#000000", "#ffffff"],
+                        range: [0, 100],
+                    }}
+                    onContinuousRangeChange={onContinuousRangeChange}
+                />
+            </div>,
+        );
+
+        await waitFor(() => {
+            expect(container.querySelector(".brush .overlay")).toBeTruthy();
+        });
+        const overlay = container.querySelector(".brush .overlay");
+        expect(overlay?.getAttribute("x")).toBe("28");
+        expect(overlay?.getAttribute("width")).toBe("124");
+    });
+
+    test("renders active continuous range selection", async () => {
+        const { container } = render(
+            <div className="legend-container">
+                <ColorLegend
+                    spec={{
+                        kind: "continuous",
+                        label: "Expression",
+                        column: "expression",
+                        colors: ["#000000", "#ffffff"],
+                        range: [0, 100],
+                    }}
+                    activeContinuousRange={[25, 75]}
+                />
+            </div>,
+        );
+
+        await waitFor(() => {
+            expect(container.querySelector(".brush .selection")).toBeTruthy();
+        });
+        expect(container.querySelector(".brush .selection")?.getAttribute("x")).toBe(
+            "59",
+        );
+        expect(
+            container.querySelector(".brush .selection")?.getAttribute("width"),
+        ).toBe("62");
     });
 });
