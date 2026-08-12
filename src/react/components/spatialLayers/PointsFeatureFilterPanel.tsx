@@ -1,5 +1,5 @@
 import { Alert, Button, Checkbox, FormControlLabel, TextField, Typography } from "@mui/material";
-import { featureNamesForCodes, resolveFeatureSelectionCodes } from "@spatialdata/core";
+import { featureNamesForCodes, isPointsWorkerEnabled, resolveFeatureSelectionCodes } from "@spatialdata/core";
 import { featureCodeToRgb } from "@spatialdata/layers";
 import { usePointsFeatureState } from "@spatialdata/vis";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -253,6 +253,17 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
     // feature's scan is still in flight.
     const residentKnown = residentCodes !== undefined;
     const scanning = matchingLoadState?.loading ?? false;
+    // `supportsOnDemandLoad` answers "does this element have a feature index", which is
+    // necessary but not sufficient: the scan that uses it runs in the core points
+    // worker, and `loadPointsMatchingFeatureCodes` throws outright without one. MDV
+    // cannot enable that worker — the published `@spatialdata/core/points-worker` is a
+    // CommonJS file in an ESM package, so `new Worker(url, {type:"module"})` dies on
+    // `require is not defined` (SpatialData.js#148). Until that ships fixed, a
+    // non-resident feature genuinely cannot be fetched, so say so rather than inviting
+    // a click that silently does nothing. Drops out on its own once the worker loads.
+    const canScanOnDemand = supportsOnDemandLoad && isPointsWorkerEnabled();
+    /** The element could scan, but the worker it needs is unavailable. */
+    const workerBlocksScan = supportsOnDemandLoad && !canScanOnDemand;
     const rowInfo = (code: number) => {
         const resident = residentKnown && (residentCodes?.has(code) ?? false);
         const rendered = loadedMatchingCodes?.has(code) ?? false;
@@ -266,7 +277,7 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
                 rendered,
                 selected,
                 scanning,
-                supportsOnDemandLoad,
+                supportsOnDemandLoad: canScanOnDemand,
                 residentKnown,
             }),
         };
@@ -298,13 +309,15 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
             ) : null}
 
             {notLoadedCount > 0 ? (
-                <Alert severity={supportsOnDemandLoad ? "info" : "warning"} sx={{ py: 0 }}>
+                <Alert severity={canScanOnDemand ? "info" : "warning"} sx={{ py: 0 }}>
                     <Typography variant="caption">
                         {notLoadedCount} of {entries.length} feature
                         {entries.length === 1 ? "" : "s"}{" "}
-                        {supportsOnDemandLoad
+                        {canScanOnDemand
                             ? "not loaded yet (greyed below) — selecting one loads it on demand."
-                            : "not in the loaded sample (greyed below). This dataset has no feature index, so they can't be shown until the memory cap is raised or it's rewritten with one."}
+                            : workerBlocksScan
+                              ? "not in the loaded sample (greyed below). Fetching them needs the points worker, which this build can't start (SpatialData.js#148) — raise the memory cap to bring more in."
+                              : "not in the loaded sample (greyed below). This dataset has no feature index, so they can't be shown until the memory cap is raised or it's rewritten with one."}
                     </Typography>
                 </Alert>
             ) : null}
@@ -371,6 +384,13 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
                     const title =
                         `${entry.name} · code ${entry.code}${countStr}\n` +
                         `${state.label}: ${state.reason}\n` +
+                        // The classifier is told there is no on-demand load, which is true
+                        // here but for the wrong reason — it blames a missing feature index,
+                        // and this element has one. Correct the attribution rather than fork
+                        // the classifier, which is a copy of upstream's and due for deletion.
+                        (workerBlocksScan
+                            ? "(This element does have a feature index; the points worker it needs can't start — SpatialData.js#148.)\n"
+                            : "") +
                         `[resident=${resident ? "y" : "n"} rendered=${rendered ? "y" : "n"} ` +
                         `selected=${selected ? "y" : "n"} scan=${scanning ? "running" : "idle"}]`;
                     return (

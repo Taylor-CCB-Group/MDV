@@ -158,6 +158,32 @@ reach the deck layer upstream (SpatialData.js#147), so the control would be iner
 flat colour control stays, with a caption saying what it actually does when the element
 has features.
 
+### On-demand feature loading does not work yet
+
+Selecting a feature whose points fall outside the memory cap is supposed to trigger a
+feature-index scan that fetches them. That scan runs in the core points worker, and
+**MDV cannot start that worker**: the published `@spatialdata/core/points-worker` is a
+CommonJS file inside a `"type": "module"` package (both build formats are written to
+the same `.js` name, so the cjs pass overwrites the esm one), and
+`new Worker(url, {type: "module"})` dies on `require is not defined`. Filed as
+SpatialData.js#148. The sd.js demo does not hit it because it imports the worker's
+TypeScript *source* by relative path, which no consumer can do.
+
+So the panel gates its on-demand messaging on `isPointsWorkerEnabled()` and tells the
+user those points can't be fetched, rather than inviting a click that does nothing. The
+gate drops out by itself once a fixed worker ships — do not remove it before then.
+
+Two related traps this exposed, both worth knowing when reading the panel:
+
+- A feature is **"resident" if it has one point inside the cap**, not if all of its
+  points are there. On an 8.07M-point element at the 4M default, all 541 features are
+  resident and nothing is greyed — while half the dataset is missing. The memory-cap
+  readout is the only honest signal, which is why it sits right above the feature list.
+- A **failed** scan is invisible: `getMatchingLoadState` returns `undefined` for a
+  failed slot exactly as it does for "no scan has run", and no error accessor exists.
+  That is SpatialData.js#149; until it lands, a scan that breaks for some new reason
+  will look like nothing happening.
+
 `src/react/spatialdata/points_feature_row_state.ts` is a temporary verbatim copy of
 upstream's row classifier, pending SpatialData.js#146. Delete it when the pin moves
 past that release.
