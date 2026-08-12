@@ -2,9 +2,13 @@ import { Alert, Button, Checkbox, FormControlLabel, TextField, Typography } from
 import { featureNamesForCodes, isPointsWorkerEnabled, resolveFeatureSelectionCodes } from "@spatialdata/core";
 import { featureCodeToRgb } from "@spatialdata/layers";
 import { describeFeatureRowState, featureRowOpacity, usePointsFeatureState } from "@spatialdata/vis";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
-import type { PointsLayerConfig, PointsLayerUpdate } from "@/react/spatialdata/points_layer_config";
+import {
+    type PointsFeatureFilterConfig,
+    type PointsLayerUpdate,
+    samePointsFeatureFilterConfig,
+} from "@/react/spatialdata/points_layer_config";
 
 /** Above this many features the list gets a search box; below it, scrolling is enough. */
 const FEATURE_LIST_SEARCH_THRESHOLD = 100;
@@ -25,11 +29,34 @@ const rowLabelSx = {
 const checkboxSx = { p: 0.25 } as const;
 
 type Props = {
-    config: PointsLayerConfig;
+    config: PointsFeatureFilterConfig;
     updateLayer: PointsLayerUpdate;
 };
 
 type CatalogEntry = { code: number; name: string; count?: number };
+
+type RowState = {
+    resident: boolean;
+    rendered: boolean;
+    selected: boolean;
+    state: ReturnType<typeof describeFeatureRowState>;
+};
+
+/** For a code the catalog does not list — unreachable from the rendered rows, which
+ * are drawn from `entries`, but a lookup must return something. */
+const UNKNOWN_ROW_STATE: RowState = {
+    resident: false,
+    rendered: false,
+    selected: false,
+    state: describeFeatureRowState({
+        resident: false,
+        rendered: false,
+        selected: false,
+        scanning: false,
+        supportsOnDemandLoad: false,
+        residentKnown: false,
+    }),
+};
 
 const hex2 = (value: number) => Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0");
 
@@ -78,7 +105,7 @@ function FeatureColorSwatch({
     );
 }
 
-export default function PointsFeatureFilterPanel({ config, updateLayer }: Props) {
+function PointsFeatureFilterPanel({ config, updateLayer }: Props) {
     // Opt out of the React Compiler. `usePointsFeatureState` re-renders this component
     // on every engine notify (via useSyncExternalStore) but reads mutable engine state
     // the compiler cannot see as a dependency, so it would memoize this JSX and hold the
@@ -121,13 +148,6 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
     const effectiveCount = (entry: CatalogEntry) => entry.count ?? partialCounts?.get(entry.code);
     const countIsPartial = (entry: CatalogEntry) =>
         entry.count === undefined && partialCounts?.get(entry.code) !== undefined;
-    // Dataset totals by code, so a row can be compared against what is resident without
-    // rescanning `entries` per row.
-    const datasetCountByCode = new Map<number, number>(
-        entries.flatMap((entry) =>
-            entry.count !== undefined ? ([[entry.code, entry.count]] as [number, number][]) : [],
-        ),
-    );
     /** Resident points for a feature when that is meaningfully LESS than the dataset —
      * a shortfall worth showing. `undefined` otherwise. */
     const residentShortfall = (entry: CatalogEntry): number | undefined => {
@@ -277,35 +297,42 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
     const canScanOnDemand = supportsOnDemandLoad && isPointsWorkerEnabled();
     /** The element could scan, but the worker it needs never started. */
     const workerBlocksScan = supportsOnDemandLoad && !canScanOnDemand;
-    const rowInfo = (code: number) => {
+    // ONE classification pass over the catalog, not one per consumer. This was a
+    // `rowInfo(code)` function called from two `reduce`s and again from the row map, so
+    // `describeFeatureRowState` ran three times per feature — a ~36ms floor on every
+    // render at 541 features, paid even when the search box narrowed the list to one row.
+    // Deliberately not `useMemo`d: `loadedMatchingCodes` is a fresh Set per engine read,
+    // so a dependency array would miss every time and only add the cost of checking.
+    const rowStates = new Map<number, RowState>();
+    let notLoadedCount = 0;
+    // `partialCount` is drawn-but-incomplete — the opposite failure of understanding to
+    // `notLoadedCount`: those rows look entirely healthy, un-greyed with a full dataset
+    // count beside them, while most of their points are outside the cap.
+    let partialCount = 0;
+    for (const entry of entries) {
+        const code = entry.code;
         const resident = residentKnown && (residentCodes?.has(code) ?? false);
         const rendered = loadedMatchingCodes?.has(code) ?? false;
         const selected = !noneSelected && (allSelected || selectedCodes.has(code));
-        return {
+        const state = describeFeatureRowState({
             resident,
             rendered,
             selected,
-            state: describeFeatureRowState({
-                resident,
-                rendered,
-                selected,
-                scanning,
-                supportsOnDemandLoad: canScanOnDemand,
-                residentKnown,
-                residentPointCount: residentFeatureCounts?.get(code),
-                datasetPointCount: datasetCountByCode.get(code),
-            }),
-        };
-    };
-    const notLoadedCount = residentKnown
-        ? entries.reduce((total, entry) => total + (rowInfo(entry.code).state.greyed ? 1 : 0), 0)
-        : 0;
-    // Drawn, but only in part. Counted apart from `notLoadedCount` because it is the
-    // opposite failure of understanding: these rows look entirely healthy — un-greyed,
-    // full dataset count beside them — while most of their points are outside the cap.
-    const partialCount = residentKnown
-        ? entries.reduce((total, entry) => total + (rowInfo(entry.code).state.tone === "partial" ? 1 : 0), 0)
-        : 0;
+            scanning,
+            supportsOnDemandLoad: canScanOnDemand,
+            residentKnown,
+            residentPointCount: residentFeatureCounts?.get(code),
+            datasetPointCount: entry.count,
+        });
+        rowStates.set(code, { resident, rendered, selected, state });
+        // Both counters were guarded on `residentKnown` when they were their own passes;
+        // without it every feature reads as not-loaded before the codes land.
+        if (residentKnown) {
+            if (state.greyed) notLoadedCount += 1;
+            if (state.tone === "partial") partialCount += 1;
+        }
+    }
+    const rowInfo = (code: number): RowState => rowStates.get(code) ?? UNKNOWN_ROW_STATE;
 
     return (
         <div className="grid gap-2">
@@ -530,3 +557,15 @@ export default function PointsFeatureFilterPanel({ config, updateLayer }: Props)
         </div>
     );
 }
+
+/**
+ * Memoised on the three config fields it reads, so the cosmetic edits that wake the
+ * layer dialog — opacity, point size, memory cap — do not re-render 541 feature rows.
+ * The comparator lives with the type it compares; see `PointsFeatureFilterConfig`.
+ *
+ * Engine-driven updates are unaffected: `usePointsFeatureState` subscribes this
+ * component through `useSyncExternalStore`, which re-renders it regardless of props.
+ */
+export default memo(PointsFeatureFilterPanel, (prev, next) => {
+    return prev.updateLayer === next.updateLayer && samePointsFeatureFilterConfig(prev.config, next.config);
+});
