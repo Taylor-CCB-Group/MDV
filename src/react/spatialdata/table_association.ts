@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type DataStore from "@/datastore/DataStore";
 import { useChartManager, useDataSources } from "@/react/hooks";
 import { fillColorSchemeFromDataStore } from "@/react/spatialdata/fill_color_scheme";
+import { measureSpatial, recordSpatialPerf } from "@/react/spatialdata/perf";
 
 type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
 type LabelsLayerConfig = Extract<LayerConfig, { type: "labels" }>;
@@ -349,6 +350,42 @@ export function withPreservedFillColorsWhileLoading({
     };
 }
 
+/**
+ * The inputs `featureState` is derived from, held alongside the result so a render
+ * that changed none of them can reuse it. Compared by identity throughout: every
+ * one of these is either a primitive or an object MDV keeps stable until its
+ * contents actually change.
+ */
+type FeatureStateCacheEntry = {
+    source: ShapesRenderData | Map<string, number>;
+    visibleRows: Uint32Array | undefined;
+    rowCount: number;
+    baseFeatureState: AssociatedFeatureState | undefined;
+    colorForRow: RowColorFunction | undefined;
+    alpha: number;
+    featureState: AssociatedFeatureState | undefined;
+};
+
+/**
+ * The element keys, with an identity that survives everything except a change to
+ * the keys themselves.
+ *
+ * They are derived from `layerInputs.layers`, whose identity changes on every
+ * cosmetic prop edit — the adapter shallow-copies that record to invalidate an
+ * upstream Viv memo. Handing a fresh array to the render-data effect each time made
+ * dragging an opacity slider re-decode the shapes geometry once per increment:
+ * ~0.5s of parquet read and WKB decode per step, for a change that touches no
+ * geometry at all.
+ *
+ * Keyed on the joined string rather than held in a ref so the stability is React's
+ * to reason about — a ref read during render is the same pattern, but the compiler
+ * cannot see through it. `\0` cannot occur in a zarr element name.
+ */
+function useElementKeys(keys: string[]): string[] {
+    const joined = keys.join("\0");
+    return useMemo(() => (joined === "" ? [] : joined.split("\0")), [joined]);
+}
+
 function shapeElementKeys(layers: RenderStackLayerInputs["layers"], layerOrder: string[]) {
     const keys = new Set<string>();
     for (const layerId of layerOrder) {
@@ -378,13 +415,19 @@ export function useShapesRenderDataByElementKey(spatialData: SpatialData | undef
             setRenderDataByElementKey({});
             return;
         }
-
         Promise.all(
             elementKeys.map(async (elementKey): Promise<ShapesRenderDataEntry> => {
                 const element = spatialData.shapes?.[elementKey];
                 if (!element) return [elementKey, undefined];
                 try {
-                    return [elementKey, await element.loadRenderData()];
+                    // The single most expensive thing this file can cause — a parquet
+                    // read plus a WKB decode of every polygon. A `count` above 1 per
+                    // element in a capture means something is re-entering this effect
+                    // that should not: geometry does not depend on how a layer looks.
+                    const startedAt = performance.now();
+                    const loaded = await element.loadRenderData();
+                    recordSpatialPerf("shapes.loadRenderData", performance.now() - startedAt);
+                    return [elementKey, loaded];
                 } catch (error) {
                     console.warn(`Failed to load SpatialData shapes render data for ${elementKey}`, error);
                     return [elementKey, undefined];
@@ -601,14 +644,10 @@ export function useAssociatedShapesLayerInputs(
     layerInputs: RenderStackLayerInputs,
 ): RenderStackLayerInputs {
     const dataSources = useDataSources();
-    const shapeKeys = useMemo(
-        () => shapeElementKeys(layerInputs.layers, layerInputs.layerOrder),
-        [layerInputs.layers, layerInputs.layerOrder],
-    );
-    const labelKeys = useMemo(
-        () => labelElementKeys(layerInputs.layers, layerInputs.layerOrder),
-        [layerInputs.layers, layerInputs.layerOrder],
-    );
+    // Stable by value, not by identity: which elements are on the canvas changes far
+    // less often than the layer record does. See `useElementKeys`.
+    const shapeKeys = useElementKeys(shapeElementKeys(layerInputs.layers, layerInputs.layerOrder));
+    const labelKeys = useElementKeys(labelElementKeys(layerInputs.layers, layerInputs.layerOrder));
     const renderDataByElementKey = useShapesRenderDataByElementKey(spatialData, shapeKeys);
     const labelsRowIndexByFeatureId = useLabelsRowIndexByFeatureId(spatialData, labelKeys);
     const tableByAssociationKey = useMemo(() => {
@@ -685,8 +724,12 @@ export function useAssociatedShapesLayerInputs(
         );
     }, [fillColumnsByDataSource, loadedColorColumnVersion, tableByAssociationKey]);
     const lastFillColorsRef = useRef<Record<string, Record<string, RgbaColor>>>({});
+    const featureStateCacheRef = useRef<Record<string, FeatureStateCacheEntry>>({});
 
-    const layers = useMemo(() => {
+    // `count` here is how many times the association projection ran during a capture;
+    // `avgMs` tells you whether the per-feature pass was cached or rebuilt. A cosmetic
+    // edit should show a high count and a near-zero average.
+    const layers = useMemo(() => measureSpatial("association.project", () => {
         let changed = false;
         const nextLayers = { ...layerInputs.layers };
 
@@ -719,29 +762,64 @@ export function useAssociatedShapesLayerInputs(
 
             // Filtering rides `featureState` on both routes: cross-filtering is
             // MDV's, not the table's, and no column in obs can express it.
+            //
+            // This is the expensive step — one pass over every feature in the element
+            // — and it is reached on every render of this memo, which includes the
+            // cosmetic ones. The memo cannot simply skip those: it hands the canvas
+            // COPIES of the layer configs, so it has to re-copy for an in-place
+            // opacity edit to reach the canvas at all. Caching the featureState on
+            // the inputs it actually reads separates the two: the copy stays cheap
+            // and per-render, the per-feature pass runs only when something it
+            // depends on moved.
+            const source =
+                layer.type === "shapes"
+                    ? renderDataByElementKey[layer.elementKey]
+                    : labelsRowIndexByFeatureId[layer.elementKey];
+            if (!source) continue;
+
+            const rowCount = table.dataStore.size;
+            const alpha = layerFillAlpha(layer);
+            const baseFeatureState = layer.featureState;
+            const cached = featureStateCacheRef.current[layerId];
             let featureState: AssociatedFeatureState | undefined;
-            if (layer.type === "shapes") {
-                const renderData = renderDataByElementKey[layer.elementKey];
-                if (!renderData) continue;
-                featureState = buildAssociatedShapesFeatureState({
-                    renderData,
-                    visibleRows,
-                    rowCount: table.dataStore.size,
-                    baseFeatureState: layer.featureState,
-                    colorForRow,
-                    alpha: layerFillAlpha(layer),
-                });
+            if (
+                cached &&
+                cached.source === source &&
+                cached.visibleRows === visibleRows &&
+                cached.rowCount === rowCount &&
+                cached.baseFeatureState === baseFeatureState &&
+                cached.colorForRow === colorForRow &&
+                cached.alpha === alpha
+            ) {
+                featureState = cached.featureState;
             } else {
-                const rowIndexByFeatureId = labelsRowIndexByFeatureId[layer.elementKey];
-                if (!rowIndexByFeatureId) continue;
-                featureState = buildAssociatedFeatureStateFromRowMap({
-                    rowIndexByFeatureId,
+                featureState =
+                    layer.type === "shapes"
+                        ? buildAssociatedShapesFeatureState({
+                              renderData: source as ShapesRenderData,
+                              visibleRows,
+                              rowCount,
+                              baseFeatureState,
+                              colorForRow,
+                              alpha,
+                          })
+                        : buildAssociatedFeatureStateFromRowMap({
+                              rowIndexByFeatureId: source as Map<string, number>,
+                              visibleRows,
+                              rowCount,
+                              baseFeatureState,
+                              colorForRow,
+                              alpha,
+                          });
+                featureStateCacheRef.current[layerId] = {
+                    source,
                     visibleRows,
-                    rowCount: table.dataStore.size,
-                    baseFeatureState: layer.featureState,
+                    rowCount,
+                    baseFeatureState,
                     colorForRow,
-                    alpha: layerFillAlpha(layer),
-                });
+                    alpha,
+                    featureState,
+                };
             }
 
             if (!viewerFillColor) {
@@ -773,7 +851,7 @@ export function useAssociatedShapesLayerInputs(
         }
 
         return changed ? nextLayers : layerInputs.layers;
-    }, [
+    }), [
         layerInputs.layers,
         layerInputs.layerOrder,
         renderDataByElementKey,
