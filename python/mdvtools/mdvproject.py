@@ -1121,7 +1121,27 @@ class MDVProject:
             left_on=index_col,
             right_index=True,
             how="left",
-        ).fillna(missing_value)
+            validate="many_to_one",
+        )
+
+        # Fill missing values according to storage datatype
+        for c in columns:
+            field = c["field"]
+            datatype = c.get("datatype", "text")
+
+            if datatype in ["text", "text16", "unique", "multitext"]:
+                # Text columns use the missing_value string
+                aligned[field] = aligned[field].fillna(missing_value)
+            elif datatype in ["double", "integer"]:
+                # Numeric columns use NaN, which is compatible with float32 storage
+                aligned[field] = aligned[field].fillna(float("nan"))
+            elif datatype == "int32":
+                # int32 storage uses numpy.int32, which cannot represent NaN
+                # Fill with 0 to keep column numeric (int32 storage expects no missing values)
+                aligned[field] = aligned[field].fillna(0)
+            else:
+                # Fallback for unknown types
+                aligned[field] = aligned[field].fillna(missing_value)
 
         h5 = self._get_h5_handle()
         gr = h5[datasource]
@@ -2800,19 +2820,21 @@ def add_column_to_group(
                     errors="coerce"
                 )
         )  # this is slooooow?
-        if col["datatype"] == "integer" and col.get("original_dtype") == "uint32":
+        # Check for precision loss when storing wide integers as float32
+        wide_int_types = {"int64", "uint32", "uint64", "Int64", "UInt32", "UInt64"}
+        if col["datatype"] == "integer" and col.get("original_dtype") in wide_int_types:
             try:
                 numeric = numpy.asarray(
                     pandas.to_numeric(clean, errors="coerce"),
                     dtype=numpy.float64,
                 )
                 finite_numeric = numeric[numpy.isfinite(numeric)]
-                out_of_range = finite_numeric[finite_numeric > 16_777_216]
+                out_of_range = finite_numeric[numpy.abs(finite_numeric) > 16_777_216]
                 if len(out_of_range) != 0:
                     col.setdefault("storage_warnings", []).append(
-                        "uint32 -> float32 (integer): "
+                        f"{col.get('original_dtype')} -> float32 (integer): "
                         f"{len(out_of_range)} value(s) exceed exact-integer range "
-                        f"(max={float(finite_numeric.max()):.0f}); precision loss possible."
+                        f"(max abs={float(numpy.abs(finite_numeric).max()):.0f}); precision loss possible."
                     )
             except Exception:
                 pass
