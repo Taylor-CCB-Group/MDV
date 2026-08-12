@@ -8,7 +8,29 @@ file serving helpers, and HTTP range request handling.
 import re
 import os
 import mimetypes
-from flask import send_file as sf, Response
+from flask import request, send_file as sf, Response
+
+
+UNCACHED_STATIC_ENTRY_PATHS = {
+    "/static/js/mdv.js",
+    "/static/js/catalog.js",
+    "/static/js/login.js",
+    "/static/assets/mdv.css",
+    "/static/assets/catalog.css",
+}
+
+
+def _is_uncached_static_entry(path: str) -> bool:
+    return any(path.endswith(entry_path) for entry_path in UNCACHED_STATIC_ENTRY_PATHS)
+
+
+def _set_shell_cache_headers(resp):
+    if resp.mimetype == "text/html":
+        resp.headers["Cache-Control"] = "no-store"
+        return
+
+    if _is_uncached_static_entry(request.path):
+        resp.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
 
 # consider using flask_cors...
 def add_safe_headers(resp):
@@ -26,9 +48,13 @@ def add_safe_headers(resp):
     resp.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
     # headers required if serving endpoints for another server e,g dev server
     resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    # range requests for parquet (& OME-TIFF/other things, but noticing issues with points parquet)
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Range"
+    resp.headers["Access-Control-Expose-Headers"] = "Content-Range, Content-Length, Accept-Ranges"
+    resp.headers["Access-Control-Max-Age"] = "86400"
     #required for vite dev
     resp.headers["Cross-Origin-Resource-Policy"] ="cross-origin"
+    _set_shell_cache_headers(resp)
     return resp
 
 

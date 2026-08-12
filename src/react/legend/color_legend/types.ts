@@ -26,6 +26,8 @@ export type ColorLegendContinuousSpec = {
     range: [number, number];
     width?: number;
     height?: number;
+    /** When true, axis ticks format as YYYY-MM-DD (days since Unix epoch). */
+    isDate?: boolean;
 };
 
 export type ColorLegendSpec =

@@ -8,6 +8,7 @@ import {
     type BrushXScaleType,
     type Range,
 } from "@/react/components/histogram/useBrushX";
+import { formatDateDays } from "@/lib/dateFormat";
 
 export type HistogramScaleType = BrushXScaleType;
 export type HistogramBrushConfig = BrushXConfig;
@@ -50,9 +51,25 @@ type HistogramWidgetProps = {
     scaleControls?: HistogramScaleControls;
     onVisibleOnce?: () => void;
     rootMargin?: string;
+    /** When true, brush range chip formats day numbers as YYYY-MM-DD. */
+    isDate?: boolean;
 };
 
-const formatBrushValue = d3.format(".4~g");
+const formatNumericBrushValue = d3.format(".4~g");
+
+/** Brush chip text for a numeric or calendar-date histogram range. */
+export function formatHistogramBrushRange(
+    start: number,
+    end: number,
+    isDate = false,
+): string {
+    const lo = start <= end ? start : end;
+    const hi = start <= end ? end : start;
+    if (isDate) {
+        return `${formatDateDays(lo)} - ${formatDateDays(hi)}`;
+    }
+    return `${formatNumericBrushValue(lo)} - ${formatNumericBrushValue(hi)}`;
+}
 
 export default function HistogramWidget({
     layers,
@@ -67,6 +84,7 @@ export default function HistogramWidget({
     scaleControls,
     onVisibleOnce,
     rootMargin = "0px 0px 100px 0px",
+    isDate = false,
 }: HistogramWidgetProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const ref = useRef<SVGSVGElement>(null);
@@ -166,11 +184,8 @@ export default function HistogramWidget({
 
     const brushValueLabel = useMemo(() => {
         if (!brush?.value) return null;
-        const [start, end] = brush.value[0] <= brush.value[1]
-            ? brush.value
-            : [brush.value[1], brush.value[0]];
-        return `${formatBrushValue(start)} - ${formatBrushValue(end)}`;
-    }, [brush?.value]);
+        return formatHistogramBrushRange(brush.value[0], brush.value[1], isDate);
+    }, [brush?.value, isDate]);
 
     return (
         <div className="relative w-full" ref={containerRef}>
@@ -188,13 +203,15 @@ export default function HistogramWidget({
             ) : null}
             {scaleControls ? (
                 <div className="pointer-events-none absolute right-1 top-1 z-10 flex items-center gap-1 text-[10px] opacity-75">
-                    <button
-                        type="button"
-                        className="pointer-events-auto rounded border border-[hsl(var(--border))] bg-[hsl(var(--background)/0.9)] px-1 py-0 text-[9px] text-[hsl(var(--foreground))] shadow-sm"
-                        onClick={scaleControls.onToggleX}
-                    >
-                        X:{scaleControls.xLabel}
-                    </button>
+                    {!isDate ? (
+                        <button
+                            type="button"
+                            className="pointer-events-auto rounded border border-[hsl(var(--border))] bg-[hsl(var(--background)/0.9)] px-1 py-0 text-[9px] text-[hsl(var(--foreground))] shadow-sm"
+                            onClick={scaleControls.onToggleX}
+                        >
+                            X:{scaleControls.xLabel}
+                        </button>
+                    ) : null}
                     <button
                         type="button"
                         className="pointer-events-auto rounded border border-[hsl(var(--border))] bg-[hsl(var(--background)/0.9)] px-1 py-0 text-[9px] text-[hsl(var(--foreground))] shadow-sm"

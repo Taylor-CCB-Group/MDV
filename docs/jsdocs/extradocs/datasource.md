@@ -44,7 +44,10 @@ integer/double columns. In the former the colors array is mapped to the values a
 * **editable** - specifies a column can be edited.
 
 * **is_url** - the column contains url links (unique and text columns)
-* **is_url** - the column contains url links (unique and text columns)
+
+* **is_date** - when `true` on an `integer`/`double`/`int32` column, values are calendar dates stored as **days since Unix epoch (UTC)**. Charts use the numeric values for continuous spacing and filters. Display formatting as `YYYY-MM-DD` is applied via `getValue`, continuous axis ticks, color-legend ticks, and Selection Dialog range inputs. Timezone-aware timestamps are converted to UTC at ingest (which can shift the calendar day); values with a time-of-day may be stored as fractional days (display rounds to the nearest day).
+
+* **date_unit** - for `is_date` columns; currently always `"days"`.
 
 * **minMax** - for integer and double columns, the minimum/maximum values in an array of length 2
 

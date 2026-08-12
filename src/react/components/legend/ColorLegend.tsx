@@ -152,6 +152,7 @@ export default function ColorLegend({
             getContinuousLegendContainerHeight(spec.range, {
                 width,
                 hasLabel: Boolean(spec.label),
+                isDate: spec.isDate,
             });
         el.style.width = `${width}px`;
         el.style.height = `${height}px`;
@@ -185,6 +186,7 @@ export default function ColorLegend({
                 height={spec.height}
                 activeRange={activeContinuousRange}
                 onRangeChange={onContinuousRangeChange}
+                isDate={spec.isDate}
             />
         </div>
     );

@@ -5,6 +5,7 @@ import { useChartSize, useParamColumns } from "../hooks";
 import { useLayoutEffect, useMemo, useState, type PropsWithChildren } from "react";
 import * as Axis from "@visx/axis";
 import * as Scale from "@visx/scale";
+import { dateTickFormat, isDateColumn } from "@/lib/dateFormat";
 
 type AxisComponentProps = {
     config: ScatterPlotConfig2D | ScatterPlotConfig3D
@@ -91,6 +92,12 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     const is2d = dimension === "2d";
     const [width, height] = useChartSize();
     const { scaleX, scaleY, margin, chartWidth, chartHeight } = useSynchronizedScales({ config, unproject });
+    const xTickFormat = isDateColumn(cx)
+        ? (value: number | { valueOf(): number }) => dateTickFormat(Number(value))
+        : undefined;
+    const yTickFormat = isDateColumn(cy)
+        ? (value: number | { valueOf(): number }) => dateTickFormat(Number(value))
+        : undefined;
     
     const deckStyle = useMemo(() => ({
         position: "absolute",
@@ -113,6 +120,7 @@ export default observer(function AxisComponent({ config, unproject, children }: 
                     scale={scaleX}
                     stroke={"var(--text_color)"}
                     tickStroke={"var(--text_color)"}
+                    tickFormat={xTickFormat}
                     tickLabelProps={() => ({
                         fill: "var(--text_color)",
                         fontSize: config.axis.x.tickfont,
@@ -133,6 +141,7 @@ export default observer(function AxisComponent({ config, unproject, children }: 
                     scale={scaleY}
                     stroke={"var(--text_color)"}
                     tickStroke={"var(--text_color)"}
+                    tickFormat={yTickFormat}
                     tickLabelProps={() => ({
                         fill: "var(--text_color)",
                         fontSize: config.axis.y.tickfont,
