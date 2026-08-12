@@ -126,11 +126,53 @@ always takes the per-feature route above. Before this existed the picker offered
 tab and the handler dropped anything that was not a string, so choosing an active
 link did nothing at all — silently.
 
+## The points layer panel
+
+`PointsLayerPanel` is a bridge, not a leaf. The layer dialog is a portal with its own
+React tree, so it cannot see the renderer hook's result; the chart publishes the live
+`PointsDataEngine` on `chart.pointsLayerRegistry` (an effect in
+`SpatialDataMDVReactComponent`, cleared on unmount) and the panel wraps its subtree in
+`<PointsFeatureStateProvider>`. That engine must be the one the render path owns — it
+holds the resident window, the feature catalog and the in-flight scans, so a second
+instance would reload everything and answer different questions from the one drawing.
+`resolveTarget` comes from the renderer hook for the same reason: panel reads have to
+hit the cache keys the render writes.
+
+Two consequences worth knowing before editing either panel file:
+
+- Every component calling `usePointsFeatureState` needs `'use no memo'`. The hook
+  re-renders on each engine notify via `useSyncExternalStore`, but the values it
+  returns come from mutable engine state the React Compiler cannot see as a
+  dependency — it would memoize the JSX and hold the pre-catalog branch on screen.
+- The hook throws outside the provider, so the style controls take an
+  `engineAvailable` flag rather than assuming one is present.
+
+The feature selection persists as **names** (`featureNames`), never codes. For a
+dictionary-only element — a Xenium `transcripts` has `feature_name` and no code
+column — the codes are app-assigned from whichever catalog scan ran first, so a saved
+code can come back meaning a different gene. The panel writes names and clears any
+legacy `featureCodes` so the two can never disagree.
+
+There is deliberately **no colour-by-feature switch**: `colorByFeature: false` does not
+reach the deck layer upstream (SpatialData.js#147), so the control would be inert. The
+flat colour control stays, with a caption saying what it actually does when the element
+has features.
+
+`src/react/spatialdata/points_feature_row_state.ts` is a temporary verbatim copy of
+upstream's row classifier, pending SpatialData.js#146. Delete it when the pin moves
+past that release.
+
 ## Minimum upstream version
 
-**`@spatialdata/* >= 0.6.0`, and `zarrextra >= 0.4.0` with it.**
+**`@spatialdata/* >= 0.7.0`, and `zarrextra >= 0.4.0` with it.**
 
-Do not ship an MDV that touches SpatialData tables against anything older. Before
+0.7.0 is the floor because the points feature panel imports
+`PointsFeatureStateProvider` and `usePointsFeatureState` from the `@spatialdata/vis`
+entry, and below it those are not re-exported there — the package publishes only a
+`"."` export, so there is no deep-import fallback either.
+
+0.6.0 remains the floor for the table work underneath that. Do not ship an MDV that
+touches SpatialData tables against anything older. Before
 0.6.0, `'auto'` mode sniffed values instead of trusting the store's declared column
 kind — one `NaN` in a float column made it categorical and gave every distinct float
 its own hue — and category colours depended on which features happened to load.
@@ -140,7 +182,7 @@ degrade-gracefully situation: the scheme MDV now sends (`categoricalPalette:
 `NaN`, and throws `Cannot read properties of undefined` three frames away inside the
 layer.
 
-`zarrextra` moves in step because `@spatialdata/core@0.6.0` depends on `0.4.0`
+`zarrextra` moves in step because `@spatialdata/core` depends on `0.4.0`
 exactly. Leaving MDV's own pin at `^0.3.0` installs a second copy, and MDV's
 `ensureChunkWorker` then flips the worker-decode flag in a module instance core
 never reads.

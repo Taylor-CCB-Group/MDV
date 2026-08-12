@@ -1,15 +1,4 @@
-import type { useSpatialCanvasRendererFromLayerInputs } from "@spatialdata/vis";
-
-/**
- * Derived from the renderer hook rather than imported by name: `@spatialdata/vis`
- * exports `PointsDataEngine` / `PointsLoadTarget` from `SpatialCanvas/public.ts`,
- * but its package entry does not re-export them (0.6.0), and the exports map has
- * only `"."` so there is no deep-import route either. The renderer's return type
- * carries both structurally, which is enough to name them here.
- */
-type SpatialCanvasRenderer = ReturnType<typeof useSpatialCanvasRendererFromLayerInputs>;
-type PointsDataEngine = SpatialCanvasRenderer["pointsEngine"];
-type PointsLoadTarget = ReturnType<SpatialCanvasRenderer["resolvePointsTarget"]>;
+import type { PointsDataEngine, PointsLoadTarget } from "@spatialdata/vis";
 
 /**
  * The live points engine, published from the chart so the layer dialog can reach it.
@@ -30,11 +19,11 @@ type PointsLoadTarget = ReturnType<SpatialCanvasRenderer["resolvePointsTarget"]>
 export type PointsLayerRegistry = {
     engine: PointsDataEngine;
     /**
-     * Layer id → the engine's load target. Must come from the renderer hook rather
-     * than being reconstructed here, so panel reads hit the same cache keys the
-     * render path writes.
+     * Layer id → the engine's load target, or `undefined` while the layer is not yet
+     * a resolvable points element. Must come from the renderer hook rather than being
+     * reconstructed here, so panel reads hit the same cache keys the render path writes.
      */
-    resolveTarget: (layerId: string) => PointsLoadTarget;
+    resolveTarget: (layerId: string) => PointsLoadTarget | undefined;
 };
 
 export function createPointsLayerRegistry(
