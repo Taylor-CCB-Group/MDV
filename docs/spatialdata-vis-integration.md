@@ -268,7 +268,7 @@ Useful follow-up SpatialData.js changes (not blocking this PR):
 
 ### Image layer panel pattern (MDV)
 
-Dependencies: pin `@spatialdata/{core,layers,react,vis,avivatorish}` at **0.2.3**.
+Dependencies: `@spatialdata/{core,layers,react,vis,avivatorish}` at **>= 0.8.0** (see the version floor above).
 
 **Viewer (chart tree)**
 

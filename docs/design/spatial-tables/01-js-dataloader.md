@@ -117,7 +117,7 @@ From the read of `anndata.js` and `SpatialData.ts` (both **read-only**, both on 
   has no "list columns" method.
 - **Version skew risk:** `anndata.js` pins `zarrita@0.5.1`; `SpatialData.ts` targets `0.7.x`.
   Reconcile before sharing a bundle. `anndata.js` is `0.0.x` — expect API churn.
-- MDV already depends on `@spatialdata/*` (`^0.6.0` as of the table-association work) and
+- MDV already depends on `@spatialdata/*` (`^0.8.0` as of the table-association work) and
   `zarrextra` — so the packages are on hand. `zarrextra` is no longer image-only: the association
   reads obs columns through the store, though **table column data still loads over h5**, which is
   the gap this theme is about.

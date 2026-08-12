@@ -86,7 +86,7 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
     const spatialElementKey = entry?.kind === "spatial" ? entry.source.elementKey : undefined;
     const tableAssociation = useElementTableAssociation(
         spatialData ?? undefined,
-        spatialElementType ?? "shapes",
+        spatialElementType,
         spatialElementKey,
         dataSources,
     );

@@ -80,6 +80,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     height,
     deckProps,
     onFeatureHover,
+    onFeatureHoverEnd,
 }: {
     spatialData: NonNullable<ReturnType<typeof useSpatialData>["spatialData"]>;
     coordinateSystem: string;
@@ -92,6 +93,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     height: number;
     deckProps: Partial<DeckGLProps>;
     onFeatureHover: (event: SpatialFeaturePickEvent) => void;
+    onFeatureHoverEnd: () => void;
 }) {
     const config = useConfig<SpatialDataMdvReactConfig>();
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
@@ -194,6 +196,11 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     const handleHover = useCallback(
         (info: PickingInfo) => {
             if (!info.picked || typeof info.x !== "number" || typeof info.y !== "number") {
+                // Returning without telling the host means an unpicked hover leaves the
+                // last tooltip on screen: deck reports moving OFF a feature this way, and
+                // the only other clear is `onMouseLeave` on the container, so the stale
+                // tooltip would follow the pointer around the canvas until it left.
+                onFeatureHoverEnd();
                 return;
             }
             const layerId = (typeof info.layer?.id === "string" ? info.layer.id : "").replace(/-#.*#$/, "");
@@ -210,7 +217,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
                 });
             }
         },
-        [coordinateSystem, onFeatureHover, renderer, spatialData],
+        [coordinateSystem, onFeatureHover, onFeatureHoverEnd, renderer, spatialData],
     );
 
     const mergedDeckProps = useMemo(
@@ -476,6 +483,9 @@ const SpatialDataViewer = observer(
             });
         }, []);
 
+        /** Deck reports moving off a feature as an unpicked hover, not as an event. */
+        const onFeatureHoverEnd = useCallback(() => setFeatureTooltip(null), []);
+
         const featureTooltipPortal =
             featureTooltip && outerContainer
                 ? createPortal(
@@ -562,6 +572,13 @@ const SpatialDataViewer = observer(
                         <Profiler id="spatial.canvas" onRender={onSpatialProfilerRender}>
                             <ErrorBoundary
                                 fallbackRender={(props) => <SpatialCanvasErrorFallback {...props} layers={layers} />}
+                                // Retry when the layer set actually changes, so a canvas
+                                // felled by one bad layer recovers once it is removed or
+                                // reconfigured instead of staying dead until remount.
+                                // `layers` keeps its identity across cosmetic edits (see
+                                // `layerConfigReplacementSignature`), so an opacity drag
+                                // cannot spin this into a re-throw loop.
+                                resetKeys={[layers, layerOrder]}
                             >
                                 <SpatialCanvasFromRenderStack
                                     spatialData={spatialData}
@@ -575,6 +592,7 @@ const SpatialDataViewer = observer(
                                     height={height}
                                     deckProps={deckProps}
                                     onFeatureHover={onFeatureHover}
+                                    onFeatureHoverEnd={onFeatureHoverEnd}
                                 />
                             </ErrorBoundary>
                         </Profiler>

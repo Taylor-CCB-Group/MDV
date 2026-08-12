@@ -55,7 +55,7 @@ const PUBLISHED_RANGES = {
     "@spatialdata/layers": "^0.8.0",
     "@spatialdata/react": "^0.8.0",
     "@spatialdata/vis": "^0.8.0",
-    zarrextra: "^0.4.0",
+    zarrextra: "0.4.0",
 };
 
 function expandHome(p) {

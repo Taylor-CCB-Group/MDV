@@ -23,6 +23,9 @@ type Props = {
     updateLayer: PointsLayerUpdate;
 };
 
+/** Cornflower blue, the flat colour a points layer starts with. */
+const DEFAULT_POINT_COLOR: [number, number, number, number] = [100, 149, 237, 200];
+
 const toHex = (value: [number, number, number, number]) =>
     `#${value
         .slice(0, 3)
@@ -149,7 +152,7 @@ function FlatColour({ config, updateLayer, placement }: Props & { placement: Pla
     return (
         <FlatColourControl
             label={placement === "inline" ? "Colour" : "Fallback colour"}
-            color={config.color ?? [100, 149, 237, 200]}
+            color={config.color ?? DEFAULT_POINT_COLOR}
             updateLayer={updateLayer}
             note={
                 placement === "advanced"
@@ -191,7 +194,7 @@ function PointsStyleControls({ config, updateLayer, engineAvailable }: Props & {
             ) : (
                 <FlatColourControl
                     label="Colour"
-                    color={config.color ?? [100, 149, 237, 200]}
+                    color={config.color ?? DEFAULT_POINT_COLOR}
                     updateLayer={updateLayer}
                 />
             )}
@@ -216,7 +219,7 @@ function PointsAdvanced({ config, updateLayer, engineAvailable }: Props & { engi
             defaultExpanded={false}
             // Collapsed means gone: the cap select is a load-triggering control and has no
             // business in the tab order while the section is shut.
-            TransitionProps={{ unmountOnExit: true }}
+            slotProps={{ transition: { unmountOnExit: true } }}
             sx={{
                 border: "1px solid hsl(var(--border))",
                 borderRadius: "6px",

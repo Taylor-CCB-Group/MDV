@@ -52,13 +52,32 @@ function linkedSpatialdataRoots(): string[] {
     for (const name of ["@spatialdata/vis", "@spatialdata/core", "zarrextra"]) {
         try {
             const real = fs.realpathSync(path.join(configDir, "node_modules", name));
+            // Path-aware, not `startsWith`: a sibling checkout at `<configDir>-other`
+            // has the config dir as a string prefix, and would be read as "inside" —
+            // silently dropping the one root that needed allowing.
+            const rel = path.relative(configDir, real);
+            const inside = rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
             // <checkout>/packages/<pkg> → <checkout>
-            if (!real.startsWith(configDir)) roots.add(path.resolve(real, "../.."));
+            if (!inside) roots.add(path.resolve(real, "../.."));
         } catch {
             // not installed / not linked — nothing to allow
         }
     }
     return [...roots];
+}
+
+/**
+ * `worker_format` comes from the shell (see the `build-flask-vite-jbrowse` script).
+ * A typo used to be cast straight through, so Vite emitted workers in whatever it
+ * made of the value and the failure surfaced far from the cause.
+ */
+function workerFormat(): "es" | "iife" {
+    const requested = process.env.worker_format;
+    if (requested === undefined || requested === "") return "iife";
+    if (requested !== "es" && requested !== "iife") {
+        throw new Error(`worker_format must be "es" or "iife", got "${requested}"`);
+    }
+    return requested;
 }
 
 const spatialdataFsAllow = linkedSpatialdataRoots();
@@ -284,7 +303,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
                 : []),
         ],
         worker: {
-            format: (process.env.worker_format || "iife") as "es" | "iife",
+            format: workerFormat(),
         },
         resolve: {
             alias: {

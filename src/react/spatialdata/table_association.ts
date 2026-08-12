@@ -1,7 +1,7 @@
 import type { ShapesRenderData, SpatialData } from "@spatialdata/core";
 import { loadAssociatedTableFeatureRows } from "@spatialdata/core";
 import type { LayerConfig, LayerType, RenderStackLayerInputs } from "@spatialdata/vis";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import type DataStore from "@/datastore/DataStore";
 import { useChartManager, useDataSources } from "@/react/hooks";
@@ -485,7 +485,10 @@ function useLabelsRowIndexByFeatureId(spatialData: SpatialData | undefined, elem
 
 export function useElementTableAssociation(
     spatialData: SpatialData | undefined,
-    elementType: AssociableSpatialElementType,
+    // `undefined` is a real answer, not a missing argument: a host entry in the layer
+    // stack is not a spatial element and has no type to associate against. Callers used
+    // to pass a placeholder `"shapes"` for that case, which read as a shapes lookup.
+    elementType: AssociableSpatialElementType | undefined,
     elementKey: string | undefined,
     dataSources: AssociatedDataSource[],
 ): TableAssociation {
@@ -494,7 +497,7 @@ export function useElementTableAssociation(
         [elementType, elementKey],
     );
     const renderDataByElementKey = useShapesRenderDataByElementKey(spatialData, elementKeys);
-    if (!elementKey || !spatialData) return NO_TABLE_ASSOCIATION;
+    if (!elementType || !elementKey || !spatialData) return NO_TABLE_ASSOCIATION;
     const table = resolveAssociatedElementTable({
         spatialData,
         elementType,
@@ -560,9 +563,14 @@ function visibleRowsForDataStore(dataStore: DataStore): Uint32Array {
 
 function useDataStoreFilterVersion(dataStores: DataStore[]) {
     const [version, setVersion] = useState(0);
+    // `DataStore.addListener` is keyed, and a duplicate key silently REPLACES the
+    // existing listener while cleanup deletes by that key. `useId` gives each hook
+    // instance a key React guarantees is distinct; a random suffix only made a
+    // collision unlikely.
+    const instanceId = useId();
 
     useEffect(() => {
-        const listenerId = `spatial-table-association-${Math.random().toString(36).slice(2)}`;
+        const listenerId = `spatial-table-association-${instanceId}`;
         const listener = (type: string) => {
             if (type === "filtered" || type === "data_added") {
                 setVersion((current) => current + 1);
@@ -577,9 +585,17 @@ function useDataStoreFilterVersion(dataStores: DataStore[]) {
                 dataStore.removeListener(listenerId);
             }
         };
-    }, [dataStores]);
+    }, [dataStores, instanceId]);
 
     return version;
+}
+
+/** Drop entries of a layer-id-keyed cache whose layer is no longer in the stack. */
+function pruneToKeys(cache: Record<string, unknown>, liveKeys: string[]) {
+    const live = new Set(liveKeys);
+    for (const key of Object.keys(cache)) {
+        if (!live.has(key)) delete cache[key];
+    }
 }
 
 function isFillColorAssociableLayer(
@@ -849,6 +865,12 @@ export function useAssociatedShapesLayerInputs(
             nextLayers[layerId] = featureState ? { ...projected, featureState } : projected;
             changed = true;
         }
+
+        // Both caches are keyed by layer id and nothing else removes their entries, so
+        // a layer deleted from the stack would leave its featureState — one entry per
+        // feature of that element — reachable for the life of the chart.
+        pruneToKeys(featureStateCacheRef.current, layerInputs.layerOrder);
+        pruneToKeys(lastFillColorsRef.current, layerInputs.layerOrder);
 
         return changed ? nextLayers : layerInputs.layers;
     }), [

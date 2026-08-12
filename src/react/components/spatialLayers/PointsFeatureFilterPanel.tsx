@@ -231,7 +231,14 @@ function PointsFeatureFilterPanel({ config, updateLayer }: Props) {
             colorFrameRef.current = null;
             const pending = pendingColorRef.current;
             pendingColorRef.current = null;
-            if (pending) updateLayer({ featureColorOverrides: pending });
+            // Clearing the last override inside the same frame as a recolour leaves an
+            // empty map here. Writing `{}` would persist an override record that says
+            // "no overrides" — `undefined` is how the rest of this file spells that.
+            if (pending) {
+                updateLayer({
+                    featureColorOverrides: Object.keys(pending).length > 0 ? pending : undefined,
+                });
+            }
         });
     };
     const clearColorOverride = (name: string) => {
@@ -503,6 +510,11 @@ function PointsFeatureFilterPanel({ config, updateLayer }: Props) {
                             title={title}
                             onMouseEnter={() => setHighlightedFeature(entry.code)}
                             onMouseLeave={() => setHighlightedFeature(null)}
+                            // Focus too, so tabbing through the list highlights on the
+                            // canvas the same way hovering does. These bubble from the
+                            // row's checkbox, which is the focusable element.
+                            onFocus={() => setHighlightedFeature(entry.code)}
+                            onBlur={() => setHighlightedFeature(null)}
                             control={
                                 <Checkbox
                                     size="small"
