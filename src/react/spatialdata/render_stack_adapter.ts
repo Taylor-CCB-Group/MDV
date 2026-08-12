@@ -12,6 +12,7 @@ import {
 } from "@spatialdata/vis";
 import { useMemo, useRef } from "react";
 
+import { withoutMdvFieldSpecs } from "./field_spec_projection";
 import { deckIdFromHostLayerId, type DeckOverlayId } from "./host_overlay_ids";
 import { touchRenderStack, renderStackSpatialRevision } from "./render_stack_observe";
 import { measureSpatial } from "./perf";
@@ -91,7 +92,9 @@ export function syncRenderStackLayerInputs(
     for (const entry of stack.entries) {
         if (entry.kind !== "spatial") continue;
         nextIds.add(entry.id);
-        const nextConfig = spatialEntryAsLayerConfig(entry);
+        // MDV's field specs stop here: past this point a layer config is the
+        // viewer's, and a `RowsAsColsQuery` is not something to hand it.
+        const nextConfig = withoutMdvFieldSpecs(spatialEntryAsLayerConfig(entry));
         const nextSignature = layerConfigReplacementSignature(nextConfig);
         const existing = cache.layers[entry.id];
         if (existing && cache.layerConfigSignatures[entry.id] === nextSignature) {

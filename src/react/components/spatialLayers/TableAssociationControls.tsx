@@ -3,7 +3,8 @@ import type { LayerConfig } from "@spatialdata/vis";
 import type { ReactNode } from "react";
 
 import type DataStore from "@/datastore/DataStore";
-import type { FieldSpecs } from "@/lib/columnTypeHelpers";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import { flattenFields } from "@/lib/columnTypeHelpers";
 import type { TableAssociation } from "@/react/spatialdata/table_association";
 import ColumnSelectionComponent from "../ColumnSelectionComponent";
 
@@ -15,14 +16,17 @@ type Props = {
     association: TableAssociation;
     dataStore: DataStore;
     tooltipFields: string[];
-    onTooltipFieldsChange: (next: string[]) => void;
+    /** MDV's own record of the choice, when there is one — see {@link MdvFieldSpecs}. */
+    tooltipFieldsSpec?: FieldSpecs;
+    onTooltipFieldsChange: (next: string[], spec: FieldSpecs) => void;
 };
 
 type FillColorByColumnProps = {
     association: TableAssociation;
     dataStore: DataStore;
     fillColorByColumn?: LayerFillColorByColumn;
-    onChange: (next: LayerFillColorByColumn | undefined) => void;
+    fillColorByColumnSpec?: FieldSpec;
+    onChange: (next: LayerFillColorByColumn | undefined, spec: FieldSpec | undefined) => void;
 };
 
 function ControlLabel({ children }: { children: string }) {
@@ -56,18 +60,11 @@ function LabeledControl({
     );
 }
 
-function isConcreteFieldName(column: FieldSpecs[number]): column is string {
-    return typeof column === "string";
-}
-
-function concreteFieldNames(columns: FieldSpecs): string[] {
-    return columns.filter(isConcreteFieldName);
-}
-
 export default function TableAssociationControls({
     association,
     dataStore,
     tooltipFields,
+    tooltipFieldsSpec,
     onTooltipFieldsChange,
 }: Props) {
     return (
@@ -99,9 +96,12 @@ export default function TableAssociationControls({
                 <ColumnSelectionComponent
                     multiple
                     dataStore={dataStore}
-                    current_value={tooltipFields}
+                    // The spec when there is one: it is what the picker gave us, so it
+                    // is what the picker can read back — an active link shown as an
+                    // active link rather than as the columns it happens to resolve to.
+                    current_value={tooltipFieldsSpec ?? tooltipFields}
                     placeholder="Select columns"
-                    setSelectedColumn={(next) => onTooltipFieldsChange(concreteFieldNames(next))}
+                    setSelectedColumn={(next) => onTooltipFieldsChange(flattenFields(next), next)}
                 />
             </LabeledControl>
         </div>
@@ -132,6 +132,7 @@ export function FillColorByColumnControl({
     association,
     dataStore,
     fillColorByColumn,
+    fillColorByColumnSpec,
     onChange,
 }: FillColorByColumnProps) {
     const fillByColumn = fillColorByColumn?.columnName;
@@ -143,16 +144,22 @@ export function FillColorByColumnControl({
                     <ColumnSelectionComponent
                         multiple={false}
                         dataStore={dataStore}
-                        current_value={fillByColumn}
+                        current_value={fillColorByColumnSpec ?? fillByColumn}
                         placeholder="Select column"
                         optional
-                        clearSelectedColumn={() => onChange(undefined)}
-                        setSelectedColumn={(columnName) => {
-                            if (typeof columnName !== "string") return;
-                            onChange({
-                                columnName,
-                                mode: FILL_COLOR_MODE,
-                            });
+                        clearSelectedColumn={() => onChange(undefined, undefined)}
+                        setSelectedColumn={(selection) => {
+                            // Not necessarily a column name: the picker's "active link"
+                            // tab returns a query, whose column is whatever the linked
+                            // datasource has selected right now. `flattenFields` reads
+                            // both, and an empty result means the link has not finished
+                            // initialising — the spec is still stored, and the projection
+                            // fills the colour column in when it resolves.
+                            const columnName = flattenFields(selection)[0];
+                            onChange(
+                                columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined,
+                                selection,
+                            );
                         }}
                     />
                 ) : (

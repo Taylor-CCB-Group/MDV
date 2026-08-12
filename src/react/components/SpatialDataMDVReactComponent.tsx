@@ -20,6 +20,7 @@ import type { FieldName } from "@/charts/charts";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
+import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
 import {
@@ -383,6 +384,8 @@ const SpatialDataViewer = observer(
             if (loading || !spatialData || !coordinateSystem) return;
             seedRenderStackFromSpatialData(config, spatialData, coordinateSystem, chart);
         }, [chart, config, coordinateSystem, loading, spatialData]);
+
+        useProjectMdvFieldSpecs(config, chart);
 
         const deckOverlaySources = useMemo<MdvDeckOverlayLayers>(
             () => ({

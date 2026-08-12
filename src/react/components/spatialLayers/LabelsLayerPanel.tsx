@@ -1,15 +1,18 @@
 import type { LayerConfig } from "@spatialdata/vis";
 
 import type DataStore from "@/datastore/DataStore";
+import { mdvFieldSpecsOf, type WithMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import type { TableAssociation } from "@/react/spatialdata/table_association";
 import TableAssociationControls, {
     FillColorByColumnControl,
     type LayerFillColorByColumn,
 } from "./TableAssociationControls";
 
-type LabelsLayerConfig = Extract<LayerConfig, { type: "labels" }> & {
-    fillColorByColumn?: LayerFillColorByColumn;
-};
+type LabelsLayerConfig = WithMdvFieldSpecs<
+    Extract<LayerConfig, { type: "labels" }> & {
+        fillColorByColumn?: LayerFillColorByColumn;
+    }
+>;
 
 type Props = {
     config: LabelsLayerConfig;
@@ -24,19 +27,33 @@ export default function LabelsLayerPanel({
     association,
     dataStore,
 }: Props) {
+    const specs = mdvFieldSpecsOf(config);
+
     return (
         <div className="grid gap-2">
             <TableAssociationControls
                 association={association}
                 dataStore={dataStore}
                 tooltipFields={config.tooltipFields ?? []}
-                onTooltipFieldsChange={(next) => updateLayer({ tooltipFields: next })}
+                tooltipFieldsSpec={specs?.tooltipFields}
+                onTooltipFieldsChange={(next, spec) =>
+                    updateLayer({
+                        tooltipFields: next,
+                        mdvFieldSpecs: { ...specs, tooltipFields: spec },
+                    })
+                }
             />
             <FillColorByColumnControl
                 association={association}
                 dataStore={dataStore}
                 fillColorByColumn={config.fillColorByColumn}
-                onChange={(next) => updateLayer({ fillColorByColumn: next })}
+                fillColorByColumnSpec={specs?.fillColorByColumn}
+                onChange={(next, spec) =>
+                    updateLayer({
+                        fillColorByColumn: next,
+                        mdvFieldSpecs: { ...specs, fillColorByColumn: spec },
+                    })
+                }
             />
         </div>
     );

@@ -106,6 +106,26 @@ categorical/string fixes; see the version note below.
 alone. It covers MDV's asynchronous `loadColumnSet`, which the viewer knows nothing
 about. Columns the viewer owns are covered by the viewer's own last-good retention.
 
+### Columns that keep moving
+
+MDV's column picker can also return a `RowsAsColsQuery` — an "active link", whose
+column is whatever the linked datasource has selected *right now*. A layer config
+has nowhere to put that: `fillColorByColumn.columnName` and `tooltipFields` are
+plain strings by design, because a saved Render Stack has to mean the same thing to
+a reader that has never heard of MDV's links.
+
+So the query stays on MDV's side of the layer props, under `mdvFieldSpecs`, and
+`projectMdvFieldSpecs` writes the concrete fields from it whenever it resolves
+somewhere new — see `field_spec_projection.ts`. The spec is the source of truth and
+the concrete fields are derived, which is why the picker stores a spec even for an
+ordinary column: a config where the two could disagree is one where the last writer
+wins at random. `withoutMdvFieldSpecs` takes it off at the viewer boundary.
+
+Gene scores live in a linked datasource, never in obs, so an active-link colour
+always takes the per-feature route above. Before this existed the picker offered the
+tab and the handler dropped anything that was not a string, so choosing an active
+link did nothing at all — silently.
+
 ## Minimum upstream version
 
 **`@spatialdata/* >= 0.6.0`, and `zarrextra >= 0.4.0` with it.**

@@ -2,10 +2,11 @@ import { Slider, Typography } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
 
 import type DataStore from "@/datastore/DataStore";
+import { mdvFieldSpecsOf, type WithMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import type { TableAssociation } from "@/react/spatialdata/table_association";
 import TableAssociationControls, { FillColorByColumnControl } from "./TableAssociationControls";
 
-type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
+type ShapesLayerConfig = WithMdvFieldSpecs<Extract<LayerConfig, { type: "shapes" }>>;
 
 type Props = {
     config: ShapesLayerConfig;
@@ -73,6 +74,7 @@ export default function ShapesLayerPanel({
     const fillColor = config.fillColor ?? [200, 200, 200, 120];
     const strokeColor = config.strokeColor ?? [255, 255, 255, 200];
     const tooltipFields = config.tooltipFields ?? [];
+    const specs = mdvFieldSpecsOf(config);
 
     return (
         <div className="grid gap-3">
@@ -80,13 +82,25 @@ export default function ShapesLayerPanel({
                 association={association}
                 dataStore={dataStore}
                 tooltipFields={tooltipFields}
-                onTooltipFieldsChange={(next) => updateLayer({ tooltipFields: next })}
+                tooltipFieldsSpec={specs?.tooltipFields}
+                onTooltipFieldsChange={(next, spec) =>
+                    updateLayer({
+                        tooltipFields: next,
+                        mdvFieldSpecs:{ ...specs, tooltipFields: spec },
+                    })
+                }
             />
             <FillColorByColumnControl
                 association={association}
                 dataStore={dataStore}
                 fillColorByColumn={config.fillColorByColumn}
-                onChange={(next) => updateLayer({ fillColorByColumn: next })}
+                fillColorByColumnSpec={specs?.fillColorByColumn}
+                onChange={(next, spec) =>
+                    updateLayer({
+                        fillColorByColumn: next,
+                        mdvFieldSpecs:{ ...specs, fillColorByColumn: spec },
+                    })
+                }
             />
             <div className="flex items-center gap-3">
                 <span className="w-24 text-xs uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
