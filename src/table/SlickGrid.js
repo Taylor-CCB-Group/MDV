@@ -2492,18 +2492,21 @@ const jQuery = $;
       }
     }
 
+    function getSafeCssRules(sheet) {
+      if (!sheet) {
+        return [];
+      }
+      try {
+        return sheet.cssRules || sheet.rules || [];
+      } catch (e) {
+        return [];
+      }
+    }
+
     function getColumnCssRules(idx) {
       var i;
       if (!stylesheet) {
         var sheets = __doc__.styleSheets;
-
-        function getSafeCssRules(sheet) {
-          try {
-            return sheet.cssRules || sheet.rules || [];
-          } catch (e) {
-            return null;
-          }
-        }
         
         for (let i = 0; i < sheets.length; i++) {
           if ((sheets[i].ownerNode || sheets[i].owningElement) == $style[0]) {
@@ -6340,14 +6343,6 @@ const jQuery = $;
       __doc__=doc;
       stylesheet=null;
       var sheets = __doc__.styleSheets;
-
-      function getSafeCssRules(sheet) {
-        try {
-          return sheet.cssRules || sheet.rules || [];
-        } catch (e) {
-          return null;
-        }
-      }
         
       for (let i = 0; i < sheets.length; i++) {
         var sheetRules = getSafeCssRules(sheets[i]);
