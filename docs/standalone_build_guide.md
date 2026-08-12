@@ -12,8 +12,14 @@ The standalone build (`pnpm run build-standalone`) exposes the `mdv` object (inc
 2. **Deploy**: Place the resulting `dist/mdv` folder into the `/static/` directory of your web application.
 3. **Include in HTML**: Add the following to your HTML page:
     ```html
+    <!-- If mdv_version is NOT set: -->
     <link rel="stylesheet" href="/static/mdv/assets/mdv.css">
     <script type="module" src="/static/mdv/mdv.js"></script>
+
+    <!-- If mdv_version=1.2.3 IS set, use versioned filenames: -->
+    <link rel="stylesheet" href="/static/mdv/assets/mdv-1.2.3.css">
+    <script type="module" src="/static/mdv/mdv-1.2.3.js"></script>
+
     <script type="module">
       // div: the container for MDV
       // dataSources: loaded from dataSources.json
