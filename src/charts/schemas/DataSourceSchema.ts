@@ -14,6 +14,8 @@ export const DataSourceColumnSchema = z.object({
     editable: z.boolean().optional().describe("Whether users can edit values in this column"),
     deleted: z.boolean().optional().describe("Whether the column has been soft-deleted and removed from user-facing column lists"),
     is_url: z.boolean().optional().describe("Whether this column contains URL links (for unique and text columns)"),
+    is_date: z.boolean().optional().describe("Whether this numeric column stores calendar dates as days since Unix epoch"),
+    date_unit: z.literal("days").optional().describe("Unit for is_date columns; always days since Unix epoch (UTC)"),
     minMax: z.tuple([z.number(), z.number()]).optional().describe("For numeric columns: [minimum, maximum] values for optimization"),
     quantiles: z.object({
         "0.05": z.tuple([z.number(), z.number()]).describe("5th and 95th percentiles"),

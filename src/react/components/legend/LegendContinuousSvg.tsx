@@ -40,6 +40,7 @@ export default function LegendContinuousSvg({
     height = DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
     activeRange = null,
     onRangeChange,
+    isDate = false,
 }: LegendContinuousSvgProps) {
     // SVG ids are document-global, and legends may be rendered through separate React roots.
     const gradientIdRef = useRef<string>(createLegendGradientId());
@@ -106,7 +107,7 @@ export default function LegendContinuousSvg({
             .domain([range[0], range[1]])
             .range([0, layout.axisWidth]);
         const axis = axisBottom(scale)
-            .tickFormat(formatContinuousTick)
+            .tickFormat((d) => formatContinuousTick(d, isDate))
             .ticks(layout.tickCount);
 
         const selection = select(axisG);
@@ -121,7 +122,7 @@ export default function LegendContinuousSvg({
         return () => {
             selection.selectAll("*").remove();
         };
-    }, [layout.axisWidth, layout.tickCount, range]);
+    }, [layout.axisWidth, layout.tickCount, range, isDate]);
 
     return (
         <svg

@@ -1,4 +1,5 @@
 import { scaleLinear } from "d3-scale";
+import { dateTickFormat } from "@/lib/dateFormat";
 import {
     CONTINUOUS_HORIZONTAL_PADDING,
     CONTINUOUS_MIN_LAYOUT_WIDTH,
@@ -71,10 +72,13 @@ export function formatLegendLabel(
     };
 }
 
-export function formatContinuousTick(value: unknown): string {
+export function formatContinuousTick(value: unknown, isDate = false): string {
     const num = Number(value);
     if (!Number.isFinite(num)) {
         return String(value);
+    }
+    if (isDate) {
+        return dateTickFormat(num);
     }
     if (Math.abs(num) >= 10000 || (Math.abs(num) > 0 && Math.abs(num) < 0.01)) {
         return num.toExponential(1).replace("+", "");
@@ -141,6 +145,7 @@ const CONTINUOUS_LEGEND_MIN_HEIGHT = 64;
 export type ContinuousLegendHeightOptions = {
     width?: number;
     hasLabel?: boolean;
+    isDate?: boolean;
 };
 
 export function getContinuousLegendContainerHeight(
@@ -149,6 +154,7 @@ export function getContinuousLegendContainerHeight(
 ): number {
     const width = options.width ?? DEFAULT_CONTINUOUS_LEGEND_WIDTH;
     const hasLabel = options.hasLabel ?? true;
+    const isDate = options.isDate ?? false;
     const layout = getContinuousLegendLayout(width, hasLabel);
 
     const scale = scaleLinear()
@@ -160,7 +166,7 @@ export function getContinuousLegendContainerHeight(
     for (const tick of ticks) {
         longestTickWidth = Math.max(
             longestTickWidth,
-            measureLegendLabelWidth(formatContinuousTick(tick)),
+            measureLegendLabelWidth(formatContinuousTick(tick, isDate)),
         );
     }
 

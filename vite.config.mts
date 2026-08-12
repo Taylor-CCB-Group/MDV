@@ -40,10 +40,11 @@ const enableBundleAnalysis =
 /** Same rules as main's per-build assetFileNames, plus fonts under assets/ (Rolldown emits url(./font) next to assets/mdv.css). */
 function flaskAssetFileNames(assetInfo: { name?: string }): string {
     const name = assetInfo.name ?? '';
-    if (name.includes('index.css')) return 'assets/mdv.css';
-    if (name === 'mdv.css') return 'assets/mdv.css';
+    // project_bootstrap / desktop_index import ./all_css → emitted as all_css.css
+    if (name.includes('index.css') || name === 'all_css.css' || name === 'mdv.css' || name === 'desktop_index.css') {
+        return 'assets/mdv.css';
+    }
     if (name === 'catalog.css') return 'assets/catalog.css';
-    if (name === 'desktop_index.css') return 'assets/mdv.css';
     if (process.env.VITE_ENTRYPOINT) {
         const { name: entryBase } = path.parse(process.env.VITE_ENTRYPOINT);
         if (name === `${entryBase}.css`) return 'assets/mdv.css';
@@ -119,10 +120,12 @@ function getRollupOptions() {
 }
 
 // avoiding some repition by defining a proxyOptions object used for all proxied routes.
+// Flask already adds CORS + Range expose headers via add_safe_headers; keep changeOrigin so
+// cross-origin Range requests (parquet / OME-TIFF / zarr via spatialdata.js) work through the proxy.
 const proxyOptions = { target: flaskURL, changeOrigin: true };
 // ... and then this is a bit more concise than 
 const proxy = [
-    '^/(get_|images|tracks|save|chat).*', // these routes are proxied to flask server in 'single project' mode
+    '^/(get_|images|tracks|save|chat|spatial).*', // single-project Flask routes (incl. /spatial zarr etc.)
     '^/project/[^/]+/.+', // proxy nested project routes, but keep /project/:id for the Vite app shell
     '^/.*\\.(json|b|gz)$',
     '/projects',
@@ -175,11 +178,15 @@ export default defineConfig(async (): Promise<UserConfig> => {
     base: process.env.asset_base || (build === 'dev_pt' ? "/" : "./"),
     server: {
         headers: {
+            // Match python/mdvtools/server_utils.add_safe_headers (SharedArrayBuffer + Range CORS).
             "Cross-Origin-Embedder-Policy": "require-corp",
             "Cross-Origin-Opener-Policy": "same-origin",
+            "Cross-Origin-Resource-Policy": "cross-origin",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET",
-            "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization",
+            "Access-Control-Allow-Headers": "Content-Type, Range, X-Requested-With, Authorization",
+            "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges",
+            "Access-Control-Max-Age": "86400",
         },
         port,
         strictPort: true,
@@ -246,10 +253,13 @@ export default defineConfig(async (): Promise<UserConfig> => {
             path.resolve(configDir, 'login_dev.html'),
             path.resolve(configDir, 'catalog_dev.html'),
         ],
-        // zarrextra/workers resolves codec-worker.js via import.meta.url; prebundling
-        // at some point broke that path causing stale-cache 504s after package bumps.
-        // as of now, this will actively prevent the url from being resolved properly in dev
-        // exclude: ['zarrextra/workers'],
+        // @spatialdata/core defers its vendored parquet-wasm import with @vite-ignore.
+        // Prebundling moves the caller to .vite/deps, so its package-relative URL cannot
+        // find the vendored asset. Upstream should expose the loader through a package
+        // export or use a Vite-transformable new URL(..., import.meta.url) reference.
+        // Core also requires Zod 4 while MDV uses Zod 3; excluding both preserves each
+        // package's own dependency resolution instead of sharing the optimized Zod 3 cache.
+        exclude: ["@spatialdata/core", "zod"],
     },
     } as UserConfig;
 });

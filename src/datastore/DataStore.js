@@ -13,6 +13,7 @@ import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
 import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
 import { isDatatypeNumeric } from "@/lib/utils";
+import { formatDateDays, isDateColumn } from "@/lib/dateFormat";
 import {
     getMultitextCapacity,
     getMultitextDelimiter,
@@ -532,6 +533,8 @@ class DataStore {
                 ) {
                     if (Number.isNaN(v)) {
                         v = "missing";
+                    } else if (isDateColumn(col)) {
+                        v = formatDateDays(v);
                     }
                 }
                 //multitext displayed as comma delimited values
