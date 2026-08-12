@@ -6351,8 +6351,11 @@ const jQuery = $;
           break;
         }
       }
-     
-      $style=$(stylesheet.ownerNode);
+      const styleNode = 
+            stylesheet && (stylesheet.ownerNode || stylesheet.owningElement);
+      if (styleNode) {
+        $style = $(styleNode);
+      }     
       removeCssRules();
       createCssRules();
       //applyColumnWidths();
