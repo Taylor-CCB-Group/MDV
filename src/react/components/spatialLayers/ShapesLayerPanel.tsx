@@ -1,27 +1,18 @@
-import {
-    Autocomplete,
-    Chip,
-    MenuItem,
-    Select,
-    Slider,
-    TextField,
-    Typography,
-} from "@mui/material";
+import { Slider, Typography } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
 
-type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
-import { useMemo } from "react";
+import type DataStore from "@/datastore/DataStore";
+import { mdvFieldSpecsOf, type WithMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import type { TableAssociation } from "@/react/spatialdata/table_association";
+import TableAssociationControls, { FillColorByColumnControl } from "./TableAssociationControls";
+
+type ShapesLayerConfig = WithMdvFieldSpecs<Extract<LayerConfig, { type: "shapes" }>>;
 
 type Props = {
     config: ShapesLayerConfig;
     updateLayer: (updates: Partial<ShapesLayerConfig>) => void;
     association: TableAssociation;
-    availableFields: string[];
-    /** Chart-level color_by column, for fill-by-column option list.
-     * nb this needs review, not working and also general background issues with colorBy type.
-     */
-    chartColorBy?: string;
+    dataStore: DataStore;
 };
 
 const toHex = (value: [number, number, number, number]) =>
@@ -78,34 +69,39 @@ export default function ShapesLayerPanel({
     config,
     updateLayer,
     association,
-    availableFields,
-    chartColorBy,
+    dataStore,
 }: Props) {
     const fillColor = config.fillColor ?? [200, 200, 200, 120];
     const strokeColor = config.strokeColor ?? [255, 255, 255, 200];
     const tooltipFields = config.tooltipFields ?? [];
-    const fillByColumn = config.fillColorByColumn?.columnName ?? "";
-
-    const options = useMemo(() => {
-        const set = new Set(availableFields);
-        if (chartColorBy) set.add(chartColorBy);
-        for (const field of tooltipFields) set.add(field);
-        if (fillByColumn) set.add(fillByColumn);
-        return [...set].sort();
-    }, [availableFields, chartColorBy, fillByColumn, tooltipFields]);
+    const specs = mdvFieldSpecsOf(config);
 
     return (
         <div className="grid gap-3">
-            {association.status === "resolved" && association.tableName && (
-                <Typography variant="caption" color="text.secondary">
-                    Associated table: {association.tableName}
-                </Typography>
-            )}
-            {association.status === "ambiguous" && (
-                <Typography variant="caption" color="warning.main">
-                    Table association is ambiguous. Choose columns manually.
-                </Typography>
-            )}
+            <TableAssociationControls
+                association={association}
+                dataStore={dataStore}
+                tooltipFields={tooltipFields}
+                tooltipFieldsSpec={specs?.tooltipFields}
+                onTooltipFieldsChange={(next, spec) =>
+                    updateLayer({
+                        tooltipFields: next,
+                        mdvFieldSpecs:{ ...specs, tooltipFields: spec },
+                    })
+                }
+            />
+            <FillColorByColumnControl
+                association={association}
+                dataStore={dataStore}
+                fillColorByColumn={config.fillColorByColumn}
+                fillColorByColumnSpec={specs?.fillColorByColumn}
+                onChange={(next, spec) =>
+                    updateLayer({
+                        fillColorByColumn: next,
+                        mdvFieldSpecs:{ ...specs, fillColorByColumn: spec },
+                    })
+                }
+            />
             <div className="flex items-center gap-3">
                 <span className="w-24 text-xs uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
                     Stroke width
@@ -135,50 +131,6 @@ export default function ShapesLayerPanel({
                 value={strokeColor}
                 onChange={(next) => updateLayer({ strokeColor: next })}
             />
-            {/* tooltip & fillColor not working yet here */}
-            {/* <Autocomplete
-                multiple
-                size="small"
-                options={options}
-                value={tooltipFields}
-                onChange={(_, value) => updateLayer({ tooltipFields: value })}
-                renderTags={(value, getTagProps) =>
-                    value.map((option, index) => {
-                        const { key, ...tagProps } = getTagProps({ index });
-                        return <Chip key={key} {...tagProps} label={option} size="small" />;
-                    })
-                }
-                renderInput={(params) => (
-                    <TextField {...params} label="Tooltip fields" placeholder="Select columns" />
-                )}
-            />
-            <Select
-                size="small"
-                displayEmpty
-                value={fillByColumn}
-                onChange={(event) => {
-                    const columnName = event.target.value;
-                    if (!columnName) {
-                        updateLayer({ fillColorByColumn: undefined });
-                        return;
-                    }
-                    updateLayer({
-                        fillColorByColumn: {
-                            columnName,
-                            mode: "categorical",
-                        },
-                    });
-                }}
-            >
-                <MenuItem value="">
-                    <em>Static fill color</em>
-                </MenuItem>
-                {options.map((field) => (
-                    <MenuItem key={field} value={field}>
-                        {field}
-                    </MenuItem>
-                ))}
-            </Select> */}
         </div>
     );
 }

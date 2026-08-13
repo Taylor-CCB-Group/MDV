@@ -71,7 +71,6 @@ export function patchRenderStackEntryPropsInPlace(
     patch: Record<string, unknown>,
 ): void {
     for (const [key, value] of Object.entries(patch)) {
-        if (value === undefined) continue;
         if (
             key === "channels" &&
             value &&
@@ -229,6 +228,8 @@ export function seedRenderStackFromSpatialData(
         changed = mergeHostOverlayEntriesInPlace(config.renderStack) || changed;
         if (changed) {
             chart?.bumpRenderStackGeneration();
+        } else {
+            chart?.bumpRenderStackPropsGeneration();
         }
     });
 }
@@ -245,9 +246,9 @@ export function isRemovableRenderStackEntry(entry: RenderStackEntry): boolean {
  *
  * - `config.renderStack` stays a stable object; entries and props are patched in place.
  * - `chart.renderStackGeneration` bumps only for entry-level changes (e.g. visibility)
- *   that need a coarse canvas refresh. In-place `props` edits rely on MobX field
- *   observation (`touchRenderStackEntry` / `renderStackSpatialRevision`) so cosmetic
- *   channel/tone/opacity edits do not reset spatial renderer passthrough.
+ *   that need a coarse canvas refresh. In-place `props` edits bump
+ *   `renderStackPropsGeneration` so cosmetic channel/tone/opacity/annotation edits
+ *   refresh viewer inputs without resetting spatial renderer passthrough.
  * - UI rows use `useRenderStackEntry(entryId)` inside `observer` components so each row
  *   subscribes only to its own entry. Panels receive plain derived props at the boundary.
  *
@@ -281,7 +282,11 @@ export function useRenderStackEntry(entryId: string) {
                 if (!config.renderStack) return;
                 patchRenderStackEntry(config.renderStack, entryId, patch);
                 // Props-only in-place edits are observed via touchRenderStackEntry /
-                // renderStackSpatialRevision; avoid bumping generation or viv passthrough resets.
+                // renderStackSpatialRevision plus a lightweight prop token; avoid the
+                // coarse generation bump that recreates viv passthrough state.
+                if (patch.props) {
+                    chart.bumpRenderStackPropsGeneration();
+                }
                 if (patch.visible !== undefined) {
                     chart.bumpRenderStackGeneration();
                 }
