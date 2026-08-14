@@ -228,7 +228,7 @@ function promoteFloatingElement(el, { container = el.parentElement, group = "def
     el.style.zIndex = String(stack.baseZ + stack.next);
 }
 
-function promoteIfStacked(el, stack) {
+export function promoteIfStacked(el, stack) {
     if (stack) {
         promoteFloatingElement(el, stack === true ? {} : stack);
     }

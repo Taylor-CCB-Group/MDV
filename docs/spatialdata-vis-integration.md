@@ -53,6 +53,171 @@ Remove the unused `refreshRenderStackShell` helper. Replacing only the stack she
 
 Possible follow-up: consider publishing MDV to npm so SpatialData.js can exercise real MDV integration points without local worktree/link setup. This is an integration enabler, not part of the adapter refactor.
 
+## Local linked `@spatialdata/*` (pre-publish verification)
+
+To iterate on an upstream fix against this MDV worktree before publishing another `@spatialdata/*` patch:
+
+```bash
+# optional if checkout is not at ~/code/www/SpatialData.ts or ../SpatialData.ts
+export SPATIALDATA_ROOT=~/code/www/SpatialData.ts
+(cd "$SPATIALDATA_ROOT" && pnpm build)   # or watch the packages you edit
+pnpm link:spatialdata
+# restart Vite; clear cache if needed: rm -rf node_modules/.vite
+```
+
+Restore registry packages with `pnpm unlink:spatialdata` before committing dependency pins.
+
+Note that `resolve.dedupe` and `server.fs.allow` in `vite.config.mts` are what make a linked checkout usable — without them you get two copies of deck/luma/React (`DECKGL_FILTER_COLOR: no matching overloaded function`) and 404s on the linked packages' non-JS assets. Both are gated on a link being present.
+
+## Who owns fill colour
+
+The viewer does, for any column in the annotating table's `obs`. MDV supplies the
+*scheme* — the palette, the domain — and the viewer does the reading and the
+encoding. Everything else stays MDV's.
+
+The routing is one question, asked in `obsColumnNamesForElement`: **is this column
+in the table's obs?**
+
+| | Colour comes from | Why |
+|---|---|---|
+| Column in obs | `fillColorByColumn`, with MDV's palette attached | The viewer can read it, so it should |
+| Column not in obs | `featureState.fillColorByFeatureId` | Gene scores, `mdv_cell_id`, anything computed at runtime — the viewer has no way to reach these |
+| Filtering (`hiddenFeatureIds`) | Always `featureState` | Cross-filtering is MDV's, and no column in obs can express it |
+
+`fillColorSchemeFromDataStore` is what makes the first row safe. It turns an MDV
+column into viewer config: a categorical column becomes
+`categoricalPalette: { byValue }` — colours named by category, so the viewer cannot
+reorder them — and a numeric column becomes `numericRamp` (the bins
+`getColumnColors` already produced) plus `numericDomain` from the column's
+`minMax`. A column drawn on the canvas therefore matches the same column in every
+other MDV chart, log scale included: the log remap is baked into those bins, which
+is why nothing sets `numericScale` (doing both would apply it twice).
+
+This replaces an earlier arrangement where MDV computed every feature's colour and
+kept `fillColorByColumn` out of viewer inputs entirely. That was defensible while
+`fillColorByColumn` could not express an MDV palette — it could only cycle an
+index-ordered list, which is not the same thing as naming a category's colour — but
+it cost a `Record<string, [r,g,b,a]>` with one entry per cell on every filter
+change, and it produced a saved render stack that only looked right inside MDV.
+Named palettes and pinned domains landed upstream in the same release as the
+categorical/string fixes; see the version note below.
+
+`withPreservedFillColorsWhileLoading` survives, scoped to the per-feature route
+alone. It covers MDV's asynchronous `loadColumnSet`, which the viewer knows nothing
+about. Columns the viewer owns are covered by the viewer's own last-good retention.
+
+### Columns that keep moving
+
+MDV's column picker can also return a `RowsAsColsQuery` — an "active link", whose
+column is whatever the linked datasource has selected *right now*. A layer config
+has nowhere to put that: `fillColorByColumn.columnName` and `tooltipFields` are
+plain strings by design, because a saved Render Stack has to mean the same thing to
+a reader that has never heard of MDV's links.
+
+So the query stays on MDV's side of the layer props, under `mdvFieldSpecs`, and
+`projectMdvFieldSpecs` writes the concrete fields from it whenever it resolves
+somewhere new — see `field_spec_projection.ts`. The spec is the source of truth and
+the concrete fields are derived, which is why the picker stores a spec even for an
+ordinary column: a config where the two could disagree is one where the last writer
+wins at random. `withoutMdvFieldSpecs` takes it off at the viewer boundary.
+
+Gene scores live in a linked datasource, never in obs, so an active-link colour
+always takes the per-feature route above. Before this existed the picker offered the
+tab and the handler dropped anything that was not a string, so choosing an active
+link did nothing at all — silently.
+
+## The points layer panel
+
+`PointsLayerPanel` is a bridge, not a leaf. The layer dialog is a portal with its own
+React tree, so it cannot see the renderer hook's result; the chart publishes the live
+`PointsDataEngine` on `chart.pointsLayerRegistry` (an effect in
+`SpatialDataMDVReactComponent`, cleared on unmount) and the panel wraps its subtree in
+`<PointsFeatureStateProvider>`. That engine must be the one the render path owns — it
+holds the resident window, the feature catalog and the in-flight scans, so a second
+instance would reload everything and answer different questions from the one drawing.
+`resolveTarget` comes from the renderer hook for the same reason: panel reads have to
+hit the cache keys the render writes.
+
+Two consequences worth knowing before editing either panel file:
+
+- Every component calling `usePointsFeatureState` needs `'use no memo'`. The hook
+  re-renders on each engine notify via `useSyncExternalStore`, but the values it
+  returns come from mutable engine state the React Compiler cannot see as a
+  dependency — it would memoize the JSX and hold the pre-catalog branch on screen.
+- The hook throws outside the provider, so the style controls take an
+  `engineAvailable` flag rather than assuming one is present.
+
+The feature selection persists as **names** (`featureNames`), never codes. For a
+dictionary-only element — a Xenium `transcripts` has `feature_name` and no code
+column — the codes are app-assigned from whichever catalog scan ran first, so a saved
+code can come back meaning a different gene. The panel writes names and clears any
+legacy `featureCodes` so the two can never disagree.
+
+There is deliberately **no colour-by-feature switch**: `colorByFeature: false` does not
+reach the deck layer upstream (SpatialData.js#147), so the control would be inert. The
+flat colour control stays, with a caption saying what it actually does when the element
+has features.
+
+### On-demand feature loading
+
+Selecting a feature whose points fall outside the memory cap triggers a feature-index
+scan that fetches them. That scan runs in the **core points worker**, which
+`ensurePointsWorker` starts alongside the zarr chunk worker. It is not optional:
+`loadPointsMatchingFeatureCodes` throws outright without a worker rather than falling
+back to the main thread, so without it a selection silently shows only whatever part of
+the feature was inside the cap.
+
+This was impossible before `@spatialdata/core@0.8.0` — the published worker entry was a
+CommonJS file in an ESM package, so `new Worker(url, {type: "module"})` died on
+`require is not defined` (SpatialData.js#148). That is the reason for the pin floor.
+The panel still gates its on-demand messaging on `isPointsWorkerEnabled()`: if the
+worker ever fails to start, a greyed row must not invite a click that cannot work.
+
+Two things about the panel that follow from how the engine reports state, both easy to
+misread:
+
+- A feature is **"resident" if it has one point inside the cap**, not if all of its
+  points are there. On an 8.07M-point element at the 4M default, all 541 features are
+  resident. Rows whose resident count falls short of the dataset total are therefore
+  classified `partial` and print `resident / dataset` — un-greyed, because they *are*
+  drawn, but never claiming to be whole.
+- A **failed** scan still draws: the render path falls back to filtering the resident
+  batch, so the canvas shows a subset and nothing about it looks broken. The panel
+  reports `matchingLoadState.failed` explicitly with a Retry, rather than letting that
+  subset read as the complete answer.
+
+## Minimum upstream version
+
+**`@spatialdata/* >= 0.8.0`, and `zarrextra >= 0.4.0` with it.**
+
+0.8.0 is the floor. It is the first release whose published
+`@spatialdata/core/points-worker` is an ES module and can therefore be started at all,
+which is what makes on-demand feature loading work rather than fail silently. It also
+carries `describeFeatureRowState` (imported here rather than mirrored) and the
+resident-vs-dataset feature counts the panel prints.
+
+0.7.0 first re-exported `PointsFeatureStateProvider` / `usePointsFeatureState` from the
+`@spatialdata/vis` entry — below it they are not reachable at all, since the package
+publishes only a `"."` export.
+
+0.6.0 remains the floor for the table work underneath that. Do not ship an MDV that
+touches SpatialData tables against anything older. Before
+0.6.0, `'auto'` mode sniffed values instead of trusting the store's declared column
+kind — one `NaN` in a float column made it categorical and gave every distinct float
+its own hue — and category colours depended on which features happened to load.
+AnnData written by newer tooling is more likely to hit both. Nor is it a
+degrade-gracefully situation: the scheme MDV now sends (`categoricalPalette:
+{ byValue }`) reaches 0.4.0 as an object where it expects a list, indexes it with a
+`NaN`, and throws `Cannot read properties of undefined` three frames away inside the
+layer.
+
+`zarrextra` moves in step because `@spatialdata/core` depends on `0.4.0`
+exactly. Leaving MDV's own pin at `^0.3.0` installs a second copy, and MDV's
+`ensureChunkWorker` then flips the worker-decode flag in a module instance core
+never reads.
+
+The pins in `package.json` are the enforcement; keep them at or above these.
+
 ## Avivatorish comparison
 
 MDV currently carries a local `src/react/components/avivatorish` implementation and also depends on `@spatialdata/avivatorish`. Treat the local copy as the integration shim for now, not as a desired long-term fork.
@@ -103,7 +268,7 @@ Useful follow-up SpatialData.js changes (not blocking this PR):
 
 ### Image layer panel pattern (MDV)
 
-Dependencies: pin `@spatialdata/{core,layers,react,vis,avivatorish}` at **0.2.3**.
+Dependencies: `@spatialdata/{core,layers,react,vis,avivatorish}` at **>= 0.8.0** (see the version floor above).
 
 **Viewer (chart tree)**
 
@@ -204,7 +369,7 @@ Implemented under `src/react/spatialdata/` and `src/react/components/SpatialData
 
 ## Deferred (follow-up PR)
 
-- Table-driven shape colouring (`fillColorByColumn`, `spatial_table_association`)
+- Render stacks saved before `FILL_COLOR_MODE` became `"auto"` still carry `mode: "categorical"` on every colour column, including numeric ones. It is inert while MDV strips `fillColorByColumn` from viewer inputs, so nothing is mis-drawn today — but whoever lifts that strip, or writes an importer for a saved stack, needs to normalise the stale value first (an explicit mode is honoured verbatim by the viewer).
 - `@spatialdata/avivatorish` zarr loader delegation (MDV keeps OME-TIFF local)
 - Playwright fixture test
 

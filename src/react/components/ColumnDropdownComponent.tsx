@@ -30,7 +30,14 @@ function isMultiColProp<T extends CTypes, M extends boolean>(p: ColumnSelectionP
 const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: ColumnSelectionProps<T, M>) => {
 
     const props = inferGenericColumnSelectionProps(gProps);
-    const { setSelectedColumn, placeholder, type, current_value } = props;
+    const {
+        setSelectedColumn,
+        clearSelectedColumn,
+        placeholder,
+        type,
+        current_value,
+        optional,
+    } = props;
     
     const isMultiType = isMultiColProp(props);
     // are we sure that props.dataStore will be right 
@@ -54,7 +61,7 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
             }
             return columns.filter(c => current_value.includes(c.field));
         } else {
-            return columns.find(c => c.field === current_value);
+            return columns.find(c => c.field === current_value) ?? null;
         }
     }, [current_value, columns, isMultiType]);
 
@@ -69,12 +76,17 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
             return (v: DataColumn<DataType>) => {
                 if (isMultiType) throw new Error("Unexpected single column value for multi column dropdown");
                 //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
-                setSelectedColumn(v?.field);
+                setSelectedColumn(v.field);
             }
         }
     }, [setSelectedColumn, isMultiType]);
 
-    return {placeholder, type, isMultiType, columns, value, setValue};
+    const clearValue =
+        optional && !isMultiType && clearSelectedColumn
+            ? clearSelectedColumn
+            : undefined;
+
+    return {placeholder, type, isMultiType, columns, value, setValue, clearValue};
 
 };
 
@@ -84,7 +96,7 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
  * it will only need to understand columns originating from 
  */
 const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(gProps: ColumnSelectionProps<T, M>) => {
-    const { placeholder, isMultiType, columns, value, setValue } = useColumnDropdownValue(gProps);
+    const { placeholder, isMultiType, columns, value, setValue, clearValue } = useColumnDropdownValue(gProps);
     const [selectAll, setSelectAll] = useState(isMultiType && isArray(value) ? columns.length === value?.length : false);
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
@@ -114,7 +126,9 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
     }, [selectAll, setValue, columns, isMultiType]);
 
     const handleValueChange = useCallback((newValue: DataColumn<DataType> | DataColumn<DataType>[] | null) => {
-        if (!newValue) return;
+        if (!newValue) {
+            return;
+        }
         if (isMultiType) {
             (setValue as (v: DataColumn<DataType>[]) => void)(newValue as DataColumn<DataType>[]);
         } else {
@@ -142,14 +156,18 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                     multiple={isMultiType}
                     value={value as ColumnValue}
                     disableCloseOnSelect={isMultiType}
+                    disableClearable={!clearValue}
                     open={open}
                     onOpen={() => setOpen(true)}
                     onClose={() => setOpen(false)}
                     ref={ref}
-                    onChange={(_, value) => {
+                    onChange={(_, value, reason) => {
                         //! now that we say `value as ColumnValue`, MUI thinks the value for onChange is not an array - which it could be.
                         // *sigh*. time to move on.
-                        if (!value) return; //! check if this is correct
+                        if (!value) {
+                            if (reason === "clear") clearValue?.();
+                            return;
+                        }
                         if (!(isMultiType === isArray(value))) throw new Error("type mismatch");
                         if (isMultiType && isArray(value) && value.length === 0) {
                             setSelectAll(false);
