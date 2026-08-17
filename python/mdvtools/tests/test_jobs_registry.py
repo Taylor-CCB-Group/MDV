@@ -117,3 +117,33 @@ def test_rejects_bool_for_int_param(project):
         validate_params(
             NUMERIC_SPEC, {"datasource": "cells", "n_neighbors": True, "output_name": "OUT"}, project
         )
+
+def test_serialize_registry_lists_all_tools_without_internal_fields():
+    from mdvtools.jobs.registry import serialize_registry
+
+    tools = serialize_registry()
+
+    # a JSON list, one entry per registered tool, id carried inside each
+    assert isinstance(tools, list)
+    assert {t["id"] for t in tools} == {"concat_columns", "umap"}
+
+    concat = next(t for t in tools if t["id"] == "concat_columns")
+
+    # fields the selector renders
+    assert concat["name"] == "Concatenate Columns"
+    assert "description" in concat
+    assert concat["input_shape"] == "columns"
+    assert concat["output"] == {
+        "shape": "column",
+        "datasource_param": "datasource",
+        "columns_param": "output_name",
+    }
+
+    # params carry their GUI-render vocabulary
+    output_name = next(p for p in concat["params"] if p["name"] == "output_name")
+    assert output_name["type"] == "text"
+    assert output_name["label"] == "New column name"
+    assert {"options_from", "default", "applies_to"} <= output_name.keys()
+
+    # entrypoint is an internal dispatch detail, never sent to the client
+    assert "entrypoint" not in concat

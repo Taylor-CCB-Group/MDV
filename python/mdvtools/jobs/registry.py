@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Any
 
 
@@ -63,6 +63,19 @@ UMAP = ToolSpec(
 )
 
 REGISTRY: dict[str, ToolSpec] = {CONCAT_COLUMNS.id: CONCAT_COLUMNS, UMAP.id: UMAP}
+
+def serialize_registry() -> list[dict]:
+    """
+    Client facing view of the tool registry for GET /jobs/tools.
+
+    asdict each ToolSpec into the JSON the selector renders
+    """
+    tools = []
+    for spec in REGISTRY.values():
+        d = asdict(spec)
+        d.pop("entrypoint", None)       # client doesn't need entrypoint
+        tools.append(d)
+    return tools
 
 
 def get_tool(tool_id: str) -> ToolSpec:
