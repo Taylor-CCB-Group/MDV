@@ -89,6 +89,29 @@ decisions live in `docs/adr/` (0004–0007).
 
 - **owner** — the web server; the sole reader/writer of the project store.
 
+- **driver** — the single background loop (one per server process) that repeatedly advances every
+  project's **jobs**, dispatching queued ones and ingesting finished ones, so they progress whether
+  or not any client is watching. Liveness, not latency: it promises each advance eventually happens,
+  on no fixed deadline. Local dev runs it as a daemon thread inside the **owner**; HPC can host it in
+  its own process. Exactly one runs at a time (ADR-0012).
+
+- **recovery scan** — the **driver**'s first action at startup: sweep the catalog, cheaply filter
+  each project for active **job records**, and build a manager only for those, so in-flight **jobs**
+  reattach or re-queue after a restart with no client having to open the project. Filter first, so
+  the cost is one stat per project, not a manager per project. The startup half of the same reconcile
+  (ADR-0005) a per-project manager runs when it is first created.
+
+- **quarantine** — where the **recovery scan** moves a **job record** it cannot parse: aside and
+  preserved for inspection (not deleted, not silently skipped), surfaced on a health signal. A
+  corrupt record loses only itself; the project's other records and every other project still
+  recover (ADR-0012).
+
+- **driver** — the single background loop (one per server process) that repeatedly advances every
+  project's **jobs** so they progress whether or not any client is watching. It provides liveness,
+  not latency: it promises each advance eventually happens, on no fixed deadline. Local dev runs it
+  as a daemon thread inside the **owner**; HPC can host it in its own process. Exactly one runs at a
+  time.
+
 - **workspace** — the per-job directory holding the materialized inputs, intermediates, and
   outputs for one **job**. Fixed layout: `input/`, `work/`, `output/`, terminal marker.
 
