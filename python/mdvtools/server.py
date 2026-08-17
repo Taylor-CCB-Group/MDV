@@ -13,6 +13,7 @@ from mdvtools.server_utils import (
     add_safe_headers,
 )
 from mdvtools.ucsc_proxy_extension import UcscProxyServerExtension
+from mdvtools.jobs.registry import serialize_registry
 
 import webbrowser
 import json
@@ -68,7 +69,7 @@ def create_app(
         """
         msg = " ".join(str(arg) for arg in args)
         logger.info(f"[{project.id} - '{project.dir.split('/')[-1]}'] {msg}", **kwargs)
-    
+
     if options is None:
         options = MDVServerOptions()
 
@@ -95,7 +96,7 @@ def create_app(
         if options.websocket:
             # reviewing this... thinking about hooking up to ProjectChat logger...
             #! nb - we're in 'single project' mode here.
-            # thinking about syncronising list of views via SocketIO rather than polling... 
+            # thinking about syncronising list of views via SocketIO rather than polling...
             # maybe via a smaller PR where I better figure out clean socket implementation.
             # maybe we have some abstraction around how we create the Flask instance.
             mdv_socketio(app)
@@ -109,7 +110,7 @@ def create_app(
         # this is to allow multiple projects to be served from the same server.
         multi_project = True
         route = "/project/" + project.id + "/"
-        
+
 
         if options.backend_db:
             project_bp = Blueprint(project.id, __name__, url_prefix=route)
@@ -165,7 +166,7 @@ def create_app(
             return "File not found", 404
         # consider allowing directory listing here if it's not a file?
         return send_file(path)
-    
+
     @project_bp.route("/<file>.b")
     def get_binary_file(file):
         # should this now b '.gz'?
@@ -193,7 +194,7 @@ def create_app(
         path = safe_join(project.dir, file + ".json")
         # log(f"get_json_file: '{path}' for project {project.id}")
 
-        
+
         if path is None or not os.path.exists(path):
             return "File not found", 404
         if file == "state":
@@ -210,7 +211,7 @@ def create_app(
                     # we should alter permissions based on the permission of the user...
                     for extension in options.extensions:
                         extension.mutate_state_json(state, project, app)
-                    
+
                     state['mdv_api_root'] = os.environ.get('MDV_API_ROOT', '/')
                     return state
                 except Exception as e:
@@ -259,6 +260,11 @@ def create_app(
     @project_bp.route("/get_configs", methods=["GET", "POST"])
     def get_configs():
         return jsonify(project.get_configs())
+
+    # tools available
+    @project_bp.route("/jobs/tools", methods=["GET"])
+    def jobs_tools():
+        return jsonify(serialize_registry())
 
     # gets a particular view
     @project_bp.route("/get_view", methods=["POST"])
@@ -600,7 +606,7 @@ def create_app(
             if not combine:
                 cleanup_folder(temp_folder)
                 return jsonify({'status': 'success', 'message': 'Operation cancelled'}), 200
-            
+
             if not label:
                 cleanup_folder(temp_folder)
                 return jsonify({'status': 'error', 'message': 'Label field not found'}), 400
@@ -624,7 +630,7 @@ def create_app(
         except Exception as e:
             current_app.logger.error(f"Unexpected error: {str(e)}")
             return jsonify({'status': 'error', 'message': str(e)}), 500
-    
+
     @project_bp.route("/add_or_update_image_datasource", access_level='editable', methods=["POST"])
     def add_or_update_image_datasource():
         try:
@@ -634,7 +640,7 @@ def create_app(
 
             # Get the file from the request
             file = request.files['file']
-            
+
             # Get the text fields from the request form
             datasource_name = request.form.get('datasourceName') # ""
             tiff_metadata = request.form.get('tiffMetadata')
@@ -646,10 +652,10 @@ def create_app(
                 tiff_metadata = json.loads(tiff_metadata)
             except Exception as e:
                 return jsonify({"status": "error", "message": f"Invalid JSON format for tiffMetadata: {e}"}), 400
-            
+
             # Call the method to add or update the image datasource
             view_name = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file)
-            
+
             # If no exception is raised, the operation was successful. let the client know which view will show the image.
             log(f">>> notify client that image datasource updated and file uploaded successfully, view: {view_name}")
             return jsonify({"status": "success", "message": "Image datasource updated and file uploaded successfully", "view": view_name}), 200
@@ -744,5 +750,3 @@ def create_app(
         from gevent.pywsgi import WSGIServer
         http_server = WSGIServer(("127.0.0.1", options.port), app)
         http_server.serve_forever()
-
-
