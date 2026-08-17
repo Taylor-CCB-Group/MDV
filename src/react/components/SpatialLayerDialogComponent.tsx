@@ -32,7 +32,6 @@ import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
-
 import {
     DECK_OVERLAY_IDS,
     DECK_OVERLAY_LABELS,
@@ -56,9 +55,9 @@ import {
     defaultPropsForSpatialElement,
     listAvailableSpatialEntries,
 } from "@/react/spatialdata/render_stack_defaults";
-import { NO_TABLE_ASSOCIATION } from "@/react/spatialdata/table_association";
+import { useElementTableAssociation } from "@/react/spatialdata/table_association";
 import { useChart, useDataStore } from "../context";
-import { useConfig } from "../hooks";
+import { useConfig, useDataSources } from "../hooks";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
 import ImageLayerPanel from "./spatialLayers/ImageLayerPanel";
@@ -71,17 +70,31 @@ type InsertOption =
     | { kind: "spatial"; type: RenderStackSpatialElementType; elementKey: string; label: string }
     | { kind: "host"; deckId: DeckOverlayId; label: string };
 
-function getAvailableFields(dataStore: ReturnType<typeof useDataStore>): string[] {
-    return Object.keys(dataStore.columnIndex).sort();
+function isLayerConfigOfType<TType extends LayerConfig["type"]>(
+    layer: LayerConfig | undefined,
+    type: TType,
+): layer is Extract<LayerConfig, { type: TType }> {
+    return layer?.type === type;
 }
 
 const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: string }) {
     const dataStore = useDataStore();
-    const chartConfig = useConfig<SpatialDataMdvReactConfig>();
+    const dataSources = useDataSources();
+    const { spatialData } = useSpatialData();
     const { entry, layer, patchLayer } = useRenderStackEntry(entryId);
-    const availableFields = useMemo(() => getAvailableFields(dataStore), [dataStore]);
-    const chartColorBy =
-        typeof chartConfig.color_by === "string" ? chartConfig.color_by : undefined;
+    const spatialElementType = entry?.kind === "spatial" ? entry.source.elementType : undefined;
+    const spatialElementKey = entry?.kind === "spatial" ? entry.source.elementKey : undefined;
+    const tableAssociation = useElementTableAssociation(
+        spatialData ?? undefined,
+        spatialElementType,
+        spatialElementKey,
+        dataSources,
+    );
+    const layerDataStore =
+        tableAssociation.status === "resolved"
+            ? dataSources.find((dataSource) => dataSource.name === tableAssociation.dataSourceName)
+                  ?.dataStore ?? dataStore
+            : dataStore;
 
     if (!entry) return null;
 
@@ -97,30 +110,32 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
         case "image":
             return <ImageLayerPanel entryId={entryId} />;
         case "shapes":
+            if (!isLayerConfigOfType(layer, "shapes")) return null;
             return (
                 <ShapesLayerPanel
-                    config={layer as Extract<LayerConfig, { type: "shapes" }>}
-                    association={NO_TABLE_ASSOCIATION}
-                    availableFields={availableFields}
-                    chartColorBy={chartColorBy}
+                    config={layer}
+                    association={tableAssociation}
+                    dataStore={layerDataStore}
                     updateLayer={patchLayer}
                 />
             );
         case "points":
+            if (!isLayerConfigOfType(layer, "points")) return null;
             return (
                 <PointsLayerPanel
-                    config={layer as Extract<LayerConfig, { type: "points" }>}
+                    config={layer}
                     updateLayer={patchLayer}
                 />
             );
         case "labels":
-            return ( null //nothing useful here at the moment.
-                // <LabelsLayerPanel
-                //     config={layer as Extract<LayerConfig, { type: "labels" }>}
-                //     association={NO_TABLE_ASSOCIATION}
-                //     availableFields={availableFields}
-                //     updateLayer={patchLayer}
-                // />
+            if (!isLayerConfigOfType(layer, "labels")) return null;
+            return (
+                <LabelsLayerPanel
+                    config={layer}
+                    association={tableAssociation}
+                    dataStore={layerDataStore}
+                    updateLayer={patchLayer}
+                />
             );
         default:
             return null;

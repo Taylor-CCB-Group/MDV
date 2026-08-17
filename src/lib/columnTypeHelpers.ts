@@ -43,10 +43,12 @@ export type ColumnSelectionProps<T extends CTypes, M extends boolean,
         type?: T; //wary of using 'type' as a name - not reserved, but could be confusing. also wary of optional type
         multiple: M; //also interacts with type "_multi..."; in future, prefer separate props for multiple selection and type
         setSelectedColumn: (column: V) => void;
+        clearSelectedColumn?: () => void;
         current_value?: V;
         placeholder?: string;
         exclude?: string[];
         dataStore?: DataStore;
+        optional?: boolean;
     };
 
 /** 

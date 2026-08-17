@@ -28,6 +28,27 @@ function touchVivLayerProps(vivLayerProps: unknown) {
     void props.contrast;
 }
 
+function stableRevisionValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(stableRevisionValue);
+    if (!value || typeof value !== "object") return value;
+
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(
+        Object.keys(record)
+            .sort()
+            .map((key) => [key, stableRevisionValue(record[key])]),
+    );
+}
+
+function spatialPropsState(props: Record<string, unknown>): Record<string, unknown> {
+    const state: Record<string, unknown> = {};
+    for (const key of Object.keys(props).sort()) {
+        if (key === "channels" || key === "vivLayerProps") continue;
+        state[key] = stableRevisionValue(props[key]);
+    }
+    return state;
+}
+
 /** Establish MobX subscriptions for a single stack entry (call during observer render). */
 export function touchRenderStackEntry(entry: RenderStackEntry | undefined) {
     if (!entry) return;
@@ -63,6 +84,7 @@ export function renderStackSpatialRevision(stack: RenderStack | undefined): stri
     for (const entry of stack.entries) {
         if (entry.kind !== "spatial") continue;
         parts.push(`${entry.id}:${entry.visible}:${String(entry.props.opacity ?? "")}`);
+        parts.push(JSON.stringify(spatialPropsState(entry.props)));
         const channels = entry.props.channels;
         if (channels && typeof channels === "object") {
             parts.push(channelStateKey(channels as LayerChannelConfig));

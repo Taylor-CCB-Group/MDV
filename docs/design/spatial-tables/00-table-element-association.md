@@ -71,20 +71,36 @@ to go row → featureId when handing colours to the library's `featureState` (wh
   table row. Fragile; assumes parquet order == filtered-table order.
 - Unmatched features get `-1` and are surfaced explicitly, not guessed.
 
-## Why nothing connects today
+## What is wired today
 
-The two halves exist but are not wired:
+> Rewritten after the fact. The original text of this section — "why nothing connects today" —
+> described a stub resolver, commented-out UI, and static fills. None of that is still true, so
+> it has been replaced rather than annotated. Everything above this line was written before the
+> work and still reads true.
 
-- `table_association.ts` ([src/react/spatialdata/table_association.ts](../../../src/react/spatialdata/table_association.ts))
-  is a **type stub** (`none | ambiguous | resolved`) with **no resolver** — `NO_TABLE_ASSOCIATION`
-  is hardcoded at both panel call sites.
-- The `fillColorByColumn` and `tooltipFields` UI in
-  [ShapesLayerPanel.tsx:138](../../../src/react/components/spatialLayers/ShapesLayerPanel.tsx) is
-  **commented out** ("not working yet"); the `LabelsLayerPanel` is **disabled**.
-- Shapes render with a **static fill**, ignore `ds.filterArray`, and are not picked into the
-  DataStore. Their tooltip is library-driven, not MDV column-driven.
-- MDV supplies **no per-feature accessors** to the library's shapes layer today — only static
-  `fillColor` / `strokeColor` props via the render-stack `LayerConfig`.
+`table_association.ts` has a real resolver, both panels are live, and geometry is coloured,
+filtered and tooltipped by table columns. What did **not** get built is the return direction:
+picking a shape does not reach `dataHighlighted`, and lasso on the spatial view does not select
+shapes into the DataStore.
+
+Colour turned out to have **two routes**, decided per column by one question — is the column in
+the annotating table's `obs`? — which neither Option A nor Option B below anticipated:
+
+- **In obs** → hand the column to the viewer as `fillColorByColumn`, with MDV's own palette
+  attached (`fillColorSchemeFromDataStore`). The viewer reads the column, encodes it, and does its
+  own load-window retention. This needed upstream work: `fillColorByColumn` could originally only
+  cycle an index-ordered list, which cannot express "this category is this colour".
+- **Not in obs** (gene scores, `mdv_cell_id`, anything computed at runtime) → MDV is the only
+  party holding the values, so it colours each feature itself via `featureState.fillColorByFeatureId`
+  — Option A as described.
+
+Filtering is always `featureState`: cross-filtering is MDV's, and no column in obs can express it.
+The full routing table is in [docs/spatialdata-vis-integration.md](../../spatialdata-vis-integration.md).
+
+So Option A's seam was real, and the answer to "does `@spatialdata/vis` accept per-layer
+`featureState`?" is yes — but the more interesting finding is that for a column the viewer *can*
+read, handing over the column beats handing over a `Record<string, [r,g,b,a]>` with one entry per
+cell on every filter change.
 
 ## The Python contract gap (why this pulls toward the JS-read path)
 
@@ -128,8 +144,11 @@ Compute, from MDV per-row data, the featureId-keyed inputs the library layer alr
 *Pro:* reuses the library's geometry loading *and* deck layers; least new rendering code.
 *Con / must-verify:* requires `@spatialdata/vis`'s renderer (`useSpatialCanvasRendererFromLayerInputs`)
 to accept per-layer `featureState` (or equivalent colour/hidden inputs) through the render-stack
-`LayerConfig` / renderer inputs. The `@spatialdata/*@0.2.5` packages are **not installed in this
-worktree** — confirm this injection seam against installed `node_modules` before committing to A.
+`LayerConfig` / renderer inputs.
+
+> **Resolved: A, and the seam is real.** Verified against `@spatialdata/*@0.6.0` — the floor for
+> this work, because the palette and domain fields it needs do not exist below it. See
+> [What is wired today](#what-is-wired-today) for the obs/not-obs split that came out of it.
 
 ### Option B — MDV host deck layer using library-loaded geometry (recommended for parity)
 Call `ShapesElement.loadRenderData()` to get geometry + `rowIndexByFeatureIndex` (so **no WKB /
@@ -176,25 +195,55 @@ Do labels **after** shapes; treat colour-by-LUT as the MVP and filtering as a fo
 
 ## Phasing
 
-0. **Association resolver** — fill `table_association.ts`: map `elementKey` → the table's DataSource
-   (via region metadata), build the feature→row `Int32Array`. Everything else depends on this.
-1. **Colour shapes by a table column** — reuse `getColorFunction`; drive Option A `featureState` or
-   Option B host layer. Re-enable the `fillColorByColumn` UI in `ShapesLayerPanel`.
-2. **Filter shapes by the table** — `filterArray` → hidden/faded features; redraw.
-3. **Pick + highlight + tooltip shapes** → `dataHighlighted`, `config.tooltip.column`.
-4. **Geometry → table lasso selection** (bidirectional filtering).
-5. **Labels**: colour-by-LUT, then hidden-label filtering.
+| | Phase | State |
+|---|---|---|
+| 0 | **Association resolver** — map `elementKey` → the table's DataSource (via region metadata), build the feature→row `Int32Array` | **Done** |
+| 1 | **Colour shapes by a table column** — reuse `getColorFunction`; drive Option A `featureState` or Option B host layer | **Done** (Option A, plus the obs route) |
+| 2 | **Filter shapes by the table** — `filterArray` → hidden/faded features; redraw | **Done** |
+| 3 | **Pick + highlight + tooltip shapes** → `dataHighlighted`, `config.tooltip.column` | **Tooltip done; highlight open** — the library emits pick events carrying `rowIndex`, but nothing routes them into `dataHighlighted` |
+| 4 | **Geometry → table lasso selection** (bidirectional filtering) | **Open** |
+| 5 | **Labels**: colour-by-LUT, then hidden-label filtering | **Done** — labels take the same two colour routes as shapes |
+
+Labels arriving early rather than last is worth noting: they came almost free once colour was
+expressed as *a column the viewer resolves* rather than *a map MDV computes*, because the viewer
+already knew how to read a column against a labels element. The doc's assumption that labels
+would need a bespoke LUT path held only for the not-in-obs route.
+
+## Columns that come from elsewhere (links, vars, computed)
+
+**Any numeric column in MDV can accept a `RowsAsColsLink`** — that is the rule, and it is why the
+column picker offers the "active link" tab wherever the parameter accepts numeric. A spatial layer's
+fill colour is no exception; it now takes one (`field_spec_projection.ts`), so a layer can be
+coloured by "whichever gene is selected over there" and follow that selection live.
+
+Worth naming for future work: **the way `RowsAsColsLink` is used today is really "choose a `var`
+from a table"** — the linked datasource is a gene/feature table, and the link picks a column of the
+expression matrix. Reading it that way suggests two directions, neither of which changes the
+current implementation:
+
+- **Computed columns.** A column produced by an expression graph is the same shape of problem — a
+  column identity that resolves late and can change while the chart is open. `mdvFieldSpecs` (the
+  spec kept on MDV's side of the layer props, projected onto the viewer's concrete field names) is
+  already the seam for that: a different kind of spec, same projection.
+- **Cheaper `vars`.** Resolving a var column currently materialises it across the whole datasource.
+  An annotated element often covers **far fewer rows than the datasource has** — one region of a
+  multi-region table — so the values actually needed are a small slice. Scoping the fetch to the
+  element's rows is the obvious win, and it wants the feature→row `Int32Array` this theme already
+  builds. Nothing today is structured to take advantage of that.
 
 ## Open questions / risks
 
-- **Which DataSource is "the table" for an element?** The resolver must map `elementKey` → region →
-  the MDV datasource name. Clean on the JS path (the store's `getAssociatedTable`); needs
-  converter-preserved region metadata on the h5 path.
-- **The converter identity gap** (above) — decide JS-read vs converter-fix as the delivery route.
-- **`@spatialdata/vis` `featureState` injection seam** — verify against installed packages
-  (worktree lacks them) before betting on Option A.
-- **Multi-region tables**: the library's `getAssociatedTable` uses only the *first* match; a
-  broad "matched zero → use all rows" fallback can over-associate for shared tables.
+- ~~**Which DataSource is "the table" for an element?**~~ Answered on the JS path:
+  `resolveAssociatedElementTable`, via the store's `getAssociatedTable`. The h5 path still needs
+  converter-preserved region metadata.
+- ~~**The converter identity gap**~~ — settled by delivery: JS-read. The converter gap (theme 2) is
+  sidestepped, not closed, and still bites anything that wants the association on the h5 path.
+- ~~**`@spatialdata/vis` `featureState` injection seam**~~ — verified against `0.6.0`; the seam
+  exists and Option A was taken.
+- **Multi-region tables**: still open, and now visible in the routing. `obsColumnNamesForElement`
+  only answers when there is exactly **one** associated table, and returns `undefined` otherwise —
+  which quietly sends every column of an ambiguously-associated element down the per-feature route
+  rather than mis-colouring it. That is a safe default, not a solution.
 - **Positional-alignment fragility** — safe only for `0..n-1` parquet indices with matching row
   counts; another reason to prefer real `instance_key`s end to end.
 - **Perf**: `loadFeatureRowIndexByFeatureIndex` re-scans the whole obs table per call; cache it in
