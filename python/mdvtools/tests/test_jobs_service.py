@@ -80,3 +80,35 @@ def test_tick_all_ticks_every_manager_once():
 
     service.tick_all()
     assert m1.ticks == 2 and m2.ticks == 2
+
+def test_tick_all_continues_when_one_manager_fails():
+    from mdvtools.jobs.service import JobService
+
+    class FakeProject:
+        def __init__(self, pid):
+            self.id = pid
+            self.dir = "/unused"
+
+    class BoomManager:
+        def __init__(self, project):
+            self.project = project
+
+        def tick(self):
+            raise RuntimeError("boom")
+
+    class OkManager:
+        def __init__(self, project):
+            self.project = project
+            self.ticks = 0
+
+        def tick(self):
+            self.ticks += 1
+
+    factories = {"boom": BoomManager, "ok": OkManager}
+    service = JobService(manager_factory=lambda p: factories[p.id](p))
+    service.get_or_create(FakeProject("boom"))  # ticks first, raises
+    ok = service.get_or_create(FakeProject("ok"))
+
+    service.tick_all()  # must not raise
+
+    assert ok.ticks == 1

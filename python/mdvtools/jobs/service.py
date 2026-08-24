@@ -1,9 +1,12 @@
 import json
+import logging
 from pathlib import Path
 
 from . import JOBS_DIRNAME
 from .jobstore import Status
 from .manager import JobManager
+
+logger = logging.getLogger(__name__)
 
 # non-terminal status: a record in any of these still needs the driver to advance it.
 _INFLIGHT = frozenset({
@@ -41,9 +44,18 @@ class JobService:
         return self._managers[project.id]
 
     def tick_all(self) -> None:
-        """Advance each registered manager once. The driver calls this each cycle"""
+        """
+        Advance each registered manager once. The driver calls this each cycle
+        One manager's failure is logged and skipped so that it doesn't exit the loop for
+        all the projects (ADR0012)
+        """
         for manager in list(self._managers.values()):
-            manager.tick()
+            try:
+                manager.tick()
+            except Exception:
+                logger.exception(
+                    "job driver: tick failed for project %s", manager.project.id
+                )
 
     def recovery_scan(self, projects) -> list[str]:
         """ADR:0012: at startup, build and reconcile a manager only for projects with in-flight jobs; leave the rest
