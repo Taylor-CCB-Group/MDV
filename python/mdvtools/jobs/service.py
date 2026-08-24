@@ -31,13 +31,19 @@ class JobService:
         server process holds exactly one owner side manager per project
     """
 
-    def __init__(self):
+    def __init__(self, manager_factory=JobManager):
         self._managers: dict[str, JobManager] = {}
+        self._manager_factory = manager_factory
 
     def get_or_create(self, project) -> JobManager:
         if project.id not in self._managers:
-            self._managers[project.id] = JobManager(project)
+            self._managers[project.id] = self._manager_factory(project)
         return self._managers[project.id]
+
+    def tick_all(self) -> None:
+        """Advance each registered manager once. The driver calls this each cycle"""
+        for manager in list(self._managers.values()):
+            manager.tick()
 
     def recovery_scan(self, projects) -> list[str]:
         """ADR:0012: at startup, build and reconcile a manager only for projects with in-flight jobs; leave the rest

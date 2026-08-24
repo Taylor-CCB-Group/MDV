@@ -54,3 +54,29 @@ def test_recovery_scan_builds_managers_only_for_inflight_projects(tmp_path):
     built = service.recovery_scan([inflight, idle, done])
 
     assert built == ["inflight"]
+
+def test_tick_all_ticks_every_manager_once():
+    from mdvtools.jobs.service import JobService
+
+    class FakeProject:
+        def __init__(self, pid):
+            self.id = pid
+            self.dir = "/unused"  # tick_all never touches disk with fake managers
+
+    class FakeManager:
+        def __init__(self, project):
+            self.project = project
+            self.ticks = 0
+
+        def tick(self):
+            self.ticks += 1
+
+    service = JobService(manager_factory=FakeManager)
+    m1 = service.get_or_create(FakeProject("p1"))
+    m2 = service.get_or_create(FakeProject("p2"))
+
+    service.tick_all()
+    assert m1.ticks == 1 and m2.ticks == 1
+
+    service.tick_all()
+    assert m1.ticks == 2 and m2.ticks == 2
