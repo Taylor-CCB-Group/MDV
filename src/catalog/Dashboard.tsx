@@ -58,6 +58,7 @@ import HelpDialog from "./HelpDialog";
 import { buildProjectUrl, shouldShowLocalBackendNotice } from "@/utils/mdvRouting";
 import BulkDeleteProjectsDialog from "./components/BulkDeleteProjectsDialog";
 import DashboardActionButton from "./components/DashboardActionButton";
+import ExtensionNavigation from "./components/ExtensionNavigation";
 import RecycleBinDialog from "./components/RecycleBinDialog";
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
@@ -217,6 +218,7 @@ const Dashboard: React.FC = () => {
                             src="secondary_logo"
                             onError={() => setCustomLogoVisible(false)}
                         />
+                        <ExtensionNavigation />
                         <Box sx={{ flexGrow: 1 }} />
                         <Paper
                             component="form"
