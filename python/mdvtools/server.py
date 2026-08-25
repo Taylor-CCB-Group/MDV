@@ -55,13 +55,14 @@ logger.info("server.py module loaded")
 routes = set()
 
 
-
-
-
-def create_app(
+def build_app(
     project: MDVProject,
     options: Optional[MDVServerOptions] = None,
 ):
+    """Register every route for `project` on a Flask app and return it without serving.
+    `create_app`'s single-project path blocks in `server_forever()` and never returns, so route-level
+    tests need this
+    """
     def log(*args, **kwargs):
         """
         Log info-level messages using the module logger.
@@ -92,7 +93,6 @@ def create_app(
             extension.register_global_routes(app, app.config)
 
         project_bp = SingleProjectShim(app)
-        multi_project = False
         if options.websocket:
             # reviewing this... thinking about hooking up to ProjectChat logger...
             #! nb - we're in 'single project' mode here.
@@ -108,7 +108,6 @@ def create_app(
         # add routes for this project to existing app
         # set the route prefix to the project name, derived from the dir name.
         # this is to allow multiple projects to be served from the same server.
-        multi_project = True
         route = "/project/" + project.id + "/"
 
 
@@ -732,21 +731,31 @@ def create_app(
         metadata = project.get_datasource_metadata(name)
         return jsonify({"success": success, "metadata": metadata})
 
+    return app
+
+def create_app(
+    project: MDVProject,
+    options: Optional[MDVServerOptions] = None,
+):
+    """Build the app, then serve it. Single-project mode blocks forever in
+    serve_forever(); multi-project mode mounts the routes on the shared catalog
+    app (served elsewhere in mdv_server_app.py) and just returns."""
+    if options is None:
+        options = MDVServerOptions()
+    app = build_app(project, options)
+
+    multi_project = options.app is not None
+    route = "/project/" + project.id + "/" if multi_project else ""
+
     if options.open_browser:
         webbrowser.open(f"http://localhost:{options.port}/{route}")
 
     if multi_project:
-        assert(isinstance(app, Flask))
+        assert isinstance(app, Flask)
         if route in app.blueprints:
-            log(f"there is already a blueprint at {route}")
-        log(f"Adding project {project.id} to existing app")
-        ## nb - uncomment this if not using ProjectBlueprint refactor...
-        # app.register_blueprint(project_bp)
+            logger.info(f"there is already a blueprint at {route}")
+        logger.info(f"Adding project {project.id} to existing app")
     else:
-        # user_reloader=False, allows the server to work within jupyter
-
-        # app.run(host="0.0.0.0", port=port, debug=True, use_reloader=use_reloader)
-        ## todo - gevent for mdvlite / non-optional dependency
         from gevent.pywsgi import WSGIServer
         http_server = WSGIServer(("127.0.0.1", options.port), app)
         http_server.serve_forever()
