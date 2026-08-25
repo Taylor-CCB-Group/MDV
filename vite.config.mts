@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { createRequire } from "node:module";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,7 +8,7 @@ import { babel as rollupBabel } from "@rollup/plugin-babel";
 // import vitePluginSocketIO from 'vite-plugin-socket.io';
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
-import { type ProxyOptions, type UserConfig, defineConfig } from "vite";
+import { type Plugin, type ProxyOptions, type UserConfig, defineConfig } from "vite";
 import glsl from "vite-plugin-glsl";
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
@@ -81,6 +82,56 @@ function workerFormat(): "es" | "iife" {
 }
 
 const spatialdataFsAllow = linkedSpatialdataRoots();
+
+/**
+ * Works around an upstream bug: @spatialdata/core loads parquet-wasm with
+ * `await import(/* @vite-ignore *\/ "../vendor/parquet-wasm/parquet_wasm.js")`, and
+ * `@vite-ignore` opts that path out of resolution, so nothing is emitted to satisfy
+ * the literal path left in the chunk. Chunks live in `assets/`, so the browser asks
+ * for `{staticRoot}/vendor/parquet-wasm/…` and gets a 404 — dev only survives because
+ * Vite serves core's vendor tree straight from node_modules.
+ *
+ * Core's own points-worker loader shows the fix: it uses `new URL(…, import.meta.url)`,
+ * which Vite emits as an asset, and its stray `@vite-ignore` is inert because the
+ * comment only suppresses dynamic-import analysis. Deleting the comment in core's
+ * `src/parquetWasmLoader.ts` is enough to make this plugin unnecessary — but check the
+ * output before removing it: the wasm then falls through `flaskAssetFileNames` to an
+ * unhashed `img/parquet_wasm_bg.wasm` while the points-worker bundle emits a second
+ * hashed copy, doubling 6.6MB. Today both chunks share the one directory copied here.
+ */
+function copySpatialdataParquetWasm(): Plugin {
+    const require = createRequire(import.meta.url);
+    let outDir = path.resolve(configDir, "dist");
+
+    return {
+        name: "copy-spatialdata-parquet-wasm",
+        apply: "build",
+        configResolved(config) {
+            outDir = path.resolve(config.root, config.build.outDir);
+        },
+        closeBundle: {
+            order: "post",
+            handler() {
+                let coreRoot: string;
+                try {
+                    const coreEntry = require.resolve("@spatialdata/core");
+                    coreRoot = path.dirname(path.dirname(coreEntry));
+                } catch {
+                    console.warn("[copy-spatialdata-parquet-wasm] @spatialdata/core not installed; skipping");
+                    return;
+                }
+                const src = path.join(coreRoot, "vendor/parquet-wasm");
+                if (!fs.existsSync(src)) {
+                    console.warn(`[copy-spatialdata-parquet-wasm] missing ${src}; skipping`);
+                    return;
+                }
+                const dest = path.join(outDir, "vendor/parquet-wasm");
+                fs.mkdirSync(path.dirname(dest), { recursive: true });
+                fs.cpSync(src, dest, { recursive: true });
+            },
+        },
+    };
+}
 
 // zarrita needed a polyfill for Buffer - seems like a bug
 // seems ok without as long we don't use ZipFileStore (marked experimental anyway)
@@ -269,6 +320,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
             },
         },
         plugins: [
+            copySpatialdataParquetWasm(),
             glsl(),
             rollupBabel({
                 babelHelpers: "bundled",
