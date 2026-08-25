@@ -34,7 +34,7 @@ class LocalSubprocessExecutor:
 
     def __init__(self, max_concurrent_jobs: int | None = 2):
         self.max_concurrent_jobs = max_concurrent_jobs
-        self._procs: dict[str, subprocess.Popen] = {}
+        self._procs: dict[str, subprocess.Popen] = {}       # in-memory table of running processes
 
     def submit(self, entrypoint: str, workspace: Path) -> Handle:
         proc = subprocess.Popen(
