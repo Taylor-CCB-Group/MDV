@@ -20,9 +20,22 @@ import { describe, expect, test } from "vitest";
 const repoRoot = path.resolve(__dirname, "../../..");
 
 /** Every outDir the build scripts in package.json write to. */
-const BUILD_OUT_DIRS = ["vite-dist", "dist/flask", "python/mdvtools/static"];
+const BUILD_OUT_DIRS = [
+    "vite-dist",
+    "dist",
+    "dist/flask",
+    "dist/mdv",
+    "python/mdvtools/static",
+    "python/dist_hotfix/flask",
+];
 
-/** Rolldown chunk output only — not `examples/` (publicDir) or the copied vendor tree. */
+/**
+ * Rolldown chunk output only — not the build root, `examples/` (publicDir) or the copied
+ * vendor tree. Excluding the root is not just about noise: a `../` reference from there
+ * escapes the build tree by definition, so `isServedFromBuild` rejects it and scanning the
+ * root cannot flag anything. Root entries (`production` emits `mdv-<version>.js`) would need
+ * a different rule to be worth reading.
+ */
 const CHUNK_DIRS = ["assets", "js"];
 
 /**
@@ -47,7 +60,8 @@ function jsFilesIn(dir: string): string[] {
     return fs
         .readdirSync(dir, { recursive: true, encoding: "utf8" })
         .filter((entry) => entry.endsWith(".js") || entry.endsWith(".mjs"))
-        .map((entry) => path.join(dir, entry));
+        .map((entry) => path.join(dir, entry))
+        .filter((file) => fs.statSync(file).isFile());
 }
 
 function danglingReferences(buildDir: string): string[] {
