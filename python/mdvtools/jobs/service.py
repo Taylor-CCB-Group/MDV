@@ -1,4 +1,5 @@
 import json
+import threading
 import logging
 from pathlib import Path
 
@@ -34,9 +35,12 @@ class JobService:
         server process holds exactly one owner side manager per project
     """
 
-    def __init__(self, manager_factory=JobManager):
+    def __init__(self, manager_factory=JobManager, interval: float = 1.0):
         self._managers: dict[str, JobManager] = {}
         self._manager_factory = manager_factory
+        self._wake = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._interval = interval
 
     def get_or_create(self, project) -> JobManager:
         if project.id not in self._managers:
@@ -56,6 +60,37 @@ class JobService:
                 logger.exception(
                     "job driver: tick failed for project %s", manager.project.id
                 )
+
+    def has_active(self) -> bool:
+        """True if any manager holds a non-terminal record"""
+        for manager in self._managers.values():
+            if any(r.status in _INFLIGHT for r in manager.store.load_all()):
+                return True
+        return False
+
+    def nudge(self) -> None:
+        """Wake the driver at once (submit calls this after writing the queued record)"""
+        self._wake.set()
+
+    def _run(self) -> None:
+        while True:
+            self.tick_all()
+            # fast poll while work is in flight so completion is noticed
+            # within an interval; block until a nudge while everything is
+            # idle (ADR0012)
+            if self.has_active():
+                self._wake.wait(self._interval)
+            else:
+                self._wake.wait()
+            self._wake.clear()
+
+    def start(self) -> None:
+        """Launch the single daemon driver thread, idempotent"""
+        if self._thread is None:
+            self._thread = threading.Thread(
+                target=self._run, name="mdv-job-driver", daemon=True
+            )
+            self._thread.start()
 
     def recovery_scan(self, projects) -> list[str]:
         """ADR:0012: at startup, build and reconcile a manager only for projects with in-flight jobs; leave the rest

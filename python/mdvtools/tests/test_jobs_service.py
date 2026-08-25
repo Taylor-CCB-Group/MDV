@@ -112,3 +112,28 @@ def test_tick_all_continues_when_one_manager_fails():
     service.tick_all()  # must not raise
 
     assert ok.ticks == 1
+
+def test_has_active_true_only_with_inflight_records(tmp_path):
+    from pathlib import Path
+    from mdvtools.jobs.service import JobService
+    from mdvtools.jobs.jobstore import JobStore
+    from mdvtools.jobs import JOBS_DIRNAME
+
+    class FakeProject:
+        def __init__(self, pid):
+            self.id = pid
+            d = tmp_path / pid
+            d.mkdir()
+            self.dir = str(d)
+
+    service = JobService()
+
+    # a project with no records -> nothing in flight
+    service.get_or_create(FakeProject("empty"))
+    assert service.has_active() is False
+
+    # a project with a QUEUED record -> in flight
+    active = FakeProject("active")
+    JobStore(Path(active.dir) / JOBS_DIRNAME).new("concat_columns", {})
+    service.get_or_create(active)
+    assert service.has_active() is True
