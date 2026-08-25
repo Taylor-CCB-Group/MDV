@@ -1,7 +1,9 @@
 import json
 import threading
 import logging
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from . import JOBS_DIRNAME
 from .jobstore import Status
@@ -35,7 +37,12 @@ class JobService:
         server process holds exactly one owner side manager per project
     """
 
-    def __init__(self, manager_factory=JobManager, interval: float = 1.0):
+    def __init__(
+        self,
+        # injection seam: any callable returning a manager-shaped object (tests pass fakes)
+        manager_factory: Callable[[Any], Any] = JobManager,
+        interval: float = 1.0,
+    ):
         self._managers: dict[str, JobManager] = {}
         self._manager_factory = manager_factory
         self._wake = threading.Event()

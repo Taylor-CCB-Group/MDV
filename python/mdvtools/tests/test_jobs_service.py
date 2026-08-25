@@ -56,6 +56,7 @@ def test_recovery_scan_builds_managers_only_for_inflight_projects(tmp_path):
     assert built == ["inflight"]
 
 def test_tick_all_ticks_every_manager_once():
+    from typing import Any
     from mdvtools.jobs.service import JobService
 
     class FakeProject:
@@ -72,8 +73,9 @@ def test_tick_all_ticks_every_manager_once():
             self.ticks += 1
 
     service = JobService(manager_factory=FakeManager)
-    m1 = service.get_or_create(FakeProject("p1"))
-    m2 = service.get_or_create(FakeProject("p2"))
+    # the registry is typed to hand back real JobManagers; these are stand-ins
+    m1: Any = service.get_or_create(FakeProject("p1"))
+    m2: Any = service.get_or_create(FakeProject("p2"))
 
     service.tick_all()
     assert m1.ticks == 1 and m2.ticks == 1
@@ -82,6 +84,7 @@ def test_tick_all_ticks_every_manager_once():
     assert m1.ticks == 2 and m2.ticks == 2
 
 def test_tick_all_continues_when_one_manager_fails():
+    from typing import Any
     from mdvtools.jobs.service import JobService
 
     class FakeProject:
@@ -107,7 +110,7 @@ def test_tick_all_continues_when_one_manager_fails():
     factories = {"boom": BoomManager, "ok": OkManager}
     service = JobService(manager_factory=lambda p: factories[p.id](p))
     service.get_or_create(FakeProject("boom"))  # ticks first, raises
-    ok = service.get_or_create(FakeProject("ok"))
+    ok: Any = service.get_or_create(FakeProject("ok"))
 
     service.tick_all()  # must not raise
 
