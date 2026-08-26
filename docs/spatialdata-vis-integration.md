@@ -161,17 +161,38 @@ has features.
 ### On-demand feature loading
 
 Selecting a feature whose points fall outside the memory cap triggers a feature-index
-scan that fetches them. That scan runs in the **core points worker**, which
-`ensurePointsWorker` starts alongside the zarr chunk worker. It is not optional:
+scan that fetches them. That scan runs in the **core parquet worker**, which
+`ensureParquetWorker` starts alongside the zarr chunk worker. It is not optional:
 `loadPointsMatchingFeatureCodes` throws outright without a worker rather than falling
 back to the main thread, so without it a selection silently shows only whatever part of
 the feature was inside the cap.
 
-This was impossible before `@spatialdata/core@0.8.0` — the published worker entry was a
-CommonJS file in an ESM package, so `new Worker(url, {type: "module"})` died on
-`require is not defined` (SpatialData.js#148). That is the reason for the pin floor.
-The panel still gates its on-demand messaging on `isPointsWorkerEnabled()`: if the
-worker ever fails to start, a greyed row must not invite a click that cannot work.
+The worker was the points worker until `@spatialdata/core@0.9.0` renamed it, with no
+aliases: it decodes and scans parquet for shapes as much as for points. MDV starts it
+through `ensureWorkers` from `@spatialdata/vis`, which is the seam that hides how
+differently the two workers are wired — the codec worker needs no configuration, the
+parquet worker needs a URL MDV's bundler produces:
+
+```ts
+import { ensureWorkers } from "@spatialdata/vis";
+import workerUrl from "@spatialdata/core/parquet-worker?worker&url";
+
+ensureWorkers({ parquet: { workerUrl, requestTimeoutMs: 120_000 } });
+```
+
+That import is doing the work — it asks Vite to *build* the worker, shared chunks and
+parquet-wasm included. The worker cannot ship self-contained, so there is no default URL
+that survives being re-bundled into MDV's `assets/`.
+
+Running a worker at all was impossible before `@spatialdata/core@0.8.0` — the published
+worker entry was a CommonJS file in an ESM package, so `new Worker(url, {type: "module"})`
+died on `require is not defined` (SpatialData.js#148).
+
+The panel still gates its on-demand messaging on `isParquetWorkerEnabled()`: if the
+worker ever fails to start, a greyed row must not invite a click that cannot work. From
+0.9.0 that answer is trustworthy rather than optimistic — a worker that errors before
+answering anything is recognised as never wired up and switched off, so every other
+caller takes its main-thread fallback instead of stalling a request at a time.
 
 Two things about the panel that follow from how the engine reports state, both easy to
 misread:
@@ -188,13 +209,23 @@ misread:
 
 ## Minimum upstream version
 
-**`@spatialdata/* >= 0.8.0`, and `zarrextra >= 0.4.0` with it.**
+**`@spatialdata/* >= 0.9.0`, and `zarrextra >= 0.5.0` with it.**
 
-0.8.0 is the floor. It is the first release whose published
-`@spatialdata/core/points-worker` is an ES module and can therefore be started at all,
-which is what makes on-demand feature loading work rather than fail silently. It also
-carries `describeFeatureRowState` (imported here rather than mirrored) and the
-resident-vs-dataset feature counts the panel prints.
+0.9.0 is the floor, and it is a hard one: the points worker was renamed to the parquet
+worker with no aliases, so `@spatialdata/core/points-worker`, `enablePointsWorker` and
+`isPointsWorkerEnabled` no longer exist and MDV does not compile below it. It is also
+the release that made a production build work at all — core reaches its vendored
+parquet-wasm through the `@spatialdata/core/parquet-wasm` export now, so MDV's bundler
+emits the wasm itself. Below 0.9.0 that import hid behind a `@vite-ignore`d relative
+path no bundler could resolve, every production build 404d on the first parquet read
+while dev worked, and MDV carried a plugin copying core's `vendor/` tree into its output
+(MDV#539) to paper over it. That plugin is gone.
+
+0.8.0 was the previous floor. It is the first release whose published worker entry is an
+ES module and can therefore be started at all, which is what makes on-demand feature
+loading work rather than fail silently. It also carries `describeFeatureRowState`
+(imported here rather than mirrored) and the resident-vs-dataset feature counts the panel
+prints.
 
 0.7.0 first re-exported `PointsFeatureStateProvider` / `usePointsFeatureState` from the
 `@spatialdata/vis` entry — below it they are not reachable at all, since the package
@@ -211,8 +242,8 @@ degrade-gracefully situation: the scheme MDV now sends (`categoricalPalette:
 `NaN`, and throws `Cannot read properties of undefined` three frames away inside the
 layer.
 
-`zarrextra` moves in step because `@spatialdata/core` depends on `0.4.0`
-exactly. Leaving MDV's own pin at `^0.3.0` installs a second copy, and MDV's
+`zarrextra` moves in step because `@spatialdata/core` depends on `0.5.0`
+exactly. Leaving MDV's own pin behind installs a second copy, and MDV's
 `ensureChunkWorker` then flips the worker-decode flag in a module instance core
 never reads.
 
@@ -268,7 +299,7 @@ Useful follow-up SpatialData.js changes (not blocking this PR):
 
 ### Image layer panel pattern (MDV)
 
-Dependencies: `@spatialdata/{core,layers,react,vis,avivatorish}` at **>= 0.8.0** (see the version floor above).
+Dependencies: `@spatialdata/{core,layers,react,vis,avivatorish}` at **>= 0.9.0** (see the version floor above).
 
 **Viewer (chart tree)**
 

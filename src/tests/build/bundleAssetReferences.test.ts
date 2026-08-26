@@ -3,15 +3,15 @@
  * the build never emitted, so the app 404s in production while dev works fine (the dev
  * server serves the dependency's own tree from node_modules).
  *
- * The live instance is @spatialdata/core's parquet-wasm loader: it imports
- * `../vendor/parquet-wasm/parquet_wasm.js` under `@vite-ignore`, which opts the path out
- * of resolution, so nothing is emitted for it and `copySpatialdataParquetWasm` in
- * `vite.config.mts` has to copy the files in. Deleting that plugin fails this test.
+ * The instance that prompted it was @spatialdata/core's parquet-wasm loader, which
+ * reached the glue by a `@vite-ignore`d relative path no consumer bundler could resolve
+ * (MDV#539 copied core's `vendor/` tree in to satisfy it). Core 0.9.0 loads it through
+ * the `@spatialdata/core/parquet-wasm` export instead, so the bundler emits the wasm
+ * itself and that reference is gone.
  *
- * Deliberately not an assertion about parquet-wasm specifically: once upstream stops
- * hiding the import, Vite emits the loader as a normal hashed asset, the `../vendor/…`
- * reference disappears, and this test keeps passing without an edit. It does mean the
- * test passes vacuously if nothing escapes its own directory — that is the healthy state.
+ * Deliberately not an assertion about parquet-wasm specifically — any chunk pointing at
+ * anything unemitted fails. It does mean the test passes vacuously if nothing escapes
+ * its own directory, which is the healthy state.
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -46,6 +46,21 @@ const CHUNK_DIRS = ["assets", "js"];
 const ESCAPING_PATH = /["'`](\.\.\/[^"'`\n]*?\.(?:js|mjs|wasm))["'`]/g;
 
 /**
+ * References that survive into a browser chunk but are unreachable there, so they never
+ * become a request. Each needs the runtime guard that makes it dead quoted alongside it —
+ * an entry here is a claim about control flow, not a way to silence a finding.
+ */
+const KNOWN_INERT = new Set([
+    // @spatialdata/core's parquet-wasm loader initialises from disk under Vitest/Node,
+    // where undici cannot fetch a file:// URL. That branch is behind
+    // `typeof process !== 'undefined' && process.versions?.node != null &&
+    // typeof window === 'undefined'`, which no browser or worker satisfies — Vite defines
+    // no global `process`, and the `node:fs` imports inside it resolved to
+    // `__vite-browser-external` stubs. Only the string reaches the bundle.
+    "../vendor/parquet-wasm/parquet_wasm_bg.wasm",
+]);
+
+/**
  * Only references landing inside the build tree are things the server would serve. Anything
  * resolving above it is a string that never becomes a request — Rolldown's CommonJS interop
  * registers modules under keys like `"../../node_modules/…/main.js"`, which are inert.
@@ -70,6 +85,7 @@ function danglingReferences(buildDir: string): string[] {
         for (const file of jsFilesIn(path.join(buildDir, chunkDir))) {
             const source = fs.readFileSync(file, "utf8");
             for (const [, reference] of source.matchAll(ESCAPING_PATH)) {
+                if (KNOWN_INERT.has(reference)) continue;
                 const target = path.resolve(path.dirname(file), reference);
                 if (isServedFromBuild(target, buildDir) && !fs.existsSync(target)) {
                     dangling.push(`${path.relative(buildDir, file)} → ${reference}`);

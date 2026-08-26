@@ -35,27 +35,31 @@ const PACKAGE_DIRS = {
  * separate copy of them, so it goes stale silently and unlink then writes a pin
  * nobody chose.
  *
- * 0.8.0 is the floor. It is the first release whose published
- * `@spatialdata/core/points-worker` is an ES module, and therefore the first that can
- * start the points worker at all — below it `new Worker(url, {type:"module"})` dies on
- * `require is not defined`, and the feature-index scan that fetches a selected
- * feature's points from beyond the memory cap is impossible. It also carries
- * `describeFeatureRowState` (which this app imports rather than mirroring) and the
- * resident-vs-dataset feature counts.
+ * 0.9.0 is the floor, and a hard one: the points worker became the parquet worker with
+ * no aliases, so `@spatialdata/core/points-worker`, `enablePointsWorker` and
+ * `isPointsWorkerEnabled` are gone and MDV does not compile below it. It is also the
+ * first release a production build survives — core loads its vendored parquet-wasm
+ * through the `@spatialdata/core/parquet-wasm` export, so MDV's bundler emits the wasm
+ * instead of 404ing on a path nothing emitted (MDV#539).
  *
- * Earlier floors, still true underneath: 0.7.0 first re-exported
+ * Earlier floors, still true underneath: 0.8.0 first published the worker entry as an ES
+ * module, and therefore the first that can start it at all — below it
+ * `new Worker(url, {type:"module"})` dies on `require is not defined`, and the
+ * feature-index scan that fetches a selected feature's points from beyond the memory cap
+ * is impossible. It also carries `describeFeatureRowState` (which this app imports rather
+ * than mirroring) and the resident-vs-dataset feature counts. 0.7.0 first re-exported
  * `PointsFeatureStateProvider` / `usePointsFeatureState` from the vis entry, and 0.6.0
  * the fill-colour scheme MDV hands a shapes layer (`categoricalPalette: { byValue }`,
  * `numericDomain`) — against 0.4.0 that did not merely fail to typecheck, it crashed
  * the layer at runtime.
  */
 const PUBLISHED_RANGES = {
-    "@spatialdata/avivatorish": "^0.8.0",
-    "@spatialdata/core": "^0.8.0",
-    "@spatialdata/layers": "^0.8.0",
-    "@spatialdata/react": "^0.8.0",
-    "@spatialdata/vis": "^0.8.0",
-    zarrextra: "0.4.0",
+    "@spatialdata/avivatorish": "^0.9.0",
+    "@spatialdata/core": "^0.9.0",
+    "@spatialdata/layers": "^0.9.0",
+    "@spatialdata/react": "^0.9.0",
+    "@spatialdata/vis": "^0.9.0",
+    zarrextra: "0.5.0",
 };
 
 function expandHome(p) {

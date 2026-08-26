@@ -1,5 +1,4 @@
 import { execSync } from "node:child_process";
-import { createRequire } from "node:module";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,15 +7,50 @@ import { babel as rollupBabel } from "@rollup/plugin-babel";
 // import vitePluginSocketIO from 'vite-plugin-socket.io';
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
-import { type Plugin, type ProxyOptions, type UserConfig, defineConfig } from "vite";
+import { type ProxyOptions, type UserConfig, defineConfig } from "vite";
 import glsl from "vite-plugin-glsl";
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 
-/** Optional local SpatialData.js checkout (see `pnpm link:spatialdata`). */
-function spatialdataLinkAliases(): Record<string, string> {
+/**
+ * Pick the file an `exports` entry points at, preferring the ESM condition. Only the
+ * shapes these packages actually publish: a string, or an object of conditions.
+ */
+function exportsTarget(entry: unknown): string | undefined {
+    if (typeof entry === "string") return entry;
+    if (typeof entry !== "object" || entry === null) return undefined;
+    const conditions = entry as Record<string, unknown>;
+    for (const condition of ["import", "default"]) {
+        const value = conditions[condition];
+        if (typeof value === "string") return value;
+    }
+    return undefined;
+}
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Optional local SpatialData.js checkout (see `pnpm link:spatialdata`).
+ *
+ * Returns the packages that were found, each with the alias entries that point it at the
+ * checkout: one per `exports` subpath, then the bare package name.
+ *
+ * Subpaths need their own entries and need to come first. Vite matches a *string* alias
+ * only on an exact hit or a `/` boundary, so `@spatialdata/core/parquet-worker?worker&url`
+ * — the query is part of the id — misses a `@spatialdata/core/parquet-worker` string alias
+ * and falls through to the bare `@spatialdata/core → <pkgRoot>` one, which rewrites it to
+ * `<pkgRoot>/parquet-worker`. Nothing is there: the real file is
+ * `<pkgRoot>/dist/parquet-worker.js`. Hence a regex anchored to end-or-`?`, which both
+ * matches and carries the query through to the replacement.
+ *
+ * Without this, every subpath import breaks under `pnpm link:spatialdata` —
+ * `zarrextra/workers`, `@spatialdata/core/parquet-worker`, `@spatialdata/core/parquet-wasm`
+ * — while a registry install is fine, so it only ever bites while testing an upstream
+ * change. Reading `exports` rather than listing subpaths keeps it right when one is added.
+ */
+function spatialdataLinkAliases(): Array<{ name: string; alias: Array<{ find: RegExp; replacement: string }> }> {
     const root = process.env.SPATIALDATA_ROOT?.trim();
-    if (!root) return {};
+    if (!root) return [];
     const abs = path.resolve(root.startsWith("~/") ? path.join(process.env.HOME ?? "", root.slice(2)) : root);
     const packages: Array<[string, string]> = [
         ["@spatialdata/avivatorish", "packages/avivatorish"],
@@ -26,17 +60,39 @@ function spatialdataLinkAliases(): Record<string, string> {
         ["@spatialdata/vis", "packages/vis"],
         ["zarrextra", "packages/zarrextra"],
     ];
-    const aliases: Record<string, string> = {};
+    const linked: Array<{ name: string; alias: Array<{ find: RegExp; replacement: string }> }> = [];
     for (const [name, rel] of packages) {
         const pkgRoot = path.join(abs, rel);
-        if (fs.existsSync(path.join(pkgRoot, "package.json"))) {
-            aliases[name] = pkgRoot;
+        const manifestPath = path.join(pkgRoot, "package.json");
+        if (!fs.existsSync(manifestPath)) continue;
+        const alias: Array<{ find: RegExp; replacement: string }> = [];
+        const exportsMap: unknown = JSON.parse(fs.readFileSync(manifestPath, "utf8")).exports;
+        if (typeof exportsMap === "object" && exportsMap !== null) {
+            for (const [key, entry] of Object.entries(exportsMap as Record<string, unknown>)) {
+                // Wildcards would need a pattern alias, and none of these packages use one.
+                if (!key.startsWith("./") || key.includes("*")) continue;
+                const target = exportsTarget(entry);
+                if (target) {
+                    alias.push({
+                        find: new RegExp(`^${escapeRegExp(`${name}/${key.slice(2)}`)}(?=$|\\?)`),
+                        // `$` is a backreference in the replacement string; paths rarely
+                        // contain one, but a checkout under `~/code/$work` would silently
+                        // resolve to nonsense.
+                        replacement: path.join(pkgRoot, target).replace(/\$/g, "$$$$"),
+                    });
+                }
+            }
         }
+        alias.push({ find: new RegExp(`^${escapeRegExp(name)}(?=$|/|\\?)`), replacement: pkgRoot });
+        linked.push({ name, alias });
     }
-    return aliases;
+    return linked;
 }
 
-const spatialdataAliases = spatialdataLinkAliases();
+const linkedSpatialdata = spatialdataLinkAliases();
+/** Every alias entry, subpaths ahead of their bare package name — order is load-bearing. */
+const spatialdataAliasEntries = linkedSpatialdata.flatMap((pkg) => pkg.alias);
+const linkedSpatialdataNames = linkedSpatialdata.map((pkg) => pkg.name);
 
 /**
  * Checkout roots Vite must be allowed to READ from when @spatialdata/* is a local
@@ -83,56 +139,6 @@ function workerFormat(): "es" | "iife" {
 
 const spatialdataFsAllow = linkedSpatialdataRoots();
 
-/**
- * Works around an upstream bug: @spatialdata/core loads parquet-wasm with
- * `await import(/* @vite-ignore *\/ "../vendor/parquet-wasm/parquet_wasm.js")`, and
- * `@vite-ignore` opts that path out of resolution, so nothing is emitted to satisfy
- * the literal path left in the chunk. Chunks live in `assets/`, so the browser asks
- * for `{staticRoot}/vendor/parquet-wasm/…` and gets a 404 — dev only survives because
- * Vite serves core's vendor tree straight from node_modules.
- *
- * Core's own points-worker loader shows the fix: it uses `new URL(…, import.meta.url)`,
- * which Vite emits as an asset, and its stray `@vite-ignore` is inert because the
- * comment only suppresses dynamic-import analysis. Deleting the comment in core's
- * `src/parquetWasmLoader.ts` is enough to make this plugin unnecessary — but check the
- * output before removing it: the wasm then falls through `flaskAssetFileNames` to an
- * unhashed `img/parquet_wasm_bg.wasm` while the points-worker bundle emits a second
- * hashed copy, doubling 6.6MB. Today both chunks share the one directory copied here.
- */
-function copySpatialdataParquetWasm(): Plugin {
-    const require = createRequire(import.meta.url);
-    let outDir = path.resolve(configDir, "dist");
-
-    return {
-        name: "copy-spatialdata-parquet-wasm",
-        apply: "build",
-        configResolved(config) {
-            outDir = path.resolve(config.root, config.build.outDir);
-        },
-        closeBundle: {
-            order: "post",
-            handler() {
-                let coreRoot: string;
-                try {
-                    const coreEntry = require.resolve("@spatialdata/core");
-                    coreRoot = path.dirname(path.dirname(coreEntry));
-                } catch {
-                    console.warn("[copy-spatialdata-parquet-wasm] @spatialdata/core not installed; skipping");
-                    return;
-                }
-                const src = path.join(coreRoot, "vendor/parquet-wasm");
-                if (!fs.existsSync(src)) {
-                    console.warn(`[copy-spatialdata-parquet-wasm] missing ${src}; skipping`);
-                    return;
-                }
-                const dest = path.join(outDir, "vendor/parquet-wasm");
-                fs.mkdirSync(path.dirname(dest), { recursive: true });
-                fs.cpSync(src, dest, { recursive: true });
-            },
-        },
-    };
-}
-
 // zarrita needed a polyfill for Buffer - seems like a bug
 // seems ok without as long we don't use ZipFileStore (marked experimental anyway)
 // having the polyfill means the build works, but devserver fails with 'cannot import outside a module'
@@ -167,6 +173,12 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
         if (name === `${entryBase}.css`) return "assets/mdv.css";
     }
     const ext = path.extname(name).slice(1).toLowerCase();
+    // Wasm is emitted by the main graph AND by a worker graph — @spatialdata/core's
+    // 6.6MB parquet-wasm goes in both. Worker builds do not take this function, so an
+    // unhashed name here yields `img/parquet_wasm_bg.wasm` for one graph and the worker
+    // default `assets/parquet_wasm_bg-<hash>.wasm` for the other: two copies of identical
+    // bytes. Matching the worker default collapses them onto one file.
+    if (ext === "wasm") return "assets/[name]-[hash][extname]";
     if (["woff", "woff2", "ttf", "eot"].includes(ext)) return "assets/[name][extname]";
     if (ext === "svg" && /^fa-(brands|regular|solid)-/.test(name)) return "assets/[name][extname]";
     return "img/[name][extname]";
@@ -320,7 +332,6 @@ export default defineConfig(async (): Promise<UserConfig> => {
             },
         },
         plugins: [
-            copySpatialdataParquetWasm(),
             glsl(),
             rollupBabel({
                 babelHelpers: "bundled",
@@ -358,10 +369,9 @@ export default defineConfig(async (): Promise<UserConfig> => {
             format: workerFormat(),
         },
         resolve: {
-            alias: {
-                "@": path.resolve(configDir, "./src"),
-                ...spatialdataAliases,
-            },
+            // Array form, not an object: the linked-checkout entries are regexes (see
+            // `spatialdataLinkAliases`), and an object alias map can only key on strings.
+            alias: [{ find: /^@(?=\/)/, replacement: path.resolve(configDir, "./src") }, ...spatialdataAliasEntries],
             // A linked checkout resolves its own bare imports from ITS node_modules, so the
             // renderer ends up with two of everything even at identical versions: two
             // @deck.gl/core (the shader hooks a layer declares are not the ones the assembler
@@ -404,12 +414,9 @@ export default defineConfig(async (): Promise<UserConfig> => {
                 path.resolve(configDir, "login_dev.html"),
                 path.resolve(configDir, "catalog_dev.html"),
             ],
-            // @spatialdata/core defers its vendored parquet-wasm import with @vite-ignore.
-            // Prebundling moves the caller to .vite/deps, so its package-relative URL cannot
-            // find the vendored asset. Upstream should expose the loader through a package
-            // export or use a Vite-transformable new URL(..., import.meta.url) reference.
-            // Core also requires Zod 4 while MDV uses Zod 3; excluding both preserves each
-            // package's own dependency resolution instead of sharing the optimized Zod 3 cache.
+            // @spatialdata/core requires Zod 4 while MDV uses Zod 3; excluding both preserves
+            // each package's own dependency resolution instead of sharing the optimized
+            // Zod 3 cache.
             // When SPATIALDATA_ROOT is set, exclude the whole linked set so Vite does
             // not freeze a stale prebundle of local dist builds.
             //
@@ -424,7 +431,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
             // function rather than reading `Le (…/.vite/deps/@spatialdata_layers.js)`.
             // (An `optimizeDeps.esbuildOptions.sourcemap` lived here for that; under
             // Vite 8 it is deprecated, it warns, and removing it changes no output.)
-            exclude: ["@spatialdata/core", "zod", ...Object.keys(spatialdataAliases)],
+            exclude: ["@spatialdata/core", "zod", ...linkedSpatialdataNames],
         },
     } as UserConfig;
 });
