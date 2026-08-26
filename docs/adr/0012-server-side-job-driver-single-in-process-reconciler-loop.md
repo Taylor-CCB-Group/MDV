@@ -46,6 +46,35 @@ Slurm and K8s are the general case (durable handles, a stateless reconciler that
 design to the general case and let Local be the degenerate one, as ADR-0005's reconcile already
 does.
 
+### Where the JobService singleton lives (implementation note)
+
+The `JobService` singleton is a module-level global in `server.py`, reached by a plain import from
+both the `POST /jobs` route and the server-boot code that runs the recovery scan and starts the
+thread. This was grilled against the alternative of attaching it to the Flask app object.
+
+In production the two are equivalent, because there is exactly one Flask app per process:
+single-project builds its own app, multi-project shares one app built in `mdv_server_app.py`. The two
+designs diverge only when one process builds several apps, which happens only in the test suite (each
+test calls `build_app` again).
+
+Three points settled it for the module global:
+
+- The driver thread runs outside any Flask application or request context, so `current_app` is not
+  available there. App-attachment would force the boot code and the thread to capture and pass the
+  concrete app object anyway, which is the same explicit global reference the module singleton
+  already is.
+- Multi-project mode calls `build_app` once per project on the shared app, so app-attachment needs an
+  attach-once guard (create the service only if the app does not already hold one). That guard is
+  itself a singleton keyed on the app, so app-attachment does not remove global state, it relocates
+  it.
+- Worker placement is orthogonal. The `JobService`, the driver, and the managers stay in the server
+  process regardless; only the worker (`run_worker`) runs on a Slurm compute node via the executor,
+  over the shared filesystem (ADR-0010). Where the singleton lives has no bearing on remote execution.
+
+The one cost of the module global is that tests in a single process share it. A pytest fixture that
+resets the global between tests restores isolation, which is cheaper than the app-attachment plumbing
+it would replace.
+
 ## Submit is write-ahead; the driver owns dispatch
 
 `submit()` writes the `QUEUED` **job record** (write-ahead intent, ADR-0005) and sets the wake
