@@ -65,7 +65,7 @@ def test_tick_all_ticks_every_manager_once():
             self.dir = "/unused"  # tick_all never touches disk with fake managers
 
     class FakeManager:
-        def __init__(self, project):
+        def __init__(self, project, on_submit=None):
             self.project = project
             self.ticks = 0
 
@@ -93,14 +93,14 @@ def test_tick_all_continues_when_one_manager_fails():
             self.dir = "/unused"
 
     class BoomManager:
-        def __init__(self, project):
+        def __init__(self, project, on_submit=None):
             self.project = project
 
         def tick(self):
             raise RuntimeError("boom")
 
     class OkManager:
-        def __init__(self, project):
+        def __init__(self, project, on_submit=None):
             self.project = project
             self.ticks = 0
 
@@ -108,7 +108,9 @@ def test_tick_all_continues_when_one_manager_fails():
             self.ticks += 1
 
     factories = {"boom": BoomManager, "ok": OkManager}
-    service = JobService(manager_factory=lambda p: factories[p.id](p))
+    service = JobService(
+        manager_factory=lambda p, on_submit=None: factories[p.id](p, on_submit=on_submit)
+    )
     service.get_or_create(FakeProject("boom"))  # ticks first, raises
     ok: Any = service.get_or_create(FakeProject("ok"))
 
@@ -140,3 +142,23 @@ def test_has_active_true_only_with_inflight_records(tmp_path):
     JobStore(Path(active.dir) / JOBS_DIRNAME).new("concat_columns", {})
     service.get_or_create(active)
     assert service.has_active() is True
+
+def test_get_or_create_wires_service_nudge_as_on_submit():
+    from typing import Any
+    from mdvtools.jobs.service import JobService
+
+    class FakeProject:
+        def __init__(self, pid):
+            self.id = pid
+            self.dir = "/unused"
+
+    class FakeManager:
+        def __init__(self, project, on_submit=None):
+            self.project = project
+            self.on_submit = on_submit
+
+    service = JobService(manager_factory=FakeManager)
+    mgr: Any = service.get_or_create(FakeProject("p1"))
+
+    # the manager's submit hook is the service's own nudge, so a submit wakes the driver
+    assert mgr.on_submit == service.nudge

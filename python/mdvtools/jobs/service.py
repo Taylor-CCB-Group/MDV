@@ -40,7 +40,7 @@ class JobService:
     def __init__(
         self,
         # injection seam: any callable returning a manager-shaped object (tests pass fakes)
-        manager_factory: Callable[[Any], Any] = JobManager,
+        manager_factory: Callable[..., Any] = JobManager,
         interval: float = 1.0,
     ):
         self._managers: dict[str, JobManager] = {}
@@ -51,7 +51,7 @@ class JobService:
 
     def get_or_create(self, project) -> JobManager:
         if project.id not in self._managers:
-            self._managers[project.id] = self._manager_factory(project)
+            self._managers[project.id] = self._manager_factory(project, on_submit=self.nudge)
         return self._managers[project.id]
 
     def tick_all(self) -> None:
