@@ -35,7 +35,13 @@ const PACKAGE_DIRS = {
  * separate copy of them, so it goes stale silently and unlink then writes a pin
  * nobody chose.
  *
- * 0.9.0 is the floor, and a hard one: the points worker became the parquet worker with
+ * 0.10.0 is what these pins ask for. Nothing in it is breaking — the compile floor is
+ * still 0.9.0 — but it is the release where the progressive points preload moved off
+ * the main thread (SpatialData.js#174), turning a preload that never finished on a
+ * 4.83M-row Xenium element into 75s, worst task 113s -> ~4.2s. Do not quietly drop back
+ * to 0.9.0 to dodge an install problem; it compiles and then freezes the tab.
+ *
+ * 0.9.0 remains the hard floor: the points worker became the parquet worker with
  * no aliases, so `@spatialdata/core/points-worker`, `enablePointsWorker` and
  * `isPointsWorkerEnabled` are gone and MDV does not compile below it. It is also the
  * first release a production build survives — core loads its vendored parquet-wasm
@@ -54,11 +60,11 @@ const PACKAGE_DIRS = {
  * the layer at runtime.
  */
 const PUBLISHED_RANGES = {
-    "@spatialdata/avivatorish": "^0.9.0",
-    "@spatialdata/core": "^0.9.0",
-    "@spatialdata/layers": "^0.9.0",
-    "@spatialdata/react": "^0.9.0",
-    "@spatialdata/vis": "^0.9.0",
+    "@spatialdata/avivatorish": "^0.10.0",
+    "@spatialdata/core": "^0.10.0",
+    "@spatialdata/layers": "^0.10.0",
+    "@spatialdata/react": "^0.10.0",
+    "@spatialdata/vis": "^0.10.0",
     zarrextra: "0.5.0",
 };
 

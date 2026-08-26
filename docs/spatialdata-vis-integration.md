@@ -209,9 +209,26 @@ misread:
 
 ## Minimum upstream version
 
-**`@spatialdata/* >= 0.9.0`, and `zarrextra >= 0.5.0` with it.**
+**`@spatialdata/* >= 0.10.0`, and `zarrextra >= 0.5.0` with it.**
 
-0.9.0 is the floor, and it is a hard one: the points worker was renamed to the parquet
+0.10.0 is what the pins ask for, though the *compile* floor is still 0.9.0 — nothing in
+0.10.0 is breaking. The reason to pin it anyway is that it is the release where a points
+layer stopped freezing the tab, and the numbers are not marginal.
+
+The progressive preload used to run parquet-wasm's `ParquetFile.stream()` on the main
+thread from above the worker gate, so enabling the parquet worker did nothing for it
+(SpatialData.js#174). It now range-fetches and decodes in the worker and posts batches
+back, so the coloured progressive paint survives and the main thread only copies each
+batch into its accumulator. Upstream's measurement on a 4.83M-row Xenium transcripts
+element capped at 4M, with a 12,448-feature panel: the preload went from *never
+completing* (still running at 9.4 minutes) to 75 s, worst single task 113 s → ~4.2 s.
+
+0.10.0 also virtualizes the upstream feature list (SpatialData.js#172), which matters
+here only for the panels MDV does not own — MDV#542 did the same for
+`PointsFeatureFilterPanel`. On the element above the two together were the difference
+between a usable panel and a minute of frozen UI, and neither alone got there.
+
+0.9.0 remains the hard compile floor: the points worker was renamed to the parquet
 worker with no aliases, so `@spatialdata/core/points-worker`, `enablePointsWorker` and
 `isPointsWorkerEnabled` no longer exist and MDV does not compile below it. It is also
 the release that made a production build work at all — core reaches its vendored
@@ -299,7 +316,7 @@ Useful follow-up SpatialData.js changes (not blocking this PR):
 
 ### Image layer panel pattern (MDV)
 
-Dependencies: `@spatialdata/{core,layers,react,vis,avivatorish}` at **>= 0.9.0** (see the version floor above).
+Dependencies: `@spatialdata/{core,layers,react,vis,avivatorish}` at **>= 0.10.0** (see the version floor above).
 
 **Viewer (chart tree)**
 

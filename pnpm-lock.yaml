@@ -120,20 +120,20 @@ importers:
         specifier: 10.6.0
         version: 10.6.0
       '@spatialdata/avivatorish':
-        specifier: ^0.9.0
-        version: 0.9.0(bb8d092af02a187d16bc7ace88d74081)
+        specifier: ^0.10.0
+        version: 0.10.0(bb8d092af02a187d16bc7ace88d74081)
       '@spatialdata/core':
-        specifier: ^0.9.0
-        version: 0.9.0
+        specifier: ^0.10.0
+        version: 0.10.0
       '@spatialdata/layers':
-        specifier: ^0.9.0
-        version: 0.9.0(201d8cd371780b7da38b87aae7d4885e)
+        specifier: ^0.10.0
+        version: 0.10.0(201d8cd371780b7da38b87aae7d4885e)
       '@spatialdata/react':
-        specifier: ^0.9.0
-        version: 0.9.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.4)
+        specifier: ^0.10.0
+        version: 0.10.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.4)
       '@spatialdata/vis':
-        specifier: ^0.9.0
-        version: 0.9.0(22a729a6f9bb47d9e3281fcc338b2b9c)
+        specifier: ^0.10.0
+        version: 0.10.0(22a729a6f9bb47d9e3281fcc338b2b9c)
       '@tanstack/react-query':
         specifier: ^5.80.0
         version: 5.80.6(react@19.2.6)
@@ -2236,30 +2236,30 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
-  '@spatialdata/avivatorish@0.9.0':
-    resolution: {integrity: sha512-gPjvrGolh9t58j29fc3ZphMn8D7mp1jU6wbLF+gyKG1vD2U1MLbmNl7sROIU/plpYWS8TefU9CHxUyWcBeG3HA==}
+  '@spatialdata/avivatorish@0.10.0':
+    resolution: {integrity: sha512-KcM5qDiwtPxQ0g952ZjvRezf2ql0/dyv+U8TKUEw8R4gIvm/Uk9kXraEEWmZJ4jGgu3okIWowstBL/c/xWRSsQ==}
     peerDependencies:
       react: '>=18 <20'
       react-dom: '>=18 <20'
 
-  '@spatialdata/core@0.9.0':
-    resolution: {integrity: sha512-OEQjI2VtTRr43vL1FhmCf507tWfO2dPqmPgP5dVcUyZz/uaCCeXO35bAYcBtJdE8Ey+aX3sRxxcWaO+69ukRNg==}
+  '@spatialdata/core@0.10.0':
+    resolution: {integrity: sha512-ULRB0lHSAjULU80qkr2i9TDrqmNhq2/VngZTnrgAjf0vcfBA51ASMzuekZ59ESBEME2Rd9yGR8KleZRN5hiOsw==}
 
-  '@spatialdata/layers@0.9.0':
-    resolution: {integrity: sha512-fQHzMQWyOyUHVtlZEIIZduA6ra0n1nZe6pn1RERoUmjtKHrs4pxiAPgcY6t6MkKYaw0Yu+pyNRGP4w+dFJ8YNw==}
+  '@spatialdata/layers@0.10.0':
+    resolution: {integrity: sha512-Zn5k8LUQecOX1HgyNKResgInWCjMiCKCeS8TSxkRhmwj8LOtujTLQE51KDbsUwaJgJYQNrr2ontqN7aInBi3QQ==}
     peerDependencies:
       deck.gl: ~9.3.7
 
-  '@spatialdata/react@0.9.0':
-    resolution: {integrity: sha512-WEZAkVUiDtm6+8kzSsUawjYsPXcdlVKv3ae/O42xHFMYtqmaop5k5wHg4Fe9FgSp90IxSjEkjvQmNUWYlNQvkg==}
+  '@spatialdata/react@0.10.0':
+    resolution: {integrity: sha512-ENHPKMcVZawP5ceDcV2dTXNA3u49qrccHi+q+R5BHnTE1ncIvZ67eQI5uYt4lIjCw2AxhzaixphD31guAnNcDw==}
     peerDependencies:
       anndata.js: ^0.0.2
       react: '>=18 <20'
       react-dom: '>=18 <20'
       zarrita: ^0.7.1
 
-  '@spatialdata/vis@0.9.0':
-    resolution: {integrity: sha512-jCeYAfjMgBJxgcE5A2kzbgZapLM4jtgyaugs3tg62dG/KI9IARJfi/gegBKyUrmtKDLXVrbrYBuVAlpZgg3PUQ==}
+  '@spatialdata/vis@0.10.0':
+    resolution: {integrity: sha512-VkK0mvq97TZzgtiht3EAtUTKyjVL4JEw45BMQb+FMKOByh8VW4bTcHY2mN0vB0U7i1gCcnOs07bIi7mv+pU1CQ==}
     peerDependencies:
       anndata.js: ^0.0.2
       react: '>=18 <20'
@@ -2295,8 +2295,17 @@ packages:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
+  '@tanstack/react-virtual@3.14.10':
+    resolution: {integrity: sha512-SRyoUbdFMRHuYXMijV5H4ZarQWpXkj3iANq8OFre+pybeVap8ZJjZ3Nz9bVjx4d8PfobVUQUdKyyyHYk3E+djw==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   '@tanstack/virtual-core@3.13.18':
     resolution: {integrity: sha512-Mx86Hqu1k39icq2Zusq+Ey2J6dDWTjDvEv43PJtRCoEYTLyfaPnxIQ6iy7YAOK0NV/qOEmZQ/uCufrppZxTgcg==}
+
+  '@tanstack/virtual-core@3.17.8':
+    resolution: {integrity: sha512-BfEvehNpOT75r5Ksc5xW6NZuXujTfb7nlSEyVu4XHG3gdxNg1KqXruWbDewXOUaUYIo4oRbSfkjIajz4MAT8tA==}
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -8467,7 +8476,7 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@spatialdata/avivatorish@0.9.0(bb8d092af02a187d16bc7ace88d74081)':
+  '@spatialdata/avivatorish@0.10.0(bb8d092af02a187d16bc7ace88d74081)':
     dependencies:
       '@hms-dbmi/viv': 0.22.0(a8a8bf4346b18ef19c73280beb43bfb9)
       '@math.gl/core': 4.1.0
@@ -8490,7 +8499,7 @@ snapshots:
       - immer
       - use-sync-external-store
 
-  '@spatialdata/core@0.9.0':
+  '@spatialdata/core@0.10.0':
     dependencies:
       '@math.gl/core': 4.1.0
       '@zarrita/storage': 0.2.0
@@ -8502,14 +8511,14 @@ snapshots:
       zarrita: 0.7.4
       zod: 4.4.3
 
-  '@spatialdata/layers@0.9.0(201d8cd371780b7da38b87aae7d4885e)':
+  '@spatialdata/layers@0.10.0(201d8cd371780b7da38b87aae7d4885e)':
     dependencies:
       '@deck.gl/core': 9.3.7
       '@hms-dbmi/viv': 0.22.0(a8a8bf4346b18ef19c73280beb43bfb9)
       '@luma.gl/core': 9.3.6
       '@luma.gl/engine': 9.3.6(@luma.gl/core@9.3.6)(@luma.gl/shadertools@9.3.6(@luma.gl/core@9.3.6))
       '@math.gl/core': 4.1.0
-      '@spatialdata/core': 0.9.0
+      '@spatialdata/core': 0.10.0
       deck.gl: 9.3.7(@arcgis/core@4.34.8)(@luma.gl/gltf@9.3.6(@luma.gl/core@9.3.6)(@luma.gl/engine@9.3.6(@luma.gl/core@9.3.6)(@luma.gl/shadertools@9.3.6(@luma.gl/core@9.3.6)))(@luma.gl/shadertools@9.3.6(@luma.gl/core@9.3.6)))(@luma.gl/shadertools@9.3.6(@luma.gl/core@9.3.6))(@luma.gl/webgl@9.3.6(@luma.gl/core@9.3.6))(@math.gl/web-mercator@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       zod: 4.4.3
     transitivePeerDependencies:
@@ -8523,24 +8532,25 @@ snapshots:
       - '@luma.gl/webgl'
       - react
 
-  '@spatialdata/react@0.9.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.4)':
+  '@spatialdata/react@0.10.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.4)':
     dependencies:
-      '@spatialdata/core': 0.9.0
+      '@spatialdata/core': 0.10.0
       anndata.js: 0.0.2
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
       zarrita: 0.7.4
 
-  '@spatialdata/vis@0.9.0(22a729a6f9bb47d9e3281fcc338b2b9c)':
+  '@spatialdata/vis@0.10.0(22a729a6f9bb47d9e3281fcc338b2b9c)':
     dependencies:
       '@deck.gl/core': 9.3.7
       '@hms-dbmi/viv': 0.22.0(a8a8bf4346b18ef19c73280beb43bfb9)
       '@luma.gl/core': 9.3.6
       '@math.gl/core': 4.1.0
-      '@spatialdata/avivatorish': 0.9.0(bb8d092af02a187d16bc7ace88d74081)
-      '@spatialdata/core': 0.9.0
-      '@spatialdata/layers': 0.9.0(201d8cd371780b7da38b87aae7d4885e)
-      '@spatialdata/react': 0.9.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.4)
+      '@spatialdata/avivatorish': 0.10.0(bb8d092af02a187d16bc7ace88d74081)
+      '@spatialdata/core': 0.10.0
+      '@spatialdata/layers': 0.10.0(201d8cd371780b7da38b87aae7d4885e)
+      '@spatialdata/react': 0.10.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.4)
+      '@tanstack/react-virtual': 3.14.10(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@uidotdev/usehooks': 2.4.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@uiw/react-json-view': 2.0.0-alpha.43(@babel/runtime@7.29.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@vivjs/views': 0.22.1(b676f017234f045295e8bc0d9eccff0e)
@@ -8597,7 +8607,15 @@ snapshots:
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
 
+  '@tanstack/react-virtual@3.14.10(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+    dependencies:
+      '@tanstack/virtual-core': 3.17.8
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
+
   '@tanstack/virtual-core@3.13.18': {}
+
+  '@tanstack/virtual-core@3.17.8': {}
 
   '@testing-library/dom@10.4.1':
     dependencies:
