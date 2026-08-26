@@ -271,10 +271,13 @@ def build_app(
     @project_bp.route("/jobs", methods=["POST"])
     def submit_jobs():
         data = request.get_json(silent=True) or {}
+        tool_id = data.get("tool_id")
+        params = data.get("params") or {}
+        if not isinstance(tool_id, str) or not isinstance(params, dict):
+            return jsonify({"error": "tool_id (string) and params (object) required"}), 400
+
         try:
-            job_id = job_service.get_or_create(project).submit(
-                data.get("tool_id"), data.get("params") or {}
-            )
+            job_id = job_service.get_or_create(project).submit(tool_id, params)
         except (KeyError, ValueError) as e:
             return jsonify({"error": str(e)}), 400 # unknown tool / bad params
         return jsonify({"job_id": job_id}), 202
