@@ -3,7 +3,7 @@ import { featureNamesForCodes, isPointsWorkerEnabled, resolveFeatureSelectionCod
 import { featureCodeToRgb } from "@spatialdata/layers";
 import { describeFeatureRowState, featureRowOpacity, usePointsFeatureState } from "@spatialdata/vis";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, memo, useEffect, useMemo, useRef, useState } from "react";
 
 import {
     type PointsFeatureFilterConfig,
@@ -129,6 +129,220 @@ function FeatureColorSwatch({
     );
 }
 
+/**
+ * One feature row. `memo` is the point of it: `FeatureRowList` re-renders on every scroll
+ * event, not just when the window moves, and MUI's `FormControlLabel` + `Checkbox` cost
+ * enough per row that re-rendering all ~22 of them each time was ~45ms — still visible as
+ * lag on a fast scroll. Every prop below is a primitive, an entry from the catalog, or a
+ * value the panel already holds by stable reference, so a scroll that does not change a
+ * row skips it entirely and only rows entering the window actually render.
+ *
+ * That is also the contract to keep: pass derived values, never freshly-built objects or
+ * per-row closures — either turns the shallow compare into a guaranteed miss and quietly
+ * puts the ~45ms back.
+ */
+const FeatureRow = memo(function FeatureRow({
+    entry,
+    row,
+    colorOverride,
+    shortfall,
+    displayCount,
+    countIsPartial,
+    showCount,
+    scanning,
+    workerBlocksScan,
+    onToggle,
+    onHighlight,
+    onPickColor,
+    onClearColor,
+}: {
+    entry: CatalogEntry;
+    row: RowState;
+    /** This feature's colour override, if it has one. Also what makes the row "overridden". */
+    colorOverride?: [number, number, number];
+    /** Resident points, when the row is drawn from fewer points than the dataset holds. */
+    shortfall?: number;
+    /** The count to print: the dataset total, or the running resident tally before it lands. */
+    displayCount?: number;
+    /** `displayCount` is still only the running tally, so it prints with a "≥". */
+    countIsPartial: boolean;
+    /** No counts anywhere in the catalog yet, so no count column on any row. */
+    showCount: boolean;
+    scanning: boolean;
+    workerBlocksScan: boolean;
+    onToggle: (code: number, checked: boolean) => void;
+    onHighlight: (code: number | null) => void;
+    onPickColor: (name: string, rgb: [number, number, number]) => void;
+    onClearColor: (name: string) => void;
+}) {
+    const { resident, rendered, selected, state } = row;
+    const overridden = colorOverride !== undefined;
+    const rgb = colorOverride ?? featureCodeToRgb(entry.code);
+    const countStr = entry.count !== undefined ? ` · ${entry.count.toLocaleString()} pts` : "";
+    // Multi-line diagnostic: the human state and its reason, then the raw
+    // signals that drove it (what made this row grey, or not).
+    const title = `${entry.name} · code ${entry.code}${countStr}\n${state.label}: ${state.reason}\n${
+        workerBlocksScan
+            ? "(This element does have a feature index; the points worker it needs can't start — SpatialData.js#148.)\n"
+            : ""
+    }[resident=${resident ? "y" : "n"} rendered=${rendered ? "y" : "n"} selected=${selected ? "y" : "n"} scan=${scanning ? "running" : "idle"}]`;
+    return (
+        <FormControlLabel
+            // `width` because the old grid container stretched its items and
+            // `FeatureRowList`'s row wrapper does not; without it the label
+            // shrinks to its text and the right-aligned point count collapses
+            // onto the name.
+            sx={{ ...rowLabelSx, width: "100%", opacity: featureRowOpacity(state) }}
+            title={title}
+            onMouseEnter={() => onHighlight(entry.code)}
+            onMouseLeave={() => onHighlight(null)}
+            // Focus too, so tabbing through the list highlights on the
+            // canvas the same way hovering does. These bubble from the
+            // row's checkbox, which is the focusable element.
+            onFocus={() => onHighlight(entry.code)}
+            onBlur={() => onHighlight(null)}
+            control={
+                <Checkbox
+                    size="small"
+                    sx={checkboxSx}
+                    checked={selected}
+                    onChange={(event) => onToggle(entry.code, event.target.checked)}
+                />
+            }
+            label={
+                <span className="flex items-center gap-1.5">
+                    <FeatureColorSwatch
+                        name={entry.name}
+                        rgb={rgb}
+                        overridden={overridden}
+                        onPick={(next) => onPickColor(entry.name, next)}
+                    />
+                    <Typography variant="caption" noWrap>
+                        {entry.name}
+                    </Typography>
+                    {overridden ? (
+                        <button
+                            type="button"
+                            title="Reset to default colour"
+                            className="shrink-0 cursor-pointer rounded border border-[hsl(var(--border))] px-1 text-[11px] leading-tight text-[hsl(var(--muted-foreground))]"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                event.preventDefault();
+                                onClearColor(entry.name);
+                            }}
+                        >
+                            ⟲
+                        </button>
+                    ) : null}
+                    {showCount ? (
+                        <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            className="ml-auto shrink-0"
+                            title={
+                                shortfall !== undefined
+                                    ? `${shortfall.toLocaleString()} of ${entry.count?.toLocaleString()} points are inside the memory cap`
+                                    : countIsPartial
+                                      ? "Points loaded so far (resident window) — dataset total still counting"
+                                      : "Points in the dataset"
+                            }
+                        >
+                            {shortfall !== undefined ? (
+                                <>
+                                    {/* The resident figure is what is on screen, so it carries
+                                        the emphasis; the dataset total is context. */}
+                                    <span className="text-[hsl(var(--warning,38_92%_50%))]">
+                                        {shortfall.toLocaleString()}
+                                    </span>
+                                    <span className="opacity-60">
+                                        {" / "}
+                                        {entry.count?.toLocaleString()}
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    {countIsPartial ? "≥" : ""}
+                                    {displayCount?.toLocaleString() ?? "—"}
+                                </>
+                            )}
+                        </Typography>
+                    ) : null}
+                </span>
+            }
+        />
+    );
+});
+
+/**
+ * The virtualised feature list — mount only the rows the fixed-height scroll box can
+ * actually show. A Xenium transcripts element has ~12,400 features, and one
+ * `FormControlLabel` + `Checkbox` each put ~88,000 nodes on the page and blocked the main
+ * thread for long enough that the tab stopped answering at all: the panel was unusable on
+ * exactly the datasets the feature filter exists for.
+ *
+ * Its own component, and NOT inlinable back into the panel: `useVirtualizer` re-renders
+ * whoever calls it on every scroll frame, and the panel's render is O(catalog) — it
+ * classifies all ~12,400 features to count how many are unloaded. Called from there, each
+ * scroll frame cost ~310ms and rows arrived visibly after the scrollbar had moved. Here
+ * the hook re-renders the window's rows and nothing else; `renderRow` closes over whatever
+ * the panel's last render computed, so scrolling never re-derives it.
+ *
+ * `lint:react-compiler` warns "incompatible library" on `useVirtualizer` — it returns
+ * functions the compiler cannot memoise safely, so it skips this component. That is the
+ * outcome we want anyway: memoising a list whose rows depend on mutable engine state is
+ * how it would go stale.
+ */
+function FeatureRowList({
+    count,
+    getItemKey,
+    renderRow,
+    children,
+}: {
+    count: number;
+    /** The row's feature code — the identity `measureElement` caches its height under. */
+    getItemKey: (index: number) => number;
+    renderRow: (index: number) => ReactNode;
+    /** Drawn after the rows, inside the scroll box: the "nothing matched" message. */
+    children?: ReactNode;
+}) {
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const rowVirtualizer = useVirtualizer({
+        count,
+        getScrollElement: () => scrollRef.current,
+        estimateSize: () => FEATURE_ROW_HEIGHT,
+        overscan: FEATURE_ROW_OVERSCAN,
+        // Key measurements by feature, not by position: the search box reshuffles which
+        // entry sits at which index, and an index-keyed cache would hand a row the
+        // measurement of whichever feature happened to be there before.
+        getItemKey,
+    });
+
+    return (
+        <div ref={scrollRef} className="max-h-56 overflow-y-auto py-1">
+            {/* Spacer as tall as the whole list, with only the scrolled-to window of rows
+                inside it. Absolute positioning has no flow for the old grid's `gap-0.5` to
+                act on, so the gap moves into each row's own padding — where it stays part
+                of what `measureElement` measures. */}
+            <div className="relative w-full" style={{ height: rowVirtualizer.getTotalSize() }}>
+                {rowVirtualizer.getVirtualItems().map((virtualItem) => (
+                    <div
+                        key={virtualItem.key}
+                        // `data-index` is how the default `measureElement` finds which row it
+                        // just measured; without it every row measures as index 0.
+                        data-index={virtualItem.index}
+                        ref={rowVirtualizer.measureElement}
+                        className="absolute left-0 top-0 w-full pb-0.5"
+                        style={{ transform: `translateY(${virtualItem.start}px)` }}
+                    >
+                        {renderRow(virtualItem.index)}
+                    </div>
+                ))}
+            </div>
+            {children}
+        </div>
+    );
+}
+
 function PointsFeatureFilterPanel({ config, updateLayer }: Props) {
     // Opt out of the React Compiler. `usePointsFeatureState` re-renders this component
     // on every engine notify (via useSyncExternalStore) but reads mutable engine state
@@ -205,31 +419,6 @@ function PointsFeatureFilterPanel({ config, updateLayer }: Props) {
         return sortedEntries.filter((entry) => entry.name.toLowerCase().includes(query));
     }, [sortedEntries, searchQuery]);
 
-    // Mount only the rows the fixed-height scroll box can actually show. A Xenium
-    // transcripts element has ~12,400 features, and one `FormControlLabel` + `Checkbox`
-    // each put ~88,000 nodes on the page and blocked the main thread for long enough that
-    // the tab stopped answering at all — the panel was unusable on exactly the datasets
-    // the feature filter exists for. `memo`ing the panel (see `PointsFeatureFilterConfig`)
-    // only stopped cosmetic re-renders; it could not make the first render cheap.
-    //
-    // Above the early returns because hooks cannot be conditional. `getScrollElement`
-    // returning null on those paths is fine — the virtualiser just reports no items.
-    //
-    // `lint:react-compiler` warns "incompatible library" here: the virtualiser hands back
-    // functions the compiler cannot memoise safely. Already moot — this component opts out
-    // of the compiler wholesale with the "use no memo" above, for its own reasons.
-    const listScrollRef = useRef<HTMLDivElement>(null);
-    const rowVirtualizer = useVirtualizer({
-        count: visibleEntries.length,
-        getScrollElement: () => listScrollRef.current,
-        estimateSize: () => FEATURE_ROW_HEIGHT,
-        overscan: FEATURE_ROW_OVERSCAN,
-        // Key measurements by feature, not by position: the search box reshuffles which
-        // entry sits at which index, and an index-keyed cache would hand a row the
-        // measurement of whichever feature happened to be there before.
-        getItemKey: (index) => visibleEntries[index].code,
-    });
-
     // Write NAMES, and clear any legacy `featureCodes` so the two cannot disagree —
     // names win when both are set, and a stale code list in a saved config is exactly
     // the confusion names exist to remove.
@@ -241,8 +430,6 @@ function PointsFeatureFilterPanel({ config, updateLayer }: Props) {
     };
 
     const colorOverrides = config.featureColorOverrides;
-    const effectiveRgb = (name: string, code: number): [number, number, number] =>
-        colorOverrides?.[name] ?? featureCodeToRgb(code);
 
     // `<input type="color">` fires change continuously while the picker is dragged, and
     // each commit is a config write → new palette → deck layer update on a layer that can
@@ -365,6 +552,9 @@ function PointsFeatureFilterPanel({ config, updateLayer }: Props) {
     // `notLoadedCount` and `partialCount` are counts over the WHOLE catalog, so every
     // entry still has to be classified once. The window's `rowInfo` lookups now ride
     // along on a pass that has to happen anyway.
+    //
+    // This is what makes rendering this component expensive (~310ms at 12,448 features),
+    // and so what `FeatureRowList` exists to keep off the scroll path.
     const rowStates = new Map<number, RowState>();
     let notLoadedCount = 0;
     // `partialCount` is drawn-but-incomplete — the opposite failure of understanding to
@@ -529,133 +719,42 @@ function PointsFeatureFilterPanel({ config, updateLayer }: Props) {
                 />
             ) : null}
 
-            <div ref={listScrollRef} className="max-h-56 overflow-y-auto py-1">
-                {/* Spacer as tall as the whole list, with only the scrolled-to window of rows
-                    inside it. Absolute positioning has no flow for the old grid's `gap-0.5` to
-                    act on, so the gap moves into each row's own padding — where it stays part
-                    of what `measureElement` measures. */}
-                <div className="relative w-full" style={{ height: rowVirtualizer.getTotalSize() }}>
-                    {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-                        const entry = visibleEntries[virtualItem.index];
-                        const { resident, rendered, selected, state } = rowInfo(entry.code);
-                        const overridden = colorOverrides?.[entry.name] !== undefined;
-                        const rgb = effectiveRgb(entry.name, entry.code);
-                        // Once dataset totals land, keep showing the resident tally too when
-                        // it falls short. Dropping it is what let a capped element print
-                        // "1,182,402" beside a row drawing a tenth of that. `partial` already
-                        // excludes features a scan has since supplied whole.
-                        const shortfall = state.tone === "partial" ? residentShortfall(entry) : undefined;
-                        const countStr = entry.count !== undefined ? ` · ${entry.count.toLocaleString()} pts` : "";
-                        // Multi-line diagnostic: the human state and its reason, then the raw
-                        // signals that drove it (what made this row grey, or not).
-                        const title = `${entry.name} · code ${entry.code}${countStr}\n${state.label}: ${state.reason}\n${
-                            workerBlocksScan
-                                ? "(This element does have a feature index; the points worker it needs can't start — SpatialData.js#148.)\n"
-                                : ""
-                        }[resident=${resident ? "y" : "n"} rendered=${rendered ? "y" : "n"} selected=${selected ? "y" : "n"} scan=${scanning ? "running" : "idle"}]`;
-                        return (
-                            <div
-                                key={entry.code}
-                                // `data-index` is how the default `measureElement` finds which row it
-                                // just measured; without it every row measures as index 0.
-                                data-index={virtualItem.index}
-                                ref={rowVirtualizer.measureElement}
-                                className="absolute left-0 top-0 w-full pb-0.5"
-                                style={{ transform: `translateY(${virtualItem.start}px)` }}
-                            >
-                                <FormControlLabel
-                                    // `width` because the old grid container stretched its items and
-                                    // this wrapper does not; without it the label shrinks to its text
-                                    // and the right-aligned point count collapses onto the name.
-                                    sx={{ ...rowLabelSx, width: "100%", opacity: featureRowOpacity(state) }}
-                                    title={title}
-                                    onMouseEnter={() => setHighlightedFeature(entry.code)}
-                                    onMouseLeave={() => setHighlightedFeature(null)}
-                                    // Focus too, so tabbing through the list highlights on the
-                                    // canvas the same way hovering does. These bubble from the
-                                    // row's checkbox, which is the focusable element.
-                                    onFocus={() => setHighlightedFeature(entry.code)}
-                                    onBlur={() => setHighlightedFeature(null)}
-                                    control={
-                                        <Checkbox
-                                            size="small"
-                                            sx={checkboxSx}
-                                            checked={selected}
-                                            onChange={(event) => toggleFeature(entry.code, event.target.checked)}
-                                        />
-                                    }
-                                    label={
-                                        <span className="flex items-center gap-1.5">
-                                            <FeatureColorSwatch
-                                                name={entry.name}
-                                                rgb={rgb}
-                                                overridden={overridden}
-                                                onPick={(next) => setColorOverride(entry.name, next)}
-                                            />
-                                            <Typography variant="caption" noWrap>
-                                                {entry.name}
-                                            </Typography>
-                                            {overridden ? (
-                                                <button
-                                                    type="button"
-                                                    title="Reset to default colour"
-                                                    className="shrink-0 cursor-pointer rounded border border-[hsl(var(--border))] px-1 text-[11px] leading-tight text-[hsl(var(--muted-foreground))]"
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        event.preventDefault();
-                                                        clearColorOverride(entry.name);
-                                                    }}
-                                                >
-                                                    ⟲
-                                                </button>
-                                            ) : null}
-                                            {hasAnyCounts ? (
-                                                <Typography
-                                                    variant="caption"
-                                                    color="text.secondary"
-                                                    className="ml-auto shrink-0"
-                                                    title={
-                                                        shortfall !== undefined
-                                                            ? `${shortfall.toLocaleString()} of ${entry.count?.toLocaleString()} points are inside the memory cap`
-                                                            : countIsPartial(entry)
-                                                              ? "Points loaded so far (resident window) — dataset total still counting"
-                                                              : "Points in the dataset"
-                                                    }
-                                                >
-                                                    {shortfall !== undefined ? (
-                                                        <>
-                                                            {/* The resident figure is what is on
-                                                                screen, so it carries the emphasis;
-                                                                the dataset total is context. */}
-                                                            <span className="text-[hsl(var(--warning,38_92%_50%))]">
-                                                                {shortfall.toLocaleString()}
-                                                            </span>
-                                                            <span className="opacity-60">
-                                                                {" / "}
-                                                                {entry.count?.toLocaleString()}
-                                                            </span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            {countIsPartial(entry) ? "≥" : ""}
-                                                            {effectiveCount(entry)?.toLocaleString() ?? "—"}
-                                                        </>
-                                                    )}
-                                                </Typography>
-                                            ) : null}
-                                        </span>
-                                    }
-                                />
-                            </div>
-                        );
-                    })}
-                </div>
+            <FeatureRowList
+                count={visibleEntries.length}
+                getItemKey={(index) => visibleEntries[index].code}
+                renderRow={(index) => {
+                    const entry = visibleEntries[index];
+                    const row = rowInfo(entry.code);
+                    return (
+                        <FeatureRow
+                            entry={entry}
+                            row={row}
+                            colorOverride={colorOverrides?.[entry.name]}
+                            // Once dataset totals land, keep showing the resident tally too
+                            // when it falls short. Dropping it is what let a capped element
+                            // print "1,182,402" beside a row drawing a tenth of that.
+                            // `partial` already excludes features a scan has since supplied
+                            // whole.
+                            shortfall={row.state.tone === "partial" ? residentShortfall(entry) : undefined}
+                            displayCount={effectiveCount(entry)}
+                            countIsPartial={countIsPartial(entry)}
+                            showCount={hasAnyCounts}
+                            scanning={scanning}
+                            workerBlocksScan={workerBlocksScan}
+                            onToggle={toggleFeature}
+                            onHighlight={setHighlightedFeature}
+                            onPickColor={setColorOverride}
+                            onClearColor={clearColorOverride}
+                        />
+                    );
+                }}
+            >
                 {showSearch && visibleEntries.length === 0 ? (
                     <Typography variant="caption" color="text.secondary">
                         No features match your search.
                     </Typography>
                 ) : null}
-            </div>
+            </FeatureRowList>
         </div>
     );
 }
