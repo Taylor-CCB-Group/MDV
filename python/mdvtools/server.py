@@ -14,6 +14,7 @@ from mdvtools.server_utils import (
 )
 from mdvtools.ucsc_proxy_extension import UcscProxyServerExtension
 from mdvtools.jobs.registry import serialize_registry
+from mdvtools.jobs.service import JobService
 
 import webbrowser
 import json
@@ -54,6 +55,7 @@ logger.info("server.py module loaded")
 
 routes = set()
 
+job_service = JobService()      # one job service driver per process
 
 def build_app(
     project: MDVProject,
@@ -264,6 +266,19 @@ def build_app(
     @project_bp.route("/jobs/tools", methods=["GET"])
     def jobs_tools():
         return jsonify(serialize_registry())
+
+    # submit a job with a write-ahead intent
+    @project_bp.route("/jobs", methods=["POST"])
+    def submit_jobs():
+        data = request.get_json(silent=True) or {}
+        try:
+            job_id = job_service.get_or_create(project).submit(
+                data.get("tool_id"), data.get("params") or {}
+            )
+        except (KeyError, ValueError) as e:
+            return jsonify({"error": str(e)}), 400 # unknown tool / bad params
+        return jsonify({"job_id": job_id}), 202
+
 
     # gets a particular view
     @project_bp.route("/get_view", methods=["POST"])
