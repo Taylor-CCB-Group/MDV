@@ -1,5 +1,6 @@
 import shutil
 from dataclasses import asdict
+from collections.abc import Callable
 from pathlib import Path
 
 from . import JOBS_DIRNAME
@@ -38,6 +39,7 @@ class JobManager:
         records_root=None,
         executor=None,
         max_concurrent: int | None = 2,
+        on_submit: Callable[[], None] | None = None,
     ):
         self.project = project
         self.records_root = (
@@ -53,6 +55,9 @@ class JobManager:
         self.store = JobStore(self.records_root)
         self.executor: Executor = executor or LocalSubprocessExecutor(max_concurrent)
         self.max_concurrent = max_concurrent
+        # wake-the-driver hook; the JobService passes its nudge here. None = no-op,
+        # so a bare-manager callers (Local/Slurm drivers, tests) work without changing anything
+        self.on_submit = on_submit
         self._reconcile_on_boot()  # ADR0005: recover in-flight jobs at startup
 
     def _workspace(self, job_id: str) -> Workspace:
@@ -75,8 +80,10 @@ class JobManager:
         spec = get_tool(tool_id)
         validate_params(spec, params, self.project)  # backend-gate
         rec = self.store.new(tool_id, params)  # write-ahead intent
-        self._dispatch()
+        if self.on_submit is not None:
+            self.on_submit() # wake the driver; it owns dispatch + ingest via tick()
         return rec.job_id
+
 
     def _busy(self) -> int:
         return sum(1 for r in self.store.load_all() if r.status in ACTIVE)

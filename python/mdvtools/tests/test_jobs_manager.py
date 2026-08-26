@@ -122,7 +122,7 @@ def test_max_concurrent_holds_extra_jobs_queued(tmp_path):
             },
         )
 
-    # right after submitting 3 with a bound of 2, before any tick: 2 active, 1 queued
+    mgr.tick()   # driver dispatch: fills the bound (2 RUNNING), holds the 3rd QUEUED
     statuses = sorted(r.status for r in mgr.store.load_all())
     assert statuses.count(Status.RUNNING.value) == 2
     assert statuses.count(Status.QUEUED.value) == 1
@@ -196,7 +196,8 @@ def test_job_that_vanishes_without_marker_is_failed(tmp_path):
                {"datasource": "cells", "column_a": "sample", "column_b": "cluster",
                 "output_name": "out"})
 
-    mgr.tick()   # marker never written; poll says lost → the manager gives up, not waits forever
+    mgr.tick()   # dispatch: QUEUED → RUNNING (driver owns dispatch now)
+    mgr.tick()   # marker never written; poll says lost → give up (FAILED), not wait forever
 
     assert [r.status for r in mgr.store.load_all()] == [Status.FAILED.value]
 
@@ -209,7 +210,8 @@ def test_running_job_without_marker_stays_running(tmp_path):
                {"datasource": "cells", "column_a": "sample", "column_b": "cluster",
                 "output_name": "out"})
 
-    mgr.tick()   # no marker yet, but the executor says it's alive → wait, don't fail
+    mgr.tick()   # dispatch: QUEUED → RUNNING
+    mgr.tick()   # no marker yet, but poll says alive → stay RUNNING, don't fail
 
     assert [r.status for r in mgr.store.load_all()] == [Status.RUNNING.value]
 
@@ -225,7 +227,7 @@ def test_unbounded_concurrency_submits_all_queued_at_once(tmp_path):
                    {"datasource": "cells", "column_a": "sample", "column_b": "cluster",
                     "output_name": f"out_{i}"})
 
-    # no manager bound → all three submitted immediately, none held QUEUED
+    mgr.tick()   # driver dispatch: no bound → all three go RUNNING at once
     statuses = [r.status for r in mgr.store.load_all()]
     assert statuses.count(Status.RUNNING.value) == 3
     assert statuses.count(Status.QUEUED.value) == 0
@@ -269,3 +271,30 @@ def test_reconcile_requeues_record_without_handle_without_polling(tmp_path):
     reloaded = {r.job_id: r for r in mgr.store.load_all()}[rec.job_id]
     assert reloaded.status == Status.QUEUED.value   # nothing to reattach to → re-queue
     assert executor.polls == 0                       # a None handle is never polled (short-circuit)
+
+def test_submit_is_write_ahead_only_and_nudges(tmp_path):
+    """submit writes a QUEUED record and wakes the driver, nothing more.
+    Dispatch (staging + executor.submit) now belongs to the driver's tick, not submit."""
+    project = _make_project(tmp_path)
+    executor = _FakeExecutor()
+    nudges = []
+
+    mgr = JobManager(
+        project,
+        executor=executor,
+        on_submit=lambda: nudges.append(1),
+    )
+    params = {
+        "datasource": "cells",
+        "column_a": "sample",
+        "column_b": "cluster",
+        "output_name": "out",
+    }
+    job_id = mgr.submit("concat_columns", params)
+
+    recs = mgr.store.load_all()
+    assert len(recs) == 1
+    assert recs[0].job_id == job_id
+    assert recs[0].status == Status.QUEUED.value   # write-ahead only, not dispatched
+    assert executor.submits == 0                   # driver owns dispatch now, not submit
+    assert nudges == [1]                           # nudge fired exactly once
