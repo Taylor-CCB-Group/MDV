@@ -13,6 +13,8 @@ from mdvtools.server_utils import (
     add_safe_headers,
 )
 from mdvtools.ucsc_proxy_extension import UcscProxyServerExtension
+from mdvtools.jobs.registry import serialize_registry
+from mdvtools.jobs.service import JobService
 
 import webbrowser
 import json
@@ -53,14 +55,16 @@ logger.info("server.py module loaded")
 
 routes = set()
 
+job_service = JobService()      # one job service driver per process
 
-
-
-
-def create_app(
+def build_app(
     project: MDVProject,
     options: Optional[MDVServerOptions] = None,
 ):
+    """Register every route for `project` on a Flask app and return it without serving.
+    `create_app`'s single-project path blocks in `server_forever()` and never returns, so route-level
+    tests need this
+    """
     def log(*args, **kwargs):
         """
         Log info-level messages using the module logger.
@@ -68,7 +72,7 @@ def create_app(
         """
         msg = " ".join(str(arg) for arg in args)
         logger.info(f"[{project.id} - '{project.dir.split('/')[-1]}'] {msg}", **kwargs)
-    
+
     if options is None:
         options = MDVServerOptions()
 
@@ -91,11 +95,10 @@ def create_app(
             extension.register_global_routes(app, app.config)
 
         project_bp = SingleProjectShim(app)
-        multi_project = False
         if options.websocket:
             # reviewing this... thinking about hooking up to ProjectChat logger...
             #! nb - we're in 'single project' mode here.
-            # thinking about syncronising list of views via SocketIO rather than polling... 
+            # thinking about syncronising list of views via SocketIO rather than polling...
             # maybe via a smaller PR where I better figure out clean socket implementation.
             # maybe we have some abstraction around how we create the Flask instance.
             mdv_socketio(app)
@@ -107,9 +110,8 @@ def create_app(
         # add routes for this project to existing app
         # set the route prefix to the project name, derived from the dir name.
         # this is to allow multiple projects to be served from the same server.
-        multi_project = True
         route = "/project/" + project.id + "/"
-        
+
 
         if options.backend_db:
             project_bp = Blueprint(project.id, __name__, url_prefix=route)
@@ -165,7 +167,7 @@ def create_app(
             return "File not found", 404
         # consider allowing directory listing here if it's not a file?
         return send_file(path)
-    
+
     @project_bp.route("/<file>.b")
     def get_binary_file(file):
         # should this now b '.gz'?
@@ -193,7 +195,7 @@ def create_app(
         path = safe_join(project.dir, file + ".json")
         # log(f"get_json_file: '{path}' for project {project.id}")
 
-        
+
         if path is None or not os.path.exists(path):
             return "File not found", 404
         if file == "state":
@@ -210,7 +212,7 @@ def create_app(
                     # we should alter permissions based on the permission of the user...
                     for extension in options.extensions:
                         extension.mutate_state_json(state, project, app)
-                    
+
                     state['mdv_api_root'] = os.environ.get('MDV_API_ROOT', '/')
                     return state
                 except Exception as e:
@@ -259,6 +261,27 @@ def create_app(
     @project_bp.route("/get_configs", methods=["GET", "POST"])
     def get_configs():
         return jsonify(project.get_configs())
+
+    # tools available
+    @project_bp.route("/jobs/tools", methods=["GET"])
+    def jobs_tools():
+        return jsonify(serialize_registry())
+
+    # submit a job with a write-ahead intent
+    @project_bp.route("/jobs", methods=["POST"])
+    def submit_jobs():
+        data = request.get_json(silent=True) or {}
+        tool_id = data.get("tool_id")
+        params = data.get("params") or {}
+        if not isinstance(tool_id, str) or not isinstance(params, dict):
+            return jsonify({"error": "tool_id (string) and params (object) required"}), 400
+
+        try:
+            job_id = job_service.get_or_create(project).submit(tool_id, params)
+        except (KeyError, ValueError) as e:
+            return jsonify({"error": str(e)}), 400 # unknown tool / bad params
+        return jsonify({"job_id": job_id}), 202
+
 
     # gets a particular view
     @project_bp.route("/get_view", methods=["POST"])
@@ -600,7 +623,7 @@ def create_app(
             if not combine:
                 cleanup_folder(temp_folder)
                 return jsonify({'status': 'success', 'message': 'Operation cancelled'}), 200
-            
+
             if not label:
                 cleanup_folder(temp_folder)
                 return jsonify({'status': 'error', 'message': 'Label field not found'}), 400
@@ -624,7 +647,7 @@ def create_app(
         except Exception as e:
             current_app.logger.error(f"Unexpected error: {str(e)}")
             return jsonify({'status': 'error', 'message': str(e)}), 500
-    
+
     @project_bp.route("/add_or_update_image_datasource", access_level='editable', methods=["POST"])
     def add_or_update_image_datasource():
         try:
@@ -634,7 +657,7 @@ def create_app(
 
             # Get the file from the request
             file = request.files['file']
-            
+
             # Get the text fields from the request form
             datasource_name = request.form.get('datasourceName') # ""
             tiff_metadata = request.form.get('tiffMetadata')
@@ -646,10 +669,10 @@ def create_app(
                 tiff_metadata = json.loads(tiff_metadata)
             except Exception as e:
                 return jsonify({"status": "error", "message": f"Invalid JSON format for tiffMetadata: {e}"}), 400
-            
+
             # Call the method to add or update the image datasource
             view_name = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file)
-            
+
             # If no exception is raised, the operation was successful. let the client know which view will show the image.
             log(f">>> notify client that image datasource updated and file uploaded successfully, view: {view_name}")
             return jsonify({"status": "success", "message": "Image datasource updated and file uploaded successfully", "view": view_name}), 200
@@ -726,23 +749,37 @@ def create_app(
         metadata = project.get_datasource_metadata(name)
         return jsonify({"success": success, "metadata": metadata})
 
+    return app
+
+def create_app(
+    project: MDVProject,
+    options: Optional[MDVServerOptions] = None,
+):
+    """Build the app, then serve it. Single-project mode blocks forever in
+    serve_forever(); multi-project mode mounts the routes on the shared catalog
+    app (served elsewhere in mdv_server_app.py) and just returns."""
+    if options is None:
+        options = MDVServerOptions()
+    app = build_app(project, options)
+
+    multi_project = options.app is not None
+    route = "/project/" + project.id + "/" if multi_project else ""
+
     if options.open_browser:
         webbrowser.open(f"http://localhost:{options.port}/{route}")
 
     if multi_project:
-        assert(isinstance(app, Flask))
+        assert isinstance(app, Flask)
         if route in app.blueprints:
-            log(f"there is already a blueprint at {route}")
-        log(f"Adding project {project.id} to existing app")
-        ## nb - uncomment this if not using ProjectBlueprint refactor...
-        # app.register_blueprint(project_bp)
+            logger.info(f"there is already a blueprint at {route}")
+        logger.info(f"Adding project {project.id} to existing app")
     else:
-        # user_reloader=False, allows the server to work within jupyter
-
-        # app.run(host="0.0.0.0", port=port, debug=True, use_reloader=use_reloader)
-        ## todo - gevent for mdvlite / non-optional dependency
+        start_driver(job_service, [project])    # start the driver before we block on serve
         from gevent.pywsgi import WSGIServer
         http_server = WSGIServer(("127.0.0.1", options.port), app)
         http_server.serve_forever()
 
-
+def start_driver(service, projects):
+    """Start the job driver: reconcile in-flight projects, then start one daemon thread."""
+    service.recovery_scan(projects)
+    service.start()

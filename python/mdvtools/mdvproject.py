@@ -23,7 +23,8 @@ from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any, cast
 from pandas.api.types import is_bool_dtype, is_datetime64_any_dtype
 import polars as pl
-# from mdvtools.charts.view import View 
+
+# from mdvtools.charts.view import View
 import time
 import copy
 import tempfile
@@ -76,11 +77,11 @@ datatype_mappings = {
     "float64": "double",
     "float32": "double",
     "object": "text",
-    "str":"text",
+    "str": "text",
     "category": "text",
     "bool": "text",
     "int32": "double",
-    "boolean":"text"
+    "boolean": "text",
 }
 
 numpy_dtypes = {
@@ -176,9 +177,9 @@ class MDVProject:
         dir: str,
         id: Optional[str] = None,
         delete_existing=False,
-        skip_column_clean=True, # todo - make this False by default, add tests etc
-        backend_db = False,
-        safe_file_save = True
+        skip_column_clean=True,  # todo - make this False by default, add tests etc
+        backend_db=False,
+        safe_file_save=True,
     ):
         self.skip_column_clean = (
             skip_column_clean  # signficant speedup for large datasets
@@ -192,7 +193,7 @@ class MDVProject:
         self.datasourcesfile = join(dir, "datasources.json")
         self.statefile = join(dir, "state.json")
         self.viewsfile = join(dir, "views.json")
-        self.readmefile = join(dir, 'README.md')
+        self.readmefile = join(dir, "README.md")
         self.imagefolder = join(dir, "images")
         self.trackfolder = join(dir, "tracks")
         if not exists(dir):
@@ -220,7 +221,9 @@ class MDVProject:
         but can be used to guard against inappropriate admin actions
         """
         # check if project has a h5 file or write permissions, newly created project doesn't have a h5 file which blocks file upload
-        h5_writable_or_not_created = (not exists(self.h5file)) or os.access(self.h5file, os.W_OK)
+        h5_writable_or_not_created = (not exists(self.h5file)) or os.access(
+            self.h5file, os.W_OK
+        )
         return (
             # belt and braces
             os.access(self.statefile, os.W_OK)
@@ -236,12 +239,12 @@ class MDVProject:
     @datasources.setter
     def datasources(self, value):
         save_json(self.datasourcesfile, value, self.safe_file_save)
-    
+
     @property
     def readme(self):
-        if not exists(self.readmefile): 
+        if not exists(self.readmefile):
             return None
-        with open(self.readmefile, 'r') as f:
+        with open(self.readmefile, "r") as f:
             markdown_string = f.read()
         return markdown_string
 
@@ -260,11 +263,13 @@ class MDVProject:
 
     @state.setter
     def state(self, value):
-        save_json(self.statefile, value ,self.safe_file_save)
+        save_json(self.statefile, value, self.safe_file_save)
 
     def set_editable(self, edit=True):
         if not self.writable:
-            logger.log(1, f"can't set_editable on '{self.dir}' because it's not writable")
+            logger.log(
+                1, f"can't set_editable on '{self.dir}' because it's not writable"
+            )
             return
         c = self.state
         c["permission"] = "edit" if edit else "view"
@@ -298,6 +303,31 @@ class MDVProject:
         ds["columns"][col_index[0]][parameter] = value
         self.set_datasource_metadata(ds)
 
+    def get_column_provenance(self, datasource, column) -> dict | None:
+        """
+        Resolve a column's provenance pointer (ADR0009) to the full job record.
+
+        Three states:
+            - no pointer on the column -> None (never produced: imported/manual)
+            - pointer + record present -> the full record, marked _resolved True
+            - pointer + record purged (GC'd) -> the pointer alone, marked _resolved False (dangling)
+
+        The dangling case is why tool_id/content_hash are denormalized onto the column: with the record gone the column
+        still self-describes. Resolves the record by convention at
+        <project>/jobs/records/<job_id>.json.
+        """
+        from mdvtools.jobs import JOBS_DIRNAME
+
+        pointer = self.get_column_metadata(datasource, column).get("provenance")
+        if pointer is None:
+            return None
+        record_path = (
+            Path(self.dir) / JOBS_DIRNAME / "records" / f"{pointer["job_id"]}.json"
+        )
+        if not record_path.exists():
+            return {**pointer, "_resolved": False}
+        return {**json.loads(record_path.read_text()), "_resolved": True}
+
     def get_datasource_as_dataframe(
         self, datasource: str, columns: Optional[List[str]] = None
     ) -> pandas.DataFrame:
@@ -329,9 +359,7 @@ class MDVProject:
             n_rows = len(self.get_column(datasource, fields[0]))
         for key in requested_keys:
             if _WRAPPER_RE.match(key):
-                out[key] = self._read_wrapper_expression_column(
-                    datasource, key, n_rows
-                )
+                out[key] = self._read_wrapper_expression_column(datasource, key, n_rows)
             elif key in field_set:
                 out[key] = self.get_column(datasource, key)
             else:
@@ -427,7 +455,9 @@ class MDVProject:
         try:
             gr = h5[row_datasource]
             if not isinstance(gr, h5py.Group):
-                raise AttributeError(f"datasource {row_datasource!r} is not an h5 group")
+                raise AttributeError(
+                    f"datasource {row_datasource!r} is not an h5 group"
+                )
             sgrp = gr[group_name]
             arr = self._read_subgroup_matrix_column(sgrp, col_index, sparse, n_rows)
             return [float(x) for x in arr]
@@ -442,7 +472,7 @@ class MDVProject:
     def get_datasource_names(self) -> list[str]:
         """
         Get a list of all datasource names in the project.
-        
+
         Returns:
             list[str]: A list of datasource names
         """
@@ -471,7 +501,9 @@ class MDVProject:
         roles = infer_datasource_roles(self)
         expr = roles.preferred_expression()
         if expr is None:
-            raise RuntimeError("No rows-as-columns expression link; cannot build gene wrappers.")
+            raise RuntimeError(
+                "No rows-as-columns expression link; cannot build gene wrappers."
+            )
         ds = expression_datasource or expr.datasource_name
         ncol = name_column or expr.name_column
         sk = subgroup_key or expr.subgroup_key
@@ -480,7 +512,9 @@ class MDVProject:
         try:
             idx = names.index(str(gene))
         except ValueError as exc:
-            raise ValueError(f"Gene {gene!r} not found in feature table {ds!r} column {ncol!r}.") from exc
+            raise ValueError(
+                f"Gene {gene!r} not found in feature table {ds!r} column {ncol!r}."
+            ) from exc
         return build_expression_wrapper_token(sk, str(gene), idx)
 
     def set_interactions(
@@ -601,36 +635,43 @@ class MDVProject:
         # Load current datasources
         datasources = self.datasources
         # Check if the datasource exists
-        datasource = next((ds for ds in datasources if ds["name"] == datasource_name), None)
+        datasource = next(
+            (ds for ds in datasources if ds["name"] == datasource_name), None
+        )
         datasource_backup = None
-        
+
         is_new_datasource = False
 
-        target_folder = os.path.join(self.imagefolder, 'avivator')
+        target_folder = os.path.join(self.imagefolder, "avivator")
         if not os.path.exists(target_folder):
             os.makedirs(target_folder)
         original_filename = file.filename
         upload_file_path = os.path.join(target_folder, original_filename)
         view_name = None
         try:
-            
             # Step 1: Update or create datasource
             if datasource:
-                 # Create a backup of the existing datasource before updating
+                # Create a backup of the existing datasource before updating
                 datasource_backup = datasource.copy()
-                view_name = self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, original_filename)
+                view_name = self.update_datasource_for_tiff(
+                    datasource, datasource_name, tiff_metadata, original_filename
+                )
             else:
                 is_new_datasource = True
                 datasource_name = "default" if not datasource_name else datasource_name
 
                 # Check if the default datasource exists
-                datasource = next((ds for ds in datasources if ds["name"] == datasource_name), None)
+                datasource = next(
+                    (ds for ds in datasources if ds["name"] == datasource_name), None
+                )
 
-                view_name = self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, original_filename)
-            
+                view_name = self.update_datasource_for_tiff(
+                    datasource, datasource_name, tiff_metadata, original_filename
+                )
+
             # Step 2: Upload the image
             self.upload_image_file(file, upload_file_path)
-            
+
             # Step 3: Add database entry (exception will propagate up if it fails)
             if self.backend_db:
                 from mdvtools.dbutils.dbservice import ProjectService, FileService
@@ -638,37 +679,50 @@ class MDVProject:
                 FileService.add_or_update_file_in_project(
                     file_name=file.filename,
                     file_path=upload_file_path,  # Adjust as necessary for actual file path
-                    project_id=self.id
+                    project_id=self.id,
                 )
-                
+
                 ProjectService.set_project_update_timestamp(self.id)
             # Print success message
-            logger.info(f"Datasource '{datasource_name}' updated, TIFF file uploaded, and database entry created successfully.")
+            logger.info(
+                f"Datasource '{datasource_name}' updated, TIFF file uploaded, and database entry created successfully."
+            )
 
         except Exception as e:
             logger.error(f"Error in MDVProject.add_or_update_image_datasource: {e}")
-            
+
             # Attempt rollback actions
             try:
                 # Rollback the file upload
-                if os.path.exists(upload_file_path):  # Check the existence of the file at the upload path
+                if os.path.exists(
+                    upload_file_path
+                ):  # Check the existence of the file at the upload path
                     logger.info("Reverting file upload...")
-                    self.delete_uploaded_image(upload_file_path) 
-                
+                    self.delete_uploaded_image(upload_file_path)
+
                 # Rollback datasource creation if it was new
-                if is_new_datasource and any(ds['name'] == datasource_name for ds in self.datasources):
+                if is_new_datasource and any(
+                    ds["name"] == datasource_name for ds in self.datasources
+                ):
                     logger.info("Reverting new datasource creation...")
-                    self.datasources = [x for x in self.datasources if x["name"] != datasource_name]
-                    #self.delete_datasource(datasource_name, False)
+                    self.datasources = [
+                        x for x in self.datasources if x["name"] != datasource_name
+                    ]
+                    # self.delete_datasource(datasource_name, False)
                 elif datasource:
                     logger.info("Reverting datasource update...")
-                    self.restore_datasource(datasource_backup)  # This method may need to be implemented for updates
+                    self.restore_datasource(
+                        datasource_backup
+                    )  # This method may need to be implemented for updates
             except Exception as rollback_error:
-                logger.error(f"Error during rollback in MDVProject.add_or_update_image_datasource: {rollback_error}")
-            
+                logger.error(
+                    f"Error during rollback in MDVProject.add_or_update_image_datasource: {rollback_error}"
+                )
+
             # Re-raise the original exception for the caller to handle
             raise
         return view_name
+
     def upload_image_file(self, file, upload_file_path):
         """Upload the TIFF file to the imagefolder, saving it with the original filename."""
         try:
@@ -677,9 +731,11 @@ class MDVProject:
             logger.info(f"File uploaded successfully to {upload_file_path}")
 
         except Exception as e:
-            logger.error(f"Error in MDVProject.upload_image_file: Failed to upload file to '{upload_file_path}': {e}")
+            logger.error(
+                f"Error in MDVProject.upload_image_file: Failed to upload file to '{upload_file_path}': {e}"
+            )
             raise
-    
+
     def delete_uploaded_image(self, file_path):
         """Delete the uploaded image file at the specified path."""
         try:
@@ -689,181 +745,199 @@ class MDVProject:
             else:
                 logger.info(f"File does not exist at: {file_path}")
         except Exception as e:
-            logger.error(f"Error in MDVProject.delete_uploaded_image: Error deleting file at {file_path}: {e}")
-            raise 
-    
+            logger.error(
+                f"Error in MDVProject.delete_uploaded_image: Error deleting file at {file_path}: {e}"
+            )
+            raise
+
     def restore_datasource(self, datasource_backup):
         """Restore the datasource from the backup."""
         try:
             # Find the existing datasource by name
             existing_datasource = next(
-                (ds for ds in self.datasources if ds["name"] == datasource_backup["name"]), 
-                None
+                (
+                    ds
+                    for ds in self.datasources
+                    if ds["name"] == datasource_backup["name"]
+                ),
+                None,
             )
 
             if existing_datasource:
                 # Overwrite the existing datasource with the backup values
-                existing_datasource.update(datasource_backup)  
-                logger.info(f"Restored datasource '{datasource_backup['name']}' from backup. ")
+                existing_datasource.update(datasource_backup)
+                logger.info(
+                    f"Restored datasource '{datasource_backup['name']}' from backup. "
+                )
 
                 # Save the updated datasources to the JSON file
-                self.datasources = self.datasources  # This will call the setter and save the data
+                self.datasources = (
+                    self.datasources
+                )  # This will call the setter and save the data
             else:
-                logger.warning(f"Warning: Could not find datasource '{datasource_backup['name']}' to restore.")
-        
+                logger.warning(
+                    f"Warning: Could not find datasource '{datasource_backup['name']}' to restore."
+                )
+
         except Exception as e:
             logger.error(f"Error in MDVProject.restore_datasource: {str(e)}")
             raise
-    
 
-    def update_datasource_for_tiff(self, datasource, datasource_name, tiff_metadata, region_name: str):
+    def update_datasource_for_tiff(
+        self, datasource, datasource_name, tiff_metadata, region_name: str
+    ):
         """Update an existing datasource with new image metadata."""
         try:
             # Find the existing datasource by name
-            existing_datasource = next((ds for ds in self.datasources if ds["name"] == datasource_name), None)
+            existing_datasource = next(
+                (ds for ds in self.datasources if ds["name"] == datasource_name), None
+            )
 
             logger.info("In update_datasource_for_tiff")
             logger.info(datasource_name)
             # print(existing_datasource)
             # print(datasource)
-            #datasources empty template
+            # datasources empty template
             # If the datasource doesn't exist, create a new one
-            if (existing_datasource is None):
-                logger.info("In update_datasource_for_tiff: existing_datasource is None")
+            if existing_datasource is None:
+                logger.info(
+                    "In update_datasource_for_tiff: existing_datasource is None"
+                )
                 datasource = self.create_datasource_template(datasource_name)
-                self.datasources.append(datasource)  # Add the new datasource to the list
-                logger.info(f"In MDVProject.update_datasource: Created new datasource template for '{datasource_name}'.")
-                
-                #adding default columns for new empty ds
-                filename = 'mdvtools/dbutils/emptyds.csv'
+                self.datasources.append(
+                    datasource
+                )  # Add the new datasource to the list
+                logger.info(
+                    f"In MDVProject.update_datasource: Created new datasource template for '{datasource_name}'."
+                )
+
+                # adding default columns for new empty ds
+                filename = "mdvtools/dbutils/emptyds.csv"
                 df_default = pandas.read_csv(filename)
                 # self.add_datasource(project_id, datasource_name, df_default, add_to_view=None)
                 self.add_datasource(datasource_name, df_default, add_to_view=None)
                 datasource = self.get_datasource_metadata(datasource_name)
-            
-            
-            #datasources-> regions section
+
+            # datasources-> regions section
             # Ensure datasource has a 'regions' field
             if "regions" not in datasource:
-               datasource["regions"] = {}
-            
+                datasource["regions"] = {}
 
             # Corrected path to access size and scale information
-            pixels_data = tiff_metadata['Pixels']
-            width = pixels_data['SizeX']
-            height = pixels_data['SizeY']
-            scale = pixels_data.get('PhysicalSizeX', 1.0)
-            scale_unit = pixels_data.get('PhysicalSizeXUnit', 'µm')  # Default to µm if not present
+            pixels_data = tiff_metadata["Pixels"]
+            width = pixels_data["SizeX"]
+            height = pixels_data["SizeY"]
+            scale = pixels_data.get("PhysicalSizeX", 1.0)
+            scale_unit = pixels_data.get(
+                "PhysicalSizeXUnit", "µm"
+            )  # Default to µm if not present
 
             # Call ensure_regions_fields to ensure the required fields and values are set
-            datasource['regions'] = self.ensure_regions_fields(
-                datasource['regions'],  # Existing regions dictionary
+            datasource["regions"] = self.ensure_regions_fields(
+                datasource["regions"],  # Existing regions dictionary
                 scale_unit=scale_unit,  # Pass the scale unit
-                scale=scale             # Pass the scale
+                scale=scale,  # Pass the scale
             )
-            
-            
-            #datasources-> regions -> all_regions-> new entry section
+
+            # datasources-> regions -> all_regions-> new entry section
             # Determine region name
             # full_name = tiff_metadata.get('Name', 'unknown')
             # region_name = full_name.split(".ome")[0] if ".ome" in full_name else full_name  # Use 'Name' from metadata or 'unknown'
-            
+
             # Define new region with metadata
             new_region = {
-                "roi": {
-                    "min_x": 0,
-                    "min_y": 0,
-                    "max_x": width,
-                    "max_y": height
-                },
+                "roi": {"min_x": 0, "min_y": 0, "max_x": width, "max_y": height},
                 "images": {},
-                "viv_image": {
-                    "file": region_name,
-                    "linked_file": True
-                }
+                "viv_image": {"file": region_name, "linked_file": True},
             }
 
             # Update or add the region in the datasource
             datasource["regions"]["all_regions"][region_name] = new_region
-            #datasource['size'] = len(datasource['regions']['all_regions'])
+            # datasource['size'] = len(datasource['regions']['all_regions'])
 
             # Save the updated datasource
             self.set_datasource_metadata(datasource)
 
-            #add empty default columns
-            
-            # Update views and image            
+            # add empty default columns
+
+            # Update views and image
             region_view_json = create_image_view_prototype(datasource_name, region_name)
 
-            #views = self.views
+            # views = self.views
 
-            #if views and "default" in views:
+            # if views and "default" in views:
             #    view_name = region_name  # If "default" exists, set view_name to region_name
-            #else:
+            # else:
             #    view_name = "default"
             view_name = region_name
             logger.info(view_name)
             self.set_view(view_name, region_view_json)
-            
-            #self.add_viv_images(region_name, image_metadata, link_images=True)
+
+            # self.add_viv_images(region_name, image_metadata, link_images=True)
             return view_name
-        
+
         except Exception as e:
-            logger.error(f"Error in MDVProject.update_datasource :  Error updating datasource '{datasource_name}': {e}")
+            logger.error(
+                f"Error in MDVProject.update_datasource :  Error updating datasource '{datasource_name}': {e}"
+            )
             raise
-    
+
     def create_datasource_template(self, datasource_name: str) -> dict:
         """Create a new datasource template with the basic structure."""
         try:
             template = {
                 "name": datasource_name,
-                "columns": [],          # Initialize empty columns
-                "size": 0,              # Start size at 0
-                "regions": {},            # Initialize regions as an empty dictionary,
-                "columnGroups": []
+                "columns": [],  # Initialize empty columns
+                "size": 0,  # Start size at 0
+                "regions": {},  # Initialize regions as an empty dictionary,
+                "columnGroups": [],
             }
             logger.info(f"Created new datasource template '{datasource_name}'.")
             return template
-        
+
         except Exception as e:
-            logger.error(f"In MDVProject.create_datasource_template: Error creating datasource template '{datasource_name}': {e}")
+            logger.error(
+                f"In MDVProject.create_datasource_template: Error creating datasource template '{datasource_name}': {e}"
+            )
             raise  # Re-raises the caught exception
 
-    def ensure_regions_fields(self, 
-                          regions, 
-                          position_fields=['x', 'y'], 
-                          region_field='sample_id', 
-                          default_color='leiden', 
-                          scale_unit='µm', 
-                          scale=1.0):
+    def ensure_regions_fields(
+        self,
+        regions,
+        position_fields=["x", "y"],
+        region_field="sample_id",
+        default_color="leiden",
+        scale_unit="µm",
+        scale=1.0,
+    ):
         try:
-            
             # Ensure that required fields exist with default values
             regions["position_fields"] = regions.get("position_fields", position_fields)
             regions["region_field"] = regions.get("region_field", region_field)
             regions["default_color"] = regions.get("default_color", default_color)
             regions["scale_unit"] = regions.get("scale_unit", scale_unit)
             regions["scale"] = regions.get("scale", scale)
-            
+
             # Initialize regions structure if needed
             if "all_regions" not in regions:
                 regions["all_regions"] = {}
 
             # Check if 'avivator' field is present, if not, add default settings
             if "avivator" not in regions:
-                default_channels = [{'name': 'DAPI'}]
+                default_channels = [{"name": "DAPI"}]
                 regions["avivator"] = {
                     "default_channels": default_channels,
                     "base_url": "images/avivator/",
                 }
 
             return regions
-        
+
         except Exception as e:
-            logger.error(f"In MDVProject.ensure_regions_fields: Error in ensure_regions_fields: {e}")
+            logger.error(
+                f"In MDVProject.ensure_regions_fields: Error in ensure_regions_fields: {e}"
+            )
             raise  # Re-raises the caught exception
 
-    
     def get_image(self, path: str):
         """Gets the filename of an image."""
         # assume path is of the form <ds>/<name>/<filename>
@@ -884,7 +958,10 @@ class MDVProject:
             handle = h5py.File(self.h5file, mode)
             return handle
         except Exception as e:
-            lock_error = isinstance(e, BlockingIOError) or "unable to lock file" in str(e).lower()
+            lock_error = (
+                isinstance(e, BlockingIOError)
+                or "unable to lock file" in str(e).lower()
+            )
             if not lock_error:
                 raise
             # certain environments seem to have issues with the handle not being closed instantly
@@ -947,12 +1024,15 @@ class MDVProject:
             # Handle unique columns - need stringLength
             if column["datatype"] == "unique":
                 string_length = column.get("stringLength")
-                if not isinstance(string_length, (int, numpy.integer)) or int(string_length) <= 0:
+                if (
+                    not isinstance(string_length, (int, numpy.integer))
+                    or int(string_length) <= 0
+                ):
                     raise ValueError(
                         f"Column {cid} of type 'unique' requires 'stringLength' in metadata"
                     )
                 string_length = int(string_length)
-                
+
                 # No conversion: "raw" means the caller supplies string-like data.
                 # Frontend (save_state) sends decoded string[] from getMd(); direct callers must pass strings/bytes.
                 if len(raw_data) > 0 and any(
@@ -965,6 +1045,7 @@ class MDVProject:
                     )
                 # Compute max byte length (handling None, str, and bytes)
                 if len(raw_data) > 0:
+
                     def _byte_len(v):
                         if v is None:
                             return 0
@@ -975,6 +1056,7 @@ class MDVProject:
                                 f"Column {cid} of type 'unique' expects string-like values, got {type(v).__name__}."
                             )
                         return len(str(v).encode("utf-8"))
+
                     max_str_len = max(_byte_len(v) for v in raw_data)
                     if max_str_len > string_length:
                         string_length = max_str_len
@@ -984,7 +1066,11 @@ class MDVProject:
                 raw_data = [
                     ""
                     if v is None
-                    else (v.decode("utf-8") if isinstance(v, (bytes, bytearray, numpy.bytes_)) else str(v))
+                    else (
+                        v.decode("utf-8")
+                        if isinstance(v, (bytes, bytearray, numpy.bytes_))
+                        else str(v)
+                    )
                     for v in raw_data
                 ]
                 dt = h5py.string_dtype("utf-8", string_length)
@@ -1080,7 +1166,7 @@ class MDVProject:
         """
         if isinstance(data, str):
             data = pandas.read_csv(data, sep=separator)
-        assert(isinstance(data, pandas.DataFrame))
+        assert isinstance(data, pandas.DataFrame)
         ds = self.get_datasource_metadata(datasource)
         index_col = data.columns[0]
         data = data.set_index(index_col)
@@ -1214,7 +1300,9 @@ class MDVProject:
             os.remove(bed)
         else:
             # copy the custom track to the tracks folder
-            shutil.copy(custom_track["location"], join(self.trackfolder, f"{track_name}.gz"))
+            shutil.copy(
+                custom_track["location"], join(self.trackfolder, f"{track_name}.gz")
+            )
             # copy index file
             shutil.copy(
                 custom_track["location"] + ".tbi",
@@ -1241,21 +1329,21 @@ class MDVProject:
         info = ds.get("genome_browser")
         if not info:
             raise AttributeError(f"no genome browser for {datasource}")
-        default_track =  {
+        default_track = {
             "short_label": info["default_track"]["label"],
             "url": info["default_track"]["url"],
             "track_id": "_base_track",
             "decode_function": "generic",
             "height": 15,
-            "displayMode": "EXPANDED"
+            "displayMode": "EXPANDED",
         }
         if info.get("default_track_parameters"):
             default_track.update(info["default_track_parameters"])
-        
+
         gb = {
             "type": "genome_browser",
             "param": info["location_fields"],
-            "tracks": [default_track]
+            "tracks": [default_track],
         }
         at = info.get("atac_bam_track")
         if at:
@@ -1305,9 +1393,9 @@ class MDVProject:
         shutil.copy(reft + ".tbi", join(self.trackfolder, f"{genome}.bed.gz.tbi"))
         self.set_datasource_metadata(ds)
 
-    def add_tracks(self,datasource: str,tracks: list[dict]) :
+    def add_tracks(self, datasource: str, tracks: list[dict]):
         """Adds a list of tracks to the datasource's genome browser.
-        
+
         Args:
             tracks (list[dict]): A list of track dictionaries to add.
             datasource (str): The name of the datasource to which the tracks will be added.
@@ -1320,26 +1408,32 @@ class MDVProject:
         for track in tracks:
             if not isinstance(track, dict):
                 raise TypeError("Each track must be a dictionary")
-            if  "file" not in track:
+            if "file" not in track:
                 raise ValueError("Each track must specify a local or remote file")
             fname = basename(track["file"])
             track_name = track.get("name", fname.split(".")[0])
-            track_type= track.get("type")
+            track_type = track.get("type")
             if not track_type:
-                if fname.endswith((".bb",".bed.gz", ".bed")):
+                if fname.endswith((".bb", ".bed.gz", ".bed")):
                     track_type = "bed"
                 elif fname.endswith((".bw", ".bigwig")):
                     track_type = "wig"
             if not track_type:
                 raise AttributeError(f"The type of track {fname} cannot be deduced")
-            #no need to do anything - will be served from the original location
+            # no need to do anything - will be served from the original location
             if track["file"].startswith("http"):
                 url = track["file"]
             else:
                 if not exists(track["file"]):
-                    raise FileNotFoundError(f"Track file {track['file']} does not exist")
+                    raise FileNotFoundError(
+                        f"Track file {track['file']} does not exist"
+                    )
                 # tracks already compressed and indexed - just copy to tracks folder
-                if track_type == "wig" or fname.endswith(".gz") or fname.endswith(".bb"):
+                if (
+                    track_type == "wig"
+                    or fname.endswith(".gz")
+                    or fname.endswith(".bb")
+                ):
                     to_file = join(self.trackfolder, fname)
                     # For .gz files, verify index exists before copying
                     if fname.endswith(".gz"):
@@ -1348,24 +1442,24 @@ class MDVProject:
                             raise FileNotFoundError(f"Index file {i_file} not found")
                         shutil.copyfile(i_file, f"{to_file}.tbi")
                     shutil.copy(track["file"], to_file)
-                        
+
                 # assume its a just a bed file- compress and index it
                 else:
                     check_htslib()
                     t_file = track["file"]
                     o_file = join(self.trackfolder, fname)
-                    create_bed_gz_file(t_file, o_file)        
-                    fname= fname+".gz"
+                    create_bed_gz_file(t_file, o_file)
+                    fname = fname + ".gz"
                 url = f"./tracks/{fname}"
-            #will need to adapt this for other browsers
-            mtrack ={
+            # will need to adapt this for other browsers
+            mtrack = {
                 "short_label": track_name,
                 "url": url,
-                "track_id": track.get("id",track_name),
+                "track_id": track.get("id", track_name),
                 "color": track.get("color", "black"),
             }
 
-            if track_type== "bed":
+            if track_type == "bed":
                 mtrack["type"] = "bed"
                 mtrack["format"] = "feature"
                 mtrack["featureHeight"] = track.get("featureHeight", 10)
@@ -1373,7 +1467,7 @@ class MDVProject:
                 mtrack["displayMode"] = track.get("displayMode", "EXPANDED")
             elif track_type == "wig":
                 mtrack["type"] = "bigwig"
-                mtrack["format"]="wig"
+                mtrack["format"] = "wig"
                 mtrack["height"] = track.get("height", 50)
             for param in ["hideLabels"]:
                 if track.get(param):
@@ -1386,17 +1480,18 @@ class MDVProject:
         self,
         # project_id: str,
         name: str,
-        dataframe: pandas.DataFrame | str, # could we add xarray here - we pass things from anndata which may not be DataFrame.
+        dataframe: pandas.DataFrame
+        | str,  # could we add xarray here - we pass things from anndata which may not be DataFrame.
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
         add_to_view: Optional[str] = "default",
-        separator="\t"
+        separator="\t",
     ) -> list[dict[str, str]]:
         """Adds a pandas dataframe to the project. Each column's datatype, will be deduced by the
         data it contains, but this is not always accurate. Hence, you can supply a list of column
         metadata, which will override the names/types deduced from the dataframe.
-        
+
         Args:
             name (string): The name of datasource
             dataframe (dataframe|str): Either a pandas dataframe or the path of a text file
@@ -1409,17 +1504,17 @@ class MDVProject:
         dodgy_columns = []  # To hold any columns that can't be added
         gr = None  # Initialize the group variable
         h5 = None
-        
+
         try:
             if isinstance(dataframe, str):
                 dataframe = pandas.read_csv(dataframe, sep=separator)
 
             dataframe, date_fields = convert_pandas_datetime_columns(dataframe)
-            
+
             # Get columns to add
             columns = get_column_info(columns, dataframe, supplied_columns_only)
             columns = apply_date_column_metadata(columns, date_fields)
-            
+
             # Check if the datasource already exists
             try:
                 ds = self.get_datasource_metadata(name)
@@ -1434,61 +1529,70 @@ class MDVProject:
                     raise FileExistsError(
                         f"Attempt to create datasource '{name}' failed because it already exists."
                     )
-            
+
             # Open HDF5 file and handle group creation
             try:
                 h5 = self._get_h5_handle()
-                
+
                 # Check for and delete existing group with this name
                 if name in h5:
                     del h5[name]
                     logger.warning(f"Deleted existing group '{name}' in HDF5 file.")
-                
-                
+
                 gr = h5.create_group(name)
             except Exception as e:
-                raise RuntimeError(f"Error managing HDF5 groups for datasource '{name}': {e}")
-            
+                raise RuntimeError(
+                    f"Error managing HDF5 groups for datasource '{name}': {e}"
+                )
+
             # Verify columns are provided
             if not columns:
-                raise AttributeError("No columns to add. Please provide valid columns metadata.")
-            
+                raise AttributeError(
+                    "No columns to add. Please provide valid columns metadata."
+                )
+
             # Add columns to the HDF5 group
             dodgy_columns = []
             for col in columns:
                 try:
-                    add_column_to_group(col, dataframe[col["field"]], gr, len(dataframe), self.skip_column_clean) # type: ignore
+                    add_column_to_group(
+                        col,
+                        dataframe[col["field"]],  # type: ignore
+                        gr,
+                        len(dataframe),
+                        self.skip_column_clean,
+                    )
                 except Exception as e:
                     dodgy_columns.append(col["field"])
                     logger.warning(
                         f"Failed to add column '{col['field']}' to datasource '{name}': {repr(e)}"
                     )
-            
+
             h5.close()  # Close HDF5 file
             columns = [x for x in columns if x["field"] not in dodgy_columns]
-            #print(f" - non-dodgy columns: {columns}")
-            
+            # print(f" - non-dodgy columns: {columns}")
+
             # Update datasource metadata
             ds = {"name": name, "columns": columns, "size": len(dataframe)}
-            #print(f'--- setting datasource metadata: {ds}')
+            # print(f'--- setting datasource metadata: {ds}')
             self.set_datasource_metadata(ds)
-            
+
             # Add to view if specified
             if add_to_view:
                 # TablePlot parameters
-                title=name,
-                #params = ["leiden", "ARVCF", "DOK3", "FAM210B", "GBGT1", "NFE2L2", "UBE2D4", "YPEL2"]
-                #only want columns from the dataframe that were added to the datasource
+                title = (name,)
+                # params = ["leiden", "ARVCF", "DOK3", "FAM210B", "GBGT1", "NFE2L2", "UBE2D4", "YPEL2"]
+                # only want columns from the dataframe that were added to the datasource
                 params = [x["field"] for x in columns]
                 size = [792, 472]
                 position = [10, 10]
-            
+
                 # Create plot
                 table_plot = self.create_table_plot(title, params, size, position)
-                
+
                 # Convert plot to JSON and set view
                 table_plot_json = self.convert_plot_to_json(table_plot)
-                
+
                 v = self.get_view(add_to_view)
                 if not v:
                     v = {"initialCharts": {}}
@@ -1500,21 +1604,22 @@ class MDVProject:
                 else:
                     # If not empty, append table_plot_json to the existing list
                     v["initialCharts"][name].append(table_plot_json)
-                    
+
                 self.set_view(add_to_view, v)
-            
-            
+
             # Update the project's update timestamp using the dedicated method
             if self.backend_db:
                 from mdvtools.dbutils.dbservice import ProjectService
+
                 ProjectService.set_project_update_timestamp(self.id)
-            
-            
+
             logger.info(f"add_datasource: Added datasource successfully '{name}'")
             return dodgy_columns
 
         except Exception as e:
-            logger.error(f"Error in MDVProject.add_datasource : Error adding datasource '{name}': {e}")
+            logger.error(
+                f"Error in MDVProject.add_datasource : Error adding datasource '{name}': {e}"
+            )
             raise  # Re-raise the exception to propagate it to the caller
 
     def add_datasource_polars(
@@ -1531,7 +1636,7 @@ class MDVProject:
         """Adds a polars dataframe to the project. Each column's datatype will be deduced by the
         data it contains, but this is not always accurate. Hence, you can supply a list of column
         metadata, which will override the names/types deduced from the dataframe.
-        
+
         Args:
             name (string): The name of datasource
             dataframe (pl.DataFrame|str): Either a polars dataframe or the path of a text file
@@ -1545,14 +1650,16 @@ class MDVProject:
         dodgy_columns = []  # To hold any columns that can't be added
         gr = None  # Initialize the group variable
         h5 = None
-        
+
         try:
             print("starting add_datasource_polars")
-            
+
             # If a path is provided, use scan_csv for lazy loading to prevent
             # loading the entire file into memory at once.
             if isinstance(dataframe, str):
-                dataframe = pl.scan_csv(dataframe, separator=separator, try_parse_dates=False)
+                dataframe = pl.scan_csv(
+                    dataframe, separator=separator, try_parse_dates=False
+                )
 
             is_lazy = isinstance(dataframe, pl.LazyFrame)
 
@@ -1569,7 +1676,7 @@ class MDVProject:
             columns = apply_date_column_metadata(columns, date_fields)
 
             has_existing_datasources = len(self.datasources) > 0
-            
+
             # Check if the datasource already exists
             try:
                 ds = self.get_datasource_metadata(name)
@@ -1581,47 +1688,55 @@ class MDVProject:
             if ds:
                 # Delete the existing datasource if replace_data is True
                 if replace_data:
-                    self.delete_datasource(name, delete_views=not preserve_views_on_replace)
+                    self.delete_datasource(
+                        name, delete_views=not preserve_views_on_replace
+                    )
                 else:
                     raise FileExistsError(
                         f"Attempt to create datasource '{name}' failed because it already exists."
                     )
-            
+
             print("got passed the ds check")
-            
+
             # Open HDF5 file and handle group creation
             try:
                 h5 = self._get_h5_handle()
-                
+
                 # Print current groups for visibility
                 for group_name in h5.keys():
                     print(group_name)
-                    
+
                 # Check for and delete existing group with this name
                 if name in h5:
                     del h5[name]
                     print(f"Deleted existing group '{name}' in HDF5 file.")
-                
+
                 gr = h5.create_group(name)
             except Exception as e:
-                raise RuntimeError(f"Error managing HDF5 groups for datasource '{name}': {e}") from e
-            
+                raise RuntimeError(
+                    f"Error managing HDF5 groups for datasource '{name}': {e}"
+                ) from e
+
             print("created h5 group without error")
-            
+
             # Verify columns are provided
             if not columns:
-                raise AttributeError("No columns to add. Please provide valid columns metadata.")
-            
+                raise AttributeError(
+                    "No columns to add. Please provide valid columns metadata."
+                )
+
             # Add columns to the HDF5 group
             dodgy_columns = []
             for col in columns:
                 try:
                     print(f"- adding column '{col['field']}' to datasource '{name}'")
-                    
+
                     # If working with a lazy frame, select and collect one column at a time.
                     # This reads only one column from the file into memory.
                     if is_lazy:
-                        polars_series = dataframe.select(col["field"]).collect().get_columns()[0]
+                        polars_series = (
+                            dataframe.select(col["field"]).collect().get_columns()[0]
+                        )
                     else:
                         polars_series = dataframe[col["field"]]
 
@@ -1645,16 +1760,16 @@ class MDVProject:
                     warnings.warn(
                         f"Failed to add column '{col['field']}' to datasource '{name}': {repr(e)}"
                     )
-            
+
             h5.close()  # Close HDF5 file
             columns = [x for x in columns if x["field"] not in dodgy_columns]
-            
+
             # Update datasource metadata
             ds = {"name": name, "columns": columns, "size": num_rows}
             self.set_datasource_metadata(ds)
-            
+
             print("Updated datasource metadata")
-            
+
             created_view = None
             # Add to view if specified
             if add_to_view:
@@ -1663,13 +1778,13 @@ class MDVProject:
                 params = [x["field"] for x in columns]
                 size = [792, 472]
                 position = [10, 10]
-            
+
                 # Create plot
                 table_plot = self.create_table_plot(title, params, size, position)
-                
+
                 # Convert plot to JSON and set view
                 table_plot_json = self.convert_plot_to_json(table_plot)
-                
+
                 v = self.get_view(add_to_view)
                 if not v:
                     v = {"initialCharts": {}}
@@ -1681,23 +1796,28 @@ class MDVProject:
                 else:
                     # If not empty, append table_plot_json to the existing list
                     v["initialCharts"][name].append(table_plot_json)
-                    
+
                 self.set_view(add_to_view, v)
             elif has_existing_datasources:
                 created_view = self.create_view_with_all_datasources(
                     view_name=f"View: {name}", make_default=False
                 )
-            
+
             # Update the project's update timestamp using the dedicated method
             if self.backend_db:
                 from mdvtools.dbutils.dbservice import ProjectService
+
                 ProjectService.set_project_update_timestamp(self.id)
-            
-            print(f"In MDVProject.add_datasource_polars: Added datasource successfully '{name}'")
+
+            print(
+                f"In MDVProject.add_datasource_polars: Added datasource successfully '{name}'"
+            )
             return (dodgy_columns, created_view)
 
         except Exception as e:
-            print(f"Error in MDVProject.add_datasource_polars : Error adding datasource '{name}': {e}")
+            print(
+                f"Error in MDVProject.add_datasource_polars : Error adding datasource '{name}': {e}"
+            )
             raise  # Re-raise the exception to propagate it to the caller
 
     def create_view_with_all_datasources(self, view_name, make_default=False):
@@ -1719,8 +1839,12 @@ class MDVProject:
             view_data["dataSources"][ds_name] = {"layout": "gridstack"}
             columns = [x["field"] for x in ds.get("columns", [])]
             if columns:
-                table_plot = self.create_table_plot(ds_name, columns, [792, 472], [10, 10])
-                view_data["initialCharts"][ds_name] = [self.convert_plot_to_json(table_plot)]
+                table_plot = self.create_table_plot(
+                    ds_name, columns, [792, 472], [10, 10]
+                )
+                view_data["initialCharts"][ds_name] = [
+                    self.convert_plot_to_json(table_plot)
+                ]
             else:
                 view_data["initialCharts"][ds_name] = []
         self.set_view(view_name, view_data, make_default=make_default)
@@ -1728,15 +1852,10 @@ class MDVProject:
 
     def create_table_plot(self, title, params, size, position):
         """Create and configure a TablePlot instance with the given parameters."""
-        plot = TablePlot(
-            title=title,
-            params=params,
-            size=size,
-            position=position
-        )
-        
+        plot = TablePlot(title=title, params=params, size=size, position=position)
+
         return plot
-    
+
     def convert_plot_to_json(self, plot):
         """Convert plot data to JSON format."""
         return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
@@ -1800,8 +1919,8 @@ class MDVProject:
         data,
         name: Optional[str] = None,
         label: Optional[str] = None,
-        sparse: Optional[bool] = None, # this should be inferred from the data
-        chunk_data=False
+        sparse: Optional[bool] = None,  # this should be inferred from the data
+        chunk_data=False,
     ):
         """Add rows as columns in a subgroup."""
         name = name if name else stub
@@ -1812,9 +1931,9 @@ class MDVProject:
             raise AttributeError(f"{row_ds} is not a group")
         if name in ds:
             raise ValueError(f"Group '{name}' already exists in {row_ds}.")
-        
+
         gr = ds.create_group(name)
-        
+
         if sparse is None:
             # Infer if the data is sparse or dense unless specified
             sparse = scipy.sparse.issparse(data)
@@ -1822,7 +1941,9 @@ class MDVProject:
         if sparse:
             # Handle sparse matrix
             density = f"{len(data.data) / (data.shape[0] * data.shape[1]):.3f}"
-            logger.info(f"Adding sparse matrix to {row_ds} with {len(data.data)} elements (density {density})")
+            logger.info(
+                f"Adding sparse matrix to {row_ds} with {len(data.data)} elements (density {density})"
+            )
             gr.create_dataset(
                 "x", (len(data.data),), data=data.data, dtype=numpy.float32
             )
@@ -1834,14 +1955,19 @@ class MDVProject:
             # Fallback to dense or convertible
             logger.info(f"Adding dense matrix to {row_ds}")
             try:
-                #Requires a lot of RAM leads to memory errors on smaller machines
+                # Requires a lot of RAM leads to memory errors on smaller machines
                 if not chunk_data:
-                    dense_data = data.toarray() if hasattr(data, 'toarray') else numpy.asarray(data)
+                    dense_data = (
+                        data.toarray()
+                        if hasattr(data, "toarray")
+                        else numpy.asarray(data)
+                    )
                     total_len = dense_data.shape[0] * dense_data.shape[1]
                     gr.create_dataset(
-                        "x", (total_len,),
+                        "x",
+                        (total_len,),
                         data=dense_data.flatten(order="F"),
-                        dtype=numpy.float32
+                        dtype=numpy.float32,
                     )
                     gr["length"] = [dense_data.shape[0]]
                 else:
@@ -1849,31 +1975,36 @@ class MDVProject:
                     num_rows, num_cols = data.shape
                     chunk_size = num_cols
                     total_len = num_rows * num_cols
-                
+
                     dset = gr.create_dataset(
-                        "x", (total_len,),
+                        "x",
+                        (total_len,),
                         dtype=numpy.float32,
                         chunks=(chunk_size,),
-                        compression="gzip"
+                        compression="gzip",
                     )
                     gr.create_dataset("length", data=[num_rows])
 
                     # Process the data in chunks to avoid high memory usage
-                    # A flat single array is not the ideal storage but in theory 
+                    # A flat single array is not the ideal storage but in theory
                     # only small arrays will be dense. However large arrays are common due to
                     # normalization creating (different) non zero values in each gene for 0 reads
-                    # Transposing the array without loading into memmory would probably take the 
+                    # Transposing the array without loading into memmory would probably take the
                     # same amount of time
                     # Adapt chunk_size so large row length won't consume too much memory.
                     chunk_size = self._get_optimal_chunk_size(num_rows, num_cols)
-                    for i in range(0, num_cols,chunk_size):
-                        # protect against out-of-bounds end_col here 
+                    for i in range(0, num_cols, chunk_size):
+                        # protect against out-of-bounds end_col here
                         # - although in testing, no difference observed, because
                         # total_len of dset is the right size & both slices will truncate correctly
                         end_col = min(i + chunk_size, num_cols)
-                        dset[i*num_rows:(end_col)*num_rows] = data[:,i:end_col].flatten("F")
+                        dset[i * num_rows : (end_col) * num_rows] = data[
+                            :, i:end_col
+                        ].flatten("F")
             except Exception as e:
-                raise TypeError(f"Unsupported data type for dense processing: {type(data)}. Original error: {e}")
+                raise TypeError(
+                    f"Unsupported data type for dense processing: {type(data)}. Original error: {e}"
+                )
 
         # Update metadata
         ds = self.get_datasource_metadata(row_ds)
@@ -1889,19 +2020,20 @@ class MDVProject:
         """Determine optimal chunk size based on matrix dimensions and available memory."""
         try:
             import psutil
+
             available_memory_mb = psutil.virtual_memory().available / 1024 / 1024
         except ImportError:
             # Fallback if psutil is not available
             available_memory_mb = 1000  # Assume 1GB available
-        
+
         # Estimate memory per element (float32 = 4 bytes)
         bytes_per_element = 4
-        
+
         # Calculate how many elements we can process with available memory
         # Use 25% of available memory to be very safe for large datasets
         safe_memory_bytes = available_memory_mb * 1024 * 1024 * 0.25
         max_elements = safe_memory_bytes / bytes_per_element
-        
+
         if rows * cols <= max_elements:
             return cols
         else:
@@ -1929,14 +2061,13 @@ class MDVProject:
                 warnings.warn(
                     "Redundant keyword arguments passed to serve() along with 'options' object. "
                     "These arguments will be ignored.",
-                    UserWarning
+                    UserWarning,
                 )
         else:
             # `options` was not provided, create it from kwargs.
             options = MDVServerOptions(**kwargs)
-        
+
         create_app(self, options=options)
-        
 
     def delete(self):
         # todo - remove from project routes, set a flag indicating it's been deleted
@@ -1947,7 +2078,7 @@ class MDVProject:
             "datasources": self.datasources,
             "state": self.state,
         }
-        
+
         # legacy
         hyperion_conf = join(self.dir, "hyperion_config.json")
         if os.path.exists(hyperion_conf):
@@ -1959,8 +2090,10 @@ class MDVProject:
         fdir = split(os.path.abspath(__file__))[0]
         # consider adding an option to do a js build here
         tdir = join(fdir, "templates")
-        # copy everything except the data (todo options for images etc)
-        copytree(self.dir, outdir, ignore=ignore_patterns(*("*.h5", "*.ome.tiff")))
+        # copy everything except the data, jobs (todo options for images etc)
+        copytree(
+            self.dir, outdir, ignore=ignore_patterns(*("*.h5", "*.ome.tiff", "jobs"))
+        )
         # copy the js and images
         self.copy_images(outdir)
         copytree(join(fdir, "static"), join(outdir, "static"))
@@ -1984,7 +2117,7 @@ class MDVProject:
         conf["static"] = True
         # throttle the dataloading so don't get network errors
         conf["dataloading"] = {"split": 5, "threads": 2}
-        save_json(join(outdir, "state.json"), conf,self.safe_file_save)
+        save_json(join(outdir, "state.json"), conf, self.safe_file_save)
         # add service worker for cross origin headers
         if include_sab_headers:
             page = page.replace("<!--sw-->", '<script src="serviceworker.js"></script>')
@@ -2042,22 +2175,24 @@ class MDVProject:
                     datasource[param] = md[ds][param]
                 self.set_datasource_metadata(datasource)
 
-    def add_image_set(self, datasource, setname, column, folder, type="png",large=False):
+    def add_image_set(
+        self, datasource, setname, column, folder, type="png", large=False
+    ):
         """Adds a set of images to a datasource. The images should be in a folder, with the same name as the column
         Args:
             datasource (str): The name of the datasource.
             column (str): The name of the column describing the images. The folder
                 should contain images with the same name as the values in this column
                 minus the file extension (typically .png or .jpg).
-            type (str, optional): The type of the images. Default is 
+            type (str, optional): The type of the images. Default is
                 'png'. Other options are 'jpg', 'jpeg', etc.
             large (bool, optional): If True, the images will be avialable to the Row Summmary Box
                 where only a single image is shown and can be panned and zoomed
                 if false (default) the images will be available in the Image Table and should
                 be thumbnails of the same size
             setname (str): The name of the image set. More than one set of images can be associated
-                with a datasource. The name should be unique within the datasource and is used tp 
-                create a folder (with a sanitized name) in the images directory     
+                with a datasource. The name should be unique within the datasource and is used tp
+                create a folder (with a sanitized name) in the images directory
             folder (str): The path to the folder containing the images.
         """
         ds = self.get_datasource_metadata(datasource)
@@ -2138,7 +2273,9 @@ class MDVProject:
                 # will frontend etc have a problem with this being None?
                 # not particularly - it'll load with AddView dialog, which is about as graceful as we could hope for.
                 # there was a potential error here when removing final view...
-                state["initial_view"] = state["all_views"][0] if state["all_views"] else None
+                state["initial_view"] = (
+                    state["all_views"][0] if state["all_views"] else None
+                )
         self.state = state
 
     def rename_view(self, old_name: str, new_name: str):
@@ -2180,7 +2317,7 @@ class MDVProject:
         if (
             not isinstance(order, list)
             or len(order) != len(existing)
-            or len(set[str](order)) != len(order) 
+            or len(set[str](order)) != len(order)
             or set[str](order) != set[str](existing)
             or set[str](order) != set[str](valid_views)
         ):
@@ -2401,14 +2538,13 @@ class MDVProject:
                 "default_channels": default_channels,
                 "base_url": "images/avivator/",
             }
-            
+
             # Save the updated metadata
             self.set_datasource_metadata(md)
 
         except Exception as e:
             logger.error(f"Error in MDVProject.add_viv_viewer: {e}")
             raise  # Re-raise the exception after logging
-
 
     def add_viv_images(self, datasource, data, link_images=True):
         md = self.get_datasource_metadata(datasource)
@@ -2585,23 +2721,25 @@ class MDVProject:
 
         return chart
 
+
 def get_json(file):
     with open(file) as f:
         return json.load(f)
 
 
-def save_json(file, data, safe= True):
+def save_json(file, data, safe=True):
     try:
         if safe:
             save_json_atomic(file, data)
         else:
-            with open(file,"w") as f:
-                json.dump(data,f,indent=2,allow_nan=False)
+            with open(file, "w") as f:
+                json.dump(data, f, indent=2, allow_nan=False)
     except Exception as e:
         logger.error(
             f"Error saving json to '{file}': some data cleaning may be necessary... project likely to be in a bad state."
         )
         raise (e)
+
 
 def save_json_atomic(path, data):
     """
@@ -2613,34 +2751,35 @@ def save_json_atomic(path, data):
     There will be some additional overhead as a result, probably not significant.
     """
     dir_name = os.path.dirname(path)
-    
+
     # Get permissions from existing file if it exists, otherwise use default group permissions
     if os.path.exists(path):
         existing_mode = os.stat(path).st_mode
     else:
         # Default to 0664 (rw-rw-r--) for group access in cluster environments
         existing_mode = 0o664
-    
+
     with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False) as tmp:
         json.dump(data, tmp, indent=2, allow_nan=False)
         tmp.flush()
         os.fsync(tmp.fileno())
         temp_name = tmp.name
-    
+
     # Set permissions on temp file to match existing file or use default
     os.chmod(temp_name, existing_mode)
-    
+
     # potential issues particularly in Docker where the files are on a different volume
     # safest option is to sync like this before and after, but may be overkill
     # 'sync' will fail silently on windows
     os.system("sync")
     os.replace(temp_name, path)  # Atomic move on most OSes
     os.system("sync")
-    # this method is lower overhead than os.system("sync") 
+    # this method is lower overhead than os.system("sync")
     # but stress testing indicates it is less robust
     # dir_fd = os.open(dir_name, os.O_DIRECTORY)
     # os.fsync(dir_fd)
     # os.close(dir_fd)
+
 
 def get_subgroup_bytes(grp, index, sparse=False):
     if sparse:
@@ -2679,17 +2818,19 @@ def add_column_to_group(
         or col["datatype"] == "unique"
         or col["datatype"] == "text16"
     ):
-        #in pandas missing values are represented by NaN
-        #which cause problems when co-ercing into text, therefore replace with ND
+        # in pandas missing values are represented by NaN
+        # which cause problems when co-ercing into text, therefore replace with ND
         if isinstance(data.dtype, pandas.CategoricalDtype):
             # Handle pandas Categorical data
             if "ND" not in data.cat.categories:
                 # see test_categorical_missing_values_edge_cases()
                 data = data.cat.add_categories("ND")
             data = data.fillna("ND")
-        #no boolean datatype in MDV at the moment, have to co-erce to text
+        # no boolean datatype in MDV at the moment, have to co-erce to text
         elif is_bool_dtype(data):
-            cat = data.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
+            cat = data.apply(
+                lambda x: "True" if x is True else "False" if x is False else "ND"
+            )
             assert isinstance(cat, pandas.Series)
             data = cat
         else:
@@ -2765,12 +2906,11 @@ def add_column_to_group(
         clean = (
             data
             if skip_column_clean
-            #this is pretty fast now
-            else
-                pandas.to_numeric(
-                    data.iloc[:, 0] if isinstance(data, pandas.DataFrame) else data,
-                    errors="coerce"
-                )
+            # this is pretty fast now
+            else pandas.to_numeric(
+                data.iloc[:, 0] if isinstance(data, pandas.DataFrame) else data,
+                errors="coerce",
+            )
         )  # this is slooooow?
         if col["datatype"] == "integer" and col.get("original_dtype") == "uint32":
             try:
@@ -2802,11 +2942,12 @@ def add_column_to_group(
         quantiles = [0.001, 0.01, 0.05]
         col["quantiles"] = {}
         for q in quantiles:
-            #quantiles must be of type float else won't serialise to json
+            # quantiles must be of type float else won't serialise to json
             col["quantiles"][str(q)] = [
                 float(numpy.percentile(na, 100 * q)),
                 float(numpy.percentile(na, 100 * (1 - q))),
             ]
+
 
 def get_column_info(columns, dataframe, supplied_columns_only):
     if columns:
@@ -2863,9 +3004,18 @@ def get_random_string(length=6):
 def map_polars_to_mdv_type(polars_dtype):
     """Map Polars data types to MDV project data types"""
     import polars as pl
-    
+
     # Map Polars types to our internal types
-    if polars_dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64]:
+    if polars_dtype in [
+        pl.Int8,
+        pl.Int16,
+        pl.Int32,
+        pl.Int64,
+        pl.UInt8,
+        pl.UInt16,
+        pl.UInt32,
+        pl.UInt64,
+    ]:
         return "integer"
     elif polars_dtype in [pl.Float32, pl.Float64]:
         return "double"
@@ -2897,10 +3047,10 @@ def get_polars_date_fields(dataframe: "pl.DataFrame | pl.LazyFrame") -> set[str]
 def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows, skip_column_clean):
     """Add a column to HDF5 group using Polars Series data"""
     import numpy as np
-    
+
     field = col_info["field"]
     col_info.setdefault("original_dtype", str(polars_series.dtype))
-    
+
     # Handle different column types
     if col_info["datatype"] in ["text", "text16", "multitext"]:
         # For categorical-like columns
@@ -2911,7 +3061,9 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
                 # Convert to pandas for compatible processing with existing code
                 data = polars_series.to_pandas()
                 # Use existing add_column_to_group since it handles complex multitext logic
-                add_column_to_group(col_info, data, h5_group, num_rows, skip_column_clean)
+                add_column_to_group(
+                    col_info, data, h5_group, num_rows, skip_column_clean
+                )
                 return
         else:
             # For regular categorical columns
@@ -2923,22 +3075,24 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
             else:
                 col_info["datatype"] = "text"
                 dtype = np.ubyte
-            
+
             # Store the unique values in the column metadata
             col_info["values"] = [str(v) for v in unique_values.to_list()]
-            
+
             # Create mapping from values to indices
             value_to_index = {str(v): i for i, v in enumerate(col_info["values"])}
-            
+
             # Create an empty dataset and write to it in chunks
             dset = h5_group.create_dataset(field, (num_rows,), dtype=dtype)
             chunk_size = 100_000  # Process 100,000 rows at a time
 
             for i in range(0, num_rows, chunk_size):
                 chunk = polars_series[i : i + chunk_size]
-                encoded_chunk = np.array([value_to_index.get(str(v), 0) for v in chunk], dtype=dtype)
+                encoded_chunk = np.array(
+                    [value_to_index.get(str(v), 0) for v in chunk], dtype=dtype
+                )
                 dset[i : i + len(encoded_chunk)] = encoded_chunk
-    
+
     elif col_info["datatype"] == "unique":
         # For string columns with many unique values
         if isinstance(polars_series, pl.Series):
@@ -2946,21 +3100,21 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
             max_len = polars_series.str.len_bytes().max()
             if max_len is None:
                 max_len = 1
-            
+
             # Create a fixed-length string dataset (HDF5 requirement)
             dt = h5py.string_dtype("utf-8", max_len)
             dset = h5_group.create_dataset(field, (num_rows,), dtype=dt)
-            
+
             # Update metadata
             col_info["stringLength"] = max_len
-            
+
             # Process and write in chunks
             chunk_size = 100_000  # Process 100,000 rows at a time
             for i in range(0, num_rows, chunk_size):
                 chunk = polars_series[i : i + chunk_size]
                 processed_chunk = chunk.fill_null("").to_list()
                 dset[i : i + len(processed_chunk)] = processed_chunk
-    
+
     else:
         # For numeric columns (integer, double)
         if isinstance(polars_series, pl.Series):
@@ -2969,9 +3123,16 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
                 data = polars_series.to_numpy(zero_copy_only=False).astype(np.int32)
             else:
                 # fillna is necessary because NaN cannot be cast to int
-                data = polars_series.fill_null(np.nan).to_numpy(zero_copy_only=False).astype(np.float32)
+                data = (
+                    polars_series.fill_null(np.nan)
+                    .to_numpy(zero_copy_only=False)
+                    .astype(np.float32)
+                )
 
-            if col_info["datatype"] == "integer" and col_info.get("original_dtype") == "UInt32":
+            if (
+                col_info["datatype"] == "integer"
+                and col_info.get("original_dtype") == "UInt32"
+            ):
                 try:
                     numeric = polars_series.cast(pl.Float64, strict=False).drop_nulls()
                     arr = numeric.to_numpy()
@@ -2993,18 +3154,27 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
             finite_mask = np.isfinite(data)
             if np.any(finite_mask):
                 finite_data = data[finite_mask]
-                col_info["minMax"] = [float(np.min(finite_data)), float(np.max(finite_data))]
-                
+                col_info["minMax"] = [
+                    float(np.min(finite_data)),
+                    float(np.max(finite_data)),
+                ]
+
                 col_info["quantiles"] = {}
                 for q in [0.001, 0.01, 0.05]:
                     col_info["quantiles"][str(q)] = [
                         float(np.percentile(finite_data, 100 * q)),
-                        float(np.percentile(finite_data, 100 * (1 - q)))
+                        float(np.percentile(finite_data, 100 * (1 - q))),
                     ]
 
-def get_column_info_polars(columns, dataframe: "pl.DataFrame | pl.LazyFrame", supplied_columns_only, num_rows: int):
+
+def get_column_info_polars(
+    columns,
+    dataframe: "pl.DataFrame | pl.LazyFrame",
+    supplied_columns_only,
+    num_rows: int,
+):
     """Polars version of get_column_info function, supports LazyFrames."""
-    
+
     if columns:
         for col in columns:
             if not col.get("field"):
@@ -3016,12 +3186,14 @@ def get_column_info_polars(columns, dataframe: "pl.DataFrame | pl.LazyFrame", su
         # .schema works on both DataFrame and LazyFrame without loading data
         for col_name, polars_dtype in dataframe.collect_schema().items():
             mdv_dtype = map_polars_to_mdv_type(polars_dtype)
-            
+
             # Check if this should be unique based on cardinality
             if mdv_dtype == "text":
                 # Handle both DataFrame and LazyFrame cases
                 if isinstance(dataframe, pl.LazyFrame):
-                    unique_count = dataframe.select(pl.col(col_name).n_unique()).collect().item()
+                    unique_count = (
+                        dataframe.select(pl.col(col_name).n_unique()).collect().item()
+                    )
                 else:
                     # For DataFrame, don't call collect()
                     unique_count = dataframe.select(pl.col(col_name).n_unique()).item()
@@ -3029,21 +3201,24 @@ def get_column_info_polars(columns, dataframe: "pl.DataFrame | pl.LazyFrame", su
                 # If most values are unique, treat as unique type
                 if unique_count > min(65536, total_count * 0.8):
                     mdv_dtype = "unique"
-            
-            cols.append({
-                "datatype": mdv_dtype,
-                "name": col_name,
-                "field": col_name,
-                "original_dtype": str(polars_dtype),
-            })
-        
+
+            cols.append(
+                {
+                    "datatype": mdv_dtype,
+                    "name": col_name,
+                    "field": col_name,
+                    "original_dtype": str(polars_dtype),
+                }
+            )
+
         # Replace with user given column metadata
         if columns:
             col_map = {x["field"]: x for x in columns}
             cols = [col_map.get(x["field"], x) for x in cols]
         columns = cols
-    
+
     return columns
+
 
 if __name__ == "__main__":
     path = os.getcwd()
