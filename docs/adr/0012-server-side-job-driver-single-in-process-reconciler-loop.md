@@ -129,6 +129,41 @@ filter is what keeps it cheap. If N ever grows enough that even the stat sweep m
 is a single top-level index of projects-with-active-jobs, at the cost of keeping that index
 consistent — deferred until profiling asks for it.
 
+### Boot wiring: one start_driver helper, called once per serve path (implementation note)
+
+The recovery scan and the thread start go through one small helper:
+
+```
+def start_driver(service, projects):
+    service.recovery_scan(projects)  # reconcile in-flight projects first (ADR-0005)
+    service.start()                  # then launch the one daemon thread
+```
+
+Order matters: reconcile before the thread starts ticking, so a tick cannot run against a project
+whose manager the scan is still building. The helper is also the testable seam. Every serve path
+blocks (single-project in `serve_forever`, multi-project in `app.run`), so none of them is reached by
+the Flask test client. Unit-testing `start_driver` with a spy service pins the scan-then-start order
+without opening a socket or spawning a thread.
+
+Placement rules:
+
+- `start()` lives only in serve paths, never in `build_app`. `build_app` runs in every route test, so
+  a `start()` there would spawn a real driver thread per test. The serve path is the one piece of code
+  the test client never runs.
+- Single-project: `create_app`'s serve branch calls `start_driver(job_service, [project])` before
+  `serve_forever`.
+- Multi-project: `mdv_desktop.py`'s `__main__` and `dbutils/mdv_server_app.py` each call
+  `start_driver(job_service, <catalog projects>)` after their serve loop, over the projects present at
+  boot.
+- `start()` is idempotent (the `self._thread is None` guard), so one call per boot is safe.
+
+Runtime-added projects get no recovery hook. A brand-new project (`/create_project`, a fresh upload)
+has no in-flight records, so there is nothing to recover, and lazy `get_or_create` builds its manager
+on the first submit. The one runtime case that could carry in-flight records, an existing project
+folder dropped into a running server's watched directory, is out of scope by decision: adding a folder
+with live in-flight jobs to a running server is not supported. Recovery scan stays a boot-time
+operation over the projects present at startup.
+
 ## Concurrency and locking (minimal)
 
 `MDVProject` already carries a `fasteners.InterProcessReaderWriterLock` (`project.lock("read"|"write")`)
