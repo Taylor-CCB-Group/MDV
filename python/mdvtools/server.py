@@ -774,6 +774,12 @@ def create_app(
             logger.info(f"there is already a blueprint at {route}")
         logger.info(f"Adding project {project.id} to existing app")
     else:
+        start_driver(job_service, [project])    # start the driver before we block on serve
         from gevent.pywsgi import WSGIServer
         http_server = WSGIServer(("127.0.0.1", options.port), app)
         http_server.serve_forever()
+
+def start_driver(service, projects):
+    """Start the job driver: reconcile in-flight projects, then start one daemon thread."""
+    service.recovery_scan(projects)
+    service.start()

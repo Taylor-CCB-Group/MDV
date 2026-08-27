@@ -77,3 +77,21 @@ def test_jobs_tools_route_answers_over_http(tmp_path):
 
     assert resp.status_code == 200
     assert resp.get_json() == serialize_registry()
+
+def test_start_driver_reconciles_before_starting():
+    """Boot wiring seam: recovery_scan must run before start(), so no tick fires
+    against a project whose manager the scan is still building (ADR-0012)."""
+    from mdvtools.server import start_driver
+
+    calls = []
+
+    class SpyService:
+        def recovery_scan(self, projects):
+            calls.append(("scan", list(projects)))
+
+        def start(self):
+            calls.append(("start",))
+
+    start_driver(SpyService(), ["p1", "p2"])
+
+    assert calls == [("scan", ["p1", "p2"]), ("start",)]
