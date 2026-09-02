@@ -374,3 +374,54 @@ Deferred, worth revisiting when there is a reason to make project identity globa
   project creation requires a single worker. `Dockerfile:165` runs `-w 1`. Making
   MDV run more than one worker needs the permission and catalog caches in
   `auth/authutils.py` addressed as well, and is not decided here.
+
+## Later work
+
+Two pieces of work follow from opaque storage names. This ADR decides neither of
+them, and the change ships without both.
+
+### An ls command for the catalog
+
+Once a directory name carries no information, an operator with a shell needs the
+database to find a project's files. `SELECT id, name, path FROM projects` gives the
+mapping, and every creation path logs the same pair, so the information is there.
+Doing it by hand each time is slow enough that a command earns its place.
+
+MDV already ships a CLI, so this is a subcommand. `python/pyproject.toml:91`
+declares `mdvtools = "mdvtools.cli:cli"`, and `mdvtools/cli.py:34` is a click group.
+`mdvtools ls` would print the Project ID, name, storage name and path for every
+project under a given Project root.
+
+The catalog sits behind the `app` extra, which shapes how this gets built.
+`dbutils/dbmodels.py` opens with `require_extra("app", "flask_sqlalchemy")` while the
+CLI ships in the slim core, so a command that reads the database has to guard that
+import the way ADR 0001 describes and tell a slim install to add `mdvtools[app]`. A
+version that reads `state.json` from each directory would run on any install and
+print names without Project IDs.
+
+### Duplicating a project
+
+MDV has no duplicate action today. Anyone who wants a copy exports the project and
+imports the zip back.
+
+Copying the directory at the shell works. `cp -r` produces a second directory,
+rescan gives it its own Project ID, and both projects serve. The catalog then shows
+two entries under the same display name, because the copy carries the original's
+`state.json`, so whoever ran the copy has to rename one of them afterwards.
+
+Using `mv` breaks the project, and people should be warned about it. The old path
+disappears, so the existing row points at a directory that has gone and becomes a
+failed project at startup, while rescan creates a second row for the new path. You
+end up with one broken catalog entry alongside a new project that has lost its
+ownership and permissions.
+
+A duplicate action in the UI would follow the same sequence as create:
+
+- choose a fresh storage name
+- copy the directory
+- insert a row and take the Project ID the database assigns
+- write a distinct display name into the copy's `state.json`
+
+`Project.path` is unique, so two rows can never share one directory and a duplicate
+is always a real copy on disk. Whether the copy inherits the original's permission,
+and who owns it, stay open.
