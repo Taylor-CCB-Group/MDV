@@ -147,10 +147,25 @@ info "connecting to $target"
 ssh -f -N -M -S "$sock" -o ControlPersist=60 "$target" \
     || die "could not open an ssh connection to $target"
 
-remote() { ssh -S "$sock" "$target" "$@"; }
+# ssh joins the command arguments it is given into one string and hands that
+# string to the remote login shell, so anything left unquoted here is shell
+# syntax on bia rather than data. MDV_COMPOSE_FILE comes from the environment
+# and reaches several remote blocks, so it is quoted like everything else.
+shquote() {
+    local arg quoted=""
+    for arg in "$@"; do
+        quoted="$quoted '${arg//\'/\'\\\'\'}'"
+    done
+    printf '%s' "${quoted# }"
+}
 
-remote "command -v docker >/dev/null" || die "docker is not available on $target"
-remote "test -f '$COMPOSE_FILE'" \
+# Takes a command and its arguments, never a shell snippet. Anything needing a
+# pipeline or a redirection goes through an explicit sh -c with its own quoting.
+remote() { ssh -S "$sock" "$target" "$(shquote "$@")"; }
+
+remote sh -c 'command -v docker >/dev/null' \
+    || die "docker is not available on $target"
+remote test -f "$COMPOSE_FILE" \
     || die "no compose file at $COMPOSE_FILE on $target
 Point somewhere else with:  MDV_COMPOSE_FILE=... $prog $target"
 
@@ -163,7 +178,7 @@ info "transferring to $target:~/$TARBALL"
 rsync -avP --partial --inplace -e "ssh -S $sock" "$tarball" "$target:$TARBALL" \
     || die "the transfer failed"
 
-remote_sum=$(remote "sha256sum '$TARBALL' | cut -d' ' -f1")
+remote_sum=$(remote sh -c 'sha256sum "$1" | cut -d" " -f1' sh "$TARBALL")
 if [ "$local_sum" != "$remote_sum" ]; then
     die "checksum mismatch after transfer.
   local   $local_sum
@@ -218,10 +233,14 @@ REMOTE
 info "loaded ${loaded_id#sha256:}"
 
 if [ "$loaded_id" != "$built_id" ]; then
-    warn "the image ID on $target does not match the one built here.
+    die "the image now tagged $IMAGE on $target is not the one built here.
   built   $built_id
   loaded  $loaded_id
-This is expected only if something else rebuilt or retagged $IMAGE."
+docker load preserves the image ID, so these differ only if something retagged
+$IMAGE on $target between the load and this check. The final check compares the
+containers against the loaded ID, so carrying on would deploy that other image
+and then call it a success. Nothing has been recreated. Find out what moved the
+tag, then run this again."
 fi
 
 # --- recreate --------------------------------------------------------------
@@ -317,7 +336,7 @@ esac
 # --- tidy up ---------------------------------------------------------------
 
 if [ "$keep" -eq 0 ]; then
-    remote "rm -f '$TARBALL'" || warn "could not remove ~/$TARBALL on $target"
+    remote rm -f "$TARBALL" || warn "could not remove ~/$TARBALL on $target"
 else
     info "kept $tarball and $target:~/$TARBALL"
 fi

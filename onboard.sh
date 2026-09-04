@@ -91,6 +91,11 @@ case "$target" in
     *) die "target must look like user@host, got '$target'" ;;
 esac
 
+case " $COMPOSE_SERVICES " in
+    *" $service "*) ;;
+    *) die "unknown service '$service'; expected one of: $COMPOSE_SERVICES" ;;
+esac
+
 case "$email" in
     ?*@?*.?*) ;;
     *) die "'$email' does not look like an email address" ;;
@@ -149,15 +154,27 @@ info "connecting to $target"
 ssh -f -N -M -S "$sock" -o ControlPersist=60 "$target" \
     || die "could not open an ssh connection to $target"
 
-remote() { ssh -S "$sock" "$target" "$@"; }
+# ssh joins the command arguments it is given into one string and hands that
+# string to the remote login shell, so anything left unquoted here is shell
+# syntax on bia rather than data. Quoting each argument means an email address
+# or a service name reaches the remote block as the value it is.
+shquote() {
+    local arg quoted=""
+    for arg in "$@"; do
+        quoted="$quoted '${arg//\'/\'\\\'\'}'"
+    done
+    printf '%s' "${quoted# }"
+}
+
+remote() { ssh -S "$sock" "$target" "$(shquote "$@")"; }
 
 # --- read the tenant and connection out of the container -------------------
 
 info "reading the Auth0 tenant and connection from $service"
 
-container_env=$(remote bash -s -- "$service" <<'REMOTE'
+container_env=$(remote bash -s -- "$service" "$APP_DIR" <<'REMOTE'
 set -euo pipefail
-service=$1
+service=$1; app_dir=$2
 
 id=$(docker ps --filter "name=^${service}$" --format '{{.ID}}' | head -1)
 if [ -z "$id" ]; then
@@ -167,18 +184,21 @@ if [ -z "$id" ]; then
 fi
 echo "ID=$id"
 
-# printenv first, then the mounted config, which is where these live when the
-# compose file does not pass them as environment variables.
+# printenv first, then the config files, in the order the app itself reads
+# them: mdv_server_app.load_config takes os.getenv(NAME) or config.get(NAME)
+# from dbutils/config.json. MDV_USER_CONFIG_PATH is tried as well because a
+# deployment may mount a config there, though the stock image ships neither
+# /config nor that variable.
 for var in AUTH0_DOMAIN AUTH0_DB_CONNECTION MDV_API_ROOT SQLITE_DB_PATH; do
     value=$(docker exec "$id" printenv "$var" 2>/dev/null || true)
     if [ -z "$value" ]; then
         value=$(docker exec "$id" python3 -c '
 import json, os, sys
 want = sys.argv[1].replace("_", "").lower()
-try:
-    cfg = json.load(open(os.environ.get("MDV_USER_CONFIG_PATH", "/config/user_config.json")))
-except Exception:
-    sys.exit(0)
+paths = [
+    os.environ.get("MDV_USER_CONFIG_PATH", "/config/user_config.json"),
+    os.path.join(sys.argv[2], "mdvtools", "dbutils", "config.json"),
+]
 def walk(node):
     if isinstance(node, dict):
         for k, v in node.items():
@@ -192,8 +212,16 @@ def walk(node):
             found = walk(item)
             if found:
                 return found
-print(walk(cfg) or "")
-' "$var" 2>/dev/null || true)
+for path in paths:
+    try:
+        cfg = json.load(open(path))
+    except Exception:
+        continue
+    found = walk(cfg)
+    if found:
+        print(found)
+        break
+' "$var" "$app_dir" 2>/dev/null || true)
     fi
     echo "${var}=${value}"
 done
@@ -272,6 +300,13 @@ case "$invitation_out" in
         die "auth_invitation could not create $email, see the message above" ;;
 esac
 
+# auth_invitation prints the new Auth0 id when it creates an account, and prints
+# nothing identifying when one already exists in this connection. Where we have
+# the id, the read-back below matches on it rather than on the email alone, so a
+# stale row for the same address cannot stand in for the identity just created.
+auth_id=$(printf '%s\n' "$invitation_out" \
+    | sed -n 's/^Created user .* with id //p' | tail -1)
+
 # --- sync the user into the instance, and grant access ---------------------
 
 if [ -n "$project" ]; then
@@ -317,13 +352,13 @@ fi
 
 info "reading the database rows back"
 
-rows=$(remote bash -s -- "$container_id" "$email" "$db_path" <<'REMOTE'
+rows=$(remote bash -s -- "$container_id" "$email" "$db_path" "$auth_id" <<'REMOTE'
 set -euo pipefail
-id=$1; email=$2; db_path=$3
+id=$1; email=$2; db_path=$3; auth_id=$4
 
 docker exec -i "$id" python3 -c '
 import sqlite3, sys
-email, db_path = sys.argv[1], sys.argv[2]
+email, db_path, want_auth_id = sys.argv[1], sys.argv[2], sys.argv[3]
 c = sqlite3.connect(db_path)
 users = c.execute(
     "select id,email,auth_id,is_admin from users where email=?", (email,)
@@ -335,10 +370,12 @@ projects = c.execute(
 print("USERS=%d" % len(users))
 for row in users:
     print("  user:", row)
+if want_auth_id:
+    print("MATCHED=%d" % sum(1 for row in users if row[2] == want_auth_id))
 print("PROJECTS=%d" % len(projects))
 for row in projects:
     print("  project:", row)
-' "$email" "$db_path"
+' "$email" "$db_path" "$auth_id"
 REMOTE
 ) || die "could not read the database on $service"
 
@@ -346,12 +383,20 @@ printf '%s\n' "$rows"
 
 user_count=$(printf '%s\n' "$rows" | sed -n 's/^USERS=//p')
 project_count=$(printf '%s\n' "$rows" | sed -n 's/^PROJECTS=//p')
+matched_count=$(printf '%s\n' "$rows" | sed -n 's/^MATCHED=//p')
 
 if [ "${user_count:-0}" -eq 0 ]; then
     die "$email is not in the users table on $service.
 The account exists in Auth0 but the sync did not pick it up, which usually means
 it landed in a different connection. Compare the user's Identities in the Auth0
 dashboard against '$connection'."
+fi
+
+if [ -n "$auth_id" ] && [ "${matched_count:-0}" -eq 0 ]; then
+    die "$email is in the users table on $service, but no row carries the Auth0
+id just created ($auth_id). The rows above belong to an older identity, and
+login matches on auth_id rather than email, so this person still cannot sign in.
+Compare their Identities in the Auth0 dashboard against '$connection'."
 fi
 
 if [ -n "$project" ] && [ "${project_count:-0}" -eq 0 ]; then
