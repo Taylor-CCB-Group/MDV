@@ -130,8 +130,13 @@ built_arch=$(docker image inspect --format '{{.Architecture}}' "$IMAGE")
 [ "$built_arch" = "$ARCH" ] || die "$IMAGE is $built_arch, not $ARCH.
 Rebuild it with:  docker build --platform $PLATFORM -t $IMAGE ."
 
+# Local and remote image IDs are not comparable, so this one is printed for
+# the record and never checked against the ID bia reports. Docker Desktop's
+# containerd image store reports the OCI image index digest as .Id, while a
+# classic daemon reports the image config digest. Both describe the same image
+# and the two digests are always different.
 built_id=$(docker image inspect --format '{{.Id}}' "$IMAGE")
-info "built $ARCH image ${built_id#sha256:}"
+info "local $ARCH image ${built_id#sha256:}"
 
 # --- save ------------------------------------------------------------------
 
@@ -230,17 +235,28 @@ docker image inspect --format '{{.Id}}' "$image"
 REMOTE
 ) || die "docker load failed on $target"
 
-info "loaded ${loaded_id#sha256:}"
+info "loaded on $target as ${loaded_id#sha256:}"
 
-if [ "$loaded_id" != "$built_id" ]; then
-    die "the image now tagged $IMAGE on $target is not the one built here.
-  built   $built_id
-  loaded  $loaded_id
-docker load preserves the image ID, so these differ only if something retagged
-$IMAGE on $target between the load and this check. The final check compares the
-containers against the loaded ID, so carrying on would deploy that other image
-and then call it a success. Nothing has been recreated. Find out what moved the
-tag, then run this again."
+# That the tarball arrived intact is already established by the checksum above,
+# and every check from here on compares against the ID bia gave the image it
+# just loaded, so the local ID is not needed again.
+
+# Deploying an image bia already has is a normal use of -B, but the run changes
+# nothing and the final check would pass in a way that reads like a fresh
+# deploy. Say so instead.
+unchanged=yes
+for svc in $services; do
+    was=$(printf '%s\n' "$before" | sed -n "s/^${svc}=//p")
+    if [ "$was" != "$loaded_id" ]; then
+        unchanged=""
+        break
+    fi
+done
+if [ -n "$unchanged" ]; then
+    warn "every named service is already running this image, so this deploy
+moves nothing. The containers below are recreated on the image they were
+already on. If you expected new code, the local $IMAGE is stale: drop -B and
+let it rebuild."
 fi
 
 # --- recreate --------------------------------------------------------------
