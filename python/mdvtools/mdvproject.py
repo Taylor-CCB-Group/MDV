@@ -39,11 +39,16 @@ def get_unwritable_project_paths(project_dir: str) -> list[str]:
     """Return project paths the current process cannot modify as required."""
     statefile = join(project_dir, "state.json")
     viewsfile = join(project_dir, "views.json")
+    datasourcesfile = join(project_dir, "datasources.json")
     h5file = join(project_dir, "datafile.h5")
+    # MDVProject.__init__ creates the directory and these three files, so they
+    # are always present. The h5 file only exists once the project has data,
+    # which is why it is checked separately below.
     required_access = (
         (statefile, os.W_OK),
         (project_dir, os.W_OK | os.X_OK),
         (viewsfile, os.W_OK),
+        (datasourcesfile, os.W_OK),
     )
     unwritable = [
         path for path, mode in required_access if not os.access(path, mode)

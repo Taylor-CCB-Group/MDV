@@ -14,6 +14,7 @@ def test_unwritable_paths_names_every_failed_access_check(tmp_path, monkeypatch)
         project.statefile,
         project.dir,
         project.viewsfile,
+        project.datasourcesfile,
         project.h5file,
     }
     monkeypatch.setattr(
@@ -26,8 +27,31 @@ def test_unwritable_paths_names_every_failed_access_check(tmp_path, monkeypatch)
         project.statefile,
         project.dir,
         project.viewsfile,
+        project.datasourcesfile,
         project.h5file,
     ]
+    assert not project.writable
+
+
+def test_unwritable_datasources_file_alone_makes_a_project_unwritable(
+    tmp_path,
+    monkeypatch,
+):
+    """A read-only datasources.json is enough to make the project unwritable.
+
+    The datasources setter writes that file, so a project the server called
+    editable on the strength of the other paths would fail partway through:
+    add_datasource writes datafile.h5 first and only then persists the
+    metadata, leaving the h5 file changed and datasources.json stale.
+    """
+    project = MDVProject(str(tmp_path / "project"))
+    monkeypatch.setattr(
+        os,
+        "access",
+        lambda path, _mode: path != project.datasourcesfile,
+    )
+
+    assert project.unwritable_paths == [project.datasourcesfile]
     assert not project.writable
 
 
