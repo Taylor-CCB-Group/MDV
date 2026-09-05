@@ -104,6 +104,18 @@ if [ -n "$project" ]; then
     esac
 fi
 
+# `$prog host service someone@x.ac.uk owner` reads owner as the project name and
+# leaves the permission at its default, which is not what anyone means by it.
+if [ $# -lt 5 ] && [ -n "$project" ]; then
+    case "$project" in
+        view|edit|owner)
+            die "'$project' is a permission, but it is in the project position.
+The order is:  $prog <user@host> <service> <email> [project] [permission]
+You may mean:  $prog $target $service $email <project> $project
+If a project really is called '$project', name the permission as well." ;;
+    esac
+fi
+
 # Credentials come from the environment so they are never written to the repo.
 [ -n "${M2M_CLIENT_ID:-}" ] || die "set M2M_CLIENT_ID, the Auth0 machine-to-machine client id"
 [ -n "${M2M_CLIENT_SECRET:-}" ] || die "set M2M_CLIENT_SECRET, the machine-to-machine secret"
@@ -318,14 +330,18 @@ id=$1; app_dir=$2; script=$3; email=$4; project=$5; permission=$6
 # interpreter, which cannot import h5py, so mdvtools fails to import before
 # argparse ever sees the subcommand. Pick an interpreter that can import the
 # package rather than assuming which one that is.
-python_bin=$(docker exec -i "$id" sh -c '
+# No -i, and stdin from /dev/null. These blocks reach bia as the script of a
+# `bash -s`, which reads them from stdin, and `docker exec -i` drains whatever
+# stdin still holds. An -i here swallows the rest of this block, so the commands
+# below never run and the block exits 0 having done nothing.
+python_bin=$(docker exec "$id" sh -c '
 for py in "$0/.venv/bin/python" "$0/.venv/bin/python3" python3 python; do
     if "$py" -c "import mdvtools" >/dev/null 2>&1; then
         printf "%s" "$py"
         exit 0
     fi
 done
-exit 1' "$app_dir") || {
+exit 1' "$app_dir" </dev/null) || {
     echo "nothing in $id can import mdvtools." >&2
     echo "Looked for $app_dir/.venv/bin/python, then python3 and python on PATH." >&2
     echo "List what is there with:  docker exec $id ls $app_dir/.venv/bin" >&2
@@ -333,13 +349,13 @@ exit 1' "$app_dir") || {
 }
 
 if [ -n "$project" ]; then
-    docker exec -i "$id" sh -c \
+    docker exec "$id" sh -c \
         'cd "$0" && "$1" "$2" assign --email "$3" --project "$4" --permission "$5"' \
-        "$app_dir" "$python_bin" "$script" "$email" "$project" "$permission"
+        "$app_dir" "$python_bin" "$script" "$email" "$project" "$permission" </dev/null
 else
-    docker exec -i "$id" sh -c \
+    docker exec "$id" sh -c \
         'cd "$0" && "$1" "$2" sync' \
-        "$app_dir" "$python_bin" "$script"
+        "$app_dir" "$python_bin" "$script" </dev/null
 fi
 REMOTE
 )
@@ -367,7 +383,7 @@ rows=$(remote bash -s -- "$container_id" "$email" "$db_path" "$auth_id" <<'REMOT
 set -euo pipefail
 id=$1; email=$2; db_path=$3; auth_id=$4
 
-docker exec -i "$id" python3 -c '
+docker exec "$id" python3 -c '
 import sqlite3, sys
 email, db_path, want_auth_id = sys.argv[1], sys.argv[2], sys.argv[3]
 c = sqlite3.connect(db_path)
@@ -386,7 +402,7 @@ if want_auth_id:
 print("PROJECTS=%d" % len(projects))
 for row in projects:
     print("  project:", row)
-' "$email" "$db_path" "$auth_id"
+' "$email" "$db_path" "$auth_id" </dev/null
 REMOTE
 ) || die "could not read the database on $service"
 
