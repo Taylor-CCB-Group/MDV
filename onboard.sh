@@ -188,44 +188,28 @@ if [ -z "$id" ]; then
 fi
 echo "ID=$id"
 
-# printenv first, then the config files, in the order the app itself reads
-# them: mdv_server_app.load_config takes os.getenv(NAME) or config.get(NAME)
-# from dbutils/config.json. MDV_USER_CONFIG_PATH is tried as well because a
-# deployment may mount a config there, though the stock image ships neither
-# /config nor that variable.
+# printenv first, then the application's own config.json, which is what
+# mdv_server_app.load_config does: os.getenv(NAME) or config.get(NAME) against
+# the top level of that file. Only the two Auth0 settings get that fallback.
+# The app reads MDV_API_ROOT and SQLITE_DB_PATH from the environment alone, so
+# a value found in a file would not be the value the app is running with, and
+# reporting it would defeat the point of reading the tenant off the container.
 for var in AUTH0_DOMAIN AUTH0_DB_CONNECTION MDV_API_ROOT SQLITE_DB_PATH; do
     value=$(docker exec "$id" printenv "$var" 2>/dev/null || true)
     if [ -z "$value" ]; then
-        value=$(docker exec "$id" python3 -c '
-import json, os, sys
-want = sys.argv[1].replace("_", "").lower()
-paths = [
-    os.environ.get("MDV_USER_CONFIG_PATH", "/config/user_config.json"),
-    os.path.join(sys.argv[2], "mdvtools", "dbutils", "config.json"),
-]
-def walk(node):
-    if isinstance(node, dict):
-        for k, v in node.items():
-            if isinstance(v, str) and k.replace("_", "").lower() == want:
-                return v
-            found = walk(v)
-            if found:
-                return found
-    elif isinstance(node, list):
-        for item in node:
-            found = walk(item)
-            if found:
-                return found
-for path in paths:
-    try:
-        cfg = json.load(open(path))
-    except Exception:
-        continue
-    found = walk(cfg)
-    if found:
-        print(found)
-        break
-' "$var" "$app_dir" 2>/dev/null || true)
+        case "$var" in
+            AUTH0_DOMAIN|AUTH0_DB_CONNECTION)
+                value=$(docker exec "$id" python3 -c '
+import json, sys
+try:
+    cfg = json.load(open(sys.argv[2]))
+except Exception:
+    sys.exit(0)
+found = cfg.get(sys.argv[1])
+if isinstance(found, str):
+    print(found)
+' "$var" "$app_dir/mdvtools/dbutils/config.json" </dev/null 2>/dev/null || true) ;;
+        esac
     fi
     echo "${var}=${value}"
 done
@@ -239,12 +223,19 @@ api_root=$(printf '%s\n' "$container_env" | sed -n 's/^MDV_API_ROOT=//p')
 db_path=$(printf '%s\n' "$container_env" | sed -n 's/^SQLITE_DB_PATH=//p')
 db_path=${db_path:-$DB_PATH_DEFAULT}
 
+# Both come from the environment or the top level of the app's config.json, and
+# nowhere else. A value nested inside either would not be one the app reads, so
+# an empty result here means the setting is genuinely absent.
+config_json=$APP_DIR/mdvtools/dbutils/config.json
 [ -n "$domain" ] || die "$service does not expose AUTH0_DOMAIN.
-Check it by hand:  ssh $target docker exec $container_id printenv | grep -i auth0"
+Check it by hand:
+  ssh $target docker exec $container_id printenv | grep -i auth0
+  ssh $target docker exec $container_id cat $config_json"
 [ -n "$connection" ] || die "$service does not expose AUTH0_DB_CONNECTION.
 An account created in the wrong connection never reaches this instance, so this
 script will not guess. Check it by hand:
-  ssh $target docker exec $container_id cat /config/user_config.json | grep -i auth0"
+  ssh $target docker exec $container_id printenv | grep -i auth0
+  ssh $target docker exec $container_id cat $config_json"
 
 # --- confirm before touching Auth0 -----------------------------------------
 
