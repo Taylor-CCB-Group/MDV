@@ -6,15 +6,7 @@
 # goes over one multiplexed SSH connection and you type your password once.
 #
 # Why this exists: the tenant and connection are read out of the running
-# container rather than from a local config. A user created in the wrong Auth0
-# connection looks correct in the dashboard and never appears in the instance,
-# because the sync only pulls identities matching AUTH0_DB_CONNECTION and login
-# matches on auth_id rather than email. That mistake is easy to make by hand and
-# hard to spot afterwards.
-#
-# Automates sections 4 to 10 of the runbook
-# "Adding a user to a bia sqlite MDV instance".
-#
+# container rather than from a local config.
 # The three instances are independent. Run this once per instance.
 
 set -euo pipefail
@@ -321,14 +313,33 @@ grant_out=$(remote bash -s -- \
 set -euo pipefail
 id=$1; app_dir=$2; script=$3; email=$4; project=$5; permission=$6
 
+# The image installs its dependencies into a uv-managed venv under $app_dir and
+# starts the app with `uv run`. Plain `python` on PATH is the base image's
+# interpreter, which cannot import h5py, so mdvtools fails to import before
+# argparse ever sees the subcommand. Pick an interpreter that can import the
+# package rather than assuming which one that is.
+python_bin=$(docker exec -i "$id" sh -c '
+for py in "$0/.venv/bin/python" "$0/.venv/bin/python3" python3 python; do
+    if "$py" -c "import mdvtools" >/dev/null 2>&1; then
+        printf "%s" "$py"
+        exit 0
+    fi
+done
+exit 1' "$app_dir") || {
+    echo "nothing in $id can import mdvtools." >&2
+    echo "Looked for $app_dir/.venv/bin/python, then python3 and python on PATH." >&2
+    echo "List what is there with:  docker exec $id ls $app_dir/.venv/bin" >&2
+    exit 1
+}
+
 if [ -n "$project" ]; then
     docker exec -i "$id" sh -c \
-        'cd "$0" && python "$1" assign --email "$2" --project "$3" --permission "$4"' \
-        "$app_dir" "$script" "$email" "$project" "$permission"
+        'cd "$0" && "$1" "$2" assign --email "$3" --project "$4" --permission "$5"' \
+        "$app_dir" "$python_bin" "$script" "$email" "$project" "$permission"
 else
     docker exec -i "$id" sh -c \
-        'cd "$0" && python "$1" sync' \
-        "$app_dir" "$script"
+        'cd "$0" && "$1" "$2" sync' \
+        "$app_dir" "$python_bin" "$script"
 fi
 REMOTE
 )
