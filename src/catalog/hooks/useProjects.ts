@@ -9,10 +9,21 @@ import {
     restoreRecycledProjectResponseSchema,
 } from "../utils/projectSchemas";
 
+type RescannedProject = {
+    id: number;
+    name: string;
+};
+
+type RescanResponse = {
+    created_project_ids: number[];
+    unwritable_projects: RescannedProject[];
+};
+
 const useProjects = () => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [rescanWarning, setRescanWarning] = useState<string | null>(null);
     const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
     const [filter, setFilter] = useState("");
     const [sortBy, setSortBy] = useState<"lastModified" | "name">(
@@ -23,6 +34,10 @@ const useProjects = () => {
     const closeErrorModal = useCallback(() => {
         setIsErrorModalOpen(false);
         setError(null);
+    }, []);
+
+    const clearRescanWarning = useCallback(() => {
+        setRescanWarning(null);
     }, []);
 
     const handleError = useCallback((errorMessage: string) => {
@@ -59,6 +74,7 @@ const useProjects = () => {
                         : [],
                     numberOfStructures: item.numberOfStructures || "0",
                     numberOfImages: item.numberOfImages || "0",
+                    writable: item.writable !== false,
                     // Assigning all permissions as true if auth is not enabled
                     permissions: item?.permissions ? {
                                 read: item.permissions["can_read"],
@@ -123,6 +139,7 @@ const useProjects = () => {
                     collaborators: [],
                     numberOfStructures: "0",
                     numberOfImages: "0",
+                    writable: true,
                     permissions: {
                         read: true,
                         edit: true,
@@ -366,11 +383,20 @@ const useProjects = () => {
         async () => {
             setIsLoading(true);
             setError(null);
+            setRescanWarning(null);
 
             try {
                 const response = await apiFetch("rescan_projects");
                 if (response.ok) {
-                   console.log("Rescan successful");
+                   const result: RescanResponse = await response.json();
+                   if (result.unwritable_projects.length > 0) {
+                       const projectNames = result.unwritable_projects
+                           .map((project) => project.name)
+                           .join(", ");
+                       setRescanWarning(
+                           `Registered ${projectNames}, but the server cannot write the project files. These projects will open read-only.`,
+                       );
+                   }
                    // Refresh the project list so newly discovered projects appear (works with or without auth)
                    await fetchProjects();
                 } else {
@@ -530,6 +556,8 @@ const useProjects = () => {
         projects: filteredAndSortedProjects,
         isLoading,
         error,
+        rescanWarning,
+        clearRescanWarning,
         isErrorModalOpen,
         closeErrorModal,
         fetchProjects,

@@ -4,6 +4,7 @@ import os
 import tempfile
 import shutil
 import json
+from types import SimpleNamespace
 from sqlalchemy.exc import OperationalError
 from flask import Flask
 from mdvtools.dbutils.mdv_server_app import (
@@ -672,16 +673,57 @@ class TestServeProjectsFromFilesystem(unittest.TestCase):
 
 
 class TestRescanProjectPermissions(unittest.TestCase):
+    @patch(
+        "mdvtools.dbutils.mdv_server_app.serve_projects_from_filesystem",
+        return_value=[10],
+    )
+    @patch("mdvtools.dbutils.routes.get_unwritable_project_paths")
+    @patch("mdvtools.dbutils.dbservice.ProjectService.get_project_by_id")
+    def test_rescan_reports_registered_unwritable_projects(
+        self,
+        mock_get_project,
+        mock_unwritable_paths,
+        _mock_serve_projects,
+    ):
+        app = Flask(__name__)
+        app.config["projects_base_dir"] = "/tmp/mdv"
+        mock_get_project.return_value = SimpleNamespace(
+            id=10,
+            name="read-only-project",
+            path="/tmp/mdv/read-only-project",
+        )
+        mock_unwritable_paths.return_value = [
+            "/tmp/mdv/read-only-project/state.json",
+        ]
+        register_routes(app, ENABLE_AUTH=False)
+
+        response = app.test_client().get("/rescan_projects")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {
+                "created_project_ids": [10],
+                "unwritable_projects": [
+                    {"id": 10, "name": "read-only-project"},
+                ],
+            },
+        )
+
     @patch("mdvtools.auth.authutils.cache_user_projects")
     @patch("mdvtools.dbutils.dbservice.UserProjectService.add_or_update_user_project")
     @patch(
         "mdvtools.dbutils.mdv_server_app.serve_projects_from_filesystem",
         return_value=[10, 11],
     )
+    @patch("mdvtools.dbutils.routes.get_unwritable_project_paths")
+    @patch("mdvtools.dbutils.dbservice.ProjectService.get_project_by_id")
     @patch("mdvtools.dbutils.dbmodels.User")
     def test_rescan_grants_every_admin_ownership(
         self,
         mock_user,
+        mock_get_project,
+        mock_unwritable_paths,
         mock_serve_projects,
         mock_add_user_project,
         mock_cache_user_projects,
@@ -693,6 +735,11 @@ class TestRescanProjectPermissions(unittest.TestCase):
             MagicMock(id=1),
             MagicMock(id=2),
         ]
+        mock_get_project.side_effect = [
+            SimpleNamespace(id=10, name="project-10", path="/tmp/mdv/project-10"),
+            SimpleNamespace(id=11, name="project-11", path="/tmp/mdv/project-11"),
+        ]
+        mock_unwritable_paths.return_value = []
         register_routes(app, ENABLE_AUTH=True)
 
         client = app.test_client()
@@ -701,7 +748,14 @@ class TestRescanProjectPermissions(unittest.TestCase):
 
         response = client.get("/rescan_projects")
 
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {
+                "created_project_ids": [10, 11],
+                "unwritable_projects": [],
+            },
+        )
         mock_serve_projects.assert_called_once_with(app, "/tmp/mdv")
         mock_user.query.filter_by.assert_called_once_with(is_admin=True)
         self.assertEqual(
@@ -721,10 +775,14 @@ class TestRescanProjectPermissions(unittest.TestCase):
         "mdvtools.dbutils.mdv_server_app.serve_projects_from_filesystem",
         return_value=[],
     )
+    @patch("mdvtools.dbutils.routes.get_unwritable_project_paths")
+    @patch("mdvtools.dbutils.dbservice.ProjectService.get_project_by_id")
     @patch("mdvtools.dbutils.dbmodels.User")
     def test_rescan_without_new_projects_does_not_change_permissions(
         self,
         mock_user,
+        mock_get_project,
+        mock_unwritable_paths,
         _mock_serve_projects,
         mock_add_user_project,
         mock_cache_user_projects,
@@ -740,10 +798,52 @@ class TestRescanProjectPermissions(unittest.TestCase):
 
         response = client.get("/rescan_projects")
 
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {
+                "created_project_ids": [],
+                "unwritable_projects": [],
+            },
+        )
         mock_user.query.filter_by.assert_not_called()
+        mock_get_project.assert_not_called()
+        mock_unwritable_paths.assert_not_called()
         mock_add_user_project.assert_not_called()
         mock_cache_user_projects.assert_not_called()
+
+
+class TestProjectListWritability(unittest.TestCase):
+    @patch("mdvtools.dbutils.routes.get_unwritable_project_paths")
+    @patch("mdvtools.dbutils.dbservice.ProjectService.get_active_projects")
+    def test_projects_reports_live_filesystem_writability(
+        self,
+        mock_get_active_projects,
+        mock_unwritable_paths,
+    ):
+        app = Flask(__name__)
+        mock_get_active_projects.return_value = [
+            {
+                "id": 10,
+                "name": "read-only-project",
+                "path": "/tmp/mdv/read-only-project",
+                "lastModified": "2026-09-03 12:00:00",
+                "thumbnail": None,
+                "readme": None,
+            },
+        ]
+        mock_unwritable_paths.return_value = [
+            "/tmp/mdv/read-only-project/state.json",
+        ]
+        register_routes(app, ENABLE_AUTH=False)
+
+        response = app.test_client().get("/projects")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.get_json()[0]["writable"])
+        mock_unwritable_paths.assert_called_once_with(
+            "/tmp/mdv/read-only-project",
+        )
 
 
 class TestCreateFlaskApp(unittest.TestCase):
