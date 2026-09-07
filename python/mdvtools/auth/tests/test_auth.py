@@ -1,6 +1,7 @@
 import pytest
 from flask import Flask, session
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
+from sqlalchemy.exc import IntegrityError
 from mdvtools.auth.authutils import get_auth_provider
 from mdvtools.auth.dummy_provider import DummyAuthProvider
 from mdvtools.auth.shibboleth_provider import ShibbolethProvider
@@ -382,3 +383,231 @@ class TestAuth0ProviderSync:
         
         # Verify: error was handled, rollback called
         assert mock_db.session.rollback.called
+
+
+class TestValidateUserBootstrapAndActivation:
+    """Tests for Auth0Provider.validate_user's first-admin bootstrap and
+    pending-user activation behavior."""
+
+    @pytest.fixture
+    def bootstrap_app(self):
+        app = Flask("test_bootstrap_app")
+        app.config["TESTING"] = True
+        app.config["AUTH0_DOMAIN"] = "test.auth0.com"
+        app.config["AUTH0_CLIENT_ID"] = "test_client_id"
+        app.config["AUTH0_CLIENT_SECRET"] = "test_client_secret"
+        app.config["MDV_BOOTSTRAP_ADMIN_EMAIL"] = "admin@example.com"
+        app.secret_key = "test_secret_key"
+        return app
+
+    @pytest.fixture
+    def provider(self, bootstrap_app):
+        with patch('mdvtools.auth.auth0_provider.requests.get') as mock_get:
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.json.return_value = {
+                'jwks_uri': 'https://test.auth0.com/.well-known/jwks.json'
+            }
+            return Auth0Provider(
+                bootstrap_app,
+                oauth=MagicMock(),
+                client_id="test_client_id",
+                client_secret="test_client_secret",
+                domain="test.auth0.com",
+            )
+
+    def _run_validate_user(self, bootstrap_app, provider, user_info, existing_user_side_effect):
+        """Drive validate_user with get_token/is_token_valid/get_user stubbed, and
+        User.query wired so `.filter_by(...).first()` returns each item of
+        `existing_user_side_effect` in order across however many times it's called."""
+        with patch.object(provider, 'get_token', return_value='dummy-token'), \
+             patch.object(provider, 'is_token_valid', return_value=True), \
+             patch.object(provider, 'get_user', return_value=user_info), \
+             patch('mdvtools.dbutils.dbmodels.User') as mock_user_class, \
+             patch('mdvtools.dbutils.dbmodels.db') as mock_db:
+
+            mock_db.session = MagicMock()
+            filter_by_mock = MagicMock()
+            filter_by_mock.first.side_effect = existing_user_side_effect
+            mock_user_class.query.filter_by.return_value = filter_by_mock
+            mock_user_class.query.count.return_value = 0
+
+            new_user = MagicMock()
+            new_user.id = 99
+            new_user.auth_id = user_info.get("sub")
+            new_user.email = user_info.get("email")
+            new_user.is_admin = True
+            mock_user_class.return_value = new_user
+
+            with bootstrap_app.test_request_context('/'):
+                result, error = provider.validate_user()
+
+        return result, error, mock_user_class, mock_db, new_user
+
+    def test_bootstrap_creates_first_admin_and_assigns_role(self, bootstrap_app, provider):
+        user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
+
+        with patch('mdvtools.auth.auth0_provider.GetToken') as mock_get_token, \
+             patch('mdvtools.auth.auth0_provider.Auth0') as mock_auth0_class:
+            mock_get_token.return_value.client_credentials.return_value = {"access_token": "mgmt-token"}
+            mock_auth0 = MagicMock()
+            mock_auth0.roles.list.return_value = {"roles": [{"id": "role_admin", "name": "admin"}]}
+            mock_auth0_class.return_value = mock_auth0
+
+            result, error, mock_user_class, mock_db, new_user = self._run_validate_user(
+                bootstrap_app, provider, user_info, existing_user_side_effect=[None]
+            )
+
+        assert error is None
+        assert result == {"id": 99, "auth_id": "auth0|new-admin", "email": "admin@example.com", "is_admin": True}
+        mock_user_class.assert_called_once_with(
+            email="admin@example.com",
+            auth_id="auth0|new-admin",
+            confirmed_at=ANY,
+            is_active=True,
+            administrator=True,
+            is_admin=True,
+            password="",
+        )
+        mock_db.session.add.assert_called_once_with(new_user)
+        mock_auth0.users.add_roles.assert_called_once_with("auth0|new-admin", ["role_admin"])
+
+    def test_bootstrap_rejects_nonmatching_email(self, bootstrap_app, provider):
+        user_info = {"sub": "auth0|someone-else", "email": "someone@else.com", "email_verified": True}
+
+        result, error, mock_user_class, mock_db, _new_user = self._run_validate_user(
+            bootstrap_app, provider, user_info, existing_user_side_effect=[None]
+        )
+
+        assert result is None
+        assert error[1] == 404
+        mock_db.session.add.assert_not_called()
+
+    def test_bootstrap_rejects_unverified_email(self, bootstrap_app, provider):
+        user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": False}
+
+        result, error, mock_user_class, mock_db, _new_user = self._run_validate_user(
+            bootstrap_app, provider, user_info, existing_user_side_effect=[None]
+        )
+
+        assert result is None
+        assert error[1] == 404
+        mock_db.session.add.assert_not_called()
+
+    def test_bootstrap_noop_when_users_already_exist(self, bootstrap_app, provider):
+        user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
+
+        with patch.object(provider, 'get_token', return_value='dummy-token'), \
+             patch.object(provider, 'is_token_valid', return_value=True), \
+             patch.object(provider, 'get_user', return_value=user_info), \
+             patch('mdvtools.dbutils.dbmodels.User') as mock_user_class, \
+             patch('mdvtools.dbutils.dbmodels.db') as mock_db:
+
+            mock_db.session = MagicMock()
+            filter_by_mock = MagicMock()
+            filter_by_mock.first.return_value = None
+            mock_user_class.query.filter_by.return_value = filter_by_mock
+            mock_user_class.query.count.return_value = 5  # an admin already exists
+
+            with bootstrap_app.test_request_context('/'):
+                result, error = provider.validate_user()
+
+        assert result is None
+        assert error[1] == 404
+        mock_db.session.add.assert_not_called()
+
+    def test_bootstrap_rolls_back_when_role_assignment_fails(self, bootstrap_app, provider):
+        user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
+
+        with patch('mdvtools.auth.auth0_provider.GetToken') as mock_get_token, \
+             patch('mdvtools.auth.auth0_provider.Auth0') as mock_auth0_class:
+            mock_get_token.return_value.client_credentials.return_value = {"access_token": "mgmt-token"}
+            mock_auth0 = MagicMock()
+            mock_auth0.roles.list.return_value = {"roles": []}  # no 'admin' role in this tenant
+            mock_auth0_class.return_value = mock_auth0
+
+            result, error, mock_user_class, mock_db, new_user = self._run_validate_user(
+                bootstrap_app, provider, user_info, existing_user_side_effect=[None]
+            )
+
+        assert result is None
+        assert error[1] == 500
+        mock_db.session.delete.assert_called_once_with(new_user)
+        assert mock_db.session.commit.call_count == 2  # once for the create, once for the rollback delete
+
+    def test_bootstrap_concurrent_race_logs_in_the_winner(self, bootstrap_app, provider):
+        """Two requests for the same bootstrap identity race; the loser's commit hits
+        the unique constraint on email/auth_id and should just log in as the winner
+        rather than surfacing an error to the legitimate administrator."""
+        user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
+        winner = MagicMock(id=1, auth_id="auth0|new-admin", email="admin@example.com", is_admin=True)
+
+        with patch.object(provider, 'get_token', return_value='dummy-token'), \
+             patch.object(provider, 'is_token_valid', return_value=True), \
+             patch.object(provider, 'get_user', return_value=user_info), \
+             patch('mdvtools.dbutils.dbmodels.User') as mock_user_class, \
+             patch('mdvtools.dbutils.dbmodels.db') as mock_db:
+
+            mock_db.session = MagicMock()
+            mock_db.session.commit.side_effect = IntegrityError("insert", {}, Exception("unique violation"))
+            filter_by_mock = MagicMock()
+            # First call: initial lookup -> None. Second call: after the IntegrityError
+            # rollback, re-query finds the row the concurrent request already created.
+            filter_by_mock.first.side_effect = [None, winner]
+            mock_user_class.query.filter_by.return_value = filter_by_mock
+            mock_user_class.query.count.return_value = 0
+            mock_user_class.return_value = MagicMock()
+
+            with bootstrap_app.test_request_context('/'):
+                result, error = provider.validate_user()
+
+        assert error is None
+        assert result == {"id": 1, "auth_id": "auth0|new-admin", "email": "admin@example.com", "is_admin": True}
+        mock_db.session.rollback.assert_called_once()
+
+    def test_pending_user_activated_on_first_login(self, bootstrap_app, provider):
+        user_info = {"sub": "auth0|invited-user", "email": "invited@example.com", "email_verified": True}
+        pending_user = MagicMock(id=7, auth_id="auth0|invited-user", email="invited@example.com", is_admin=False)
+        pending_user.is_active = False
+
+        with patch.object(provider, 'get_token', return_value='dummy-token'), \
+             patch.object(provider, 'is_token_valid', return_value=True), \
+             patch.object(provider, 'get_user', return_value=user_info), \
+             patch('mdvtools.dbutils.dbmodels.User') as mock_user_class, \
+             patch('mdvtools.dbutils.dbmodels.db') as mock_db:
+
+            mock_db.session = MagicMock()
+            filter_by_mock = MagicMock()
+            filter_by_mock.first.return_value = pending_user
+            mock_user_class.query.filter_by.return_value = filter_by_mock
+
+            with bootstrap_app.test_request_context('/'):
+                result, error = provider.validate_user()
+
+        assert error is None
+        assert pending_user.is_active is True
+        assert pending_user.confirmed_at is not None
+        mock_db.session.commit.assert_called_once()
+        assert result == {"id": 7, "auth_id": "auth0|invited-user", "email": "invited@example.com", "is_admin": False}
+
+    def test_active_user_login_does_not_touch_db(self, bootstrap_app, provider):
+        user_info = {"sub": "auth0|active-user", "email": "active@example.com", "email_verified": True}
+        active_user = MagicMock(id=3, auth_id="auth0|active-user", email="active@example.com", is_admin=False)
+        active_user.is_active = True
+
+        with patch.object(provider, 'get_token', return_value='dummy-token'), \
+             patch.object(provider, 'is_token_valid', return_value=True), \
+             patch.object(provider, 'get_user', return_value=user_info), \
+             patch('mdvtools.dbutils.dbmodels.User') as mock_user_class, \
+             patch('mdvtools.dbutils.dbmodels.db') as mock_db:
+
+            mock_db.session = MagicMock()
+            filter_by_mock = MagicMock()
+            filter_by_mock.first.return_value = active_user
+            mock_user_class.query.filter_by.return_value = filter_by_mock
+
+            with bootstrap_app.test_request_context('/'):
+                result, error = provider.validate_user()
+
+        assert error is None
+        mock_db.session.commit.assert_not_called()
+        assert result == {"id": 3, "auth_id": "auth0|active-user", "email": "active@example.com", "is_admin": False}

@@ -4,6 +4,7 @@ require_extra("app", "authlib")
 import time
 import requests
 import threading
+from datetime import datetime
 from authlib.integrations.flask_client import OAuth
 from flask import jsonify, session, redirect
 from typing import Optional, Dict, List, Any, TYPE_CHECKING
@@ -109,7 +110,7 @@ class Auth0Provider(AuthProvider):
             assert self.oauth.auth0 is not None, "Auth0 provider is not registered."
             return self.oauth.auth0.authorize_redirect(
                 redirect_uri=redirect_uri,
-                audience=audience  # The audience for the token (API identifier)                
+                audience=audience  # The audience for the token (API identifier)
             )
         
         except Exception as e:
@@ -180,6 +181,7 @@ class Auth0Provider(AuthProvider):
                     "first_name": user_metadata.get("first_name", "Unknown"),
                     "last_name": user_metadata.get("last_name", "Unknown"),
                     "email": raw_data.get("email", ""),
+                    "email_verified": bool(raw_data.get("email_verified", False)),
                     "association": user_metadata.get("association", "Unknown Organization"),
                     "avatarUrl": raw_data.get("picture", ""),
                 }
@@ -362,8 +364,8 @@ class Auth0Provider(AuthProvider):
     def validate_user(self):
         """Validate the user using Auth0."""
 
-        from mdvtools.dbutils.dbmodels import User
-        
+        from mdvtools.dbutils.dbmodels import User, db
+
         try:
             # Check if user information is already cached in session
             if 'user' in session:
@@ -377,7 +379,7 @@ class Auth0Provider(AuthProvider):
             # Validate token using the provider-specific logic
             if not self.is_token_valid(token):
                 return None, (jsonify({"error": "Invalid or expired token"}), 401)
-            
+
             # Retrieve user info from Auth0
             user_info = self.get_user({"access_token": token})
             if not user_info:
@@ -385,11 +387,24 @@ class Auth0Provider(AuthProvider):
 
             # Get Auth0 user ID
             auth0_id = user_info.get("sub")
+            email = (user_info.get("email") or "").strip().lower()
 
             # Query the user from the database if not in cache
             user = User.query.filter_by(auth_id=auth0_id).first()
-            if not user:
-                return None, (jsonify({"error": "User not found"}), 404)
+
+            if user is None:
+                try:
+                    user = self._try_bootstrap_first_admin(user_info, auth0_id, email)
+                except Exception as e:
+                    logging.exception(f"Bootstrap administrator creation failed: {e}")
+                    return None, (jsonify({"error": "Administrator bootstrap failed"}), 500)
+                if user is None:
+                    return None, (jsonify({"error": "User not found"}), 404)
+            elif not user.is_active:
+                # First successful login for a pending (admin-invited) user: activate them.
+                user.is_active = True
+                user.confirmed_at = datetime.now()
+                db.session.commit()
 
             # Add the user to the in-memory cache
             user_data = {"id": user.id, "auth_id": user.auth_id, "email": user.email, "is_admin": user.is_admin}
@@ -403,6 +418,79 @@ class Auth0Provider(AuthProvider):
         except Exception as e:
             logging.exception(f"Error in validate_user: {e}")
             return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
+
+    def _try_bootstrap_first_admin(self, user_info: Dict[str, Any], auth0_id: Optional[str], email: str):
+        """
+        Create the first local administrator, but only while the local database has zero
+        users and the verified Auth0 identity matches MDV_BOOTSTRAP_ADMIN_EMAIL. Returns
+        None (bootstrap not applicable) rather than creating anything if any check fails.
+
+        This path only ever runs once per deployment: as soon as any local user exists,
+        User.query.count() > 0 and this method always returns None.
+        """
+        from mdvtools.dbutils.dbmodels import User, db
+        from sqlalchemy.exc import IntegrityError
+
+        if not auth0_id:
+            return None
+
+        bootstrap_email = (self.app.config.get("MDV_BOOTSTRAP_ADMIN_EMAIL") or "").strip().lower()
+        if not bootstrap_email:
+            return None
+        if User.query.count() > 0:
+            return None
+        if not user_info.get("email_verified"):
+            logging.warning("Bootstrap admin login rejected: Auth0 email is not verified.")
+            return None
+        if not email or email != bootstrap_email:
+            logging.warning("Bootstrap admin login rejected: email does not match MDV_BOOTSTRAP_ADMIN_EMAIL.")
+            return None
+
+        user = User(
+            email=email,
+            auth_id=auth0_id,
+            confirmed_at=datetime.now(),
+            is_active=True,
+            administrator=True,
+            is_admin=True,
+            password="",
+        )
+        db.session.add(user)
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            # A concurrent request for this same identity already won the race and
+            # created the row (e.g. a double-click or two tabs). Log that user in
+            # rather than showing the legitimate bootstrap administrator an error.
+            return User.query.filter_by(auth_id=auth0_id).first()
+
+        try:
+            self._assign_admin_role(auth0_id)
+        except Exception:
+            logging.exception(
+                "Failed to assign the Auth0 'admin' role to the bootstrap administrator; rolling back."
+            )
+            db.session.delete(user)
+            db.session.commit()
+            raise
+
+        logging.info(f"Bootstrapped first administrator: {email}")
+        return user
+
+    def _assign_admin_role(self, auth0_id: str) -> None:
+        """Assign the Auth0 tenant's 'admin' role to auth0_id via the Management API."""
+        get_token = GetToken(domain=self.domain, client_id=self.client_id, client_secret=self.client_secret)
+        mgmt_api_token = get_token.client_credentials(audience=f"https://{self.domain}/api/v2/")["access_token"]
+        auth0 = Auth0(self.domain, mgmt_api_token)
+
+        roles_response = auth0.roles.list(name_filter="admin")
+        roles = roles_response.get("roles", []) if isinstance(roles_response, dict) else []
+        role_id = next((role["id"] for role in roles if role.get("name") == "admin"), None)
+        if not role_id:
+            raise RuntimeError("Auth0 tenant has no role named 'admin'.")
+
+        auth0.users.add_roles(auth0_id, [role_id])
     
     class SyncContext:
         """Context object for user sync operations."""
