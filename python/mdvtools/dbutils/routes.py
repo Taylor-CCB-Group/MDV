@@ -174,7 +174,31 @@ def register_routes(app, ENABLE_AUTH):
                 "created_project_ids": created_ids,
                 "unwritable_projects": unwritable_projects,
             })
-        
+
+        @app.route('/refresh_cache', methods=['GET', 'POST'])
+        def refresh_cache():
+            """
+            Reloads the in-memory user/project caches from the database.
+
+            Needed because out-of-band DB changes (e.g. the Auth0 sync run via
+            `docker exec`) update the DB in a separate process and never touch the
+            running server's cache, so they stay invisible until reload. Hitting this
+            (as a logged-in admin) refreshes the live cache without a container restart.
+            """
+            logger.info(" /REFRESH CACHE...")
+
+            if ENABLE_AUTH:
+                user = session.get('user')
+                if not user:
+                    raise ValueError("User not found in session.")
+                if not user.get("is_admin", False):
+                    abort(403)  # Forbidden
+
+            ok = cache_user_projects()
+            return jsonify({"refreshed": bool(ok)}), (200 if ok else 500)
+
+        logger.info("Route registered: /refresh_cache")
+
         def get_project_owners(project_id):
             owners = []
             for user_id, projects in user_project_cache.items():

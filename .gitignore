@@ -89,4 +89,8 @@ tests_playwright/test-data/temp/
 /python/mdvtools/llm/structured_schemas.py
 /scripts/python/mdvtools/llm/structured_schemas.py
 
+# Deployment-generated files
+.env.*
+.docker-deploy.*.override.yml
+
 .cursor/
