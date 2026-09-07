@@ -11,6 +11,7 @@ def register_routes(app, ENABLE_AUTH):
     from flask import abort, jsonify, session, redirect, url_for, render_template, send_file
     from mdvtools.auth.authutils import active_projects_cache, user_project_cache, all_users_cache, cache_user_projects
     from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
+    from mdvtools.dbutils.dbmodels import User
     from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
     
     """Register routes with the Flask app."""
@@ -116,11 +117,15 @@ def register_routes(app, ENABLE_AUTH):
                 # Serve the projects after checking authentication and admin privileges
                 created_ids = serve_projects_from_filesystem(app, app.config["projects_base_dir"])
 
-                # If auth is enabled and there are new projects, grant owner to current admin and refresh cache
+                # Keep rescanned projects consistent with Auth0 startup sync:
+                # every administrator owns every newly discovered project.
                 if ENABLE_AUTH and created_ids:
                     try:
-                        user_id = user.get("id") if user else None
-                        if user_id is not None:
+                        admin_ids = [
+                            admin.id
+                            for admin in User.query.filter_by(is_admin=True).all()
+                        ]
+                        for user_id in admin_ids:
                             for pid in created_ids:
                                 UserProjectService.add_or_update_user_project(user_id=user_id, project_id=pid, is_owner=True)
                         # Refresh caches so /projects reflects new permissions
