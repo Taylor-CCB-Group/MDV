@@ -35,6 +35,29 @@ from mdvtools.project_protocols import RowsAsColumnsLinkSource
 logger = get_logger(__name__)
 
 
+def get_unwritable_project_paths(project_dir: str) -> list[str]:
+    """Return project paths the current process cannot modify as required."""
+    statefile = join(project_dir, "state.json")
+    viewsfile = join(project_dir, "views.json")
+    datasourcesfile = join(project_dir, "datasources.json")
+    h5file = join(project_dir, "datafile.h5")
+    # MDVProject.__init__ creates the directory and these three files, so they
+    # are always present. The h5 file only exists once the project has data,
+    # which is why it is checked separately below.
+    required_access = (
+        (statefile, os.W_OK),
+        (project_dir, os.W_OK | os.X_OK),
+        (viewsfile, os.W_OK),
+        (datasourcesfile, os.W_OK),
+    )
+    unwritable = [
+        path for path, mode in required_access if not os.access(path, mode)
+    ]
+    if exists(h5file) and not os.access(h5file, os.W_OK):
+        unwritable.append(h5file)
+    return unwritable
+
+
 def _agent_debug_log(
     run_id: str,
     hypothesis_id: str,
@@ -211,23 +234,22 @@ class MDVProject:
                 o.write(json.dumps({"all_views": []}))
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
         self.backend_db = backend_db
+        self._writability_warning_logged = False
 
     @property
-    def writable(self):
+    def unwritable_paths(self):
         """
-        Determine whether the user running this process has write-permission on relevant files
+        List project paths the current process cannot modify as required.
+
         This is independent of any permissions set in db etc,
         but can be used to guard against inappropriate admin actions
         """
-        # check if project has a h5 file or write permissions, newly created project doesn't have a h5 file which blocks file upload
-        h5_writable_or_not_created = (not exists(self.h5file)) or os.access(self.h5file, os.W_OK)
-        return (
-            # belt and braces
-            os.access(self.statefile, os.W_OK)
-            and os.access(self.dir, os.W_OK | os.X_OK)
-            and os.access(self.viewsfile, os.W_OK)
-            and h5_writable_or_not_created
-        )
+        return get_unwritable_project_paths(self.dir)
+
+    @property
+    def writable(self):
+        """Whether the current process can modify all required project paths."""
+        return not self.unwritable_paths
 
     @property
     def datasources(self):
@@ -263,8 +285,15 @@ class MDVProject:
         save_json(self.statefile, value ,self.safe_file_save)
 
     def set_editable(self, edit=True):
-        if not self.writable:
-            logger.log(1, f"can't set_editable on '{self.dir}' because it's not writable")
+        unwritable_paths = self.unwritable_paths
+        if unwritable_paths:
+            logger.warning(
+                "Cannot set project '%s' editable state because the process lacks "
+                "write access to these paths (the project directory also requires "
+                "execute access): %s",
+                self.dir,
+                ", ".join(unwritable_paths),
+            )
             return
         c = self.state
         c["permission"] = "edit" if edit else "view"

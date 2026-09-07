@@ -6,7 +6,8 @@ import {
     LockPerson,
     MoreVert,
     Upload as UploadIcon,
-    Share as ShareIcon
+    Share as ShareIcon,
+    WarningAmber,
 } from "@mui/icons-material";
 import {
     Checkbox,
@@ -22,6 +23,7 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    Tooltip,
     Typography,
     useTheme,
 } from "@mui/material";
@@ -98,6 +100,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                             <TableCell>Owner</TableCell>
                             {!isPublicPage && <TableCell>Last Modified</TableCell>}
                             <TableCell>Type</TableCell>
+                            {!isPublicPage && <TableCell>Filesystem</TableCell>}
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
                     </TableHead>
@@ -135,6 +138,24 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                                 <TableCell>{project.owner ? project.owner.join(', ') : ''}</TableCell>
                                 {!isPublicPage && <TableCell>{project.lastModified}</TableCell>}
                                 <TableCell>{project.type}</TableCell>
+                                {!isPublicPage && (
+                                    <TableCell>
+                                        {project.writable ? (
+                                            "Writable"
+                                        ) : (
+                                            <Tooltip title="The MDV server cannot write this project's files. It will open read-only.">
+                                                <Typography
+                                                    component="span"
+                                                    color="warning.main"
+                                                    sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
+                                                >
+                                                    <WarningAmber fontSize="small" />
+                                                    Server read-only
+                                                </Typography>
+                                            </Tooltip>
+                                        )}
+                                    </TableCell>
+                                )}
                                 <TableCell align="right">
                                 {(hasReadme(project) || hasPermissions(project)) && 
                                     (
