@@ -1,5 +1,5 @@
 import { Alert, Button, Checkbox, FormControlLabel, TextField, Typography } from "@mui/material";
-import { featureNamesForCodes, isPointsWorkerEnabled, resolveFeatureSelectionCodes } from "@spatialdata/core";
+import { featureNamesForCodes, isParquetWorkerEnabled, resolveFeatureSelectionCodes } from "@spatialdata/core";
 import { featureCodeToRgb } from "@spatialdata/layers";
 import { describeFeatureRowState, featureRowOpacity, usePointsFeatureState } from "@spatialdata/vis";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -532,12 +532,13 @@ function PointsFeatureFilterPanel({ config, updateLayer }: Props) {
     const residentKnown = residentCodes !== undefined;
     const scanning = matchingLoadState?.loading ?? false;
     // `supportsOnDemandLoad` answers "does this element have a feature index", which is
-    // necessary but not sufficient: the scan that uses it runs in the core points
+    // necessary but not sufficient: the scan that uses it runs in the core parquet
     // worker, and `loadPointsMatchingFeatureCodes` throws outright without one rather
-    // than falling back to the main thread. `ensurePointsWorker` starts it, so this is
-    // normally true — but if that ever fails the row must not invite a click that
-    // cannot work, which is the state this app shipped in before core 0.8.0.
-    const canScanOnDemand = supportsOnDemandLoad && isPointsWorkerEnabled();
+    // than falling back to the main thread. `ensureParquetWorker` starts it, so this is
+    // normally true — but a worker that fails to load is now detected and switched off,
+    // so `isParquetWorkerEnabled()` reports `false` rather than staying optimistic, and
+    // the row must not invite a click that cannot work.
+    const canScanOnDemand = supportsOnDemandLoad && isParquetWorkerEnabled();
     /** The element could scan, but the worker it needs never started. */
     const workerBlocksScan = supportsOnDemandLoad && !canScanOnDemand;
     // ONE classification pass over the catalog, not one per consumer. This was a
