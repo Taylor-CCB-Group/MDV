@@ -47,11 +47,16 @@ def cli():
 @click.option('--add_layer_data', is_flag=True, default=True, help='Add layer data (log values etc.).')
 @click.option('--gene_identifier_column', default=None, help='Gene column for identification.')
 @click.option('--link-name-column', default=None, help='Variable datasource column used as the rows_as_columns name_column.')
+@click.option('--add-reverse-link', is_flag=True, help='Add a reverse link from the variable datasource to the observation datasource.')
+@click.option('--reverse-link-name-column', default='name', show_default=True, help='Column used for reverse link names.')
+@click.option('--rows-as-columns-name-column', default=None, help='Column used for rows_as_columns dynamic column names.')
+@click.option('--x-data-name', default='Gene Expr', show_default=True, help='Name for the X data matrix.')
+@click.option('--x-data-transformation', default='Gene Score', show_default=True, help='Transformation name for the X data.')
 @click.option('--compute-x-umap', 'compute_x_umap', is_flag=True, help='Compute neighbors, UMAP, and Leiden clusters directly from adata.X before export.')
 @click.option('--leiden-resolution', default=1.0, type=float, show_default=True, help='Leiden resolution used with --compute-x-umap.')
 @click.option('--zip', 'zip_output', is_flag=True, help='Zip the output folder and delete the original.')
 @click.option('--chatmdv', is_flag=True, help='Include the original Scanpy .h5ad file in the zipped project.')
-def convert_scanpy(folder, scanpy_object, max_dims, delete_existing, label, obs_datasource_name, var_datasource_name, chunk_data, add_layer_data, gene_identifier_column, link_name_column, compute_x_umap, leiden_resolution, zip_output, chatmdv):
+def convert_scanpy(folder, scanpy_object, max_dims, delete_existing, label, obs_datasource_name, var_datasource_name, chunk_data, add_layer_data, gene_identifier_column, link_name_column, add_reverse_link, reverse_link_name_column, rows_as_columns_name_column, x_data_name, x_data_transformation, compute_x_umap, leiden_resolution, zip_output, chatmdv):
     """Convert Scanpy AnnData object to MDV format."""
     import scanpy as sc
     from .conversions import convert_scanpy_to_mdv
@@ -69,6 +74,11 @@ def convert_scanpy(folder, scanpy_object, max_dims, delete_existing, label, obs_
         add_layer_data,
         gene_identifier_column,
         link_name_column=link_name_column,
+        add_reverse_link=add_reverse_link,
+        reverse_link_name_column=reverse_link_name_column,
+        rows_as_columns_name_column=rows_as_columns_name_column,
+        x_data_name=x_data_name,
+        x_data_transformation=x_data_transformation,
         compute_x_umap=compute_x_umap,
         leiden_resolution=leiden_resolution,
     )

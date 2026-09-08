@@ -89,23 +89,46 @@ ColumnName = str  # NewType("ColumnName", str)
 # List[ColumnName] gets tricky, `ColumnName | str` syntax needs python>=3.10
 Cols = Union[List[str], NewType("Params", List[ColumnName])]
 
+# Pandas to MDV datattypes
 datatype_mappings = {
-    "int8": "integer",
-    "int16": "integer",
-    "uint8": "integer",
-    "uint16": "integer",
-    "uint32": "integer",
+    # Exact legacy int32 storage; no missing values expected.
+    "int8": "int32",
+    "int16": "int32",
+    "int32": "int32",
+    "uint8": "int32",
+    "uint16": "int32",
+
+    # Pandas nullable integers; legacy integer storage is float32.
+    #could be loss of precision for int64, uint32, uint64, but MDV doesn't have a better option
+    # at the moment
+    "Int8": "integer",
+    "Int16": "integer",
+    "Int32": "integer",
+    "Int64": "integer",
+    "UInt8": "integer",
+    "UInt16": "integer",
+    "UInt32": "integer",
+    "UInt64": "integer",
+
+    # Native integers that may exceed exact float32 precision.
     "int64": "integer",
-    "float64": "double",
+    "uint32": "integer",
+    "uint64": "integer",
+
+    # MDV double is historically float32-backed.
     "float32": "double",
+    "float64": "double",
+
+    # Text-like and boolean values have no dedicated MDV boolean type.
     "object": "text",
-    "str":"text",
+    "string": "text",
+    "str": "text",
     "category": "text",
     "bool": "text",
-    "int32": "double",
-    "boolean":"text"
+    "boolean": "text",
 }
 
+# underlying datatypes for each MDV datatype, used for reading/writing h5 files
 numpy_dtypes = {
     "text": numpy.ubyte,
     "text16": numpy.uint16,
@@ -113,7 +136,7 @@ numpy_dtypes = {
     "double": numpy.float32,
     "integer": numpy.float32,
     "int32": numpy.int32,
-    # unique created in fly (depends on string length)
+    # unique created on the fly (depends on string length)
 }
 
 _UNIX_EPOCH_UTC = pandas.Timestamp("1970-01-01", tz="UTC")
@@ -1121,14 +1144,39 @@ class MDVProject:
             )
         # py-right: dictionary key must be hashable
         newdf = pandas.DataFrame({index_col: self.get_column(datasource, index_col)})  # type: ignore
+        fields = [c["field"] for c in columns]
+        aligned = newdf[[index_col]].merge(
+            data[fields],
+            left_on=index_col,
+            right_index=True,
+            how="left",
+            validate="many_to_one",
+        )
+
+        # Fill missing values according to storage datatype
+        for c in columns:
+            field = c["field"]
+            datatype = c.get("datatype", "text")
+
+            if datatype in ["text", "text16", "unique", "multitext"]:
+                # Text columns use the missing_value string
+                aligned[field] = aligned[field].fillna(missing_value)
+            elif datatype in ["double", "integer"]:
+                # Numeric columns use NaN, which is compatible with float32 storage
+                aligned[field] = aligned[field].fillna(float("nan"))
+            elif datatype == "int32":
+                # int32 storage uses numpy.int32, which cannot represent NaN
+                # Fill with 0 to keep column numeric (int32 storage expects no missing values)
+                aligned[field] = aligned[field].fillna(0)
+            else:
+                # Fallback for unknown types
+                aligned[field] = aligned[field].fillna(missing_value)
+
         h5 = self._get_h5_handle()
         gr = h5[datasource]
         assert isinstance(gr, h5py.Group)
         for c in columns:
-            d = {k: v for k, v in zip(data.index, data[c["field"]])}
-            # v slow - needs improving
-            # py-right: `Argument of type "Series | Unknown | DataFrame" cannot be assigned to parameter "data" of type "Series"`
-            ncol = newdf.apply(lambda row: d.get(row[0], missing_value), axis=1)
+            ncol = aligned[c["field"]]
             assert isinstance(ncol, pandas.Series)
             add_column_to_group(c, ncol, gr, len(ncol), self.skip_column_clean)
             ds["columns"].append(c)
@@ -1928,7 +1976,7 @@ class MDVProject:
         
         # Calculate how many elements we can process with available memory
         # Use 25% of available memory to be very safe for large datasets
-        safe_memory_bytes = available_memory_mb * 1024 * 1024 * 0.25
+        safe_memory_bytes = available_memory_mb * 1024 * 1024 * 0.5
         max_elements = safe_memory_bytes / bytes_per_element
         
         if rows * cols <= max_elements:
@@ -2801,19 +2849,21 @@ def add_column_to_group(
                     errors="coerce"
                 )
         )  # this is slooooow?
-        if col["datatype"] == "integer" and col.get("original_dtype") == "uint32":
+        # Check for precision loss when storing wide integers as float32
+        wide_int_types = {"int64", "uint32", "uint64", "Int64", "UInt32", "UInt64"}
+        if col["datatype"] == "integer" and col.get("original_dtype") in wide_int_types:
             try:
                 numeric = numpy.asarray(
                     pandas.to_numeric(clean, errors="coerce"),
                     dtype=numpy.float64,
                 )
                 finite_numeric = numeric[numpy.isfinite(numeric)]
-                out_of_range = finite_numeric[finite_numeric > 16_777_216]
+                out_of_range = finite_numeric[numpy.abs(finite_numeric) > 16_777_216]
                 if len(out_of_range) != 0:
                     col.setdefault("storage_warnings", []).append(
-                        "uint32 -> float32 (integer): "
+                        f"{col.get('original_dtype')} -> float32 (integer): "
                         f"{len(out_of_range)} value(s) exceed exact-integer range "
-                        f"(max={float(finite_numeric.max()):.0f}); precision loss possible."
+                        f"(max abs={float(numpy.abs(finite_numeric).max()):.0f}); precision loss possible."
                     )
             except Exception:
                 pass
