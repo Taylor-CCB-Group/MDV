@@ -14,13 +14,15 @@ if TYPE_CHECKING:
 # from flask import Response
 from flask.typing import ResponseReturnValue
 from mdvtools.auth.auth_provider import AuthProvider
-import logging
+from mdvtools.logging_config import get_logger
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
 from auth0.management import Auth0
 from auth0.authentication import GetToken
 from auth0.exceptions import RateLimitError
 import random
+
+logger = get_logger(__name__)
 
 # Add JWKS cache with thread-safe access
 _jwks_cache = {}
@@ -54,9 +56,9 @@ class Auth0Provider(AuthProvider):
             self.domain = domain
 
             self._initialize_oauth()
-            logging.info("Auth0Provider initialized successfully.")
+            logger.info("Auth0Provider initialized successfully.")
         except Exception as e:
-            logging.critical(f"Failed to initialize Auth0Provider: {e}")
+            logger.critical(f"Failed to initialize Auth0Provider: {e}")
             raise
 
     def _initialize_oauth(self):
@@ -70,7 +72,7 @@ class Auth0Provider(AuthProvider):
             # Attempt to fetch metadata to ensure it's accessible
             response = requests.get(server_metadata_url)
             if response.status_code != 200:
-                logging.error(f"Failed to fetch OpenID configuration from {server_metadata_url}: {response.text}")
+                logger.error(f"Failed to fetch OpenID configuration from {server_metadata_url}: {response.text}")
                 raise RuntimeError(f"Unable to fetch OpenID Connect metadata from {server_metadata_url}")
 
             # Parse and check the existence of jwks_uri in the metadata
@@ -78,7 +80,7 @@ class Auth0Provider(AuthProvider):
 
             jwks_uri = metadata.get('jwks_uri')
             if not jwks_uri:
-                logging.error(f"The OpenID configuration is missing 'jwks_uri': {metadata}")
+                logger.error(f"The OpenID configuration is missing 'jwks_uri': {metadata}")
                 raise RuntimeError("'jwks_uri' is missing in OpenID Connect metadata.")
 
             # Register the OAuth provider with server_metadata_url for dynamic metadata fetching
@@ -89,9 +91,9 @@ class Auth0Provider(AuthProvider):
                 server_metadata_url=server_metadata_url,
                 client_kwargs={'scope': 'openid profile email'},
             )
-            logging.info("Auth0 OAuth provider registered successfully with OpenID Connect metadata.")
+            logger.info("Auth0 OAuth provider registered successfully with OpenID Connect metadata.")
         except Exception as e:
-            logging.error(f"Error while registering OAuth provider: {e}")
+            logger.error(f"Error while registering OAuth provider: {e}")
             raise RuntimeError("Failed to initialize OAuth.") from e
 
     def login(self) -> str:
@@ -100,7 +102,7 @@ class Auth0Provider(AuthProvider):
         """
         try:
             
-            logging.info("Initiating login process.")
+            logger.info("Initiating login process.")
             #redirect_uri = url_for('callback', _external=True)
             redirect_uri = self.app.config["AUTH0_CALLBACK_URL"]
             audience = self.app.config["AUTH0_AUDIENCE"]  # The API audience for which the token is requested
@@ -114,7 +116,7 @@ class Auth0Provider(AuthProvider):
             )
         
         except Exception as e:
-            logging.error(f"Error during login process: {e}")
+            logger.error(f"Error during login process: {e}")
             raise RuntimeError("Login failed.") from e
 
     def logout(self) -> ResponseReturnValue:
@@ -122,7 +124,7 @@ class Auth0Provider(AuthProvider):
         Logs the user out by clearing the session and redirecting to Auth0's logout endpoint.
         """
         try:
-            logging.info("Logging out user from Auth0.")
+            logger.info("Logging out user from Auth0.")
             
             # Clear the server-side session to remove any stored tokens and user data
             session.clear()
@@ -134,12 +136,12 @@ class Auth0Provider(AuthProvider):
             # This will log the user out of Auth0 and redirect them to the provided URL
             logout_url = f"https://{self.app.config['AUTH0_DOMAIN']}/v2/logout?returnTo={redirect_url}&client_id={self.app.config['AUTH0_CLIENT_ID']}"
             
-            logging.info(f"Redirecting to Auth0 logout URL: {logout_url}")
+            logger.info(f"Redirecting to Auth0 logout URL: {logout_url}")
             # "type 'response' is not assignable to None"
             return redirect(logout_url)
 
         except Exception as e:
-            logging.error(f"Error during logout process: {e}")
+            logger.error(f"Error during logout process: {e}")
             raise RuntimeError("Auth0 logout failed.") from e
 
 
@@ -151,16 +153,16 @@ class Auth0Provider(AuthProvider):
         :return: User information dictionary or None
         """
         try:
-            logging.info("Fetching user information.")
+            logger.info("Fetching user information.")
 
             if token is None:
-                logging.error("Token is None.")
+                logger.error("Token is None.")
                 return None
         
             # Extract access token
             access_token = token.get("access_token")
             if not access_token:
-                logging.error("Access token is missing.")
+                logger.error("Access token is missing.")
                 return None
 
             # Correct Authorization Header
@@ -170,7 +172,7 @@ class Auth0Provider(AuthProvider):
             response = requests.get(user_info_url, headers=headers)
 
             if response.status_code == 200:
-                logging.debug("User information retrieved successfully.")
+                logger.debug("User information retrieved successfully.")
                 raw_data = response.json()
 
                 # Extract user metadata if present
@@ -188,11 +190,11 @@ class Auth0Provider(AuthProvider):
                 
                 return user_data
             else:
-                logging.warning(f"Failed to fetch user information: {response.status_code} {response.text}")
+                logger.warning(f"Failed to fetch user information: {response.status_code} {response.text}")
                 return None
 
         except requests.RequestException as e:
-            logging.error(f"Error while fetching user information: {e}")
+            logger.error(f"Error while fetching user information: {e}")
             return None
         
     def get_token(self) -> Optional[str]:
@@ -202,10 +204,10 @@ class Auth0Provider(AuthProvider):
         :return: Token string or None
         """
         try:
-            logging.info("Retrieving token from session.")
+            logger.info("Retrieving token from session.")
             return session.get('token', {}).get('access_token')
         except Exception as e:
-            logging.error(f"Error while retrieving token: {e}")
+            logger.error(f"Error while retrieving token: {e}")
             return None
 
     def handle_callback(self) -> Optional[str]:
@@ -215,7 +217,7 @@ class Auth0Provider(AuthProvider):
         :return: Access token string
         """
         try:
-            logging.info("Handling callback from Auth0.")
+            logger.info("Handling callback from Auth0.")
             assert self.oauth.auth0 is not None, "Auth0 provider is not registered."
             token = self.oauth.auth0.authorize_access_token()
             if 'access_token' not in token:
@@ -230,22 +232,22 @@ class Auth0Provider(AuthProvider):
 
                 # Ensure the algorithm is RS256 (not JWE)
                 if header.get('alg') != 'RS256':
-                    logging.error(f"Expected RS256 algorithm, but found {header.get('alg')}")
+                    logger.error(f"Expected RS256 algorithm, but found {header.get('alg')}")
                     raise ValueError("The token is not of type RS256.")
             except Exception as e:
-                logging.error(f"Error decoding the token header: {e}")
+                logger.error(f"Error decoding the token header: {e}")
                 raise ValueError("Invalid token format.")
 
             # Store the token in the session for later use
             session['token'] = token
             session["auth_method"] = "auth0"
             session.modified = True
-            logging.info("Access token retrieved and stored in session.")
+            logger.info("Access token retrieved and stored in session.")
             
             return token['access_token']
 
         except Exception as e:
-            logging.error(f"Error during callback handling: {e}")
+            logger.error(f"Error during callback handling: {e}")
             session.clear()  # Clear session in case of failure
             raise RuntimeError("Callback handling failed.") from e
         
@@ -261,7 +263,7 @@ class Auth0Provider(AuthProvider):
             unverified_header = jwt.get_unverified_header(token)
             
             if unverified_header is None:
-                logging.error("Invalid token header.")
+                logger.error("Invalid token header.")
                 return False
 
             # Step 2: Get the public key from Auth0's JWKS (JSON Web Key Set) endpoint with caching
@@ -304,14 +306,14 @@ class Auth0Provider(AuthProvider):
                             timeout=10
                         )
                         if response.status_code != 200:
-                            logging.error(f"Failed to fetch JWKS: {response.status_code}")
+                            logger.error(f"Failed to fetch JWKS: {response.status_code}")
                             return False
                         new_jwks = response.json()
                         with _jwks_cache_lock:
                             _jwks_cache = new_jwks
                             _jwks_cache_expiry = current_time + JWKS_CACHE_DURATION
                             cache_to_use = _jwks_cache
-                        logging.info("JWKS cache refreshed")
+                        logger.info("JWKS cache refreshed")
                     # Find the key in the cached JWKS that matches the 'kid' in the token header
                     assert cache_to_use is not None, "Cache is None"
                     for key in cache_to_use['keys']:
@@ -325,11 +327,11 @@ class Auth0Provider(AuthProvider):
                             }
                             break
                 except Exception as e:
-                    logging.error(f"Error getting public keys from Auth0: {e}")
+                    logger.error(f"Error getting public keys from Auth0: {e}")
                     return False
             
             if not rsa_key:
-                logging.error("No valid key found in JWKS for token verification.")
+                logger.error("No valid key found in JWKS for token verification.")
                 return False
 
             # Step 3: Verify the JWT token using the public key
@@ -345,20 +347,20 @@ class Auth0Provider(AuthProvider):
             if payload['exp'] > time.time():
                 return True
             else:
-                logging.error("Token is expired.")
+                logger.error("Token is expired.")
                 return False
 
         except ExpiredSignatureError:
-            logging.error("Token is expired.")
+            logger.error("Token is expired.")
             return False
         except JWTClaimsError:
-            logging.error("Invalid claims in token.")
+            logger.error("Invalid claims in token.")
             return False
         except JWTError as e:
-            logging.error(f"Error decoding token: {e}")
+            logger.error(f"Error decoding token: {e}")
             return False
         except Exception as e:
-            logging.error(f"Error during token validation: {e}")
+            logger.error(f"Error during token validation: {e}")
             return False
 
     def validate_user(self):
@@ -396,7 +398,7 @@ class Auth0Provider(AuthProvider):
                 try:
                     user = self._try_bootstrap_first_admin(user_info, auth0_id, email)
                 except Exception as e:
-                    logging.exception(f"Bootstrap administrator creation failed: {e}")
+                    logger.exception(f"Bootstrap administrator creation failed: {e}")
                     return None, (jsonify({"error": "Administrator bootstrap failed"}), 500)
                 if user is None:
                     return None, (jsonify({"error": "User not found"}), 404)
@@ -416,7 +418,7 @@ class Auth0Provider(AuthProvider):
             return user_data, None
 
         except Exception as e:
-            logging.exception(f"Error in validate_user: {e}")
+            logger.exception(f"Error in validate_user: {e}")
             return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
 
     def _try_bootstrap_first_admin(self, user_info: Dict[str, Any], auth0_id: Optional[str], email: str):
@@ -440,10 +442,10 @@ class Auth0Provider(AuthProvider):
         if User.query.count() > 0:
             return None
         if not user_info.get("email_verified"):
-            logging.warning("Bootstrap admin login rejected: Auth0 email is not verified.")
+            logger.warning("Bootstrap admin login rejected: Auth0 email is not verified.")
             return None
         if not email or email != bootstrap_email:
-            logging.warning("Bootstrap admin login rejected: email does not match MDV_BOOTSTRAP_ADMIN_EMAIL.")
+            logger.warning("Bootstrap admin login rejected: email does not match MDV_BOOTSTRAP_ADMIN_EMAIL.")
             return None
 
         user = User(
@@ -468,7 +470,7 @@ class Auth0Provider(AuthProvider):
         try:
             self._assign_admin_role(auth0_id)
         except Exception:
-            logging.exception(
+            logger.exception(
                 "Failed to assign the Auth0 'admin' role to the bootstrap administrator; rolling back."
             )
             db.session.delete(user)
@@ -484,14 +486,14 @@ class Auth0Provider(AuthProvider):
 
             granted = UserProjectService.grant_all_projects_to_admins()
             cache_user_projects()
-            logging.info(f"Granted the bootstrap administrator access to {granted} project(s).")
+            logger.info(f"Granted the bootstrap administrator access to {granted} project(s).")
         except Exception:
-            logging.exception(
+            logger.exception(
                 "Bootstrapped the first administrator but could not grant project access; "
                 "it can still be granted from Admin."
             )
 
-        logging.info(f"Bootstrapped first administrator: {email}")
+        logger.info(f"Bootstrapped first administrator: {email}")
         return user
 
     def _assign_admin_role(self, auth0_id: str) -> None:
@@ -595,7 +597,7 @@ class Auth0Provider(AuthProvider):
                     }
                     error_info = {k: v for k, v in error_info.items() if v is not None}
                     
-                    logging.error(
+                    logger.error(
                         f"Rate limit during role fetch for user {auth0_id} after {max_retries} retries: "
                         f"{error_info}. Skipping user."
                     )
@@ -603,14 +605,14 @@ class Auth0Provider(AuthProvider):
                 else:
                     # Calculate exponential backoff delay with jitter
                     delay = min(BASE_DELAY * (2 ** retry_count) + random.uniform(0, 1), MAX_DELAY)
-                    logging.warning(
+                    logger.warning(
                         f"Rate limit during role fetch for user {auth0_id}. "
                         f"Retrying in {delay:.2f} seconds... (Attempt {retry_count}/{max_retries})"
                     )
                     time.sleep(delay)
             except Exception as e:
                 # Non-rate-limit error
-                logging.error(f"Error fetching roles for user {auth0_id}: {str(e)}")
+                logger.error(f"Error fetching roles for user {auth0_id}: {str(e)}")
                 return None
         
         return roles if success else None
@@ -636,7 +638,7 @@ class Auth0Provider(AuthProvider):
         email = user.get('email', '')
         auth0_id = user.get('user_id')
         if not auth0_id:
-            logging.error(f"User '{email}' has no user_id, skipping")
+            logger.error(f"User '{email}' has no user_id, skipping")
             return False
         
         # Check if user already exists to track new vs updated
@@ -668,7 +670,7 @@ class Auth0Provider(AuthProvider):
             db.session.commit()
         except Exception as e:
             db.session.rollback()
-            logging.error(f"Error updating user {auth0_id} admin status: {e}")
+            logger.error(f"Error updating user {auth0_id} admin status: {e}")
             return False
                 
         if is_admin:
@@ -681,7 +683,7 @@ class Auth0Provider(AuthProvider):
                         is_owner=True
                     )
                 except Exception as e:
-                    logging.error(f"Error assigning project {project.name} to user {auth0_id}: {e}")
+                    logger.error(f"Error assigning project {project.name} to user {auth0_id}: {e}")
                     return False
         # Update context stats
         if is_admin and not was_admin:
@@ -727,11 +729,11 @@ class Auth0Provider(AuthProvider):
         # Filter out None values for cleaner output
         error_info = {k: v for k, v in error_info.items() if v is not None}
         
-        logging.error(f"Rate limit during pagination: {error_info}")
+        logger.error(f"Rate limit during pagination: {error_info}")
         
         # Check if we've exceeded max retries
         if new_count >= context.max_pagination_rate_limit_retries:
-            logging.error(
+            logger.error(
                 f"Aborting: {new_count} consecutive rate limit errors "
                 f"(max: {context.max_pagination_rate_limit_retries}). Processed {context.processed_users} users."
             )
@@ -740,7 +742,7 @@ class Auth0Provider(AuthProvider):
                 f"concurrent execution, or insufficient delays between requests."
             ) from e
         
-        logging.warning(
+        logger.warning(
             f"Rate limit hit ({new_count}/{context.max_pagination_rate_limit_retries}). "
             f"Possible issues: frequent calls, concurrent execution, batch size ({context.per_page}), "
             f"or insufficient delays (1s pages, {context.user_processing_delay}s roles). Retrying in {context.pagination_retry_delay}s..."
@@ -759,7 +761,7 @@ class Auth0Provider(AuthProvider):
         final_user_count = User.query.count()
         final_admin_count = User.query.filter_by(is_admin=True).count()
         
-        logging.info(
+        logger.info(
             f"User sync completed. Database: {final_user_count} total users "
             f"({final_user_count - initial_user_count:+d}), "
             f"{final_admin_count} admin users ({final_admin_count - initial_admin_count:+d})"
@@ -801,7 +803,7 @@ class Auth0Provider(AuthProvider):
             from mdvtools.dbutils.dbmodels import User
             initial_user_count = User.query.count()
             initial_admin_count = User.query.filter_by(is_admin=True).count()
-            logging.info(
+            logger.info(
                 f"Starting user sync. Database stats: {initial_user_count} total users, "
                 f"{initial_admin_count} admin users"
             )
@@ -831,7 +833,7 @@ class Auth0Provider(AuthProvider):
                     # Auth0 returns an empty list when there are no more users to fetch
                     user_list = users.get('users', [])
                     if not user_list:
-                        logging.info(f"Reached end of pagination at page {sync_context.page} (empty user list returned)")
+                        logger.info(f"Reached end of pagination at page {sync_context.page} (empty user list returned)")
                         break
                     
                     # Process users on this page
@@ -840,12 +842,12 @@ class Auth0Provider(AuthProvider):
                         try:
                             success = self._process_single_user(user, sync_context)
                         except Exception as e:
-                            logging.error(f"Error processing user '{user.get('email', '')}': {e}")
+                            logger.error(f"Error processing user '{user.get('email', '')}': {e}")
                         
                         if success:
                             # Log progress every 10 users
                             if sync_context.processed_users % 10 == 0:
-                                logging.info(
+                                logger.info(
                                     f"Progress: {sync_context.processed_users} processed "
                                     f"({sync_context.new_users} new, {sync_context.updated_users} updated, "
                                     f"{sync_context.admin_users_synced} admins)"
@@ -853,7 +855,7 @@ class Auth0Provider(AuthProvider):
                     
                     # Check if we got fewer users than requested (indicates last page)
                     if len(user_list) < sync_context.per_page:
-                        logging.info(
+                        logger.info(
                             f"Reached end of pagination at page {sync_context.page} "
                             f"(got {len(user_list)} users, less than requested {sync_context.per_page})"
                         )
@@ -871,7 +873,7 @@ class Auth0Provider(AuthProvider):
                     continue
                 
             # Log final statistics
-            logging.info(
+            logger.info(
                 f"User sync completed. Stats: {sync_context.processed_users} processed "
                 f"({sync_context.new_users} new, {sync_context.updated_users} updated, "
                 f"{sync_context.admin_users_synced} admins synced)."
@@ -879,5 +881,5 @@ class Auth0Provider(AuthProvider):
             self._log_sync_statistics(initial_user_count, initial_admin_count)
 
         except Exception as e:
-            logging.exception(f"In sync_users_to_db: An unexpected error occurred: {e}")
+            logger.exception(f"In sync_users_to_db: An unexpected error occurred: {e}")
             raise

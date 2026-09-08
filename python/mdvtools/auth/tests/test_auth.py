@@ -207,7 +207,7 @@ class TestAuth0ProviderSync:
                     domain="test.auth0.com"
                 )
                 
-                with patch('mdvtools.auth.auth0_provider.logging') as mock_logging:
+                with patch('mdvtools.auth.auth0_provider.logger'):
                     with patch('mdvtools.auth.auth0_provider.time.sleep'):  # Speed up test
                         provider.sync_users_to_db()
         
@@ -260,7 +260,7 @@ class TestAuth0ProviderSync:
                     domain="test.auth0.com"
                 )
                 
-                with patch('mdvtools.auth.auth0_provider.logging'):
+                with patch('mdvtools.auth.auth0_provider.logger'):
                     with patch('mdvtools.auth.auth0_provider.time.sleep'):  # Speed up test
                         provider.sync_users_to_db()
         
@@ -304,7 +304,7 @@ class TestAuth0ProviderSync:
                     domain="test.auth0.com"
                 )
                 
-                with patch('mdvtools.auth.auth0_provider.logging'):
+                with patch('mdvtools.auth.auth0_provider.logger'):
                     with patch('mdvtools.auth.auth0_provider.time.sleep'):  # Speed up test
                         provider.sync_users_to_db()
         
@@ -336,7 +336,7 @@ class TestAuth0ProviderSync:
                     domain="test.auth0.com"
                 )
                 
-                with patch('mdvtools.auth.auth0_provider.logging') as mock_logging:
+                with patch('mdvtools.auth.auth0_provider.logger'):
                     provider.sync_users_to_db()
         
         # Verify: handled gracefully
@@ -377,7 +377,7 @@ class TestAuth0ProviderSync:
                     domain="test.auth0.com"
                 )
                 
-                with patch('mdvtools.auth.auth0_provider.logging') as mock_logging:
+                with patch('mdvtools.auth.auth0_provider.logger'):
                     with patch('mdvtools.auth.auth0_provider.time.sleep'):  # Speed up test
                         provider.sync_users_to_db()
         
