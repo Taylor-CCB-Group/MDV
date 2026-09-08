@@ -190,7 +190,7 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
                     target: "_blank",
                     href: url,
                 },
-                document.body,
+                this.__doc__.body,
             );
             save.click();
             save.remove();
@@ -310,6 +310,7 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
             }),
         ];
     }
+
 }
 
 BaseChart.types["table_chart_react"] = {
