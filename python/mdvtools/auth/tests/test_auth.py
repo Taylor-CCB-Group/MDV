@@ -447,7 +447,10 @@ class TestValidateUserBootstrapAndActivation:
         user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
 
         with patch('mdvtools.auth.auth0_provider.GetToken') as mock_get_token, \
-             patch('mdvtools.auth.auth0_provider.Auth0') as mock_auth0_class:
+             patch('mdvtools.auth.auth0_provider.Auth0') as mock_auth0_class, \
+             patch('mdvtools.dbutils.dbservice.UserProjectService.grant_all_projects_to_admins',
+                   return_value=3) as mock_grant, \
+             patch('mdvtools.auth.authutils.cache_user_projects') as mock_cache:
             mock_get_token.return_value.client_credentials.return_value = {"access_token": "mgmt-token"}
             mock_auth0 = MagicMock()
             mock_auth0.roles.list.return_value = {"roles": [{"id": "role_admin", "name": "admin"}]}
@@ -459,6 +462,9 @@ class TestValidateUserBootstrapAndActivation:
 
         assert error is None
         assert result == {"id": 99, "auth_id": "auth0|new-admin", "email": "admin@example.com", "is_admin": True}
+        # Without this the first administrator logs in to an empty project list.
+        mock_grant.assert_called_once()
+        mock_cache.assert_called_once()
         mock_user_class.assert_called_once_with(
             email="admin@example.com",
             auth_id="auth0|new-admin",
@@ -470,6 +476,30 @@ class TestValidateUserBootstrapAndActivation:
         )
         mock_db.session.add.assert_called_once_with(new_user)
         mock_auth0.users.add_roles.assert_called_once_with("auth0|new-admin", ["role_admin"])
+
+    def test_bootstrap_still_logs_in_when_project_grant_fails(self, bootstrap_app, provider):
+        """Failing to grant projects must not block login. The administrator exists and
+        holds the Auth0 role; access can still be granted from Admin afterwards."""
+        user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
+
+        with patch('mdvtools.auth.auth0_provider.GetToken') as mock_get_token, \
+             patch('mdvtools.auth.auth0_provider.Auth0') as mock_auth0_class, \
+             patch('mdvtools.dbutils.dbservice.UserProjectService.grant_all_projects_to_admins',
+                   side_effect=Exception("database unavailable")), \
+             patch('mdvtools.auth.authutils.cache_user_projects'):
+            mock_get_token.return_value.client_credentials.return_value = {"access_token": "mgmt-token"}
+            mock_auth0 = MagicMock()
+            mock_auth0.roles.list.return_value = {"roles": [{"id": "role_admin", "name": "admin"}]}
+            mock_auth0_class.return_value = mock_auth0
+
+            result, error, _mock_user_class, mock_db, _new_user = self._run_validate_user(
+                bootstrap_app, provider, user_info, existing_user_side_effect=[None]
+            )
+
+        assert error is None
+        assert result["is_admin"] is True
+        # Unlike a role-assignment failure, the administrator is kept.
+        mock_db.session.delete.assert_not_called()
 
     def test_bootstrap_rejects_nonmatching_email(self, bootstrap_app, provider):
         user_info = {"sub": "auth0|someone-else", "email": "someone@else.com", "email_verified": True}

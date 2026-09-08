@@ -475,6 +475,22 @@ class Auth0Provider(AuthProvider):
             db.session.commit()
             raise
 
+        # Administrators own every project, but only the Auth0 sync and a project
+        # rescan write those grants, and neither has run on a fresh deployment.
+        # Without this the first administrator logs in to an empty project list.
+        try:
+            from mdvtools.dbutils.dbservice import UserProjectService
+            from mdvtools.auth.authutils import cache_user_projects
+
+            granted = UserProjectService.grant_all_projects_to_admins()
+            cache_user_projects()
+            logging.info(f"Granted the bootstrap administrator access to {granted} project(s).")
+        except Exception:
+            logging.exception(
+                "Bootstrapped the first administrator but could not grant project access; "
+                "it can still be granted from Admin."
+            )
+
         logging.info(f"Bootstrapped first administrator: {email}")
         return user
 
