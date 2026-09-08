@@ -274,9 +274,13 @@ what the rescan admin permissions change does automatically.
 
 ## Two deployments sharing one project directory
 
-This is the Workbench shape: separate applications, separate databases, one set of
-files reached by mount or bucket sync. Each catalog assigns its own Project ID to
-the same directory, and that is intended.
+Separate applications, separate databases, one set of files reached by a shared
+filesystem or by bucket sync. Each catalog assigns its own Project ID to the same
+directory, and that is intended.
+
+Workbench is this shape and reaches the files by bucket sync. The mount available
+there is gcsfuse, which MDV's storage layer cannot run on, so the files are copied
+to each instance's local disk rather than read in place.
 
 ```mermaid
 flowchart TB
