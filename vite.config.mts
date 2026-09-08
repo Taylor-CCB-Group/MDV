@@ -139,6 +139,11 @@ function copySpatialdataParquetWasm(): Plugin {
 // (not in the code using zarrita, but in unrelated worker modules)
 // import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
+// version number for the main entry point  in production build,
+// will be added to mdv js and css files and can be used for cache busting. 
+ const version =process.env.mdv_version ? "-" + process.env.mdv_version : "";
+
+
 const flaskURL = "http://127.0.0.1:5055";
 const port = Number(process.env.PORT || process.env.VITE_PORT || 5170);
 const build = (process.env.build || "desktop_pt") as "production" | "dev_pt" | "desktop" | "desktop_pt";
@@ -159,6 +164,10 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
     const name = assetInfo.name ?? "";
     // project_bootstrap / desktop_index import ./all_css → emitted as all_css.css
     if (name.includes("index.css") || name === "all_css.css" || name === "mdv.css" || name === "desktop_index.css") {
+        // in production build, add version to mdv.css for cache busting
+        if (build  === "production"){
+            return `assets/mdv${version}.css`;
+        }
         return "assets/mdv.css";
     }
     if (name === "catalog.css") return "assets/catalog.css";
@@ -180,8 +189,8 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
  * other methods are supposed to be for replacing other webpack configs.
  */
 function getRollupOptions() {
-    if (build === "production") {
-        const version = process.env.mdv_version ? "-" + process.env.mdv_version : "";
+    if (build === 'production') {
+
 
         // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {

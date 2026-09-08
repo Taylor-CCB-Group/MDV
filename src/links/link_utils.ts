@@ -426,21 +426,37 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
     if (!isColumnLoaded(nameCol)) {
         throw new Error(`Column ${link.name_column} not loaded`);
     }
+    const loadedNameCol = nameCol;
+
+    /**
+     * Shared helper to get the name_column value for a given row index.
+     * Returns the full unstripped value (e.g., `source#id` for unique columns),
+     * matching what `RAColumn.name` uses via `tds.getRowText()`.
+     */
+    function getNameColumnValue(rowIndex: number): string {
+        return tds.getRowText(rowIndex, link.name_column) as string;
+    }
+
+    function getValueToRowIndex() {
+        const valueToRowIndex = new Map<string, number>();
+        // Build the map by iterating all rows and using the shared helper,
+        // ensuring keys match what RAColumn.name / rowValueOk will use.
+        for (let rowIndex = 0; rowIndex < tds.size; rowIndex++) {
+            const value = getNameColumnValue(rowIndex);
+            if (valueToRowIndex.has(value)) {
+                console.warn(`Multiple rows with the same value '${value}' in column '${link.name_column}'`);
+                // Last occurrence wins (overwrite) - preserves existing behavior from non-unique branch
+            }
+            valueToRowIndex.set(value, rowIndex);
+        }
+        return valueToRowIndex;
+    }
 
     // we should also add a data structure mapping each name_column value (string) to the index of the corresponding row
-    // which seems to assume a 1:1 mapping between name_column values and rows? Or not? 
+    // which seems to assume a 1:1 mapping between name_column values and rows? Or not?
     // While we're here, check for anything that may be inconsistent with our assumptions.
     // Maybe we can have a lot of rows with the same name_column value, returning equivalent rows_as_columns data?
-    const valueToRowIndex = new Map<string, number>();
-    //! this is O(n) when we shouldn't need it...
-    nameCol.data.forEach((valueIndex, rowIndex) => {
-        const value = nameCol.values[valueIndex];
-        if (valueToRowIndex.has(value)) {
-            console.warn(`Multiple rows with the same value '${value}' in column '${link.name_column}'`);
-        }
-        valueToRowIndex.set(value, rowIndex);
-    });
-    link.valueToRowIndex = valueToRowIndex;
+    link.valueToRowIndex = getValueToRowIndex();
     // `IRowAsColumn.fieldName` / `.column` default to the first subgroup for backward compatibility;
     // consumers that care about another subgroup use `fieldNameForSubgroup` / `columnForSubgroup`.
     const firstSubgroupKey = Object.keys(link.subgroups)[0] ?? "";
@@ -455,8 +471,7 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
         constructor(public index: number) {}
         @computed
         get name() {
-            // if I don't have `as string` here, it's inferred as string | number
-            return tds.getRowText(this.index, link.name_column) as string;
+            return getNameColumnValue(this.index);
         }
         fieldNameForSubgroup(subgroupKey: string): FieldName {
             return getFieldName(subgroupKey, this.name, this.index);
