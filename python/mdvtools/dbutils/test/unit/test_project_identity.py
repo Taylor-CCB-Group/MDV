@@ -10,6 +10,7 @@ from flask import Flask
 
 from mdvtools.dbutils.dbmodels import Project, db
 from mdvtools.dbutils.dbservice import ProjectService
+from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
 from mdvtools.file_processing import mdv_project_processing
 from mdvtools.project_router import ProjectBlueprint
@@ -55,6 +56,15 @@ def retire_one_project_id(tmp_path):
     purged, message = ProjectService.purge_deleted_project(retired_id)
     assert purged, message
     return retired_id
+
+
+def write_project_directory(path):
+    """Write the files a directory needs to be recognised as an MDV project."""
+    path.mkdir()
+    (path / "datasources.json").write_text(json.dumps([]))
+    (path / "views.json").write_text(json.dumps({}))
+    (path / "state.json").write_text(json.dumps({"all_views": [], "permission": "edit"}))
+    return path
 
 
 def mdv_project_archive():
@@ -172,3 +182,26 @@ def test_uploaded_project_registers_the_route_under_the_assigned_id(app, tmp_pat
         project = db.session.get(Project, assigned_id)
         assert project is not None
         assert os.path.basename(project.path) != str(assigned_id)
+
+
+def test_rescan_serves_discovered_directories_under_their_assigned_ids(app, tmp_path):
+    """A rescan gives each discovered directory the ID the database assigns and
+    keeps the directory where it found it."""
+    with app.app_context():
+        retire_one_project_id(tmp_path)
+        first = write_project_directory(tmp_path / "first-on-disk")
+        second = write_project_directory(tmp_path / "second-on-disk")
+
+        created_ids = serve_projects_from_filesystem(app, str(tmp_path))
+
+    assert len(created_ids) == 2
+    assert len(set(created_ids)) == 2
+
+    with app.app_context():
+        paths = set()
+        for assigned_id in created_ids:
+            assert str(assigned_id) in ProjectBlueprint.blueprints
+            project = db.session.get(Project, assigned_id)
+            assert project is not None
+            paths.add(project.path)
+        assert paths == {str(first), str(second)}

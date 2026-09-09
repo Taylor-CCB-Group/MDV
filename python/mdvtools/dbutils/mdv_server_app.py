@@ -483,64 +483,32 @@ def serve_projects_from_filesystem(app, base_dir):
                 try:
                     project_name = os.path.basename(project_path)
 
-                    # Get the next ID from the database
-                    next_id = db.session.query(db.func.max(Project.id)).scalar()
-                    if next_id is None:
-                        next_id = 1
-                    else:
-                        next_id += 1
+                    # Create a new Project record in the database with the default name.
+                    # The database assigns the Project ID; the directory keeps the name
+                    # it was discovered under.
+                    new_project = ProjectService.add_new_project(name=project_name, path=project_path)
+                    if new_project is None:
+                        raise ValueError(f"Failed to add project '{project_name}' to the database.")
 
-                    p = MDVProject(dir=project_path, id= str(next_id), backend_db= True)
-                    # Respect existing state.json permission if present; default to editable when unspecified
+                    p = MDVProject(dir=project_path, id=str(new_project.id), backend_db= True)
+                    # No row existed for this directory, so state.json is the only record
+                    # of the permission it was last served with. Default to editable when
+                    # unspecified.
                     try:
                         state = p.state or {}
                         perm = (state.get('permission') or '').lower()
                         is_editable = True if perm == 'edit' else False if perm == 'view' else True
-                        p.set_editable(is_editable)
+                        new_project.access_level = 'editable' if is_editable else 'read-only'
                     except Exception:
-                        p.set_editable(True)
-                    p.serve(options=options) 
+                        is_editable = True
+                    p.set_editable(is_editable)
+                    p.serve(options=options)
                     logger.info(f"Serving project: {project_path}")
 
-                    # Create a new Project record in the database with the default name
-                    new_project = ProjectService.add_new_project(name=project_name, path=project_path)
-                    if new_project is None:
-                        raise ValueError(f"Failed to add project '{project_name}' to the database.")
-                    
-                    logger.info(f"Added project to DB: {new_project}")
+                    db.session.commit()
+                    logger.info(f"Added project {new_project.id} to DB from {project_path}")
                     created_project_ids.append(new_project.id)
-                    # One-time sync: initialize DB access_level from state.json.permission
-                    try:
-                        state = p.state or {}
-                        perm = (state.get('permission') or '').lower()
-                        desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
-                        if desired_level is not None:
-                            ProjectService.change_project_access(new_project.id, desired_level)
-                    except Exception:
-                        pass
 
-                    # Rename directory to use project ID as folder name
-                    """
-                    project_id_str = str(new_project.id)
-                    desired_path = os.path.join(app.config["projects_base_dir"], project_id_str)
-
-                    if project_path != desired_path:
-                        try:
-                            # Rename the directory
-                            os.rename(project_path, desired_path)
-                            logger.info(f"Renamed project folder from {project_path} to {desired_path}")
-
-                            # Update project path in DB
-                            new_project.path = desired_path
-                            db.session.commit()
-                            logger.info(f"Updated project path in DB for project ID {new_project.id}")
-
-                            # Also update local reference for downstream operations (like file sync)
-                            project_path = desired_path
-
-                        except Exception as rename_error:
-                            logger.exception(f"Failed to rename project directory or update DB for project ID {new_project.id}: {rename_error}")
-                    """
                     # Auth-related setup
                     if ENABLE_AUTH:
                         try:
@@ -572,6 +540,9 @@ def serve_projects_from_filesystem(app, base_dir):
                         logger.info("Skipping file sync for new project %s (ENABLE_FILE_SYNC disabled)", new_project.id)
                 except Exception as e:
                     logger.exception(f"In serve_projects_from_filesystem: Error creating/serving project at path '{project_path}': {e}")
+                    # Discard this project's pending row so the next iteration's
+                    # commit does not persist it.
+                    db.session.rollback()
                     failed_project_paths.append(project_path)
                     # continue to next project_path without raising
             else:
