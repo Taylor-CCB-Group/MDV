@@ -11,6 +11,7 @@ from flask import Flask
 from mdvtools.dbutils.dbmodels import Project, db
 from mdvtools.dbutils.dbservice import ProjectService
 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
+from mdvtools.file_processing import mdv_project_processing
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.websocket import mdv_socketio
 
@@ -151,3 +152,23 @@ def test_import_project_registers_the_route_under_the_assigned_id(app, tmp_path)
         assert project is not None
         assert os.path.basename(project.path) != str(assigned_id)
         assert os.path.exists(os.path.join(project.path, "datasources.json"))
+
+
+def test_uploaded_project_registers_the_route_under_the_assigned_id(app, tmp_path):
+    """An uploaded archive is served on the ID the database gave it, and the row
+    survives the app context the upload was processed in."""
+    archive_path = tmp_path / "upload.zip"
+    archive_path.write_bytes(mdv_project_archive().getvalue())
+
+    with app.app_context():
+        retired_id = retire_one_project_id(tmp_path)
+
+        result = mdv_project_processing(app, str(tmp_path), str(archive_path), "upload.zip")
+        assigned_id = result["project_id"]
+        assert assigned_id != retired_id
+
+    with app.app_context():
+        assert str(assigned_id) in ProjectBlueprint.blueprints
+        project = db.session.get(Project, assigned_id)
+        assert project is not None
+        assert os.path.basename(project.path) != str(assigned_id)
