@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request, send_file, Response
 from typing import Union, Tuple
 import os
 import shutil
+import uuid
 import zipfile
 import io
 import tempfile
@@ -9,7 +10,7 @@ from mdvtools.server_extension import MDVProjectServerExtension
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprintProtocol
 from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
-from mdvtools.dbutils.dbmodels import User
+from mdvtools.dbutils.dbmodels import User, db
 from mdvtools.dbutils.project_manager_service import (
     get_current_user_id,
     refresh_auth_cache,
@@ -60,33 +61,31 @@ class ProjectManagerExtension(MDVProjectServerExtension):
             Creates a new project and updates the caches and database accordingly.
             """
             project_path = None
-            next_id = None
+            assigned_id = None
             try:
-                
-                logger.info("Creating project")
-                
-                # Get the next available ID
-                next_id = ProjectService.get_next_project_id()
-                if next_id is None:
-                    logger.error("In register_routes: Error- Failed to determine next project ID from db")
-                    return jsonify({"error": "Failed to determine next project ID from db"}), 500
 
-                # Create the project directory path
-                project_path = os.path.join(app.config['projects_base_dir'], str(next_id))
+                logger.info("Creating project")
+
+                # The directory name is opaque. The Project ID is assigned by the
+                # database below and never appears on disk.
+                project_path = os.path.join(app.config['projects_base_dir'], uuid.uuid4().hex)
+
+                # Insert first so the database assigns the Project ID. Everything
+                # downstream uses that value, and the commit happens once the
+                # project is serving.
+                logger.info("Adding new project to the database")
+                new_project = ProjectService.add_new_project(path=project_path)
+                assigned_id = str(new_project.id)
 
                 # Create and serve the MDVProject
                 try:
                     logger.info("Creating and serving the new project")
-                    p = MDVProject(project_path, backend_db= True)
+                    p = MDVProject(project_path, id=assigned_id, backend_db= True)
                     p.set_editable(True)
                     p.serve(app=app, open_browser=False, backend_db=True)
                 except Exception as e:
                     logger.exception(f"In register_routes: Error serving MDVProject: {e}")
-                    return jsonify({"error": "Failed to serve MDVProject"}), 500
-                    
-                # Create a new Project record in the database with the path
-                logger.info("Adding new project to the database")
-                new_project = ProjectService.add_new_project(path=project_path)
+                    raise
 
                 if new_project:
                     # Step 5: Associate the admin user with the new project and grant all permissions
@@ -125,6 +124,9 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                             }
                         )
                         
+                    db.session.commit()
+                    logger.info(f"Created project {new_project.id} in {project_path}")
+
                     # Return the new project info
                     return jsonify({
                         "id": new_project.id,
@@ -138,6 +140,8 @@ class ProjectManagerExtension(MDVProjectServerExtension):
             except Exception as e:
                 logger.error(f"In register_routes - /create_project : Error creating project: {e}")
                 logger.info("started rollabck")
+                db.session.rollback()
+
                 # Rollback: Clean up the projects filesystem directory if it was created
                 if project_path and os.path.exists(project_path):
                     try:
@@ -147,10 +151,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         logger.exception(f"In register_routes -/create_project : Error during rollback cleanup: {cleanup_error}")
 
                 # Optional: Remove project routes from Flask app if needed
-                if next_id is not None and str(next_id) in ProjectBlueprint.blueprints:
-                    del ProjectBlueprint.blueprints[str(next_id)]
+                if assigned_id is not None and assigned_id in ProjectBlueprint.blueprints:
+                    del ProjectBlueprint.blueprints[assigned_id]
                     logger.info("In register_routes -/create_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
-                
+
                 return jsonify({"error": str(e)}), 500
 
         logger.info("Route registered: /create_project")
