@@ -892,6 +892,36 @@ class UserProjectService:
             raise
 
     @staticmethod
+    def grant_all_projects_to_admins():
+        """
+        Give every administrator owner access to every project.
+
+        MDV treats administrators as owners of all projects, but those grants are
+        only written in particular places - the Auth0 user sync, and a project
+        rescan. Anything that creates an administrator or discovers projects
+        outside those paths leaves the grants missing, and the administrator sees
+        an empty project list. Call this from those places rather than repeating
+        the loop.
+
+        Safe to call repeatedly: existing grants are updated in place.
+
+        Returns:
+            int: The number of user-project grants written.
+        """
+        admin_ids = [admin.id for admin in User.query.filter_by(is_admin=True).all()]
+        project_ids = [project.id for project in Project.query.all()]
+
+        for user_id in admin_ids:
+            for project_id in project_ids:
+                UserProjectService.add_or_update_user_project(
+                    user_id=user_id,
+                    project_id=project_id,
+                    is_owner=True,
+                )
+
+        return len(admin_ids) * len(project_ids)
+
+    @staticmethod
     def get_user_project_permissions(user_id: int, project_id: int) -> dict:
         """
         Get the permission information for a user-project relationship.

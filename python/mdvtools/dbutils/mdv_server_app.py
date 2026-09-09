@@ -19,7 +19,11 @@ from mdvtools.auth.authutils import register_before_request_auth, get_auth_provi
 from mdvtools.dbutils.dbservice import ProjectService, FileService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
-from mdvtools.dbutils.server_options import get_server_options_for_db_projects
+from mdvtools.dbutils.server_options import (
+    get_server_options_for_db_projects,
+    register_global_routes_for_extensions,
+)
+from mdvtools.server_extension import ExtensionError
 #this shouldn't be necessary in future
 from psycogreen.gevent import patch_psycopg
 patch_psycopg()
@@ -139,16 +143,15 @@ def create_flask_app(config_name=None):
         logger.exception(f"Error registering routes: {e}")
         raise e
 
-    # Register global routes from extensions
+    # Resolve configured built-in and installed extensions once, then register
+    # their app-wide routes through the existing extension lifecycle.
     try:
         logger.info("Registering global routes from extensions")
-        from mdvtools.dbutils.server_options import get_server_options_for_db_projects
-        options = get_server_options_for_db_projects(app)
-        
-        for extension in options.extensions:
-            if hasattr(extension, 'register_global_routes'):
-                logger.info(f"Registering global routes for extension: {extension.__class__.__name__}")
-                extension.register_global_routes(app, app.config)
+        active_extensions = register_global_routes_for_extensions(app)
+        logger.info(
+            "Registered extensions: %s",
+            list(active_extensions),
+        )
     except Exception as e:
         logger.exception(f"Error registering global routes from extensions: {e}")
         raise e
@@ -336,6 +339,10 @@ def load_config(app, config_name=None, enable_auth=False):
                     app.config["AUTH0_PUBLIC_KEY_URI"] = os.getenv('AUTH0_PUBLIC_KEY_URI') or config.get('AUTH0_PUBLIC_KEY_URI')
                     app.config["AUTH0_AUDIENCE"] = os.getenv('AUTH0_AUDIENCE') or config.get('AUTH0_AUDIENCE')
                     app.config["AUTH0_DB_CONNECTION"] = os.getenv('AUTH0_DB_CONNECTION') or config.get('AUTH0_DB_CONNECTION')
+                    # Optional: while the local database has zero users, a verified Auth0
+                    # identity matching this email may bootstrap as the first administrator.
+                    # Leave unset once bootstrap is no longer needed for this deployment.
+                    app.config["MDV_BOOTSTRAP_ADMIN_EMAIL"] = os.getenv('MDV_BOOTSTRAP_ADMIN_EMAIL') or config.get('MDV_BOOTSTRAP_ADMIN_EMAIL')
                 
                 app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
                 app.config["SHIBBOLETH_LOGIN_URL"] = os.getenv('SHIBBOLETH_LOGIN_URL') or config.get('SHIBBOLETH_LOGIN_URL')
@@ -597,6 +604,9 @@ try:
         serve_projects_from_db(app)
         logger.info("Starting - create_projects_from_filesystem")
         serve_projects_from_filesystem(app, app.config['projects_base_dir'])
+except ExtensionError as e:
+    logger.exception(f"Error during app initialization: {e}")
+    raise
 except Exception as e:
     logger.exception(f"Error during app initialization: {e}")
 

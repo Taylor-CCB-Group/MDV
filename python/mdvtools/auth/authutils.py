@@ -1,4 +1,6 @@
-from flask import session, request,redirect, current_app, has_request_context
+from functools import wraps
+
+from flask import abort, current_app, has_request_context, redirect, request, session
 from mdvtools.logging_config import get_logger
 
 # Setup logging
@@ -169,6 +171,25 @@ def register_before_request_auth(app):
 
         return None
 
+
+def admin_required(view):
+    """Allow a route in development, or require MDV's authenticated admin identity."""
+
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not current_app.config.get("ENABLE_AUTH", False):
+            return view(*args, **kwargs)
+
+        user = session.get("user")
+        if not user:
+            redirect_uri = current_app.config.get("LOGIN_REDIRECT_URL", "/login_dev")
+            return redirect(redirect_uri)
+        if not user.get("is_admin", False):
+            abort(403)
+        return view(*args, **kwargs)
+
+    return wrapped
+
 def needs_cache_refresh():
     """Check if cache needs to be refreshed based on time interval."""
     import time
@@ -288,6 +309,5 @@ def update_cache(user_id=None, project_id=None, user_data=None, project_data=Non
     
     except Exception as e:
         logger.exception(f"Error updating cache: {e}")
-
 
 

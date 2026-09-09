@@ -90,13 +90,16 @@ def register_routes(app, ENABLE_AUTH):
             """
             try:
                 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
+                from mdvtools.dbutils.server_options import get_active_extension
 
                 # Determine if project_manager is enabled in config.json
                 enabled_extensions = app.config.get('extensions', []) or []
                 pm_enabled = 'project_manager' in enabled_extensions
 
                 # Get the canonical set of keys from the extension, then override values
-                pm = ProjectManagerExtension()
+                pm = get_active_extension(app, "project_manager")
+                if pm is None:
+                    pm = ProjectManagerExtension()
                 ext_any: Any = pm
                 pm_config_true = ext_any.get_session_config()  # type: ignore[attr-defined]
 
@@ -258,4 +261,3 @@ def register_routes(app, ENABLE_AUTH):
     except Exception as e:
         logger.exception(f"Error registering routes: {e}")
         raise  # Re-raise to be handled by the parent function
-
