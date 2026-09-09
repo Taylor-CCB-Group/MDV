@@ -161,20 +161,24 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
         @app.route("/import_project", methods=["POST"])
         def import_project() -> Union[Response, Tuple[Response, int]]:
+            project_path = None
+            assigned_id = None
             try:
                 # Check if the request contains a file
                 if 'file' not in request.files:
                     logger.error("In register_routes /import_project: Error - No project archive provided")
                     return jsonify({"error": "No project archive provided"}), 400
-                
+
                 project_file = request.files['file']
                 project_name = request.form.get('name')
 
-                # Get next available project ID
-                next_id = ProjectService.get_next_project_id()
-                project_path = os.path.join(app.config['projects_base_dir'], str(next_id))
-                os.makedirs(project_path, exist_ok=True)
-                
+                # The directory name is opaque. The Project ID is assigned by the
+                # database once the files are in place. Without exist_ok, a name
+                # that is somehow already taken fails rather than extracting the
+                # archive over another project.
+                project_path = os.path.join(app.config['projects_base_dir'], uuid.uuid4().hex)
+                os.makedirs(project_path)
+
                 file_stream = io.BytesIO(project_file.read())
 
                 with zipfile.ZipFile(file_stream) as zf:
@@ -207,8 +211,15 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         shutil.move(os.path.join(subdir, item), project_path)
                     os.rmdir(subdir)
                 
-                # # Create a new MDV project out of the new path and files copied
-                p = MDVProject(project_path, backend_db=True)
+                # Initialize the project and register it using project name if valid
+                if project_name is not None:
+                    new_project = ProjectService.add_new_project(path=project_path, name=project_name)
+                else:
+                    new_project = ProjectService.add_new_project(path=project_path)
+                assigned_id = str(new_project.id)
+
+                # Create a new MDV project out of the new path and files copied
+                p = MDVProject(project_path, id=assigned_id, backend_db=True)
                 # Respect permission in imported state.json, default to non-editable if unspecified
                 try:
                     state = p.state or {}
@@ -218,14 +229,6 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 except Exception:
                     p.set_editable(False)
                 p.serve(app=app, open_browser=False, backend_db=True)
-                
-
-                
-                # Initialize the project and register it using project name if valid
-                if project_name is not None:
-                    new_project = ProjectService.add_new_project(path=project_path, name=project_name)
-                else:
-                    new_project = ProjectService.add_new_project(path=project_path)
 
                 if new_project:
                     if ENABLE_AUTH:
@@ -262,6 +265,9 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                                 "owners": [owner_email]
                             }
                         )
+                db.session.commit()
+                logger.info(f"Imported project {new_project.id} into {project_path}")
+
                 # Return the new project id and name
                 logger.info("Import successfull. Returning the success response.")
                 return jsonify({
@@ -269,14 +275,12 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     "name": new_project.name,
                     "status": "success"
                 })
-                
+
             except Exception as e:
                 logger.exception(f"In register_routes - /import_project : Error importing project: {e}")
                 logger.info("started rollabck")
-                # Clean up on error
-                project_path = locals().get('project_path')
-                next_id = locals().get('next_id')
-                
+                db.session.rollback()
+
                 # Clean up project directory if it was created
                 if project_path and os.path.exists(project_path):
                     try:
@@ -284,11 +288,11 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         logger.info("In register_routes -/import_project : Rolled back project directory creation as db entry is not added")
                     except Exception as cleanup_error:
                         logger.exception(f"In register_routes -/import_project : Error during cleanup: {cleanup_error}")
-                
+
                 # Remove from blueprints if registered
-                if next_id is not None and str(next_id) in ProjectBlueprint.blueprints:
+                if assigned_id is not None and assigned_id in ProjectBlueprint.blueprints:
                     try:
-                        del ProjectBlueprint.blueprints[str(next_id)]
+                        del ProjectBlueprint.blueprints[assigned_id]
                         logger.info("In register_routes -/import_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
                     except Exception as blueprint_error:
                         logger.exception(f"In register_routes -/import_project : Error removing blueprint: {blueprint_error}")
