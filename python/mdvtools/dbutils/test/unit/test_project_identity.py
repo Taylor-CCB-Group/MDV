@@ -49,3 +49,19 @@ def test_purged_project_id_is_not_reused(app, tmp_path):
 
         assert second.id != first_id
         assert db.session.get(Project, first_id) is None
+
+
+def test_add_new_project_assigns_an_id_without_committing(app, tmp_path):
+    """The Project ID is readable as soon as the row is added, but the row is
+    only durable once the caller commits, so a failed creation can roll back."""
+    with app.app_context():
+        path = tmp_path / "rolled-back"
+        path.mkdir()
+
+        project = ProjectService.add_new_project(path=str(path), name="rolled back")
+        assigned_id = project.id
+        assert assigned_id is not None
+
+        db.session.rollback()
+
+        assert db.session.get(Project, assigned_id) is None

@@ -152,16 +152,17 @@ class ProjectService:
         """
         Create a new project record in the database.
         
-        Creates a new Project instance with the specified path and name,
-        adds it to the database session, and commits the transaction.
-        
+        Creates a new Project instance with the specified path and name, adds it
+        to the database session and flushes so the database assigns the Project
+        ID. The caller owns the commit.
+
         Args:
             path (str): Filesystem path to the project directory. Must be unique.
             name (str, optional): Project name. Defaults to 'unnamed_project'.
-        
+
         Returns:
-            Project: The newly created Project model instance.
-        
+            Project: The newly created Project model instance, with its assigned id.
+
         Raises:
             Exception: If database operation fails (e.g., duplicate path).
             The exception is logged, transaction is rolled back, and exception
@@ -178,7 +179,7 @@ class ProjectService:
             new_project.name = name
             new_project.path = path
             db.session.add(new_project)
-            db.session.commit()
+            db.session.flush()
             return new_project
         except Exception as e:
             logger.exception(f"Error in dbservice: Error creating project: {e}")
