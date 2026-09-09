@@ -10,7 +10,7 @@ from sqlalchemy import text, create_engine
 from sqlalchemy.exc import OperationalError
 from flask import Flask
 from mdvtools.server import add_safe_headers
-from mdvtools.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 from mdvtools.dbutils.routes import register_routes
@@ -481,26 +481,26 @@ def serve_projects_from_filesystem(app, base_dir):
             
             if os.path.exists(project_path):
                 try:
-                    project_name = os.path.basename(project_path)
+                    # No row exists for this directory, so state.json is the only record
+                    # of the name and permission it was last served with. A directory
+                    # copied in from another deployment keeps both. Fall back to the
+                    # directory name, and to editable, when it says nothing.
+                    try:
+                        state = get_json(os.path.join(project_path, "state.json")) or {}
+                    except Exception:
+                        state = {}
+                    project_name = state.get('name') or os.path.basename(project_path)
+                    perm = (state.get('permission') or '').lower()
+                    is_editable = False if perm == 'view' else True
 
-                    # Create a new Project record in the database with the default name.
-                    # The database assigns the Project ID; the directory keeps the name
-                    # it was discovered under.
+                    # Create a new Project record in the database. The database assigns
+                    # the Project ID; the directory keeps the name it was discovered under.
                     new_project = ProjectService.add_new_project(name=project_name, path=project_path)
                     if new_project is None:
                         raise ValueError(f"Failed to add project '{project_name}' to the database.")
+                    new_project.access_level = 'editable' if is_editable else 'read-only'
 
                     p = MDVProject(dir=project_path, id=str(new_project.id), backend_db= True)
-                    # No row existed for this directory, so state.json is the only record
-                    # of the permission it was last served with. Default to editable when
-                    # unspecified.
-                    try:
-                        state = p.state or {}
-                        perm = (state.get('permission') or '').lower()
-                        is_editable = True if perm == 'edit' else False if perm == 'view' else True
-                        new_project.access_level = 'editable' if is_editable else 'read-only'
-                    except Exception:
-                        is_editable = True
                     p.set_editable(is_editable)
                     p.serve(options=options)
                     logger.info(f"Serving project: {project_path}")

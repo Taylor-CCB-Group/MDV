@@ -270,6 +270,19 @@ class MDVProject:
         c["permission"] = "edit" if edit else "view"
         self.state = c
 
+    def set_display_name(self, name):
+        """Record the project's display name in state.json.
+
+        The database is authoritative for the name. This copy is what a rescan
+        reads when it finds a directory with no catalog row.
+        """
+        if not self.writable:
+            logger.log(1, f"can't set_display_name on '{self.dir}' because it's not writable")
+            return
+        c = self.state
+        c["name"] = name
+        self.state = c
+
     def set_chat_enabled(self, chat_enabled=True):
         # would prefer not to be adding methods in this file, maybe it could be in chat_server_extension.py
         c = self.state

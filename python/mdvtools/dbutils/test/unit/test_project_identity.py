@@ -13,6 +13,7 @@ from mdvtools.dbutils.dbservice import ProjectService
 from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
 from mdvtools.file_processing import mdv_project_processing
+from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.websocket import mdv_socketio
 
@@ -58,12 +59,15 @@ def retire_one_project_id(tmp_path):
     return retired_id
 
 
-def write_project_directory(path):
+def write_project_directory(path, name=None):
     """Write the files a directory needs to be recognised as an MDV project."""
     path.mkdir()
+    state = {"all_views": [], "permission": "edit"}
+    if name is not None:
+        state["name"] = name
     (path / "datasources.json").write_text(json.dumps([]))
     (path / "views.json").write_text(json.dumps({}))
-    (path / "state.json").write_text(json.dumps({"all_views": [], "permission": "edit"}))
+    (path / "state.json").write_text(json.dumps(state))
     return path
 
 
@@ -76,6 +80,17 @@ def mdv_project_archive():
         archive.writestr("state.json", json.dumps({"all_views": [], "permission": "edit"}))
     buffer.seek(0)
     return buffer
+
+
+def test_set_display_name_writes_the_name_into_state_json(tmp_path):
+    """The display name is kept in the project directory so a rescan can rebuild
+    a catalog row for a directory that has lost one."""
+    project = MDVProject(str(tmp_path / "project"))
+
+    project.set_display_name("Tumour atlas")
+
+    assert project.state["name"] == "Tumour atlas"
+    assert MDVProject(str(tmp_path / "project")).state["name"] == "Tumour atlas"
 
 
 def test_purged_project_id_is_not_reused(app, tmp_path):
@@ -205,3 +220,21 @@ def test_rescan_serves_discovered_directories_under_their_assigned_ids(app, tmp_
             assert project is not None
             paths.add(project.path)
         assert paths == {str(first), str(second)}
+
+
+def test_rescan_recovers_the_display_name_from_state_json(app, tmp_path):
+    """A directory copied in from elsewhere keeps the name it had there. Without
+    a name on disk there is nothing to recover, so the directory name is used."""
+    with app.app_context():
+        copied_in = write_project_directory(tmp_path / "e4f5a6b7c8d9", name="Tumour atlas")
+        no_name = write_project_directory(tmp_path / "pilot-cohort")
+
+        created_ids = serve_projects_from_filesystem(app, str(tmp_path))
+
+    with app.app_context():
+        names = {}
+        for assigned_id in created_ids:
+            project = db.session.get(Project, assigned_id)
+            names[project.path] = project.name
+        assert names[str(copied_in)] == "Tumour atlas"
+        assert names[str(no_name)] == "pilot-cohort"
