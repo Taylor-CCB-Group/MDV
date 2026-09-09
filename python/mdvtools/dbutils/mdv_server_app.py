@@ -589,16 +589,21 @@ def serve_projects_from_filesystem(app, base_dir):
 
 # Create the app object at the module level
 app = None
-try:
-    app = create_flask_app()
-    
-    with app.app_context():
-        logger.info("Serving projects from database")
-        serve_projects_from_db(app)
-        logger.info("Starting - create_projects_from_filesystem")
-        serve_projects_from_filesystem(app, app.config['projects_base_dir'])
-except Exception as e:
-    logger.exception(f"Error during app initialization: {e}")
+# Importing this module starts the server: it builds the app, connects to the
+# database and registers a route for every project it finds, creating rows for
+# directories that have none. Anything that only needs a function from here sets
+# MDV_SKIP_SERVER_STARTUP=1 first.
+if os.environ.get('MDV_SKIP_SERVER_STARTUP') != '1':
+    try:
+        app = create_flask_app()
+
+        with app.app_context():
+            logger.info("Serving projects from database")
+            serve_projects_from_db(app)
+            logger.info("Starting - create_projects_from_filesystem")
+            serve_projects_from_filesystem(app, app.config['projects_base_dir'])
+    except Exception as e:
+        logger.exception(f"Error during app initialization: {e}")
 
 if __name__ == '__main__':
     logger.info("Inside main..")
