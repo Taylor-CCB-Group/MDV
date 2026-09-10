@@ -258,6 +258,25 @@ def test_rescan_writes_back_a_name_it_had_to_guess(app, tmp_path):
         assert state.get("name") == db.session.get(Project, created_ids[0]).name
 
 
+def test_rename_writes_the_new_name_to_disk(app, tmp_path):
+    """A rename updates the row and the recovery copy together, so a project
+    copied out afterwards carries the name it was renamed to."""
+    with app.app_context():
+        ProjectManagerExtension().register_global_routes(app, app.config)
+
+    client = app.test_client()
+    created = client.post("/create_project").json["id"]
+
+    response = client.put(f"/projects/{created}/rename", data={"name": "Tumour atlas"})
+    assert response.status_code == 200, response.get_data(as_text=True)
+
+    with app.app_context():
+        project = db.session.get(Project, created)
+        assert project.name == "Tumour atlas"
+        with open(os.path.join(project.path, "state.json")) as state_file:
+            assert json.load(state_file).get("name") == "Tumour atlas"
+
+
 def test_creation_paths_record_the_display_name_on_disk(app, tmp_path):
     """Every path that creates a project directory writes the display name into
     it, so the name survives the row being lost or the directory being copied."""
