@@ -19,10 +19,15 @@ import sys
 # Add the parent directory to sys.path to import mdvtools modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+from sqlalchemy import Table
 from sqlalchemy.dialects import sqlite as sqlite_dialect
 from sqlalchemy.schema import CreateIndex, CreateTable
 
 from mdvtools.dbutils.dbmodels import Project
+
+# flask_sqlalchemy builds the declarative base at runtime, so the table it attaches
+# to each model is invisible to the type checker.
+PROJECTS: Table = Project.__table__  # pyright: ignore[reportAttributeAccessIssue]
 
 TABLE = "projects"
 OLD_TABLE = "projects_pre_autoincrement"
@@ -82,7 +87,7 @@ def migrate_projects_table(db_path, dry_run=False, backup=True):
             )
 
         existing_columns = _existing_columns(connection)
-        target_columns = [column.name for column in Project.__table__.columns]
+        target_columns = [column.name for column in PROJECTS.columns]
         shared = [name for name in target_columns if name in existing_columns]
         dropped = [name for name in existing_columns if name not in target_columns]
         added = [name for name in target_columns if name not in existing_columns]
@@ -91,8 +96,8 @@ def migrate_projects_table(db_path, dry_run=False, backup=True):
         # the copy. Say so rather than leaving a half-migrated database.
         unfillable = [
             name for name in added
-            if not Project.__table__.columns[name].nullable
-            and Project.__table__.columns[name].server_default is None
+            if not PROJECTS.columns[name].nullable
+            and PROJECTS.columns[name].server_default is None
         ]
         if unfillable:
             raise ValueError(
@@ -127,7 +132,7 @@ def migrate_projects_table(db_path, dry_run=False, backup=True):
         # Move the old table aside and create the new one under the real name, so
         # the DDL comes straight from the model and its foreign key to genomes
         # still resolves.
-        create_table = _compile(CreateTable(Project.__table__))
+        create_table = _compile(CreateTable(PROJECTS))
         columns = ", ".join(f'"{name}"' for name in shared)
 
         # The rename must not rewrite the foreign keys that other tables declare
@@ -150,7 +155,7 @@ def migrate_projects_table(db_path, dry_run=False, backup=True):
             # Dropping the old table takes its indexes with it, which frees their
             # names for the ones the model declares.
             connection.execute(f"DROP TABLE {OLD_TABLE}")
-            for index in Project.__table__.indexes:
+            for index in PROJECTS.indexes:
                 connection.execute(_compile(CreateIndex(index)))
 
             # Start the sequence above every ID ever used, so the rows just copied
