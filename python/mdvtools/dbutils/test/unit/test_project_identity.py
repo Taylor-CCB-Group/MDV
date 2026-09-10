@@ -277,6 +277,25 @@ def test_rename_writes_the_new_name_to_disk(app, tmp_path):
             assert json.load(state_file).get("name") == "Tumour atlas"
 
 
+def test_access_change_writes_the_permission_to_disk(app, tmp_path):
+    """Making a project read-only updates the row and the recovery copy together,
+    so the permission survives the row being lost."""
+    with app.app_context():
+        ProjectManagerExtension().register_global_routes(app, app.config)
+
+    client = app.test_client()
+    created = client.post("/create_project").json["id"]
+
+    response = client.put(f"/projects/{created}/access", data={"type": "read-only"})
+    assert response.status_code == 200, response.get_data(as_text=True)
+
+    with app.app_context():
+        project = db.session.get(Project, created)
+        assert project.access_level == "read-only"
+        with open(os.path.join(project.path, "state.json")) as state_file:
+            assert json.load(state_file).get("permission") == "view"
+
+
 def test_creation_paths_record_the_display_name_on_disk(app, tmp_path):
     """Every path that creates a project directory writes the display name into
     it, so the name survives the row being lost or the directory being copied."""

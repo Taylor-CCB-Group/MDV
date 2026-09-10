@@ -561,6 +561,16 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if access_level is None:
                     return jsonify({"error": message}), status_code
 
+                # Keep the copy in the project directory in step. The database write
+                # above decides whether the change succeeded, so a directory that
+                # cannot be written is logged and the change still stands.
+                try:
+                    project = ProjectService.get_project_by_id(project_id)
+                    if project is not None:
+                        MDVProject(dir=project.path, id=str(project_id), backend_db=True).set_editable(access_level == 'editable')
+                except Exception as state_error:
+                    logger.exception(f"In register_routes - /access : Changed access level for project '{project_id}' in db but could not write state.json: {state_error}")
+
                 return jsonify({"status": "success", "access_level": access_level}), 200
 
             except Exception as e:
