@@ -7,7 +7,7 @@ import zipfile
 import io
 import tempfile
 from mdvtools.server_extension import MDVProjectServerExtension
-from mdvtools.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprintProtocol
 from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
 from mdvtools.dbutils.dbmodels import User, db
@@ -82,6 +82,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     logger.info("Creating and serving the new project")
                     p = MDVProject(project_path, id=assigned_id, backend_db= True)
                     p.set_editable(True)
+                    p.set_display_name(new_project.name)
                     p.serve(app=app, open_browser=False, backend_db=True)
                 except Exception as e:
                     logger.exception(f"In register_routes: Error serving MDVProject: {e}")
@@ -211,6 +212,14 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         shutil.move(os.path.join(subdir, item), project_path)
                     os.rmdir(subdir)
                 
+                # With no name supplied, keep the one the archive carries so an
+                # imported project is not renamed to the default.
+                if project_name is None:
+                    try:
+                        project_name = (get_json(os.path.join(project_path, "state.json")) or {}).get('name')
+                    except Exception:
+                        project_name = None
+
                 # Initialize the project and register it using project name if valid
                 if project_name is not None:
                     new_project = ProjectService.add_new_project(path=project_path, name=project_name)
@@ -228,6 +237,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     p.set_editable(is_editable)
                 except Exception:
                     p.set_editable(False)
+                p.set_display_name(new_project.name)
                 p.serve(app=app, open_browser=False, backend_db=True)
 
                 if new_project:

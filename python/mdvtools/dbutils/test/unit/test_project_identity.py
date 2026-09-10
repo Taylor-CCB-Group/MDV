@@ -71,13 +71,16 @@ def write_project_directory(path, name=None):
     return path
 
 
-def mdv_project_archive():
+def mdv_project_archive(name=None):
     """A minimal valid MDV project archive, with the required files at the root."""
+    state = {"all_views": [], "permission": "edit"}
+    if name is not None:
+        state["name"] = name
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("datasources.json", json.dumps([]))
         archive.writestr("views.json", json.dumps({}))
-        archive.writestr("state.json", json.dumps({"all_views": [], "permission": "edit"}))
+        archive.writestr("state.json", json.dumps(state))
     buffer.seek(0)
     return buffer
 
@@ -238,3 +241,56 @@ def test_rescan_recovers_the_display_name_from_state_json(app, tmp_path):
             names[project.path] = project.name
         assert names[str(copied_in)] == "Tumour atlas"
         assert names[str(no_name)] == "pilot-cohort"
+
+
+def test_creation_paths_record_the_display_name_on_disk(app, tmp_path):
+    """Every path that creates a project directory writes the display name into
+    it, so the name survives the row being lost or the directory being copied."""
+    archive_path = tmp_path / "upload.zip"
+    archive_path.write_bytes(mdv_project_archive().getvalue())
+
+    with app.app_context():
+        ProjectManagerExtension().register_global_routes(app, app.config)
+
+    client = app.test_client()
+    created = client.post("/create_project").json["id"]
+    imported = client.post(
+        "/import_project",
+        data={"file": (mdv_project_archive(), "project.zip"), "name": "imported project"},
+        content_type="multipart/form-data",
+    ).json["id"]
+
+    with app.app_context():
+        uploaded = mdv_project_processing(app, str(tmp_path), str(archive_path), "upload.zip")["project_id"]
+
+    with app.app_context():
+        for assigned_id in (created, imported, uploaded):
+            project = db.session.get(Project, assigned_id)
+            with open(os.path.join(project.path, "state.json")) as state_file:
+                state = json.load(state_file)
+            assert state.get("name") == project.name
+
+
+def test_import_and_upload_take_the_name_from_the_archive(app, tmp_path):
+    """An archive carrying a display name keeps it when the caller supplies no
+    name, instead of the name being replaced by the default."""
+    archive_path = tmp_path / "upload.zip"
+    archive_path.write_bytes(mdv_project_archive(name="Pilot cohort").getvalue())
+
+    with app.app_context():
+        ProjectManagerExtension().register_global_routes(app, app.config)
+
+    response = app.test_client().post(
+        "/import_project",
+        data={"file": (mdv_project_archive(name="Tumour atlas"), "project.zip")},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200, response.get_data(as_text=True)
+    imported = response.json["id"]
+
+    with app.app_context():
+        uploaded = mdv_project_processing(app, str(tmp_path), str(archive_path), "upload.zip")["project_id"]
+
+    with app.app_context():
+        assert db.session.get(Project, imported).name == "Tumour atlas"
+        assert db.session.get(Project, uploaded).name == "Pilot cohort"
