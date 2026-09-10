@@ -10,7 +10,7 @@ from flask import Flask
 
 from mdvtools.dbutils.dbmodels import Project, db
 from mdvtools.dbutils.dbservice import ProjectService
-from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
+from mdvtools.dbutils.mdv_server_app import serve_projects_from_db, serve_projects_from_filesystem
 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
 from mdvtools.file_processing import mdv_project_processing
 from mdvtools.mdvproject import MDVProject
@@ -293,6 +293,27 @@ def test_access_change_writes_the_permission_to_disk(app, tmp_path):
         project = db.session.get(Project, created)
         assert project.access_level == "read-only"
         with open(os.path.join(project.path, "state.json")) as state_file:
+            assert json.load(state_file).get("permission") == "view"
+
+
+def test_startup_does_not_let_state_json_overwrite_an_access_level(app, tmp_path):
+    """The database decides the access level for a project it holds a row for, so
+    a stale permission on disk cannot unlock a project that was made read-only."""
+    with app.app_context():
+        directory = write_project_directory(tmp_path / "locked-project")
+        locked = Project()
+        locked.name = "locked"
+        locked.path = str(directory)
+        locked.access_level = "read-only"
+        db.session.add(locked)
+        db.session.commit()
+        project_id = locked.id
+
+        serve_projects_from_db(app)
+
+    with app.app_context():
+        assert db.session.get(Project, project_id).access_level == "read-only"
+        with open(directory / "state.json") as state_file:
             assert json.load(state_file).get("permission") == "view"
 
 

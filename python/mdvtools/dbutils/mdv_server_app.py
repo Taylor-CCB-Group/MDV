@@ -391,18 +391,20 @@ def serve_projects_from_db(app):
             if os.path.exists(project.path):
                 try:
                     p = MDVProject(dir=project.path, id=str(project.id), backend_db= True)
-                    # Sync DB access level from state.json if present, then serve with resulting editability
+                    # The row decides the access level. state.json is only consulted to
+                    # fill a row that has none, which legacy rows predating the column
+                    # can be. Serving then writes the resulting permission back to disk.
                     try:
-                        state = p.state or {}
-                        perm = (state.get('permission') or '').lower()
-                        desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
-                        if desired_level is not None and desired_level != getattr(project, 'access_level', None):
-                            ProjectService.change_project_access(project.id, desired_level)
-                            is_editable = (desired_level == 'editable')
-                        else:
-                            # Default to editable when access level is missing/unknown or non-string (e.g., MagicMock)
-                            access_level_val = getattr(project, 'access_level', None)
-                            is_editable = (access_level_val == 'editable') if isinstance(access_level_val, str) else True
+                        access_level_val = getattr(project, 'access_level', None)
+                        if not (isinstance(access_level_val, str) and access_level_val):
+                            state = p.state or {}
+                            perm = (state.get('permission') or '').lower()
+                            desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
+                            if desired_level is not None:
+                                ProjectService.change_project_access(project.id, desired_level)
+                                access_level_val = desired_level
+                        # Default to editable when access level is missing/unknown or non-string (e.g., MagicMock)
+                        is_editable = (access_level_val == 'editable') if isinstance(access_level_val, str) else True
                         # nb this will warn in log if the project isn't writable by current user
                         # avoiding touching other aspects of surrounding logic for now.
                         p.set_editable(is_editable)
