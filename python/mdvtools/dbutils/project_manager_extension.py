@@ -487,9 +487,13 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
                     user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
-                    if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
+                    is_owner = bool(user_projects and user_projects.get(int(project_id), {}).get("is_owner", False))
+                    # An administrator is let through because a project picked up
+                    # from the filesystem has no owner, and nothing else can
+                    # rename it.
+                    if not is_owner and not user.get("is_admin", False):
                         logger.error(f"User does not have ownership of project {project_id}")
-                        return jsonify({"error": "Only the project owner can rename the project."}), 403
+                        return jsonify({"error": "Only the project owner or an administrator can rename the project."}), 403
 
 
                 # Step 4: Check if project is editable
@@ -550,9 +554,13 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
                     user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
-                    if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
+                    is_owner = bool(user_projects and user_projects.get(int(project_id), {}).get("is_owner", False))
+                    # An administrator is let through because a project picked up
+                    # from the filesystem has no owner, and nothing else can
+                    # change its access level.
+                    if not is_owner and not user.get("is_admin", False):
                         logger.error(f"User does not have ownership of project {project_id}")
-                        return jsonify({"error": "Only the project owner can change the access level."}), 403
+                        return jsonify({"error": "Only the project owner or an administrator can change the access level."}), 403
 
 
                 # Call the service method to change the access level
