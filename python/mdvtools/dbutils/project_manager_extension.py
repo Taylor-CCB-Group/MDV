@@ -40,6 +40,18 @@ def find_root_prefix(names):
     return None
 
 
+def is_owner_or_admin(user, permissions):
+    """Whether a signed-in user may manage a project.
+
+    `permissions` is that user's cached entry for the project, or None when they
+    hold none. Administrators are included because a project that arrives by file
+    copy can reach a deployment with no owner at all.
+    """
+    if permissions and permissions.get("is_owner"):
+        return True
+    return bool(user.get("is_admin", False))
+
+
 class ProjectManagerExtension(MDVProjectServerExtension):
     def register_global_routes(self, app: Flask, config: dict):
         ENABLE_AUTH = app.config.get('ENABLE_AUTH', False)
@@ -487,11 +499,8 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
                     user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
-                    is_owner = bool(user_projects and user_projects.get(int(project_id), {}).get("is_owner", False))
-                    # An administrator is let through because a project picked up
-                    # from the filesystem has no owner, and nothing else can
-                    # rename it.
-                    if not is_owner and not user.get("is_admin", False):
+                    permissions = user_projects.get(int(project_id)) if user_projects else None
+                    if not is_owner_or_admin(user, permissions):
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner or an administrator can rename the project."}), 403
 
@@ -554,11 +563,8 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
                     user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
-                    is_owner = bool(user_projects and user_projects.get(int(project_id), {}).get("is_owner", False))
-                    # An administrator is let through because a project picked up
-                    # from the filesystem has no owner, and nothing else can
-                    # change its access level.
-                    if not is_owner and not user.get("is_admin", False):
+                    permissions = user_projects.get(int(project_id)) if user_projects else None
+                    if not is_owner_or_admin(user, permissions):
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner or an administrator can change the access level."}), 403
 
@@ -606,8 +612,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 user_id = user["id"]
 
                 user_permissions = user_project_cache.get(user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
-                if not user_permissions or not user_permissions.get("is_owner"):
-                    return jsonify({"error": "Only the project owner can share the project"}), 403
+                # An administrator is let through so a project with no owner, or
+                # one whose owner has gone, can still be handed to someone.
+                if not is_owner_or_admin(user, user_permissions):
+                    return jsonify({"error": "Only the project owner or an administrator can share the project"}), 403
 
                 # Refresh cache to pick up permission changes from manage_project_permissions.py
                 # Note: sync_users_to_db is no longer called here - the manage_project_permissions.py
@@ -679,10 +687,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     raise ValueError("User not found in session.")
                 user_id = user["id"]
 
-                # Step 2: Check if current user is owner of the project
+                # Step 2: Check if current user is owner of the project, or an administrator
                 user_permissions = user_project_cache.get(user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
-                if not user_permissions or not user_permissions.get("is_owner"):
-                    return jsonify({"error": "Only the project owner can share the project"}), 403
+                if not is_owner_or_admin(user, user_permissions):
+                    return jsonify({"error": "Only the project owner or an administrator can share the project"}), 403
 
 
                 # Step 5: Get data from the POST request
@@ -745,10 +753,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     raise ValueError("User not found in session.")
                 current_user_id = user["id"]
 
-                # Step 2: Validate if current user is the owner
+                # Step 2: Validate if current user is the owner, or an administrator
                 user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
-                if not user_permissions or not user_permissions.get("is_owner"):
-                    return jsonify({"error": "Only the project owner can edit permissions"}), 403
+                if not is_owner_or_admin(user, user_permissions):
+                    return jsonify({"error": "Only the project owner or an administrator can edit permissions"}), 403
 
 
                 # Step 3: Extract new permission from request
@@ -807,10 +815,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     raise ValueError("User not found in session.")
                 current_user_id = user["id"]
 
-                # Step 2: Validate ownership
+                # Step 2: Validate ownership, or administrator status
                 user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
-                if not user_permissions or not user_permissions.get("is_owner"):
-                    return jsonify({"error": "Only the project owner can remove users"}), 403
+                if not is_owner_or_admin(user, user_permissions):
+                    return jsonify({"error": "Only the project owner or an administrator can remove users"}), 403
 
                 # Step 4: Remove the user from the project using the service method
                 UserProjectService.remove_user_from_project(user_id, project_id)

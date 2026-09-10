@@ -77,6 +77,13 @@ from the Project ID. New projects get a random one; directories that already exi
 names they have.
 _Avoid_: project folder ID, project slug, directory ID
 
+**Unowned project**:
+A project with a catalog row and no `user_projects` row marking an owner. A project copied
+into the Project root arrives this way, because the scan that finds it has no user to
+attribute it to. Startup and rescan give every administrator ownership of one, since the
+project list only shows a user the projects they hold a permission row for.
+_Avoid_: orphan, public project, shared project
+
 ## SpatialData.js integration terms
 
 Canonical rendering vocabulary lives in [SpatialData.js CONTEXT.md](https://github.com/Taylor-CCB-Group/SpatialData.js/blob/main/CONTEXT.md). MDV chart code uses the same terms:

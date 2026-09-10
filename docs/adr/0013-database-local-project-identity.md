@@ -269,8 +269,14 @@ without a supplied name reads `state.json["name"]`, and falls back to the storag
 basename only when the disk has nothing.
 
 Ownership does not travel, because `UserProject` rows are keyed on a
-deployment-local `User.id`. On the receiving side an admin grants access, which is
-what the rescan admin permissions change does automatically.
+deployment-local `User.id`. The receiving deployment gives the project to its
+administrators. A rescan makes the administrator who triggered it the owner of
+every project the scan created, and startup and rescan both make every
+administrator an owner of a project that still has none. An administrator then
+hands it to a real owner through the sharing routes and can remove themselves.
+This matters because the project list only shows a user the projects they hold a
+permission row for, so a project with no owner would be reachable only by typing
+its URL.
 
 ## Two deployments sharing one project directory
 

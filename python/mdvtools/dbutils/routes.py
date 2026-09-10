@@ -10,7 +10,7 @@ REQUIRED_FILES = {"views.json", "state.json", "datasources.json"}
 def register_routes(app, ENABLE_AUTH):
     from flask import abort, jsonify, session, redirect, url_for, render_template, send_file
     from mdvtools.auth.authutils import active_projects_cache, user_project_cache, all_users_cache, cache_user_projects
-    from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
+    from mdvtools.dbutils.mdv_server_app import grant_admins_ownership_of_unowned_projects, serve_projects_from_filesystem
     from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
     
     """Register routes with the Flask app."""
@@ -113,13 +113,17 @@ def register_routes(app, ENABLE_AUTH):
                 # Serve the projects after checking authentication and admin privileges
                 created_ids = serve_projects_from_filesystem(app, app.config["projects_base_dir"])
 
-                # If auth is enabled and there are new projects, grant owner to current admin and refresh cache
-                if ENABLE_AUTH and created_ids:
+                # If auth is enabled, grant owner to current admin and refresh cache
+                if ENABLE_AUTH:
                     try:
                         user_id = user.get("id") if user else None
                         if user_id is not None:
                             for pid in created_ids:
                                 UserProjectService.add_or_update_user_project(user_id=user_id, project_id=pid, is_owner=True)
+                        # A project whose row was created at a boot with no
+                        # administrator present is still unowned, and no scan will
+                        # create a row for it again.
+                        grant_admins_ownership_of_unowned_projects()
                         # Refresh caches so /projects reflects new permissions
                         cache_user_projects()
                     except Exception as perm_e:

@@ -12,11 +12,11 @@ from flask import Flask
 from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprint
-from mdvtools.dbutils.dbmodels import db, Project
+from mdvtools.dbutils.dbmodels import db, Project, User, UserProject
 from mdvtools.dbutils.routes import register_routes
 from mdvtools.auth.register_auth_routes import register_auth_routes
 from mdvtools.auth.authutils import register_before_request_auth, get_auth_provider, cache_user_projects
-from mdvtools.dbutils.dbservice import ProjectService, FileService
+from mdvtools.dbutils.dbservice import ProjectService, FileService, UserProjectService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
 from mdvtools.dbutils.server_options import get_server_options_for_db_projects
@@ -572,6 +572,40 @@ def serve_projects_from_filesystem(app, base_dir):
     return created_project_ids
 
 
+def grant_admins_ownership_of_unowned_projects():
+    """Make every administrator an owner of each active project that has no owner.
+
+    A scan has no user to attribute a project to, and the project list only shows
+    a user the projects they hold a permission row for, so a project that arrives
+    by file copy would otherwise be invisible to everyone. An owner assigned
+    afterwards through the sharing routes can remove the administrators.
+
+    Returns the Project IDs that were given owners.
+    """
+    owned_ids = {
+        row.project_id
+        for row in UserProject.query.filter_by(is_owner=True).with_entities(UserProject.project_id).all()
+    }
+    unowned_ids = [
+        row.id
+        for row in Project.query.filter_by(is_deleted=False).with_entities(Project.id).all()
+        if row.id not in owned_ids
+    ]
+    if not unowned_ids:
+        return []
+
+    admin_ids = [row.id for row in User.query.filter_by(is_admin=True).with_entities(User.id).all()]
+    if not admin_ids:
+        logger.info(f"Projects {unowned_ids} have no owner and there is no administrator to give them to")
+        return []
+
+    for project_id in unowned_ids:
+        for admin_id in admin_ids:
+            UserProjectService.add_or_update_user_project(user_id=admin_id, project_id=project_id, is_owner=True)
+    logger.info(f"Gave administrators {admin_ids} ownership of projects {unowned_ids}")
+    return unowned_ids
+
+
 # Create the app object at the module level
 app = None
 # Importing this module starts the server: it builds the app, connects to the
@@ -587,6 +621,12 @@ if os.environ.get('MDV_SKIP_SERVER_STARTUP') != '1':
             serve_projects_from_db(app)
             logger.info("Starting - create_projects_from_filesystem")
             serve_projects_from_filesystem(app, app.config['projects_base_dir'])
+            if ENABLE_AUTH:
+                # A directory copied into the Project root arrives with no owner,
+                # and startup has no user to attribute it to. The caches were
+                # filled before the scan ran, so they are rebuilt here.
+                if grant_admins_ownership_of_unowned_projects():
+                    cache_user_projects()
     except Exception as e:
         logger.exception(f"Error during app initialization: {e}")
 
