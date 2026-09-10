@@ -502,6 +502,9 @@ def serve_projects_from_filesystem(app, base_dir):
 
                     p = MDVProject(dir=project_path, id=str(new_project.id), backend_db= True)
                     p.set_editable(is_editable)
+                    # Record the name even when it came from state.json, so a name
+                    # derived from the directory is only ever derived once.
+                    p.set_display_name(new_project.name)
                     p.serve(options=options)
                     logger.info(f"Serving project: {project_path}")
 

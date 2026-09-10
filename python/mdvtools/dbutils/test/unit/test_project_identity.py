@@ -243,6 +243,21 @@ def test_rescan_recovers_the_display_name_from_state_json(app, tmp_path):
         assert names[str(no_name)] == "pilot-cohort"
 
 
+def test_rescan_writes_back_a_name_it_had_to_guess(app, tmp_path):
+    """A directory with no name on disk is named after itself once, and that name
+    is recorded, so copying it on again does not depend on the folder name."""
+    with app.app_context():
+        discovered = write_project_directory(tmp_path / "pilot-cohort")
+
+        created_ids = serve_projects_from_filesystem(app, str(tmp_path))
+
+    with open(discovered / "state.json") as state_file:
+        state = json.load(state_file)
+
+    with app.app_context():
+        assert state.get("name") == db.session.get(Project, created_ids[0]).name
+
+
 def test_creation_paths_record_the_display_name_on_disk(app, tmp_path):
     """Every path that creates a project directory writes the display name into
     it, so the name survives the row being lost or the directory being copied."""
