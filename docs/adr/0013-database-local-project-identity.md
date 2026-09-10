@@ -1,6 +1,6 @@
 # Keep Project IDs local to each deployment
 
-**Status:** proposed
+**Status:** accepted
 
 ## Context and decision
 
