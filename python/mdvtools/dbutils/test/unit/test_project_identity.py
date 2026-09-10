@@ -225,6 +225,37 @@ def test_rescan_serves_discovered_directories_under_their_assigned_ids(app, tmp_
         assert paths == {str(first), str(second)}
 
 
+def test_rescan_creates_nothing_when_there_is_nothing_new(app, tmp_path):
+    """An empty project root is not an error and leaves the catalog untouched."""
+    with app.app_context():
+        assert serve_projects_from_filesystem(app, str(tmp_path)) == []
+        assert Project.query.count() == 0
+
+
+def test_rescan_skips_a_failing_project_without_leaving_a_row(app, tmp_path, monkeypatch):
+    """One directory that cannot be served does not stop the scan, and the row
+    started for it is discarded rather than committed with the next project."""
+    good = write_project_directory(tmp_path / "good-project")
+    bad = write_project_directory(tmp_path / "bad-project")
+
+    original_serve = MDVProject.serve
+
+    def serve(self, *args, **kwargs):
+        if self.dir == str(bad):
+            raise RuntimeError("cannot serve this project")
+        return original_serve(self, *args, **kwargs)
+
+    monkeypatch.setattr(MDVProject, "serve", serve)
+
+    with app.app_context():
+        created_ids = serve_projects_from_filesystem(app, str(tmp_path))
+
+    with app.app_context():
+        assert len(created_ids) == 1
+        assert db.session.get(Project, created_ids[0]).path == str(good)
+        assert Project.query.count() == 1
+
+
 def test_rescan_recovers_the_display_name_from_state_json(app, tmp_path):
     """A directory copied in from elsewhere keeps the name it had there. Without
     a name on disk there is nothing to recover, so the directory name is used."""

@@ -14,8 +14,7 @@ from mdvtools.dbutils.mdv_server_app import (
     create_base_directory, 
     tables_exist, 
     is_valid_mdv_project,
-    serve_projects_from_db,
-    serve_projects_from_filesystem
+    serve_projects_from_db
 )
 from sqlalchemy.sql.elements import TextClause
 
@@ -564,110 +563,6 @@ class TestServeProjectsFromDb(unittest.TestCase):
         serve_projects_from_db(self.app)
         
         # Should handle errors gracefully and continue
-
-
-class TestServeProjectsFromFilesystem(unittest.TestCase):
-    """Test cases for the serve_projects_from_filesystem function."""
-
-    def setUp(self):
-        """Set up test fixtures."""
-        self.app = Flask(__name__)
-        self.temp_dir = tempfile.mkdtemp()
-        self.app.config['projects_base_dir'] = self.temp_dir
-
-    def tearDown(self):
-        """Clean up after tests."""
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-
-    @patch('mdvtools.dbutils.mdv_server_app.Project')
-    @patch('mdvtools.dbutils.mdv_server_app.MDVProject')
-    @patch('mdvtools.dbutils.mdv_server_app.ProjectService')
-    @patch('mdvtools.dbutils.mdv_server_app.db')
-    @patch('os.listdir')
-    @patch('os.path.isdir')
-    @patch('os.path.exists')
-    def test_serve_projects_from_filesystem_new_project(self, mock_exists, mock_isdir, mock_listdir, mock_db, mock_project_service, mock_mdv_project, mock_project):
-        """Test creating and serving a new project from filesystem."""
-        # Mock filesystem
-        mock_listdir.return_value = ['project1']
-        mock_isdir.return_value = True
-        mock_exists.return_value = True
-        
-        # Mock database
-        mock_project.query.with_entities.return_value.all.return_value = []
-        mock_db.session.query.return_value.func.max.return_value.scalar.return_value = None
-        
-        # Mock project service
-        mock_new_project = MagicMock()
-        mock_new_project.id = 1
-        mock_new_project.path = os.path.join(self.temp_dir, 'project1')
-        mock_project_service.add_new_project.return_value = mock_new_project
-        
-        # Mock MDVProject
-        mock_mdv_instance = MagicMock()
-        mock_mdv_project.return_value = mock_mdv_instance
-        
-        # Mock file walk
-        with patch('os.walk') as mock_walk:
-            mock_walk.return_value = [(os.path.join(self.temp_dir, 'project1'), [], ['test.txt'])]
-            
-            serve_projects_from_filesystem(self.app, self.temp_dir)
-            
-            # Verify project was created and served
-            mock_project_service.add_new_project.assert_called_once()
-            mock_mdv_project.assert_called_once()
-            mock_mdv_instance.serve.assert_called_once()
-
-    @patch('mdvtools.dbutils.mdv_server_app.Project')
-    @patch('mdvtools.dbutils.mdv_server_app.MDVProject')
-    @patch('os.listdir')
-    @patch('os.path.isdir')
-    def test_serve_projects_from_filesystem_no_new_projects(self, mock_isdir, mock_listdir, mock_mdv_project, mock_project):
-        """Test when no new projects exist in filesystem."""
-        # Mock filesystem with no projects
-        mock_listdir.return_value = []
-        
-        # Mock database with existing projects
-        mock_project.query.with_entities.return_value.all.return_value = []
-        
-        serve_projects_from_filesystem(self.app, self.temp_dir)
-        
-        # Should handle empty filesystem gracefully
-        mock_mdv_project.assert_not_called()
-
-    @patch('mdvtools.dbutils.mdv_server_app.Project')
-    @patch('mdvtools.dbutils.mdv_server_app.MDVProject')
-    @patch('mdvtools.dbutils.mdv_server_app.ProjectService')
-    @patch('os.listdir')
-    @patch('os.path.isdir')
-    @patch('os.path.exists')
-    def test_serve_projects_from_filesystem_project_service_error(self, mock_exists, mock_isdir, mock_listdir, mock_project_service, mock_mdv_project, mock_project):
-        """Test handling of ProjectService errors."""
-        # Mock filesystem
-        mock_listdir.return_value = ['project1']
-        mock_isdir.return_value = True
-        mock_exists.return_value = True
-        
-        # Mock database
-        mock_project.query.with_entities.return_value.all.return_value = []
-        
-        # Mock project service to return None
-        mock_project_service.add_new_project.return_value = None
-        
-        # Mock MDVProject
-        mock_mdv_instance = MagicMock()
-        mock_mdv_project.return_value = mock_mdv_instance
-        
-        # Mock database session query
-        with patch('mdvtools.dbutils.mdv_server_app.db') as mock_db:
-            mock_query = MagicMock()
-            mock_query.func.max.return_value.scalar.return_value = None
-            mock_db.session.query.return_value = mock_query
-            
-            with self.app.app_context():
-                # Implementation handles errors gracefully; should not raise and should return []
-                created_ids = serve_projects_from_filesystem(self.app, self.temp_dir)
-                self.assertEqual(created_ids, [])
 
 
 class TestCreateFlaskApp(unittest.TestCase):
