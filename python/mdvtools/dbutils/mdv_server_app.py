@@ -411,6 +411,15 @@ def serve_projects_from_db(app):
                     except Exception:
                         # Favor editable by default on unexpected errors (see comment above on writable check)
                         p.set_editable(True)
+
+                    # Keep the name in the project directory current. Projects created
+                    # before that copy existed get it here, and a directory copied to
+                    # another deployment then carries the name this catalog has for it.
+                    try:
+                        p.set_display_name(project.name)
+                    except Exception:
+                        logger.exception(f"Could not write the display name for project {project.id}")
+
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(options=options)
                     logger.info(f"Serving project: {project.path}")

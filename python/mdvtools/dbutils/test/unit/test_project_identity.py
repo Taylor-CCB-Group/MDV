@@ -327,6 +327,23 @@ def test_access_change_writes_the_permission_to_disk(app, tmp_path):
             assert json.load(state_file).get("permission") == "view"
 
 
+def test_startup_writes_the_display_name_of_every_served_project(app, tmp_path):
+    """A project whose directory predates the recovery copy gets its name written
+    on the next boot, so copying that directory elsewhere carries the name."""
+    with app.app_context():
+        directory = write_project_directory(tmp_path / "1")
+        existing = Project()
+        existing.name = "Tumour atlas"
+        existing.path = str(directory)
+        db.session.add(existing)
+        db.session.commit()
+
+        serve_projects_from_db(app)
+
+    with open(directory / "state.json") as state_file:
+        assert json.load(state_file).get("name") == "Tumour atlas"
+
+
 def test_startup_does_not_let_state_json_overwrite_an_access_level(app, tmp_path):
     """The database decides the access level for a project it holds a row for, so
     a stale permission on disk cannot unlock a project that was made read-only."""
