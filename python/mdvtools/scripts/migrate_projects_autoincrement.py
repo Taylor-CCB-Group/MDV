@@ -50,16 +50,25 @@ def _projects_digest(connection):
 
 
 def _existing_indexes(connection):
-    """Index DDL the database holds for the table.
+    """The DDL and indexed columns of every index the database holds for the table.
 
     An index SQLite maintains for a UNIQUE column has no DDL of its own and comes
-    back with the rebuilt table, so those are left out.
+    back with the rebuilt table, so those are left out. The columns are read here
+    because dropping the old table takes its indexes with it.
     """
-    return connection.execute(
+    indexes = connection.execute(
         "SELECT name, sql FROM sqlite_master"
         " WHERE type = 'index' AND tbl_name = ? AND sql IS NOT NULL",
         (TABLE,),
     ).fetchall()
+    return [
+        (
+            name,
+            sql,
+            {row[2] for row in connection.execute(f'PRAGMA index_info("{name}")') if row[2]},
+        )
+        for name, sql in indexes
+    ]
 
 
 def _has_sequence_table(connection):
@@ -171,6 +180,7 @@ def migrate_projects_table(db_path, dry_run=False, backup=True, min_next_id=None
             "copied_columns": shared,
             "dropped_columns": dropped,
             "added_columns": added,
+            "skipped_indexes": [],
             "backup": None,
         }
 
@@ -231,11 +241,17 @@ def migrate_projects_table(db_path, dry_run=False, backup=True, min_next_id=None
             for index in PROJECTS.indexes:
                 connection.execute(_compile(CreateIndex(index)))
             # Dropping the table took every index with it, including any this
-            # deployment added by hand, which the model knows nothing about.
+            # deployment added by hand, which the model knows nothing about. An
+            # index over a column the model no longer has cannot come back, so it
+            # is reported rather than failing the rebuild.
             model_index_names = {index.name for index in PROJECTS.indexes}
-            for name, index_sql in preserved_indexes:
-                if name not in model_index_names:
-                    connection.execute(index_sql)
+            for name, index_sql, indexed_columns in preserved_indexes:
+                if name in model_index_names:
+                    continue
+                if indexed_columns & set(dropped):
+                    summary["skipped_indexes"].append(name)
+                    continue
+                connection.execute(index_sql)
 
             # Start the sequence above every ID this database shows was assigned,
             # so neither the rows just copied nor a retired ID is handed out again.
@@ -316,6 +332,11 @@ def main():
         print(f"Columns in the database but not the model, not copied: {summary['dropped_columns']}")
     if summary.get("added_columns"):
         print(f"Columns in the model but not the database, left at their default: {summary['added_columns']}")
+    if summary.get("skipped_indexes"):
+        print(
+            "Indexes over columns the model no longer has, not recreated: "
+            f"{summary['skipped_indexes']}"
+        )
     if summary.get("next_id"):
         print(f"Next project will be given ID {summary['next_id']}")
     if summary.get("backup"):

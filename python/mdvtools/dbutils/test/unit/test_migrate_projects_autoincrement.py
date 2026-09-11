@@ -187,3 +187,37 @@ def test_min_next_id_reserves_ids_that_no_row_remembers(db_path):
         connection.close()
 
     assert assigned == 100
+
+
+def test_an_index_on_a_dropped_column_is_skipped_rather_than_failing(db_path):
+    """A column the model no longer has cannot carry its indexes over. Replaying
+    one would fail on a column the rebuilt table does not have and roll back a
+    migration that had otherwise finished."""
+    connection = sqlite3.connect(db_path)
+    try:
+        connection.execute("ALTER TABLE projects ADD COLUMN legacy_note TEXT")
+        connection.execute("CREATE INDEX idx_projects_legacy_note ON projects (legacy_note)")
+        connection.execute("CREATE INDEX idx_projects_name ON projects (name)")
+        connection.commit()
+    finally:
+        connection.close()
+
+    summary = migrate_projects_table(db_path)
+
+    assert summary["migrated"] is True
+    assert summary["skipped_indexes"] == ["idx_projects_legacy_note"]
+
+    connection = sqlite3.connect(db_path)
+    try:
+        indexes = {
+            row[0] for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'projects'"
+            )
+        }
+        projects = connection.execute("SELECT count(*) FROM projects").fetchone()[0]
+    finally:
+        connection.close()
+
+    assert "idx_projects_legacy_note" not in indexes
+    assert "idx_projects_name" in indexes
+    assert projects == 2
