@@ -66,6 +66,7 @@ class ProjectService:
             list[dict]: List of project dictionaries, each containing:
                 - id (int): Project ID
                 - name (str): Project name
+                - path (str): Project directory path for internal server checks
                 - lastModified (str): Formatted update timestamp (YYYY-MM-DD HH:MM:SS)
                 - thumbnail (str|None): First available viewImage from project views
                 - readme (str|None): Project README content if available
@@ -107,6 +108,7 @@ class ProjectService:
                 {
                     "id": p.id,
                     "name": p.name,
+                    "path": p.path,
                     "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                     "thumbnail": get_project_thumbnail(p.path),
                     "readme": get_readme_file(p.path),

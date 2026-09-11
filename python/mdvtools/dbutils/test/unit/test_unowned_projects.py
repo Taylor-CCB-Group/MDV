@@ -13,11 +13,16 @@ from flask import Flask
 from mdvtools.dbutils.dbmodels import Project, User, UserProject, db
 from mdvtools.dbutils.mdv_server_app import grant_admins_ownership_of_unowned_projects
 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
+from mdvtools.project_router import ProjectBlueprint
+from mdvtools.websocket import mdv_socketio
 
 
 @pytest.fixture()
 def app(tmp_path):
     app = Flask(__name__)
+    # A scan serves each project it discovers, which initialises the SocketIO
+    # upload handlers the real app creates at startup.
+    mdv_socketio(app)
     app.config.update(
         SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
@@ -48,13 +53,26 @@ def client(app, monkeypatch):
     return app.test_client()
 
 
-def add_unowned_project(tmp_path, name="orphan"):
-    """A catalog row with no user_projects row, as a boot-time rescan creates."""
-    path = tmp_path / name
+@pytest.fixture(autouse=True)
+def clear_route_registry():
+    """ProjectBlueprint.blueprints is class-level, so it outlives a test."""
+    ProjectBlueprint.blueprints.clear()
+    yield
+    ProjectBlueprint.blueprints.clear()
+
+
+def write_project_directory(path):
+    """The files a directory needs to be recognised as an MDV project."""
     path.mkdir()
     (path / "datasources.json").write_text(json.dumps([]))
     (path / "views.json").write_text(json.dumps({}))
     (path / "state.json").write_text(json.dumps({"all_views": [], "permission": "edit"}))
+    return path
+
+
+def add_unowned_project(tmp_path, name="orphan"):
+    """A catalog row with no user_projects row, as a boot-time rescan creates."""
+    path = write_project_directory(tmp_path / name)
     project = Project()
     project.name = name
     project.path = str(path)
@@ -137,10 +155,42 @@ def test_rescan_gives_administrators_a_project_that_was_left_without_an_owner(ap
 
     response = client.get("/rescan_projects")
 
-    assert response.status_code == 302, response.get_data(as_text=True)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert response.json["created_project_ids"] == []
     with app.app_context():
         assignment = UserProject.query.filter_by(project_id=project_id, user_id=administrator_id).one()
         assert assignment.is_owner
+
+
+def test_rescan_gives_every_administrator_a_newly_discovered_project(app, tmp_path, monkeypatch):
+    """A directory copied into the Project root is owned by the administrators,
+    since the scan that discovers it has no user to attribute it to."""
+    from mdvtools.auth import authutils
+    from mdvtools.dbutils.routes import register_routes
+
+    write_project_directory(tmp_path / "copied-in")
+    with app.app_context():
+        first_admin_id = add_user("admin1@example.com", "admin1", is_admin=True).id
+        second_admin_id = add_user("admin2@example.com", "admin2", is_admin=True).id
+
+    monkeypatch.setattr(authutils, "user_project_cache", {})
+    monkeypatch.setattr(authutils, "active_projects_cache", [])
+    monkeypatch.setattr(authutils, "user_cache", {})
+    monkeypatch.setattr(authutils, "all_users_cache", [])
+    with app.app_context():
+        register_routes(app, True)
+
+    client = app.test_client()
+    sign_in(client, first_admin_id, is_admin=True)
+
+    response = client.get("/rescan_projects")
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    created_ids = response.json["created_project_ids"]
+    assert len(created_ids) == 1
+    with app.app_context():
+        owners = {row.user_id for row in UserProject.query.filter_by(project_id=created_ids[0], is_owner=True)}
+        assert owners == {first_admin_id, second_admin_id}
 
 
 def test_administrator_renames_a_project_they_do_not_own(app, client, tmp_path):

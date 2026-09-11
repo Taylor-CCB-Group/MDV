@@ -1,6 +1,7 @@
 import os
 from typing import Any
 from mdvtools.logging_config import get_logger
+from mdvtools.mdvproject import get_unwritable_project_paths
 logger = get_logger(__name__)
 
 # Module-level constants and functions that can be imported
@@ -8,12 +9,31 @@ REQUIRED_FILES = {"views.json", "state.json", "datasources.json"}
 
 
 def register_routes(app, ENABLE_AUTH):
-    from flask import abort, jsonify, session, redirect, url_for, render_template, send_file
+    """Register routes with the Flask app."""
+    from flask import abort, jsonify, session, render_template, send_file
     from mdvtools.auth.authutils import active_projects_cache, user_project_cache, all_users_cache, cache_user_projects
     from mdvtools.dbutils.mdv_server_app import grant_admins_ownership_of_unowned_projects, serve_projects_from_filesystem
-    from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
-    
-    """Register routes with the Flask app."""
+    from mdvtools.dbutils.dbservice import ProjectService
+
+    def project_is_writable(project_data: dict[str, Any]) -> bool:
+        project_path = project_data.get("path")
+        if not project_path:
+            logger.warning(
+                "Cannot determine filesystem writability for project %s because "
+                "its path is missing from the project cache",
+                project_data.get("id"),
+            )
+            return False
+        try:
+            return not get_unwritable_project_paths(project_path)
+        except Exception:
+            logger.exception(
+                "Cannot determine filesystem writability for project %s at '%s'",
+                project_data.get("id"),
+                project_path,
+            )
+            return False
+
     logger.info("Registering routes...")
     # Note: Project management routes (create, import, export, delete, rename, access, share)
     # are now handled by the ProjectManagerExtension
@@ -112,36 +132,42 @@ def register_routes(app, ENABLE_AUTH):
             try:
                 # Serve the projects after checking authentication and admin privileges
                 created_ids = serve_projects_from_filesystem(app, app.config["projects_base_dir"])
+                unwritable_projects = []
 
-                # If auth is enabled, grant owner to current admin and refresh cache
+                # Every administrator owns each project the scan discovers, and
+                # each project that reached the catalog at a boot with no
+                # administrator present, which no later scan would create a row for.
                 if ENABLE_AUTH:
                     try:
-                        user_id = user.get("id") if user else None
-                        if user_id is not None:
-                            for pid in created_ids:
-                                UserProjectService.add_or_update_user_project(user_id=user_id, project_id=pid, is_owner=True)
-                        # A project whose row was created at a boot with no
-                        # administrator present is still unowned, and no scan will
-                        # create a row for it again.
                         grant_admins_ownership_of_unowned_projects()
                         # Refresh caches so /projects reflects new permissions
                         cache_user_projects()
                     except Exception as perm_e:
                         logger.exception(f"Error assigning permissions for new projects {created_ids}: {perm_e}")
+
+                for project_id in created_ids:
+                    project = ProjectService.get_project_by_id(project_id)
+                    if project is None:
+                        continue
+                    project_data = {
+                        "id": project.id,
+                        "name": project.name,
+                        "path": project.path,
+                    }
+                    if not project_is_writable(project_data):
+                        unwritable_projects.append({
+                            "id": project.id,
+                            "name": project.name,
+                        })
             except Exception as e:
                 # Handle potential errors while serving the projects
                 logger.exception(f"Error while serving the projects: {e}")
                 abort(500, description="Error while serving the projects.")
 
-            # If everything goes well, redirect to the 'index' page
-            # Check for MDV_API_ROOT environment variable
-            mdv_api_root = os.getenv('MDV_API_ROOT')
-            if mdv_api_root:
-                logger.info(f"Redirecting to MDV_API_ROOT: {mdv_api_root}")
-                return redirect(mdv_api_root)
-            else:
-                logger.info("MDV_API_ROOT not set, redirecting to index")
-                return redirect(url_for("index"))
+            return jsonify({
+                "created_project_ids": created_ids,
+                "unwritable_projects": unwritable_projects,
+            })
         
         def get_project_owners(project_id):
             owners = []
@@ -194,6 +220,7 @@ def register_routes(app, ENABLE_AUTH):
                             "permissions": user_projects[p["id"]],
                             "owner": get_project_owners(p["id"]),
                             "readme": p.get("readme"),
+                            "writable": project_is_writable(p),
                         }
                         for p in active_projects
                         if p["id"] in allowed_project_ids
@@ -209,6 +236,7 @@ def register_routes(app, ENABLE_AUTH):
                             "permissions": None,
                             "owner": [],
                             "readme": p.get("readme"),
+                            "writable": project_is_writable(p),
                         }
                         for p in active_projects
                     ]

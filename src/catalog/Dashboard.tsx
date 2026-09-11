@@ -68,8 +68,10 @@ const Dashboard: React.FC = () => {
         projects,
         isLoading: projectsLoading,
         error,
+        rescanWarning,
         isErrorModalOpen,
         closeErrorModal,
+        clearRescanWarning,
         fetchProjects,
         createProject,
         deleteProject,
@@ -282,6 +284,15 @@ const Dashboard: React.FC = () => {
                             If your browser asks whether this site can communicate with local apps or devices, allow it for this preview:
                             the Netlify page is only the frontend, and project lists plus <code>/project/:id</code> data are loaded from your local MDV container.
                             No local data is sent to a remote server.
+                        </Alert>
+                    )}
+                    {rescanWarning && (
+                        <Alert
+                            severity="warning"
+                            onClose={clearRescanWarning}
+                            sx={{ mb: 3 }}
+                        >
+                            {rescanWarning}
                         </Alert>
                     )}
                     <Grid container spacing={3} sx={{ mb: 4 }}>

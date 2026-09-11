@@ -268,6 +268,7 @@ def update_cache(user_id=None, project_id=None, user_data=None, project_data=Non
             if existing_project:
                 # Project exists in cache, update only the changed fields
                 existing_project["name"] = project_data.get("name", existing_project["name"])
+                existing_project["path"] = project_data.get("path", existing_project.get("path"))
                 existing_project["lastModified"] = project_data.get("lastModified", existing_project["lastModified"])
                 existing_project["thumbnail"] = project_data.get("thumbnail", existing_project["thumbnail"])
                 logger.info(f"Updated project {project_id} in active projects cache.")
@@ -276,6 +277,7 @@ def update_cache(user_id=None, project_id=None, user_data=None, project_data=Non
                 project_entry = {
                     "id": project_data["id"],
                     "name": project_data["name"],
+                    "path": project_data.get("path"),
                     "lastModified": project_data["lastModified"],
                     "thumbnail": project_data["thumbnail"]
                 }
