@@ -352,13 +352,9 @@ def mdv_project_processing(app, projects_base_dir, filepath, original_filename, 
                             break
 
                 # Copy the files to newly created project path, if project is valid
-                if extracted_project_path is not None:
-                    shutil.copytree(extracted_project_path, project_path, dirs_exist_ok=True)
-                else:
-                    # Clean up the created directory
-                    if os.path.exists(project_path):
-                        shutil.rmtree(project_path)
+                if extracted_project_path is None:
                     raise ValidationError("The uploaded file is not a valid MDV project")
+                shutil.copytree(extracted_project_path, project_path, dirs_exist_ok=True)
 
         # Initialize the project and register it using project name if valid. With
         # no name supplied, keep the one the archive carries before falling back to
@@ -374,9 +370,6 @@ def mdv_project_processing(app, projects_base_dir, filepath, original_filename, 
         new_project = ProjectService.add_new_project(path=project_path, name=final_project_name)
 
         if not new_project:
-            # Clean up on failure
-            if os.path.exists(project_path):
-                shutil.rmtree(project_path)
             raise ValidationError("Failed to register project in database")
         assigned_id = str(new_project.id)
 
@@ -400,14 +393,12 @@ def mdv_project_processing(app, projects_base_dir, filepath, original_filename, 
         }
         return result
         
-    except ValidationError:
-        # Re-raise ValidationError as-is
-        raise
     except Exception as e:
         print(f"Error in mdv_project_processing: {str(e)}")
         db.session.rollback()
 
-        # Clean up project directory if it was created
+        # Clean up project directory if it was created. A rejected archive leaves
+        # one behind that nothing points at and no scan can tell from a project.
         if project_path and os.path.exists(project_path):
             try:
                 shutil.rmtree(project_path)
@@ -417,6 +408,10 @@ def mdv_project_processing(app, projects_base_dir, filepath, original_filename, 
         # Remove the route if it was registered
         if assigned_id is not None:
             ProjectBlueprint.blueprints.pop(assigned_id, None)
+
+        # A rejected archive is already described, so it keeps its own message.
+        if isinstance(e, ValidationError):
+            raise
         raise ValidationError(f"Failed to process MDV project: {str(e)}", status_code=400)
     
 class ValidationError(Exception):

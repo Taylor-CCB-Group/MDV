@@ -12,7 +12,7 @@ from mdvtools.dbutils.dbmodels import Project, db
 from mdvtools.dbutils.dbservice import ProjectService
 from mdvtools.dbutils.mdv_server_app import serve_projects_from_db, serve_projects_from_filesystem
 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
-from mdvtools.file_processing import mdv_project_processing
+from mdvtools.file_processing import ValidationError, mdv_project_processing
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.websocket import mdv_socketio
@@ -71,9 +71,9 @@ def write_project_directory(path, name=None):
     return path
 
 
-def mdv_project_archive(name=None):
+def mdv_project_archive(name=None, permission="edit"):
     """A minimal valid MDV project archive, with the required files at the root."""
-    state = {"all_views": [], "permission": "edit"}
+    state = {"all_views": [], "permission": permission}
     if name is not None:
         state["name"] = name
     buffer = io.BytesIO()
@@ -256,6 +256,63 @@ def test_rescan_skips_a_failing_project_without_leaving_a_row(app, tmp_path, mon
         assert Project.query.count() == 1
 
 
+def test_rescan_unregisters_a_project_whose_row_could_not_be_committed(app, tmp_path, monkeypatch):
+    """Serving registers the route before the row is committed, so a failed commit
+    has to take the route back out. Otherwise the URL answers for a project the
+    catalog does not hold."""
+    write_project_directory(tmp_path / "uncommittable")
+
+    def commit():
+        raise RuntimeError("database went away")
+
+    with app.app_context():
+        monkeypatch.setattr(db.session, "commit", commit)
+        created_ids = serve_projects_from_filesystem(app, str(tmp_path))
+        monkeypatch.undo()
+
+    assert created_ids == []
+    assert ProjectBlueprint.blueprints == {}
+    with app.app_context():
+        assert Project.query.count() == 0
+
+
+def test_import_records_the_archive_permission_in_the_catalog(app, tmp_path):
+    """The database decides a project's access level, so a read-only project has
+    to arrive read-only in the row. A row left editable would have the next
+    startup unlock the project on disk."""
+    with app.app_context():
+        ProjectManagerExtension().register_global_routes(app, app.config)
+
+    client = app.test_client()
+    response = client.post(
+        "/import_project",
+        data={"file": (mdv_project_archive(permission="view"), "project.zip"), "name": "read only"},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200, response.get_data(as_text=True)
+
+    with app.app_context():
+        assert db.session.get(Project, response.json["id"]).access_level == "read-only"
+
+
+def test_startup_treats_an_unrecognised_access_level_as_editable(app, tmp_path):
+    """Only "read-only" locks a project. A row holding anything else keeps the
+    project editable rather than silently locking it on disk."""
+    with app.app_context():
+        directory = write_project_directory(tmp_path / "legacy-project")
+        legacy = Project()
+        legacy.name = "legacy"
+        legacy.path = str(directory)
+        legacy.access_level = "private"
+        db.session.add(legacy)
+        db.session.commit()
+
+        serve_projects_from_db(app)
+
+    with open(directory / "state.json") as state_file:
+        assert json.load(state_file).get("permission") == "edit"
+
+
 def test_rescan_recovers_the_display_name_from_state_json(app, tmp_path):
     """A directory copied in from elsewhere keeps the name it had there. Without
     a name on disk there is nothing to recover, so the directory name is used."""
@@ -363,6 +420,47 @@ def test_startup_does_not_let_state_json_overwrite_an_access_level(app, tmp_path
         assert db.session.get(Project, project_id).access_level == "read-only"
         with open(directory / "state.json") as state_file:
             assert json.load(state_file).get("permission") == "view"
+
+
+def unsafe_archive():
+    """An archive whose entry escapes the directory it is extracted into."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("../escaped.json", "{}")
+    buffer.seek(0)
+    return buffer
+
+
+def test_a_rejected_upload_leaves_no_directory_behind(app, tmp_path):
+    """A rejected archive must not leave its directory in the Project root, where
+    no catalog row points at it and no later scan can tell it from a project."""
+    projects_root = tmp_path / "projects"
+    projects_root.mkdir()
+    archive_path = tmp_path / "unsafe.zip"
+    archive_path.write_bytes(unsafe_archive().getvalue())
+
+    with app.app_context():
+        with pytest.raises(ValidationError):
+            mdv_project_processing(app, str(projects_root), str(archive_path), "unsafe.zip")
+
+    assert list(projects_root.iterdir()) == []
+
+
+def test_a_rejected_import_leaves_no_directory_behind(app, tmp_path):
+    """The import route rejects the same archives and has the same directory to
+    clean up."""
+    with app.app_context():
+        ProjectManagerExtension().register_global_routes(app, app.config)
+
+    client = app.test_client()
+    response = client.post(
+        "/import_project",
+        data={"file": (unsafe_archive(), "unsafe.zip")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_creation_paths_record_the_display_name_on_disk(app, tmp_path):

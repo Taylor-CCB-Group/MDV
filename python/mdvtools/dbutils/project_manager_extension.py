@@ -52,6 +52,14 @@ def is_owner_or_admin(user, permissions):
     return bool(user.get("is_admin", False))
 
 
+class ImportRejected(Exception):
+    """An archive the caller sent that cannot be imported.
+
+    Raised rather than returned so the route's cleanup runs and the directory the
+    archive was being extracted into does not outlive the request.
+    """
+
+
 class ProjectManagerExtension(MDVProjectServerExtension):
     def register_global_routes(self, app: Flask, config: dict):
         ENABLE_AUTH = app.config.get('ENABLE_AUTH', False)
@@ -202,7 +210,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     bad = [n for n in names if n.startswith(("/", "\\")) or ".." in n]
                     if bad:
                         logger.error("In register_routes /import_project: Error - Unsafe entries in ZIP")
-                        return jsonify({"error": "Invalid ZIP file: unsafe paths detected"}), 400
+                        raise ImportRejected("Invalid ZIP file: unsafe paths detected")
 
                     # Find the root directory of the mdv project
                     # TODO: when we cut & pasted this block from routes.py, we didn't copy the find_root_prefix function
@@ -210,7 +218,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     root = find_root_prefix(names)
                     if root is None:
                         logger.error("In register_routes /import_project: Error - Not a valid MDV project")
-                        return jsonify({"error": "Not a valid MDV project"}), 400
+                        raise ImportRejected("Not a valid MDV project")
 
                     # Select the files based in the mdv project
                     members = [n for n in names if n.startswith(root)]
@@ -248,8 +256,12 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     perm = (state.get('permission') or '').lower()
                     is_editable = True if perm == 'edit' else False if perm == 'view' else False
                     p.set_editable(is_editable)
+                    # The row decides the access level from here on, so it has to
+                    # carry the permission the archive arrived with.
+                    new_project.access_level = 'editable' if is_editable else 'read-only'
                 except Exception:
                     p.set_editable(False)
+                    new_project.access_level = 'read-only'
                 p.set_display_name(new_project.name)
                 p.serve(app=app, open_browser=False, backend_db=True)
 
@@ -320,6 +332,11 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         logger.info("In register_routes -/import_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
                     except Exception as blueprint_error:
                         logger.exception(f"In register_routes -/import_project : Error removing blueprint: {blueprint_error}")
+
+                # A rejected archive is the caller's, so it keeps its own message
+                # and a 400 rather than being reported as a server error.
+                if isinstance(e, ImportRejected):
+                    return jsonify({"error": str(e)}), 400
                 return jsonify({"error": str(e)}), 500
 
         logger.info("Route registered: /import_project")

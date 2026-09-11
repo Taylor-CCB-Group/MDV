@@ -295,9 +295,12 @@ class MDVProject:
                 ", ".join(unwritable_paths),
             )
             return
-        c = self.state
-        c["permission"] = "edit" if edit else "view"
-        self.state = c
+        # The whole file is rewritten, so a concurrent write to another field
+        # would otherwise be lost.
+        with self.lock("write"):
+            c = self.state
+            c["permission"] = "edit" if edit else "view"
+            self.state = c
 
     def set_display_name(self, name):
         """Record the project's display name in state.json.
@@ -315,9 +318,12 @@ class MDVProject:
                 ", ".join(unwritable_paths),
             )
             return
-        c = self.state
-        c["name"] = name
-        self.state = c
+        # The whole file is rewritten, so a concurrent write to another field
+        # would otherwise be lost.
+        with self.lock("write"):
+            c = self.state
+            c["name"] = name
+            self.state = c
 
     def set_chat_enabled(self, chat_enabled=True):
         # would prefer not to be adding methods in this file, maybe it could be in chat_server_extension.py

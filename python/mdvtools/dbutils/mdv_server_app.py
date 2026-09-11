@@ -403,8 +403,9 @@ def serve_projects_from_db(app):
                             if desired_level is not None:
                                 ProjectService.change_project_access(project.id, desired_level)
                                 access_level_val = desired_level
-                        # Default to editable when access level is missing/unknown or non-string (e.g., MagicMock)
-                        is_editable = (access_level_val == 'editable') if isinstance(access_level_val, str) else True
+                        # Only 'read-only' locks a project. A missing or unrecognised
+                        # value leaves it editable rather than locking it on disk.
+                        is_editable = access_level_val != 'read-only'
                         # nb this will warn in log if the project isn't writable by current user
                         # avoiding touching other aspects of surrounding logic for now.
                         p.set_editable(is_editable)
@@ -491,6 +492,7 @@ def serve_projects_from_filesystem(app, base_dir):
             logger.info(f"Processing project path: {project_path}")
             
             if os.path.exists(project_path):
+                assigned_id = None
                 try:
                     # No row exists for this directory, so state.json is the only record
                     # of the name and permission it was last served with. A directory
@@ -510,6 +512,7 @@ def serve_projects_from_filesystem(app, base_dir):
                     if new_project is None:
                         raise ValueError(f"Failed to add project '{project_name}' to the database.")
                     new_project.access_level = 'editable' if is_editable else 'read-only'
+                    assigned_id = str(new_project.id)
 
                     p = MDVProject(dir=project_path, id=str(new_project.id), backend_db= True)
                     p.set_editable(is_editable)
@@ -554,6 +557,11 @@ def serve_projects_from_filesystem(app, base_dir):
                         logger.info("Skipping file sync for new project %s (ENABLE_FILE_SYNC disabled)", new_project.id)
                 except Exception as e:
                     logger.exception(f"In serve_projects_from_filesystem: Error creating/serving project at path '{project_path}': {e}")
+                    # Serving registers the route before the row is committed, so a
+                    # route can outlive the row it was registered for and answer for
+                    # a project the catalog does not hold.
+                    if assigned_id is not None:
+                        ProjectBlueprint.blueprints.pop(assigned_id, None)
                     # Discard this project's pending row so the next iteration's
                     # commit does not persist it.
                     db.session.rollback()
