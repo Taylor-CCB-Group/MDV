@@ -10,13 +10,13 @@ from sqlalchemy import text, create_engine
 from sqlalchemy.exc import OperationalError
 from flask import Flask
 from mdvtools.server import add_safe_headers
-from mdvtools.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprint
-from mdvtools.dbutils.dbmodels import db, Project
+from mdvtools.dbutils.dbmodels import db, Project, User, UserProject
 from mdvtools.dbutils.routes import register_routes
 from mdvtools.auth.register_auth_routes import register_auth_routes
 from mdvtools.auth.authutils import register_before_request_auth, get_auth_provider, cache_user_projects
-from mdvtools.dbutils.dbservice import ProjectService, FileService
+from mdvtools.dbutils.dbservice import ProjectService, FileService, UserProjectService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
 from mdvtools.dbutils.server_options import get_server_options_for_db_projects
@@ -391,24 +391,36 @@ def serve_projects_from_db(app):
             if os.path.exists(project.path):
                 try:
                     p = MDVProject(dir=project.path, id=str(project.id), backend_db= True)
-                    # Sync DB access level from state.json if present, then serve with resulting editability
+                    # The row decides the access level. state.json is only consulted to
+                    # fill a row that has none, which legacy rows predating the column
+                    # can be. Serving then writes the resulting permission back to disk.
                     try:
-                        state = p.state or {}
-                        perm = (state.get('permission') or '').lower()
-                        desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
-                        if desired_level is not None and desired_level != getattr(project, 'access_level', None):
-                            ProjectService.change_project_access(project.id, desired_level)
-                            is_editable = (desired_level == 'editable')
-                        else:
-                            # Default to editable when access level is missing/unknown or non-string (e.g., MagicMock)
-                            access_level_val = getattr(project, 'access_level', None)
-                            is_editable = (access_level_val == 'editable') if isinstance(access_level_val, str) else True
+                        access_level_val = getattr(project, 'access_level', None)
+                        if not (isinstance(access_level_val, str) and access_level_val):
+                            state = p.state or {}
+                            perm = (state.get('permission') or '').lower()
+                            desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
+                            if desired_level is not None:
+                                ProjectService.change_project_access(project.id, desired_level)
+                                access_level_val = desired_level
+                        # Only 'read-only' locks a project. A missing or unrecognised
+                        # value leaves it editable rather than locking it on disk.
+                        is_editable = access_level_val != 'read-only'
                         # nb this will warn in log if the project isn't writable by current user
                         # avoiding touching other aspects of surrounding logic for now.
                         p.set_editable(is_editable)
                     except Exception:
                         # Favor editable by default on unexpected errors (see comment above on writable check)
                         p.set_editable(True)
+
+                    # Keep the name in the project directory current. Projects created
+                    # before that copy existed get it here, and a directory copied to
+                    # another deployment then carries the name this catalog has for it.
+                    try:
+                        p.set_display_name(project.name)
+                    except Exception:
+                        logger.exception(f"Could not write the display name for project {project.id}")
+
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(options=options)
                     logger.info(f"Serving project: {project.path}")
@@ -480,67 +492,40 @@ def serve_projects_from_filesystem(app, base_dir):
             logger.info(f"Processing project path: {project_path}")
             
             if os.path.exists(project_path):
+                assigned_id = None
                 try:
-                    project_name = os.path.basename(project_path)
-
-                    # Get the next ID from the database
-                    next_id = db.session.query(db.func.max(Project.id)).scalar()
-                    if next_id is None:
-                        next_id = 1
-                    else:
-                        next_id += 1
-
-                    p = MDVProject(dir=project_path, id= str(next_id), backend_db= True)
-                    # Respect existing state.json permission if present; default to editable when unspecified
+                    # No row exists for this directory, so state.json is the only record
+                    # of the name and permission it was last served with. A directory
+                    # copied in from another deployment keeps both. Fall back to the
+                    # directory name, and to editable, when it says nothing.
                     try:
-                        state = p.state or {}
-                        perm = (state.get('permission') or '').lower()
-                        is_editable = True if perm == 'edit' else False if perm == 'view' else True
-                        p.set_editable(is_editable)
+                        state = get_json(os.path.join(project_path, "state.json")) or {}
                     except Exception:
-                        p.set_editable(True)
-                    p.serve(options=options) 
-                    logger.info(f"Serving project: {project_path}")
+                        state = {}
+                    project_name = state.get('name') or os.path.basename(project_path)
+                    perm = (state.get('permission') or '').lower()
+                    is_editable = False if perm == 'view' else True
 
-                    # Create a new Project record in the database with the default name
+                    # Create a new Project record in the database. The database assigns
+                    # the Project ID; the directory keeps the name it was discovered under.
                     new_project = ProjectService.add_new_project(name=project_name, path=project_path)
                     if new_project is None:
                         raise ValueError(f"Failed to add project '{project_name}' to the database.")
-                    
-                    logger.info(f"Added project to DB: {new_project}")
+                    new_project.access_level = 'editable' if is_editable else 'read-only'
+                    assigned_id = str(new_project.id)
+
+                    p = MDVProject(dir=project_path, id=str(new_project.id), backend_db= True)
+                    p.set_editable(is_editable)
+                    # Record the name even when it came from state.json, so a name
+                    # derived from the directory is only ever derived once.
+                    p.set_display_name(new_project.name)
+                    p.serve(options=options)
+                    logger.info(f"Serving project: {project_path}")
+
+                    db.session.commit()
+                    logger.info(f"Added project {new_project.id} to DB from {project_path}")
                     created_project_ids.append(new_project.id)
-                    # One-time sync: initialize DB access_level from state.json.permission
-                    try:
-                        state = p.state or {}
-                        perm = (state.get('permission') or '').lower()
-                        desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
-                        if desired_level is not None:
-                            ProjectService.change_project_access(new_project.id, desired_level)
-                    except Exception:
-                        pass
 
-                    # Rename directory to use project ID as folder name
-                    """
-                    project_id_str = str(new_project.id)
-                    desired_path = os.path.join(app.config["projects_base_dir"], project_id_str)
-
-                    if project_path != desired_path:
-                        try:
-                            # Rename the directory
-                            os.rename(project_path, desired_path)
-                            logger.info(f"Renamed project folder from {project_path} to {desired_path}")
-
-                            # Update project path in DB
-                            new_project.path = desired_path
-                            db.session.commit()
-                            logger.info(f"Updated project path in DB for project ID {new_project.id}")
-
-                            # Also update local reference for downstream operations (like file sync)
-                            project_path = desired_path
-
-                        except Exception as rename_error:
-                            logger.exception(f"Failed to rename project directory or update DB for project ID {new_project.id}: {rename_error}")
-                    """
                     # Auth-related setup
                     if ENABLE_AUTH:
                         try:
@@ -572,6 +557,14 @@ def serve_projects_from_filesystem(app, base_dir):
                         logger.info("Skipping file sync for new project %s (ENABLE_FILE_SYNC disabled)", new_project.id)
                 except Exception as e:
                     logger.exception(f"In serve_projects_from_filesystem: Error creating/serving project at path '{project_path}': {e}")
+                    # Serving registers the route before the row is committed, so a
+                    # route can outlive the row it was registered for and answer for
+                    # a project the catalog does not hold.
+                    if assigned_id is not None:
+                        ProjectBlueprint.blueprints.pop(assigned_id, None)
+                    # Discard this project's pending row so the next iteration's
+                    # commit does not persist it.
+                    db.session.rollback()
                     failed_project_paths.append(project_path)
                     # continue to next project_path without raising
             else:
@@ -587,18 +580,63 @@ def serve_projects_from_filesystem(app, base_dir):
     return created_project_ids
 
 
+def grant_admins_ownership_of_unowned_projects():
+    """Make every administrator an owner of each active project that has no owner.
+
+    A scan has no user to attribute a project to, and the project list only shows
+    a user the projects they hold a permission row for, so a project that arrives
+    by file copy would otherwise be invisible to everyone. An owner assigned
+    afterwards through the sharing routes can remove the administrators.
+
+    Returns the Project IDs that were given owners.
+    """
+    owned_ids = {
+        row.project_id
+        for row in UserProject.query.filter_by(is_owner=True).with_entities(UserProject.project_id).all()
+    }
+    unowned_ids = [
+        row.id
+        for row in Project.query.filter_by(is_deleted=False).with_entities(Project.id).all()
+        if row.id not in owned_ids
+    ]
+    if not unowned_ids:
+        return []
+
+    admin_ids = [row.id for row in User.query.filter_by(is_admin=True).with_entities(User.id).all()]
+    if not admin_ids:
+        logger.info(f"Projects {unowned_ids} have no owner and there is no administrator to give them to")
+        return []
+
+    for project_id in unowned_ids:
+        for admin_id in admin_ids:
+            UserProjectService.add_or_update_user_project(user_id=admin_id, project_id=project_id, is_owner=True)
+    logger.info(f"Gave administrators {admin_ids} ownership of projects {unowned_ids}")
+    return unowned_ids
+
+
 # Create the app object at the module level
 app = None
-try:
-    app = create_flask_app()
-    
-    with app.app_context():
-        logger.info("Serving projects from database")
-        serve_projects_from_db(app)
-        logger.info("Starting - create_projects_from_filesystem")
-        serve_projects_from_filesystem(app, app.config['projects_base_dir'])
-except Exception as e:
-    logger.exception(f"Error during app initialization: {e}")
+# Importing this module starts the server: it builds the app, connects to the
+# database and registers a route for every project it finds, creating rows for
+# directories that have none. Anything that only needs a function from here sets
+# MDV_SKIP_SERVER_STARTUP=1 first.
+if os.environ.get('MDV_SKIP_SERVER_STARTUP') != '1':
+    try:
+        app = create_flask_app()
+
+        with app.app_context():
+            logger.info("Serving projects from database")
+            serve_projects_from_db(app)
+            logger.info("Starting - create_projects_from_filesystem")
+            serve_projects_from_filesystem(app, app.config['projects_base_dir'])
+            if ENABLE_AUTH:
+                # A directory copied into the Project root arrives with no owner,
+                # and startup has no user to attribute it to. The caches were
+                # filled before the scan ran, so they are rebuilt here.
+                if grant_admins_ownership_of_unowned_projects():
+                    cache_user_projects()
+    except Exception as e:
+        logger.exception(f"Error during app initialization: {e}")
 
 if __name__ == '__main__':
     logger.info("Inside main..")

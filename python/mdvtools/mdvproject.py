@@ -295,9 +295,35 @@ class MDVProject:
                 ", ".join(unwritable_paths),
             )
             return
-        c = self.state
-        c["permission"] = "edit" if edit else "view"
-        self.state = c
+        # The whole file is rewritten, so a concurrent write to another field
+        # would otherwise be lost.
+        with self.lock("write"):
+            c = self.state
+            c["permission"] = "edit" if edit else "view"
+            self.state = c
+
+    def set_display_name(self, name):
+        """Record the project's display name in state.json.
+
+        The database is authoritative for the name. This copy is what a rescan
+        reads when it finds a directory with no catalog row.
+        """
+        unwritable_paths = self.unwritable_paths
+        if unwritable_paths:
+            logger.warning(
+                "Cannot record the display name of project '%s' because the process "
+                "lacks write access to these paths (the project directory also "
+                "requires execute access): %s",
+                self.dir,
+                ", ".join(unwritable_paths),
+            )
+            return
+        # The whole file is rewritten, so a concurrent write to another field
+        # would otherwise be lost.
+        with self.lock("write"):
+            c = self.state
+            c["name"] = name
+            self.state = c
 
     def set_chat_enabled(self, chat_enabled=True):
         # would prefer not to be adding methods in this file, maybe it could be in chat_server_extension.py
