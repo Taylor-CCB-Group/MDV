@@ -1,14 +1,17 @@
 """Tests for the script that rebuilds a SQLite database so Project IDs are never reused."""
 
+import logging
 import sqlite3
 from contextlib import closing
 from typing import NamedTuple
 
 import pytest
+from flask import Flask
 from sqlalchemy.dialects import sqlite
 from sqlalchemy.schema import CreateIndex, CreateTable
 
 from mdvtools.dbutils.dbmodels import db
+from mdvtools.dbutils.mdv_server_app import warn_if_project_ids_can_be_reused
 from mdvtools.scripts.migrate_projects_autoincrement import main
 
 # Every NOT NULL column in the models has a Python-side default only, so raw SQL
@@ -99,6 +102,21 @@ def run_sql(path, statements):
         for statement in statements:
             connection.execute(statement)
         connection.commit()
+
+
+def app_for(database_uri):
+    app = Flask(__name__)
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
+    db.init_app(app)
+    return app
+
+
+def app_warnings(caplog):
+    return [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "mdvtools.dbutils.mdv_server_app" and record.levelno >= logging.WARNING
+    ]
 
 
 @pytest.fixture()
@@ -242,3 +260,22 @@ def test_a_foreign_key_violation_already_in_the_original_is_reported_and_does_no
 
     assert "user_projects row 3" in capsys.readouterr().out
     assert (tmp_path / "mdv.sqlite3.pre-autoincrement").exists()
+
+
+def test_the_app_warns_when_a_sqlite_projects_table_can_reuse_ids(db_path, caplog):
+    app = app_for(f"sqlite:///{db_path}")
+
+    with app.app_context():
+        warn_if_project_ids_can_be_reused()
+
+    assert any("migrate_projects_autoincrement.py" in message for message in app_warnings(caplog))
+
+
+def test_the_app_does_not_warn_for_a_projects_table_built_from_the_models(caplog):
+    app = app_for("sqlite:///:memory:")
+
+    with app.app_context():
+        db.create_all()
+        warn_if_project_ids_can_be_reused()
+
+    assert app_warnings(caplog) == []

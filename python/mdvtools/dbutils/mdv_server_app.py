@@ -91,6 +91,7 @@ def create_flask_app(config_name=None):
                 logger.info("Created database tables")
             else:
                 logger.info("Database tables already exist")
+            warn_if_project_ids_can_be_reused()
 
             if ENABLE_AUTH:
                 try:
@@ -364,6 +365,33 @@ def tables_exist():
         #logger.info("printing table names")
         #print(inspector.get_table_names())
         return inspector.get_table_names()
+
+def warn_if_project_ids_can_be_reused():
+    """Log a warning when a SQLite projects table can give a purged project's ID to
+    the next project.
+
+    The models declare the table AUTOINCREMENT, but SQLite only reads that when the
+    table is created, so a database created before the declaration keeps reusing
+    IDs until migrate_projects_autoincrement.py rebuilds it. The check never stops
+    the app from starting.
+    """
+    try:
+        # PostgreSQL sequences never hand out an ID twice.
+        if db.engine.dialect.name != "sqlite":
+            return
+        with db.engine.connect() as connection:
+            projects_sql = connection.execute(
+                text("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projects'")
+            ).scalar()
+    except Exception:
+        logger.exception("Could not check whether the projects table can reuse Project IDs")
+        return
+    if projects_sql and "AUTOINCREMENT" not in projects_sql.upper():
+        logger.warning(
+            "The projects table is not declared AUTOINCREMENT, so SQLite can give a purged "
+            "project's ID to the next project. Stop the app and run "
+            "mdvtools/scripts/migrate_projects_autoincrement.py, whose --help gives the steps."
+        )
 
 def is_valid_mdv_project(path: str):
     if not os.path.isdir(path):
