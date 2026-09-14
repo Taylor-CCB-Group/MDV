@@ -195,3 +195,50 @@ def test_keep_extras_brings_across_something_the_models_do_not_declare(db_path, 
 
     with closing(sqlite3.connect(db_path)) as connection:
         assert connection.execute(extra.query).fetchall() == extra.expected
+
+
+@pytest.mark.parametrize("suffix", ["-journal", "-wal", "-shm"])
+def test_a_file_sqlite_keeps_beside_the_database_stops_the_run(db_path, tmp_path, capsys, suffix):
+    db_path.with_name(db_path.name + suffix).write_bytes(b"")
+    before = directory_contents(tmp_path)
+
+    assert main([str(db_path)]) == 1
+
+    assert f"{db_path.name}{suffix}" in capsys.readouterr().err
+    assert directory_contents(tmp_path) == before
+
+
+def test_a_null_in_a_not_null_column_stops_the_run_and_removes_the_partial_file(db_path, tmp_path, capsys):
+    """The models declare user_preferences.preference NOT NULL, and a table created
+    without that constraint can hold a NULL the new table rejects."""
+    run_sql(
+        db_path,
+        [
+            "DROP TABLE user_preferences",
+            "CREATE TABLE user_preferences (id INTEGER PRIMARY KEY, preference TEXT, data JSON, user_id INTEGER)",
+            "INSERT INTO user_preferences (preference, user_id) VALUES (NULL, 1)",
+        ],
+    )
+    before = directory_contents(tmp_path)
+
+    assert main([str(db_path)]) == 1
+
+    assert "user_preferences.preference" in capsys.readouterr().err
+    assert directory_contents(tmp_path) == before
+
+
+def test_a_foreign_key_violation_already_in_the_original_is_reported_and_does_not_block_the_swap(
+    db_path, tmp_path, capsys
+):
+    run_sql(
+        db_path,
+        [
+            "INSERT INTO user_projects (user_id, project_id, can_read, can_write, is_owner)"
+            " VALUES (1, 99, 1, 1, 1)"
+        ],
+    )
+
+    assert main([str(db_path)]) == 0
+
+    assert "user_projects row 3" in capsys.readouterr().out
+    assert (tmp_path / "mdv.sqlite3.pre-autoincrement").exists()

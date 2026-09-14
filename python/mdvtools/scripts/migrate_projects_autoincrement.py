@@ -11,7 +11,12 @@ row into it and swaps it in, keeping the original beside it as
 A table or nullable column that the models declare and the database lacks is
 created empty. The run stops and lists anything the database holds that the models
 do not declare, which can be a table, column, index, trigger, view or non-zero
-user_version. Pass --keep-extras to copy those into the new database.
+user_version. Pass --keep-extras to copy those into the new database. Rows that
+already break a foreign key are copied as they are and listed.
+
+The run also stops if a -journal, -wal or -shm file sits beside the database, or if
+the database is in WAL mode. If a copied row breaks a constraint, the run stops,
+removes the file it was building and leaves the original untouched.
 
 A dry run writes nothing, so it is safe at any time inside the running app
 container. It prints the rows in each table and the ID the next project will get:
@@ -37,6 +42,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+from collections import Counter
 from contextlib import closing
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -110,11 +116,15 @@ def _print_list(heading, lines, file=None):
         print(f"  {line}", file=file)
 
 
-def _print_report(comparison, rows, next_id):
+def _print_report(comparison, violations, rows, next_id):
     for heading, lines in (
         ("Tables the models declare and the database lacks, created empty:", comparison.missing_tables),
         ("Columns the models declare and the database lacks, left empty:", comparison.missing_columns),
         ("Copied from the database, though the models do not declare them:", comparison.extras()),
+        (
+            "Rows that already break a foreign key, copied as they are:",
+            [f"{table} row {rowid} has no matching row in {parent}" for table, rowid, parent, _ in violations],
+        ),
         ("Rows per table:", [f"{name}: {count}" for name, count in rows.items()]),
     ):
         if lines:
@@ -178,14 +188,18 @@ def _compare(connection):
     return comparison
 
 
-def _build_from_models(new_path, original_path, comparison, sequence):
+def _build_from_models(new_path, original_path, comparison, sequence, violations):
     """Create the models' tables in new_path, copy the original's rows into them,
     set the projects sequence and check the result.
 
+    violations are the rows PRAGMA foreign_key_check reports in the original.
     Returns the rows in each copied table.
     """
     with closing(sqlite3.connect(new_path.as_uri(), uri=True, isolation_level=None)) as connection:
         connection.execute("ATTACH DATABASE ? AS original", (original_path.as_uri() + "?mode=ro",))
+        # Rows that already break a foreign key in the original are copied as they
+        # are. The check after the copy compares them with the new file.
+        connection.execute("PRAGMA foreign_keys = OFF")
 
         connection.execute("BEGIN")
         for table in db.metadata.sorted_tables:
@@ -238,6 +252,17 @@ def _build_from_models(new_path, original_path, comparison, sequence):
         if integrity != [("ok",)]:
             raise RuntimeError(f"The new database failed its integrity check: {integrity}")
 
+        # Counted per table and parent, because a table without an INTEGER PRIMARY
+        # KEY can give copied rows new rowids.
+        introduced = Counter(
+            (table, parent)
+            for table, _, parent, _ in connection.execute("PRAGMA main.foreign_key_check")
+        ) - Counter((table, parent) for table, _, parent, _ in violations)
+        if introduced:
+            raise RuntimeError(
+                f"The new database breaks foreign keys the original does not: {dict(introduced)}"
+            )
+
         sequence_rows = connection.execute(
             "SELECT seq FROM main.sqlite_sequence WHERE name = 'projects'"
         ).fetchall()
@@ -280,6 +305,33 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     db_path = Path(args.database).resolve()
+    if not db_path.is_file():
+        print(f"There is no database at {db_path}.", file=sys.stderr)
+        return 1
+    # Each of these files means a connection is open or did not close cleanly. SQLite
+    # would read one left beside the new file as belonging to it.
+    for suffix in ("-journal", "-wal", "-shm"):
+        sidecar = db_path.with_name(db_path.name + suffix)
+        if sidecar.exists():
+            print(
+                f"{sidecar} exists, so something may still have the database open or may not "
+                "have closed it cleanly. Stop the app before migrating. If the file is still "
+                "there, start and stop the app once so SQLite can recover the database.",
+                file=sys.stderr,
+            )
+            return 1
+    # Bytes 18 and 19 of the header are 2 for a database in WAL mode, where even a
+    # read-only connection can create -wal and -shm files.
+    with open(db_path, "rb") as database_file:
+        header = database_file.read(20)
+    if 2 in header[18:20]:
+        print(
+            f"{db_path} is in WAL mode. Switch it back with PRAGMA journal_mode = DELETE "
+            "before migrating.",
+            file=sys.stderr,
+        )
+        return 1
+
     with closing(sqlite3.connect(db_path.as_uri() + "?mode=ro", uri=True)) as original:
         projects = original.execute(
             "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projects'"
@@ -295,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
         highest_id = 0
         if "id" in comparison.copy_columns.get("projects", []):
             highest_id = original.execute("SELECT max(id) FROM projects").fetchone()[0] or 0
+        violations = original.execute("PRAGMA foreign_key_check").fetchall()
 
     backup_path = db_path.with_name(db_path.name + BACKUP_SUFFIX)
     if backup_path.exists():
@@ -319,7 +372,7 @@ def main(argv: list[str] | None = None) -> int:
     sequence = highest_id if args.min_next_id is None else max(highest_id, args.min_next_id - 1)
     next_id = sequence + 1
     if args.dry_run:
-        _print_report(comparison, rows, next_id)
+        _print_report(comparison, violations, rows, next_id)
         print("This was a dry run, so nothing was written.")
         return 0
 
@@ -327,17 +380,26 @@ def main(argv: list[str] | None = None) -> int:
     os.close(descriptor)
     new_path = Path(new_name)
 
-    rows = _build_from_models(new_path, db_path, comparison, sequence)
+    try:
+        rows = _build_from_models(new_path, db_path, comparison, sequence, violations)
+        # The new file replaces the original under the same name, so it takes the
+        # original's permissions and reaches the disk before either rename.
+        shutil.copymode(db_path, new_path)
+        _fsync(new_path)
+    except Exception as error:
+        new_path.unlink(missing_ok=True)
+        print(
+            "The migration stopped and the original database is unchanged. "
+            f"{type(error).__name__}: {error}",
+            file=sys.stderr,
+        )
+        return 1
 
-    # The new file replaces the original under the same name, so it takes the
-    # original's permissions and reaches the disk before either rename.
-    shutil.copymode(db_path, new_path)
-    _fsync(new_path)
     os.rename(db_path, backup_path)
     os.rename(new_path, db_path)
     _fsync(db_path.parent)
 
-    _print_report(comparison, rows, next_id)
+    _print_report(comparison, violations, rows, next_id)
     print(f"The original database is now at {backup_path}")
     return 0
 
