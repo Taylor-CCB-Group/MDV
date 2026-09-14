@@ -2,6 +2,7 @@
 
 import sqlite3
 from contextlib import closing
+from typing import NamedTuple
 
 import pytest
 from sqlalchemy.dialects import sqlite
@@ -27,6 +28,59 @@ INSERT_OWNER = (
 )
 
 
+class Extra(NamedTuple):
+    """Something a deployment added that the models do not declare."""
+
+    statements: list[str]
+    name: str
+    # Run against the migrated database to show the extra came across.
+    query: str
+    expected: list[tuple]
+
+
+EXTRAS = {
+    "table": Extra(
+        [
+            "CREATE TABLE legacy_notes (id INTEGER PRIMARY KEY, note TEXT)",
+            "INSERT INTO legacy_notes (note) VALUES ('kept')",
+        ],
+        "legacy_notes",
+        "SELECT note FROM legacy_notes",
+        [("kept",)],
+    ),
+    "column": Extra(
+        [
+            "ALTER TABLE projects ADD COLUMN legacy_note TEXT",
+            "UPDATE projects SET legacy_note = 'kept' WHERE id = 1",
+        ],
+        "legacy_note",
+        "SELECT legacy_note FROM projects WHERE id = 1",
+        [("kept",)],
+    ),
+    "index": Extra(
+        ["CREATE INDEX idx_projects_name ON projects (name)"],
+        "idx_projects_name",
+        "SELECT type FROM sqlite_master WHERE name = 'idx_projects_name'",
+        [("index",)],
+    ),
+    "trigger": Extra(
+        [
+            "CREATE TRIGGER touch_project AFTER UPDATE OF name ON projects"
+            " BEGIN UPDATE projects SET update_timestamp = '2026-09-14' WHERE id = new.id; END"
+        ],
+        "touch_project",
+        "SELECT type FROM sqlite_master WHERE name = 'touch_project'",
+        [("trigger",)],
+    ),
+    "view": Extra(
+        ["CREATE VIEW live_projects AS SELECT name FROM projects WHERE is_deleted = 0"],
+        "live_projects",
+        "SELECT name FROM live_projects ORDER BY name",
+        [("Pilot cohort",), ("Tumour atlas",)],
+    ),
+}
+
+
 def compile_sqlite(element):
     return str(element.compile(dialect=sqlite.dialect()))
 
@@ -38,6 +92,13 @@ def table_rows(path, table):
 
 def directory_contents(directory):
     return {path.name: path.read_bytes() for path in directory.iterdir()}
+
+
+def run_sql(path, statements):
+    with closing(sqlite3.connect(path)) as connection:
+        for statement in statements:
+            connection.execute(statement)
+        connection.commit()
 
 
 @pytest.fixture()
@@ -113,3 +174,24 @@ def test_min_next_id_sets_the_next_id(db_path):
         connection.commit()
 
     assert new_id == 100
+
+
+@pytest.mark.parametrize("extra", EXTRAS.values(), ids=list(EXTRAS))
+def test_something_the_models_do_not_declare_stops_the_run(db_path, tmp_path, capsys, extra):
+    run_sql(db_path, extra.statements)
+    before = directory_contents(tmp_path)
+
+    assert main([str(db_path)]) == 1
+
+    assert extra.name in capsys.readouterr().err
+    assert directory_contents(tmp_path) == before
+
+
+@pytest.mark.parametrize("extra", EXTRAS.values(), ids=list(EXTRAS))
+def test_keep_extras_brings_across_something_the_models_do_not_declare(db_path, extra):
+    run_sql(db_path, extra.statements)
+
+    assert main([str(db_path), "--keep-extras"]) == 0
+
+    with closing(sqlite3.connect(db_path)) as connection:
+        assert connection.execute(extra.query).fetchall() == extra.expected
