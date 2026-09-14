@@ -36,6 +36,10 @@ def table_rows(path, table):
         return connection.execute(f'SELECT * FROM "{table}" ORDER BY rowid').fetchall()
 
 
+def directory_contents(directory):
+    return {path.name: path.read_bytes() for path in directory.iterdir()}
+
+
 @pytest.fixture()
 def db_path(tmp_path):
     """A database as the app created it before projects was declared AUTOINCREMENT.
@@ -79,3 +83,33 @@ def test_every_table_keeps_its_rows_and_the_original_is_kept_unchanged(db_path, 
     assert backup.read_bytes() == original
     for table in db.metadata.sorted_tables:
         assert table_rows(db_path, table.name) == table_rows(backup, table.name), table.name
+
+
+def test_an_already_migrated_database_reports_nothing_to_do_and_writes_nothing(db_path, tmp_path, capsys):
+    assert main([str(db_path)]) == 0
+    capsys.readouterr()
+    before = directory_contents(tmp_path)
+
+    assert main([str(db_path)]) == 0
+
+    assert "nothing to do" in capsys.readouterr().out
+    assert directory_contents(tmp_path) == before
+
+
+def test_a_dry_run_writes_nothing_and_reports_the_next_id(db_path, tmp_path, capsys):
+    before = directory_contents(tmp_path)
+
+    assert main([str(db_path), "--dry-run"]) == 0
+
+    assert "Next project ID: 3" in capsys.readouterr().out
+    assert directory_contents(tmp_path) == before
+
+
+def test_min_next_id_sets_the_next_id(db_path):
+    assert main([str(db_path), "--min-next-id", "100"]) == 0
+
+    with closing(sqlite3.connect(db_path)) as connection:
+        new_id = connection.execute(INSERT_PROJECT, ("Third project", "/app/mdv/third")).lastrowid
+        connection.commit()
+
+    assert new_id == 100

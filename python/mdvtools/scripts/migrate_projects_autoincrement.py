@@ -8,6 +8,11 @@ it is rebuilt. This script builds a new database file from the models, copies ev
 row into it and swaps it in, keeping the original beside it as
 <name>.pre-autoincrement.
 
+A dry run writes nothing, so it is safe at any time inside the running app
+container. It prints the rows in each table and the ID the next project will get:
+
+    docker compose exec <service> uv run python mdvtools/scripts/migrate_projects_autoincrement.py --dry-run
+
 Stop the app before migrating, and run the script in a one-off container:
 
     docker compose stop <service>
@@ -54,11 +59,17 @@ def _fsync(path):
         os.close(descriptor)
 
 
-def _build_from_models(new_path, original_path):
-    """Create the models' tables in new_path, copy the original's rows into them and
-    check the result.
+def _print_rows(rows):
+    print("Rows per table:")
+    for table_name, count in rows.items():
+        print(f"  {table_name}: {count}")
 
-    Returns the rows in each table and the next Project ID.
+
+def _build_from_models(new_path, original_path, sequence):
+    """Create the models' tables in new_path, copy the original's rows into them,
+    set the projects sequence and check the result.
+
+    Returns the rows in each table.
     """
     with closing(sqlite3.connect(new_path.as_uri(), uri=True, isolation_level=None)) as connection:
         connection.execute("ATTACH DATABASE ? AS original", (original_path.as_uri() + "?mode=ro",))
@@ -75,10 +86,9 @@ def _build_from_models(new_path, original_path):
             )
         # SQLite does not promise that inserting explicit ids moves the sequence,
         # so it is set here.
-        highest_id = connection.execute("SELECT max(id) FROM main.projects").fetchone()[0] or 0
         connection.execute("DELETE FROM main.sqlite_sequence WHERE name = 'projects'")
         connection.execute(
-            "INSERT INTO main.sqlite_sequence (name, seq) VALUES ('projects', ?)", (highest_id,)
+            "INSERT INTO main.sqlite_sequence (name, seq) VALUES ('projects', ?)", (sequence,)
         )
         connection.execute("COMMIT")
 
@@ -95,16 +105,16 @@ def _build_from_models(new_path, original_path):
         if integrity != [("ok",)]:
             raise RuntimeError(f"The new database failed its integrity check: {integrity}")
 
-        sequence = connection.execute(
+        sequence_rows = connection.execute(
             "SELECT seq FROM main.sqlite_sequence WHERE name = 'projects'"
         ).fetchall()
-        if sequence != [(highest_id,)]:
+        if sequence_rows != [(sequence,)]:
             raise RuntimeError(
-                f"The projects sequence is {sequence} after the copy, expected {highest_id}"
+                f"The projects sequence is {sequence_rows} after the copy, expected {sequence}"
             )
 
         connection.execute("DETACH DATABASE original")
-    return rows, highest_id + 1
+    return rows
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -117,19 +127,51 @@ def main(argv: list[str] | None = None) -> int:
         default=(os.getenv("SQLITE_DB_PATH") or DEFAULT_DATABASE).strip(),
         help=f"the SQLite database file, by default SQLITE_DB_PATH or {DEFAULT_DATABASE}",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the rows in each table and the next Project ID, and write nothing",
+    )
+    parser.add_argument(
+        "--min-next-id",
+        type=int,
+        help="the lowest ID the next project may get. Use it when projects with higher IDs "
+        "were purged before the migration, because nothing in the database records them",
+    )
     args = parser.parse_args(argv)
 
     db_path = Path(args.database).resolve()
+    with closing(sqlite3.connect(db_path.as_uri() + "?mode=ro", uri=True)) as original:
+        projects_sql = original.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projects'"
+        ).fetchone()[0]
+        if "AUTOINCREMENT" in projects_sql.upper():
+            print("The projects table is already declared AUTOINCREMENT, so there is nothing to do.")
+            return 0
+        rows = {
+            table.name: original.execute(f'SELECT count(*) FROM "{table.name}"').fetchone()[0]
+            for table in db.metadata.sorted_tables
+        }
+        highest_id = original.execute("SELECT max(id) FROM projects").fetchone()[0] or 0
+
     backup_path = db_path.with_name(db_path.name + BACKUP_SUFFIX)
     if backup_path.exists():
         print(f"{backup_path} already exists. Move it away before migrating.", file=sys.stderr)
         return 1
 
+    sequence = highest_id if args.min_next_id is None else max(highest_id, args.min_next_id - 1)
+    next_id = sequence + 1
+    if args.dry_run:
+        _print_rows(rows)
+        print(f"Next project ID: {next_id}")
+        print("This was a dry run, so nothing was written.")
+        return 0
+
     descriptor, new_name = tempfile.mkstemp(dir=db_path.parent, prefix=f"{db_path.name}.", suffix=".tmp")
     os.close(descriptor)
     new_path = Path(new_name)
 
-    rows, next_id = _build_from_models(new_path, db_path)
+    rows = _build_from_models(new_path, db_path, sequence)
 
     # The new file replaces the original under the same name, so it takes the
     # original's permissions and reaches the disk before either rename.
@@ -139,9 +181,7 @@ def main(argv: list[str] | None = None) -> int:
     os.rename(new_path, db_path)
     _fsync(db_path.parent)
 
-    print("Rows per table:")
-    for table_name, count in rows.items():
-        print(f"  {table_name}: {count}")
+    _print_rows(rows)
     print(f"Next project ID: {next_id}")
     print(f"The original database is now at {backup_path}")
     return 0
