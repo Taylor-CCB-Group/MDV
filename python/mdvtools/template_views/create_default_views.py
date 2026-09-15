@@ -602,6 +602,14 @@ def skip_factor_gene(name: str) -> bool:
     return name.startswith("FP") and len(name) > 2 and name[2].isdigit()
 
 
+def require_h5_group(obj: Any, label: str) -> Any:
+    import h5py
+
+    if isinstance(obj, h5py.Group):
+        return obj
+    raise TypeError(f"{label} is not an HDF5 group")
+
+
 def read_codes(h5: Any, obs: str, field: str) -> Any:
     import numpy as np
 
@@ -697,7 +705,7 @@ def compute_marker_tables(
         if roles.obs not in h5:
             roles.skipped.append(f"cluster markers (missing {roles.obs})")
             return result
-        obs_grp = h5[roles.obs]
+        obs_grp = require_h5_group(h5[roles.obs], roles.obs)
         if matrix_h5 not in obs_grp:
             fallback = next(
                 (c for c in (roles.rna.matrix, "gene_scores", "rna_logged_counts", "gs") if c and c in obs_grp),
@@ -743,7 +751,7 @@ def compute_marker_tables(
             [] for _ in clusters
         ]
         factor_best: dict[str, list[tuple[float, int]]] = {fid: [] for fid, *_ in factor_specs}
-        grp = obs_grp[matrix_h5]
+        grp = require_h5_group(obs_grp[matrix_h5], str(matrix_h5))
         n_genes = len(np.asarray(grp["p"])) - 1
         reported = 0
         for gene_i, cell_i, vals in iter_sparse_columns(grp):
@@ -1201,12 +1209,13 @@ def view_atlas(roles: Roles) -> dict[str, Any] | None:
                 [6, 4],
             )
         )
-    if roles.disease and (roles.broad_type or roles.cell_type):
-        cat = roles.broad_type or roles.cell_type
+    disease = roles.disease
+    cat = roles.broad_type or roles.cell_type
+    if disease and cat:
         cells.append(
             stacked(
-                f"{suffix(cat)} by {suffix(roles.disease)}",
-                [roles.disease, cat],
+                f"{suffix(cat)} by {suffix(disease)}",
+                [disease, cat],
                 [6, y],
                 [6, 4],
             )
