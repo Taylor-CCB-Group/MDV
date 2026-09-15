@@ -246,5 +246,29 @@ def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, l
         )
         convert_spatialdata_to_mdv(args)
 
+
+@cli.command("create-default-views")
+@click.argument("project")
+@click.option(
+    "--skip-markers",
+    is_flag=True,
+    help="Do not compute or attach top-20 / factor-varying marker tables.",
+)
+@click.option(
+    "--recompute-markers",
+    is_flag=True,
+    help="Recompute cluster and factor markers even if a cache exists.",
+)
+def create_default_views_cmd(project, skip_markers, recompute_markers):
+    """Infer experimental-design fields and write template views into an MDV project."""
+    from .template_views import create_default_views
+
+    create_default_views(
+        project,
+        skip_markers=skip_markers,
+        recompute_markers=recompute_markers,
+    )
+
+
 if __name__ == '__main__':
     cli()
