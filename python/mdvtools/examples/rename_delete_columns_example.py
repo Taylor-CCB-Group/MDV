@@ -11,14 +11,19 @@ Both address the column by its `field` (its identifier), never by its display na
 tombstone: the column stays in the datasource and in exported files, and MDV stops
 showing it. Both are reversible and safe to re-run.
 
-THE ORDERING RULE, which this example exists to demonstrate:
+THE ORDERING RULE, which this example exists to demonstrate - it applies to
+HIDING only:
 
     soft_delete_column refuses while a saved view still references the column.
-    So curate FIRST, then build views.
+    So hide columns BEFORE building views.
 
     add_datasource defaults to add_to_view="default", which generates a table plot
     listing every column - and that view would then block every deletion. Passing
-    add_to_view=None is what makes curation possible.
+    add_to_view=None is what makes hiding possible.
+
+    rename_column is never blocked. It changes only the display label, and charts
+    resolve columns by `field`, which a rename leaves untouched - so labels can be
+    fixed at any time, including on a project whose views already exist.
 
 See docs/rename-and-hide-columns.md for the full guide.
 """

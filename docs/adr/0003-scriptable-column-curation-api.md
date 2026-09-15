@@ -104,10 +104,12 @@ Scope is deliberately narrow: chart configs under `initialCharts[datasource]` on
 ## Consequences
 
 - Curation becomes scriptable, applied identically across projects as part of view generation.
-- **Order is forced: curate first, then generate views.** `add_datasource` defaults to
+- **Order is forced for hiding: hide first, then generate views.** `add_datasource` defaults to
   `add_to_view="default"`, which generates a table plot listing every column and would block every
-  deletion, so curation scripts pass `add_to_view=None`. `create_view_with_all_datasources` was
-  changed to skip tombstoned columns.
+  deletion, so scripts that hide columns pass `add_to_view=None`.
+  `create_view_with_all_datasources` was changed to skip tombstoned columns. Renaming carries no
+  such constraint — it never consults views, because `field` is unchanged — so labels can be fixed
+  on a project whose views already exist.
 - **A UI rename now persists immediately** via `saveView()`, as delete already did. It previously
   only marked `dirtyMetadata`, so navigating away discarded it. Accepted costs: renaming also
   commits the rest of the view state, and each rename is a full view save.

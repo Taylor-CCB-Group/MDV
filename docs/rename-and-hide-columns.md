@@ -15,10 +15,15 @@ showing it. It is reversible.
 
 ---
 
-## The one rule: curate before you build views
+## The one rule: hide columns before you build views
 
-`soft_delete_column` refuses while a saved view still references the column. So do the renaming
-and hiding **before** any view exists.
+This applies to **hiding only**. `soft_delete_column` refuses while a saved view still references
+the column, so hiding has to happen before that view exists.
+
+**`rename_column` is never blocked.** It changes only the display label, and every chart resolves
+columns by `field`, which the rename leaves untouched — so you can relabel a column at any point,
+including on a project whose views already exist. That is the normal way to fix labels on a
+project someone else built.
 
 If you create datasources with `add_datasource`, pass `add_to_view=None` — the default builds a
 view listing every column, which blocks every deletion:
@@ -126,7 +131,7 @@ curl -s -X POST http://localhost:5055/project/<id>/soft_delete_column -H 'Conten
 | `column X already exists in Y datasource` | another visible column already uses that label |
 | `Column name is required` | empty label |
 | `column X ... is a spatial (sgindex) column` | geometry column, not curatable |
-| `deletion of column X ... is blocked: it is still used by other charts or views (view: chart)` | curate before building views |
+| `deletion of column X ... is blocked: it is still used by other charts or views (view: chart)` | hide the column before that view exists, or edit the chart first |
 
 ---
 
