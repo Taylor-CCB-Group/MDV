@@ -108,10 +108,11 @@ that flag let an import extract into a directory that already held another proje
 
 ## Three names, and which is which
 
-Today the Project ID and the directory name are the same string, because the code
-guesses a number and uses it for both. That is the coupling this ADR removes. After
-the change the Project ID never appears on disk, and the directory name never
-appears in a URL.
+Today create, import and upload name the directory after a guessed Project ID, and
+the database can assign a different one. A scan keeps whatever name a copied-in
+directory already has, such as `cg_run13`. On an existing deployment a directory
+name is no guide to the Project ID, even when it is a number. After the change a new
+project's ID never appears on disk, and the directory name never appears in a URL.
 
 | Name | Example | Where it lives | Who reads it |
 | --- | --- | --- | --- |
@@ -141,9 +142,9 @@ Deployment A calls that directory project 7 and deployment B calls it project 12
 a folder named after the id would have to be called `7` and `12` at the same time.
 It gets a name that belongs to neither catalog instead.
 
-Existing numeric directories are not renamed, so a Project root will hold a mix of
-old numeric names and new opaque ones. Neither is parsed. `Project.path` is read in
-both cases.
+Existing directories are not renamed, so a Project root will hold a mix of older
+names, numeric or not, and new opaque ones. None of them is parsed. `Project.path` is
+read in every case.
 
 ## Where the Project ID goes
 
@@ -349,9 +350,8 @@ Deferred, worth revisiting when there is a reason to make project identity globa
   reported symptom and leaves create, import and upload naming directories from a
   predicted id.
 - **Name the directory after the assigned Project ID.** Needs a rename after the
-  insert, or an insert with a placeholder path, and it puts back the coupling
-  between folder name and id. In a shared Project root two deployments would both
-  want the folder called `7`.
+  insert, or an insert with a placeholder path, and it ties the folder name to the
+  id. In a shared Project root two deployments would both want the folder called `7`.
 - **Write the Project ID into the directory as a marker file.** In a shared Project
   root two deployments write different ids into the same directory, and the loser's
   marker becomes a trap for whoever reads it next. Operators map a project to its
@@ -367,10 +367,11 @@ Deferred, worth revisiting when there is a reason to make project identity globa
 - Project IDs are deployment-local. Links and bookmarks do not carry between
   deployments, and export then import into another deployment produces a new
   Project ID.
-- Storage names carry no information. An operator maps a project to its directory
-  with `SELECT id, name, path FROM projects`, or from the log line each creation
-  path writes with the assigned Project ID and the storage name together.
-- No row migration and no directory renames. Numeric and opaque directory names
+- Storage names carry no information, and an older numeric name may not match the
+  Project ID. An operator maps a project to its directory with
+  `SELECT id, name, path FROM projects`, or from the log line each creation path
+  writes with the assigned Project ID and the storage name together.
+- No row migration and no directory renames. Older directory names and opaque ones
   coexist. `sqlite_autoincrement` only affects `CREATE TABLE`, so existing SQLite
   databases keep reusing ids until the table is rebuilt. There is no migration
   tooling in this repo, only `db.create_all()` (`dbutils/mdv_server_app.py:90`), so
@@ -392,7 +393,7 @@ them, and the change ships without both.
 
 ### An ls command for the catalog
 
-Once a directory name carries no information, an operator with a shell needs the
+A directory name does not identify a project, so an operator with a shell needs the
 database to find a project's files. `SELECT id, name, path FROM projects` gives the
 mapping, and every creation path logs the same pair, so the information is there.
 Doing it by hand each time is slow enough that a command earns its place.
