@@ -21,13 +21,13 @@ removes the file it was building and leaves the original untouched.
 A dry run writes nothing, so it is safe at any time inside the running app
 container. It prints the rows in each table and the ID the next project will get:
 
-    docker compose exec <service> uv run python mdvtools/scripts/migrate_projects_autoincrement.py --dry-run
+    docker compose -f <compose file> exec <service> uv run python mdvtools/scripts/migrate_projects_autoincrement.py --dry-run
 
 Stop the app before migrating, and run the script in a one-off container:
 
-    docker compose stop <service>
-    docker compose run --rm --no-deps <service> uv run python mdvtools/scripts/migrate_projects_autoincrement.py
-    docker compose start <service>
+    docker compose -f <compose file> stop <service>
+    docker compose -f <compose file> run --rm --no-deps <service> uv run python mdvtools/scripts/migrate_projects_autoincrement.py
+    docker compose -f <compose file> start <service>
 
 Do not run the migration with docker compose exec in the running container. The app
 holds the database open, so anything it writes after the copy would be lost.
