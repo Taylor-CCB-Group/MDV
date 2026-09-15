@@ -1,7 +1,7 @@
 import os
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint
-from mdvtools.server import add_safe_headers
+from mdvtools.server import add_safe_headers, start_driver, job_service
 from flask import Flask, render_template, jsonify, request
 import json
 import threading
@@ -109,7 +109,7 @@ if __name__ == "__main__":
                 projects.append(p)
                 p.serve(app=app, open_browser=False)
             else:
-                # the frontend doesn't care about this, and it's not an error given that 
+                # the frontend doesn't care about this, and it's not an error given that
                 # we assert that the project doesn't already exist at the start of this function
                 print(f"project '{p.id}' is already being served")
             return jsonify({"id": p.id, "name": p.id, "status": "success"})
@@ -128,6 +128,9 @@ if __name__ == "__main__":
             return jsonify({"status": "success"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
+
+    # start the job driver over the projects present at startup
+    start_driver(job_service, projects)
 
     watcher = threading.Thread(target=watch_folder, args=(app,))
     # print("Oh frabjous day! Callooh! Callay!")
