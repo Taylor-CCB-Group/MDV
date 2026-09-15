@@ -119,6 +119,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                             project_data={
                                 "id": new_project.id,
                                 "name": new_project.name,
+                                "path": new_project.path,
                                 "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                                 "thumbnail": thumbnail,
                                 "owner": [owner_email]
@@ -253,6 +254,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                             project_data={
                                 "id": new_project.id,
                                 "name": new_project.name,
+                                "path": new_project.path,
                                 "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                                 "thumbnail": thumbnail,
                                 "owners": [owner_email]

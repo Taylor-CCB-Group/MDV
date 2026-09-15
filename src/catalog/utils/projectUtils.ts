@@ -18,6 +18,7 @@ export interface Project {
     numberOfStructures: string;
     numberOfImages: string;
     permissions: Permissions;
+    writable: boolean;
     thumbnail?: string;
     readme?: string;
 }

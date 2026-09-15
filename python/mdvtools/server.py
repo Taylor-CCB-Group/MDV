@@ -57,7 +57,31 @@ routes = set()
 
 job_service = JobService()      # one job service driver per process
 
-def build_app(
+def _apply_project_writability(
+    project: MDVProject,
+    state: dict,
+    websocket_enabled: bool,
+) -> None:
+    unwritable_paths = project.unwritable_paths
+    if unwritable_paths:
+        if not project._writability_warning_logged:
+            logger.warning(
+                "[%s - '%s'] Serving project read-only because the process "
+                "lacks write access to these paths (the project directory also "
+                "requires execute access): %s",
+                project.id,
+                os.path.basename(project.dir),
+                ", ".join(unwritable_paths),
+            )
+            project._writability_warning_logged = True
+        state["permission"] = "view"
+    state["websocket"] = not unwritable_paths and websocket_enabled
+
+
+
+
+
+def create_app(
     project: MDVProject,
     options: Optional[MDVServerOptions] = None,
 ):
@@ -203,11 +227,7 @@ def build_app(
                 try:
                     state = json.load(f)
                     # if we don't have write-permission, then we definitely shouldn't allow `permission: "edit"` to get to the frontend
-                    if not project.writable:
-                        log("overriding editable permission because state is not writable")
-                        state["permission"] = "view"
-                    # do we want this to always be true/not a flag we pass?
-                    state["websocket"] = project.writable and options.websocket
+                    _apply_project_writability(project, state, options.websocket)
                     # in future, we could iterate over a list of extensions.
                     # we should alter permissions based on the permission of the user...
                     for extension in options.extensions:
