@@ -49,7 +49,7 @@ Module form (same flags as before):
 python -m mdvtools.template_views --project /path/to/mdv_project
 ```
 
-The old `python/mdvtools/test_projects/create_default_views.py` path is a thin wrapper around this module.
+Gene panels, field-name patterns, and thresholds live in `defaults.py` and are imported by `create_default_views.py`.
 
 Python API:
 
