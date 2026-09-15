@@ -122,48 +122,21 @@ class ProjectService:
             raise
 
     @staticmethod
-    def get_next_project_id():
-        """
-        Calculate the next available project ID.
-        
-        Queries the database for the maximum existing project ID and returns
-        the next sequential ID. If no projects exist, returns 1.
-        
-        Returns:
-            int: The next available project ID (minimum 1)
-        
-        Raises:
-            Exception: If database query fails. The exception is logged and re-raised.
-        
-        Note:
-            This method is used by the /create_project API route.
-        """
-        try:
-            next_id = db.session.query(db.func.max(Project.id)).scalar()
-            if next_id is None:
-                next_id = 1
-            else:
-                next_id += 1
-            return next_id
-        except Exception as e:
-            logger.exception(f"Error in dbservice: Error getting next project ID: {e}")
-            raise
-
-    @staticmethod
     def add_new_project(path, name='unnamed_project'):
         """
         Create a new project record in the database.
         
-        Creates a new Project instance with the specified path and name,
-        adds it to the database session, and commits the transaction.
-        
+        Creates a new Project instance with the specified path and name, adds it
+        to the database session and flushes so the database assigns the Project
+        ID. The caller owns the commit.
+
         Args:
             path (str): Filesystem path to the project directory. Must be unique.
             name (str, optional): Project name. Defaults to 'unnamed_project'.
-        
+
         Returns:
-            Project: The newly created Project model instance.
-        
+            Project: The newly created Project model instance, with its assigned id.
+
         Raises:
             Exception: If database operation fails (e.g., duplicate path).
             The exception is logged, transaction is rolled back, and exception
@@ -180,7 +153,7 @@ class ProjectService:
             new_project.name = name
             new_project.path = path
             db.session.add(new_project)
-            db.session.commit()
+            db.session.flush()
             return new_project
         except Exception as e:
             logger.exception(f"Error in dbservice: Error creating project: {e}")

@@ -2,14 +2,15 @@ from flask import Flask, jsonify, request, send_file, Response
 from typing import Union, Tuple
 import os
 import shutil
+import uuid
 import zipfile
 import io
 import tempfile
 from mdvtools.server_extension import MDVProjectServerExtension
-from mdvtools.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprintProtocol
 from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
-from mdvtools.dbutils.dbmodels import User
+from mdvtools.dbutils.dbmodels import User, db
 from mdvtools.dbutils.project_manager_service import (
     get_current_user_id,
     refresh_auth_cache,
@@ -39,6 +40,26 @@ def find_root_prefix(names):
     return None
 
 
+def is_owner_or_admin(user, permissions):
+    """Whether a signed-in user may manage a project.
+
+    `permissions` is that user's cached entry for the project, or None when they
+    hold none. Administrators are included because a project that arrives by file
+    copy can reach a deployment with no owner at all.
+    """
+    if permissions and permissions.get("is_owner"):
+        return True
+    return bool(user.get("is_admin", False))
+
+
+class ImportRejected(Exception):
+    """An archive the caller sent that cannot be imported.
+
+    Raised rather than returned so the route's cleanup runs and the directory the
+    archive was being extracted into does not outlive the request.
+    """
+
+
 class ProjectManagerExtension(MDVProjectServerExtension):
     def register_global_routes(self, app: Flask, config: dict):
         ENABLE_AUTH = app.config.get('ENABLE_AUTH', False)
@@ -49,44 +70,43 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         active_projects_cache = []
         user_project_cache = {}
         all_users_cache = []
-        
+
         if ENABLE_AUTH:
             from flask import session
             from mdvtools.auth.authutils import user_cache, active_projects_cache, user_project_cache, all_users_cache
 
         @app.route("/create_project", methods=["POST"])
-        def create_project() -> Union[Response, Tuple[Response, int]]:   
+        def create_project() -> Union[Response, Tuple[Response, int]]:
             """
             Creates a new project and updates the caches and database accordingly.
             """
             project_path = None
-            next_id = None
+            assigned_id = None
             try:
-                
-                logger.info("Creating project")
-                
-                # Get the next available ID
-                next_id = ProjectService.get_next_project_id()
-                if next_id is None:
-                    logger.error("In register_routes: Error- Failed to determine next project ID from db")
-                    return jsonify({"error": "Failed to determine next project ID from db"}), 500
 
-                # Create the project directory path
-                project_path = os.path.join(app.config['projects_base_dir'], str(next_id))
+                logger.info("Creating project")
+
+                # The directory name is opaque. The Project ID is assigned by the
+                # database below and never appears on disk.
+                project_path = os.path.join(app.config['projects_base_dir'], uuid.uuid4().hex)
+
+                # Insert first so the database assigns the Project ID. Everything
+                # downstream uses that value, and the commit happens once the
+                # project is serving.
+                logger.info("Adding new project to the database")
+                new_project = ProjectService.add_new_project(path=project_path)
+                assigned_id = str(new_project.id)
 
                 # Create and serve the MDVProject
                 try:
                     logger.info("Creating and serving the new project")
-                    p = MDVProject(project_path, backend_db= True)
+                    p = MDVProject(project_path, id=assigned_id, backend_db= True)
                     p.set_editable(True)
+                    p.set_display_name(new_project.name)
                     p.serve(app=app, open_browser=False, backend_db=True)
                 except Exception as e:
                     logger.exception(f"In register_routes: Error serving MDVProject: {e}")
-                    return jsonify({"error": "Failed to serve MDVProject"}), 500
-                    
-                # Create a new Project record in the database with the path
-                logger.info("Adding new project to the database")
-                new_project = ProjectService.add_new_project(path=project_path)
+                    raise
 
                 if new_project:
                     # Step 5: Associate the admin user with the new project and grant all permissions
@@ -106,7 +126,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         owner_email = user_cache.get(auth_id, {}).get("email", "unknown")
                         # Generate thumbnail
                         thumbnail = _get_project_thumbnail(project_path)
-                        
+
                         # Step 6: Update caches for the admin user and new project
                         update_cache(
                             user_id=current_user_id,
@@ -125,7 +145,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                                 "owner": [owner_email]
                             }
                         )
-                        
+
+                    db.session.commit()
+                    logger.info(f"Created project {new_project.id} in {project_path}")
+
                     # Return the new project info
                     return jsonify({
                         "id": new_project.id,
@@ -139,6 +162,8 @@ class ProjectManagerExtension(MDVProjectServerExtension):
             except Exception as e:
                 logger.error(f"In register_routes - /create_project : Error creating project: {e}")
                 logger.info("started rollabck")
+                db.session.rollback()
+
                 # Rollback: Clean up the projects filesystem directory if it was created
                 if project_path and os.path.exists(project_path):
                     try:
@@ -148,30 +173,34 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         logger.exception(f"In register_routes -/create_project : Error during rollback cleanup: {cleanup_error}")
 
                 # Optional: Remove project routes from Flask app if needed
-                if next_id is not None and str(next_id) in ProjectBlueprint.blueprints:
-                    del ProjectBlueprint.blueprints[str(next_id)]
+                if assigned_id is not None and assigned_id in ProjectBlueprint.blueprints:
+                    del ProjectBlueprint.blueprints[assigned_id]
                     logger.info("In register_routes -/create_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
-                
+
                 return jsonify({"error": str(e)}), 500
 
         logger.info("Route registered: /create_project")
 
         @app.route("/import_project", methods=["POST"])
         def import_project() -> Union[Response, Tuple[Response, int]]:
+            project_path = None
+            assigned_id = None
             try:
                 # Check if the request contains a file
                 if 'file' not in request.files:
                     logger.error("In register_routes /import_project: Error - No project archive provided")
                     return jsonify({"error": "No project archive provided"}), 400
-                
+
                 project_file = request.files['file']
                 project_name = request.form.get('name')
 
-                # Get next available project ID
-                next_id = ProjectService.get_next_project_id()
-                project_path = os.path.join(app.config['projects_base_dir'], str(next_id))
-                os.makedirs(project_path, exist_ok=True)
-                
+                # The directory name is opaque. The Project ID is assigned by the
+                # database once the files are in place. Without exist_ok, a name
+                # that is somehow already taken fails rather than extracting the
+                # archive over another project.
+                project_path = os.path.join(app.config['projects_base_dir'], uuid.uuid4().hex)
+                os.makedirs(project_path)
+
                 file_stream = io.BytesIO(project_file.read())
 
                 with zipfile.ZipFile(file_stream) as zf:
@@ -181,7 +210,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     bad = [n for n in names if n.startswith(("/", "\\")) or ".." in n]
                     if bad:
                         logger.error("In register_routes /import_project: Error - Unsafe entries in ZIP")
-                        return jsonify({"error": "Invalid ZIP file: unsafe paths detected"}), 400
+                        raise ImportRejected("Invalid ZIP file: unsafe paths detected")
 
                     # Find the root directory of the mdv project
                     # TODO: when we cut & pasted this block from routes.py, we didn't copy the find_root_prefix function
@@ -189,7 +218,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     root = find_root_prefix(names)
                     if root is None:
                         logger.error("In register_routes /import_project: Error - Not a valid MDV project")
-                        return jsonify({"error": "Not a valid MDV project"}), 400
+                        raise ImportRejected("Not a valid MDV project")
 
                     # Select the files based in the mdv project
                     members = [n for n in names if n.startswith(root)]
@@ -203,26 +232,38 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     for item in os.listdir(subdir):
                         shutil.move(os.path.join(subdir, item), project_path)
                     os.rmdir(subdir)
-                
-                # # Create a new MDV project out of the new path and files copied
-                p = MDVProject(project_path, backend_db=True)
+
+                # With no name supplied, keep the one the archive carries so an
+                # imported project is not renamed to the default.
+                if project_name is None:
+                    try:
+                        project_name = (get_json(os.path.join(project_path, "state.json")) or {}).get('name')
+                    except Exception:
+                        project_name = None
+
+                # Initialize the project and register it using project name if valid
+                if project_name is not None:
+                    new_project = ProjectService.add_new_project(path=project_path, name=project_name)
+                else:
+                    new_project = ProjectService.add_new_project(path=project_path)
+                assigned_id = str(new_project.id)
+
+                # Create a new MDV project out of the new path and files copied
+                p = MDVProject(project_path, id=assigned_id, backend_db=True)
                 # Respect permission in imported state.json, default to non-editable if unspecified
                 try:
                     state = p.state or {}
                     perm = (state.get('permission') or '').lower()
                     is_editable = True if perm == 'edit' else False if perm == 'view' else False
                     p.set_editable(is_editable)
+                    # The row decides the access level from here on, so it has to
+                    # carry the permission the archive arrived with.
+                    new_project.access_level = 'editable' if is_editable else 'read-only'
                 except Exception:
                     p.set_editable(False)
+                    new_project.access_level = 'read-only'
+                p.set_display_name(new_project.name)
                 p.serve(app=app, open_browser=False, backend_db=True)
-                
-
-                
-                # Initialize the project and register it using project name if valid
-                if project_name is not None:
-                    new_project = ProjectService.add_new_project(path=project_path, name=project_name)
-                else:
-                    new_project = ProjectService.add_new_project(path=project_path)
 
                 if new_project:
                     if ENABLE_AUTH:
@@ -260,6 +301,9 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                                 "owners": [owner_email]
                             }
                         )
+                db.session.commit()
+                logger.info(f"Imported project {new_project.id} into {project_path}")
+
                 # Return the new project id and name
                 logger.info("Import successfull. Returning the success response.")
                 return jsonify({
@@ -267,14 +311,12 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     "name": new_project.name,
                     "status": "success"
                 })
-                
+
             except Exception as e:
                 logger.exception(f"In register_routes - /import_project : Error importing project: {e}")
                 logger.info("started rollabck")
-                # Clean up on error
-                project_path = locals().get('project_path')
-                next_id = locals().get('next_id')
-                
+                db.session.rollback()
+
                 # Clean up project directory if it was created
                 if project_path and os.path.exists(project_path):
                     try:
@@ -282,16 +324,21 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         logger.info("In register_routes -/import_project : Rolled back project directory creation as db entry is not added")
                     except Exception as cleanup_error:
                         logger.exception(f"In register_routes -/import_project : Error during cleanup: {cleanup_error}")
-                
+
                 # Remove from blueprints if registered
-                if next_id is not None and str(next_id) in ProjectBlueprint.blueprints:
+                if assigned_id is not None and assigned_id in ProjectBlueprint.blueprints:
                     try:
-                        del ProjectBlueprint.blueprints[str(next_id)]
+                        del ProjectBlueprint.blueprints[assigned_id]
                         logger.info("In register_routes -/import_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
                     except Exception as blueprint_error:
                         logger.exception(f"In register_routes -/import_project : Error removing blueprint: {blueprint_error}")
+
+                # A rejected archive is the caller's, so it keeps its own message
+                # and a 400 rather than being reported as a server error.
+                if isinstance(e, ImportRejected):
+                    return jsonify({"error": str(e)}), 400
                 return jsonify({"error": str(e)}), 500
-            
+
         logger.info("Route registered: /import_project")
 
         @app.route("/export_project/<int:project_id>", methods=["GET"])
@@ -317,25 +364,25 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can export the project."}), 403
-                    
+
                 if project.access_level != 'editable':
                     logger.error(f"Project with ID {project_id} is not editable.")
                     return jsonify({"error": "This project is not editable and cannot be exported."}), 403
-                    
+
                 if project.path is None:
                     logger.error(f"In register_routes - /export_project Error: Project with ID {project_id} has no path in database")
                     return jsonify({"error": f"Project with ID {project_id} has no path in the database"})
-                
+
                 if project.name is None:
                     project_name = "unnamed_project"
                 else:
                     project_name = project.name
-                                
+
                 # Create a temporary directory
                 with tempfile.TemporaryDirectory() as temp_dir:
                     file_name = f"{project_name}"
                     file_path = os.path.join(temp_dir, file_name)
-                    
+
                     # Create an archive from the project path
                     logger.info(f"Creating archive for project {project_name} at path: {project.path}...")
                     zip_path = shutil.make_archive(
@@ -355,7 +402,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
             except Exception as e:
                 logger.exception(f"In register_routes - /export_project : Unexpected error while exporting project with project id - '{project_id}': {e}")
                 return jsonify({"error": str(e)}), 500
-        
+
         print("Route registered: /export_project/<project_id>")
 
         @app.route("/delete_project/<int:project_id>", methods=["DELETE"])
@@ -451,10 +498,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         def rename_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
             # Retrieve the new project name from the multipart/form-data payload
             new_name = request.form.get("name")
-            
+
             if not new_name:
                 return jsonify({"error": "New name not provided"}), 400
-            
+
             try:
                 # Step 1: Check if project exists in active cache
                 project = ProjectService.get_project_by_id(project_id)
@@ -471,11 +518,12 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
                     user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
-                    if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
+                    permissions = user_projects.get(int(project_id)) if user_projects else None
+                    if not is_owner_or_admin(user, permissions):
                         logger.error(f"User does not have ownership of project {project_id}")
-                        return jsonify({"error": "Only the project owner can rename the project."}), 403
+                        return jsonify({"error": "Only the project owner or an administrator can rename the project."}), 403
 
-        
+
                 # Step 4: Check if project is editable
                 if project.access_level != 'editable':
                     logger.error(f"Project with ID {project_id} is not editable.")
@@ -487,7 +535,14 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if not rename_status:
                     logger.error(f"In register_routes - /rename_project Error: The project with ID '{project_id}' not found in db")
                     return jsonify({"error": f"Failed to rename project '{project_id}' in db"}), 500
-                
+
+                # Keep the copy in the project directory in step. The database write
+                # above decides whether the rename succeeded
+                try:
+                    MDVProject(dir=project.path, id=str(project_id), backend_db=True).set_display_name(new_name)
+                except Exception as state_error:
+                    logger.exception(f"In register_routes - /rename_project : Renamed project '{project_id}' in db but could not write state.json: {state_error}")
+
                 # Step 6: Update the name in active_projects_cache
                 if ENABLE_AUTH:
                     for proj in active_projects_cache:
@@ -516,7 +571,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 # Validate the new access level
                 if new_access_level not in ["read-only", "editable"]:
                     return jsonify({"error": "Invalid access level. Must be 'read-only' or 'editable'."}), 400
-            
+
 
                 # Step 3: Check ownership from the user_project_cache
                 if ENABLE_AUTH:
@@ -527,9 +582,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
                     user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
-                    if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
+                    permissions = user_projects.get(int(project_id)) if user_projects else None
+                    if not is_owner_or_admin(user, permissions):
                         logger.error(f"User does not have ownership of project {project_id}")
-                        return jsonify({"error": "Only the project owner can change the access level."}), 403
+                        return jsonify({"error": "Only the project owner or an administrator can change the access level."}), 403
 
 
                 # Call the service method to change the access level
@@ -538,12 +594,22 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if access_level is None:
                     return jsonify({"error": message}), status_code
 
+                # Keep the copy in the project directory in step. The database write
+                # above decides whether the change succeeded, so a directory that
+                # cannot be written is logged and the change still stands.
+                try:
+                    project = ProjectService.get_project_by_id(project_id)
+                    if project is not None:
+                        MDVProject(dir=project.path, id=str(project_id), backend_db=True).set_editable(access_level == 'editable')
+                except Exception as state_error:
+                    logger.exception(f"In register_routes - /access : Changed access level for project '{project_id}' in db but could not write state.json: {state_error}")
+
                 return jsonify({"status": "success", "access_level": access_level}), 200
 
             except Exception as e:
                 logger.exception(f"In register_routes - /access : Unexpected error while changing access level for project '{project_id}': {e}")
                 return jsonify({"error": "An unexpected error occurred."}), 500
-        
+
         logger.info("Route registered: /projects/<int:project_id>/access")
 
         @app.route("/projects/<int:project_id>/share", methods=["GET"])
@@ -556,7 +622,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if not ENABLE_AUTH:
                     logger.info("Authentication is disabled, skipping authentication check.")
                     return jsonify({"error": "Authentication is disabled, no action taken."})
-                
+
                 if session is None:
                     raise ValueError("Session not available.")
                 user = session.get('user')
@@ -565,9 +631,11 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 user_id = user["id"]
 
                 user_permissions = user_project_cache.get(user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
-                if not user_permissions or not user_permissions.get("is_owner"):
-                    return jsonify({"error": "Only the project owner can share the project"}), 403
-                
+                # An administrator is let through so a project with no owner, or
+                # one whose owner has gone, can still be handed to someone.
+                if not is_owner_or_admin(user, user_permissions):
+                    return jsonify({"error": "Only the project owner or an administrator can share the project"}), 403
+
                 # Refresh cache to pick up permission changes from manage_project_permissions.py
                 # Note: sync_users_to_db is no longer called here - the manage_project_permissions.py
                 # script ensures the DB is up to date by syncing at the start of main()
@@ -583,14 +651,14 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 # Read directly from database to ensure we have the latest permissions
                 from mdvtools.dbutils.dbmodels import UserProject
                 shared_users_list = []
-                
+
                 # Get all user-project relationships for this project from database
                 user_projects = UserProject.query.filter_by(project_id=project_id).all()
                 for up in user_projects:
                     user_obj = User.query.get(up.user_id)
                     if not user_obj:
                         continue
-                    
+
                     shared_users_list.append({
                         "id": user_obj.id,
                         "email": user_obj.email,
@@ -608,18 +676,18 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     for u in all_db_users
                     if u.id not in shared_user_ids
                 ]
-                
+
                 # Return the list of users with permissions, and all users for the dropdown
                 return jsonify({
                     "shared_users": shared_users_list,
                     "all_users": all_users  # List of all users to populate the dropdown
                 })
-            
+
             except Exception as e:
                 logger.exception(f"Error in share_project: {e}")
                 return jsonify({"error": str(e)}), 500
         logger.info("Route registered: /projects/<int:project_id>/share- GET")
-            
+
         @app.route("/projects/<int:project_id>/share", methods=["POST"])
         def add_user_to_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
             """Add a user to the project with specified permissions."""
@@ -638,10 +706,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     raise ValueError("User not found in session.")
                 user_id = user["id"]
 
-                # Step 2: Check if current user is owner of the project
+                # Step 2: Check if current user is owner of the project, or an administrator
                 user_permissions = user_project_cache.get(user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
-                if not user_permissions or not user_permissions.get("is_owner"):
-                    return jsonify({"error": "Only the project owner can share the project"}), 403
+                if not is_owner_or_admin(user, user_permissions):
+                    return jsonify({"error": "Only the project owner or an administrator can share the project"}), 403
 
 
                 # Step 5: Get data from the POST request
@@ -651,7 +719,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
                 if not target_user_id or permission not in ["view", "edit", "owner"]:
                     return jsonify({"error": "Invalid user or permission"}), 400
-                
+
                 # Step 4: Determine permission flags
                 is_owner = permission == "owner"
                 can_write = permission in ["edit", "owner"]
@@ -664,7 +732,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     is_owner=is_owner,
                     can_write=can_write
                 )
-                
+
                 # Update user_project_cache
                 if target_user_id not in user_project_cache:
                     user_project_cache[target_user_id] = {}
@@ -703,11 +771,11 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if not user:
                     raise ValueError("User not found in session.")
                 current_user_id = user["id"]
-                
-                # Step 2: Validate if current user is the owner
+
+                # Step 2: Validate if current user is the owner, or an administrator
                 user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
-                if not user_permissions or not user_permissions.get("is_owner"):
-                    return jsonify({"error": "Only the project owner can edit permissions"}), 403
+                if not is_owner_or_admin(user, user_permissions):
+                    return jsonify({"error": "Only the project owner or an administrator can edit permissions"}), 403
 
 
                 # Step 3: Extract new permission from request
@@ -715,7 +783,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 new_permission = request.json.get("permission", "").lower()
                 if new_permission not in ["view", "edit", "owner"]:
                     return jsonify({"error": "Invalid permission value"}), 400
-                
+
                 is_owner = new_permission == "owner"
                 can_write = new_permission in ["edit", "owner"]
                 can_read = True  # Always true for project access
@@ -727,7 +795,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     is_owner=is_owner,
                     can_write=can_write
                 )
-                
+
                 # Step 5: Update cache
                 if user_project_cache is not None:
                     if user_id not in user_project_cache:
@@ -741,12 +809,12 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
                 logger.info(f"Updated permissions for user {user_id} in project {project_id}: {new_permission}")
                 return jsonify({"message": "Permissions updated successfully"}), 200
-            
+
             except Exception as e:
                 logger.exception(f"Error in edit_user_permission: {e}")
                 return jsonify({"error": str(e)}), 500
         logger.info("Route registered: /projects/<int:project_id>/share/<int:user_id>/edit")
-            
+
         @app.route("/projects/<int:project_id>/share/<int:user_id>/delete", methods=["POST"])
         def delete_user_from_project(project_id: int, user_id: int) -> Union[Response, Tuple[Response, int]]:
             """Remove a user from the project."""
@@ -766,10 +834,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     raise ValueError("User not found in session.")
                 current_user_id = user["id"]
 
-                # Step 2: Validate ownership
+                # Step 2: Validate ownership, or administrator status
                 user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
-                if not user_permissions or not user_permissions.get("is_owner"):
-                    return jsonify({"error": "Only the project owner can remove users"}), 403
+                if not is_owner_or_admin(user, user_permissions):
+                    return jsonify({"error": "Only the project owner or an administrator can remove users"}), 403
 
                 # Step 4: Remove the user from the project using the service method
                 UserProjectService.remove_user_from_project(user_id, project_id)
@@ -783,12 +851,12 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     else:
                         logger.warning(f"Project {project_id} not found in cache for user {user_id}")
                 return jsonify({"message": "User removed successfully"}), 200
-            
+
             except Exception as e:
                 logger.exception(f"Error in delete_user_from_project: {e}")
                 return jsonify({"error": str(e)}), 500
         logger.info("Route registered: /projects/<int:project_id>/share/<int:user_id>/delete")
-        
+
     def register_routes(self, project: MDVProject, project_bp: ProjectBlueprintProtocol):
         pass
 

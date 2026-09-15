@@ -50,6 +50,9 @@ class Project(db.Model):
     __table_args__ = (
         db.Index('idx_projects_genome', 'genome'),
         db.Index('idx_projects_owner', 'owner'),
+        # Applies at CREATE TABLE, so existing databases need
+        # the projects table rebuilt.
+        {'sqlite_autoincrement': True},
     )
 
 
@@ -62,7 +65,7 @@ class File(db.Model):
     update_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     #project = db.relationship('Project', backref=db.backref('files', lazy=True))
-    
+
 class UserProject(db.Model):
     __tablename__ = 'user_projects'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
