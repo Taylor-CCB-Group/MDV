@@ -32,6 +32,10 @@ Stop the app before migrating, and run the script in a one-off container:
 Do not run the migration with docker compose exec in the running container. The app
 holds the database open, so anything it writes after the copy would be lost.
 
+Run it as the image's default user, as the command above does, and leave out -u root.
+The new database file belongs to whoever runs the script, so a run as root leaves a
+database the app cannot write to.
+
 To roll back, stop the service, move <name>.pre-autoincrement back to the live name,
 and start the service.
 """
