@@ -602,14 +602,6 @@ def skip_factor_gene(name: str) -> bool:
     return name.startswith("FP") and len(name) > 2 and name[2].isdigit()
 
 
-def require_h5_group(obj: Any, label: str) -> Any:
-    import h5py
-
-    if isinstance(obj, h5py.Group):
-        return obj
-    raise TypeError(f"{label} is not an HDF5 group")
-
-
 def read_codes(h5: Any, obs: str, field: str) -> Any:
     import numpy as np
 
@@ -705,7 +697,11 @@ def compute_marker_tables(
         if roles.obs not in h5:
             roles.skipped.append(f"cluster markers (missing {roles.obs})")
             return result
-        obs_grp = require_h5_group(h5[roles.obs], roles.obs)
+        obs_obj = h5[roles.obs]
+        if not isinstance(obs_obj, h5py.Group):
+            roles.skipped.append(f"cluster markers ({roles.obs} is not a group)")
+            return result
+        obs_grp = obs_obj
         if matrix_h5 not in obs_grp:
             fallback = next(
                 (c for c in (roles.rna.matrix, "gene_scores", "rna_logged_counts", "gs") if c and c in obs_grp),
@@ -751,7 +747,11 @@ def compute_marker_tables(
             [] for _ in clusters
         ]
         factor_best: dict[str, list[tuple[float, int]]] = {fid: [] for fid, *_ in factor_specs}
-        grp = require_h5_group(obs_grp[matrix_h5], str(matrix_h5))
+        matrix_obj = obs_grp[matrix_h5]
+        if not isinstance(matrix_obj, h5py.Group):
+            roles.skipped.append(f"cluster markers ({matrix_h5} is not a group)")
+            return result
+        grp = matrix_obj
         n_genes = len(np.asarray(grp["p"])) - 1
         reported = 0
         for gene_i, cell_i, vals in iter_sparse_columns(grp):
