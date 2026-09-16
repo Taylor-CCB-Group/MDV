@@ -10,7 +10,7 @@ from mdvtools.template_views import (
     infer_roles,
     unique_top_markers,
 )
-from mdvtools.template_views.create_default_views import MarkerResult
+from mdvtools.template_views.create_default_views import Grid, MarkerResult, pretty_field
 
 
 def _tiny_datasources() -> list[dict]:
@@ -100,6 +100,27 @@ def test_infer_roles_picks_obs_cell_type_and_embedding():
     assert roles.rna.ds_name == "genes"
     assert roles.rna.names == ["CD14", "CD3D", "MS4A1"]
     assert "CD14" in roles.gene_wrappers
+
+
+def test_pretty_field_rewrites_generated_cluster_ids():
+    assert (
+        pretty_field("RNA_nbclust_5a743e84.988e.47bf.ada7.33b307458379_1_clusters")
+        == "Clusters"
+    )
+    assert pretty_field("rna:RNA_nbclust_abc_1_clusters") == "Clusters"
+    assert pretty_field("spatialclust_region_assignments") == "Spatial niche"
+    assert pretty_field("tissue") == "tissue"
+    assert pretty_field("rna:annotation") == "annotation"
+
+
+def test_grid_wraps_at_twelve_columns():
+    grid = Grid()
+    first, size_a = grid.place(6, 5)
+    second, size_b = grid.place(6, 5)
+    third, size_c = grid.place(6, 4)
+    assert first == [0, 0] and size_a == [6, 5]
+    assert second == [6, 0] and size_b == [6, 5]
+    assert third == [0, 5] and size_c == [6, 4]
 
 
 def test_unique_top_markers_first_cluster_wins_and_caps():
