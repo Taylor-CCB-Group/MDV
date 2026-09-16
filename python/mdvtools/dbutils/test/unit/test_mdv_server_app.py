@@ -321,6 +321,31 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(self.app.config['PREFERRED_URL_SCHEME'], 'http')
         self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], 'sqlite:///:memory:')
 
+    @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false}')
+    @patch('os.path.dirname')
+    @patch('os.path.abspath')
+    def test_load_config_names_session_cookie_after_api_root(self, mock_abspath, mock_dirname, mock_file):
+        """Deployments under different paths on one host get separate session cookies (mdv-roadmap issue 29)."""
+        mock_abspath.return_value = '/test/path'
+        mock_dirname.return_value = '/test'
+        env = {
+            'DB_USER': 'u', 'DB_PASSWORD': 'p', 'DB_NAME': 'd', 'DB_HOST': 'h',
+            'DEFAULT_AUTH_METHOD': 'dummy', 'FLASK_SECRET_KEY': 'k',
+        }
+        cases = {
+            '/sqlite_1/': 'mdv_session_sqlite_1',
+            '/mdv/sqlite_1': 'mdv_session_mdv_sqlite_1',
+            '/': 'session',
+            None: 'session',
+        }
+        for api_root, expected in cases.items():
+            with self.subTest(api_root=api_root):
+                app = Flask(__name__)
+                root_env = {} if api_root is None else {'MDV_API_ROOT': api_root}
+                with patch.dict(os.environ, {**env, **root_env}, clear=True):
+                    load_config(app, enable_auth=True)
+                self.assertEqual(app.config['SESSION_COOKIE_NAME'], expected)
+
 
 class TestCreateBaseDirectory(unittest.TestCase):
     """Test cases for the create_base_directory function."""

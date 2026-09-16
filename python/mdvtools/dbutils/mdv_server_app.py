@@ -6,6 +6,7 @@ import sys
 import time
 import json
 import logging
+import re
 from sqlalchemy import text, create_engine
 from sqlalchemy.exc import OperationalError
 from flask import Flask
@@ -320,6 +321,11 @@ def load_config(app, config_name=None, enable_auth=False):
                 app.config['ENABLE_AUTH'] = True
                 app.config["DEFAULT_AUTH_METHOD"] = os.getenv('DEFAULT_AUTH_METHOD') or config.get('DEFAULT_AUTH_METHOD')
                 app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
+                # Deployments served under different paths on one host share the browser's
+                # cookies, so name the session cookie after the path to keep their logins apart.
+                api_root = (os.getenv('MDV_API_ROOT') or '/').strip('/')
+                if api_root:
+                    app.config['SESSION_COOKIE_NAME'] = 'mdv_session_' + re.sub(r'[^A-Za-z0-9_-]+', '_', api_root)
                 
                 # Check if the authentication method is 'auth0'
                 if app.config["DEFAULT_AUTH_METHOD"] == "auth0":
