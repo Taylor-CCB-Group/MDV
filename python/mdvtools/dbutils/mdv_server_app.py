@@ -6,7 +6,7 @@ import sys
 import time
 import json
 import logging
-import re
+from urllib.parse import quote
 from sqlalchemy import text, create_engine
 from sqlalchemy.exc import OperationalError
 from flask import Flask
@@ -323,9 +323,11 @@ def load_config(app, config_name=None, enable_auth=False):
                 app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
                 # Deployments served under different paths on one host share the browser's
                 # cookies, so name the session cookie after the path to keep their logins apart.
+                # Percent-encoding gives every path its own name and leaves only characters
+                # that are valid in a cookie name.
                 api_root = (os.getenv('MDV_API_ROOT') or '/').strip('/')
                 if api_root:
-                    app.config['SESSION_COOKIE_NAME'] = 'mdv_session_' + re.sub(r'[^A-Za-z0-9_-]+', '_', api_root)
+                    app.config['SESSION_COOKIE_NAME'] = 'mdv_session_' + quote(api_root, safe='')
                 
                 # Check if the authentication method is 'auth0'
                 if app.config["DEFAULT_AUTH_METHOD"] == "auth0":

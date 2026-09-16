@@ -334,7 +334,10 @@ class TestLoadConfig(unittest.TestCase):
         }
         cases = {
             '/sqlite_1/': 'mdv_session_sqlite_1',
-            '/mdv/sqlite_1': 'mdv_session_mdv_sqlite_1',
+            '/mdv/sqlite_1': 'mdv_session_mdv%2Fsqlite_1',
+            '/mdv_sqlite_1': 'mdv_session_mdv_sqlite_1',
+            '/a.b': 'mdv_session_a.b',
+            '/a_b': 'mdv_session_a_b',
             '/': 'session',
             None: 'session',
         }
