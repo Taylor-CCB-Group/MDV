@@ -133,6 +133,14 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         this.gridRef = gridRef;
     }
 
+    setSize(x?: number, y?: number) {
+        super.setSize(x, y);
+        // Slickgrid's container observer is created before the chart moves to a
+        // popout window. Resize it explicitly so the grid follows that window
+        // immediately, rather than waiting for its original observer to fire.
+        void this.gridRef?.current?.resizerService.resizeGrid(0);
+    }
+
     setAddColumnDialogOpener(opener?: () => void) {
         this.addColumnDialogOpener = opener;
     }
@@ -190,7 +198,7 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
                     target: "_blank",
                     href: url,
                 },
-                document.body,
+                this.__doc__.body,
             );
             save.click();
             save.remove();
@@ -310,6 +318,7 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
             }),
         ];
     }
+
 }
 
 BaseChart.types["table_chart_react"] = {
