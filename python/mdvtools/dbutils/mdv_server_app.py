@@ -322,12 +322,14 @@ def load_config(app, config_name=None, enable_auth=False):
                 app.config["DEFAULT_AUTH_METHOD"] = os.getenv('DEFAULT_AUTH_METHOD') or config.get('DEFAULT_AUTH_METHOD')
                 app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
                 # Deployments served under different paths on one host share the browser's
-                # cookies, so name the session cookie after the path to keep their logins apart.
-                # Percent-encoding gives every path its own name and leaves only characters
-                # that are valid in a cookie name.
+                # cookies. Scope the session cookie to this deployment's path, so the browser
+                # sends it only here, and name it after that path, so it never shares a name
+                # with another deployment's cookie or an older cookie at "/". Percent-encoding
+                # gives every path its own name using only characters valid in a cookie name.
                 api_root = (os.getenv('MDV_API_ROOT') or '/').strip('/')
                 if api_root:
                     app.config['SESSION_COOKIE_NAME'] = 'mdv_session_' + quote(api_root, safe='')
+                    app.config['SESSION_COOKIE_PATH'] = '/' + api_root
                 
                 # Check if the authentication method is 'auth0'
                 if app.config["DEFAULT_AUTH_METHOD"] == "auth0":
