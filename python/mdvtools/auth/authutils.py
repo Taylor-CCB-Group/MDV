@@ -146,8 +146,7 @@ def register_before_request_auth(app):
         '/flask/js/',
         '/static',
         '/flask/assets',
-        '/flask/img',
-        '/flask/vendor/',
+        '/flask/img'
     ]
 
     @app.before_request
