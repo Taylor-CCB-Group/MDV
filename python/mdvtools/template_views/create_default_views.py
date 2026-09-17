@@ -774,7 +774,11 @@ def compute_marker_tables(
             n_genes = len(np.asarray(grp["p"])) - 1
         else:
             length = int(np.asarray(grp["length"]).reshape(-1)[0])
-            n_genes = int(grp["x"].shape[0] // max(length, 1))
+            x_obj = grp["x"]
+            if not isinstance(x_obj, h5py.Dataset):
+                roles.skipped.append(f"cluster markers ({matrix_h5}/x is not a dataset)")
+                return result
+            n_genes = int(x_obj.shape[0] // max(length, 1))
         reported = 0
         for gene_i, cell_i, vals in columns:
             if gene_i >= len(names):
