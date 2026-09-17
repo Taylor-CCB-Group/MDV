@@ -321,6 +321,36 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(self.app.config['PREFERRED_URL_SCHEME'], 'http')
         self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], 'sqlite:///:memory:')
 
+    @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false}')
+    @patch('os.path.dirname')
+    @patch('os.path.abspath')
+    def test_load_config_scopes_session_cookie_to_api_root(self, mock_abspath, mock_dirname, mock_file):
+        """Each deployment under a path on one host gets its own session cookie, sent only to that path (mdv-roadmap issue 29)."""
+        mock_abspath.return_value = '/test/path'
+        mock_dirname.return_value = '/test'
+        env = {
+            'DB_USER': 'u', 'DB_PASSWORD': 'p', 'DB_NAME': 'd', 'DB_HOST': 'h',
+            'DEFAULT_AUTH_METHOD': 'dummy', 'FLASK_SECRET_KEY': 'k',
+        }
+        cases = {
+            '/sqlite_1/': ('mdv_session_sqlite_1', '/sqlite_1'),
+            '/mdv/sqlite_1': ('mdv_session_mdv%2Fsqlite_1', '/mdv/sqlite_1'),
+            '/mdv_sqlite_1': ('mdv_session_mdv_sqlite_1', '/mdv_sqlite_1'),
+            '/a.b': ('mdv_session_a.b', '/a.b'),
+            '/a_b': ('mdv_session_a_b', '/a_b'),
+            '/': ('session', '/'),
+            None: ('session', '/'),
+        }
+        for api_root, (expected_name, expected_path) in cases.items():
+            with self.subTest(api_root=api_root):
+                app = Flask(__name__)
+                root_env = {} if api_root is None else {'MDV_API_ROOT': api_root}
+                with patch.dict(os.environ, {**env, **root_env}, clear=True):
+                    load_config(app, enable_auth=True)
+                self.assertEqual(app.config['SESSION_COOKIE_NAME'], expected_name)
+                # The path Flask writes on the cookie, so the browser sends it only to this deployment.
+                self.assertEqual(app.session_interface.get_cookie_path(app), expected_path)
+
 
 class TestCreateBaseDirectory(unittest.TestCase):
     """Test cases for the create_base_directory function."""
