@@ -10,7 +10,12 @@ from mdvtools.template_views import (
     infer_roles,
     unique_top_markers,
 )
-from mdvtools.template_views.create_default_views import Grid, MarkerResult, pretty_field
+from mdvtools.template_views.create_default_views import (
+    Grid,
+    MarkerResult,
+    iter_dense_columns,
+    pretty_field,
+)
 
 
 def _tiny_datasources() -> list[dict]:
@@ -111,6 +116,29 @@ def test_pretty_field_rewrites_generated_cluster_ids():
     assert pretty_field("spatialclust_region_assignments") == "Spatial niche"
     assert pretty_field("tissue") == "tissue"
     assert pretty_field("rna:annotation") == "annotation"
+
+
+def test_iter_dense_columns_yields_nonzero_cells():
+    import numpy as np
+
+    class _Dense:
+        def __init__(self):
+            self._data = {
+                "length": np.array([3], dtype=np.int64),
+                "x": np.array([1.0, 0.0, 2.0, 0.0, 0.0, 0.0, 3.0, 4.0, 0.0], dtype=np.float32),
+            }
+
+        def __getitem__(self, key):
+            return self._data[key]
+
+    cols = list(iter_dense_columns(_Dense(), chunk_genes=2))
+    assert cols[0][0] == 0
+    assert list(cols[0][1]) == [0, 2]
+    assert list(cols[0][2]) == [1.0, 2.0]
+    assert cols[1][0] == 1
+    assert cols[1][1].size == 0
+    assert cols[2][0] == 2
+    assert list(cols[2][1]) == [0, 1]
 
 
 def test_grid_wraps_at_twelve_columns():

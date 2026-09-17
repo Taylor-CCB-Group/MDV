@@ -630,6 +630,36 @@ def iter_sparse_columns(grp: Any, chunk_nnz: int = 8_000_000):
         gene = end_gene
 
 
+def iter_dense_columns(grp: Any, chunk_genes: int = 64):
+    """Yield (gene_index, nonzero_cell_index, values) from an MDV dense matrix group."""
+    import numpy as np
+
+    length = int(np.asarray(grp["length"]).reshape(-1)[0])
+    if length <= 0:
+        return
+    x = grp["x"]
+    n_genes = int(x.shape[0] // length)
+    for start in range(0, n_genes, chunk_genes):
+        stop = min(start + chunk_genes, n_genes)
+        block = np.asarray(x[start * length : stop * length], dtype=np.float32)
+        block = block.reshape(stop - start, length)
+        for j in range(stop - start):
+            vals = block[j]
+            nz = np.flatnonzero(vals)
+            yield start + j, nz.astype(np.int64), vals[nz]
+
+
+def iter_matrix_columns(grp: Any):
+    keys = set(grp.keys())
+    if {"p", "i", "x"} <= keys:
+        yield from iter_sparse_columns(grp)
+        return
+    if {"x", "length"} <= keys:
+        yield from iter_dense_columns(grp)
+        return
+    raise TypeError(f"unrecognised matrix group keys: {sorted(keys)}")
+
+
 def accumulate_groups(codes: Any, n_groups: int, rows: Any, vals: Any) -> tuple[Any, Any]:
     import numpy as np
 
@@ -734,9 +764,19 @@ def compute_marker_tables(
             roles.skipped.append(f"cluster markers ({matrix_h5} is not a group)")
             return result
         grp = matrix_obj
-        n_genes = len(np.asarray(grp["p"])) - 1
+        try:
+            columns = iter_matrix_columns(grp)
+        except TypeError:
+            roles.skipped.append(f"cluster markers ({matrix_h5} is not sparse or dense)")
+            return result
+        keys = set(grp.keys())
+        if {"p", "i", "x"} <= keys:
+            n_genes = len(np.asarray(grp["p"])) - 1
+        else:
+            length = int(np.asarray(grp["length"]).reshape(-1)[0])
+            n_genes = int(grp["x"].shape[0] // max(length, 1))
         reported = 0
-        for gene_i, cell_i, vals in iter_sparse_columns(grp):
+        for gene_i, cell_i, vals in columns:
             if gene_i >= len(names):
                 break
             gene = names[gene_i]
