@@ -90,3 +90,4 @@ tests_playwright/test-data/temp/
 /scripts/python/mdvtools/llm/structured_schemas.py
 
 .cursor/
+.venv/
