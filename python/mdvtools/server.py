@@ -5,7 +5,8 @@ from flask import (
     request,
     make_response,
     jsonify,
-    current_app
+    current_app,
+    session
 )
 from mdvtools.server_utils import (
     send_file,
@@ -52,6 +53,43 @@ logger = get_logger(__name__)
 logger.info("server.py module loaded")
 
 routes = set()
+
+
+def record_usage_event(project_id, event_type, backend_db, view_name=None):
+    """Record one usage event, or quietly do nothing if this deployment cannot.
+
+    Module level so it is unit-testable without building a project. Guards run in
+    order: no backend database (single-project mode's project ids are not row ids,
+    so a foreign key would fail), auth disabled (nobody to attribute it to), no
+    user in the session. Never raises - telemetry must not break a page.
+    """
+    try:
+        if not backend_db:
+            return False
+        if not current_app.config.get("ENABLE_AUTH", False):
+            return False
+        user = session.get("user") or {}
+        user_id = user.get("id")
+        if not user_id:
+            return False
+
+        # MDVProject.id is a *string* in backend mode - mdv_server_app.py builds
+        # it as str(project.id) - and in single-project mode it is a directory
+        # name. The column is an integer with a foreign key, so coerce here and
+        # give up quietly on anything that is not a row id.
+        try:
+            project_id = int(project_id) if project_id is not None else None
+        except (TypeError, ValueError):
+            return False
+
+        from mdvtools.dbutils.dbservice import UsageEventService
+
+        return UsageEventService.record_event(
+            user_id, event_type, project_id=project_id, view_name=view_name
+        )
+    except Exception as e:
+        logger.warning(f"Could not record usage event '{event_type}': {e}")
+        return False
 
 
 
@@ -151,6 +189,7 @@ def create_app(
         # some requests were being downgraded to http, which caused problems with the backend
         # but if we always add the header it messes up localhost development.
         # todo if necessary, apply equivalent change to index.html / any other pages we might have
+        record_usage_event(project.id, "project_open", options.backend_db)
         return render_template(
             "page.html",
             route=route,
@@ -266,6 +305,13 @@ def create_app(
         data = request.json
         if not data or "view" not in data:
             return "Request must contain JSON with 'view'", 400
+        # Recorded here because the view name only exists in the POST body - the
+        # URL is identical for every view, which is why a web-server log cannot
+        # answer "which view did they open". After the 400 guard so a malformed
+        # request never records anything.
+        record_usage_event(
+            project.id, "view_open", options.backend_db, view_name=data["view"]
+        )
         return jsonify(project.get_view(data["view"]))
 
     # get any custom row data
@@ -320,13 +366,27 @@ def create_app(
     def save_data():
         # Frontend sends decoded column data; unique columns are string[] from ChartManager getMd()
         success = True
+        new_view_name = None
         try:
             state = request.json
+            # A view created in the browser is never fetched from the server - it
+            # is already in memory - so /get_view never fires for it and it would
+            # be invisible in usage until somebody opened it later. Checked before
+            # save_state, which add-or-updates. Recorded as its own event type:
+            # counting a creation as an "open" would inflate every open count.
+            if state:
+                candidate = state.get("currentView")
+                if candidate and state.get("view") and candidate not in project.views:
+                    new_view_name = candidate
             project.save_state(state)
         except Exception as e:
             logger.error(e)
             success = False
 
+        if success and new_view_name:
+            record_usage_event(
+                project.id, "view_create", options.backend_db, view_name=new_view_name
+            )
         return jsonify({"success": success})
 
     @project_bp.route("/rename_view", access_level='editable', methods=["POST"])

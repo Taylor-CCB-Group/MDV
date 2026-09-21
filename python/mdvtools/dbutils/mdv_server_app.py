@@ -12,7 +12,7 @@ from flask import Flask
 from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint
-from mdvtools.dbutils.dbmodels import db, Project
+from mdvtools.dbutils.dbmodels import db, Project, UsageEvent
 from mdvtools.dbutils.routes import register_routes
 from mdvtools.auth.register_auth_routes import register_auth_routes
 from mdvtools.auth.authutils import register_before_request_auth, get_auth_provider, cache_user_projects
@@ -95,6 +95,13 @@ def create_flask_app(config_name=None):
                 logger.info("Created database tables")
             else:
                 logger.info("Database tables already exist")
+
+            # Own try/except: the enclosing handler re-raises, and telemetry
+            # must never be able to prevent the server from starting.
+            try:
+                ensure_usage_events_table()
+            except Exception as e:
+                logger.warning(f"Skipping usage_events table setup: {e}")
 
             if ENABLE_AUTH:
                 try:
@@ -371,6 +378,22 @@ def tables_exist():
         #logger.info("printing table names")
         #print(inspector.get_table_names())
         return inspector.get_table_names()
+
+def ensure_usage_events_table():
+    """Create usage_events on an existing database, where create_all() never runs.
+
+    tables_exist() returns the table list, so on any established deployment the
+    create_all() branch above is skipped entirely and a newly added table would
+    never appear. This creates just that one table, and never raises: telemetry
+    must not be able to stop the server from booting.
+    """
+    try:
+        UsageEvent.__table__.create(bind=db.engine, checkfirst=True)
+    except Exception as e:
+        # checkfirst=True is check-then-act, so two workers racing can both pass
+        # the check. Gunicorn runs -w 1 today but will not forever.
+        logger.warning(f"Could not ensure the usage_events table exists: {e}")
+
 
 def is_valid_mdv_project(path: str):
     if not os.path.isdir(path):

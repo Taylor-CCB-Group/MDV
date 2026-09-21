@@ -23,7 +23,7 @@ Example:
     >>> new_project = ProjectService.add_new_project('/path/to/project', 'My Project')
 """
 
-from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject
+from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject, UsageEvent
 from datetime import datetime
 from mdvtools.mdvproject import MDVProject
 from typing import Optional
@@ -334,6 +334,14 @@ class ProjectService:
 
             File.query.filter_by(project_id=project_id).delete(synchronize_session=False)
             UserProject.query.filter_by(project_id=project_id).delete(synchronize_session=False)
+            # Detach the usage history rather than deleting it. The foreign key
+            # would block this delete otherwise, and dropping the rows would make
+            # last month's access numbers silently change when somebody empties
+            # the recycle bin. details is otherwise unused, so overwriting is safe.
+            UsageEvent.query.filter_by(project_id=project_id).update(
+                {"project_id": None, "details": {"project_name": project.name}},
+                synchronize_session=False,
+            )
             db.session.delete(project)
             db.session.flush()
             if filesystem_delete is not None:
@@ -998,3 +1006,59 @@ class UserProjectService:
             logger.exception(f"Error in remove_user_from_project: {e}")
             db.session.rollback()  # Rollback in case of error
             raise
+
+
+class UsageEventService:
+    """Records who used what, for the Admin usage page.
+
+    Two deliberate departures from every other service in this module. Both are
+    intentional - please do not "fix" them to match the siblings:
+
+    1. Writes go through db.engine.begin(), not db.session. The sibling services
+       call db.session.rollback() on failure; doing that here would roll back
+       *the caller's* uncommitted work, and the login hook fires immediately
+       after a user-activation commit.
+    2. Every exception is swallowed rather than re-raised. Telemetry must never
+       turn a working page into an error for the person using it.
+    """
+
+    @staticmethod
+    def record_event(user_id, event_type, project_id=None, view_name=None):
+        """Insert one usage row. Never raises, never touches the caller's session."""
+        try:
+            if not user_id or not event_type:
+                return False
+
+            if view_name is not None:
+                view_name = str(view_name)[:128]
+
+            with db.engine.begin() as connection:
+                connection.execute(
+                    UsageEvent.__table__.insert().values(
+                        user_id=user_id,
+                        project_id=project_id,
+                        event_type=event_type,
+                        view_name=view_name,
+                        occurred_at=datetime.now(),
+                    )
+                )
+            return True
+        except Exception as e:
+            # Deliberately not re-raised - see the class docstring.
+            logger.warning(f"Could not record usage event '{event_type}': {e}")
+            return False
+
+    @staticmethod
+    def record_login(user_id):
+        return UsageEventService.record_event(user_id, "login")
+
+    @staticmethod
+    def record_project_open(user_id, project_id):
+        return UsageEventService.record_event(user_id, "project_open", project_id=project_id)
+
+    @staticmethod
+    def record_view_open(user_id, project_id, view_name):
+        """view_name arrives from an untrusted request body, so record_event truncates it."""
+        return UsageEventService.record_event(
+            user_id, "view_open", project_id=project_id, view_name=view_name
+        )

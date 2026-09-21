@@ -84,6 +84,34 @@ class UserProject(db.Model):
             self.can_write = can_write
             self.can_read = True if can_write else (can_read if can_read is not None else False)
 
+class UsageEvent(db.Model):
+    """Append-only record of who used what, for the Admin usage page.
+
+    Deliberately separate from UserProject: that table says who is *allowed*
+    into a project, this one says who actually went in.
+    """
+    __tablename__ = 'usage_events'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    # Null for 'login' (not about a project) and for events whose project was
+    # later purged from the recycle bin - see ProjectService.purge_deleted_project.
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=True, index=True)
+    event_type = db.Column(db.String(32), nullable=False)  # login | project_open | view_open
+    view_name = db.Column(db.String(128), nullable=True)  # only set for view_open
+    # Deliberately unused today. create_all() and ensure_usage_events_table()
+    # only create missing *tables*, never missing *columns*, so adding a column
+    # after this ships means hand-run ALTER TABLE on every deployment. This is
+    # the escape hatch for the next requirement change - not dead weight.
+    details = db.Column(db.JSON, nullable=True)
+    occurred_at = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
+
+    # No relationship backrefs on User or Project: those are lazy=True and a
+    # backref would widen existing hot-path loads for a table nothing else reads.
+    __table_args__ = (
+        db.Index('idx_usage_events_type_time', 'event_type', 'occurred_at'),
+    )
+
+
 class Genome(db.Model):
     __tablename__ = 'genomes'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

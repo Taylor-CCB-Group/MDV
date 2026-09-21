@@ -473,6 +473,12 @@ class Auth0Provider(AuthProvider):
             logger.exception(
                 "Failed to assign the Auth0 'admin' role to the bootstrap administrator; rolling back."
             )
+            # Deliberately no usage_events cleanup here. None can exist yet: the
+            # login event is written in is_authenticated() *after* validate_user()
+            # returns, and nothing else can reference a user created moments ago.
+            # An earlier version cleared them defensively and broke this rollback,
+            # because a query here is a new way for the recovery path to fail.
+            # A future delete-user feature does need to clear usage_events first.
             db.session.delete(user)
             db.session.commit()
             raise

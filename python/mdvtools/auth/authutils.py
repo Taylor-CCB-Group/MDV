@@ -110,6 +110,21 @@ def is_authenticated(project_id=None):
         user, error_response = provider.validate_user()
         if user is None or error_response is not None:
             return (False, "Authentication required.")
+
+        # Only reached when a session is established, so this fires once per
+        # session rather than once per request - the else branch below handles
+        # every subsequent request. All three providers converge here, so this
+        # is the single login capture point for Auth0, Shibboleth and dummy.
+        # Imported lazily: authutils is imported before db.init_app() runs,
+        # the same reason cache_user_projects() defers its import.
+        try:
+            from mdvtools.dbutils.dbservice import UsageEventService
+
+            session_user = session.get("user") or {}
+            if session_user.get("id"):
+                UsageEventService.record_login(session_user["id"])
+        except Exception as e:
+            logger.warning(f"Could not record login event: {e}")
     else:
         user = session.get("user")
 
