@@ -1,10 +1,14 @@
 """Tests for usage telemetry recording and its interaction with project deletion."""
 
+import random
+from datetime import datetime
+
 import pytest
 from flask import Flask
 
 from mdvtools.dbutils.dbmodels import Project, UsageEvent, User, db
 from mdvtools.dbutils.dbservice import ProjectService, UsageEventService
+from mdvtools.dbutils.seed_usage_events import clear_seeded, generate, summarise
 
 
 @pytest.fixture()
@@ -226,3 +230,122 @@ class TestProjectDeletion:
         assert event.project_id is None
         assert event.view_name == "Overview"
         assert event.details == {"project_name": "project-3"}
+
+
+class TestSeedGeneration:
+    """generate() is pure, so the shape of demo data can be checked without a database."""
+
+    @staticmethod
+    def _users(count=5):
+        return [User(id=i, email=f"u{i}@example.org", auth_id=f"a{i}") for i in range(1, count + 1)]
+
+    @staticmethod
+    def _projects(count=3):
+        return [Project(id=i, name=f"p{i}", path=f"/tmp/p{i}") for i in range(1, count + 1)]
+
+    def test_it_produces_events(self):
+        events = generate(self._users(), self._projects(), 30, random.Random(1))
+        assert len(events) > 0
+
+    def test_a_session_always_starts_with_a_sign_in(self):
+        events = generate(self._users(), self._projects(), 30, random.Random(1))
+        assert events[0][2] == "login"
+
+    def test_a_sign_in_has_no_project(self):
+        events = generate(self._users(), self._projects(), 30, random.Random(1))
+        assert all(e[1] is None for e in events if e[2] == "login")
+
+    def test_view_events_always_name_a_view(self):
+        events = generate(self._users(), self._projects(), 30, random.Random(1))
+        assert all(e[3] for e in events if e[2] in ("view_open", "view_create"))
+
+    def test_project_opens_never_name_a_view(self):
+        events = generate(self._users(), self._projects(), 30, random.Random(1))
+        assert all(e[3] is None for e in events if e[2] == "project_open")
+
+    def test_nothing_is_dated_in_the_future(self):
+        events = generate(self._users(), self._projects(), 30, random.Random(1))
+        assert all(e[4] <= datetime.now() for e in events)
+
+    def test_the_same_seed_gives_the_same_data(self):
+        a = generate(self._users(), self._projects(), 30, random.Random(7))
+        b = generate(self._users(), self._projects(), 30, random.Random(7))
+        assert a == b
+
+    def test_weekends_are_quieter_than_weekdays(self):
+        events = generate(self._users(), self._projects(), 60, random.Random(3))
+        weekend = sum(1 for e in events if e[4].weekday() >= 5)
+        weekday = sum(1 for e in events if e[4].weekday() < 5)
+        assert weekend < weekday / 2, "weekend dip is what makes the chart read as real"
+
+    def test_activity_is_uneven_across_people(self):
+        """A demo needs the spread - somebody heavy, somebody who never shows up."""
+        events = generate(self._users(), self._projects(), 60, random.Random(5))
+        per_user = {}
+        for user_id, *_ in events:
+            per_user[user_id] = per_user.get(user_id, 0) + 1
+        assert len(set(per_user.values())) > 1
+        assert len(per_user) < 5, "at least one seeded user should be dormant"
+
+
+class TestSeedMarker:
+    """--clear must remove only what the script wrote, however often it has run."""
+
+    def test_clear_removes_seeded_rows_and_leaves_real_ones(self, app, tmp_path):
+        add_user()
+        add_project(tmp_path)
+        UsageEventService.record_project_open(7, 3)
+        db.session.add(UsageEvent(
+            user_id=7, project_id=3, event_type="view_open",
+            view_name="seeded", occurred_at=datetime.now(), details={"seeded": True},
+        ))
+        db.session.commit()
+        assert UsageEvent.query.count() == 2
+
+        assert clear_seeded() == 1
+
+        remaining = UsageEvent.query.all()
+        assert len(remaining) == 1
+        assert remaining[0].event_type == "project_open"
+
+    def test_clear_is_safe_to_run_when_nothing_was_seeded(self, app, tmp_path):
+        add_user()
+        add_project(tmp_path)
+        UsageEventService.record_project_open(7, 3)
+        assert clear_seeded() == 0
+        assert UsageEvent.query.count() == 1
+
+    def test_clearing_twice_is_harmless(self, app, tmp_path):
+        """--reset calls this before seeding, so it runs on already-clean tables."""
+        add_user()
+        add_project(tmp_path)
+        db.session.add(UsageEvent(
+            user_id=7, project_id=3, event_type="login",
+            occurred_at=datetime.now(), details={"seeded": True},
+        ))
+        db.session.commit()
+        assert clear_seeded() == 1
+        assert clear_seeded() == 0
+
+    def test_a_row_with_other_details_is_not_treated_as_seeded(self, app, tmp_path):
+        """A purged project writes project_name into details - it must survive."""
+        add_user()
+        add_project(tmp_path)
+        db.session.add(UsageEvent(
+            user_id=7, project_id=None, event_type="project_open",
+            occurred_at=datetime.now(), details={"project_name": "Old pilot"},
+        ))
+        db.session.commit()
+        assert clear_seeded() == 0
+        assert UsageEvent.query.count() == 1
+
+    def test_summary_separates_seeded_from_real(self, app, tmp_path):
+        add_user()
+        add_project(tmp_path)
+        UsageEventService.record_project_open(7, 3)
+        db.session.add(UsageEvent(
+            user_id=7, project_id=3, event_type="login",
+            occurred_at=datetime.now(), details={"seeded": True},
+        ))
+        db.session.commit()
+        assert summarise() == (2, 1, 1)
