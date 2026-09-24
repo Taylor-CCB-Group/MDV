@@ -213,10 +213,11 @@ describe("useSlickGridReact", () => {
             expect(result.current.columnDefs[2].field).toBe("name");
         });
 
-        test("should include remove column in editable column header menu", () => {
+        test("should include curation and data commands for an editable column", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             const ageColumn = result.current.columnDefs.find((col) => col.field === "age");
+            // curation (rename, delete) is grouped before data (bulk edit)
             expect(ageColumn?.header?.menu?.commandItems).toEqual([
                 {
                     command: "find-replace",
@@ -229,21 +230,23 @@ describe("useSlickGridReact", () => {
                     iconCssClass: "mdi mdi-pencil",
                 },
                 {
+                    command: "remove-column",
+                    title: "Delete Column",
+                    iconCssClass: "mdi mdi-delete",
+                },
+                {
                     command: "bulk-edit",
                     title: "Bulk Edit",
                     iconCssClass: "mdi mdi-table-edit",
                 },
-                                    {
-                                        command: "remove-column",
-                                        title: "Delete Column",
-                                        iconCssClass: "mdi mdi-delete",
-                                    },
             ]);
         });
 
-        test("should not include remove column for non-editable column", () => {
+        test("should include curation but not bulk edit for a non-editable column", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
+            // `editable` governs overwriting values, not curation: a read-only column can
+            // still be renamed and hidden. See ADR-0003.
             const nameColumn = result.current.columnDefs.find((col) => col.field === "name");
             expect(nameColumn?.header?.menu?.commandItems).toEqual([
                 {
@@ -251,10 +254,20 @@ describe("useSlickGridReact", () => {
                     title: "Find",
                     iconCssClass: "mdi mdi-magnify",
                 },
+                {
+                    command: "rename-column",
+                    title: "Rename Column",
+                    iconCssClass: "mdi mdi-pencil",
+                },
+                {
+                    command: "remove-column",
+                    title: "Delete Column",
+                    iconCssClass: "mdi mdi-delete",
+                },
             ]);
         });
 
-        test("should not include rename for query-backed editable columns", () => {
+        test("should not include rename or delete for query-backed editable columns", () => {
             mockOrderedParamColumns = [
                 {
                     ...mockOrderedParamColumns[0],
@@ -266,6 +279,8 @@ describe("useSlickGridReact", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             const ageColumn = result.current.columnDefs.find((col) => col.field === "age");
+            // the structural predicate excludes spatial geometry columns from BOTH curation
+            // commands; bulk edit remains because the column is still editable
             expect(ageColumn?.header?.menu?.commandItems).toEqual([
                 {
                     command: "find-replace",
@@ -276,11 +291,6 @@ describe("useSlickGridReact", () => {
                     command: "bulk-edit",
                     title: "Bulk Edit",
                     iconCssClass: "mdi mdi-table-edit",
-                },
-                {
-                    command: "remove-column",
-                    title: "Delete Column",
-                    iconCssClass: "mdi mdi-delete",
                 },
             ]);
         });
@@ -457,17 +467,44 @@ describe("useSlickGridReact", () => {
                 message: "This column cannot be renamed.",
             });
         });
+
+        test("should block delete for query-backed columns", async () => {
+            mockOrderedParamColumns[0] = {
+                ...mockOrderedParamColumns[0],
+                sgtype: "query",
+            } as any;
+            mockDataStore.columnIndex.age = mockOrderedParamColumns[0];
+
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
+
+            await act(async () => {
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+                await Promise.resolve();
+            });
+
+            expect(analyzeColumnRemoval).not.toHaveBeenCalled();
+            expect(result.current.pendingColumnRemoval).toBeNull();
+            expect(result.current.feedbackAlert).toEqual({
+                type: "warning",
+                title: "Delete Column Warning",
+                message: "This column cannot be deleted.",
+            });
+        });
     });
 
     describe("rename column", () => {
-        test("should rename an editable column without changing the param config", () => {
+        test("should rename an editable column without changing the param config", async () => {
             const { result } = renderHook(() => useSlickGridReact());
             const { gridInstance } = setupGrid(result);
             const liveColumns = [{ field: "age", name: "Age" }];
             gridInstance.slickGrid.getColumns = vi.fn(() => liveColumns as any);
 
-            act(() => {
-                result.current.handleRenameColumn({
+            await act(async () => {
+                await result.current.handleRenameColumn({
                     columnField: "age",
                     newName: "Age label",
                 });
@@ -483,14 +520,14 @@ describe("useSlickGridReact", () => {
             expect(result.current.renameColumnState).toBeNull();
         });
 
-        test("should escape html when updating the column header", () => {
+        test("should escape html when updating the column header", async () => {
             const { result } = renderHook(() => useSlickGridReact());
             const { gridInstance } = setupGrid(result);
             const liveColumns = [{ field: "age", name: "Age" }];
             gridInstance.slickGrid.getColumns = vi.fn(() => liveColumns as any);
 
-            act(() => {
-                result.current.handleRenameColumn({
+            await act(async () => {
+                await result.current.handleRenameColumn({
                     columnField: "age",
                     newName: `<img src=x onerror=alert('xss')>`,
                 });
@@ -539,6 +576,59 @@ describe("useSlickGridReact", () => {
                 title: "Rename Column Warning",
                 message: "Column name is required.",
             });
+        });
+
+        test("should save the view so the rename is not lost", async () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            setupGrid(result);
+
+            await act(async () => {
+                await result.current.handleRenameColumn({
+                    columnField: "age",
+                    newName: "Age label",
+                });
+            });
+
+            expect(mockChartManager.viewManager.saveView).toHaveBeenCalledTimes(1);
+            expect(result.current.feedbackAlert).toBeNull();
+        });
+
+        test("should not save when the name was already the same", async () => {
+            mockDataStore.renameColumnDisplayName = vi.fn(() => false);
+            const { result } = renderHook(() => useSlickGridReact());
+            setupGrid(result);
+
+            await act(async () => {
+                await result.current.handleRenameColumn({
+                    columnField: "age",
+                    newName: "Age label",
+                });
+            });
+
+            expect(mockChartManager.viewManager.saveView).not.toHaveBeenCalled();
+        });
+
+        test("should report when the rename applied but the view save failed", async () => {
+            // saveView() swallows its own errors, so hasUnsavedChanges is the only failure signal
+            mockChartManager.viewManager.hasUnsavedChanges = vi.fn(() => true);
+            const { result } = renderHook(() => useSlickGridReact());
+            setupGrid(result);
+
+            await act(async () => {
+                await result.current.handleRenameColumn({
+                    columnField: "age",
+                    newName: "Age label",
+                });
+            });
+
+            expect(mockDataStore.renameColumnDisplayName).toHaveBeenCalledWith("age", "Age label");
+            expect(result.current.feedbackAlert).toEqual(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Rename Column Error",
+                    message: expect.stringContaining("saving the view failed"),
+                }),
+            );
         });
     });
 

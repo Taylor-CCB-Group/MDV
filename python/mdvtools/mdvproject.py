@@ -336,7 +336,7 @@ class MDVProject:
 
     def get_column_metadata(self, datasource, column):
         ds = self.get_datasource_metadata(datasource)
-        col = [x for x in ds["columns"] if x["field"] == column]
+        col = [x for x in ds["columns"] if x.get("field") == column]
         if len(col) == 0:
             raise AttributeError(
                 f"column {column} not found in {datasource} datasource"
@@ -345,13 +345,201 @@ class MDVProject:
 
     def set_column_metadata(self, datasource, column, parameter, value):
         ds = self.get_datasource_metadata(datasource)
-        col_index = [c for c, x in enumerate(ds["columns"]) if x["field"] == column]
+        col_index = [c for c, x in enumerate(ds["columns"]) if x.get("field") == column]
         if len(col_index) == 0:
             raise AttributeError(
                 f"column {column} not found in {datasource} datasource"
             )
         ds["columns"][col_index[0]][parameter] = value
         self.set_datasource_metadata(ds)
+
+    def rename_column(self, datasource: str, field: str, new_name: str) -> bool:
+        """Change a column's display name, leaving its `field` identifier untouched.
+
+        This is the scriptable equivalent of the table chart's "Rename Column" menu item.
+        Only the user-facing `name` changes; `field` is what charts, column groups, links
+        and image key columns reference, so renaming can never break them.
+
+        Args:
+            datasource (str): The name of the datasource.
+            field (str): The column's `field` identifier (not its display name).
+            new_name (str): The new display name. Surrounding whitespace is stripped.
+
+        Returns:
+            bool: True if the name changed, False if the column already had that name.
+
+        Raises:
+            AttributeError: if the datasource or column does not exist, or the column
+                cannot be renamed (soft-deleted, a spatial `sgindex`/`sgtype` column, or
+                a legacy column carrying no `field` identifier).
+            ValueError: if `new_name` is empty, or another live column already uses it
+                (compared case-insensitively, matching the frontend).
+        """
+        ds = self.get_datasource_metadata(datasource)
+        columns = ds.get("columns", [])
+
+        trimmed = new_name.strip() if isinstance(new_name, str) else ""
+        if not trimmed:
+            raise ValueError("Column name is required")
+
+        column = next((x for x in columns if x.get("field") == field), None)
+        if column is None:
+            # A legacy column carrying only `name` has no stable identifier: the frontend
+            # synthesises `field` from `name` on load, so renaming it would silently change
+            # the column's identity rather than its label.
+            if any(x.get("field") is None and x.get("name") == field for x in columns):
+                raise AttributeError(
+                    f"column {field} in {datasource} datasource has no 'field' identifier"
+                    " so cannot be renamed"
+                )
+            raise AttributeError(
+                f"column {field} not found in {datasource} datasource"
+            )
+
+        if column.get("deleted"):
+            raise AttributeError(
+                f"column {field} in {datasource} datasource is deleted so cannot be renamed"
+            )
+
+        spatial_key = next(
+            (key for key in ("sgindex", "sgtype") if column.get(key) is not None), None
+        )
+        if spatial_key:
+            raise AttributeError(
+                f"column {field} in {datasource} datasource is a spatial ({spatial_key})"
+                " column so cannot be renamed"
+            )
+
+        if column.get("name") == trimmed:
+            return False
+
+        normalized = trimmed.casefold()
+        clash = next(
+            (
+                x
+                for x in columns
+                if x.get("field") != field
+                and not x.get("deleted")
+                and str(x.get("name", "")).strip().casefold() == normalized
+            ),
+            None,
+        )
+        if clash is not None:
+            raise ValueError(
+                f"column {trimmed} already exists in {datasource} datasource"
+            )
+
+        self.set_column_metadata(datasource, field, "name", trimmed)
+        return True
+
+    def _find_column_references(self, datasource: str, field: str) -> List[tuple]:
+        """Find charts in saved views that reference a column by its `field`.
+
+        This is a generic recursive scan of each chart config, rather than a port of the
+        frontend's chart-type-aware `configEntriesUsingColumns` list (see ADR-0003). It
+        cannot go stale as chart types are added, and it fails closed: it may over-report
+        (a field name appearing in an unrelated string) but it cannot miss a reference.
+
+        Returns:
+            list: (view_name, chart_label) tuples, empty if nothing references the column.
+        """
+
+        def references(value) -> bool:
+            if isinstance(value, str):
+                return value == field
+            if isinstance(value, dict):
+                return any(references(v) for v in value.values())
+            if isinstance(value, (list, tuple)):
+                return any(references(v) for v in value)
+            return False
+
+        def label(chart: dict) -> str:
+            title = chart.get("title")
+            if isinstance(title, list):
+                title = " ".join(str(x) for x in title)
+            return str(title or chart.get("type") or chart.get("id") or "untitled chart")
+
+        hits = []
+        for view_name, view in (self.views or {}).items():
+            if not isinstance(view, dict):
+                continue
+            charts = (view.get("initialCharts") or {}).get(datasource) or []
+            for chart in charts:
+                if isinstance(chart, dict) and references(chart):
+                    hits.append((view_name, label(chart)))
+        return hits
+
+    def soft_delete_column(self, datasource: str, field: str) -> bool:
+        """Hide a column from MDV without removing it or its data.
+
+        Sets the `deleted` tombstone on the column's metadata. The column stays in the
+        datasource and in exported files; MDV simply stops showing it. This is the
+        scriptable equivalent of the table chart's "Delete Column" menu item, and it
+        applies the same rule the UI does: deletion is blocked while a saved view still
+        references the column.
+
+        Not to be confused with `remove_column`, which deletes the column *and its data*
+        and cannot be undone.
+
+        Ordering matters in scripts. `add_datasource` defaults to `add_to_view="default"`,
+        which builds a view whose table plot lists every column - that view then blocks
+        every deletion. Pass `add_to_view=None`, hide the unwanted columns, and generate
+        views afterwards; `create_view_with_all_datasources` skips tombstoned columns.
+
+        Args:
+            datasource (str): The name of the datasource.
+            field (str): The column's `field` identifier (not its display name).
+
+        Returns:
+            bool: True if the column was tombstoned, False if it already was.
+
+        Raises:
+            AttributeError: if the datasource or column does not exist, or the column
+                cannot be curated (a spatial `sgindex`/`sgtype` column, or a legacy
+                column carrying no `field` identifier).
+            ValueError: if any saved view still references the column.
+        """
+        ds = self.get_datasource_metadata(datasource)
+        columns = ds.get("columns", [])
+
+        column = next((x for x in columns if x.get("field") == field), None)
+        if column is None:
+            # As with rename, a legacy column carrying only `name` has no stable
+            # identifier, so there is nothing safe to tombstone it by.
+            if any(x.get("field") is None and x.get("name") == field for x in columns):
+                raise AttributeError(
+                    f"column {field} in {datasource} datasource has no 'field' identifier"
+                    " so cannot be deleted"
+                )
+            raise AttributeError(
+                f"column {field} not found in {datasource} datasource"
+            )
+
+        if column.get("deleted"):
+            return False
+
+        spatial_key = next(
+            (key for key in ("sgindex", "sgtype") if column.get(key) is not None), None
+        )
+        if spatial_key:
+            raise AttributeError(
+                f"column {field} in {datasource} datasource is a spatial ({spatial_key})"
+                " column so cannot be deleted"
+            )
+
+        references = self._find_column_references(datasource, field)
+        if references:
+            used_by = "; ".join(
+                f"{view_name}: {chart_label}" for view_name, chart_label in references
+            )
+            raise ValueError(
+                f"deletion of column {field} in {datasource} datasource is blocked:"
+                f" it is still used by other charts or views ({used_by})."
+                " Update those charts, then try deleting again."
+            )
+
+        self.set_column_metadata(datasource, field, "deleted", True)
+        return True
 
     def get_datasource_as_dataframe(
         self, datasource: str, columns: Optional[List[str]] = None
@@ -1772,7 +1960,12 @@ class MDVProject:
         for ds in all_ds:
             ds_name = ds["name"]
             view_data["dataSources"][ds_name] = {"layout": "gridstack"}
-            columns = [x["field"] for x in ds.get("columns", [])]
+            # Soft-deleted columns are hidden in MDV, so a generated view must not
+            # list them: the frontend refuses to restore a tombstoned column, leaving
+            # the chart a column short.
+            columns = [
+                x["field"] for x in ds.get("columns", []) if not x.get("deleted")
+            ]
             if columns:
                 table_plot = self.create_table_plot(ds_name, columns, [792, 472], [10, 10])
                 view_data["initialCharts"][ds_name] = [self.convert_plot_to_json(table_plot)]
