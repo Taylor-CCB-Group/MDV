@@ -7,6 +7,7 @@ import pytest
 from flask import Flask
 
 from mdvtools.dbutils.dbmodels import Project, UsageEvent, User, db
+from mdvtools.dbutils import dbservice
 from mdvtools.dbutils.dbservice import ProjectService, UsageEventService
 from mdvtools.dbutils.seed_usage_events import clear_seeded, generate, summarise
 
@@ -191,6 +192,42 @@ class TestViewCreation:
         creates = UsageEvent.query.filter_by(event_type="view_create").count()
         assert opens == 1
         assert creates == 1
+
+
+class TestOffSwitch:
+    """ENABLE_USAGE_TRACKING lets a deployment record nothing at all."""
+
+    @pytest.fixture()
+    def tracking_off(self, monkeypatch):
+        monkeypatch.setattr(dbservice, "ENABLE_USAGE_TRACKING", False)
+
+    def test_recording_is_on_by_default(self, app):
+        """A deployment that says nothing gets usage recording."""
+        assert dbservice.ENABLE_USAGE_TRACKING is True
+
+    def test_nothing_is_recorded_when_switched_off(self, app, tracking_off):
+        add_user()
+        assert UsageEventService.record_login(7) is False
+        assert UsageEvent.query.count() == 0
+
+    def test_the_switch_covers_every_event_type(self, app, tmp_path, tracking_off):
+        """Checked in record_event, so a new event type cannot bypass it."""
+        add_user()
+        add_project(tmp_path)
+        UsageEventService.record_login(7)
+        UsageEventService.record_project_open(7, 3)
+        UsageEventService.record_view_open(7, 3, "Overview")
+        UsageEventService.record_event(7, "view_create", project_id=3, view_name="New")
+        assert UsageEvent.query.count() == 0
+
+    def test_switching_it_off_does_not_delete_what_was_already_recorded(self, app, tmp_path, monkeypatch):
+        """It stops collection. Removing history is retention's job, not this."""
+        add_user()
+        add_project(tmp_path)
+        UsageEventService.record_project_open(7, 3)
+        monkeypatch.setattr(dbservice, "ENABLE_USAGE_TRACKING", False)
+        UsageEventService.record_project_open(7, 3)
+        assert UsageEvent.query.count() == 1
 
 
 class TestProjectDeletion:

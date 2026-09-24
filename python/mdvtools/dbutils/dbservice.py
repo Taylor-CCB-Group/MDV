@@ -33,6 +33,14 @@ from mdvtools.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Usage recording can be switched off for a whole deployment - an institution
+# may not want it logged at all, and that should be a config change rather than
+# a rebuild. Read at import like ENABLE_AUTH, so it is a deployment-wide
+# decision that no individual request can alter.
+ENABLE_USAGE_TRACKING = os.getenv("ENABLE_USAGE_TRACKING", "1").lower() in ["1", "true", "yes"]
+if not ENABLE_USAGE_TRACKING:
+    logger.info("Usage tracking is disabled (ENABLE_USAGE_TRACKING)")
+
 
 class ProjectService:
     """
@@ -1024,8 +1032,15 @@ class UsageEventService:
 
     @staticmethod
     def record_event(user_id, event_type, project_id=None, view_name=None):
-        """Insert one usage row. Never raises, never touches the caller's session."""
+        """Insert one usage row. Never raises, never touches the caller's session.
+
+        The off switch is checked here rather than at each call site because
+        every recording path funnels through this one function - so a new event
+        type cannot be added that quietly ignores it.
+        """
         try:
+            if not ENABLE_USAGE_TRACKING:
+                return False
             if not user_id or not event_type:
                 return False
 
