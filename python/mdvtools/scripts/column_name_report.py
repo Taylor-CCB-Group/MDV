@@ -42,12 +42,19 @@ def normalize_field(value: str) -> str:
 
 
 @dataclass(frozen=True)
+class ChartUse:
+    view_name: str
+    chart_type: str
+
+
+@dataclass(frozen=True)
 class ColumnHit:
     project: str
     datasource: str
     field_name: str
     display_name: str
     used_in_views: bool = False
+    chart_uses: tuple[ChartUse, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -55,6 +62,7 @@ class Occurrence:
     project: str
     display_name: str
     used_in_views: bool = False
+    chart_uses: tuple[ChartUse, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -167,10 +175,12 @@ def _referenced_fields(value: object) -> list[str]:
     return []
 
 
-def used_fields_in_views(project: Path) -> tuple[set[tuple[str, str]], str | None]:
-    """Return (datasource, field) pairs referenced by charts in views.json.
+def used_fields_in_views(
+    project: Path,
+) -> tuple[dict[tuple[str, str], tuple[ChartUse, ...]], str | None]:
+    """Return chart uses for each (datasource, field) referenced in views.json.
 
-    A missing file is not an error. An unreadable file returns an empty set and
+    A missing file is not an error. An unreadable file returns an empty mapping and
     an error string.
     """
     path = project / "views.json"
@@ -182,10 +192,11 @@ def used_fields_in_views(project: Path) -> tuple[set[tuple[str, str]], str | Non
         return set(), f"{path}: {exc}"
     if not isinstance(parsed, dict):
         return set(), f"{path}: expected a map of views"
-    used: set[tuple[str, str]] = set()
-    for view in parsed.values():
+    used: dict[tuple[str, str], set[ChartUse]] = defaultdict(set)
+    for raw_view_name, view in parsed.items():
         if not isinstance(view, dict):
             continue
+        view_name = raw_view_name if isinstance(raw_view_name, str) else str(raw_view_name)
         charts_by_datasource = view.get("initialCharts")
         if not isinstance(charts_by_datasource, dict):
             continue
@@ -195,19 +206,25 @@ def used_fields_in_views(project: Path) -> tuple[set[tuple[str, str]], str | Non
             for chart in charts:
                 if not isinstance(chart, dict):
                     continue
+                raw_chart_type = chart.get("type")
+                chart_type = raw_chart_type if isinstance(raw_chart_type, str) else ""
+                chart_use = ChartUse(view_name=view_name, chart_type=chart_type)
                 for key in _CHART_FIELD_KEYS:
                     if key not in chart:
                         continue
                     for field_name in _referenced_fields(chart.get(key)):
-                        used.add((datasource, field_name))
-    return used, None
+                        used[(datasource, field_name)].add(chart_use)
+    return {
+        key: tuple(sorted(uses, key=lambda use: (use.view_name, use.chart_type)))
+        for key, uses in used.items()
+    }, None
 
 
 def load_project_columns(
     project: Path,
     *,
     include_internal: bool,
-    used_in_views: set[tuple[str, str]] | None = None,
+    used_in_views: dict[tuple[str, str], tuple[ChartUse, ...]] | None = None,
 ) -> tuple[list[ColumnHit], str | None]:
     """Read column hits from one project's ``datasources.json``."""
     path = project / "datasources.json"
@@ -237,13 +254,15 @@ def load_project_columns(
             if not include_internal and field_name.startswith("__"):
                 continue
             display_name = _string_field(column, "name") or field_name
+            chart_uses = (used_in_views or {}).get((datasource, field_name), ())
             hits.append(
                 ColumnHit(
                     project=project_name,
                     datasource=datasource,
                     field_name=field_name,
                     display_name=display_name,
-                    used_in_views=(datasource, field_name) in (used_in_views or set()),
+                    used_in_views=bool(chart_uses),
+                    chart_uses=chart_uses,
                 )
             )
     return hits, None
@@ -318,16 +337,22 @@ def find_inconsistencies(
                                 project=hit.project,
                                 display_name=hit.display_name,
                                 used_in_views=hit.used_in_views,
+                                chart_uses=hit.chart_uses,
                             )
                         )
                         continue
-                    if hit.used_in_views and not occurrences[existing].used_in_views:
-                        previous = occurrences[existing]
-                        occurrences[existing] = Occurrence(
-                            project=previous.project,
-                            display_name=previous.display_name,
-                            used_in_views=True,
-                        )
+                    previous = occurrences[existing]
+                    occurrences[existing] = Occurrence(
+                        project=previous.project,
+                        display_name=previous.display_name,
+                        used_in_views=previous.used_in_views or hit.used_in_views,
+                        chart_uses=tuple(
+                            sorted(
+                                set(previous.chart_uses) | set(hit.chart_uses),
+                                key=lambda use: (use.view_name, use.chart_type),
+                            )
+                        ),
+                    )
                 spellings.append(Spelling(field_name=field_name, occurrences=tuple(occurrences)))
             clusters.append(
                 Cluster(
@@ -416,17 +441,29 @@ def format_markdown(
         spelling_label = _spelling_count_label(len(cluster.spellings))
         lines.append(f"### {_normalized_label(cluster)} ({spelling_label})")
         lines.append("")
-        lines.append("| field | projects | used in views | display names |")
-        lines.append("| --- | ---: | ---: | --- |")
+        lines.append(
+            "| field | projects | used in views | view names | chart types | display names |"
+        )
+        lines.append("| --- | ---: | ---: | --- | --- | --- |")
         for spelling in cluster.spellings:
             differing = [
                 name for name in spelling.display_names if name != spelling.field_name
             ]
             display = ", ".join(differing) if differing else "(same as field)"
             used_projects = {item.project for item in spelling.occurrences if item.used_in_views}
+            chart_uses = {
+                chart_use
+                for item in spelling.occurrences
+                for chart_use in item.chart_uses
+            }
+            view_names = "<br>".join(sorted({use.view_name for use in chart_uses})) or "None"
+            chart_types = "<br>".join(
+                sorted({use.chart_type or "(unspecified)" for use in chart_uses})
+            ) or "None"
             lines.append(
                 f"| `{spelling.field_name}` | {len(spelling.projects)} | "
-                f"{len(used_projects)}/{len(spelling.projects)} | {display} |"
+                f"{len(used_projects)}/{len(spelling.projects)} | {view_names} | "
+                f"{chart_types} | {display} |"
             )
         lines.append("")
         for spelling in cluster.spellings:
@@ -436,7 +473,22 @@ def format_markdown(
                     item.used_in_views and item.project == project for item in spelling.occurrences
                 )
                 mark = "used" if used else "not used"
-                lines.append(f"  - {project} ({mark})")
+                project_uses = {
+                    chart_use
+                    for item in spelling.occurrences
+                    if item.project == project
+                    for chart_use in item.chart_uses
+                }
+                context = ""
+                if project_uses:
+                    context = " — " + ", ".join(
+                        f"{use.view_name} [{use.chart_type or 'unspecified'}]"
+                        for use in sorted(
+                            project_uses,
+                            key=lambda use: (use.view_name, use.chart_type),
+                        )
+                    )
+                lines.append(f"  - {project} ({mark}){context}")
         lines.append("")
     return "\n".join(lines)
 
@@ -446,6 +498,12 @@ def iter_csv_rows(scan: Scan) -> Iterator[dict[str, str]]:
         label = _normalized_label(cluster)
         for spelling in cluster.spellings:
             for occurrence in spelling.occurrences:
+                view_names = "; ".join(
+                    sorted({use.view_name for use in occurrence.chart_uses})
+                ) or "None"
+                chart_types = "; ".join(
+                    sorted({use.chart_type for use in occurrence.chart_uses if use.chart_type})
+                ) or "None"
                 yield {
                     "datasource": cluster.datasource,
                     "normalized": label,
@@ -453,6 +511,8 @@ def iter_csv_rows(scan: Scan) -> Iterator[dict[str, str]]:
                     "display_name": occurrence.display_name,
                     "project": occurrence.project,
                     "used_in_views": "true" if occurrence.used_in_views else "false",
+                    "view_name": view_names,
+                    "chart_type": chart_types,
                 }
 
 
@@ -466,6 +526,8 @@ def write_csv(scan: Scan, destination: TextIO) -> None:
             "display_name",
             "project",
             "used_in_views",
+            "view_name",
+            "chart_type",
         ],
     )
     writer.writeheader()
@@ -488,6 +550,13 @@ def cluster_to_json(cluster: Cluster) -> dict[str, object]:
                         "project": item.project,
                         "display_name": item.display_name,
                         "used_in_views": item.used_in_views,
+                        "chart_uses": [
+                            {
+                                "view_name": use.view_name,
+                                "chart_type": use.chart_type,
+                            }
+                            for use in item.chart_uses
+                        ],
                     }
                     for item in spelling.occurrences
                 ],
