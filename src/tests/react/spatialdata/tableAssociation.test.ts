@@ -56,6 +56,7 @@ describe("SpatialData table association", () => {
         const cellsDataStore = {
             name: "cells_by_region",
             config: {
+                columns: [{ field: "spatialdata_table_id" }],
                 spatialdata_tables: {
                     tables: [{ table_name: "cells" }],
                 },
@@ -96,6 +97,7 @@ describe("SpatialData table association", () => {
                 name: "segmentation",
                 dataStore: {
                     config: {
+                        columns: [{ field: "spatialdata_table_id" }],
                         spatialdata_tables: {
                             tables: [{ table_name: "segmentation_table" }],
                         },
@@ -116,6 +118,35 @@ describe("SpatialData table association", () => {
             tableName: "segmentation_table",
             dataSourceName: "segmentation",
         });
+    });
+
+    test("ignores the genes datasource the converter also stamps with table provenance", () => {
+        const spatialData = {
+            getAssociatedTables: (kind: string): Array<[string, AssociatedTableElementMock]> =>
+                kind === "labels" ? [["table", {}]] : [],
+        };
+        const provenance = { tables: [{ table_name: "table", table_id: "sample.zarr/table" }] };
+        const dataSources: DataSourceAssociationCandidate[] = [
+            {
+                name: "blobs_labels",
+                dataStore: {
+                    config: { columns: [{ field: "spatialdata_table_id" }], spatialdata_tables: provenance },
+                },
+            },
+            {
+                name: "blobs_labels_genes",
+                dataStore: { config: { columns: [{ field: "name" }], spatialdata_tables: provenance } },
+            },
+        ];
+
+        expect(
+            resolveAssociatedElementTable({
+                spatialData,
+                elementType: "labels",
+                elementKey: "blobs_labels",
+                dataSources,
+            }),
+        ).toMatchObject({ status: "resolved", dataSourceName: "blobs_labels" });
     });
 
     test("resolves labels from MDV table_name column metadata", () => {

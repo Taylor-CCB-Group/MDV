@@ -125,10 +125,21 @@ function spatialDataAssociationKind(elementType: AssociableSpatialElementType): 
     }
 }
 
+function columnId(column: DataSourceColumnMetadata): string | undefined {
+    if (typeof column.field === "string") return column.field;
+    if (typeof column.name === "string") return column.name;
+    return undefined;
+}
+
 function tableNamesForDataSource<TDataStore>(dataSource: DataSourceAssociationCandidate<TDataStore>): string[] {
     const names = new Set<string>();
+    const columns = dataSource.dataStore.config?.columns;
+    // The converter writes the same provenance onto a group's var (genes) datasource,
+    // whose rows are genes, not the table's obs. Only an obs datasource carries the
+    // per-row `spatialdata_table_id` column alongside it.
+    const hasObsRows = Array.isArray(columns) && columns.some((column) => columnId(column) === "spatialdata_table_id");
     const provenance = dataSource.dataStore.config?.spatialdata_tables;
-    const tables = Array.isArray(provenance?.tables) ? provenance.tables : [];
+    const tables = hasObsRows && Array.isArray(provenance?.tables) ? provenance.tables : [];
     for (const table of tables) {
         if (typeof table.table_name === "string") names.add(table.table_name);
         if (typeof table.table_id === "string") {
@@ -137,16 +148,9 @@ function tableNamesForDataSource<TDataStore>(dataSource: DataSourceAssociationCa
         }
     }
 
-    const columns = dataSource.dataStore.config?.columns;
     if (Array.isArray(columns)) {
         for (const column of columns) {
-            const columnId =
-                typeof column.field === "string"
-                    ? column.field
-                    : typeof column.name === "string"
-                      ? column.name
-                      : undefined;
-            if (columnId !== "table_name") continue;
+            if (columnId(column) !== "table_name") continue;
             if (!Array.isArray(column.values)) continue;
             for (const value of column.values) {
                 if (typeof value === "string") names.add(value);
