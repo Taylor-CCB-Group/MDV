@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Report column-name inconsistencies across MDV projects on disk.
 
-Reads ``datasources.json`` only (no HDF5, no database, no mdvtools import).
+Reads ``datasources.json`` and ``views.json`` (no HDF5, no database, no mdvtools import).
 Projects are directories that contain ``datasources.json``. The walk does not
 descend into a project, so nested data files are not treated as further projects.
+Each column is marked used when a chart in that project's ``views.json`` references
+its exact ``field`` on the same datasource.
 
 Columns are compared within a datasource name. ``field`` values that match
 after trimming, lowercasing, and dropping every character outside ``[a-z0-9]``
 are one spelling cluster. ``cell_type``, ``Cell Type``, and ``cell-type`` all
 join ``celltype``. Every group is reported, including a column that uses one
-spelling everywhere. A group is inconsistent when it contains more than one
-raw ``field`` string.
+spelling everywhere.
 
 ``--fuzzy RATIO`` additionally merges clusters in the same datasource whose
 normalized keys have a ``difflib`` ratio at or above ``RATIO``. Keys shorter
@@ -46,12 +47,14 @@ class ColumnHit:
     datasource: str
     field_name: str
     display_name: str
+    used_in_views: bool = False
 
 
 @dataclass(frozen=True)
 class Occurrence:
     project: str
     display_name: str
+    used_in_views: bool = False
 
 
 @dataclass(frozen=True)
@@ -73,10 +76,6 @@ class Cluster:
     datasource: str
     normalized: tuple[str, ...]
     spellings: tuple[Spelling, ...]
-
-    @property
-    def inconsistent(self) -> bool:
-        return len(self.spellings) > 1
 
 
 @dataclass
@@ -125,8 +124,90 @@ def _string_field(column: dict[str, object], key: str) -> str | None:
     return None
 
 
+_CHART_FIELD_KEYS = (
+    "param",
+    "color_by",
+    "tooltip",
+    "background_filter",
+    "densityFields",
+    "contourParameter",
+    "category",
+    "category_filters",
+    "image_key",
+    "image_title",
+)
+
+
+def _referenced_fields(value: object) -> list[str]:
+    """Field ids stored as strings or as objects with field, fields, column, or columnId."""
+    if isinstance(value, str):
+        return [value] if value else []
+    if isinstance(value, list):
+        found: list[str] = []
+        for item in value:
+            found.extend(_referenced_fields(item))
+        return found
+    if isinstance(value, dict):
+        found = []
+        field_value = value.get("field")
+        if isinstance(field_value, str):
+            if field_value:
+                found.append(field_value)
+        elif "field" in value:
+            found.extend(_referenced_fields(field_value))
+        fields_value = value.get("fields")
+        if isinstance(fields_value, list):
+            found.extend(_referenced_fields(fields_value))
+        column_id = value.get("columnId")
+        if isinstance(column_id, str) and column_id:
+            found.append(column_id)
+        if "column" in value:
+            found.extend(_referenced_fields(value.get("column")))
+        return found
+    return []
+
+
+def used_fields_in_views(project: Path) -> tuple[set[tuple[str, str]], str | None]:
+    """Return (datasource, field) pairs referenced by charts in views.json.
+
+    A missing file is not an error. An unreadable file returns an empty set and
+    an error string.
+    """
+    path = project / "views.json"
+    if not path.exists():
+        return set(), None
+    try:
+        parsed: object = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        return set(), f"{path}: {exc}"
+    if not isinstance(parsed, dict):
+        return set(), f"{path}: expected a map of views"
+    used: set[tuple[str, str]] = set()
+    for view in parsed.values():
+        if not isinstance(view, dict):
+            continue
+        charts_by_datasource = view.get("initialCharts")
+        if not isinstance(charts_by_datasource, dict):
+            continue
+        for datasource, charts in charts_by_datasource.items():
+            if not isinstance(datasource, str) or not isinstance(charts, list):
+                continue
+            for chart in charts:
+                if not isinstance(chart, dict):
+                    continue
+                for key in _CHART_FIELD_KEYS:
+                    if key not in chart:
+                        continue
+                    for field_name in _referenced_fields(chart.get(key)):
+                        used.add((datasource, field_name))
+    return used, None
+
+
 def load_project_columns(
-    project: Path, *, include_internal: bool
+    project: Path,
+    *,
+    include_internal: bool,
+    used_in_views: set[tuple[str, str]] | None = None,
 ) -> tuple[list[ColumnHit], str | None]:
     """Read column hits from one project's ``datasources.json``."""
     path = project / "datasources.json"
@@ -162,6 +243,7 @@ def load_project_columns(
                     datasource=datasource,
                     field_name=field_name,
                     display_name=display_name,
+                    used_in_views=(datasource, field_name) in (used_in_views or set()),
                 )
             )
     return hits, None
@@ -224,14 +306,28 @@ def find_inconsistencies(
             spellings: list[Spelling] = []
             for field_name in sorted(by_field):
                 field_hits = by_field[field_name]
-                seen: set[tuple[str, str]] = set()
+                seen: dict[tuple[str, str], int] = {}
                 occurrences: list[Occurrence] = []
                 for hit in sorted(field_hits, key=lambda item: (item.project, item.display_name)):
                     key = (hit.project, hit.display_name)
-                    if key in seen:
+                    existing = seen.get(key)
+                    if existing is None:
+                        seen[key] = len(occurrences)
+                        occurrences.append(
+                            Occurrence(
+                                project=hit.project,
+                                display_name=hit.display_name,
+                                used_in_views=hit.used_in_views,
+                            )
+                        )
                         continue
-                    seen.add(key)
-                    occurrences.append(Occurrence(project=hit.project, display_name=hit.display_name))
+                    if hit.used_in_views and not occurrences[existing].used_in_views:
+                        previous = occurrences[existing]
+                        occurrences[existing] = Occurrence(
+                            project=previous.project,
+                            display_name=previous.display_name,
+                            used_in_views=True,
+                        )
                 spellings.append(Spelling(field_name=field_name, occurrences=tuple(occurrences)))
             clusters.append(
                 Cluster(
@@ -255,7 +351,14 @@ def scan_roots(
     scan = Scan(roots=[str(root) for root in roots], projects=[str(p) for p in projects], errors=errors)
     hits: list[ColumnHit] = []
     for project in projects:
-        project_hits, error = load_project_columns(project, include_internal=include_internal)
+        used, view_error = used_fields_in_views(project)
+        if view_error is not None:
+            scan.errors.append(view_error)
+        project_hits, error = load_project_columns(
+            project,
+            include_internal=include_internal,
+            used_in_views=used,
+        )
         if error is not None:
             scan.errors.append(error)
             continue
@@ -282,12 +385,10 @@ def format_markdown(
     fuzzy: float | None = None,
     min_fuzzy_length: int = 6,
 ) -> str:
-    inconsistent_count = sum(1 for cluster in scan.clusters if cluster.inconsistent)
     lines: list[str] = ["# Column naming report", ""]
     lines.append(f"- Roots: {', '.join(scan.roots) if scan.roots else '(none)'}")
     lines.append(f"- Projects scanned: {len(scan.projects)}")
     lines.append(f"- Column groups: {len(scan.clusters)}")
-    lines.append(f"- Inconsistent groups: {inconsistent_count}")
     lines.append(f"- Unreadable files: {len(scan.errors)}")
     for error in scan.errors:
         lines.append(f"  - {error}")
@@ -315,21 +416,27 @@ def format_markdown(
         spelling_label = _spelling_count_label(len(cluster.spellings))
         lines.append(f"### {_normalized_label(cluster)} ({spelling_label})")
         lines.append("")
-        lines.append("| field | projects | display names |")
-        lines.append("| --- | ---: | --- |")
+        lines.append("| field | projects | used in views | display names |")
+        lines.append("| --- | ---: | ---: | --- |")
         for spelling in cluster.spellings:
             differing = [
                 name for name in spelling.display_names if name != spelling.field_name
             ]
             display = ", ".join(differing) if differing else "(same as field)"
+            used_projects = {item.project for item in spelling.occurrences if item.used_in_views}
             lines.append(
-                f"| `{spelling.field_name}` | {len(spelling.projects)} | {display} |"
+                f"| `{spelling.field_name}` | {len(spelling.projects)} | "
+                f"{len(used_projects)}/{len(spelling.projects)} | {display} |"
             )
         lines.append("")
         for spelling in cluster.spellings:
             lines.append(f"- `{spelling.field_name}` ({len(spelling.projects)})")
             for project in spelling.projects:
-                lines.append(f"  - {project}")
+                used = any(
+                    item.used_in_views and item.project == project for item in spelling.occurrences
+                )
+                mark = "used" if used else "not used"
+                lines.append(f"  - {project} ({mark})")
         lines.append("")
     return "\n".join(lines)
 
@@ -345,7 +452,7 @@ def iter_csv_rows(scan: Scan) -> Iterator[dict[str, str]]:
                     "field": spelling.field_name,
                     "display_name": occurrence.display_name,
                     "project": occurrence.project,
-                    "inconsistent": "true" if cluster.inconsistent else "false",
+                    "used_in_views": "true" if occurrence.used_in_views else "false",
                 }
 
 
@@ -358,7 +465,7 @@ def write_csv(scan: Scan, destination: TextIO) -> None:
             "field",
             "display_name",
             "project",
-            "inconsistent",
+            "used_in_views",
         ],
     )
     writer.writeheader()
@@ -370,7 +477,6 @@ def cluster_to_json(cluster: Cluster) -> dict[str, object]:
     return {
         "datasource": cluster.datasource,
         "normalized": list(cluster.normalized),
-        "inconsistent": cluster.inconsistent,
         "spellings": [
             {
                 "field": spelling.field_name,
@@ -378,7 +484,11 @@ def cluster_to_json(cluster: Cluster) -> dict[str, object]:
                 "projects": list(spelling.projects),
                 "display_names": list(spelling.display_names),
                 "occurrences": [
-                    {"project": item.project, "display_name": item.display_name}
+                    {
+                        "project": item.project,
+                        "display_name": item.display_name,
+                        "used_in_views": item.used_in_views,
+                    }
                     for item in spelling.occurrences
                 ],
             }
@@ -402,9 +512,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Report every column field across MDV projects, grouped by datasource "
-            "and normalized spelling. Groups with more than one raw field are "
-            "marked inconsistent. Fuzzy matches are optional suggestions and "
-            "can be wrong."
+            "and normalized spelling. Each row records whether that field is referenced "
+            "by a chart in the project's views.json. Fuzzy matches are optional "
+            "suggestions and can be wrong."
         )
     )
     parser.add_argument(

@@ -48,7 +48,7 @@ def test_identical_spellings_are_one_consistent_group():
     ]
     clusters = find_inconsistencies(hits)
     assert len(clusters) == 1
-    assert clusters[0].inconsistent is False
+    assert len(clusters[0].spellings) == 1
     assert [spelling.field_name for spelling in clusters[0].spellings] == ["cell_type"]
     assert clusters[0].spellings[0].projects == ("/proj/a", "/proj/b")
 
@@ -82,14 +82,14 @@ def test_near_duplicate_fields_cluster_within_a_datasource(tmp_path: Path):
     assert len(scan.clusters) == 2
     cluster = next(item for item in scan.clusters if item.datasource == "cells")
     genes = next(item for item in scan.clusters if item.datasource == "genes")
-    assert cluster.inconsistent is True
+    assert len(cluster.spellings) == 3
     assert cluster.normalized == ("celltype",)
     assert [spelling.field_name for spelling in cluster.spellings] == [
         "Cell Type",
         "cell_type",
         "celltype",
     ]
-    assert genes.inconsistent is False
+    assert len(genes.spellings) == 1
     assert [spelling.field_name for spelling in genes.spellings] == ["Cell Type"]
     fields_by_project = {
         spelling.field_name: spelling.projects for spelling in cluster.spellings
@@ -120,7 +120,7 @@ def test_fuzzy_merges_long_keys_and_skips_short_ones():
     ]
     exact = find_inconsistencies(hits)
     assert len(exact) == 4
-    assert all(cluster.inconsistent is False for cluster in exact)
+    assert all(len(cluster.spellings) == 1 for cluster in exact)
     fuzzy = find_inconsistencies(hits, fuzzy=0.8)
     assert len(fuzzy) == 3
     merged = next(cluster for cluster in fuzzy if len(cluster.spellings) > 1)
@@ -129,7 +129,7 @@ def test_fuzzy_merges_long_keys_and_skips_short_ones():
         "cell_type",
         "cell_types",
     ]
-    assert {cluster.normalized for cluster in fuzzy if not cluster.inconsistent} == {
+    assert {cluster.normalized for cluster in fuzzy if len(cluster.spellings) == 1} == {
         ("pc1",),
         ("pc2",),
     }
@@ -144,7 +144,7 @@ def test_columns_are_not_clustered_across_datasources():
     clusters = find_inconsistencies(hits)
     assert len(clusters) == 2
     assert {cluster.datasource for cluster in clusters} == {"cells", "genes"}
-    assert all(cluster.inconsistent is False for cluster in clusters)
+    assert all(len(cluster.spellings) == 1 for cluster in clusters)
 
 
 def test_load_omits_internal_fields_unless_requested(tmp_path: Path):
@@ -193,7 +193,99 @@ def test_csv_rows_keep_display_name_with_its_project(tmp_path: Path):
     with destination.open("w", encoding="utf-8", newline="") as handle:
         write_csv(scan, handle)
     text = destination.read_text(encoding="utf-8")
-    assert "datasource,normalized,field,display_name,project,inconsistent" in text
+    assert "datasource,normalized,field,display_name,project,used_in_views" in text
+    assert "inconsistent" not in text
     assert "cell_type,Cell type," in text
     assert "celltype,celltype," in text
-    assert ",true" in text
+    assert text.strip().endswith(",false")
+
+
+def _occurrence_used(scan, datasource: str, field_name: str, project: Path) -> bool:
+    project_name = str(project.resolve())
+    for cluster in scan.clusters:
+        if cluster.datasource != datasource:
+            continue
+        for spelling in cluster.spellings:
+            if spelling.field_name != field_name:
+                continue
+            for item in spelling.occurrences:
+                if item.project == project_name:
+                    return bool(item.used_in_views)
+    raise AssertionError(f"{datasource}.{field_name} not found in {project_name}")
+
+
+def test_used_in_views_follows_charts_on_the_same_datasource(tmp_path: Path):
+    project = tmp_path / "proj"
+    _write_project(
+        project,
+        [
+            {
+                "name": "cells",
+                "columns": [
+                    {"field": "cell_type", "name": "cell_type"},
+                    {"field": "n_counts", "name": "n_counts"},
+                    {"field": "leiden", "name": "leiden"},
+                    {"field": "tissue", "name": "tissue"},
+                    {"field": "unused", "name": "unused"},
+                ],
+            },
+            {"name": "genes", "columns": [{"field": "cell_type", "name": "cell_type"}]},
+        ],
+    )
+    views = {
+        "atlas": {
+            "initialCharts": {
+                "cells": [
+                    {
+                        "type": "scatter_plot",
+                        "param": ["n_counts", "umap_2"],
+                        "color_by": "cell_type",
+                        "category_filters": [{"column": "leiden", "category": ["tissue"]}],
+                    }
+                ],
+                "genes": [{"type": "table", "param": ["name"]}],
+            }
+        }
+    }
+    (project / "views.json").write_text(json.dumps(views), encoding="utf-8")
+    other = tmp_path / "other"
+    _write_project(
+        other,
+        [{"name": "cells", "columns": [{"field": "cell_type", "name": "cell_type"}]}],
+    )
+
+    scan = scan_roots([tmp_path])
+    assert _occurrence_used(scan, "cells", "cell_type", project) is True
+    assert _occurrence_used(scan, "cells", "n_counts", project) is True
+    assert _occurrence_used(scan, "cells", "leiden", project) is True
+    assert _occurrence_used(scan, "cells", "tissue", project) is False
+    assert _occurrence_used(scan, "cells", "unused", project) is False
+    assert _occurrence_used(scan, "genes", "cell_type", project) is False
+    assert _occurrence_used(scan, "cells", "cell_type", other) is False
+    assert scan.errors == []
+
+    report = format_markdown(scan)
+    assert "used in views" in report
+    assert "(used)" in report
+    assert "(not used)" in report
+
+    destination = tmp_path / "report.csv"
+    with destination.open("w", encoding="utf-8", newline="") as handle:
+        write_csv(scan, handle)
+    text = destination.read_text(encoding="utf-8")
+    project_path = str(project.resolve())
+    assert "used_in_views" in text.splitlines()[0]
+    assert f"n_counts,n_counts,{project_path},true" in text
+    assert f"tissue,tissue,{project_path},false" in text
+
+
+def test_unreadable_views_json_leaves_columns_unused(tmp_path: Path):
+    project = tmp_path / "proj"
+    _write_project(
+        project,
+        [{"name": "cells", "columns": [{"field": "x", "name": "x"}]}],
+    )
+    (project / "views.json").write_text("{", encoding="utf-8")
+    scan = scan_roots([tmp_path])
+    assert any("views.json" in error for error in scan.errors)
+    assert _occurrence_used(scan, "cells", "x", project) is False
