@@ -2,7 +2,6 @@ import { fillColorSchemeFromDataStore } from "@/react/spatialdata/fill_color_sch
 import {
     type DataSourceAssociationCandidate,
     buildAssociatedFeatureStateFromRowMap,
-    buildAssociatedShapesFeatureState,
     getShapesTableAssociation,
     obsColumnNamesForElement,
     resolveAssociatedElementTable,
@@ -57,6 +56,7 @@ describe("SpatialData table association", () => {
         const cellsDataStore = {
             name: "cells_by_region",
             config: {
+                columns: [{ field: "spatialdata_table_id" }],
                 spatialdata_tables: {
                     tables: [{ table_name: "cells" }],
                 },
@@ -97,6 +97,7 @@ describe("SpatialData table association", () => {
                 name: "segmentation",
                 dataStore: {
                     config: {
+                        columns: [{ field: "spatialdata_table_id" }],
                         spatialdata_tables: {
                             tables: [{ table_name: "segmentation_table" }],
                         },
@@ -117,6 +118,35 @@ describe("SpatialData table association", () => {
             tableName: "segmentation_table",
             dataSourceName: "segmentation",
         });
+    });
+
+    test("ignores the genes datasource the converter also stamps with table provenance", () => {
+        const spatialData = {
+            getAssociatedTables: (kind: string): Array<[string, AssociatedTableElementMock]> =>
+                kind === "labels" ? [["table", {}]] : [],
+        };
+        const provenance = { tables: [{ table_name: "table", table_id: "sample.zarr/table" }] };
+        const dataSources: DataSourceAssociationCandidate[] = [
+            {
+                name: "blobs_labels",
+                dataStore: {
+                    config: { columns: [{ field: "spatialdata_table_id" }], spatialdata_tables: provenance },
+                },
+            },
+            {
+                name: "blobs_labels_genes",
+                dataStore: { config: { columns: [{ field: "name" }], spatialdata_tables: provenance } },
+            },
+        ];
+
+        expect(
+            resolveAssociatedElementTable({
+                spatialData,
+                elementType: "labels",
+                elementKey: "blobs_labels",
+                dataSources,
+            }),
+        ).toMatchObject({ status: "resolved", dataSourceName: "blobs_labels" });
     });
 
     test("resolves labels from MDV table_name column metadata", () => {
@@ -159,8 +189,11 @@ describe("SpatialData table association", () => {
     });
 
     test("builds feature-id keyed colors and hidden feature ids from row state", () => {
-        const featureState = buildAssociatedShapesFeatureState({
-            renderData: shapesRenderData(["a", "b", "c"], [0, 1, -1]),
+        const featureState = buildAssociatedFeatureStateFromRowMap({
+            rowIndexByFeatureId: new Map([
+                ["a", 0],
+                ["b", 1],
+            ]),
             visibleRows: Uint32Array.from([0]),
             rowCount: 2,
             alpha: 123,
@@ -177,8 +210,11 @@ describe("SpatialData table association", () => {
     });
 
     test("preserves explicit feature state while adding table filter state", () => {
-        const featureState = buildAssociatedShapesFeatureState({
-            renderData: shapesRenderData(["a", "b"], [0, 1]),
+        const featureState = buildAssociatedFeatureStateFromRowMap({
+            rowIndexByFeatureId: new Map([
+                ["a", 0],
+                ["b", 1],
+            ]),
             visibleRows: Uint32Array.from([1]),
             rowCount: 2,
             alpha: 255,

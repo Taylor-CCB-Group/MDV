@@ -27,6 +27,7 @@
  * |---|---|---|
  * | `shapes.loadRenderData` | **absent**, or one per element per session | Geometry is being re-decoded. Parquet read + WKB decode of every polygon, ~0.5s each. Nothing cosmetic should ever produce one — see `useElementKeys` in `table_association.ts`. |
  * | `association.project` | high `count`, `avgMs` ≈ 0 | High `avgMs` means the per-feature pass is rebuilding rather than reusing its cache. Expected on a colour or filter change; on an opacity drag it is a bug. |
+ * | `association.rows` | **absent** during a cosmetic edit or filter; once per geometry or key-column load | Feature ids are being re-resolved to DataStore rows (`table_rows.ts`). It depends only on geometry, table association and key-column loads — never on layer props. |
  * | `adapter.*` | one per viewer render | These are cheap; the `count` is the signal, and it tracks how often the adapter re-ran. |
  * | `render:spatial.viewer` / `.canvas` | one per interaction step, under ~16ms | More than one per step means something downstream is setting state during the render that follows an edit. |
  */
