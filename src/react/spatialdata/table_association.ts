@@ -7,6 +7,12 @@ import type DataStore from "@/datastore/DataStore";
 import { useChartManager, useDataSources } from "@/react/hooks";
 import { fillColorSchemeFromDataStore } from "@/react/spatialdata/fill_color_scheme";
 import { measureSpatial, recordSpatialPerf } from "@/react/spatialdata/perf";
+import {
+    type TableRowPlan,
+    datasourceRowsByFeatureId,
+    getTableRowResolver,
+    planTableRows,
+} from "@/react/spatialdata/table_rows";
 
 type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
 type LabelsLayerConfig = Extract<LayerConfig, { type: "labels" }>;
@@ -200,37 +206,6 @@ function toRgba(color: RgbColor | RgbaColor | undefined, alpha: number): RgbaCol
     ];
 }
 
-export function buildAssociatedShapesFeatureState({
-    renderData,
-    visibleRows,
-    rowCount,
-    baseFeatureState,
-    colorForRow,
-    alpha,
-}: {
-    renderData: ShapesRenderData;
-    visibleRows: ArrayLike<number>;
-    rowCount: number;
-    baseFeatureState?: ShapeFeatureState;
-    colorForRow?: RowColorFunction;
-    alpha: number;
-}): ShapeFeatureState | undefined {
-    const rowIndexByFeatureId = new Map<string, number>();
-    renderData.featureIds.forEach((featureId, featureIndex) => {
-        const rowIndex = renderData.rowIndexByFeatureIndex[featureIndex];
-        if (rowIndex === undefined) return;
-        rowIndexByFeatureId.set(featureId, rowIndex);
-    });
-    return buildAssociatedFeatureStateFromRowMap({
-        rowIndexByFeatureId,
-        visibleRows,
-        rowCount,
-        baseFeatureState,
-        colorForRow,
-        alpha,
-    });
-}
-
 export function buildAssociatedFeatureStateFromRowMap({
     rowIndexByFeatureId,
     visibleRows,
@@ -357,7 +332,7 @@ export function withPreservedFillColorsWhileLoading({
  * contents actually change.
  */
 type FeatureStateCacheEntry = {
-    source: ShapesRenderData | Map<string, number>;
+    source: Map<string, number>;
     visibleRows: Uint32Array | undefined;
     rowCount: number;
     baseFeatureState: AssociatedFeatureState | undefined;
@@ -628,13 +603,14 @@ function getFillColumnsByDataSource(
     );
 }
 
-function useLoadedColorColumnVersion(fillColumnsByDataSource: Record<string, string[]>) {
+/** Load these columns of each datasource; the version bumps as each set lands. */
+function useLoadedColumnsVersion(columnsByDataSource: Record<string, string[]>) {
     const chartManager = useChartManager();
     const [version, setVersion] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
-        for (const [dataSourceName, columns] of Object.entries(fillColumnsByDataSource)) {
+        for (const [dataSourceName, columns] of Object.entries(columnsByDataSource)) {
             const dataStore = chartManager.getDataSource(dataSourceName);
             const missing = columns.filter((columnName) => !dataStore.columnsWithData.includes(columnName));
             if (missing.length === 0) continue;
@@ -645,7 +621,7 @@ function useLoadedColorColumnVersion(fillColumnsByDataSource: Record<string, str
         return () => {
             cancelled = true;
         };
-    }, [chartManager, fillColumnsByDataSource]);
+    }, [chartManager, columnsByDataSource]);
 
     return version;
 }
@@ -655,9 +631,35 @@ function layerFillAlpha(layer: LayerConfig): number {
     return 255;
 }
 
+/** Datasource columns each value-join plan reads, so they can be loaded up front. */
+function getRowKeyColumnsByDataSource(
+    tableByAssociationKey: Record<string, AssociatedElementTable>,
+    rowPlanByAssociationKey: Record<string, TableRowPlan>,
+) {
+    const columnsByDataSource: Record<string, Set<string>> = {};
+    for (const [associationKey, plan] of Object.entries(rowPlanByAssociationKey)) {
+        const table = tableByAssociationKey[associationKey];
+        if (plan.kind !== "value" || table?.status !== "resolved") continue;
+        columnsByDataSource[table.dataSourceName] ??= new Set();
+        for (const column of plan.columns) columnsByDataSource[table.dataSourceName]?.add(column);
+    }
+    return Object.fromEntries(
+        Object.entries(columnsByDataSource).map(([dataSourceName, columns]) => [
+            dataSourceName,
+            Array.from(columns).sort(),
+        ]),
+    );
+}
+
+/**
+ * @param spatialDataName - the SpatialData object on this canvas, as the converter named
+ * it (`region.spatial.file`). A datasource merged from several objects may hold a
+ * same-named table from each; this says which one this canvas is showing.
+ */
 export function useAssociatedShapesLayerInputs(
     spatialData: SpatialData | undefined,
     layerInputs: RenderStackLayerInputs,
+    spatialDataName?: string,
 ): RenderStackLayerInputs {
     const dataSources = useDataSources();
     // Stable by value, not by identity: which elements are on the canvas changes far
@@ -692,6 +694,70 @@ export function useAssociatedShapesLayerInputs(
         }
         return Object.fromEntries(entries);
     }, [spatialData, shapeKeys, labelKeys, dataSources]);
+    const rowPlanByAssociationKey = useMemo(() => {
+        const entries: Array<[string, TableRowPlan]> = [];
+        for (const [associationKey, table] of Object.entries(tableByAssociationKey)) {
+            if (table.status !== "resolved") continue;
+            const plan = planTableRows(table.dataStore.config.spatialdata_tables, table.tableName, spatialDataName);
+            if (plan.kind === "unresolved") {
+                console.warn(`No DataStore rows for ${associationKey} in '${table.dataSourceName}': ${plan.reason}`);
+            }
+            entries.push([associationKey, plan]);
+        }
+        return Object.fromEntries(entries);
+    }, [tableByAssociationKey, spatialDataName]);
+    const rowKeyColumnsByDataSource = useMemo(
+        () => getRowKeyColumnsByDataSource(tableByAssociationKey, rowPlanByAssociationKey),
+        [tableByAssociationKey, rowPlanByAssociationKey],
+    );
+    const loadedRowKeyColumnsVersion = useLoadedColumnsVersion(rowKeyColumnsByDataSource);
+    // Feature id → DataStore row, per element. Rows reported by `@spatialdata/core`
+    // index ONE zarr table; the datasource may hold several (see `table_rows.ts`).
+    // Depends on geometry, association and key columns only — never on layer props —
+    // so a cosmetic edit reuses these maps and the per-feature cache below holds.
+    const rowIndexByFeatureIdByAssociationKey = useMemo(() => {
+        loadedRowKeyColumnsVersion;
+        return measureSpatial("association.rows", () => {
+            const entries: Array<[string, Map<string, number>]> = [];
+            const add = (
+                associationKey: string,
+                elementKey: string,
+                featureIds: ArrayLike<string>,
+                tableRows: ArrayLike<number>,
+            ) => {
+                const table = tableByAssociationKey[associationKey];
+                const plan = rowPlanByAssociationKey[associationKey];
+                if (table?.status !== "resolved" || !plan) return;
+                const resolver = getTableRowResolver(table.dataStore, plan);
+                if (!resolver) return;
+                entries.push([associationKey, datasourceRowsByFeatureId(resolver, elementKey, featureIds, tableRows)]);
+            };
+            for (const elementKey of shapeKeys) {
+                const renderData = renderDataByElementKey[elementKey];
+                if (!renderData) continue;
+                add(`shapes:${elementKey}`, elementKey, renderData.featureIds, renderData.rowIndexByFeatureIndex);
+            }
+            for (const elementKey of labelKeys) {
+                const tableRowByFeatureId = labelsRowIndexByFeatureId[elementKey];
+                if (!tableRowByFeatureId) continue;
+                add(
+                    `labels:${elementKey}`,
+                    elementKey,
+                    Array.from(tableRowByFeatureId.keys()),
+                    Array.from(tableRowByFeatureId.values()),
+                );
+            }
+            return Object.fromEntries(entries);
+        });
+    }, [
+        loadedRowKeyColumnsVersion,
+        shapeKeys,
+        labelKeys,
+        renderDataByElementKey,
+        labelsRowIndexByFeatureId,
+        tableByAssociationKey,
+        rowPlanByAssociationKey,
+    ]);
     const obsColumnNamesByAssociationKey = useMemo(() => {
         const entries: Array<[string, Set<string> | undefined]> = [];
         for (const elementKey of shapeKeys) {
@@ -706,7 +772,7 @@ export function useAssociatedShapesLayerInputs(
         () => getFillColumnsByDataSource(layerInputs.layers, layerInputs.layerOrder, tableByAssociationKey),
         [layerInputs.layers, layerInputs.layerOrder, tableByAssociationKey],
     );
-    const loadedColorColumnVersion = useLoadedColorColumnVersion(fillColumnsByDataSource);
+    const loadedColorColumnVersion = useLoadedColumnsVersion(fillColumnsByDataSource);
     const associatedDataStores = useMemo(() => {
         const storesByName = new Map<string, DataStore>();
         for (const table of Object.values(tableByAssociationKey)) {
@@ -787,10 +853,7 @@ export function useAssociatedShapesLayerInputs(
             // the inputs it actually reads separates the two: the copy stays cheap
             // and per-render, the per-feature pass runs only when something it
             // depends on moved.
-            const source =
-                layer.type === "shapes"
-                    ? renderDataByElementKey[layer.elementKey]
-                    : labelsRowIndexByFeatureId[layer.elementKey];
+            const source = rowIndexByFeatureIdByAssociationKey[associationKey];
             if (!source) continue;
 
             const rowCount = table.dataStore.size;
@@ -809,24 +872,14 @@ export function useAssociatedShapesLayerInputs(
             ) {
                 featureState = cached.featureState;
             } else {
-                featureState =
-                    layer.type === "shapes"
-                        ? buildAssociatedShapesFeatureState({
-                              renderData: source as ShapesRenderData,
-                              visibleRows,
-                              rowCount,
-                              baseFeatureState,
-                              colorForRow,
-                              alpha,
-                          })
-                        : buildAssociatedFeatureStateFromRowMap({
-                              rowIndexByFeatureId: source as Map<string, number>,
-                              visibleRows,
-                              rowCount,
-                              baseFeatureState,
-                              colorForRow,
-                              alpha,
-                          });
+                featureState = buildAssociatedFeatureStateFromRowMap({
+                    rowIndexByFeatureId: source,
+                    visibleRows,
+                    rowCount,
+                    baseFeatureState,
+                    colorForRow,
+                    alpha,
+                });
                 featureStateCacheRef.current[layerId] = {
                     source,
                     visibleRows,
@@ -876,8 +929,7 @@ export function useAssociatedShapesLayerInputs(
     }), [
         layerInputs.layers,
         layerInputs.layerOrder,
-        renderDataByElementKey,
-        labelsRowIndexByFeatureId,
+        rowIndexByFeatureIdByAssociationKey,
         tableByAssociationKey,
         obsColumnNamesByAssociationKey,
         visibleRowsByDataSource,

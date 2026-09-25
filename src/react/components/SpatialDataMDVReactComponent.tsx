@@ -429,10 +429,11 @@ const SpatialDataViewer = observer(
             propsGeneration: chart.renderStackPropsGeneration,
             hostLayerResolver,
         });
-        const { layers, layerOrder } = useAssociatedShapesLayerInputs(spatialData ?? undefined, {
-            layers: baseLayers,
-            layerOrder: baseLayerOrder,
-        });
+        const { layers, layerOrder } = useAssociatedShapesLayerInputs(
+            spatialData ?? undefined,
+            { layers: baseLayers, layerOrder: baseLayerOrder },
+            region?.spatial?.file,
+        );
 
         const onSpatialViewStateChange = useCallback(
             (next: SpatialCanvasViewState) => {

@@ -2,7 +2,6 @@ import { fillColorSchemeFromDataStore } from "@/react/spatialdata/fill_color_sch
 import {
     type DataSourceAssociationCandidate,
     buildAssociatedFeatureStateFromRowMap,
-    buildAssociatedShapesFeatureState,
     getShapesTableAssociation,
     obsColumnNamesForElement,
     resolveAssociatedElementTable,
@@ -159,8 +158,11 @@ describe("SpatialData table association", () => {
     });
 
     test("builds feature-id keyed colors and hidden feature ids from row state", () => {
-        const featureState = buildAssociatedShapesFeatureState({
-            renderData: shapesRenderData(["a", "b", "c"], [0, 1, -1]),
+        const featureState = buildAssociatedFeatureStateFromRowMap({
+            rowIndexByFeatureId: new Map([
+                ["a", 0],
+                ["b", 1],
+            ]),
             visibleRows: Uint32Array.from([0]),
             rowCount: 2,
             alpha: 123,
@@ -177,8 +179,11 @@ describe("SpatialData table association", () => {
     });
 
     test("preserves explicit feature state while adding table filter state", () => {
-        const featureState = buildAssociatedShapesFeatureState({
-            renderData: shapesRenderData(["a", "b"], [0, 1]),
+        const featureState = buildAssociatedFeatureStateFromRowMap({
+            rowIndexByFeatureId: new Map([
+                ["a", 0],
+                ["b", 1],
+            ]),
             visibleRows: Uint32Array.from([1]),
             rowCount: 2,
             alpha: 255,
