@@ -8,12 +8,14 @@ import {
     Upload as UploadIcon,
     Settings,
     Share as ShareIcon,
+    WarningAmber,
 } from "@mui/icons-material";
 import {
     Card,
     CardContent,
     CardMedia,
     Checkbox,
+    Chip,
     Divider,
     IconButton,
     ListItemIcon,
@@ -46,6 +48,7 @@ export interface ProjectCardProps {
     numberOfStructures: string;
     numberOfImages: string;
     permissions: Permissions;
+    writable: boolean;
     onDelete: (id: string) => Promise<void>;
     onRename: (id: string, newName: string) => Promise<void>;
     onChangeType: (
@@ -67,6 +70,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     type,
     lastModified,
     permissions,
+    writable,
     onDelete,
     onRename,
     onChangeType,
@@ -211,6 +215,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                             {name}
                         </Typography>
                     </Tooltip>
+                    {!isPublicPage && !writable && (
+                        <Tooltip title="The MDV server cannot write this project's files. It will open read-only.">
+                            <Chip
+                                icon={<WarningAmber />}
+                                label="Server read-only"
+                                color="warning"
+                                size="small"
+                                sx={{ alignSelf: "flex-start", mb: 1 }}
+                            />
+                        </Tooltip>
+                    )}
                     {!isPublicPage && (
                         <Typography
                             variant="body2"

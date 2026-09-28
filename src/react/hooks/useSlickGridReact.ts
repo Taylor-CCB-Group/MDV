@@ -548,6 +548,7 @@ const useSlickGridReact = () => {
             if (cleanupRef.current) {
                 cleanupRef.current();
             }
+            gridRef.current = null;
         }
     }, []);
 
