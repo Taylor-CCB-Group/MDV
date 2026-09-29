@@ -37,7 +37,14 @@ def validate_extension_navigation(extension_id: str, instance: Any) -> None:
             f"Extension '{extension_id}' navigation URL must be a string."
         )
     parsed_url = urlsplit(navigation.url)
-    if not navigation.url.startswith("/") or parsed_url.scheme or parsed_url.netloc:
+    # Browsers read a backslash as a slash, so "/\host" leaves the app as "//host"
+    # even though urlsplit sees no network location in it.
+    if (
+        not navigation.url.startswith("/")
+        or "\\" in navigation.url
+        or parsed_url.scheme
+        or parsed_url.netloc
+    ):
         raise ExtensionError(
             f"Extension '{extension_id}' navigation URL must be an app-relative path."
         )

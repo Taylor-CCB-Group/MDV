@@ -333,6 +333,10 @@ def ill_typed_navigation(label: Any, url: Any) -> ExtensionNavigation:
             ExtensionNavigation(label="Example", url="//example.com/path"),
             "app-relative path",
         ),
+        (
+            ExtensionNavigation(label="Example", url="/\\example.com/path"),
+            "app-relative path",
+        ),
         ({"label": "Example", "url": "/example/"}, "must be ExtensionNavigation"),
         # A dataclass does not enforce its annotations, so these arrive as
         # AttributeError unless the types are checked. Anything that is not an
