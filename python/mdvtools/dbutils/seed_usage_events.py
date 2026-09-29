@@ -105,12 +105,19 @@ def generate(users, projects, days, rng):
     return events
 
 
+# Rows are streamed in batches of this size rather than loaded all at once. The
+# marker lives inside a JSON column and the databases we support disagree about
+# how to look inside one, so the check stays in Python - but memory no longer
+# scales with the table.
+BATCH_SIZE = 1000
+
+
 def clear_seeded():
     """Remove only rows this script wrote, identified by the details marker."""
+    removed = 0
     rows = UsageEvent.query.filter(
         UsageEvent.details.isnot(None), UsageEvent.event_type.isnot(None)
-    ).all()
-    removed = 0
+    ).yield_per(BATCH_SIZE)
     for row in rows:
         if isinstance(row.details, dict) and row.details.get("seeded") is True:
             db.session.delete(row)
@@ -123,7 +130,7 @@ def summarise():
     total = UsageEvent.query.count()
     seeded = sum(
         1
-        for row in UsageEvent.query.all()
+        for row in UsageEvent.query.yield_per(BATCH_SIZE)
         if isinstance(row.details, dict) and row.details.get("seeded") is True
     )
     return total, seeded, total - seeded
