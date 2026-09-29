@@ -6,6 +6,7 @@ from datetime import datetime
 
 import pytest
 from flask import Flask
+from sqlalchemy import event
 
 from mdvtools.dbutils.dbmodels import Project, UsageEvent, User, db
 from mdvtools.dbutils import dbservice, seed_usage_events
@@ -385,6 +386,35 @@ class TestSeedMarker:
         db.session.rollback()
 
         assert UsageEvent.query.count() == 1
+
+    def test_clear_never_holds_more_than_a_batch_of_deletions(self, app, tmp_path, monkeypatch):
+        """Deleted objects stay in memory until flushed, so a large clear must not
+        leave them all for the final commit."""
+        add_user()
+        add_project(tmp_path)
+        for _ in range(5):
+            db.session.add(UsageEvent(
+                user_id=7, project_id=3, event_type="login",
+                occurred_at=datetime.now(), details={"seeded": True},
+            ))
+        db.session.commit()
+        monkeypatch.setattr(seed_usage_events, "BATCH_SIZE", 2)
+
+        pending_at_flush = []
+
+        def record(session, flush_context, instances):
+            pending_at_flush.append(len(session.deleted))
+
+        session = db.session()
+        event.listen(session, "before_flush", record)
+        try:
+            assert clear_seeded() == 5
+            db.session.commit()
+        finally:
+            event.remove(session, "before_flush", record)
+
+        assert max(pending_at_flush) <= 2
+        assert UsageEvent.query.count() == 0
 
     def test_clear_is_safe_to_run_when_nothing_was_seeded(self, app, tmp_path):
         add_user()

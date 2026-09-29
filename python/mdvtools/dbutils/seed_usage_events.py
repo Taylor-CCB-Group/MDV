@@ -130,6 +130,10 @@ def clear_seeded():
         if isinstance(row.details, dict) and row.details.get("seeded") is True:
             db.session.delete(row)
             removed += 1
+            # The session holds every deleted object until the next flush, and
+            # iterating yield_per never autoflushes. Flush, not commit: see above.
+            if removed % BATCH_SIZE == 0:
+                db.session.flush()
     return removed
 
 
