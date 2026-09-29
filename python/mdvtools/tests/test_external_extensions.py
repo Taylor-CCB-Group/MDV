@@ -292,6 +292,18 @@ def test_broken_global_registration_is_rejected(monkeypatch) -> None:
         register_global_routes_for_extensions(app)
 
 
+def ill_typed_navigation(label: Any, url: Any) -> ExtensionNavigation:
+    """Build navigation with fields of the wrong type.
+
+    ExtensionNavigation's annotations are not enforced at runtime, so an
+    extension really can produce these - a label read from an unset environment
+    variable is None. Constructing them through a deliberately untyped helper
+    keeps the type checker quiet about cases that exist precisely to prove the
+    validator catches what the annotations do not.
+    """
+    return ExtensionNavigation(label=label, url=url)
+
+
 @pytest.mark.parametrize(
     "navigation, message",
     [
@@ -310,9 +322,9 @@ def test_broken_global_registration_is_rejected(monkeypatch) -> None:
         # ExtensionError escapes the startup handler and leaves the deployment
         # serving a fallback app rather than refusing to start - which looks
         # healthy to anything that only checks whether the port answers.
-        (ExtensionNavigation(label=None, url="/example/"), "non-empty string"),
-        (ExtensionNavigation(label=123, url="/example/"), "non-empty string"),
-        (ExtensionNavigation(label="Example", url=None), "URL must be a string"),
+        (ill_typed_navigation(None, "/example/"), "non-empty string"),
+        (ill_typed_navigation(123, "/example/"), "non-empty string"),
+        (ill_typed_navigation("Example", None), "URL must be a string"),
     ],
 )
 def test_invalid_navigation_is_rejected(monkeypatch, navigation, message) -> None:
