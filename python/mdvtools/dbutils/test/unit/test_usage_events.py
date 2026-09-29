@@ -1,15 +1,16 @@
 """Tests for usage telemetry recording and its interaction with project deletion."""
 
 import random
+import sys
 from datetime import datetime
 
 import pytest
 from flask import Flask
 
 from mdvtools.dbutils.dbmodels import Project, UsageEvent, User, db
-from mdvtools.dbutils import dbservice
+from mdvtools.dbutils import dbservice, seed_usage_events
 from mdvtools.dbutils.dbservice import ProjectService, UsageEventService
-from mdvtools.dbutils.seed_usage_events import clear_seeded, generate, summarise
+from mdvtools.dbutils.seed_usage_events import clear_seeded, generate, main, summarise
 
 
 @pytest.fixture()
@@ -304,6 +305,30 @@ class TestSeedGeneration:
         events = generate(self._users(), self._projects(), 30, random.Random(1))
         assert all(e[4] <= datetime.now() for e in events)
 
+    def test_a_session_that_would_run_past_now_is_left_out(self, monkeypatch):
+        """A session starting minutes ago would otherwise log views an hour ahead."""
+        fixed = datetime(2026, 9, 29, 12, 30)
+
+        class FrozenDatetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed
+
+        monkeypatch.setattr(seed_usage_events, "datetime", FrozenDatetime)
+        events = generate(self._users(50), self._projects(), 0, random.Random(2))
+
+        assert events
+        assert all(e[4] <= fixed for e in events)
+
+    def test_a_negative_day_count_is_refused_before_anything_is_deleted(self, monkeypatch):
+        """It generates nothing, so --reset would empty the seeded rows and stop."""
+        monkeypatch.setattr(sys, "argv", ["seed", "--days", "-1", "--reset", "--yes"])
+
+        with pytest.raises(SystemExit) as exited:
+            main()
+
+        assert exited.value.code == 2
+
     def test_the_same_seed_gives_the_same_data(self):
         a = generate(self._users(), self._projects(), 30, random.Random(7))
         b = generate(self._users(), self._projects(), 30, random.Random(7))
@@ -344,6 +369,22 @@ class TestSeedMarker:
         remaining = UsageEvent.query.all()
         assert len(remaining) == 1
         assert remaining[0].event_type == "project_open"
+
+    def test_clear_leaves_committing_to_the_caller(self, app, tmp_path):
+        """--reset deletes and re-inserts in one transaction, so a failed insert
+        must be able to roll the deletion back."""
+        add_user()
+        add_project(tmp_path)
+        db.session.add(UsageEvent(
+            user_id=7, project_id=3, event_type="login",
+            occurred_at=datetime.now(), details={"seeded": True},
+        ))
+        db.session.commit()
+
+        assert clear_seeded() == 1
+        db.session.rollback()
+
+        assert UsageEvent.query.count() == 1
 
     def test_clear_is_safe_to_run_when_nothing_was_seeded(self, app, tmp_path):
         add_user()

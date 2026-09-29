@@ -84,7 +84,8 @@ def generate(users, projects, days, rng):
     # Give the newest project a head start so "most used" is not a dead heat.
     weights = [max(1, len(projects) - index) for index in range(len(projects))]
 
-    end = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    now = datetime.now()
+    end = now.replace(hour=0, minute=0, second=0, microsecond=0)
     events = []
     for day_offset in range(days, -1, -1):
         day = end - timedelta(days=day_offset)
@@ -98,10 +99,13 @@ def generate(users, projects, days, rng):
                 start = day + timedelta(
                     hours=rng.randint(8, 18), minutes=rng.randint(0, 59), seconds=rng.randint(0, 59)
                 )
-                if start > datetime.now():
-                    continue
                 project = rng.choices(projects, weights=weights, k=1)[0]
-                events.extend(_session_events(user.id, project, start, rng))
+                session_events = _session_events(user.id, project, start, rng)
+                # A session runs on for up to an hour after it starts, so one that
+                # began a few minutes ago would otherwise record views not yet seen.
+                if session_events[-1][4] > now:
+                    continue
+                events.extend(session_events)
     return events
 
 
@@ -113,7 +117,11 @@ BATCH_SIZE = 1000
 
 
 def clear_seeded():
-    """Remove only rows this script wrote, identified by the details marker."""
+    """Remove only rows this script wrote, identified by the details marker.
+
+    Does not commit, so --reset can delete and re-insert in one transaction and
+    a failed insert leaves the previous seeded rows in place.
+    """
     removed = 0
     rows = UsageEvent.query.filter(
         UsageEvent.details.isnot(None), UsageEvent.event_type.isnot(None)
@@ -122,7 +130,6 @@ def clear_seeded():
         if isinstance(row.details, dict) and row.details.get("seeded") is True:
             db.session.delete(row)
             removed += 1
-    db.session.commit()
     return removed
 
 
@@ -156,6 +163,10 @@ def main():
         help="required to write anything - this is fabricated data",
     )
     args = parser.parse_args()
+    # Checked before anything touches the database: a negative value generates
+    # nothing, so --reset would delete the seeded rows and write none back.
+    if args.days < 0:
+        parser.error("--days must be zero or more")
 
     from mdvtools.dbutils.mdv_server_app import app
 
@@ -169,7 +180,9 @@ def main():
             if not args.yes:
                 print("Refusing to delete without --yes.")
                 return 1
-            print(f"Removed {clear_seeded()} seeded row(s). Real events untouched.")
+            removed = clear_seeded()
+            db.session.commit()
+            print(f"Removed {removed} seeded row(s). Real events untouched.")
             return 0
 
         users = User.query.all()
@@ -191,21 +204,26 @@ def main():
             print("Never run it where the numbers matter. Re-run with --yes to proceed.")
             return 1
 
-        if args.reset:
-            print(f"Removed {clear_seeded()} previously seeded row(s).")
-
-        for user_id, project_id, event_type, view_name, occurred_at in events:
-            db.session.add(
-                UsageEvent(
-                    user_id=user_id,
-                    project_id=project_id,
-                    event_type=event_type,
-                    view_name=view_name,
-                    occurred_at=occurred_at,
-                    details=dict(SEED_MARKER),
+        try:
+            removed = clear_seeded() if args.reset else 0
+            for user_id, project_id, event_type, view_name, occurred_at in events:
+                db.session.add(
+                    UsageEvent(
+                        user_id=user_id,
+                        project_id=project_id,
+                        event_type=event_type,
+                        view_name=view_name,
+                        occurred_at=occurred_at,
+                        details=dict(SEED_MARKER),
+                    )
                 )
-            )
-        db.session.commit()
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+
+        if args.reset:
+            print(f"Removed {removed} previously seeded row(s).")
         print(f"Wrote {len(events)} seeded event(s) across {args.days} day(s).")
         print("Remove them again with: --clear --yes")
         return 0
