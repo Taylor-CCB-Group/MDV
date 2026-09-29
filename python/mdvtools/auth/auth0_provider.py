@@ -494,6 +494,8 @@ class Auth0Provider(AuthProvider):
             cache_user_projects()
             logger.info(f"Granted the bootstrap administrator access to {granted} project(s).")
         except Exception:
+            # To rollback the session if the failure occurs in the querying of grant_all_projects_to_admins()
+            db.session.rollback()
             logger.exception(
                 "Bootstrapped the first administrator but could not grant project access; "
                 "it can still be granted from Admin."
