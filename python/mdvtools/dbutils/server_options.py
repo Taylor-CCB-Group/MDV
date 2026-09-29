@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from flask import Flask
 
@@ -50,7 +50,7 @@ def get_active_extensions(
     # Preserve the existing always-on UCSC proxy behaviour.
     reject_external_provider("ucsc_proxy", external_providers)
     active: dict[str, MDVProjectServerExtension] = {
-        "ucsc_proxy": UcscProxyServerExtension()
+        "ucsc_proxy": _create_builtin_extension("ucsc_proxy", UcscProxyServerExtension)
     }
 
     for extension_id in configured_ids:
@@ -60,7 +60,7 @@ def get_active_extensions(
         builtin_factory = extension_classes.get(extension_id)
         if builtin_factory is not None:
             reject_external_provider(extension_id, external_providers)
-            instance = builtin_factory()
+            instance = _create_builtin_extension(extension_id, builtin_factory)
         else:
             instance = load_external_extension(extension_id, external_providers)
 
@@ -111,6 +111,18 @@ def get_server_options_for_db_projects(app: Flask) -> MDVServerOptions:
         extensions=list(get_active_extensions(app).values()),
         websocket=True,
     )
+
+
+def _create_builtin_extension(
+    extension_id: str, factory: Callable[[], MDVProjectServerExtension]
+) -> MDVProjectServerExtension:
+    try:
+        return factory()
+    except Exception as exc:
+        raise ExtensionError(
+            f"Extension '{extension_id}' failed while being created from the "
+            "built-in registry."
+        ) from exc
 
 
 def _validate_configured_ids(configured_ids: object) -> tuple[str, ...]:

@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from flask import Flask
 
-from mdvtools.dbutils import external_extensions
+from mdvtools.dbutils import external_extensions, server_options
 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
 from mdvtools.dbutils.server_options import (
     ACTIVE_EXTENSIONS_KEY,
@@ -290,6 +290,23 @@ def test_broken_global_registration_is_rejected(monkeypatch) -> None:
 
     with pytest.raises(ExtensionError, match="failed while registering global routes"):
         register_global_routes_for_extensions(app)
+
+
+def test_broken_builtin_construction_is_rejected(monkeypatch) -> None:
+    def broken() -> MDVProjectChatServerExtension:
+        raise ValueError("constructor failed")
+
+    use_entry_points(monkeypatch)
+    monkeypatch.setitem(server_options.extension_classes, "chat", broken)
+    app = Flask(__name__)
+    app.config["extensions"] = ["chat"]
+
+    with pytest.raises(
+        ExtensionError, match="'chat' failed while being created"
+    ) as raised:
+        get_active_extensions(app)
+
+    assert isinstance(raised.value.__cause__, ValueError)
 
 
 def ill_typed_navigation(label: Any, url: Any) -> ExtensionNavigation:
