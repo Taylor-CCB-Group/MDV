@@ -295,7 +295,7 @@ def test_broken_global_registration_is_rejected(monkeypatch) -> None:
 @pytest.mark.parametrize(
     "navigation, message",
     [
-        (ExtensionNavigation(label="", url="/example/"), "label must not be empty"),
+        (ExtensionNavigation(label="", url="/example/"), "non-empty string"),
         (
             ExtensionNavigation(label="Example", url="https://example.com"),
             "app-relative path",
@@ -305,6 +305,14 @@ def test_broken_global_registration_is_rejected(monkeypatch) -> None:
             "app-relative path",
         ),
         ({"label": "Example", "url": "/example/"}, "must be ExtensionNavigation"),
+        # A dataclass does not enforce its annotations, so these arrive as
+        # AttributeError unless the types are checked. Anything that is not an
+        # ExtensionError escapes the startup handler and leaves the deployment
+        # serving a fallback app rather than refusing to start - which looks
+        # healthy to anything that only checks whether the port answers.
+        (ExtensionNavigation(label=None, url="/example/"), "non-empty string"),
+        (ExtensionNavigation(label=123, url="/example/"), "non-empty string"),
+        (ExtensionNavigation(label="Example", url=None), "URL must be a string"),
     ],
 )
 def test_invalid_navigation_is_rejected(monkeypatch, navigation, message) -> None:

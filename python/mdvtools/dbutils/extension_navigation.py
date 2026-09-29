@@ -23,9 +23,18 @@ def validate_extension_navigation(extension_id: str, instance: Any) -> None:
         raise ExtensionError(
             f"Extension '{extension_id}' navigation must be ExtensionNavigation."
         )
-    if not navigation.label.strip():
+    # ExtensionNavigation is a plain dataclass, so its annotations are not
+    # enforced at runtime. Check the field types before using them: a None label
+    # raises AttributeError, which is not an ExtensionError, so it lands in the
+    # generic startup handler and leaves the deployment serving a fallback app
+    # instead of refusing to start.
+    if not isinstance(navigation.label, str) or not navigation.label.strip():
         raise ExtensionError(
-            f"Extension '{extension_id}' navigation label must not be empty."
+            f"Extension '{extension_id}' navigation label must be a non-empty string."
+        )
+    if not isinstance(navigation.url, str):
+        raise ExtensionError(
+            f"Extension '{extension_id}' navigation URL must be a string."
         )
     parsed_url = urlsplit(navigation.url)
     if not navigation.url.startswith("/") or parsed_url.scheme or parsed_url.netloc:
