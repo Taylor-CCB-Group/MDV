@@ -196,6 +196,47 @@ class TestViewCreation:
         assert creates == 1
 
 
+class TestViewChangeClassification:
+    """Creation and deletion both arrive as /save_state, with no route of their own.
+
+    classify_view_change is what tells them apart, and it can only do so before
+    the save - which is the part that is easy to break later.
+    """
+
+    @staticmethod
+    def _classify(state, existing=("Overview",)):
+        from mdvtools.server import classify_view_change
+
+        return classify_view_change(state, list(existing))
+
+    def test_a_new_name_with_a_view_is_a_creation(self):
+        assert self._classify({"currentView": "New", "view": {"a": 1}}) == (
+            "view_create",
+            "New",
+        )
+
+    def test_a_known_name_with_a_null_view_is_a_deletion(self):
+        assert self._classify({"currentView": "Overview", "view": None}) == (
+            "view_delete",
+            "Overview",
+        )
+
+    def test_editing_an_existing_view_records_nothing(self):
+        """The common case by far - every chart tweak saves the whole view."""
+        assert self._classify({"currentView": "Overview", "view": {"a": 1}}) == (None, None)
+
+    def test_deleting_a_view_that_is_not_there_records_nothing(self):
+        """set_view only deletes when the name exists, so neither should this."""
+        assert self._classify({"currentView": "Ghost", "view": None}) == (None, None)
+
+    @pytest.mark.parametrize(
+        "state",
+        [None, {}, {"view": {"a": 1}}, {"currentView": "", "view": None}],
+    )
+    def test_a_payload_that_names_no_view_records_nothing(self, state):
+        assert self._classify(state) == (None, None)
+
+
 class TestOffSwitch:
     """ENABLE_USAGE_TRACKING lets a deployment record nothing at all."""
 
@@ -220,6 +261,14 @@ class TestOffSwitch:
         UsageEventService.record_project_open(7, 3)
         UsageEventService.record_view_open(7, 3, "Overview")
         UsageEventService.record_event(7, "view_create", project_id=3, view_name="New")
+        UsageEventService.record_event(7, "view_delete", project_id=3, view_name="Old")
+        UsageEventService.record_event(7, "project_delete", project_id=3)
+        UsageEventService.record_event(7, "project_restore", project_id=3)
+        UsageEventService.record_event(7, "project_create", project_id=3)
+        UsageEventService.record_event(7, "project_purge", details={"project_name": "x"})
+        UsageEventService.record_event(
+            7, "project_rename", project_id=3, details={"from": "a", "to": "b"}
+        )
         assert UsageEvent.query.count() == 0
 
     def test_switching_it_off_does_not_delete_what_was_already_recorded(self, app, tmp_path, monkeypatch):
@@ -242,6 +291,17 @@ class TestProjectDeletion:
 
         assert UsageEvent.query.count() == 1
         assert UsageEvent.query.first().project_id == 3
+
+    def test_a_restore_is_recorded_so_the_log_explains_the_reappearance(self, app, tmp_path):
+        """Otherwise a project is deleted, and then used again, with nothing in
+        between - which reads as missing recording rather than a change of mind."""
+        add_user()
+        add_project(tmp_path, deleted=True)
+        UsageEventService.record_event(7, "project_restore", project_id=3)
+
+        event = UsageEvent.query.one()
+        assert event.event_type == "project_restore"
+        assert event.project_id == 3, "the row survives a soft delete, so this still points at it"
 
     def test_restoring_a_project_keeps_its_history_attached(self, app, tmp_path):
         add_user()
@@ -268,6 +328,102 @@ class TestProjectDeletion:
         assert event is not None, "usage history should survive a purge"
         assert event.project_id is None
         assert event.view_name == "Overview"
+        assert event.details == {"project_name": "project-3"}
+
+    def test_purge_adds_the_name_to_details_without_discarding_what_was_there(
+        self, app, tmp_path
+    ):
+        """Assigning over details would erase a rename's names at the one moment
+        the project name stops being recoverable - and the seeder's marker with
+        them, leaving rows --clear could never remove again."""
+        add_user()
+        add_project(tmp_path, deleted=True)
+        UsageEventService.record_event(
+            7, "project_rename", project_id=3, details={"from": "old", "to": "project-3"}
+        )
+        db.session.add(
+            UsageEvent(
+                user_id=7,
+                project_id=3,
+                event_type="project_open",
+                details={"seeded": True},
+                occurred_at=datetime.now(),
+            )
+        )
+        db.session.commit()
+
+        ok, error = ProjectService.purge_deleted_project(3)
+        assert ok is True, error
+
+        renamed = UsageEvent.query.filter_by(event_type="project_rename").one()
+        assert renamed.details == {
+            "from": "old",
+            "to": "project-3",
+            "project_name": "project-3",
+        }
+        seeded = UsageEvent.query.filter_by(event_type="project_open").one()
+        assert seeded.details["seeded"] is True
+        assert seeded.details["project_name"] == "project-3"
+
+    def test_purge_detaches_every_event_when_only_some_carry_details(self, app, tmp_path):
+        """The detach runs in two passes - rows with details, then the rest - so a
+        mixture is the case where one pass could silently miss rows."""
+        add_user()
+        add_project(tmp_path, deleted=True)
+        for index in range(5):
+            UsageEventService.record_view_open(7, 3, f"View {index}")
+        UsageEventService.record_event(
+            7, "project_rename", project_id=3, details={"from": "a", "to": "project-3"}
+        )
+
+        ok, error = ProjectService.purge_deleted_project(3)
+
+        assert ok is True, error
+        assert UsageEvent.query.count() == 6
+        assert UsageEvent.query.filter(UsageEvent.project_id.isnot(None)).count() == 0
+        assert all(
+            row.details["project_name"] == "project-3" for row in UsageEvent.query.all()
+        )
+
+
+class TestEventDetails:
+    """details carries the few facts that have nowhere else to live."""
+
+    def test_details_are_stored_as_given(self, app, tmp_path):
+        add_user()
+        add_project(tmp_path)
+        UsageEventService.record_event(
+            7, "project_rename", project_id=3, details={"from": "before", "to": "after"}
+        )
+
+        assert UsageEvent.query.one().details == {"from": "before", "to": "after"}
+
+    def test_an_event_without_details_stores_none(self, app, tmp_path):
+        add_user()
+        add_project(tmp_path)
+        UsageEventService.record_project_open(7, 3)
+
+        assert UsageEvent.query.one().details is None
+
+    def test_overlong_values_are_truncated_not_rejected(self, app, tmp_path):
+        """Project names arrive from a request body, and this column has no limit."""
+        add_user()
+        add_project(tmp_path)
+        UsageEventService.record_event(
+            7, "project_rename", project_id=3, details={"from": "x" * 500, "to": "y"}
+        )
+
+        assert len(UsageEvent.query.one().details["from"]) == 256
+
+    def test_a_purge_event_names_the_project_it_can_no_longer_point_at(self, app, tmp_path):
+        """Recorded after the row is gone, so the foreign key has to stay empty."""
+        add_user()
+        UsageEventService.record_event(
+            7, "project_purge", details={"project_name": "project-3"}
+        )
+
+        event = UsageEvent.query.one()
+        assert event.project_id is None
         assert event.details == {"project_name": "project-3"}
 
 

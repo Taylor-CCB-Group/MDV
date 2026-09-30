@@ -55,7 +55,7 @@ logger.info("server.py module loaded")
 routes = set()
 
 
-def record_usage_event(project_id, event_type, backend_db, view_name=None):
+def record_usage_event(project_id, event_type, backend_db, view_name=None, details=None):
     """Record one usage event, or quietly do nothing if this deployment cannot.
 
     Module level so it is unit-testable without building a project. Guards run in
@@ -85,12 +85,46 @@ def record_usage_event(project_id, event_type, backend_db, view_name=None):
         from mdvtools.dbutils.dbservice import UsageEventService
 
         return UsageEventService.record_event(
-            user_id, event_type, project_id=project_id, view_name=view_name
+            user_id,
+            event_type,
+            project_id=project_id,
+            view_name=view_name,
+            details=details,
         )
     except Exception as e:
         logger.warning(f"Could not record usage event '{event_type}': {e}")
         return False
         
+def classify_view_change(state, existing_views):
+    """Say whether a /save_state payload creates or deletes a view.
+
+    Returns (event_type, view_name), or (None, None) when the payload does
+    neither - the ordinary case of editing a view that already exists.
+
+    Both of these reach the server only through /save_state, so neither is
+    visible as a route. A view created in the browser is never fetched from the
+    server, so /get_view never fires for it and it would otherwise stay invisible
+    in usage until somebody opened it later; a deletion is a save with a null
+    view (see MDVProject.set_view). The payload alone cannot tell the two apart -
+    that depends on whether the name already existed, which is only knowable
+    before the save.
+
+    Module level and pure so the decision can be tested without a project, and so
+    the route stays a list of steps rather than a nest of conditions.
+    """
+    if not state:
+        return None, None
+    name = state.get("currentView")
+    if not name:
+        return None, None
+    existed = name in existing_views
+    if state.get("view"):
+        # Recorded as its own event type rather than as an open: counting a
+        # creation as an open would inflate every view's open count.
+        return ("view_create", name) if not existed else (None, None)
+    return ("view_delete", name) if existed else (None, None)
+
+
 def _apply_project_writability(
     project: MDVProject,
     state: dict,
@@ -382,26 +416,21 @@ def create_app(
     def save_data():
         # Frontend sends decoded column data; unique columns are string[] from ChartManager getMd()
         success = True
-        new_view_name = None
+        event_type = None
+        changed_view = None
         try:
             state = request.json
-            # A view created in the browser is never fetched from the server - it
-            # is already in memory - so /get_view never fires for it and it would
-            # be invisible in usage until somebody opened it later. Checked before
-            # save_state, which add-or-updates. Recorded as its own event type:
-            # counting a creation as an "open" would inflate every open count.
-            if state:
-                candidate = state.get("currentView")
-                if candidate and state.get("view") and candidate not in project.views:
-                    new_view_name = candidate
+            # Classified before the save, because afterwards project.views no
+            # longer says which case this was.
+            event_type, changed_view = classify_view_change(state, project.views)
             project.save_state(state)
         except Exception as e:
             logger.error(e)
             success = False
 
-        if success and new_view_name:
+        if success and event_type:
             record_usage_event(
-                project.id, "view_create", options.backend_db, view_name=new_view_name
+                project.id, event_type, options.backend_db, view_name=changed_view
             )
         return jsonify({"success": success})
 

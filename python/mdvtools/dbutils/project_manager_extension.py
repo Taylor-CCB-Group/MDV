@@ -52,6 +52,21 @@ def is_owner_or_admin(user, permissions):
     return bool(user.get("is_admin", False))
 
 
+def record_project_event(project_id, event_type, details=None):
+    """Record one project-management usage event.
+
+    Wraps the recorder in server.py so the routes below read as one call. Two
+    reasons it is not that function directly: these routes only exist in a
+    database-backed deployment, so the backend_db guard is always satisfied and
+    repeating it at every call site would only invite someone to pass the wrong
+    thing; and the import is deferred because server.py builds the request-serving
+    app, which this module is part of - importing it at module scope is circular.
+    """
+    from mdvtools.server import record_usage_event
+
+    return record_usage_event(project_id, event_type, True, details=details)
+
+
 class ImportRejected(Exception):
     """An archive the caller sent that cannot be imported.
 
@@ -148,6 +163,14 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
                     db.session.commit()
                     logger.info(f"Created project {new_project.id} in {project_path}")
+
+                    # After the commit, not before. record_event writes on its own
+                    # connection, so until this transaction commits the project row
+                    # does not exist as far as that connection is concerned and the
+                    # foreign key would reject the event - silently, because
+                    # recording swallows its own failures. It also means a create
+                    # that rolls back below leaves nothing behind in the log.
+                    record_project_event(new_project.id, "project_create")
 
                     # Return the new project info
                     return jsonify({
@@ -409,7 +432,16 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         def delete_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
             try:
                 logger.info(f"Deleting project '{project_id}'")
-                soft_delete_projects([project_id], ENABLE_AUTH)
+                deleted = soft_delete_projects([project_id], ENABLE_AUTH)
+                # Driven by what was deleted, not by what was asked for: an id that
+                # was already in the recycle bin comes back from here unlisted, and
+                # logging it would invent a deletion that did not happen.
+                #
+                # The project row survives a soft delete, so the foreign key holds
+                # and this event keeps pointing at a project the recycle bin can
+                # still restore - project_purge is the irreversible one.
+                for project in deleted:
+                    record_project_event(project.id, "project_delete")
                 return jsonify({"message": f"Project '{project_id}' moved to recycle bin."})
             except PermissionError as e:
                 return jsonify({"error": str(e)}), 403
@@ -433,7 +465,13 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 return jsonify({"error": "projectIds must be a non-empty list of integers."}), 400
             deduplicated_ids = list(dict.fromkeys(project_ids))
             try:
-                soft_delete_projects(deduplicated_ids, ENABLE_AUTH)
+                deleted = soft_delete_projects(deduplicated_ids, ENABLE_AUTH)
+                # One event per project rather than one for the batch: the log is
+                # read per project, and a batch row would be invisible there. Taken
+                # from what was deleted rather than what was requested - see
+                # /delete_project.
+                for project in deleted:
+                    record_project_event(project.id, "project_delete")
                 return jsonify({"deletedProjectIds": deduplicated_ids})
             except PermissionError as e:
                 return jsonify({"error": str(e)}), 403
@@ -468,9 +506,21 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 deleted_project_ids = []
                 failures = []
                 for project in projects:
+                    # Read before the purge: afterwards the row is gone and the
+                    # name with it.
+                    purged_name = project.name
                     success, message = ProjectService.purge_deleted_project(project.id)
                     if success:
                         deleted_project_ids.append(project.id)
+                        # Recorded with no project_id at all. The row it would
+                        # reference no longer exists, so a foreign key would reject
+                        # it - and recording before the purge instead would log
+                        # deletions that then failed. The name goes in details,
+                        # which is exactly what the purge does to this project's
+                        # other events, so the log renders it the same way.
+                        record_project_event(
+                            None, "project_purge", details={"project_name": purged_name}
+                        )
                     else:
                         failures.append({"projectId": project.id, "message": message})
                 refresh_auth_cache(ENABLE_AUTH)
@@ -485,6 +535,13 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         def restore_recycle_bin_project(project_id: int) -> Union[Response, Tuple[Response, int]]:
             try:
                 restore_deleted_project(project_id, ENABLE_AUTH, app)
+                # The counterpart of project_delete. Without it the log shows a
+                # project being deleted and then, with no explanation, being used
+                # again - which reads as a gap in the recording rather than as
+                # somebody having changed their mind. restore_deleted_project
+                # raises rather than returning on failure, so reaching here means
+                # it happened.
+                record_project_event(project_id, "project_restore")
                 return jsonify({"restoredProjectId": project_id})
             except PermissionError as e:
                 return jsonify({"error": str(e)}), 403
@@ -529,12 +586,25 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     logger.error(f"Project with ID {project_id} is not editable.")
                     return jsonify({"error": "This project is not editable and cannot be renamed."}), 403
 
+                # Read before the rename, which writes through this same object.
+                previous_name = project.name
+
                 # Attempt to rename the project
                 rename_status = ProjectService.update_project_name(project_id, new_name)
 
                 if not rename_status:
                     logger.error(f"In register_routes - /rename_project Error: The project with ID '{project_id}' not found in db")
                     return jsonify({"error": f"Failed to rename project '{project_id}' in db"}), 500
+
+                # Both names are recorded because neither alone is much use: the
+                # log shows the current name everywhere, so an entry saying only
+                # "renamed" cannot tell you what it used to be called - which is
+                # the whole question when an older report names something else.
+                record_project_event(
+                    project_id,
+                    "project_rename",
+                    details={"from": previous_name, "to": new_name},
+                )
 
                 # Keep the copy in the project directory in step. The database write
                 # above decides whether the rename succeeded

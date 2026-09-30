@@ -320,7 +320,37 @@ class ProjectService:
             # Detach the usage history rather than deleting it. The foreign key
             # would block this delete otherwise, and dropping the rows would make
             # last month's access numbers silently change when somebody empties
-            # the recycle bin. details is otherwise unused, so overwriting is safe.
+            # the recycle bin.
+            #
+            # The project name is merged into details rather than assigned over
+            # it. details also carries what an event meant - a rename's old and
+            # new names, the demo seeder's marker - and replacing it would erase
+            # that at the one moment the name is about to become unrecoverable.
+            #
+            # Two passes, because the merge cannot be expressed in SQL the same
+            # way on SQLite and Postgres. The first handles the rows that carry
+            # something, which are a small minority - an event only has details
+            # if it was a rename or was seeded - and it reads them all before
+            # writing any, because updating project_id while scanning on
+            # project_id is exactly the kind of thing SQLite leaves undefined.
+            # The second is the original single statement, and still does the
+            # overwhelming majority of the work.
+            carrying_details = (
+                UsageEvent.query.filter(
+                    UsageEvent.project_id == project_id,
+                    UsageEvent.details.isnot(None),
+                )
+                .with_entities(UsageEvent.id, UsageEvent.details)
+                .all()
+            )
+            for event_id, existing_details in carrying_details:
+                merged = dict(existing_details) if isinstance(existing_details, dict) else {}
+                merged["project_name"] = project.name
+                UsageEvent.query.filter_by(id=event_id).update(
+                    {"project_id": None, "details": merged},
+                    synchronize_session=False,
+                )
+            # Everything still attached had no details to preserve.
             UsageEvent.query.filter_by(project_id=project_id).update(
                 {"project_id": None, "details": {"project_name": project.name}},
                 synchronize_session=False,
@@ -1006,12 +1036,16 @@ class UsageEventService:
     """
 
     @staticmethod
-    def record_event(user_id, event_type, project_id=None, view_name=None):
+    def record_event(user_id, event_type, project_id=None, view_name=None, details=None):
         """Insert one usage row. Never raises, never touches the caller's session.
 
         The off switch is checked here rather than at each call site because
         every recording path funnels through this one function - so a new event
         type cannot be added that quietly ignores it.
+
+        details carries the few facts that have nowhere else to live, such as the
+        names either side of a rename. Values are truncated like view_name: they
+        come from request bodies, and this column has no length limit of its own.
         """
         try:
             if not ENABLE_USAGE_TRACKING:
@@ -1021,6 +1055,11 @@ class UsageEventService:
 
             if view_name is not None:
                 view_name = str(view_name)[:128]
+            if details is not None:
+                details = {
+                    str(key)[:64]: (str(value)[:256] if isinstance(value, str) else value)
+                    for key, value in details.items()
+                }
 
             with db.engine.begin() as connection:
                 connection.execute(
@@ -1029,6 +1068,7 @@ class UsageEventService:
                         project_id=project_id,
                         event_type=event_type,
                         view_name=view_name,
+                        details=details,
                         occurred_at=datetime.now(),
                     )
                 )
