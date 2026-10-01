@@ -545,7 +545,10 @@ class TestValidateUserBootstrapAndActivation:
         assert error[1] == 404
         mock_db.session.add.assert_not_called()
 
-    def test_bootstrap_rolls_back_when_role_assignment_fails(self, bootstrap_app, provider):
+    def test_bootstrap_discards_the_admin_when_role_assignment_fails(self, bootstrap_app, provider):
+        """The user is flushed but never committed, so a failed role assignment
+        leaves the deployment exactly as it was - nothing to delete, and nothing
+        for a concurrent login's usage event to block."""
         user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
 
         with patch('mdvtools.auth.auth0_provider.GetToken') as mock_get_token, \
@@ -555,19 +558,61 @@ class TestValidateUserBootstrapAndActivation:
             mock_auth0.roles.list.return_value = {"roles": []}  # no 'admin' role in this tenant
             mock_auth0_class.return_value = mock_auth0
 
-            result, error, mock_user_class, mock_db, new_user = self._run_validate_user(
+            result, error, _mock_user_class, mock_db, _new_user = self._run_validate_user(
                 bootstrap_app, provider, user_info, existing_user_side_effect=[None]
             )
 
         assert result is None
         assert error[1] == 500
-        mock_db.session.delete.assert_called_once_with(new_user)
-        assert mock_db.session.commit.call_count == 2  # once for the create, once for the rollback delete
+        mock_db.session.rollback.assert_called_once()
+        mock_db.session.delete.assert_not_called()
+        # The whole point of the ordering: no administrator was ever published.
+        mock_db.session.commit.assert_not_called()
+
+    def test_bootstrap_commits_only_after_the_role_is_assigned(self, bootstrap_app, provider):
+        """Ordering is the fix, so assert the order rather than just the calls."""
+        user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
+        calls = []
+
+        with patch('mdvtools.auth.auth0_provider.GetToken') as mock_get_token, \
+             patch('mdvtools.auth.auth0_provider.Auth0') as mock_auth0_class, \
+             patch('mdvtools.dbutils.dbservice.UserProjectService.grant_all_projects_to_admins',
+                   return_value=0), \
+             patch('mdvtools.auth.authutils.cache_user_projects'):
+            mock_get_token.return_value.client_credentials.return_value = {"access_token": "mgmt-token"}
+            mock_auth0 = MagicMock()
+            mock_auth0.roles.list.return_value = {"roles": [{"id": "role_admin", "name": "admin"}]}
+            mock_auth0.users.add_roles.side_effect = lambda *a, **k: calls.append("assign_role")
+            mock_auth0_class.return_value = mock_auth0
+
+            with patch.object(provider, 'get_token', return_value='dummy-token'), \
+                 patch.object(provider, 'is_token_valid', return_value=True), \
+                 patch.object(provider, 'get_user', return_value=user_info), \
+                 patch('mdvtools.dbutils.dbmodels.User') as mock_user_class, \
+                 patch('mdvtools.dbutils.dbmodels.db') as mock_db:
+
+                mock_db.session = MagicMock()
+                mock_db.session.flush.side_effect = lambda *a, **k: calls.append("flush")
+                mock_db.session.commit.side_effect = lambda *a, **k: calls.append("commit")
+                filter_by_mock = MagicMock()
+                filter_by_mock.first.side_effect = [None]
+                mock_user_class.query.filter_by.return_value = filter_by_mock
+                mock_user_class.query.count.return_value = 0
+
+                with bootstrap_app.test_request_context('/'):
+                    result, error = provider.validate_user()
+
+        assert error is None
+        assert result is not None
+        assert calls[:3] == ["flush", "assign_role", "commit"]
 
     def test_bootstrap_concurrent_race_logs_in_the_winner(self, bootstrap_app, provider):
-        """Two requests for the same bootstrap identity race; the loser's commit hits
+        """Two requests for the same bootstrap identity race; the loser's insert hits
         the unique constraint on email/auth_id and should just log in as the winner
-        rather than surfacing an error to the legitimate administrator."""
+        rather than surfacing an error to the legitimate administrator.
+
+        The constraint is hit at flush, which is where the INSERT is now issued -
+        before the Auth0 call, so the loser never attempts a role assignment."""
         user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
         winner = MagicMock(id=1, auth_id="auth0|new-admin", email="admin@example.com", is_admin=True)
 
@@ -578,7 +623,7 @@ class TestValidateUserBootstrapAndActivation:
              patch('mdvtools.dbutils.dbmodels.db') as mock_db:
 
             mock_db.session = MagicMock()
-            mock_db.session.commit.side_effect = IntegrityError("insert", {}, Exception("unique violation"))
+            mock_db.session.flush.side_effect = IntegrityError("insert", {}, Exception("unique violation"))
             filter_by_mock = MagicMock()
             # First call: initial lookup -> None. Second call: after the IntegrityError
             # rollback, re-query finds the row the concurrent request already created.

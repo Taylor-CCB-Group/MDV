@@ -458,8 +458,16 @@ class Auth0Provider(AuthProvider):
             password="",
         )
         db.session.add(user)
+        # Flushed, not committed: the row has to exist for the database to enforce
+        # its unique constraints, but it must not become visible to anything else
+        # until the Auth0 role is in place. Committing first would publish a
+        # working local administrator that Auth0 does not know is one, and undoing
+        # that afterwards is not reliably possible - usage_events.user_id is a
+        # non-nullable foreign key with no cascade, so a concurrent login writing
+        # its login event is enough to block the delete and strand the half-made
+        # administrator. Ordering it this way means there is nothing to undo.
         try:
-            db.session.commit()
+            db.session.flush()
         except IntegrityError:
             db.session.rollback()
             # A concurrent request for this same identity already won the race and
@@ -471,17 +479,22 @@ class Auth0Provider(AuthProvider):
             self._assign_admin_role(auth0_id)
         except Exception:
             logger.exception(
-                "Failed to assign the Auth0 'admin' role to the bootstrap administrator; rolling back."
+                "Failed to assign the Auth0 'admin' role to the bootstrap administrator; "
+                "discarding the uncommitted administrator."
             )
-            # Deliberately no usage_events cleanup here. None can exist yet: the
-            # login event is written in is_authenticated() *after* validate_user()
-            # returns, and nothing else can reference a user created moments ago.
-            # An earlier version cleared them defensively and broke this rollback,
-            # because a query here is a new way for the recovery path to fail.
-            # A future delete-user feature does need to clear usage_events first.
-            db.session.delete(user)
-            db.session.commit()
+            # Nothing was ever committed, so this discards the row rather than
+            # deleting a published one. The deployment is left exactly as it was
+            # before the attempt, which is what the old cleanup path was trying
+            # and failing to achieve.
+            db.session.rollback()
             raise
+
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            # The same race, seen at commit instead of at flush.
+            return User.query.filter_by(auth_id=auth0_id).first()
 
         # Administrators own every project, but only the Auth0 sync and a project
         # rescan write those grants, and neither has run on a fresh deployment.
