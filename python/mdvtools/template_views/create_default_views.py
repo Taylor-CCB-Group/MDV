@@ -26,7 +26,10 @@ try:
         DISEASE_PATTERNS,
         FACTOR_PATTERNS,
         FEATURE_PLOT_CAP,
+        FEATURE_UMAP_CAP,
         FEATURE_UMAP_GENES,
+        GENE_PROTEIN_ALIASES,
+        MARKER_DOT_CAP,
         INFLAMMATION_PATTERNS,
         MARKER_CACHE,
         MARKER_DS_NAME,
@@ -60,7 +63,10 @@ except ImportError:
         DISEASE_PATTERNS,
         FACTOR_PATTERNS,
         FEATURE_PLOT_CAP,
+        FEATURE_UMAP_CAP,
         FEATURE_UMAP_GENES,
+        GENE_PROTEIN_ALIASES,
+        MARKER_DOT_CAP,
         INFLAMMATION_PATTERNS,
         MARKER_CACHE,
         MARKER_DS_NAME,
@@ -156,7 +162,10 @@ def umap(
         size,
         color_by=color_by,
         default_color="#377eb8",
-        axis={"x": scatter_axis(coords[0]), "y": scatter_axis(coords[1], 45)},
+        axis={
+            "x": scatter_axis(pretty_field(coords[0])),
+            "y": scatter_axis(pretty_field(coords[1]), 45),
+        },
         color_legend={"display": True, "pos": [12, 12]},
         radius=3,
         opacity=0.8,
@@ -211,7 +220,7 @@ def histogram(
         bin_number=50,
         display_min=display_min,
         display_max=display_max,
-        x_axis={"size": 30, "label": field, "textSize": 13, "tickfont": 10},
+        x_axis={"size": 30, "label": pretty_field(field), "textSize": 13, "tickfont": 10},
         y_axis={
             "size": 45,
             "label": "cells",
@@ -265,6 +274,21 @@ def pretty_field(field: str) -> str:
         return "Clusters"
     if name.startswith("spatialclust_") and name.endswith("_assignments"):
         return "Spatial niche"
+    low = name.lower()
+    if low in {"ncount_rna", "total_counts"}:
+        return "UMI counts"
+    if low == "cell_type":
+        return "Cell type"
+    if low in {"nfeature_rna", "n_genes_by_counts", "n_genes"}:
+        return "Genes per cell"
+    if low == "pct_counts_mt":
+        return "Mitochondrial fraction"
+    if "dblfinder" in low or "doublet" in low:
+        return "Doublet score"
+    if "umap" in low and low.endswith("_1"):
+        return "UMAP 1"
+    if "umap" in low and low.endswith("_2"):
+        return "UMAP 2"
     return name
 
 
@@ -1137,6 +1161,76 @@ def design_fields(roles: Roles) -> list[str]:
     return out[:6]
 
 
+def cohort_summary(roles: Roles) -> str:
+    parts: list[str] = []
+    if roles.n_cells:
+        parts.append(f"{int(roles.n_cells):,} cells")
+    if roles.cell_type:
+        n = n_values(roles.columns.get(roles.cell_type) or {})
+        if n:
+            parts.append(f"{n} cell types")
+    assays: list[str] = []
+    if roles.rna:
+        assays.append("RNA")
+    if roles.protein:
+        assays.append("surface protein")
+    if assays:
+        parts.append(" and ".join(assays))
+    return " · ".join(parts) if parts else "Cohort"
+
+
+def summary_chart(text: str, grid: Grid) -> dict[str, Any]:
+    return textbox("Summary", text, *grid.place(12, 1))
+
+
+def is_doublet_score(field: str) -> bool:
+    low = suffix(field).lower()
+    return "dblfinder" in low or "doublet" in low
+
+
+def _norm_feature(name: str) -> str:
+    token = name.strip()
+    if token.lower().startswith("adt_"):
+        token = token[4:]
+    return token.upper().replace("_", "").replace("-", "")
+
+
+def match_rna_protein(roles: Roles) -> list[tuple[str, str, str, str]]:
+    """Return (gene, gene wrapper, protein name, protein wrapper) pairs."""
+    if not roles.rna or not roles.protein:
+        return []
+    prot_by_norm: dict[str, str] = {}
+    for name in roles.protein.names:
+        prot_by_norm.setdefault(_norm_feature(name), name)
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for gene in list(MARKER_PANEL) + list(GENE_PROTEIN_ALIASES):
+        if gene in roles.gene_wrappers and gene not in seen:
+            candidates.append(gene)
+            seen.add(gene)
+
+    def sort_key(gene: str) -> tuple[int, int]:
+        lead = ("CD3D", "CD3E", "CD8A", "CD4", "CD14", "MS4A1", "FCGR3A")
+        lead_i = lead.index(gene) if gene in lead else len(lead)
+        panel_i = MARKER_PANEL.index(gene) if gene in MARKER_PANEL else len(MARKER_PANEL)
+        return (lead_i, panel_i)
+
+    pairs: list[tuple[str, str, str, str]] = []
+    used: set[str] = set()
+    for gene in sorted(candidates, key=sort_key):
+        alias = GENE_PROTEIN_ALIASES.get(gene, gene)
+        protein = prot_by_norm.get(_norm_feature(alias)) or prot_by_norm.get(_norm_feature(gene))
+        if not protein or protein in used:
+            continue
+        gene_wrapper = roles.gene_wrappers[gene]
+        protein_wrapper = roles.protein_wrappers.get(protein)
+        if protein_wrapper is None:
+            protein_wrapper = wrapper(roles.protein.subgroup, protein, roles.protein.names.index(protein))
+        used.add(protein)
+        pairs.append((gene, gene_wrapper, protein, protein_wrapper))
+    return pairs
+
+
 def default_gene(roles: Roles) -> tuple[str, str] | None:
     for gene in FEATURE_UMAP_GENES + MARKER_PANEL:
         if gene in roles.gene_wrappers:
@@ -1157,45 +1251,27 @@ def default_protein(roles: Roles) -> tuple[str, str] | None:
 def view_study_overview(roles: Roles) -> dict[str, Any] | None:
     cells: list[dict[str, Any]] = []
     grid = Grid()
-    bits = [
-        "What you see: cohort size, experimental-design bars, QC histograms, and filters.",
-        "Use this view to check who is in the study and whether QC looks even across groups before interpreting later screens.",
-        f"{roles.n_cells or '?'} cells in `{roles.obs}`.",
-        f"RNA link: {roles.rna.ds_name}/{roles.rna.subgroup} ({len(roles.rna.names)} features)."
-        if roles.rna
-        else "No RNA expression link.",
-        f"Protein link: {roles.protein.ds_name}/{roles.protein.subgroup} ({len(roles.protein.names)} features)."
-        if roles.protein
-        else "No protein expression link.",
-        "Spatial coordinates are available; use the existing default view for the image/Viv overlay."
-        if roles.embedding and roles.embedding[0] in {"x", "spatial_1", "global_1"}
-        else "This project is dissociated single-cell data; spatial localisation is not available unless coordinates exist.",
-    ]
-    cells.append(textbox("About this view", " ".join(bits), *grid.place(12, 3)))
+    cells.append(summary_chart(cohort_summary(roles), grid))
     design = design_fields(roles)
-    for fid in design[:4]:
-        cells.append(row(pretty_field(fid), fid, *grid.place(3, 3)))
+    primary = roles.cell_type if roles.cell_type in design else (design[0] if design else None)
+    others = [fid for fid in design if fid != primary][:2]
+    if primary and not others:
+        cells.append(row(pretty_field(primary), primary, *grid.place(6, 3)))
+    elif primary:
+        cells.append(row(pretty_field(primary), primary, *grid.place(4, 3)))
+        for fid in others:
+            cells.append(row(pretty_field(fid), fid, *grid.place(4, 3)))
     grid.newline()
-    if roles.disease and roles.tissue:
-        cells.append(
-            stacked(
-                f"{pretty_field(roles.disease)} by {pretty_field(roles.tissue)}",
-                [roles.disease, roles.tissue],
-                *grid.place(6, 4),
-            )
-        )
     for fid in roles.qc[:2]:
         mm = minmax(roles.columns[fid])
         if not mm:
             continue
-        cells.append(histogram(pretty_field(fid), fid, mm[0], mm[1], *grid.place(6, 4)))
-    grid.newline()
-    filt = [f for f in (roles.workstream, roles.tissue, roles.disease) if f]
-    if filt:
-        cells.append(selection("Filter cohort", filt, *grid.place(6, 3)))
-    extra = [f for f in design[4:] if f]
-    if extra:
-        cells.append(row(pretty_field(extra[0]), extra[0], *grid.place(6, 3)))
+        cells.append(histogram(pretty_field(fid), fid, mm[0], mm[1], *grid.place(6, 3)))
+    doublet = next((fid for fid in roles.scores if is_doublet_score(fid)), None)
+    if doublet:
+        mm = minmax(roles.columns.get(doublet) or {})
+        if mm:
+            cells.append(histogram("Doublet score", doublet, mm[0], mm[1], *grid.place(6, 3)))
     if len(cells) <= 1:
         roles.skipped.append("1 Study overview (no design/QC fields)")
         return None
@@ -1209,56 +1285,21 @@ def view_atlas(roles: Roles) -> dict[str, Any] | None:
     if not roles.embedding:
         roles.skipped.append("2 Cell atlas (no UMAP)")
         return None
+    color = roles.cell_type or roles.broad_type
+    if not color:
+        roles.skipped.append("2 Cell atlas (no cell type)")
+        return None
     xy = roles.embedding
     cells: list[dict[str, Any]] = []
     grid = Grid()
-    cells.append(
-        textbox(
-            "About this view",
-            "What you see: embeddings coloured by cell type, broad type, tissue, and disease, "
-            "plus composition bars. Use this view to see how populations separate in low-dimensional "
-            "space and whether a cluster is enriched in a tissue or disease group.",
-            *grid.place(12, 3),
-        )
-    )
-    colors = [
-        (fid, title)
-        for fid, title in (
-            (roles.cell_type, "Cell type"),
-            (roles.broad_type, "Broad type"),
-            (roles.tissue, "Tissue"),
-            (roles.disease, "Disease"),
-        )
-        if fid
-    ]
-    umap_w = {1: 12, 2: 6}.get(len(colors), 4)
-    for fid, title in colors:
-        cells.append(umap(title, fid, *grid.place(umap_w, 5), xy))
-    grid.newline()
-    if roles.tissue and roles.cell_type:
-        cells.append(
-            stacked(
-                f"{pretty_field(roles.cell_type)} by {pretty_field(roles.tissue)}",
-                [roles.tissue, roles.cell_type],
-                *grid.place(6, 4),
-            )
-        )
-    disease = roles.disease
-    cat = roles.broad_type or roles.cell_type
-    if disease and cat:
-        cells.append(
-            stacked(
-                f"{pretty_field(cat)} by {pretty_field(disease)}",
-                [disease, cat],
-                *grid.place(6, 4),
-            )
-        )
-    grid.newline()
-    if roles.cell_type:
-        cells.append(row(pretty_field(roles.cell_type), roles.cell_type, *grid.place(12, 3)))
-    if not cells:
-        roles.skipped.append("2 Cell atlas (no colour fields)")
-        return None
+    cells.append(summary_chart("Where the annotated groups sit on the embedding.", grid))
+    cells.append(umap(pretty_field(color), color, *grid.place(8, 4), xy))
+    cells.append(row(pretty_field(color), color, *grid.place(4, 4)))
+    extras = [fid for fid in (roles.broad_type, roles.tissue, roles.disease) if fid and fid != color]
+    if extras:
+        grid.newline()
+        for fid in extras[:2]:
+            cells.append(umap(pretty_field(fid), fid, *grid.place(6, 4), xy))
     return {
         "dataSources": {roles.obs: {"layout": "gridstack", "panelWidth": 100}},
         "initialCharts": {roles.obs: cells},
@@ -1269,109 +1310,53 @@ def view_markers(roles: Roles, feature_ds: dict[str, Any] | None) -> dict[str, A
     if not roles.rna:
         roles.skipped.append("3 Marker genes (no RNA link)")
         return None
-    pinned = list(roles.gene_wrappers.values())
     markers = roles.markers
-    top_hits = unique_top_markers(markers)
-    top_wraps: list[str] = []
-    if roles.rna and top_hits:
-        top_wraps = list(resolve_named_wrappers(roles.rna, [g for g, _c in top_hits]).values())
-    expr_wraps = top_wraps if len(top_wraps) >= 3 else pinned
+    dot_hits = unique_top_markers(markers, per_cluster=2, cap=MARKER_DOT_CAP)
+    feature_hits = unique_top_markers(markers, per_cluster=1, cap=FEATURE_UMAP_CAP)
+    if dot_hits:
+        dot_wraps = list(resolve_named_wrappers(roles.rna, [gene for gene, _cluster in dot_hits]).values())
+        dot_label = "Top markers"
+    else:
+        pinned = [gene for gene in MARKER_PANEL if gene in roles.gene_wrappers][:MARKER_DOT_CAP]
+        dot_wraps = [roles.gene_wrappers[gene] for gene in pinned]
+        dot_label = "Lineage markers"
+        feature_hits = [(gene, "") for gene in FEATURE_UMAP_GENES if gene in roles.gene_wrappers][:FEATURE_UMAP_CAP]
     cells: list[dict[str, Any]] = []
     grid = Grid()
-    note = (
-        "What you see: cluster-vs-rest top markers (dot, heatmap, and the side table) and "
-        "feature UMAPs for the unique top-2 genes per cluster (cap 24). "
-        f"Scores come from `{roles.rna.matrix or roles.rna.subgroup}`. "
-        "Use this view to find genes that define a cluster or shift with tissue or treatment, "
-        "then confirm they are expressed in the expected region of the embedding."
-        if top_hits
-        else "What you see: a canonical lineage gene panel (no computed top-20 table). "
-        "Use this view to check familiar markers; re-run without --skip-markers for project-specific tables."
-    )
-    cells.append(textbox("About this view", note, *grid.place(12, 3)))
-    if roles.cell_type and len(expr_wraps) >= 3:
-        label = "Top cluster markers" if top_wraps else "Canonical markers"
+    cells.append(summary_chart("Genes that define each cell type.", grid))
+    if roles.cell_type and len(dot_wraps) >= 3:
         cells.append(
             dot(
-                f"{label} by {pretty_field(roles.cell_type)}",
-                [roles.cell_type, *expr_wraps],
-                *grid.place(6, 5),
-            )
-        )
-        cells.append(
-            heatmap(
-                f"Marker heatmap ({pretty_field(roles.cell_type)})",
-                [roles.cell_type, *expr_wraps],
-                *grid.place(6, 5),
+                f"{dot_label} by {pretty_field(roles.cell_type)}",
+                [roles.cell_type, *dot_wraps],
+                *grid.place(12, 4),
             )
         )
     elif roles.cell_type:
         cells.append(
             dot(
-                f"Gene collection by {pretty_field(roles.cell_type)}",
-                [roles.cell_type, query(roles.rna.ds_name, 10)],
-                *grid.place(12, 5),
+                f"Genes by {pretty_field(roles.cell_type)}",
+                [roles.cell_type, query(roles.rna.ds_name, 8)],
+                *grid.place(12, 4),
             )
         )
-    grid.newline()
-    if markers and roles.rna:
-        for fid, genes in markers.factor_genes.items():
-            wraps = list(resolve_named_wrappers(roles.rna, genes).values())
-            if len(wraps) < 3:
-                continue
-            cells.append(
-                dot(
-                    f"Genes varying by {pretty_field(fid)}",
-                    [fid, *wraps],
-                    *grid.place(6, 5),
-                )
-            )
+    if roles.embedding and feature_hits:
         grid.newline()
-    axes = [
-        (roles.tissue, "tissue"),
-        (roles.disease, "diagnosis"),
-        (roles.treatment, "treatment"),
-        (roles.inflammation, "inflammation"),
-        (roles.response, "response"),
-        (roles.workstream, "workstream"),
-    ]
-    if len(expr_wraps) >= 3:
-        used = set(markers.factor_genes) if markers else set()
-        axis_label = "Top cluster markers" if top_wraps else "Canonical markers"
-        for fid, label in axes:
-            if not fid or fid in used:
-                continue
-            cells.append(
-                dot(
-                    f"{axis_label} by {label}",
-                    [fid, *expr_wraps],
-                    *grid.place(6, 5),
-                )
-            )
-        grid.newline()
-    if roles.embedding:
-        feature_genes: list[tuple[str, str]] = list(top_hits)
-        if not feature_genes:
-            feature_genes = [(g, "") for g in FEATURE_UMAP_GENES if g in roles.gene_wrappers][:3]
-        wraps = resolve_named_wrappers(roles.rna, [g for g, _c in feature_genes]) if roles.rna else {}
-        for gene, cluster in feature_genes:
+        wraps = resolve_named_wrappers(roles.rna, [gene for gene, _cluster in feature_hits])
+        for gene, cluster in feature_hits:
             wr = wraps.get(gene) or roles.gene_wrappers.get(gene)
             if not wr:
                 continue
-            title = f"{gene} ({cluster})" if cluster else f"{gene} expression"
-            cells.append(umap(title, wr, *grid.place(6, 5), roles.embedding))
-        grid.newline()
-    if roles.embedding:
-        for fid in roles.scores[:3]:
-            cells.append(umap(pretty_field(fid), fid, *grid.place(6, 5), roles.embedding))
+            title = f"{gene} in {cluster}" if cluster else gene
+            cells.append(umap(title, wr, *grid.place(6, 4), roles.embedding))
     extra: dict[str, list[dict[str, Any]]] = {roles.obs: cells}
     widths = {roles.obs: {"layout": "gridstack", "panelWidth": 100}}
     side = Grid()
     if markers and markers.rows and markers.table_fields:
         tcols = [c for c in markers.table_fields if c]
         extra[MARKER_DS_NAME] = [
-            selection("Filter markers", ["contrast", "cluster"], *side.place(12, 4)),
-            table("Top 20 markers / factor-varying genes", tcols, *side.place(12, 8)),
+            selection("Filter markers", ["contrast", "cluster"], *side.place(12, 2)),
+            table("Top markers", tcols, *side.place(12, 6)),
         ]
         widths[roles.obs] = {"layout": "gridstack", "panelWidth": 70}
         widths[MARKER_DS_NAME] = {"layout": "gridstack", "panelWidth": 30}
@@ -1380,9 +1365,9 @@ def view_markers(roles: Roles, feature_ds: dict[str, Any] | None) -> dict[str, A
         tcols = [c for c in ("name", "mean", "std", "highly_variable", "mean_counts") if c in avail]
         genes_charts: list[dict[str, Any]] = []
         if "name" in avail:
-            genes_charts.append(selection("Search features", ["name"], *side.place(12, 4)))
+            genes_charts.append(selection("Search genes", ["name"], *side.place(12, 2)))
         if tcols:
-            genes_charts.append(table("Feature table", tcols, *side.place(12, 8)))
+            genes_charts.append(table("Genes", tcols, *side.place(12, 6)))
         if genes_charts:
             extra[roles.rna.ds_name] = genes_charts
             widths[roles.obs] = {"layout": "gridstack", "panelWidth": 70}
@@ -1392,23 +1377,13 @@ def view_markers(roles: Roles, feature_ds: dict[str, Any] | None) -> dict[str, A
         return None
     return {"dataSources": widths, "initialCharts": extra}
 
-
 def view_condition(roles: Roles) -> dict[str, Any] | None:
     if not (roles.disease or roles.tissue):
         roles.skipped.append("4 Tissue and disease (no disease/tissue)")
         return None
     cells: list[dict[str, Any]] = []
     grid = Grid()
-    cells.append(
-        textbox(
-            "About this view",
-            "What you see: embeddings and composition by tissue, disease, or treatment, "
-            "plus per-sample abundance and a few gene violins. "
-            "Use this view to ask whether a cluster or gene changes across conditions "
-            "or is driven by a few samples.",
-            *grid.place(12, 3),
-        )
-    )
+    cells.append(summary_chart("Whether groups change across tissue or disease.", grid))
     umap_fields = [
         (roles.disease, "Disease"),
         (roles.inflammation or roles.treatment, "Inflammation" if roles.inflammation else "Treatment"),
@@ -1418,7 +1393,7 @@ def view_condition(roles: Roles) -> dict[str, Any] | None:
     umap_w = {1: 12, 2: 6}.get(len(umap_fields), 4)
     if roles.embedding:
         for fid, title in umap_fields:
-            cells.append(umap(title, fid, *grid.place(umap_w, 5), roles.embedding))
+            cells.append(umap(title, fid, *grid.place(umap_w, 4), roles.embedding))
         grid.newline()
     if roles.cell_type and roles.disease:
         cells.append(
@@ -1451,14 +1426,17 @@ def view_condition(roles: Roles) -> dict[str, Any] | None:
         cells.append(violin(f"{gene[0]} by {pretty_field(roles.disease)}", [roles.disease, gene[1]], *grid.place(6, 4)))
     if gene and roles.tissue:
         cells.append(violin(f"{gene[0]} by {pretty_field(roles.tissue)}", [roles.tissue, gene[1]], *grid.place(6, 4)))
-    if roles.rna and roles.disease:
-        cells.append(
-            dot(
-                f"Gene collection by {pretty_field(roles.disease)}",
-                [roles.disease, query(roles.rna.ds_name, 10)],
-                *grid.place(6, 4),
+    if roles.rna and (roles.disease or roles.tissue):
+        wraps = [roles.gene_wrappers[gene] for gene in MARKER_PANEL if gene in roles.gene_wrappers][:8]
+        group = roles.disease or roles.tissue
+        if group and len(wraps) >= 3:
+            cells.append(
+                dot(
+                    f"Lineage markers by {pretty_field(group)}",
+                    [group, *wraps],
+                    *grid.place(6, 4),
+                )
             )
-        )
     grid.newline()
     filt = [
         f
@@ -1475,7 +1453,7 @@ def view_condition(roles: Roles) -> dict[str, Any] | None:
         if f
     ]
     if filt:
-        cells.append(selection("Filter disease / tissue / group", filt, *grid.place(12, 3)))
+        cells.append(selection("Filter group", filt, *grid.place(12, 2)))
     if not cells:
         roles.skipped.append("4 Tissue and disease (nothing to plot)")
         return None
@@ -1489,66 +1467,52 @@ def view_rna_protein(roles: Roles, rna_ds: dict[str, Any] | None, prot_ds: dict[
     if not roles.rna or not roles.protein:
         roles.skipped.append("5 RNA-protein concordance (no protein link)")
         return None
-    gene = default_gene(roles)
-    prot = default_protein(roles)
-    gene_label = gene[0] if gene else "RNA"
-    prot_label = prot[0] if prot else "protein"
+    pairs = match_rna_protein(roles)
     grid = Grid()
-    cells = [
-        textbox(
-            "About this view",
-            "What you see: paired RNA and protein dots and UMAPs for the same cells. "
-            f"RNA is `{roles.rna.subgroup}` on `{roles.rna.ds_name}`; "
-            f"protein is `{roles.protein.subgroup}` on `{roles.protein.ds_name}`. "
-            f"Example colours: {gene_label} RNA and {prot_label} protein. "
-            "Use this view to check whether a protein measurement agrees with its transcript "
-            "and to spot RNA+/protein- or RNA-/protein+ cells.",
-            *grid.place(12, 3),
-        )
-    ]
+    if pairs:
+        gene, gene_wrapper, protein, protein_wrapper = pairs[0]
+        sentence = f"{gene} transcript beside {protein} protein."
+    else:
+        gene = gene_wrapper = protein = protein_wrapper = None
+        sentence = "Surface protein next to the matching transcript."
+    cells: list[dict[str, Any]] = [summary_chart(sentence, grid)]
+    if roles.embedding and gene and gene_wrapper and protein and protein_wrapper:
+        cells.append(umap(f"{gene} transcript", gene_wrapper, *grid.place(6, 4), roles.embedding))
+        cells.append(umap(f"{protein} protein", protein_wrapper, *grid.place(6, 4), roles.embedding))
+        grid.newline()
     cat = roles.cell_type
-    if cat:
+    if cat and len(pairs) >= 3:
         cells.append(
-            dot(f"RNA by {pretty_field(cat)}", [cat, query(roles.rna.ds_name, 10)], *grid.place(6, 4))
+            dot(
+                f"Transcripts by {pretty_field(cat)}",
+                [cat, *[gene_wrapper for _gene, gene_wrapper, _protein, _protein_wrapper in pairs[:8]]],
+                *grid.place(6, 3),
+            )
         )
         cells.append(
             dot(
-                f"Protein by {pretty_field(cat)}",
-                [cat, query(roles.protein.ds_name, 10)],
-                *grid.place(6, 4),
-            )
-        )
-        grid.newline()
-    if roles.embedding and gene:
-        cells.append(umap(f"RNA UMAP ({gene_label} RNA)", gene[1], *grid.place(6, 5), roles.embedding))
-    if roles.embedding and prot:
-        cells.append(umap(f"RNA UMAP ({prot_label} protein)", prot[1], *grid.place(6, 5), roles.embedding))
-    if roles.protein_embedding and prot:
-        cells.append(
-            umap(
-                f"Protein UMAP ({prot_label})",
-                prot[1],
-                *grid.place(6, 5),
-                roles.protein_embedding,
+                f"Proteins by {pretty_field(cat)}",
+                [cat, *[protein_wrapper for _gene, _gene_wrapper, _protein, protein_wrapper in pairs[:8]]],
+                *grid.place(6, 3),
             )
         )
     extra: dict[str, list[dict[str, Any]]] = {roles.obs: cells}
-    widths = {roles.obs: {"layout": "gridstack", "panelWidth": 70}}
+    widths: dict[str, Any] = {roles.obs: {"layout": "gridstack", "panelWidth": 70}}
     if rna_ds:
         avail = {c.get("field") for c in rna_ds.get("columns") or []}
         tcols = [c for c in ("name", "mean", "highly_variable", "mean_counts") if c in avail]
-        charts = [selection("Search genes", ["name"], [0, 0], [12, 4])] if "name" in avail else []
+        charts = [selection("Search genes", ["name"], [0, 0], [12, 2])] if "name" in avail else []
         if tcols:
-            charts.append(table("Genes", tcols, [0, 4], [12, 8]))
+            charts.append(table("Genes", tcols, [0, 2], [12, 6]))
         if charts:
             extra[roles.rna.ds_name] = charts
             widths[roles.rna.ds_name] = {"layout": "gridstack", "panelWidth": 15}
     if prot_ds:
         avail = {c.get("field") for c in prot_ds.get("columns") or []}
         tcols = [c for c in ("name", "Protein", "gene_symbols", "highly_variable") if c in avail]
-        charts = [selection("Search proteins", ["name"], [0, 0], [12, 4])] if "name" in avail else []
+        charts = [selection("Search proteins", ["name"], [0, 0], [12, 2])] if "name" in avail else []
         if tcols:
-            charts.append(table("Proteins", tcols, [0, 4], [12, 8]))
+            charts.append(table("Proteins", tcols, [0, 2], [12, 6]))
         if charts:
             extra[roles.protein.ds_name] = charts
             widths[roles.protein.ds_name] = {"layout": "gridstack", "panelWidth": 15}
