@@ -379,6 +379,28 @@ def create_app(
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 400
 
+    @project_bp.route("/rename_column", access_level='editable', methods=["POST"])
+    def rename_column():
+        data = request.json
+        if not data or not all(key in data for key in ("datasource", "field", "name")):
+            return jsonify({"success": False, "error": "Request must contain 'datasource', 'field' and 'name'"}), 400
+        try:
+            changed = project.rename_column(data["datasource"], data["field"], data["name"])
+            return jsonify({"success": True, "changed": changed})
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+
+    @project_bp.route("/soft_delete_column", access_level='editable', methods=["POST"])
+    def soft_delete_column():
+        data = request.json
+        if not data or not all(key in data for key in ("datasource", "field")):
+            return jsonify({"success": False, "error": "Request must contain 'datasource' and 'field'"}), 400
+        try:
+            changed = project.soft_delete_column(data["datasource"], data["field"])
+            return jsonify({"success": True, "changed": changed})
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+
     # Utility Functions
     def create_temp_folder(base_path):
         """
