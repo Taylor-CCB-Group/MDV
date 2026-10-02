@@ -23,7 +23,7 @@ import json
 from typing import List, Dict, Tuple, Optional, Any, Union
 from datetime import datetime
 
-from mdvtools.dbutils.dbmodels import db, Project, File, UserProject
+from mdvtools.dbutils.dbmodels import db, Project, File, UserProject, UsageEvent
 from mdvtools.dbutils.dbservice import ProjectService
 from mdvtools.logging_config import get_logger
 
@@ -227,9 +227,14 @@ def delete_project_from_database(app, project_id: int, project_name: str, dry_ru
                     for user_project in user_projects:
                         db.session.delete(user_project)
                 
-                # Now delete the project itself
+                # Detach usage history instead of deleting it - same reasoning
+                # as ProjectService.purge_deleted_project.
                 project = Project.query.get(project_id)
                 if project:
+                    UsageEvent.query.filter_by(project_id=project_id).update(
+                        {"project_id": None, "details": {"project_name": project.name}},
+                        synchronize_session=False,
+                    )
                     db.session.delete(project)
                     db.session.commit()
                     logger.info(f"  ✓ Removed from database (including {len(files)} files, {len(user_projects)} user associations)")

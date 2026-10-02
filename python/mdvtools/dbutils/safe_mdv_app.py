@@ -1,6 +1,7 @@
 from flask import Flask
 import os
 from mdvtools.logging_config import get_logger
+from mdvtools.server_extension import ExtensionError
 
 # Setup logging
 logger = get_logger(__name__)
@@ -14,6 +15,9 @@ try:
     if app is None:
         logger.error("app from mdv_server_app is None - using fallback")
         app = Flask(__name__)
+except ExtensionError as e:
+    logger.exception(f'Configured extension could not be loaded: {e}')
+    raise
 except Exception as e:
     logger.exception(f'Error importing mdv_app: {e}')
     app = Flask(__name__)

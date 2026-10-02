@@ -1,4 +1,6 @@
-from flask import session, request,redirect, current_app, has_request_context
+from functools import wraps
+
+from flask import abort, current_app, has_request_context, redirect, request, session
 from mdvtools.logging_config import get_logger
 
 # Setup logging
@@ -108,6 +110,21 @@ def is_authenticated(project_id=None):
         user, error_response = provider.validate_user()
         if user is None or error_response is not None:
             return (False, "Authentication required.")
+
+        # Only reached when a session is established, so this fires once per
+        # session rather than once per request - the else branch below handles
+        # every subsequent request. All three providers converge here, so this
+        # is the single login capture point for Auth0, Shibboleth and dummy.
+        # Imported lazily: authutils is imported before db.init_app() runs,
+        # the same reason cache_user_projects() defers its import.
+        try:
+            from mdvtools.dbutils.dbservice import UsageEventService
+
+            session_user = session.get("user") or {}
+            if session_user.get("id"):
+                UsageEventService.record_login(session_user["id"])
+        except Exception as e:
+            logger.warning(f"Could not record login event: {e}")
     else:
         user = session.get("user")
         # The session cookie may come from another MDV deployment on the same host,
@@ -191,6 +208,79 @@ def register_before_request_auth(app):
             return redirect(redirect_uri)
 
         return None
+
+
+def revalidated_session_user():
+    """Re-read the signed-in user from the database, or None if there isn't one.
+
+    session['user'] is a cache written once at login. Flask signs it, so a client
+    cannot forge one, but it is a *snapshot*: an administrator who is demoted or
+    deactivated afterwards keeps the privileges recorded in their cookie until
+    they log out. For an application whose job is managing access, that means
+    revoking access does not revoke access.
+
+    So privileged routes ask the database instead of the cookie. Returning None
+    covers three cases a caller should treat alike - no session, a user who no
+    longer exists, and a user who is no longer active.
+
+    The rest of the session dict is preserved rather than rebuilt: auth_id and
+    anything else a provider stored there are still needed downstream. Only the
+    fields that decide authority are refreshed, and the session is rewritten only
+    when they actually changed, to avoid reissuing the cookie on every request.
+    """
+    session_user = session.get("user")
+    if not session_user:
+        return None
+
+    # The dummy provider invents a user rather than reading one: its id belongs
+    # to no row. Looking it up would lock dummy administrators out - or, worse,
+    # find whoever really holds that id and hand the session their privileges.
+    # There is nothing to re-validate against, so the invented user stands.
+    auth_method = (current_app.config.get("DEFAULT_AUTH_METHOD") or "").lower()
+    if auth_method == "dummy":
+        return dict(session_user)
+
+    user_id = session_user.get("id")
+    if not user_id:
+        return None
+
+    # Imported lazily for the same reason as elsewhere in this module: authutils
+    # is imported before db.init_app() runs.
+    from mdvtools.dbutils.dbmodels import User
+
+    user = User.query.filter_by(id=user_id).first()
+    if user is None or not user.is_active:
+        return None
+
+    fresh = dict(session_user)
+    fresh["is_admin"] = bool(user.is_admin)
+    if fresh != session_user:
+        session["user"] = fresh
+        session.modified = True
+    return fresh
+
+
+def admin_required(view):
+    """Allow a route in development, or require MDV's authenticated admin identity."""
+
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not current_app.config.get("ENABLE_AUTH", False):
+            return view(*args, **kwargs)
+
+        # Checked against the database, not the cookie - see revalidated_session_user.
+        # A user deleted or deactivated mid-session lands here as no user at all,
+        # and is sent to log in rather than told they are forbidden, because from
+        # this request's point of view they are not signed in.
+        user = revalidated_session_user()
+        if not user:
+            redirect_uri = current_app.config.get("LOGIN_REDIRECT_URL", "/login_dev")
+            return redirect(redirect_uri)
+        if not user.get("is_admin", False):
+            abort(403)
+        return view(*args, **kwargs)
+
+    return wrapped
 
 def needs_cache_refresh():
     """Check if cache needs to be refreshed based on time interval."""
@@ -311,6 +401,5 @@ def update_cache(user_id=None, project_id=None, user_data=None, project_data=Non
     
     except Exception as e:
         logger.exception(f"Error updating cache: {e}")
-
 
 

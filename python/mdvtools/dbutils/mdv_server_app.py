@@ -13,14 +13,18 @@ from flask import Flask
 from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprint
-from mdvtools.dbutils.dbmodels import db, Project, User, UserProject
+from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent
 from mdvtools.dbutils.routes import register_routes
 from mdvtools.auth.register_auth_routes import register_auth_routes
 from mdvtools.auth.authutils import register_before_request_auth, get_auth_provider, cache_user_projects
 from mdvtools.dbutils.dbservice import ProjectService, FileService, UserProjectService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
-from mdvtools.dbutils.server_options import get_server_options_for_db_projects
+from mdvtools.dbutils.server_options import (
+    get_server_options_for_db_projects,
+    register_global_routes_for_extensions,
+)
+from mdvtools.server_extension import ExtensionError
 #this shouldn't be necessary in future
 from psycogreen.gevent import patch_psycopg
 patch_psycopg()
@@ -94,6 +98,13 @@ def create_flask_app(config_name=None):
                 logger.info("Database tables already exist")
             warn_if_project_ids_can_be_reused()
 
+            # Own try/except: the enclosing handler re-raises, and telemetry
+            # must never be able to prevent the server from starting.
+            try:
+                ensure_usage_events_table()
+            except Exception as e:
+                logger.warning(f"Skipping usage_events table setup: {e}")
+
             if ENABLE_AUTH:
                 try:
                     # Note: sync_users_to_db() is no longer called automatically on startup.
@@ -141,16 +152,15 @@ def create_flask_app(config_name=None):
         logger.exception(f"Error registering routes: {e}")
         raise e
 
-    # Register global routes from extensions
+    # Resolve configured built-in and installed extensions once, then register
+    # their app-wide routes through the existing extension lifecycle.
     try:
         logger.info("Registering global routes from extensions")
-        from mdvtools.dbutils.server_options import get_server_options_for_db_projects
-        options = get_server_options_for_db_projects(app)
-        
-        for extension in options.extensions:
-            if hasattr(extension, 'register_global_routes'):
-                logger.info(f"Registering global routes for extension: {extension.__class__.__name__}")
-                extension.register_global_routes(app, app.config)
+        active_extensions = register_global_routes_for_extensions(app)
+        logger.info(
+            "Registered extensions: %s",
+            list(active_extensions),
+        )
     except Exception as e:
         logger.exception(f"Error registering global routes from extensions: {e}")
         raise e
@@ -347,6 +357,10 @@ def load_config(app, config_name=None, enable_auth=False):
                     app.config["AUTH0_PUBLIC_KEY_URI"] = os.getenv('AUTH0_PUBLIC_KEY_URI') or config.get('AUTH0_PUBLIC_KEY_URI')
                     app.config["AUTH0_AUDIENCE"] = os.getenv('AUTH0_AUDIENCE') or config.get('AUTH0_AUDIENCE')
                     app.config["AUTH0_DB_CONNECTION"] = os.getenv('AUTH0_DB_CONNECTION') or config.get('AUTH0_DB_CONNECTION')
+                    # Optional: while the local database has zero users, a verified Auth0
+                    # identity matching this email may bootstrap as the first administrator.
+                    # Leave unset once bootstrap is no longer needed for this deployment.
+                    app.config["MDV_BOOTSTRAP_ADMIN_EMAIL"] = os.getenv('MDV_BOOTSTRAP_ADMIN_EMAIL') or config.get('MDV_BOOTSTRAP_ADMIN_EMAIL')
                 
                 app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
                 app.config["SHIBBOLETH_LOGIN_URL"] = os.getenv('SHIBBOLETH_LOGIN_URL') or config.get('SHIBBOLETH_LOGIN_URL')
@@ -375,6 +389,21 @@ def tables_exist():
         #logger.info("printing table names")
         #print(inspector.get_table_names())
         return inspector.get_table_names()
+
+def ensure_usage_events_table():
+    """Create usage_events on an existing database, where create_all() never runs.
+
+    tables_exist() returns the table list, so on any established deployment the
+    create_all() branch above is skipped entirely and a newly added table would
+    never appear. This creates just that one table, and never raises: telemetry
+    must not be able to stop the server from booting.
+    """
+    try:
+        UsageEvent.__table__.create(bind=db.engine, checkfirst=True)
+    except Exception as e:
+        # checkfirst=True is check-then-act, so two workers racing can both pass
+        # the check. Gunicorn runs -w 1 today but will not forever.
+        logger.warning(f"Could not ensure the usage_events table exists: {e}")
 
 def warn_if_project_ids_can_be_reused():
     """Log a warning when a SQLite projects table can give a purged project's ID to
@@ -673,6 +702,9 @@ if os.environ.get('MDV_SKIP_SERVER_STARTUP') != '1':
                 # filled before the scan ran, so they are rebuilt here.
                 if grant_admins_ownership_of_unowned_projects():
                     cache_user_projects()
+    except ExtensionError as e:
+        logger.exception(f"Error during app initialization: {e}")
+        raise
     except Exception as e:
         logger.exception(f"Error during app initialization: {e}")
 
