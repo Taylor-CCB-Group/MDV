@@ -239,7 +239,11 @@ class RowChart extends CategoryChart {
     getSettings() {
         const settings = super.getSettings();
         const c = this.config;
-        if (c.wordcloud) return this.getWordCloudSettings();
+        if (c.wordcloud) {
+            return settings
+                .filter((setting) => setting.label !== "Axis controls")
+                .concat(this.getWordCloudSettings());
+        }
         const max = Math.max(this.data.length || 60);
 
         return settings.concat([
