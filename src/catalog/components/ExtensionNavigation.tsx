@@ -22,9 +22,8 @@ export default function ExtensionNavigation() {
                     variant={"outlined"} 
                     key={item.id} 
                     href={buildApiUrl(item.url)} 
-                    color="inherit" 
                     sx={{ 
-                        borderWidth: 1,
+                        borderWidth: 1.5,
                         borderRadius: 2,
                         px: 1.5,
                         py: 0.75,
