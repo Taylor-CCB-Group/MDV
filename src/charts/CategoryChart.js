@@ -94,14 +94,14 @@ class CategoryChart extends SVGChart {
         if (c.filter_zeros) {
             this.rowData = this.rowData.filter((x) => x[0] !== 0);
         }
-        if (c.sort === "size") {
+        if (c.sort === "size" || (c.wordcloud && !c.sort)) {
             this.rowData.sort((a, b) => b[0] - a[0]);
         }
         if (c.sort === "name") {
             const v = this.dataStore.getColumnValues(c.param);
             this.rowData.sort((a, b) => v[a[1]].localeCompare(v[b[1]]));
         }
-        if (this.rowData.length > 40 && !c.show_limit) {
+        if (!c.wordcloud && this.rowData.length > 40 && !c.show_limit) {
             c.show_limit = 40;
         }
         if (c.show_limit) {

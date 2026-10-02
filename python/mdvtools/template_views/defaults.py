@@ -104,6 +104,19 @@ MARKER_CACHE = "cluster_markers.json"
 MARKERS_PER_CLUSTER = 20
 VARYING_GENES_PER_FACTOR = 15
 FEATURE_PLOT_CAP = 24
+MARKER_DOT_CAP = 12
+FEATURE_UMAP_CAP = 4
+# Transcript symbol -> surface-protein name when the strings differ.
+GENE_PROTEIN_ALIASES = {
+    "CD8A": "CD8",
+    "CD8B": "CD8",
+    "CD3D": "CD3",
+    "CD3E": "CD3",
+    "CD3G": "CD3",
+    "FCGR3A": "CD16",
+    "NCAM1": "CD56",
+    "CD1C": "CD1c",
+}
 MISSING_LABELS = {"nd", "nan", "na", "", "undetermined or na", "null"}
 SKIP_GENE_PREFIXES = ("MT-", "RPL", "RPS")
 SKIP_GENES = {"MALAT1", "NEAT1"}
