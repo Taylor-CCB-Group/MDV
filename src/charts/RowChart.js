@@ -5,6 +5,16 @@ import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import WordCloud from "wordcloud";
 
+function mulberry32(seed) {
+    let state = seed >>> 0;
+    return () => {
+        state = (state + 0x6d2b79f5) | 0;
+        let t = Math.imul(state ^ (state >>> 15), 1 | state);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
 function monochromeInk(backgroundColor) {
     const probe = document.createElement("canvas").getContext("2d");
     if (!probe) return "#000";
@@ -102,6 +112,25 @@ class RowChart extends CategoryChart {
             rotationSteps: 2,
         };
         console.log("wordcloud options", options);
+        this._restoreWordcloudRandom?.();
+        WordCloud.stop();
+        if (this._wordcloudSeed == null) {
+            this._wordcloudSeed = (Math.random() * 0x100000000) >>> 0;
+        }
+        const nativeRandom = Math.random;
+        const seeded = mulberry32(this._wordcloudSeed);
+        Math.random = seeded;
+        const restoreRandom = () => {
+            if (Math.random === seeded) Math.random = nativeRandom;
+            canvas.removeEventListener("wordcloudstop", restoreRandom);
+            canvas.removeEventListener("wordcloudabort", restoreRandom);
+            if (this._restoreWordcloudRandom === restoreRandom) {
+                this._restoreWordcloudRandom = null;
+            }
+        };
+        this._restoreWordcloudRandom = restoreRandom;
+        canvas.addEventListener("wordcloudstop", restoreRandom);
+        canvas.addEventListener("wordcloudabort", restoreRandom);
         WordCloud(canvas, options);
     }
 
@@ -247,15 +276,6 @@ class RowChart extends CategoryChart {
                 func: (v) => {
                     c.sort = v;
                     this.updateData();
-                    this.drawChart();
-                },
-            },
-            {
-                type: "check",
-                label: "Display as WordCloud",
-                current_value: c.wordcloud,
-                func: (x) => {
-                    c.wordcloud = x;
                     this.drawChart();
                 },
             },
