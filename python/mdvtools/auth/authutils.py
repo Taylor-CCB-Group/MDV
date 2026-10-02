@@ -110,6 +110,30 @@ def is_authenticated(project_id=None):
             return (False, "Authentication required.")
     else:
         user = session.get("user")
+        # The session cookie may come from another MDV deployment on the same host,
+        # whose local user id and admin flag mean nothing here. Re-resolve the user
+        # from this deployment's own records on every request, keyed by auth_id.
+        # The dummy provider's user has no database row, so it is left as it is.
+        if (current_app.config.get("DEFAULT_AUTH_METHOD") or "").lower() != "dummy":
+            auth_id = user.get("auth_id") if user else None
+            local_user = user_cache.get(auth_id) if auth_id else None
+            if auth_id and local_user is None:
+                # Not cached yet, for example a user created since the last refresh.
+                from mdvtools.dbutils.dbmodels import User
+                db_user = User.query.filter_by(auth_id=auth_id).first()
+                if db_user:
+                    local_user = {
+                        "id": db_user.id,
+                        "auth_id": db_user.auth_id,
+                        "email": db_user.email,
+                        "is_admin": db_user.is_admin,
+                    }
+            if local_user is None:
+                session.clear()
+                return (False, "Authentication required.")
+            if user != local_user:
+                session["user"] = dict(local_user)
+            user = local_user
 
     # Optional project read-access check
     if project_id is not None and ENABLE_AUTH:
