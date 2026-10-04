@@ -2,13 +2,23 @@ import { observer } from "mobx-react-lite";
 import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
+import type { ReactNode } from "react";
 import Gui from "./SettingsDialogComponent";
 import BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 
+function chartSettingsHeader(chart: object): ReactNode {
+    const header = Reflect.get(chart, "settingsHeader");
+    return typeof header === "function" ? header.call(chart) : null;
+}
+
 const SettingsDialog = observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
-    // const config = chart.getConfig(); //instrument with mobx etc
-    return <Gui chart={chart} />;
+    return (
+        <>
+            {chartSettingsHeader(chart)}
+            <Gui chart={chart} />
+        </>
+    );
 });
 
 // don't necessarily want to inherit from BaseDialog, could consider different approach.

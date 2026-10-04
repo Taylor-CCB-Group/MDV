@@ -1531,7 +1531,7 @@ class MDVProject:
             # Add to view if specified
             if add_to_view:
                 # TablePlot parameters
-                title=name,
+                title = name
                 #params = ["leiden", "ARVCF", "DOK3", "FAM210B", "GBGT1", "NFE2L2", "UBE2D4", "YPEL2"]
                 #only want columns from the dataframe that were added to the datasource
                 params = [x["field"] for x in columns]

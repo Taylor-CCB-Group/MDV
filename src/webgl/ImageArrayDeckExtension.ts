@@ -59,7 +59,6 @@ export class ImageArrayDeckExtension<
         uniform mediump sampler2DArray imageArray;
         in float vImageIndex;
         in float vImageAspect;
-        uniform float opacity;
 
         vec3 rgb2hsv(vec3 c){
             vec4 K = vec4(0., -1./3., 2./3., -1.);
@@ -90,8 +89,6 @@ export class ImageArrayDeckExtension<
         c.y *= ${M}.saturation;
         t.rgb = hsv2rgb(c);
         color *= t;
-        ///--- opacity may well not be correct gamma etc
-        color.a = t.a * opacity; //HACK so broken inCircle doesn't break opacity
         // color.r = vImageAspect - 0.5;
         // vec3 s = vec3(textureSize(imageArray, 0));
         // uvw.z /= s.z;

@@ -58,7 +58,7 @@ export type SpatialImagePanelContextValue = {
     patchToneAtIndex: (index: number, key: "brightness" | "contrast", value: number) => void;
 };
 
-const SpatialImagePanelContext = createContext<SpatialImagePanelContextValue | null>(null);
+export const SpatialImagePanelContext = createContext<SpatialImagePanelContextValue | null>(null);
 
 export function useSpatialImagePanelContext() {
     return useContext(SpatialImagePanelContext);

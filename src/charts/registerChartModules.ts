@@ -25,6 +25,7 @@ import "./RowSummaryBox";
 import "./VivScatterPlot";
 import "./ImageTableChart";
 import "./ImageScatterChart";
+import "./spatialThumbnail/SpatialThumbnailScatter";
 import "./CustomBoxPlot";
 import "./SingleSeriesChart";
 import "./GenomeBrowser";

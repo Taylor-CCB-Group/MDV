@@ -14,6 +14,13 @@ export type ImageArrayConfig = {
     cancel?: boolean;
 };
 
+/** Empty texture array filled later with composited rasters (one layer per image). */
+export type RasterArrayConfig = {
+    width: number;
+    height: number;
+    count: number;
+};
+
 export type ImageArrayEntry = {
     // image: HTMLImageElement,
     zIndex: number;
@@ -44,15 +51,15 @@ export class ImageArray {
     height: number;
     depth = 1;
     constructor(
-        dataStore: DataStore,
+        dataStore: DataStore | null,
         canvas: HTMLCanvasElement,
-        dataView: DataModel,
-        config: ImageArrayConfig,
+        dataView: DataModel | null,
+        config: ImageArrayConfig | RasterArrayConfig,
     ) {
         this.textures = new Map();
         this.texturesByIndex = new Map();
 
-        this.dataView = dataView;
+        this.dataView = dataView as DataModel;
         this.width = config.width;
         this.height = config.height;
 
@@ -64,7 +71,51 @@ export class ImageArray {
         this.texture = texture;
         this.logEl = createEl("div", {}, canvas.parentElement || undefined);
         this.logEl.style.color = "white";
+        if ("count" in config) {
+            this.allocateLayers(gl, config.count);
+            return;
+        }
+        if (!dataStore) throw new Error("ImageArray column load needs a data store");
         this.loadImageColumn(dataStore, gl, config);
+    }
+    /** Cap at the device's array-texture depth. Returns the layer count actually allocated. */
+    allocateLayers(gl: WebGL2RenderingContext, count: number) {
+        const max = gl.getParameter(gl.MAX_ARRAY_TEXTURE_LAYERS) as number;
+        const depth = Math.max(1, Math.min(count, max || count));
+        this.depth = depth;
+        setupArrayTexture(gl, this.texture, this.width, this.height, depth);
+        for (let i = 0; i < depth; i++) {
+            const entry = { zIndex: i, aspectRatio: 1, url: "" };
+            this.texturesByIndex.set(i, entry);
+        }
+        return depth;
+    }
+    /**
+     * Replace one composited thumbnail. Channel planes are not stored as extra layers.
+     * Call `refreshMipmaps` after a batch of uploads.
+     */
+    uploadRgba(zIndex: number, rgba: Uint8ClampedArray) {
+        const gl = this.gl;
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texture);
+        gl.texSubImage3D(
+            gl.TEXTURE_2D_ARRAY,
+            0,
+            0,
+            0,
+            zIndex,
+            this.width,
+            this.height,
+            1,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            rgba,
+        );
+    }
+    refreshMipmaps() {
+        const gl = this.gl;
+        gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texture);
+        gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
     }
     wrapLumaTexture(device: Device) {
         if (this.lumaTexture) return;
@@ -100,41 +151,12 @@ export class ImageArray {
         const col = ds.columnIndex[image_key];
         if (!isColumnLoaded(col)) throw "expected column to be loaded - purpose of method is to load associated images";
         const texture = this.texture;
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
-        const mipLevels = Math.floor(Math.log2(width));
-
-        gl.texParameteri(
-            gl.TEXTURE_2D_ARRAY,
-            gl.TEXTURE_MIN_FILTER,
-            gl.LINEAR_MIPMAP_LINEAR,
-        );
-        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(
-            gl.TEXTURE_2D_ARRAY,
-            gl.TEXTURE_WRAP_S,
-            gl.CLAMP_TO_EDGE,
-        );
-        gl.texParameteri(
-            gl.TEXTURE_2D_ARRAY,
-            gl.TEXTURE_WRAP_T,
-            gl.CLAMP_TO_EDGE,
-        );
-
         const isUnique = col.datatype === "unique";
         const numImages: number = isUnique
             ? col.data.length / col.stringLength
             : col.values?.length || col.data.length;
         this.depth = numImages;
-
-        gl.texStorage3D(
-            gl.TEXTURE_2D_ARRAY,
-            mipLevels,
-            gl.RGBA8,
-            width,
-            height,
-            numImages,
-        );
+        setupArrayTexture(gl, texture, width, height, numImages);
         const memUsage = (width * height * 4 * numImages) / 1024 / 1024;
         //consider showing this in the UI ('i' for info?)
         console.log(
@@ -212,6 +234,23 @@ export class ImageArray {
             };
         });
     }
+}
+
+function setupArrayTexture(
+    gl: WebGL2RenderingContext,
+    texture: WebGLTexture,
+    width: number,
+    height: number,
+    depth: number,
+) {
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
+    const mipLevels = Math.max(1, Math.floor(Math.log2(width)));
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texStorage3D(gl.TEXTURE_2D_ARRAY, mipLevels, gl.RGBA8, width, height, depth);
 }
 
 function resizeImage(
