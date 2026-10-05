@@ -299,6 +299,28 @@ def test_used_in_views_follows_charts_on_the_same_datasource(tmp_path: Path):
     assert tissue["chart_type"] == "None"
 
 
+def test_markdown_table_escapes_pipes_in_view_names(tmp_path: Path):
+    project = tmp_path / "proj"
+    _write_project(
+        project,
+        [{"name": "cells", "columns": [{"field": "n_counts", "name": "n_counts"}]}],
+    )
+    views = {
+        "atlas | overview": {
+            "initialCharts": {
+                "cells": [{"type": "scatter|plot", "param": ["n_counts"]}],
+            }
+        }
+    }
+    (project / "views.json").write_text(json.dumps(views), encoding="utf-8")
+
+    report = format_markdown(scan_roots([tmp_path]))
+    assert (
+        "| `n_counts` | 1 | 1/1 | atlas \\| overview | scatter\\|plot | (same as field) |"
+        in report
+    )
+
+
 def test_unreadable_views_json_leaves_columns_unused(tmp_path: Path):
     project = tmp_path / "proj"
     _write_project(

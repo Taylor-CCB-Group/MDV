@@ -404,6 +404,11 @@ def _spelling_count_label(count: int) -> str:
     return f"{count} spellings"
 
 
+def _markdown_table_cell(value: str) -> str:
+    """Keep a literal pipe inside one Markdown table cell."""
+    return value.replace("|", "\\|")
+
+
 def format_markdown(
     scan: Scan,
     *,
@@ -456,9 +461,13 @@ def format_markdown(
                 for item in spelling.occurrences
                 for chart_use in item.chart_uses
             }
-            view_names = "<br>".join(sorted({use.view_name for use in chart_uses})) or "None"
+            view_names = "<br>".join(
+                _markdown_table_cell(name)
+                for name in sorted({use.view_name for use in chart_uses})
+            ) or "None"
             chart_types = "<br>".join(
-                sorted({use.chart_type or "(unspecified)" for use in chart_uses})
+                _markdown_table_cell(name)
+                for name in sorted({use.chart_type or "(unspecified)" for use in chart_uses})
             ) or "None"
             lines.append(
                 f"| `{spelling.field_name}` | {len(spelling.projects)} | "
