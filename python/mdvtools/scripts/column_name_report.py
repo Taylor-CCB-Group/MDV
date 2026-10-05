@@ -185,13 +185,13 @@ def used_fields_in_views(
     """
     path = project / "views.json"
     if not path.exists():
-        return set(), None
+        return {}, None
     try:
         parsed: object = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        return set(), f"{path}: {exc}"
+        return {}, f"{path}: {exc}"
     if not isinstance(parsed, dict):
-        return set(), f"{path}: expected a map of views"
+        return {}, f"{path}: expected a map of views"
     used: dict[tuple[str, str], set[ChartUse]] = defaultdict(set)
     for raw_view_name, view in parsed.items():
         if not isinstance(view, dict):
