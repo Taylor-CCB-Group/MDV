@@ -27,7 +27,7 @@ from mdvtools.project_router import (
 import os
 import pandas as pd
 from datetime import datetime
-from typing import Optional
+from typing import Collection, Dict, Optional, Tuple, TypedDict, Union
 import threading
 # Configure Numba caching before importing libraries that depend on it (e.g. scanpy)
 # In some deployment environments (zip/venv layers), Numba cannot locate source files for caching
@@ -55,7 +55,13 @@ logger.info("server.py module loaded")
 routes = set()
 
 
-def record_usage_event(project_id, event_type, backend_db, view_name=None, details=None):
+def record_usage_event(
+    project_id: Union[str, int, None],
+    event_type: str,
+    backend_db: bool,
+    view_name: Optional[str] = None,
+    details: Optional[Dict[str, str]] = None,
+) -> bool:
     """Record one usage event, or quietly do nothing if this deployment cannot.
 
     Module level so it is unit-testable without building a project. Guards run in
@@ -76,9 +82,11 @@ def record_usage_event(project_id, event_type, backend_db, view_name=None, detai
         # MDVProject.id is a *string* in backend mode - mdv_server_app.py builds
         # it as str(project.id) - and in single-project mode it is a directory
         # name. The column is an integer with a foreign key, so coerce here and
-        # give up quietly on anything that is not a row id.
+        # give up quietly on anything that is not a row id. Kept as its own name
+        # rather than reassigning project_id, so the parameter means one thing
+        # throughout.
         try:
-            project_id = int(project_id) if project_id is not None else None
+            project_row_id = int(project_id) if project_id is not None else None
         except (TypeError, ValueError):
             return False
 
@@ -87,7 +95,7 @@ def record_usage_event(project_id, event_type, backend_db, view_name=None, detai
         return UsageEventService.record_event(
             user_id,
             event_type,
-            project_id=project_id,
+            project_id=project_row_id,
             view_name=view_name,
             details=details,
         )
@@ -95,7 +103,23 @@ def record_usage_event(project_id, event_type, backend_db, view_name=None, detai
         logger.warning(f"Could not record usage event '{event_type}': {e}")
         return False
         
-def classify_view_change(state, existing_views):
+class SaveStatePayload(TypedDict, total=False):
+    """The parts of a /save_state body this module reads.
+
+    total=False because the frontend sends considerably more than this and may
+    send neither key. Declared rather than left as a bare dict so the two fields
+    the classifier depends on are named in one place, and so a change to either
+    is a change to something a reader can find.
+    """
+
+    currentView: str
+    view: Optional[Dict[str, object]]
+
+
+def classify_view_change(
+    state: Optional[SaveStatePayload],
+    existing_views: Collection[str],
+) -> Tuple[Optional[str], Optional[str]]:
     """Say whether a /save_state payload creates or deletes a view.
 
     Returns (event_type, view_name), or (None, None) when the payload does
@@ -114,8 +138,11 @@ def classify_view_change(state, existing_views):
     """
     if not state:
         return None, None
+    # Checked rather than trusted: this arrives as a request body, so the
+    # annotation above says what a well-formed payload looks like, not what
+    # actually turned up. A non-string name would otherwise be recorded as one.
     name = state.get("currentView")
-    if not name:
+    if not isinstance(name, str) or not name:
         return None, None
     existed = name in existing_views
     if state.get("view"):

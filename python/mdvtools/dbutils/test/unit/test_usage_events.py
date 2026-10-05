@@ -236,6 +236,12 @@ class TestViewChangeClassification:
     def test_a_payload_that_names_no_view_records_nothing(self, state):
         assert self._classify(state) == (None, None)
 
+    @pytest.mark.parametrize("name", [123, True, {"nested": 1}, ["a"]])
+    def test_a_name_that_is_not_a_string_records_nothing(self, name):
+        """The payload is a request body, so the type annotation describes a
+        well-formed one rather than guaranteeing it."""
+        assert self._classify({"currentView": name, "view": {"a": 1}}) == (None, None)
+
 
 class TestOffSwitch:
     """ENABLE_USAGE_TRACKING lets a deployment record nothing at all."""

@@ -91,7 +91,10 @@ example_extension = "example_package.mdv_extension:create_extension"
 The returned object must conform to `MDVProjectServerExtension`:
 
 ```python
-class ExampleExtension:
+from mdvtools.server_extension import MDVProjectServerExtension
+
+
+class ExampleExtension(MDVProjectServerExtension):
     def register_global_routes(self, app, config):
         ...
 
@@ -105,6 +108,13 @@ class ExampleExtension:
 def create_extension():
     return ExampleExtension()
 ```
+
+`MDVProjectServerExtension` is a `Protocol`, and MDV's startup check is
+structural - it verifies the three methods are callable, not that the class
+inherits anything. Inheriting is therefore optional, and an object that simply
+has the methods is accepted. It is still the recommended form: every built-in
+extension inherits, and doing so lets a type checker catch a wrong signature
+before startup does.
 
 A global-only extension registers its Flask Blueprint in
 `register_global_routes()` and can implement the two project methods as no-ops.
@@ -124,10 +134,10 @@ An extension may contribute one catalog link without changing the required
 three-method interface:
 
 ```python
-from mdvtools.server_extension import ExtensionNavigation
+from mdvtools.server_extension import ExtensionNavigation, MDVProjectServerExtension
 
 
-class ExampleExtension:
+class ExampleExtension(MDVProjectServerExtension):
     navigation = ExtensionNavigation(
         label="Example",
         url="/example/",
@@ -168,6 +178,24 @@ Existing built-in extensions continue to use the same configuration IDs and
 three required methods. Installed discovery only handles configured IDs that are
 not supplied by the built-in map. Navigation is optional, so extensions written
 before navigation support remain valid.
+
+### Interface versioning (future work)
+
+The extension interface carries no version. An extension does not declare which
+revision of the interface it was built against, and MDV does not record one.
+
+Today compatibility rests on the deployment pinning and testing a known-good set
+of versions, as described under Responsibility boundaries. A structural mismatch
+- an extension missing one of the three methods, or supplying malformed
+navigation - is rejected at startup with an `ExtensionError` rather than running
+in a degraded state, so the common case of an outdated extension fails visibly.
+
+Versioning is likely to be needed, and the suggestion so far is to introduce it
+at the point where an API change actually requires it, treating an extension that
+declares no version as conforming to this initial revision. That has not been
+designed or agreed, and is recorded here as a next step rather than a decision.
+
+### Unchanged by this work
 
 This change does not alter MDV's database schema, project schema or extension
 configuration shape. A deployment using only its previous built-in extension
