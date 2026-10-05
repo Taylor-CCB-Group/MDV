@@ -284,11 +284,18 @@ def _find_run(project: Path, run: str) -> str | None:
 
 
 def restore_project(project: Path, rev_id: str, *, run: str, message: str) -> str:
-    """Copy ``rev_id`` onto the live JSON files, then snapshot that state."""
+    """Copy ``rev_id`` onto the live JSON files, drop snapshot files it omits, then snapshot that state."""
     _manifest, files = _load_revision(project, rev_id)
     rev_dir = _revision_dir(project, rev_id)
     for name in files:
         _replace_bytes(project / name, (rev_dir / name).read_bytes())
+    recorded = set(files)
+    for name in SNAPSHOT_FILES:
+        if name in recorded:
+            continue
+        extra = project / name
+        if extra.is_file() or extra.is_symlink():
+            extra.unlink()
     return snapshot_project(project, run=run, message=message, when=_utc_now())
 
 

@@ -177,6 +177,31 @@ def test_restore_one_revision_puts_bytes_back_and_appends_history(tmp_path: Path
     assert (project / "history" / new_head / "views.json").read_bytes() == original_views
 
 
+def test_restore_removes_snapshot_files_absent_from_the_revision(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    project = tmp_path / "pbmc3k"
+    _write_project(project, b'[{"name": "cells"}]\n')
+    (project / "datafile.h5").write_bytes(b"leave-me")
+    assert main(["snapshot", str(project), "--message", "datasources only"]) == 0
+    _run, first = _parse_snapshot(capsys.readouterr().out)
+    first_id = first[str(project.resolve())]
+
+    (project / "views.json").write_bytes(b'{"view": 1}\n')
+    (project / "state.json").write_bytes(b'{"all_views": ["default"]}\n')
+    assert main(["restore", str(project), first_id]) == 0
+    capsys.readouterr()
+
+    assert (project / "datasources.json").read_bytes() == b'[{"name": "cells"}]\n'
+    assert not (project / "views.json").exists()
+    assert not (project / "state.json").exists()
+    assert (project / "datafile.h5").read_bytes() == b"leave-me"
+    head = _head(project)
+    assert _manifest(project, head)["files"] == ["datasources.json"]
+    assert not (project / "history" / head / "views.json").exists()
+    assert not (project / "history" / head / "state.json").exists()
+
+
 def test_restore_run_restores_matching_projects_and_skips_the_rest(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ):
