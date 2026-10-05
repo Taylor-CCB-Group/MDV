@@ -158,7 +158,10 @@ class DotPlot extends SVGChart {
         );
         this.xLabelAngle = layout.angle;
         this.xLabelFontSize = layout.fontSize;
+        // keep the configured height, which applies again when auto-fit is off
+        const configuredSize = ax.size;
         this.setAxisSize("x", layout.margin);
+        ax.size = configuredSize;
         return new Map(fieldIds.map((f, i) => [f, layout.labels[i]]));
     }
 
@@ -442,9 +445,13 @@ class DotPlot extends SVGChart {
             xFieldIds = this.columnOrder;
         }
         // sets the bottom margin, so must run before reading content dimensions
-        const xLabels = this.config.axis.x.fit_labels
-            ? this.fitXAxisLabels(xFieldIds, this.getXAxisLabels(xFieldIds))
-            : this.getXAxisLabels(xFieldIds);
+        const ax = this.config.axis.x;
+        let xLabels = this.getXAxisLabels(xFieldIds);
+        if (ax.fit_labels) {
+            xLabels = this.fitXAxisLabels(xFieldIds, xLabels);
+        } else {
+            this.setAxisSize("x", ax.size);
+        }
         this.x_scale.domain(xFieldIds);
         this.x_axis_call.tickFormat((id) => xLabels.get(id));
         const dim = this._getContentDimensions();

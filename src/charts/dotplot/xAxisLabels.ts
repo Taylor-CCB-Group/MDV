@@ -145,8 +145,9 @@ export function layoutXLabels(
 
     // perpendicular distance between neighbouring 45° labels
     const spacing = bandWidth * Math.SQRT1_2;
+    // the minimum never exceeds the user's size, so fitting never enlarges labels
     const fontSize = Math.max(
-        X_MIN_FONT_SIZE,
+        Math.min(X_MIN_FONT_SIZE, input.fontSize),
         Math.min(input.fontSize, spacing / X_LABEL_SPACING),
     );
     const step = input.thin

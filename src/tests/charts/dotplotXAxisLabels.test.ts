@@ -170,6 +170,14 @@ describe("layoutXLabels", () => {
         expect(layout.fontSize).toBeLessThan(10);
     });
 
+    it("never enlarges labels past a user size below the minimum", () => {
+        const layout = layoutXLabels(
+            { ...base, labels: Array(60).fill("GENE00"), plotWidth: 315, fontSize: 5 },
+            measure,
+        );
+        expect(layout.fontSize).toBe(5);
+    });
+
     describe("crowded columns", () => {
         // 60 columns in 315px: 5.25px each, too narrow even at the minimum font
         const crowded = { ...base, plotWidth: 315, labels: Array(60).fill("GENE00") };
