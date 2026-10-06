@@ -255,6 +255,13 @@
       "@biomejs/biome",
       "@vaadin/vaadin-usage-statistics",
       "esbuild"
-    ]
+    ],
+    "packageExtensions": {
+      "@loaders.gl/gis": {
+        "dependencies": {
+          "apache-arrow": "^21.2.0"
+        }
+      }
+    }
   }
 }
