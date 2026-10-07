@@ -638,7 +638,11 @@ def iter_dense_columns(grp: Any, chunk_genes: int = 64):
     if length <= 0:
         return
     x = grp["x"]
-    n_genes = int(x.shape[0] // length)
+    # h5py types __getitem__ as Group|Dataset|Datatype; only Dataset has shape/size.
+    x_size = int(getattr(x, "size", 0))
+    n_genes = x_size // length
+    if n_genes <= 0:
+        return
     for start in range(0, n_genes, chunk_genes):
         stop = min(start + chunk_genes, n_genes)
         block = np.asarray(x[start * length : stop * length], dtype=np.float32)
@@ -769,12 +773,7 @@ def compute_marker_tables(
         except TypeError:
             roles.skipped.append(f"cluster markers ({matrix_h5} is not sparse or dense)")
             return result
-        keys = set(grp.keys())
-        if {"p", "i", "x"} <= keys:
-            n_genes = len(np.asarray(grp["p"])) - 1
-        else:
-            length = int(np.asarray(grp["length"]).reshape(-1)[0])
-            n_genes = int(grp["x"].shape[0] // max(length, 1))
+        n_genes = len(names)
         reported = 0
         for gene_i, cell_i, vals in columns:
             if gene_i >= len(names):
