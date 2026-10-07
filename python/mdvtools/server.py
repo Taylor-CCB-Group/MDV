@@ -81,7 +81,7 @@ def _apply_project_writability(
 
 
 
-def create_app(
+def build_app(
     project: MDVProject,
     options: Optional[MDVServerOptions] = None,
 ):
