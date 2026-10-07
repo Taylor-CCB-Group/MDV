@@ -592,6 +592,7 @@ const CheckboxComponent = ({ props }: { props: GuiSpec<"check"> }) => (
                 if (props.func) props.func(e.target.checked);
             })}
             size="small"
+            disableRipple
             sx={{ padding: 0 }}
         />
     </>

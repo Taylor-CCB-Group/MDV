@@ -12,9 +12,8 @@ def register_routes(app, ENABLE_AUTH):
     """Register routes with the Flask app."""
     from flask import abort, jsonify, session, render_template, send_file
     from mdvtools.auth.authutils import active_projects_cache, user_project_cache, all_users_cache, cache_user_projects
-    from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
-    from mdvtools.dbutils.dbmodels import User
-    from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
+    from mdvtools.dbutils.mdv_server_app import grant_admins_ownership_of_unowned_projects, serve_projects_from_filesystem
+    from mdvtools.dbutils.dbservice import ProjectService
 
     def project_is_writable(project_data: dict[str, Any]) -> bool:
         project_path = project_data.get("path")
@@ -135,17 +134,12 @@ def register_routes(app, ENABLE_AUTH):
                 created_ids = serve_projects_from_filesystem(app, app.config["projects_base_dir"])
                 unwritable_projects = []
 
-                # Keep rescanned projects consistent with Auth0 startup sync:
-                # every administrator owns every newly discovered project.
-                if ENABLE_AUTH and created_ids:
+                # Every administrator owns each project the scan discovers, and
+                # each project that reached the catalog at a boot with no
+                # administrator present, which no later scan would create a row for.
+                if ENABLE_AUTH:
                     try:
-                        admin_ids = [
-                            admin.id
-                            for admin in User.query.filter_by(is_admin=True).all()
-                        ]
-                        for user_id in admin_ids:
-                            for pid in created_ids:
-                                UserProjectService.add_or_update_user_project(user_id=user_id, project_id=pid, is_owner=True)
+                        grant_admins_ownership_of_unowned_projects()
                         # Refresh caches so /projects reflects new permissions
                         cache_user_projects()
                     except Exception as perm_e:

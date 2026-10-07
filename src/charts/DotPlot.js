@@ -10,6 +10,11 @@ import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import FractionLegend from "@/react/components/legend/FractionLegend";
 import LegendWrapper from "@/react/components/legend/LegendWrapper";
+import {
+    canvasMeasureText,
+    layoutXLabels,
+    stripSharedSubgroupSuffix,
+} from "./dotplot/xAxisLabels";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -63,6 +68,12 @@ class DotPlot extends SVGChart {
             c.axis.x.rotate_labels = true;
             this.setAxisSize("x", 60);
         }
+        // Fit and truncate labels by default
+        c.axis.x.fit_labels ??= true;
+        c.axis.x.truncate_labels ??= true;
+
+        // Only thin labels when user explicitly allows it
+        c.axis.x.thin_labels ??= false;
         if (!hasCustomYAxis) {
             this.setAxisSize("y", 110);
         }
@@ -106,9 +117,81 @@ class DotPlot extends SVGChart {
         this.fieldNames = fieldNames;
         this.colorLegendRange = undefined;
         // await cm.loadColumnSetAsync(fieldNames, this.dataStore.name);
-        const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
-        this.x_scale.domain(yLabels);
+        this.x_scale.domain(fieldNames);
         this.onDataFiltered();
+    }
+
+    /**
+     * Maps each field to its x-axis label, without the `(subgroup)` suffix
+     * when every field shares one.
+     */
+    getXAxisLabels(fieldIds) {
+        const names = stripSharedSubgroupSuffix(
+            fieldIds.map((f) => ({
+                field: f,
+                name: this.dataStore.getColumnName(f) ?? f,
+                inSubgroup: Boolean(this.dataStore.columnIndex[f]?.subgroup),
+            })),
+        );
+        return new Map(fieldIds.map((f, i) => [f, names[i]]));
+    }
+
+    /**
+     * Fits the x labels to the chart's current size (see `layoutXLabels`) and
+     * sets the bottom margin to match.
+     * @returns the labels to display, keyed by field
+     */
+    fitXAxisLabels(fieldIds, labels) {
+        const ax = this.config.axis.x;
+        const layout = layoutXLabels(
+            {
+                labels: fieldIds.map((f) => labels.get(f)),
+                plotLeft: this.margins.left,
+                plotWidth: this.width - this.margins.left - this.margins.right,
+                chartHeight: this.height,
+                fontSize: ax.tickfont,
+                titleSize: ax.label ? (ax.textsize ?? ax.textSize ?? 13) + 6 : 0,
+                truncate: ax.truncate_labels,
+                thin: ax.thin_labels,
+            },
+            canvasMeasureText,
+        );
+        this.xLabelAngle = layout.angle;
+        this.xLabelFontSize = layout.fontSize;
+        // keep the configured height, which applies again when auto-fit is off
+        const configuredSize = ax.size;
+        this.setAxisSize("x", layout.margin);
+        ax.size = configuredSize;
+        return new Map(fieldIds.map((f, i) => [f, layout.labels[i]]));
+    }
+
+    updateAxis() {
+        super.updateAxis();
+        // full name on hover, as labels may be shortened
+        this.x_axis_svg
+            .selectAll(".tick")
+            .on("mouseover pointermove", (e, id) => {
+                this.showToolTip(e, this.dataStore.getColumnName(id) ?? id);
+            })
+            .on("mouseout", () => this.hideToolTip());
+        const ax = this.config.axis.x;
+        if (!ax.fit_labels || this.xLabelAngle === undefined) {
+            return;
+        }
+        const text = this.x_axis_svg
+            .selectAll(".tick text")
+            .attr("font-size", this.xLabelFontSize);
+        if (this.xLabelAngle === 0) {
+            text.style("text-anchor", "middle")
+                .attr("dx", null)
+                .attr("dy", ".71em")
+                .attr("transform", null);
+        } else {
+            text.style("text-anchor", "end")
+                .attr("dx", "-.8em")
+                .attr("dy", ".10em")
+                .attr("transform", "rotate(-45)");
+        }
     }
 
     @loadColumnData
@@ -357,6 +440,20 @@ class DotPlot extends SVGChart {
             .transition()
             .duration(tTime)
             .ease(easeLinear);
+        let xFieldIds = this.fieldNames;
+        if (this.config.cluster_columns && this.columnOrder) {
+            xFieldIds = this.columnOrder;
+        }
+        // sets the bottom margin, so must run before reading content dimensions
+        const ax = this.config.axis.x;
+        let xLabels = this.getXAxisLabels(xFieldIds);
+        if (ax.fit_labels) {
+            xLabels = this.fitXAxisLabels(xFieldIds, xLabels);
+        } else {
+            this.setAxisSize("x", ax.size);
+        }
+        this.x_scale.domain(xFieldIds);
+        this.x_axis_call.tickFormat((id) => xLabels.get(id));
         const dim = this._getContentDimensions();
         const cWidth = dim.width / (this.fieldNames.length);
         const fa = this.dim.filterMethod;
@@ -378,14 +475,6 @@ class DotPlot extends SVGChart {
                 .map((id) => rowById.get(id))
                 .filter((row) => row !== undefined);
         }
-
-        let xFieldIds = this.fieldNames;
-        if (this.config.cluster_columns && this.columnOrder) {
-            xFieldIds = this.columnOrder;
-        }
-        this.x_scale.domain(
-            xFieldIds.map((id) => this.dataStore.getColumnName(id)),
-        );
 
         const orderedDataWithColumns = orderedData.map((row) => {
             if (!this.config.cluster_columns || !this.columnOrder) {
@@ -457,7 +546,7 @@ class DotPlot extends SVGChart {
                         //const tip = { category: vals[d.cat_id], value: d.id, fraction: d.frac };
                         const category = this.dataStore.columnIndex[this.config.param[0]].name;
                         const id = this.dataStore.columnIndex[d.id].name;
-                        this.showToolTip(e, `${d.id}<br />${category}: ${vals[d.cat_id]}<br>percentage: ${d.frac.toFixed(0)}%`);
+                        this.showToolTip(e, `${id}<br />${category}: ${vals[d.cat_id]}<br>percentage: ${d.frac.toFixed(0)}%`);
                     })
                     .on("mouseout", () => {
                         this.hideToolTip();
@@ -537,6 +626,33 @@ class DotPlot extends SVGChart {
                 },
             },
             {
+                type: "check",
+                label: "Auto-fit X axis labels",
+                current_value: c.axis.x.fit_labels,
+                func: (v) => {
+                    c.axis.x.fit_labels = v;
+                    this.drawChart();
+                },
+            },
+            {
+                type: "check",
+                label: "Shorten long X axis labels",
+                current_value: c.axis.x.truncate_labels,
+                func: (v) => {
+                    c.axis.x.truncate_labels = v;
+                    this.drawChart();
+                },
+            },
+            {
+                type: "check",
+                label: "Hide overlapping X axis labels",
+                current_value: c.axis.x.thin_labels,
+                func: (v) => {
+                    c.axis.x.thin_labels = v;
+                    this.drawChart();
+                },
+            },
+            {
                 type: "radiobuttons",
                 label: "Y-axis order",
                 current_value: c.y_axis_order || "data",
@@ -606,6 +722,15 @@ class DotPlot extends SVGChart {
                 func: (x) => {
                     c.color_legend.display = x;
                     this.setColorLegend();
+                },
+            },
+            {
+                label: "Show Fraction Legend",
+                type: "check",
+                current_value: c.fraction_legend.display,
+                func: (x) => {
+                    c.fraction_legend.display = x;
+                    this.showFractionLegend();
                 },
             },
             {
