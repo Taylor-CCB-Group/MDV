@@ -35,8 +35,19 @@ export class TextEditorWithMaxLength extends InputEditor {
     }
 }
 
-function isRenameableDataColumn(column: {
-    editable?: boolean;
+/**
+ * Structural test for whether a column may be *curated* - renamed or hidden.
+ *
+ * Deliberately does NOT consider `editable`. That flag means "users may overwrite the values
+ * in this column" (see DataSourceSchema.ts) - a data-plane permission. Curation changes
+ * presentation metadata instead, and is gated by project edit permission alone, so that the
+ * UI and the backend API agree on who may rename or hide a column.
+ * See docs/adr/0003-scriptable-column-curation-api.md.
+ *
+ * What remains is structural: spatial geometry columns carry `sgindex` / `sgtype` and are not
+ * user-facing data columns, and a tombstoned column is already hidden.
+ */
+function isCuratableDataColumn(column: {
     sgindex?: unknown;
     sgtype?: unknown;
     deleted?: boolean;
@@ -44,7 +55,7 @@ function isRenameableDataColumn(column: {
     if (!column) {
         return false;
     }
-    return Boolean(column.editable) && column.sgindex == null && column.sgtype == null && column.deleted !== true;
+    return column.sgindex == null && column.sgtype == null && column.deleted !== true;
 }
 
 function formatColumnHeaderName(name: string, isEditable: boolean) {
@@ -287,26 +298,30 @@ const useSlickGridReact = () => {
                                 title: isColumnEditable && isEditMode ? "Find & Replace" : "Find",
                                 iconCssClass: "mdi mdi-magnify",
                             },
-                            ...(isColumnEditable && isEditMode
+                            // Curation changes presentation metadata only, so it is gated by
+                            // project edit permission plus the structural predicate - not by
+                            // `editable`, which governs overwriting values.
+                            ...(isEditMode && isCuratableDataColumn(col)
                                 ? [
-                                    ...(isRenameableDataColumn(col)
-                                        ? [
-                                            {
-                                                command: "rename-column",
-                                                title: "Rename Column",
-                                                iconCssClass: "mdi mdi-pencil",
-                                            },
-                                        ]
-                                        : []),
                                     {
-                                        command: "bulk-edit",
-                                        title: "Bulk Edit",
-                                        iconCssClass: "mdi mdi-table-edit",
+                                        command: "rename-column",
+                                        title: "Rename Column",
+                                        iconCssClass: "mdi mdi-pencil",
                                     },
                                     {
                                         command: "remove-column",
                                         title: "Delete Column",
                                         iconCssClass: "mdi mdi-delete",
+                                    },
+                                ]
+                                : []),
+                            // Bulk Edit overwrites values, so `editable` is exactly the right gate.
+                            ...(isColumnEditable && isEditMode
+                                ? [
+                                    {
+                                        command: "bulk-edit",
+                                        title: "Bulk Edit",
+                                        iconCssClass: "mdi mdi-table-edit",
                                     },
                                 ]
                                 : []),
@@ -503,7 +518,7 @@ const useSlickGridReact = () => {
                         return;
                     }
                     const targetColumn = dataStore.columnIndex[column.field];
-                    if (!targetColumn || !isRenameableDataColumn(targetColumn)) {
+                    if (!targetColumn || !isCuratableDataColumn(targetColumn)) {
                         setFeedbackAlert({
                             type: "warning",
                             title: "Rename Column Warning",
@@ -516,7 +531,16 @@ const useSlickGridReact = () => {
                         initialName: targetColumn.name,
                     });
                 } else if (command === "remove-column") {
-                    if (!isEditModeRef.current) {
+                    if (!isEditModeRef.current || typeof column.field !== "string") {
+                        return;
+                    }
+                    const targetColumn = dataStore.columnIndex[column.field];
+                    if (!targetColumn || !isCuratableDataColumn(targetColumn)) {
+                        setFeedbackAlert({
+                            type: "warning",
+                            title: "Delete Column Warning",
+                            message: "This column cannot be deleted.",
+                        });
                         return;
                     }
                     void requestColumnRemoval(column.field);
@@ -1045,7 +1069,7 @@ const useSlickGridReact = () => {
         }
     }, [closeBulkEditDialog, dataModel, isEditMode]);
 
-    const handleRenameColumn = useCallback(({
+    const handleRenameColumn = useCallback(async ({
         columnField,
         newName,
     }: {
@@ -1056,7 +1080,7 @@ const useSlickGridReact = () => {
             return;
         }
         const column = dataStore.columnIndex[columnField];
-        if (!column || !isRenameableDataColumn(column)) {
+        if (!column || !isCuratableDataColumn(column)) {
             setFeedbackAlert({
                 type: "warning",
                 title: "Rename Column Warning",
@@ -1088,8 +1112,9 @@ const useSlickGridReact = () => {
             });
             return;
         }
+        let didRename = false;
         try {
-            const didRename = dataStore.renameColumnDisplayName(columnField, trimmedName);
+            didRename = dataStore.renameColumnDisplayName(columnField, trimmedName);
             if (didRename) {
                 updateGridColumnHeader(gridRef.current, columnField, trimmedName, Boolean(column.editable));
             }
@@ -1106,8 +1131,42 @@ const useSlickGridReact = () => {
                     columnName: columnField,
                 },
             });
+            return;
         }
-    }, [dataStore, isEditMode]);
+
+        if (!didRename) {
+            // the column already had this name - nothing to persist
+            return;
+        }
+
+        // Persist straight away, as the delete flow does. renameColumnDisplayName only marks
+        // dirtyMetadata, so without this the rename is discarded if the user navigates away
+        // without saving the view. Note saveView() swallows its own errors and never rejects,
+        // so hasUnsavedChanges() is the only signal that the save did not land.
+        try {
+            if (chartManager?.viewManager?.saveView) {
+                await chartManager.viewManager.saveView();
+                if (chartManager.viewManager.hasUnsavedChanges?.()) {
+                    throw new Error("Saving the renamed column did not complete successfully");
+                }
+            } else {
+                chartManager?.saveState?.();
+            }
+        } catch (err) {
+            const error =
+                err instanceof Error ? err : new Error("Failed to save the renamed column");
+            setFeedbackAlert({
+                type: "error",
+                title: "Rename Column Error",
+                message: `Column was renamed to ${trimmedName}, but saving the view failed. Reloading the project may restore the previous name.`,
+                stack: error.stack,
+                metadata: {
+                    columnName: columnField,
+                    saveError: error.message,
+                },
+            });
+        }
+    }, [chartManager, dataStore, isEditMode]);
 
     return {
         config,
