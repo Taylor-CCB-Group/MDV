@@ -118,7 +118,8 @@ curl -s -X POST http://localhost:5055/project/<id>/rename_column -H 'Content-Typ
 curl -s -X POST http://localhost:5055/project/<id>/soft_delete_column -H 'Content-Type: application/json' -d '{"datasource":"cells","field":"scratch_col"}'
 ```
 
-`200 {"changed":true}` = done · `200 {"changed":false}` = already in that state ·
+`200 {"changed":true}` = done
+`200 {"changed":false}` = already in that state
 `400 {"success":false,"error":"..."}` = rejected, with the same message the Python call raises.
 
 ---
