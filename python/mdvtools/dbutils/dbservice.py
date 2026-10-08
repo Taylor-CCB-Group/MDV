@@ -23,7 +23,7 @@ Example:
     >>> new_project = ProjectService.add_new_project('/path/to/project', 'My Project')
 """
 
-from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject
+from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject, UsageEvent
 from datetime import datetime
 from mdvtools.mdvproject import MDVProject
 from typing import Optional
@@ -32,6 +32,14 @@ import shutil
 from mdvtools.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# Usage recording can be switched off for a whole deployment - an institution
+# may not want it logged at all, and that should be a config change rather than
+# a rebuild. Read at import like ENABLE_AUTH, so it is a deployment-wide
+# decision that no individual request can alter.
+ENABLE_USAGE_TRACKING = os.getenv("ENABLE_USAGE_TRACKING", "1").lower() in ["1", "true", "yes"]
+if not ENABLE_USAGE_TRACKING:
+    logger.info("Usage tracking is disabled (ENABLE_USAGE_TRACKING)")
 
 
 class ProjectService:
@@ -309,6 +317,44 @@ class ProjectService:
 
             File.query.filter_by(project_id=project_id).delete(synchronize_session=False)
             UserProject.query.filter_by(project_id=project_id).delete(synchronize_session=False)
+            # Detach the usage history rather than deleting it. The foreign key
+            # would block this delete otherwise, and dropping the rows would make
+            # last month's access numbers silently change when somebody empties
+            # the recycle bin.
+            #
+            # The project name is merged into details rather than assigned over
+            # it. details also carries what an event meant - a rename's old and
+            # new names, the demo seeder's marker - and replacing it would erase
+            # that at the one moment the name is about to become unrecoverable.
+            #
+            # Two passes, because the merge cannot be expressed in SQL the same
+            # way on SQLite and Postgres. The first handles the rows that carry
+            # something, which are a small minority - an event only has details
+            # if it was a rename or was seeded - and it reads them all before
+            # writing any, because updating project_id while scanning on
+            # project_id is exactly the kind of thing SQLite leaves undefined.
+            # The second is the original single statement, and still does the
+            # overwhelming majority of the work.
+            carrying_details = (
+                UsageEvent.query.filter(
+                    UsageEvent.project_id == project_id,
+                    UsageEvent.details.isnot(None),
+                )
+                .with_entities(UsageEvent.id, UsageEvent.details)
+                .all()
+            )
+            for event_id, existing_details in carrying_details:
+                merged = dict(existing_details) if isinstance(existing_details, dict) else {}
+                merged["project_name"] = project.name
+                UsageEvent.query.filter_by(id=event_id).update(
+                    {"project_id": None, "details": merged},
+                    synchronize_session=False,
+                )
+            # Everything still attached had no details to preserve.
+            UsageEvent.query.filter_by(project_id=project_id).update(
+                {"project_id": None, "details": {"project_name": project.name}},
+                synchronize_session=False,
+            )
             db.session.delete(project)
             db.session.flush()
             if filesystem_delete is not None:
@@ -865,6 +911,36 @@ class UserProjectService:
             raise
 
     @staticmethod
+    def grant_all_projects_to_admins():
+        """
+        Give every administrator owner access to every project.
+
+        MDV treats administrators as owners of all projects, but those grants are
+        only written in particular places - the Auth0 user sync, and a project
+        rescan. Anything that creates an administrator or discovers projects
+        outside those paths leaves the grants missing, and the administrator sees
+        an empty project list. Call this from those places rather than repeating
+        the loop.
+
+        Safe to call repeatedly: existing grants are updated in place.
+
+        Returns:
+            int: The number of user-project grants written.
+        """
+        admin_ids = [admin.id for admin in User.query.filter_by(is_admin=True).all()]
+        project_ids = [project.id for project in Project.query.all()]
+
+        for user_id in admin_ids:
+            for project_id in project_ids:
+                UserProjectService.add_or_update_user_project(
+                    user_id=user_id,
+                    project_id=project_id,
+                    is_owner=True,
+                )
+
+        return len(admin_ids) * len(project_ids)
+
+    @staticmethod
     def get_user_project_permissions(user_id: int, project_id: int) -> dict:
         """
         Get the permission information for a user-project relationship.
@@ -943,3 +1019,76 @@ class UserProjectService:
             logger.exception(f"Error in remove_user_from_project: {e}")
             db.session.rollback()  # Rollback in case of error
             raise
+
+
+class UsageEventService:
+    """Records who used what, for the Admin usage page.
+
+    Two deliberate departures from every other service in this module. Both are
+    intentional - please do not "fix" them to match the siblings:
+
+    1. Writes go through db.engine.begin(), not db.session. The sibling services
+       call db.session.rollback() on failure; doing that here would roll back
+       *the caller's* uncommitted work, and the login hook fires immediately
+       after a user-activation commit.
+    2. Every exception is swallowed rather than re-raised. Telemetry must never
+       turn a working page into an error for the person using it.
+    """
+
+    @staticmethod
+    def record_event(user_id, event_type, project_id=None, view_name=None, details=None):
+        """Insert one usage row. Never raises, never touches the caller's session.
+
+        The off switch is checked here rather than at each call site because
+        every recording path funnels through this one function - so a new event
+        type cannot be added that quietly ignores it.
+
+        details carries the few facts that have nowhere else to live, such as the
+        names either side of a rename. Values are truncated like view_name: they
+        come from request bodies, and this column has no length limit of its own.
+        """
+        try:
+            if not ENABLE_USAGE_TRACKING:
+                return False
+            if not user_id or not event_type:
+                return False
+
+            if view_name is not None:
+                view_name = str(view_name)[:128]
+            if details is not None:
+                details = {
+                    str(key)[:64]: (str(value)[:256] if isinstance(value, str) else value)
+                    for key, value in details.items()
+                }
+
+            with db.engine.begin() as connection:
+                connection.execute(
+                    UsageEvent.__table__.insert().values(
+                        user_id=user_id,
+                        project_id=project_id,
+                        event_type=event_type,
+                        view_name=view_name,
+                        details=details,
+                        occurred_at=datetime.now(),
+                    )
+                )
+            return True
+        except Exception as e:
+            # Deliberately not re-raised - see the class docstring.
+            logger.warning(f"Could not record usage event '{event_type}': {e}")
+            return False
+
+    @staticmethod
+    def record_login(user_id):
+        return UsageEventService.record_event(user_id, "login")
+
+    @staticmethod
+    def record_project_open(user_id, project_id):
+        return UsageEventService.record_event(user_id, "project_open", project_id=project_id)
+
+    @staticmethod
+    def record_view_open(user_id, project_id, view_name):
+        """view_name arrives from an untrusted request body, so record_event truncates it."""
+        return UsageEventService.record_event(
+            user_id, "view_open", project_id=project_id, view_name=view_name
+        )

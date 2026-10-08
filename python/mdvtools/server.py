@@ -5,7 +5,8 @@ from flask import (
     request,
     make_response,
     jsonify,
-    current_app
+    current_app,
+    session
 )
 from mdvtools.server_utils import (
     send_file,
@@ -26,7 +27,7 @@ from mdvtools.project_router import (
 import os
 import pandas as pd
 from datetime import datetime
-from typing import Optional
+from typing import Collection, Dict, Optional, Tuple, TypedDict, Union
 import threading
 # Configure Numba caching before importing libraries that depend on it (e.g. scanpy)
 # In some deployment environments (zip/venv layers), Numba cannot locate source files for caching
@@ -52,6 +53,103 @@ logger = get_logger(__name__)
 logger.info("server.py module loaded")
 
 routes = set()
+
+
+def record_usage_event(
+    project_id: Union[str, int, None],
+    event_type: str,
+    backend_db: bool,
+    view_name: Optional[str] = None,
+    details: Optional[Dict[str, str]] = None,
+) -> bool:
+    """Record one usage event, or quietly do nothing if this deployment cannot.
+
+    Module level so it is unit-testable without building a project. Guards run in
+    order: no backend database (single-project mode's project ids are not row ids,
+    so a foreign key would fail), auth disabled (nobody to attribute it to), no
+    user in the session. Never raises - telemetry must not break a page.
+    """
+    try:
+        if not backend_db:
+            return False
+        if not current_app.config.get("ENABLE_AUTH", False):
+            return False
+        user = session.get("user") or {}
+        user_id = user.get("id")
+        if not user_id:
+            return False
+
+        # MDVProject.id is a *string* in backend mode - mdv_server_app.py builds
+        # it as str(project.id) - and in single-project mode it is a directory
+        # name. The column is an integer with a foreign key, so coerce here and
+        # give up quietly on anything that is not a row id. Kept as its own name
+        # rather than reassigning project_id, so the parameter means one thing
+        # throughout.
+        try:
+            project_row_id = int(project_id) if project_id is not None else None
+        except (TypeError, ValueError):
+            return False
+
+        from mdvtools.dbutils.dbservice import UsageEventService
+
+        return UsageEventService.record_event(
+            user_id,
+            event_type,
+            project_id=project_row_id,
+            view_name=view_name,
+            details=details,
+        )
+    except Exception as e:
+        logger.warning(f"Could not record usage event '{event_type}': {e}")
+        return False
+        
+class SaveStatePayload(TypedDict, total=False):
+    """The parts of a /save_state body this module reads.
+
+    total=False because the frontend sends considerably more than this and may
+    send neither key. Declared rather than left as a bare dict so the two fields
+    the classifier depends on are named in one place, and so a change to either
+    is a change to something a reader can find.
+    """
+
+    currentView: str
+    view: Optional[Dict[str, object]]
+
+
+def classify_view_change(
+    state: Optional[SaveStatePayload],
+    existing_views: Collection[str],
+) -> Tuple[Optional[str], Optional[str]]:
+    """Say whether a /save_state payload creates or deletes a view.
+
+    Returns (event_type, view_name), or (None, None) when the payload does
+    neither - the ordinary case of editing a view that already exists.
+
+    Both of these reach the server only through /save_state, so neither is
+    visible as a route. A view created in the browser is never fetched from the
+    server, so /get_view never fires for it and it would otherwise stay invisible
+    in usage until somebody opened it later; a deletion is a save with a null
+    view (see MDVProject.set_view). The payload alone cannot tell the two apart -
+    that depends on whether the name already existed, which is only knowable
+    before the save.
+
+    Module level and pure so the decision can be tested without a project, and so
+    the route stays a list of steps rather than a nest of conditions.
+    """
+    if not state:
+        return None, None
+    # Checked rather than trusted: this arrives as a request body, so the
+    # annotation above says what a well-formed payload looks like, not what
+    # actually turned up. A non-string name would otherwise be recorded as one.
+    name = state.get("currentView")
+    if not isinstance(name, str) or not name:
+        return None, None
+    existed = name in existing_views
+    if state.get("view"):
+        # Recorded as its own event type rather than as an open: counting a
+        # creation as an open would inflate every view's open count.
+        return ("view_create", name) if not existed else (None, None)
+    return ("view_delete", name) if existed else (None, None)
 
 
 def _apply_project_writability(
@@ -172,6 +270,7 @@ def create_app(
         # some requests were being downgraded to http, which caused problems with the backend
         # but if we always add the header it messes up localhost development.
         # todo if necessary, apply equivalent change to index.html / any other pages we might have
+        record_usage_event(project.id, "project_open", options.backend_db)
         return render_template(
             "page.html",
             route=route,
@@ -283,6 +382,13 @@ def create_app(
         data = request.json
         if not data or "view" not in data:
             return "Request must contain JSON with 'view'", 400
+        # Recorded here because the view name only exists in the POST body - the
+        # URL is identical for every view, which is why a web-server log cannot
+        # answer "which view did they open". After the 400 guard so a malformed
+        # request never records anything.
+        record_usage_event(
+            project.id, "view_open", options.backend_db, view_name=data["view"]
+        )
         return jsonify(project.get_view(data["view"]))
 
     # get any custom row data
@@ -337,13 +443,22 @@ def create_app(
     def save_data():
         # Frontend sends decoded column data; unique columns are string[] from ChartManager getMd()
         success = True
+        event_type = None
+        changed_view = None
         try:
             state = request.json
+            # Classified before the save, because afterwards project.views no
+            # longer says which case this was.
+            event_type, changed_view = classify_view_change(state, project.views)
             project.save_state(state)
         except Exception as e:
             logger.error(e)
             success = False
 
+        if success and event_type:
+            record_usage_event(
+                project.id, event_type, options.backend_db, view_name=changed_view
+            )
         return jsonify({"success": success})
 
     @project_bp.route("/rename_view", access_level='editable', methods=["POST"])
