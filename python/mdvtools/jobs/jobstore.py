@@ -33,6 +33,7 @@ class JobRecord:
     )
     created: float = field(default_factory=time.time)
     provenance: dict | None = None  # promoted at ingest (ADR0007)
+    error: str | None = None # set when the owner side fails this record
 
 
 # states that mean "work was in flight when we stopped" - recoverable not terminal
