@@ -59,3 +59,25 @@ def test_load_all_quarantines_malformed_record_and_keeps_the_rest(tmp_path, cont
     assert [r.job_id for r in recs] == [good.job_id]
     assert not bad.exists()  # out of the active set
     assert (tmp_path / "records" / "quarantine" / "broken.json").read_text() == contents  # kept for inspection
+
+
+def test_load_all_skips_unreadable_record_and_retries_it_next_pass(tmp_path, monkeypatch):
+    store = JobStore(tmp_path)
+    good = store.new("concat_columns", {"datasource": "cells"})
+    flaky = store.new("concat_columns", {"datasource": "cells"})
+    flaky_path = tmp_path / "records" / f"{flaky.job_id}.json"
+
+    real_read_text = Path.read_text
+
+    def locked_once(self, *args, **kwargs):
+        if self == flaky_path:
+            raise OSError("resource temporarily unavailable")
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", locked_once)
+    first = store.load_all()
+    monkeypatch.undo()
+
+    assert [r.job_id for r in first] == [good.job_id]  # skipped this pass
+    assert flaky_path.exists()  # transient: not quarantined
+    assert {r.job_id for r in store.load_all()} == {good.job_id, flaky.job_id}  # back next pass

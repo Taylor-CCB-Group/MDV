@@ -90,4 +90,7 @@ class JobStore:
                 quarantine.mkdir(exist_ok=True)
                 os.replace(p, quarantine / p.name)
                 logger.exception("job record %s is malformed; quarantined", p.name)
+            except OSError:
+                # transient: a lock or IO hiccup, so leave it in place for the next pass
+                logger.warning("job record %s unreadable this pass; will retry", p.name, exc_info=True)
         return records
