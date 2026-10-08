@@ -27,6 +27,7 @@ from mdvtools.project_router import (
 )
 import os
 import pandas as pd
+from dataclasses import asdict
 from datetime import datetime
 from typing import Optional
 import threading
@@ -302,6 +303,13 @@ def build_app(
             return jsonify({"error": str(e)}), 400 # unknown tool / bad params
         return jsonify({"job_id": job_id}), 202
 
+    # list this project's jobs; the client-safe view drops the internal executor handle
+    @project_bp.route("/jobs", methods=["GET"])
+    def list_jobs():
+        records = job_service.get_or_create(project).store.load_all()
+        return jsonify([
+            {k: v for k, v in asdict(r).items() if k != "handle"} for r in records
+        ])
 
     # gets a particular view
     @project_bp.route("/get_view", methods=["POST"])

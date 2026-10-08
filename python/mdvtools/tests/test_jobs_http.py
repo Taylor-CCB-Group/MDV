@@ -95,3 +95,36 @@ def test_start_driver_reconciles_before_starting():
     start_driver(SpyService(), ["p1", "p2"])
 
     assert calls == [("scan", ["p1", "p2"]), ("start",)]
+
+
+def test_get_jobs_lists_records_without_handle(tmp_path):
+    from mdvtools.jobs.jobstore import Status
+
+    project = _project_with_cells(tmp_path)
+    app = build_app(project, MDVServerOptions(open_browser=False, websocket=False))
+    client = app.test_client()
+    job_id = client.post(
+        "/jobs",
+        json={
+            "tool_id": "concat_columns",
+            "params": {
+                "datasource": "cells",
+                "column_a": "sample",
+                "column_b": "cluster",
+                "output_name": "out",
+            },
+        },
+    ).get_json()["job_id"]
+
+    # stand in for the driver having dispatched it, so the record carries an internal handle
+    store = server_module.job_service.get_or_create(project).store
+    rec = {r.job_id: r for r in store.load_all()}[job_id]
+    store.set(rec, Status.RUNNING, handle={"kind": "local", "ref": "123"})
+
+    resp = client.get("/jobs")
+
+    assert resp.status_code == 200
+    jobs = resp.get_json()
+    assert [j["job_id"] for j in jobs] == [job_id]
+    assert jobs[0]["status"] == Status.RUNNING.value
+    assert "handle" not in jobs[0]
