@@ -41,3 +41,21 @@ def test_failed_write_leaves_previous_record_intact(tmp_path, monkeypatch):
 
     reloaded = {r.job_id: r for r in store.load_all()}
     assert reloaded[rec.job_id].status == Status.QUEUED.value
+
+
+@pytest.mark.parametrize(
+    "contents",
+    ["{not json", '{"job_id": "x", "unknown_field": 1}'],
+    ids=["bad_json", "wrong_fields"],
+)
+def test_load_all_quarantines_malformed_record_and_keeps_the_rest(tmp_path, contents):
+    store = JobStore(tmp_path)
+    good = store.new("concat_columns", {"datasource": "cells"})
+    bad = tmp_path / "records" / "broken.json"
+    bad.write_text(contents)
+
+    recs = store.load_all()
+
+    assert [r.job_id for r in recs] == [good.job_id]
+    assert not bad.exists()  # out of the active set
+    assert (tmp_path / "records" / "quarantine" / "broken.json").read_text() == contents  # kept for inspection

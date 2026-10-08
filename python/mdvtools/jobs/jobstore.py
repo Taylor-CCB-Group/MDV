@@ -6,6 +6,9 @@ import json
 import time
 import uuid
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Status(str, Enum):
@@ -76,7 +79,15 @@ class JobStore:
         return rec
 
     def load_all(self) -> list[JobRecord]:
-        return [
-            JobRecord(**json.loads(p.read_text()))
-            for p in self.records_dir.glob("*.json")
-        ]
+        """Parse each record on its own (ADR0012)."""
+        records = []
+        for p in self.records_dir.glob("*.json"):
+            try:
+                records.append(JobRecord(**json.loads(p.read_text())))
+            except (ValueError, TypeError):
+                # terminal: bad JSON or wrong fields will not heal, so move it aside for inspection
+                quarantine = self.records_dir / "quarantine"
+                quarantine.mkdir(exist_ok=True)
+                os.replace(p, quarantine / p.name)
+                logger.exception("job record %s is malformed; quarantined", p.name)
+        return records
