@@ -12,8 +12,11 @@ from mdvtools.template_views import (
 )
 from mdvtools.template_views.create_default_views import (
     Grid,
+    LinkInfo,
     MarkerResult,
+    Roles,
     iter_dense_columns,
+    match_rna_protein,
     pretty_field,
 )
 
@@ -116,6 +119,9 @@ def test_pretty_field_rewrites_generated_cluster_ids():
     assert pretty_field("spatialclust_region_assignments") == "Spatial niche"
     assert pretty_field("tissue") == "tissue"
     assert pretty_field("rna:annotation") == "annotation"
+    assert pretty_field("nCount_RNA") == "UMI counts"
+    assert pretty_field("rna:X_umap_1") == "UMAP 1"
+    assert pretty_field("scDblFinder.cxds_score") == "Doublet score"
 
 
 def test_iter_dense_columns_yields_nonzero_cells():
@@ -161,6 +167,22 @@ def test_unique_top_markers_first_cluster_wins_and_caps():
     ]
     picked = unique_top_markers(MarkerResult(rows=rows), per_cluster=2, cap=2)
     assert picked == [("CD14", "A"), ("LYZ", "A")]
+
+
+def test_match_rna_protein_pairs_cd3d_with_cd3():
+    roles = Roles(
+        obs="cells",
+        columns={},
+        fields=[],
+        rna=LinkInfo("rna", "gene_ids", "gs", ["CD14", "CD3D", "CD8A"], None, None),
+        protein=LinkInfo("adt", "name", "adt_expr", ["CD14", "CD3", "CD8"], None, None),
+    )
+    roles.gene_wrappers = {"CD14": "g14", "CD3D": "g3", "CD8A": "g8"}
+    roles.protein_wrappers = {"CD14": "p14", "CD3": "p3", "CD8": "p8"}
+    pairs = match_rna_protein(roles)
+    assert pairs[0][:3] == ("CD3D", "g3", "CD3")
+    assert ("CD8A", "g8", "CD8") == tuple(pairs[1][:3])
+    assert ("CD14", "g14", "CD14") == tuple(pairs[2][:3])
 
 
 def test_create_default_views_writes_expected_names(tmp_path):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import importlib.util
 import json
 import sys
@@ -197,7 +198,7 @@ def test_csv_rows_keep_display_name_with_its_project(tmp_path: Path):
     assert "inconsistent" not in text
     assert "cell_type,Cell type," in text
     assert "celltype,celltype," in text
-    assert text.strip().endswith(",false")
+    assert text.strip().endswith(",false,None,None")
 
 
 def _occurrence_used(scan, datasource: str, field_name: str, project: Path) -> bool:
@@ -245,7 +246,12 @@ def test_used_in_views_follows_charts_on_the_same_datasource(tmp_path: Path):
                 ],
                 "genes": [{"type": "table", "param": ["name"]}],
             }
-        }
+        },
+        "quality control": {
+            "initialCharts": {
+                "cells": [{"type": "histogram", "param": "n_counts"}],
+            }
+        },
     }
     (project / "views.json").write_text(json.dumps(views), encoding="utf-8")
     other = tmp_path / "other"
@@ -266,6 +272,12 @@ def test_used_in_views_follows_charts_on_the_same_datasource(tmp_path: Path):
 
     report = format_markdown(scan)
     assert "used in views" in report
+    assert "view names" in report
+    assert "chart types" in report
+    assert "atlas" in report
+    assert "quality control" in report
+    assert "scatter_plot" in report
+    assert "histogram" in report
     assert "(used)" in report
     assert "(not used)" in report
 
@@ -274,9 +286,17 @@ def test_used_in_views_follows_charts_on_the_same_datasource(tmp_path: Path):
         write_csv(scan, handle)
     text = destination.read_text(encoding="utf-8")
     project_path = str(project.resolve())
-    assert "used_in_views" in text.splitlines()[0]
-    assert f"n_counts,n_counts,{project_path},true" in text
-    assert f"tissue,tissue,{project_path},false" in text
+    rows = list(csv.DictReader(text.splitlines()))
+    assert rows[0].keys() >= {"used_in_views", "view_name", "chart_type"}
+    n_counts = next(row for row in rows if row["field"] == "n_counts")
+    assert n_counts["project"] == project_path
+    assert n_counts["used_in_views"] == "true"
+    assert n_counts["view_name"] == "atlas; quality control"
+    assert n_counts["chart_type"] == "histogram; scatter_plot"
+    tissue = next(row for row in rows if row["field"] == "tissue")
+    assert tissue["used_in_views"] == "false"
+    assert tissue["view_name"] == "None"
+    assert tissue["chart_type"] == "None"
 
 
 def test_unreadable_views_json_leaves_columns_unused(tmp_path: Path):
