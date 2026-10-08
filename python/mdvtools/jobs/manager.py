@@ -105,10 +105,16 @@ class JobManager:
             spec = get_tool(nxt.tool_id)
             ws = self._workspace(nxt.job_id)
             self.store.set(nxt, Status.STAGING)
-            MATERIALIZERS[spec.input_shape](self.project, spec, nxt.params, ws)
-            handle = self.executor.submit(
-                spec.entrypoint, ws.root
-            )  # submit AFTER intent
+            try:
+                MATERIALIZERS[spec.input_shape](self.project, spec, nxt.params, ws)
+                handle = self.executor.submit(
+                    spec.entrypoint, ws.root
+                ) # submit AFTER intent
+            except Exception as e:
+                # owner side failure: fail this record, free its slot, try the next queued (ADR:0012)
+                logger.exception("job %s: dispatch failed", nxt.job_id)
+                self.store.set(nxt, Status.FAILED, error=str(e))
+                continue
             self.store.set(nxt, Status.RUNNING, handle=asdict(handle))
 
     def tick(self) -> None:

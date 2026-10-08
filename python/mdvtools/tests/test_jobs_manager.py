@@ -320,3 +320,22 @@ def test_ingest_failure_fails_that_record_and_tick_carries_on(tmp_path):
     for job_id in ids:
         assert recs[job_id].status == Status.FAILED.value
         assert recs[job_id].error   # the ingest exception's message is stored
+
+
+def test_materialise_failure_fails_that_record_and_dispatch_carries_on(tmp_path):
+    project = _make_project(tmp_path)
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch",
+                     executor=_FakeExecutor(poll_result="running"))
+    params = {"datasource": "cells", "column_a": "sample", "column_b": "cluster"}
+    ids = [mgr.submit("concat_columns", {**params, "output_name": f"out_{i}"})
+           for i in range(2)]
+
+    # the column passed validation at submit, then vanished before dispatch
+    project.remove_column("cells", "sample")
+
+    mgr.tick()   # must not raise
+
+    recs = {r.job_id: r for r in mgr.store.load_all()}
+    for job_id in ids:
+        assert recs[job_id].status == Status.FAILED.value   # not stuck in STAGING
+        assert recs[job_id].error
