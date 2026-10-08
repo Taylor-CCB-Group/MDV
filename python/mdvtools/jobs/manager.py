@@ -2,6 +2,7 @@ import shutil
 from dataclasses import asdict
 from collections.abc import Callable
 from pathlib import Path
+import logging
 
 from . import JOBS_DIRNAME
 from .registry import get_tool, validate_params
@@ -15,6 +16,8 @@ from .workspace import (
 from .ingest import ingest_column_output
 from .executor import Executor, LocalSubprocessExecutor, Handle
 from .provenance import build_provenance
+
+logger = logging.getLogger(__name__)
 
 # materializers keyed by INPUT shape; ingest handlers keyed by OUTPUT shape
 MATERIALIZERS = {"columns": materialize_columns_tray, "matrix": materialize_matrix_tray}
@@ -120,25 +123,30 @@ class JobManager:
                     continue
                 marker = ws.read_marker() or "failed"
             if marker == "done":
-                spec = get_tool(rec.tool_id)
-                self.store.set(rec, Status.INGESTING)
-                result = INGESTERS[spec.output.shape](
-                    self.project, rec.params, ws
-                )  # idempotent; {"manifest": ..., "outputs": [(ds, col)]}
-                provenance = build_provenance(rec, result["manifest"])
-                pointer = {
-                    "kind": "job",
-                    "job_id": rec.job_id,
-                    "tool_id": rec.tool_id,
-                    "content_hash": provenance["content_hash"],
-                }
+                try:
+                    spec = get_tool(rec.tool_id)
+                    self.store.set(rec, Status.INGESTING)
+                    result = INGESTERS[spec.output.shape](
+                        self.project, rec.params, ws
+                    )  # idempotent; {"manifest": ..., "outputs": [(ds, col)]}
+                    provenance = build_provenance(rec, result["manifest"])
+                    pointer = {
+                        "kind": "job",
+                        "job_id": rec.job_id,
+                        "tool_id": rec.tool_id,
+                        "content_hash": provenance["content_hash"],
+                    }
 
-                for ds, col in result["outputs"]:
-                    self.project.set_column_metadata(ds, col, "provenance", pointer)
+                    for ds, col in result["outputs"]:
+                        self.project.set_column_metadata(ds, col, "provenance", pointer)
 
-                # commit last: pointer + column data are written while status is still "INGESTING"
-                self.store.set(rec, Status.DONE, provenance=provenance)
-                shutil.rmtree(ws.root, ignore_errors=True)
+                    # commit last: pointer + column data are written while status is still "INGESTING"
+                    self.store.set(rec, Status.DONE, provenance=provenance)
+                    shutil.rmtree(ws.root, ignore_errors=True)
+                except Exception as e:
+                    # owner side failure: fail this record and carry on with the rest (ADR:0012)
+                    logger.exception("job %s: ingest failed", rec.job_id)
+                    self.store.set(rec, Status.FAILED, error=str(e))
             elif marker == "failed":
                 self.store.set(rec, Status.FAILED)
         self._dispatch()  # a finished job frees up a slot

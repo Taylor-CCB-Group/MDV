@@ -298,3 +298,25 @@ def test_submit_is_write_ahead_only_and_nudges(tmp_path):
     assert recs[0].status == Status.QUEUED.value   # write-ahead only, not dispatched
     assert executor.submits == 0                   # driver owns dispatch now, not submit
     assert nudges == [1]                           # nudge fired exactly once
+
+
+def test_ingest_failure_fails_that_record_and_tick_carries_on(tmp_path):
+    project = _make_project(tmp_path)
+    scratch = tmp_path / "scratch"
+    mgr = JobManager(project, workspace_root=scratch,
+                     executor=_FakeExecutor(poll_result="running"))
+    params = {"datasource": "cells", "column_a": "sample", "column_b": "cluster"}
+    ids = [mgr.submit("concat_columns", {**params, "output_name": f"out_{i}"})
+           for i in range(2)]
+    mgr.tick()   # dispatch: both QUEUED → RUNNING (max_concurrent defaults to 2)
+
+    # the worker reports done but leaves no result.h5, so ingest raises
+    for job_id in ids:
+        (scratch / job_id / "STATUS").write_text("done")
+
+    mgr.tick()   # must not raise
+
+    recs = {r.job_id: r for r in mgr.store.load_all()}
+    for job_id in ids:
+        assert recs[job_id].status == Status.FAILED.value
+        assert recs[job_id].error   # the ingest exception's message is stored
