@@ -25,7 +25,12 @@ def _has_inflight_records(project) -> bool:
     if not records_dir.exists():
         return False
     for p in records_dir.glob("*.json"):
-        if json.loads(p.read_text()).get("status") in _INFLIGHT:
+        try:
+            status = json.loads(p.read_text()).get("status")
+        except Exception:
+            # can't tell from a peek: build the manager and let its load_all quarantine or retry it
+            return True
+        if status in _INFLIGHT:
             return True
     return False
 

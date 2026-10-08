@@ -162,3 +162,32 @@ def test_get_or_create_wires_service_nudge_as_on_submit():
 
     # the manager's submit hook is the service's own nudge, so a submit wakes the driver
     assert mgr.on_submit == service.nudge
+
+
+def test_recovery_scan_survives_a_corrupt_record_and_hands_it_to_quarantine(tmp_path):
+    from pathlib import Path
+    from mdvtools.jobs.service import JobService
+    from mdvtools.jobs.jobstore import JobStore
+    from mdvtools.jobs import JOBS_DIRNAME
+
+    class FakeProject:
+        def __init__(self, pid):
+            self.id = pid
+            d = tmp_path / pid
+            d.mkdir()
+            self.dir = str(d)
+
+    # a project whose only record is unparseable
+    corrupt = FakeProject("corrupt")
+    records = Path(corrupt.dir) / JOBS_DIRNAME / "records"
+    records.mkdir(parents=True)
+    (records / "broken.json").write_text("{not json")
+
+    # a healthy in-flight project scanned after it
+    inflight = FakeProject("inflight")
+    JobStore(Path(inflight.dir) / JOBS_DIRNAME).new("concat_columns", {})
+
+    built = JobService().recovery_scan([corrupt, inflight])
+
+    assert built == ["corrupt", "inflight"]  # the scan did not abort
+    assert (records / "quarantine" / "broken.json").exists()  # building its manager quarantined it
