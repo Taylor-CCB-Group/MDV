@@ -5,6 +5,7 @@ from pathlib import Path
 import json
 import time
 import uuid
+import os
 
 
 class Status(str, Enum):
@@ -59,7 +60,10 @@ class JobStore:
         return rec
 
     def _write(self, rec: JobRecord) -> None:
-        (self.records_dir / f"{rec.job_id}.json").write_text(json.dumps(asdict(rec)))
+        path = self.records_dir / f"{rec.job_id}.json"
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(asdict(rec)))
+        os.replace(tmp, path) # atomic rename: readers see the old record or the new one
 
     def set(self, rec: JobRecord, status: Status, **fields) -> JobRecord:
         rec.status = status.value
