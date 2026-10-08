@@ -307,9 +307,16 @@ def build_app(
     @project_bp.route("/jobs", methods=["GET"])
     def list_jobs():
         records = job_service.get_or_create(project).store.load_all()
-        return jsonify([
-            {k: v for k, v in asdict(r).items() if k != "handle"} for r in records
-        ])
+        return jsonify([_client_view(r) for r in records])
+
+    # one jobs's record, client safe
+    @project_bp.route("/jobs/<job_id>", methods=["GET"])
+    def get_job(job_id):
+        records = {r.job_id: r for r in job_service.get_or_create(project).store.load_all()}
+        rec = records.get(job_id)
+        if rec is None:
+            return jsonify({"error": f"no job {job_id!r}"}), 404
+        return jsonify(_client_view(rec))
 
     # gets a particular view
     @project_bp.route("/get_view", methods=["POST"])
@@ -833,3 +840,7 @@ def start_driver(service, projects):
     """Start the job driver: reconcile in-flight projects, then start one daemon thread."""
     service.recovery_scan(projects)
     service.start()
+
+def _client_view(rec) -> dict:
+    """A job record as the browser sees it: everything except the internal executor handle (ADR-0012)."""
+    return {k: v for k, v in asdict(rec).items() if k != "handle"}

@@ -128,3 +128,41 @@ def test_get_jobs_lists_records_without_handle(tmp_path):
     assert [j["job_id"] for j in jobs] == [job_id]
     assert jobs[0]["status"] == Status.RUNNING.value
     assert "handle" not in jobs[0]
+
+
+def test_get_job_by_id_returns_client_safe_record(tmp_path):
+    from mdvtools.jobs.jobstore import Status
+
+    project = _project_with_cells(tmp_path)
+    app = build_app(project, MDVServerOptions(open_browser=False, websocket=False))
+    client = app.test_client()
+    job_id = client.post(
+        "/jobs",
+        json={
+            "tool_id": "concat_columns",
+            "params": {
+                "datasource": "cells",
+                "column_a": "sample",
+                "column_b": "cluster",
+                "output_name": "out",
+            },
+        },
+    ).get_json()["job_id"]
+
+    resp = client.get(f"/jobs/{job_id}")
+
+    assert resp.status_code == 200
+    job = resp.get_json()
+    assert job["job_id"] == job_id
+    assert job["status"] == Status.QUEUED.value
+    assert "handle" not in job
+
+
+def test_get_job_by_unknown_id_returns_404(tmp_path):
+    project = _project_with_cells(tmp_path)
+    app = build_app(project, MDVServerOptions(open_browser=False, websocket=False))
+
+    resp = app.test_client().get("/jobs/does_not_exist")
+
+    assert resp.status_code == 404
+    assert resp.get_json()["error"]
