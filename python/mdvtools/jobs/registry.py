@@ -53,6 +53,7 @@ UMAP = ToolSpec(
         ParamSpec("datasource", "datasource", "Datasource"),
         ParamSpec("layer", "subgroup", "Matrix", options_from="datasource", default="gs"),
         ParamSpec("output_name", "text", "New column base name", default="UMAP"),
+        ParamSpec("n_comps", "int", "PCA components", default=50, applies_to="pca"),
         ParamSpec("n_neighbors", "int", "Neighbors", default=15, applies_to="neighbors"),
         ParamSpec("min_dist", "float", "Minimum distance", default=0.5, applies_to="umap"),
         ParamSpec("n_components", "int", "Dimensions", default=2, applies_to="umap"),

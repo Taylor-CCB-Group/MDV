@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import cast
 import json
 
@@ -5,6 +6,8 @@ import h5py
 import numpy as np
 import pandas as pd
 import scipy.sparse
+import anndata as ad
+from sklearn.neighbors import NearestNeighbors
 
 from mdvtools.mdvproject import MDVProject
 from mdvtools.jobs.workspace import Workspace, materialize_matrix_tray
@@ -54,7 +57,7 @@ def test_matrix_tray_roundtrips_stored_X(tmp_path):
         assert (n_cells, n_genes) == (3, 2)
         assert np.allclose(rebuilt.toarray(), X.toarray())
 
-def _write_matrix_tray(ws, X, out_name="UMAP", neighbors_kwargs=None, umap_kwargs=None):
+def _write_matrix_tray(ws, X, out_name="UMAP", neighbors_kwargs=None, umap_kwargs=None, pca_kwargs=None):
     """Hand-build the tray materialize_matrix_tray would produce, so this test crosses the courier
     boundary the same way the worker will in production - and stays MDV-free, like the worker."""
     X = scipy.sparse.csc_matrix(X)
@@ -71,6 +74,8 @@ def _write_matrix_tray(ws, X, out_name="UMAP", neighbors_kwargs=None, umap_kwarg
             f.attrs["kwargs.neighbors"] = json.dumps(neighbors_kwargs)
         if umap_kwargs is not None:
             f.attrs["kwargs.umap"] = json.dumps(umap_kwargs)
+        if pca_kwargs is not None:
+            f.attrs["kwargs.pca"] = json.dumps(pca_kwargs)
 
 
 def test_umap_worker_embeds_and_survives_nonfinite(tmp_path):
@@ -137,3 +142,53 @@ def test_umap_worker_honors_n_components(tmp_path):
         assert "UMAP_1" in f and "UMAP_2" in f and "UMAP_3" in f   # 3 dims -> 3 columns
     manifest = json.loads((ws.output / "manifest.json").read_text())
     assert manifest["columns"] == 3
+
+def test_umap_worker_honors_n_comps(tmp_path):
+    rng = np.random.default_rng(0)
+    dense = rng.random((60, 10)).astype(np.float32)
+    dense[dense < 0.6] = 0.0
+
+    ws = Workspace(tmp_path / "scratch", "job1")
+    _write_matrix_tray(ws, dense, out_name="UMAP", pca_kwargs={"n_comps": 5})
+
+    umap_run(str(ws.root))
+
+    assert ws.read_marker() == "done"
+    manifest = json.loads((ws.output / "manifest.json").read_text())
+    assert manifest["n_comps"] == 5
+
+def test_umap_worker_caps_n_comps_to_matrix_size(tmp_path):
+    rng = np.random.default_rng(0)
+    dense = rng.random((60, 10)).astype(np.float32)
+    dense[dense < 0.6] = 0.0
+
+    ws = Workspace(tmp_path / "scratch", "job1")
+    _write_matrix_tray(ws, dense, out_name="UMAP", pca_kwargs={"n_comps": 50})   # more than 10 genes allow
+
+    umap_run(str(ws.root))
+
+    assert ws.read_marker() == "done"
+    manifest = json.loads((ws.output / "manifest.json").read_text())
+    assert manifest["n_comps"] == 9   # min(60 cells, 10 genes) - 1
+
+PBMC3K = Path(__file__).resolve().parents[3] / "tests_playwright" / "test-data" / "scanpy-pbmc3k.h5ad"
+
+def test_umap_worker_keeps_pbmc3k_leiden_clusters_together(tmp_path):
+    adata = ad.read_h5ad(PBMC3K)   # X is scanpy's scaled matrix: 2638 cells x 1838 genes
+    leiden = adata.obs["leiden"].astype(str).to_numpy()
+
+    ws = Workspace(tmp_path / "scratch", "job1")
+    _write_matrix_tray(ws, adata.X, out_name="UMAP")
+
+    umap_run(str(ws.root))
+
+    assert ws.read_marker() == "done"
+    with h5py.File(ws.output / "result.h5", "r") as f:
+        embedding = np.column_stack([cast(h5py.Dataset, f["UMAP_1"])[:], cast(h5py.Dataset, f["UMAP_2"])[:]])
+
+    # share of each cell's 15 nearest neighbours in the embedding that are in its leiden cluster:
+    # scanpy's stored X_umap scores 0.872, a neighbour graph built on all genes without PCA 0.315
+    k = 15
+    neighbours = NearestNeighbors(n_neighbors=k + 1).fit(embedding).kneighbors(embedding, return_distance=False)[:, 1:]
+    agreement = (leiden[neighbours] == leiden[:, None]).mean()
+    assert agreement > 0.75

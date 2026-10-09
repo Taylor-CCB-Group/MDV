@@ -20,6 +20,7 @@ def run(workspace: str) -> None:
             out_name = cast(str, f.attrs["output_name"])
             neighbors_kwargs = json.loads(cast(str, f.attrs.get("kwargs.neighbors", "{}")))
             umap_kwargs = json.loads(cast(str, f.attrs.get("kwargs.umap", "{}")))
+            pca_kwargs = json.loads(cast(str, f.attrs.get("kwargs.pca", "{}")))
 
         # rebuild the CSC matrix from the tray triplet - n_cells from metadata, NOT max(i) + 1
         X = scipy.sparse.csc_matrix((x, i, p), shape=(n_cells, n_genes))
@@ -28,9 +29,14 @@ def run(workspace: str) -> None:
         X.data = np.nan_to_num(X.data, nan=0.0, posinf=0.0, neginf=0.0)
         X.eliminate_zeros()
 
-        # neighbour graph on X -> embed
+        # PCA -> neighbour graph on X_pca -> embed; a graph on every gene lets noise swamp the clusters
         adata = AnnData(X=X)
-        sc.pp.neighbors(adata, use_rep="X", **neighbors_kwargs)
+        if "n_comps" in pca_kwargs:
+            # arpack needs fewer components than the smaller dimension; manifest records what was used
+            pca_kwargs["n_comps"] = min(int(pca_kwargs["n_comps"]), min(n_cells, n_genes) - 1)
+        sc.pp.pca(adata, **pca_kwargs)
+        n_comps = int(adata.obsm["X_pca"].shape[1])   # components actually used
+        sc.pp.neighbors(adata, use_rep="X_pca", **neighbors_kwargs)
         sc.tl.umap(adata, **umap_kwargs)
         embedding = np.asarray(adata.obsm["X_umap"], dtype=np.float64) # (n_cells, n_components)
 
@@ -41,7 +47,7 @@ def run(workspace: str) -> None:
             f.attrs["output_name"] = out_name
 
         (ws / "output" / "manifest.json").write_text(
-            json.dumps({"rows": int(embedding.shape[0]), "columns": int(embedding.shape[1])})
+            json.dumps({"rows": int(embedding.shape[0]), "columns": int(embedding.shape[1]), "n_comps": n_comps})
         ) # basic provenance
         (ws / "STATUS").write_text("done")
 
