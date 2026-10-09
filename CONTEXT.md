@@ -101,8 +101,9 @@ decisions live in `docs/adr/` (0004–0007).
   the cost is one stat per project, not a manager per project. The startup half of the same reconcile
   (ADR-0005) a per-project manager runs when it is first created.
 
-- **quarantine** — where the **recovery scan** moves a **job record** it cannot parse: aside and
-  preserved for inspection (not deleted, not silently skipped), surfaced on a health signal. A
+- **quarantine** — where loading a project's **job records** (during the **recovery scan** or any
+  later read) moves a record it cannot parse: aside and preserved for inspection (not deleted, not
+  silently skipped), surfaced on a health signal. A
   corrupt record loses only itself; the project's other records and every other project still
   recover (ADR-0012).
 

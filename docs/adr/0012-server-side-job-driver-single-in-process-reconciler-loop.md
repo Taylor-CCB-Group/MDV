@@ -139,8 +139,11 @@ def start_driver(service, projects):
     service.start()                  # then launch the one daemon thread
 ```
 
-Order matters: reconcile before the thread starts ticking, so a tick cannot run against a project
-whose manager the scan is still building. The helper is also the testable seam. Every serve path
+Order matters because of how the loop waits. A thread started with no managers registered finds
+nothing active, so it parks on the event with no timeout, and `recovery_scan` never sets the event.
+If the thread started first, the managers the scan then registers would sit untouched until an
+unrelated submit woke the loop. Scanning first means the thread's first tick already sees every
+recovered manager and switches to the timed wait. The helper is also the testable seam. Every serve path
 blocks (single-project in `serve_forever`, multi-project in `app.run`), so none of them is reached by
 the Flask test client. Unit-testing `start_driver` with a spy service pins the scan-then-start order
 without opening a socket or spawning a thread.
@@ -152,9 +155,14 @@ Placement rules:
   the test client never runs.
 - Single-project: `create_app`'s serve branch calls `start_driver(job_service, [project])` before
   `serve_forever`.
-- Multi-project: `mdv_desktop.py`'s `__main__` and `dbutils/mdv_server_app.py` each call
-  `start_driver(job_service, <catalog projects>)` after their serve loop, over the projects present at
-  boot.
+- Desktop: `mdv_desktop.py`'s `__main__` calls `start_driver(job_service, projects)` over the
+  projects present at boot, before it starts the folder watcher and `app.run`. It then calls
+  `create_app` once per project with `options.app` set, which takes the mount branch and never calls
+  `start_driver`, so there is one driver per process.
+- Production catalog: `dbutils/mdv_server_app.py` does not call `start_driver` yet. Its serving
+  functions build each `MDVProject`, mount it and discard it, so wiring the driver there means
+  returning those objects instead of building a second instance per project for the cached manager to
+  hold. Nothing in that deployment submits jobs yet, so the wiring lands with the frontend selector.
 - `start()` is idempotent (the `self._thread is None` guard), so one call per boot is safe.
 
 Runtime-added projects get no recovery hook. A brand-new project (`/create_project`, a fresh upload)
@@ -171,12 +179,16 @@ that works across threads and processes — the same lock covers the dev daemon 
 separate driver process later. Its discipline is applied unevenly today (only `rename_view` and the
 tray materialisers take it). For the driver we:
 
-- wrap ingest's project mutation in `project.lock("write")` — the one place the driver writes the
-  project.
+- wrap ingest's project mutation in `project.lock("write")`, the one place the driver writes the
+  project. This is not built yet: `tick` calls the ingester and `set_column_metadata` without the
+  lock. The tray materialisers already take `project.lock("read")`.
 - rely on HDF5's own file locking plus the `_get_h5_handle` retry loop (built for multi-accessor
   access) to mediate an ingest write against a concurrent `/get_data` read of the same `datafile.h5`.
-- make `JobStore` record writes atomic (temp file plus `os.replace`), so the driver's `load_all` on
-  its thread can never read a half-written record a submit greenlet is mid-write.
+- make `JobStore` record writes atomic, so the driver's `load_all` on its thread can never read a
+  half-written record a submit greenlet is mid-write. `_write` writes `<job_id>.json.tmp` and then
+  calls `os.replace`. The `.tmp` suffix keeps the temp file out of every `*.json` glob (`load_all`,
+  the recovery scan's peek). There is no `fsync`, so this protects against the process dying
+  mid-write, not against power loss.
 
 **Known gap:** `set_column` also does a read-modify-write of the datasource metadata JSON, which
 neither HDF5 locking nor the write lock covers unless every other metadata writer also takes the
@@ -191,12 +203,13 @@ is different: ingest's `set_column` throws, or materialise throws, though the wo
 `done`. There is no marker for it — but the response is the *same* JobStore transition to `FAILED`
 the marker path already makes. So:
 
-- catch owner-side exceptions **per record** inside `tick`, set that record `FAILED` with a new
-  `error` field on `JobRecord`, log the traceback, and continue. The record is the source of truth
-  the status endpoint reads; the log is the detail. No log scraping to learn which job failed,
-  because the record is in hand at the catch point.
-- errors that cannot be pinned to a single record (a whole `load_all` failing) log-and-continue at
-  the manager level.
+- catch owner-side exceptions **per record**, set that record `FAILED` with `str(e)` in the
+  `error` field on `JobRecord`, log the traceback, and continue with the other records. The record
+  is the source of truth the status endpoint reads; the log is the detail. No log scraping to learn
+  which job failed, because the record is in hand at the catch point.
+- errors that cannot be pinned to a single record log and continue at the project level:
+  `JobService.tick_all` wraps each manager's `tick` in its own guard, so one project's failure skips
+  only that project for one cycle.
 
 Failing on the first owner-side exception gives up a free idempotent retry (a failed ingest leaves
 the workspace intact and the marker still `done`). We accept that for the POC because exceptions that
@@ -204,6 +217,28 @@ escape ingest are usually terminal, and the common transient one — h5 lock con
 retried inside `_get_h5_handle`. Bounded-retry-then-`FAILED` (allow K owner-side errors before giving
 up) is the hardening that reclaims the rare transient without changing the "record is the source of
 truth" contract.
+
+### Where the per-record catches sit (implementation note)
+
+There are two catch points in `JobManager`:
+
+- `tick`, around the whole `done` branch: the `INGESTING` transition, the ingester, provenance, the
+  provenance pointers, the `DONE` transition and the workspace cleanup. On failure the workspace is
+  kept, because cleanup only runs on success, so the worker's output is still there to debug.
+- `_dispatch`, around the materialiser and `executor.submit`. On failure the record goes from
+  `STAGING` to `FAILED` and the loop moves on to the next queued record. Without this catch the
+  record would stay in `STAGING`, which counts as busy, and hold one concurrency slot for good. The
+  `RUNNING` transition sits outside the catch on purpose: once `executor.submit` has returned, the job
+  is live on the backend, and marking it `FAILED` would orphan it. If that write fails, the error
+  reaches `tick_all`, the record stays in `STAGING` without a handle, and boot reconcile re-queues it.
+
+`executor.poll` is not caught per record. Its failures, such as a `squeue` timeout, are usually
+temporary, and failing the job for one would be wrong; `tick_all` logs it and the next cycle polls
+again.
+
+`error` reaches the client unchanged. It can contain the scratch path (`$SCRATCH` on HPC) or the
+project's path on the server; if a shared deployment needs to hide those, the place to do it is the
+client-safe view described under the HTTP surface.
 
 ## Recovery-scan corruption: quarantine, don't halt and don't bury
 
@@ -228,14 +263,56 @@ So the policy:
   for the next scan.
 - **Never abort the scan.** A corrupt project sits quarantined while every other project recovers.
 
+### How quarantine is implemented (implementation note)
+
+`JobStore.load_all` parses each `records/*.json` file inside its own guard:
+
+- `ValueError` (bad JSON, including undecodable bytes) or `TypeError` (fields that do not match
+  `JobRecord`) is terminal. The file moves to `JobStore.quarantine_dir`, which is
+  `records/quarantine/`, created on first use, and the traceback is logged. The quarantine folder is
+  outside the non-recursive `*.json` glob, so a quarantined file leaves the active set without any
+  other change.
+- `OSError` is transient. The file stays where it is, a warning is logged, and the next pass reads it
+  again.
+
+Every caller gets this through `load_all`, including `has_active`, which runs in the driver loop
+outside any guard. Before per-file parsing, one corrupt record anywhere made `has_active` raise and
+killed the driver thread for every project.
+
+The recovery scan's peek (`_has_inflight_records`) reads record files directly so it does not build a
+`JobStore`. When it cannot read or parse a file, it reports the project as in flight. The scan then
+builds that project's manager, whose `load_all` quarantines or retries the file, so the sorting rules
+live in one place, and the project's other in-flight records are still recovered at boot.
+
+The health signal is `GET /jobs/health`, which returns `{"quarantined": N}`: the number of files in
+the project's quarantine folder. The count is cumulative, so a quarantined record stays visible until
+someone removes it.
+
+Two limits are accepted. If `os.replace` itself fails while moving a file into quarantine, that
+`OSError` escapes `load_all`. A record written by a newer version with an extra field is quarantined
+by an older version reading the same project.
+
 ## HTTP surface (context)
 
-The selector talks to per-project routes registered in `add_project` (the existing closure-over-
-`project` convention): `GET /project/<id>/jobs/tools` serialises the registry for the form,
-`POST /project/<id>/jobs` returns `202` with `{job_id}` after re-validating (ADR-0006) and nudging,
-and `GET /project/<id>/jobs` / `GET /project/<id>/jobs/<job_id>` are **pure reads** of a client-safe
-record view (internal `handle` and workspace paths dropped). Status is a pure read precisely because
-the driver, not the request, advances jobs.
+The selector talks to per-project routes registered in `server.py::build_app`, following the
+existing closure-over-`project` convention. Single-project mode serves them at the root (`/jobs`);
+multi-project mode mounts them under `/project/<id>/`.
+
+| Route | Returns |
+| --- | --- |
+| `GET /jobs/tools` | the serialised tool registry for the form, without internal `entrypoint` |
+| `POST /jobs` | `202 {job_id}` after re-validating (ADR-0006) and nudging; `400 {error}` for an unknown tool or bad params |
+| `GET /jobs` | every record in the client-safe view, in no fixed order |
+| `GET /jobs/<job_id>` | one record in the client-safe view; `404 {error}` for an unknown id |
+| `GET /jobs/health` | `{"quarantined": N}` |
+
+The client-safe view (`_client_view`) is the record without `handle`. That is the only internal
+field: a record never stores a workspace path, because the workspace is derived from `job_id`.
+
+The read routes never advance a job, because the driver does that. They reach records through
+`job_service.get_or_create(project)`, the same path as `POST /jobs`, so the first request for a
+project the recovery scan skipped builds its manager, and building a manager runs its boot
+reconcile (ADR-0005).
 
 ## Consequences
 
@@ -248,8 +325,9 @@ the driver, not the request, advances jobs.
   needs a client to reopen a project for its jobs to advance.
 - The driver moving to its own process (HPC/K8s) is a deployment change, because submit already only
   enqueues and the reconciler is already stateless for durable-handle backends.
-- Two follow-ups are recorded, not built: completing the read/write lock discipline across the data
-  routes, and bounded-retry-then-`FAILED` for owner-side exceptions.
+- Four follow-ups are recorded, not built: taking `project.lock("write")` around ingest, completing
+  the read/write lock discipline across the data routes, bounded-retry-then-`FAILED` for owner-side
+  exceptions, and calling `start_driver` from the production catalog.
 
 Prior art:
 [Kubernetes client-go workqueue](https://pkg.go.dev/k8s.io/client-go/util/workqueue),
