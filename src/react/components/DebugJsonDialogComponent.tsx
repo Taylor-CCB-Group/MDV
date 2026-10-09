@@ -6,7 +6,6 @@ import "react18-json-view/src/dark.css";
 import { observer } from "mobx-react-lite";
 import { useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
-import { vivLoaderCacheTelemetryObservable } from "../viv_loader_cache";
 import "../../utilities/css/JsonDialogStyles.css";
 import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Divider, Link, Typography } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -277,16 +276,9 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
         () => omitValidationFindings(json),
         [json],
     );
-    const jsonWithVivTelemetry = useMemo(
-        () => ({
-            ...jsonWithoutValidationFindings,
-            vivLoaderCacheTelemetry: vivLoaderCacheTelemetryObservable.snapshot,
-        }),
-        [jsonWithoutValidationFindings, vivLoaderCacheTelemetryObservable.snapshot],
-    );
     const filteredJson = useMemo(
-        () => filterJSON(jsonWithVivTelemetry, debouncedFilter),
-        [jsonWithVivTelemetry, debouncedFilter],
+        () => filterJSON(jsonWithoutValidationFindings, debouncedFilter),
+        [jsonWithoutValidationFindings, debouncedFilter],
     );
     const hasAnyFindings = Boolean(validationFindings?.hasAny);
     const injectFaultAndReload = (mode: DataLoaderFaultMode) => {
