@@ -18,6 +18,7 @@ import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 import type { FieldName } from "@/charts/charts";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
+import RasterDataWarning, { rasterEntriesKey } from "./RasterDataWarning";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
 import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
@@ -599,6 +600,7 @@ const SpatialDataViewer = observer(
                         </Profiler>
                     </div>
                 </div>
+                <RasterDataWarning spatialData={spatialData} entriesKey={rasterEntriesKey(config.renderStack)} />
                 <SpatialDataLink />
                 {tooltipPortal}
                 {featureTooltipPortal}
