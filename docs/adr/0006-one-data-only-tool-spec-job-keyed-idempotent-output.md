@@ -44,13 +44,15 @@ deliberately.)
 
 ### Param type vocabulary & the validation charter — enum/bool deferred
 
-`ParamSpec.type` today spans `column` / `dropdown` / `text` / `int` / `float`. **The backend gate
-(`validate_params`) enforces type + identity/membership, never value ranges** — a `column` value
-must be a real field of its datasource; a numeric value must be the declared `int`/`float`. A
-*range* (e.g. `n_neighbors >= 2`) is deliberately NOT the gate's job: that is the frontend
-control's declared bound (a `slider`'s min/max) and the worker's to reject at compute time (a bad
-value fails the job cleanly via `STATUS=failed` + `error.txt`). The gate answers "are the params
-what they claim to be," not "are they sensible."
+`ParamSpec.type` today spans `datasource` / `subgroup` / `column` / `dropdown` / `text` / `int` /
+`float`. **The backend gate (`validate_params`) enforces type + identity/membership, never value
+ranges** — a `datasource` value must be a real datasource of the project; a `column` value must be a
+real field of its datasource; a `subgroup` value must be a real `rows_as_columns` subgroup key of
+its datasource; a numeric value must be the declared `int`/`float`. A *range* (e.g. `n_neighbors >=
+2`) is deliberately NOT the gate's job: that is the frontend control's declared bound (a `slider`'s
+min/max) and the worker's to reject at compute time (a bad value fails the job cleanly via
+`STATUS=failed` + `error.txt`). The gate answers "are the params what they claim to be," not "are
+they sensible."
 
 **Open (deferred) — `enum` and `boolean` types.** scanpy (and later tools) expose choice params
 (`metric`, `method`) and toggles (`knn`) the current vocabulary can't declare. This is **not built**
@@ -60,7 +62,8 @@ what they claim to be," not "are they sensible."
   subclass the numeric check already excludes) + one `isinstance(v, bool)` branch; maps to a
   checkbox / JSON-Schema `boolean`.
 - **enum** → reuse `type="dropdown"` + a new **static** `options: list[str]` field (distinct from
-  the existing dynamic `options_from`, which resolves choices from a datasource's columns) + a
+  the existing dynamic `options_from`, which resolves choices from the columns or subgroups of the
+datasource another param names) + a
   membership branch (`value in options`). Membership is the SAME family as the `column` check, so
   it lands INSIDE the validation charter above — unlike a numeric range would.
 
