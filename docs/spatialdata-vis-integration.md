@@ -260,9 +260,10 @@ degrade-gracefully situation: the scheme MDV now sends (`categoricalPalette:
 layer.
 
 `zarrextra` moves in step because `@spatialdata/core` depends on `0.5.0`
-exactly. Leaving MDV's own pin behind installs a second copy, and MDV's
-`ensureChunkWorker` then flips the worker-decode flag in a module instance core
-never reads.
+exactly; leaving MDV's own pin behind installs a second copy. MDV no longer
+imports it directly: sd.js owns codec-worker setup and the chunk cache
+(`ensureCodecWorkers`), and a direct `enableWorkerChunkDecode` call from MDV
+would replace that page-global backend without the cache.
 
 The pins in `package.json` are the enforcement; keep them at or above these.
 

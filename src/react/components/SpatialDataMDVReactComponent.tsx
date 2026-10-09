@@ -19,7 +19,6 @@ import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import type { FieldName } from "@/charts/charts";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
-import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
 import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
@@ -290,7 +289,6 @@ const SpatialDataMainChart = observer(() => {
     const region = getSpatialRegionMetadata(rawRegion);
     const spatialDataUrl = region ? getSpatialDataUrl(region) : null;
     useEffect(() => {
-        ensureChunkWorker();
         ensureParquetWorker();
     }, []);
 

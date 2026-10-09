@@ -24,8 +24,10 @@ import parquetWorkerUrl from "@spatialdata/core/parquet-worker?worker&url";
  * seconds in the worker; on timeout the client falls back to the main thread rather
  * than failing, so a slow worker degrades instead of breaking.
  *
- * `codec: false` because MDV starts the zarr chunk worker itself via
- * `ensureChunkWorker`, not because it wants it off.
+ * `codec: false` because sd.js's canvas hook starts the zarr codec workers, with their
+ * shared chunk cache, itself. MDV must not call zarrextra's `enableWorkerChunkDecode`
+ * directly: each call replaces the page-global decode backend, so a call without
+ * sd.js's cache would silently drop it for every spatial chart.
  *
  * Returns whether the parquet worker is actually running — `false` outside a browser
  * or after a failed load — which is what UI depending on the no-fallback scan should
