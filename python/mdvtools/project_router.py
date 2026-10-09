@@ -40,7 +40,7 @@ TESTS NEEDED BEFORE REFACTORING:
 - Integration tests for auth hooks with route options
 """
 
-from flask import Flask
+from flask import Flask, request
 from flask.typing import ResponseReturnValue as Response
 from typing import Dict, Any, Callable, Tuple, List
 import re
@@ -112,7 +112,8 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
     def __init__(self, name: str, _ignored: str, url_prefix: str) -> None:
         self.name = name
         self.url_prefix = url_prefix  # i.e. /project/<project_id>/
-        self.routes: Dict[re.Pattern[str], Tuple[Callable, Dict[str, Any]]] = {}
+        # every handler registered for a path pattern, in registration order (one per method)
+        self.routes: Dict[re.Pattern[str], List[Tuple[Callable, Dict[str, Any]]]] = {}
         self.before_request_funcs: List[Callable] = []
         ProjectBlueprint.blueprints[name] = self
 
@@ -186,7 +187,8 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
             rule_re = re.compile(f'^{rule_pattern}$')
             
             # Store route with handler and options (options may contain access_level, methods, etc.)
-            self.routes[rule_re] = (f, options)
+            # equal patterns compare equal, so a second method on the same path joins this list
+            self.routes.setdefault(rule_re, []).append((f, options))
             return f
 
         return decorator
@@ -197,38 +199,53 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
         Process:
         1. Normalize subpath to absolute path (strip query params)
         2. Try each registered route pattern in order
-        3. On match, run before_request hooks (for auth/validation)
-        4. If hooks pass, call view function with captured groups as args
-        
+        3. On a path match, pick the handler that accepts the request method (ADR-0015):
+           one that declares `methods` handles only those; one that declares none accepts any
+        4. Run before_request hooks (for auth/validation)
+        5. If hooks pass, call view function with captured groups as args
+
         Example: '/tracks/<path:path>' compiles to regex '/tracks/(.+)'
                  Request '/tracks/mytrack/file.json' matches and calls handler('mytrack/file.json')
-        
+
         NOTE: Routes are tried in iteration order (Python 3.7+ dict ordering).
         For more control over route priority, consider using werkzeug.routing.Map
         which supports priority/specificity rules.
         """
         # Parse URL to get clean path without query parameters
         subpath = f"/{urlparse(subpath).path}"
-        
-        for rule, (method, options) in self.routes.items():
+        path_matched = False
+
+        for rule, handlers in self.routes.items():
             match = rule.match(subpath)
-            if match:
-                # Run all before_request functions (used for auth, logging, etc.)
-                for func in self.before_request_funcs:
-                    # Hooks receive project_id and route options (e.g., access_level)
-                    rv = func(project_id=project_id, options=options)
-                    if rv is not None:
-                        # Hook returned a response - short-circuit and return it
-                        # (typically used for auth failures, redirects, etc.)
-                        return rv
-                
-                # All hooks passed - call the view function with captured groups
-                # TODO: Consider type conversion here (int, float, etc.) based on converter
-                # Currently just passes strings - handlers must convert themselves
-                return method(*match.groups())
-        
+            if not match:
+                continue
+            path_matched = True
+            accepting = [
+                (view, options) for view, options in handlers
+                if "methods" not in options
+                or request.method in (m.upper() for m in options["methods"])
+            ]
+            if not accepting:
+                continue  # a later pattern may still accept this method
+            view, options = accepting[0]
+            # Run all before_request functions (used for auth, logging, etc.)
+            for func in self.before_request_funcs:
+                # Hooks receive project_id and route options (e.g., access_level)
+                rv = func(project_id=project_id, options=options)
+                if rv is not None:
+                    # Hook returned a response - short-circuit and return it
+                    # (typically used for auth failures, redirects, etc.)
+                    return rv
+
+            # All hooks passed - call the view function with captured groups
+            # TODO: Consider type conversion here (int, float, etc.) based on converter
+            # Currently just passes strings - handlers must convert themselves
+            return view(*match.groups())
+
+        if path_matched:
+            return {"status": "error", "message": f"method {request.method} not allowed for '{subpath}'"}, 405
         # No route matched
-        return {"status": "error", "message": f"no matching route for '{subpath}'"}, 404        
+        return {"status": "error", "message": f"no matching route for '{subpath}'"}, 404
 
 
 
