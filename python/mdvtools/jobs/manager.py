@@ -1,4 +1,7 @@
+import json
 import shutil
+import subprocess
+import sys
 from dataclasses import asdict
 from collections.abc import Callable
 from pathlib import Path
@@ -6,11 +9,9 @@ import logging
 
 from . import JOBS_DIRNAME
 from .registry import get_tool, validate_params
-from .jobstore import JobStore, Status, ACTIVE
+from .jobstore import JobRecord, JobStore, Status, ACTIVE
 from .workspace import Workspace, default_workspace_root
-from .owner_step import MATERIALIZERS, INGESTERS
 from .executor import Executor, LocalSubprocessExecutor, Handle
-from .provenance import build_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,22 @@ class JobManager:
         # and the ephemeral scratch (workspace_root) — the two roots are separate by design.
         return Workspace(self.workspace_root, job_id)
 
+    def _run_owner_step(self, step: str, rec: JobRecord, ws: Workspace) -> str:
+        """Run an owner step in its own process and wait for it (ADR-0014): the HDF5 work stays off
+        the server's gevent hub and out of the process its request handlers use. Returns the
+        step's stdout; a failed step raises with the last line of its stderr."""
+        result = subprocess.run(
+            [sys.executable, "-m", "mdvtools.jobs.owner_step", step, self.project.dir, str(ws.root)],
+            input=json.dumps(asdict(rec)),
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            logger.error("job %s: %s step failed:\n%s", rec.job_id, step, result.stderr)
+            lines = result.stderr.strip().splitlines()
+            raise RuntimeError(lines[-1] if lines else f"{step} step exited with {result.returncode}")
+        return result.stdout
+
     def _reconcile_on_boot(self) -> None:
         # rather than blindly re-queuing every active record, poll its durable handle
         # and only re-queue if the handle is not present or the job is not running
@@ -97,7 +114,7 @@ class JobManager:
             ws = self._workspace(nxt.job_id)
             self.store.set(nxt, Status.STAGING)
             try:
-                MATERIALIZERS[spec.input_shape](self.project, spec, nxt.params, ws)
+                self._run_owner_step("materialize", nxt, ws)
                 handle = self.executor.submit(
                     spec.entrypoint, ws.root
                 ) # submit AFTER intent
@@ -121,22 +138,9 @@ class JobManager:
                 marker = ws.read_marker() or "failed"
             if marker == "done":
                 try:
-                    spec = get_tool(rec.tool_id)
                     self.store.set(rec, Status.INGESTING)
-                    result = INGESTERS[spec.output.shape](
-                        self.project, rec.params, ws
-                    )  # idempotent; {"manifest": ..., "outputs": [(ds, col)]}
-                    provenance = build_provenance(rec, result["manifest"])
-                    pointer = {
-                        "kind": "job",
-                        "job_id": rec.job_id,
-                        "tool_id": rec.tool_id,
-                        "content_hash": provenance["content_hash"],
-                    }
-
-                    for ds, col in result["outputs"]:
-                        self.project.set_column_metadata(ds, col, "provenance", pointer)
-
+                    # idempotent: writes the columns and their provenance pointers
+                    provenance = json.loads(self._run_owner_step("ingest", rec, ws))
                     # commit last: pointer + column data are written while status is still "INGESTING"
                     self.store.set(rec, Status.DONE, provenance=provenance)
                     shutil.rmtree(ws.root, ignore_errors=True)
