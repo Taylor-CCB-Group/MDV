@@ -54,6 +54,8 @@ class JobStore:
     def __init__(self, records_root: Path):
         self.records_dir = Path(records_root) / "records"
         self.records_dir.mkdir(parents=True, exist_ok=True)
+        # malformed records moved aside by load_all; outside the *.json glob of records_dir (ADR0012)
+        self.quarantine_dir = self.records_dir / "quarantine"
 
     def new(self, tool_id: str, params: dict) -> JobRecord:
         rec = JobRecord(
@@ -86,9 +88,8 @@ class JobStore:
                 records.append(JobRecord(**json.loads(p.read_text())))
             except (ValueError, TypeError):
                 # terminal: bad JSON or wrong fields will not heal, so move it aside for inspection
-                quarantine = self.records_dir / "quarantine"
-                quarantine.mkdir(exist_ok=True)
-                os.replace(p, quarantine / p.name)
+                self.quarantine_dir.mkdir(exist_ok=True)
+                os.replace(p, self.quarantine_dir / p.name)
                 logger.exception("job record %s is malformed; quarantined", p.name)
             except OSError:
                 # transient: a lock or IO hiccup, so leave it in place for the next pass

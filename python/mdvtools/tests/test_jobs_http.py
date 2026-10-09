@@ -166,3 +166,19 @@ def test_get_job_by_unknown_id_returns_404(tmp_path):
 
     assert resp.status_code == 404
     assert resp.get_json()["error"]
+
+
+def test_jobs_health_reports_quarantined_count(tmp_path):
+    from pathlib import Path
+    from mdvtools.jobs import JOBS_DIRNAME
+
+    project = _project_with_cells(tmp_path)
+    records = Path(project.dir) / JOBS_DIRNAME / "records"
+    records.mkdir(parents=True, exist_ok=True)
+    (records / "broken.json").write_text("{not json")
+    app = build_app(project, MDVServerOptions(open_browser=False, websocket=False))
+
+    resp = app.test_client().get("/jobs/health")
+
+    assert resp.status_code == 200
+    assert resp.get_json() == {"quarantined": 1}

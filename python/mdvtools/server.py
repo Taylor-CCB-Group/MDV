@@ -309,6 +309,12 @@ def build_app(
         records = job_service.get_or_create(project).store.load_all()
         return jsonify([_client_view(r) for r in records])
 
+    # jobs health signal: how many malformed records load_all has quarantined (ADR0012)
+    @project_bp.route("/jobs/health", methods=["GET"])
+    def jobs_health():
+        store = job_service.get_or_create(project).store
+        return jsonify({"quarantined": len(list(store.quarantine_dir.glob("*.json")))})
+
     # one jobs's record, client safe
     @project_bp.route("/jobs/<job_id>", methods=["GET"])
     def get_job(job_id):
