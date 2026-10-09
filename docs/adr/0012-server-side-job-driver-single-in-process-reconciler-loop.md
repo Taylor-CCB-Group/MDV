@@ -81,15 +81,18 @@ it would replace.
 **event**. It does **no** dispatch. The driver owns all dispatch (materialise the **tray**, call
 `executor.submit`) and all **ingest**. Three reasons:
 
-- **Keep heavy work off the hub.** The server runs on gevent (`gevent.pywsgi.WSGIServer`), a
-  cooperative green-thread model. Materialising a tray is blocking HDF5 work in a C extension with no
-  yield point, so doing it in the request greenlet would freeze every other client for its duration.
-  The driver is a real OS thread — the codebase does not monkeypatch gevent, so `threading.Thread`
-  is genuine — and h5py/numpy release the GIL during native work, so the heavy step there does not
-  block the hub.
-- **Single writer.** Because the driver is a real OS thread and the request is a greenlet, they run
-  concurrently and the OS can interleave them. If both dispatched, they would race the JobStore and
-  the executor's process handles. One dispatcher removes that race by construction.
+- **Keep heavy work off the hub.** The server runs on gevent, a cooperative green-thread model.
+  Materialising a tray and ingesting outputs are blocking HDF5 work in a C extension with no yield
+  point, so doing either in a request greenlet would freeze every other client for its duration.
+  The driver does not run them itself either: it runs each as an **owner step** in a short-lived
+  process and waits on it (ADR-0014). That matters because the driver's own form differs by server.
+  The single-project and desktop servers do not monkeypatch, so their driver is a real OS thread.
+  The catalog runs under gunicorn's gevent worker, which calls `monkey.patch_all()`, so there
+  `threading.Thread` is a greenlet and anything heavy it ran would stall the hub.
+- **Single writer.** The driver and request handlers interleave: as an OS thread under the
+  single-project server, and at every I/O yield under the catalog. If both dispatched, they would
+  race the JobStore and the executor's process handles. One dispatcher removes that race by
+  construction.
 - **Forward-compatible.** When the driver moves to its own process, `submit()` *cannot* dispatch —
   the executor lives in the driver. Deciding it this way now makes that a deployment change, not a
   rewrite.
@@ -159,10 +162,13 @@ Placement rules:
   projects present at boot, before it starts the folder watcher and `app.run`. It then calls
   `create_app` once per project with `options.app` set, which takes the mount branch and never calls
   `start_driver`, so there is one driver per process.
-- Production catalog: `dbutils/mdv_server_app.py` does not call `start_driver` yet. Its serving
-  functions build each `MDVProject`, mount it and discard it, so wiring the driver there means
-  returning those objects instead of building a second instance per project for the cached manager to
-  hold. Nothing in that deployment submits jobs yet, so the wiring lands with the frontend selector.
+- Production catalog: `serve_projects_from_db` returns the `MDVProject` objects it mounted, and
+  the startup block in `dbutils/mdv_server_app.py` calls `start_driver(job_service, served)` after
+  both serve functions run. The recovery scan and the job routes therefore hold the same instance of
+  each project. Only projects served from the database are scanned. A folder that
+  `serve_projects_from_filesystem` discovers at boot gets a new row and is treated like a fresh
+  upload; if it does carry in-flight records, the next restart recovers them, because by then it
+  has a row.
 - `start()` is idempotent (the `self._thread is None` guard), so one call per boot is safe.
 
 Runtime-added projects get no recovery hook. A brand-new project (`/create_project`, a fresh upload)
@@ -174,16 +180,19 @@ operation over the projects present at startup.
 
 ## Concurrency and locking (minimal)
 
-`MDVProject` already carries a `fasteners.InterProcessReaderWriterLock` (`project.lock("read"|"write")`)
-that works across threads and processes — the same lock covers the dev daemon thread now and a
-separate driver process later. Its discipline is applied unevenly today (only `rename_view` and the
-tray materialisers take it). For the driver we:
+`MDVProject` already carries a `fasteners.InterProcessReaderWriterLock` (`project.lock("read"|"write")`).
+It is an fcntl file lock, so it excludes other processes but not other threads or greenlets in the
+same process. Owner steps run in their own process (ADR-0014), which is where this lock does its
+job. Its discipline is applied unevenly today (only `rename_view` and the owner steps take it). For
+the driver we:
 
-- wrap ingest's project mutation in `project.lock("write")`, the one place the driver writes the
-  project. This is not built yet: `tick` calls the ingester and `set_column_metadata` without the
-  lock. The tray materialisers already take `project.lock("read")`.
+- take `project.lock("write")` in the ingest owner step around writing the columns and their
+  provenance pointers, the one place a job writes the project. The materialise owner step takes
+  `project.lock("read")`.
 - rely on HDF5's own file locking plus the `_get_h5_handle` retry loop (built for multi-accessor
   access) to mediate an ingest write against a concurrent `/get_data` read of the same `datafile.h5`.
+  Because ingest runs in another process, a clash surfaces as an HDF5 lock error, which that loop
+  retries.
 - make `JobStore` record writes atomic, so the driver's `load_all` on its thread can never read a
   half-written record a submit greenlet is mid-write. `_write` writes `<job_id>.json.tmp` and then
   calls `os.replace`. The `.tmp` suffix keeps the temp file out of every `*.json` glob (`load_all`,
@@ -316,18 +325,22 @@ reconcile (ADR-0005).
 
 ## Consequences
 
-- The server gains one daemon thread and a `JobService` singleton; `submit()` loses its inline
-  `_dispatch()` and the driver owns dispatch, so heavy work stays off the gevent hub and there is a
-  single writer of executor and project state.
+- The server gains one driver and a `JobService` singleton; `submit()` loses its inline
+  `_dispatch()` and the driver owns dispatch, so there is a single writer of executor and job state.
+  Heavy work stays off the gevent hub because the driver runs it as owner steps (ADR-0014).
+- One driver per project store is a deployment requirement. The catalog must run as one process:
+  gunicorn `-w 1`, one replica on Kubernetes or Azure Container Apps, and a rollout that stops the
+  old instance before it starts the new one (Kubernetes `strategy: Recreate`). Two instances would
+  each run a driver over the same store and dispatch and ingest the same queued job twice, with
+  nothing to report it.
 - `JobRecord` gains an `error` field; `JobStore` writes become atomic. Both are backward-compatible
   (old records default `error=None`).
 - Boot-time reconcile is free for projects with no jobs and cheap for the rest; a restart no longer
   needs a client to reopen a project for its jobs to advance.
 - The driver moving to its own process (HPC/K8s) is a deployment change, because submit already only
   enqueues and the reconciler is already stateless for durable-handle backends.
-- Four follow-ups are recorded, not built: taking `project.lock("write")` around ingest, completing
-  the read/write lock discipline across the data routes, bounded-retry-then-`FAILED` for owner-side
-  exceptions, and calling `start_driver` from the production catalog.
+- Two follow-ups are recorded, not built: completing the read/write lock discipline across the
+  data routes, and bounded-retry-then-`FAILED` for owner-side exceptions.
 
 Prior art:
 [Kubernetes client-go workqueue](https://pkg.go.dev/k8s.io/client-go/util/workqueue),

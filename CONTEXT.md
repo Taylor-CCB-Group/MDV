@@ -87,13 +87,19 @@ decisions live in `docs/adr/` (0004–0007).
 - **worker** — the environment-agnostic compute process; reads and writes **only** its
   **workspace**.
 
-- **owner** — the web server; the sole reader/writer of the project store.
+- **owner**: the web server together with the short-lived processes it starts for **owner
+  steps**. It is the only side that reads or writes the project store; the **worker** never does.
 
-- **driver** — the single background loop (one per server process) that repeatedly advances every
+- **owner step**: one piece of owner-side work for a **job** that reads or writes the project
+  store, namely materializing the **tray** or **ingest**. Each runs in its own short-lived process,
+  never on the server's request loop (ADR-0014).
+
+- **driver**: the single background loop (one per server process) that repeatedly advances every
   project's **jobs**, dispatching queued ones and ingesting finished ones, so they progress whether
-  or not any client is watching. Liveness, not latency: it promises each advance eventually happens,
-  on no fixed deadline. Local dev runs it as a daemon thread inside the **owner**; HPC can host it in
-  its own process. Exactly one runs at a time (ADR-0012).
+  or not any client is watching. It provides liveness, not latency: it promises each advance
+  eventually happens, on no fixed deadline. It runs inside the **owner** and waits on each **owner
+  step**'s process; HPC can host it in its own process. Exactly one runs per project store at a time
+  (ADR-0012).
 
 - **recovery scan** — the **driver**'s first action at startup: sweep the catalog, cheaply filter
   each project for active **job records**, and build a manager only for those, so in-flight **jobs**
@@ -107,12 +113,6 @@ decisions live in `docs/adr/` (0004–0007).
   corrupt record loses only itself; the project's other records and every other project still
   recover (ADR-0012).
 
-- **driver** — the single background loop (one per server process) that repeatedly advances every
-  project's **jobs** so they progress whether or not any client is watching. It provides liveness,
-  not latency: it promises each advance eventually happens, on no fixed deadline. Local dev runs it
-  as a daemon thread inside the **owner**; HPC can host it in its own process. Exactly one runs at a
-  time.
-
 - **workspace** — the per-job directory holding the materialized inputs, intermediates, and
   outputs for one **job**. Fixed layout: `input/`, `work/`, `output/`, terminal marker.
 
@@ -120,7 +120,7 @@ decisions live in `docs/adr/` (0004–0007).
   one **job**. HDF5, with a per-**tool** schema; decoded from the store so the **worker** reads
   plain arrays, never MDV internals. The format is an owner↔worker contract — substitutable.
 
-- **ingest** — the **owner** step that reads **worker** outputs and writes them into the
+- **ingest**: the **owner step** that reads **worker** outputs and writes them into the
   project.
 
 - **job record** — the durable owner-side file for one **job**

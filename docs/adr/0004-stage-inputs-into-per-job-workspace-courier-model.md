@@ -37,7 +37,8 @@ below).
   "local" is just a very short courier walk — test it on a laptop, trust it on a cluster.
   Validated in production by Galaxy/Pulsar, which stage files to a remote host with **no
   shared filesystem**.
-- **Single active writer by construction.** Only the owner touches the project store. Staging
+- **Single active writer by construction.** Only the owner touches the project store: the web
+  server and the short-lived processes it starts to materialize and ingest (ADR-0014). Staging
   reads under the project **read-lock** (`MDVProject.lock`), so the tray is a torn-read-free
   **snapshot** frozen at submit time — a long job can never see a half-edited matrix. (This
   snapshot isolation is *why* materializing locally is not wasteful even though the data is
