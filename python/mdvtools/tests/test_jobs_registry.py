@@ -4,13 +4,22 @@ from mdvtools.jobs.registry import CONCAT_COLUMNS, get_tool, validate_params
 from mdvtools.jobs.registry import ToolSpec, ParamSpec, OutputSpec
 
 class FakeProject:
-    """Minimal stand-in: validate_params only calls get_datasource_metadata"""
+    """Minimal stand-in for the project lookups validate_params makes"""
 
-    def __init__(self, datasources):
+    def __init__(self, datasources, subgroups=None):
         self._ds = datasources  # {ds_name: [field, ...]}
+        self._subgroups = subgroups or {}  # {ds_name: [subgroup_key, ...]}
 
     def get_datasource_metadata(self, name):
         return {"columns": [{"field": f} for f in self._ds[name]]}
+
+    def get_datasource_names(self):
+        return list(self._ds)
+
+    def get_links(self, datasource, filter=None):
+        keys = self._subgroups.get(datasource, [])
+        return [{"datasource": "genes",
+                 "link": {"rows_as_columns": {"subgroups": {k: {} for k in keys}}}}]
 
 
 NUMERIC_SPEC = ToolSpec(
@@ -147,3 +156,48 @@ def test_serialize_registry_lists_all_tools_without_internal_fields():
 
     # entrypoint is an internal dispatch detail, never sent to the client
     assert "entrypoint" not in concat
+
+
+MATRIX_SPEC = ToolSpec(
+    id="matrixtool",
+    name="Matrix tool",
+    description="test",
+    params=[
+        ParamSpec("datasource", "datasource", "Datasource"),
+        ParamSpec("layer", "subgroup", "Matrix", options_from="datasource", default="gs"),
+        ParamSpec("output_name", "text", "Name", default="OUT"),
+    ],
+    output=OutputSpec("column", "datasource", "output_name"),
+    entrypoint="x:run",
+    input_shape="matrix",
+)
+
+
+@pytest.fixture
+def matrix_project():
+    return FakeProject({"cells": ["sample"], "genes": ["name"]}, subgroups={"cells": ["gs"]})
+
+
+def test_valid_datasource_and_subgroup_pass(matrix_project):
+    validate_params(MATRIX_SPEC, {"datasource": "cells", "layer": "gs", "output_name": "OUT"}, matrix_project)
+
+
+def test_rejects_unknown_datasource(matrix_project):
+    with pytest.raises(ValueError, match="'nope' is not a datasource"):
+        validate_params(MATRIX_SPEC, {"datasource": "nope", "layer": "gs", "output_name": "OUT"}, matrix_project)
+
+
+def test_rejects_subgroup_not_on_datasource(matrix_project):
+    with pytest.raises(ValueError, match="'other' is not a matrix of 'cells'"):
+        validate_params(MATRIX_SPEC, {"datasource": "cells", "layer": "other", "output_name": "OUT"}, matrix_project)
+
+
+def test_registry_declares_datasource_and_subgroup_types():
+    # the selector picks a control from the type alone, so pickers need their own types
+    from mdvtools.jobs.registry import UMAP
+
+    types = {p.name: p for p in UMAP.params}
+    assert types["datasource"].type == "datasource"
+    assert types["layer"].type == "subgroup"
+    assert types["layer"].options_from == "datasource"
+    assert {p.name: p.type for p in CONCAT_COLUMNS.params}["datasource"] == "datasource"

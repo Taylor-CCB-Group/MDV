@@ -5,9 +5,9 @@ from typing import Any
 @dataclass(frozen=True)
 class ParamSpec:
     name: str
-    type: str  # GuiSpecType: "dropdown" | "column" | "text" | "int" | "float"
+    type: str  # "datasource" | "subgroup" | "column" | "dropdown" | "text" | "int" | "float"
     label: str
-    options_from: str | None = None  # column picker scoped to THIS datasource param
+    options_from: str | None = None  # column or subgroup picker scoped to THIS datasource param
     default: Any = None
     applies_to: str | None = None # compute param -> which worker call it feeds; None = a control/output param (eg. output_name)
 
@@ -34,7 +34,7 @@ CONCAT_COLUMNS = ToolSpec(
     name="Concatenate Columns",
     description="Concatenate multiple columns into a single column.",
     params=[
-        ParamSpec("datasource", "dropdown", "Datasource"),
+        ParamSpec("datasource", "datasource", "Datasource"),
         ParamSpec("column_a", "column", "First column", options_from="datasource"),
         ParamSpec("column_b", "column", "Second column", options_from="datasource"),
         ParamSpec("separator", "text", "Separator", default="_"),
@@ -50,8 +50,8 @@ UMAP = ToolSpec(
     name="UMAP",
     description="Compute a UMAP embedding from the expression matrix (adds UMAP_1, UMAP_2, ..., UMAP_n)",
     params=[
-        ParamSpec("datasource", "dropdown", "Datasource"),
-        ParamSpec("layer", "dropdown", "Matrix", default="gs"),
+        ParamSpec("datasource", "datasource", "Datasource"),
+        ParamSpec("layer", "subgroup", "Matrix", options_from="datasource", default="gs"),
         ParamSpec("output_name", "text", "New column base name", default="UMAP"),
         ParamSpec("n_neighbors", "int", "Neighbors", default=15, applies_to="neighbors"),
         ParamSpec("min_dist", "float", "Minimum distance", default=0.5, applies_to="umap"),
@@ -85,9 +85,22 @@ def get_tool(tool_id: str) -> ToolSpec:
 
 
 def validate_params(spec: ToolSpec, params: dict, project) -> None:
-    """ADR: 0006 backend re-validates. Every "column" param must name a column of the datasource its options_from points at."""
+    """ADR: 0006 backend re-validates. A "datasource" param must name a datasource; every "column"
+    or "subgroup" param must name a column or matrix of the datasource its options_from points at."""
     for p in spec.params:
-        if p.type == "column":
+        if p.type == "datasource":
+            if params.get(p.name) not in project.get_datasource_names():
+                raise ValueError(f"{params.get(p.name)!r} is not a datasource")
+        elif p.type == "subgroup":
+            ds_name = params[p.options_from]
+            keys = {
+                k
+                for ln in project.get_links(ds_name, "rows_as_columns")
+                for k in (ln["link"].get("rows_as_columns") or {}).get("subgroups") or {}
+            }
+            if params.get(p.name) not in keys:
+                raise ValueError(f"{params.get(p.name)!r} is not a matrix of {ds_name!r}")
+        elif p.type == "column":
             ds_name = params[p.options_from]
             fields = {
                 c["field"] for c in project.get_datasource_metadata(ds_name)["columns"]
