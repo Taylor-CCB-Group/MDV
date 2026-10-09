@@ -8,15 +8,11 @@ from . import JOBS_DIRNAME
 from .registry import get_tool, validate_params
 from .jobstore import JobStore, Status, ACTIVE
 from .workspace import Workspace, default_workspace_root
-from .owner_step import MATERIALIZERS
-from .ingest import ingest_column_output
+from .owner_step import MATERIALIZERS, INGESTERS
 from .executor import Executor, LocalSubprocessExecutor, Handle
 from .provenance import build_provenance
 
 logger = logging.getLogger(__name__)
-
-# ingest handlers keyed by OUTPUT shape
-INGESTERS = {"column": ingest_column_output}
 
 
 class JobManager:
