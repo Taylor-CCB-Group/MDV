@@ -7,20 +7,15 @@ import logging
 from . import JOBS_DIRNAME
 from .registry import get_tool, validate_params
 from .jobstore import JobStore, Status, ACTIVE
-from .workspace import (
-    Workspace,
-    materialize_columns_tray,
-    materialize_matrix_tray,
-    default_workspace_root
-)
+from .workspace import Workspace, default_workspace_root
+from .owner_step import MATERIALIZERS
 from .ingest import ingest_column_output
 from .executor import Executor, LocalSubprocessExecutor, Handle
 from .provenance import build_provenance
 
 logger = logging.getLogger(__name__)
 
-# materializers keyed by INPUT shape; ingest handlers keyed by OUTPUT shape
-MATERIALIZERS = {"columns": materialize_columns_tray, "matrix": materialize_matrix_tray}
+# ingest handlers keyed by OUTPUT shape
 INGESTERS = {"column": ingest_column_output}
 
 
