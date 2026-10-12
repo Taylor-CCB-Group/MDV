@@ -21,24 +21,10 @@ import {
     setParam,
     toSubmitParams,
 } from "./jobForm";
-import {
-    type JobParamSpec,
-    type JobParamValue,
-    type JobRecord,
-    type JobStatus,
-    fetchJobs,
-    fetchTools,
-    submitJob,
-} from "./jobsApi";
+import { type JobParamSpec, type JobParamValue, type JobStatus, fetchTools, submitJob } from "./jobsApi";
+import { jobsQueryOptions } from "./useJobColumnSync";
 
-/** Statuses the driver will still move on from (ADR-0012), so the list keeps polling. */
-const MOVING: JobStatus[] = ["queued", "staging", "running", "ingesting"];
 const FAILED: JobStatus[] = ["failed", "lost", "stale"];
-const POLL_MS = 2000;
-
-export function jobsRefetchInterval(jobs: JobRecord[] | undefined): number | false {
-    return jobs?.some((j) => MOVING.includes(j.status)) ? POLL_MS : false;
-}
 
 type ParamFieldProps = {
     param: JobParamSpec;
@@ -108,11 +94,7 @@ type JobsPanelProps = {
 export default function JobsPanel({ root, sources }: JobsPanelProps) {
     const queryClient = useQueryClient();
     const toolsQuery = useQuery({ queryKey: ["jobs-tools", root], queryFn: () => fetchTools(root) });
-    const jobsQuery = useQuery({
-        queryKey: ["jobs", root],
-        queryFn: () => fetchJobs(root),
-        refetchInterval: (query) => jobsRefetchInterval(query.state.data),
-    });
+    const jobsQuery = useQuery(jobsQueryOptions(root));
     const submit = useMutation({
         mutationFn: ({ toolId, params }: { toolId: string; params: Record<string, JobParamValue> }) =>
             submitJob(root, toolId, params),
@@ -209,9 +191,7 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
                                     <Chip size="small" label={j.status} color={statusColor(j.status)} />
                                 </TableCell>
                                 <TableCell>{new Date(j.created * 1000).toLocaleString()}</TableCell>
-                                <TableCell>
-                                    {j.error ?? (j.status === "done" ? "Reload the page to use the new columns" : "")}
-                                </TableCell>
+                                <TableCell>{j.error ?? ""}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

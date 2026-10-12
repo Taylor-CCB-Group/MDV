@@ -4,6 +4,7 @@
  * `root` is the project root from `useProject()`: "" in single-project mode, "/project/<id>" in
  * multi-project mode.
  */
+import type { ServerDataSource } from "./jobColumns";
 
 /** How the selector renders a param; mirrors `ParamSpec.type` in `mdvtools/jobs/registry.py`. */
 export type JobParamType = "datasource" | "subgroup" | "column" | "dropdown" | "text" | "int" | "float";
@@ -73,6 +74,11 @@ export async function submitJob(root: string, toolId: string, params: Record<str
     });
     const body: { job_id: string } = await readJson(resp);
     return body.job_id;
+}
+
+/** The project's datasource metadata, as the page loaded it, including columns jobs have written since. */
+export async function fetchConfigs(root: string): Promise<{ datasources: ServerDataSource[] }> {
+    return readJson(await fetch(`${root}/get_configs`));
 }
 
 /** Every job of the project, newest first. */

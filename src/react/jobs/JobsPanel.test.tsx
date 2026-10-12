@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import JobsPanel, { jobsRefetchInterval } from "./JobsPanel";
+import JobsPanel from "./JobsPanel";
 import type { JobsDataSource } from "./jobForm";
 import type { JobRecord, JobTool } from "./jobsApi";
+import { jobsRefetchInterval } from "./useJobColumnSync";
 
 const TOOLS: JobTool[] = [
     {
