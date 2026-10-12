@@ -594,6 +594,34 @@ class DataStore {
     }
 
     /**
+     * Replaces a column's metadata with a newer version from the backend, for example after a job
+     * re-ran and overwrote the column. The column object stays the same, so charts holding it see
+     * the change. Any loaded data stays in place until the caller reloads it; minMax and quantiles
+     * are then recomputed from the new data unless the metadata supplies them.
+     * @param {object} metadata the column's metadata from the backend
+     * @returns {boolean} true if the column has data loaded, which the caller should reload
+     */
+    replaceColumnMetadata(metadata) {
+        const c = this.columnIndex[metadata.field];
+        if (!c) {
+            throw `column ${metadata.field} is not present in data store`;
+        }
+        delete c.minMax;
+        delete c.quantiles;
+        Object.assign(c, metadata);
+        if (isDatatypeNumeric(c.datatype) && metadata.minMax) {
+            c.minMax = this._normalizeMinMax(c, metadata.minMax);
+        }
+        this.config.columns = updateColumnMetadata(this.config.columns, c);
+        delete this.indexes[c.field];
+        // setColumnData can list a column more than once; the loader skips any column listed here
+        for (let i = this.columnsWithData.indexOf(c.field); i !== -1; i = this.columnsWithData.indexOf(c.field)) {
+            this.columnsWithData.splice(i, 1);
+        }
+        return c.data != null;
+    }
+
+    /**
      * This method will return (case-insensitive) any values in the column
      * which contain the specified text (unique/text/multitext columns only)
      * @param {string} text - the query value
