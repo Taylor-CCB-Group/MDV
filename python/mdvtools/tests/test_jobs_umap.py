@@ -57,6 +57,31 @@ def test_matrix_tray_roundtrips_stored_X(tmp_path):
         assert (n_cells, n_genes) == (3, 2)
         assert np.allclose(rebuilt.toarray(), X.toarray())
 
+def _make_dense_matrix_project(tmp_path):
+    project = MDVProject(tmp_path)
+    project.add_datasource("cells", pd.DataFrame({"cell_id": ["c0", "c1", "c2"]}))
+    project.add_datasource("genes", pd.DataFrame({"name": ["g0", "g1"]}))
+    project.add_rows_as_columns_link("cells", "genes", "name", "Gene Expr")
+    # column-major and row-major flattening differ for this matrix, so a wrong reshape fails
+    X = np.array([[1.0, 0.0], [0.0, 2.0], [3.0, 4.0]], dtype=np.float32)  # 3 cells x 2 genes
+    project.add_rows_as_columns_subgroup("cells", "genes", "gs", X, name="gene_scores")
+    return project, X
+
+def test_matrix_tray_roundtrips_stored_dense_X(tmp_path):
+    project, X = _make_dense_matrix_project(tmp_path)
+    ws = Workspace(tmp_path / "scratch", "job1")
+    params = {"datasource": "cells", "layer": "gs", "output_name": "UMAP"}
+
+    materialize_matrix_tray(project, UMAP_SPEC, params, ws)
+
+    with h5py.File(ws.input / "tray.h5", "r") as f:
+        n_cells, n_genes = int(cast(int, f.attrs["n_cells"])), int(cast(int, f.attrs["n_genes"]))
+        assert not f.attrs["sparse"]
+        assert "i" not in f and "p" not in f
+        x = cast(h5py.Dataset, f["x"])[:]
+        assert (n_cells, n_genes) == (3, 2)
+        assert np.allclose(x.reshape((n_cells, n_genes), order="F"), X)
+
 def _write_matrix_tray(ws, X, out_name="UMAP", neighbors_kwargs=None, umap_kwargs=None, pca_kwargs=None):
     """Hand-build the tray materialize_matrix_tray would produce, so this test crosses the courier
     boundary the same way the worker will in production - and stays MDV-free, like the worker."""

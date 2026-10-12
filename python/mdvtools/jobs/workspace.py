@@ -5,6 +5,7 @@ import numpy as np
 import json
 
 MARKER = "STATUS"  # worker writes "done/failed" - the primary completion signal
+DENSE_COPY_SLICE = 1 << 24  # float32 elements per slice when copying a dense matrix (64 MB)
 
 
 def default_workspace_root(project) -> Path:
@@ -59,14 +60,13 @@ def materialize_columns_tray(project, spec, params: dict, ws: Workspace) -> None
 
 def materialize_matrix_tray(project, spec, params: dict, ws: Workspace) -> None:
     """Input shape 'matrix': copy the expression matrix (a rows_as_column subgroup) into its tray
-    as its CSC triplet - x/i/p unchanged, plus explicit shape, stays sparse. The worker rebuilds csc_matrix
-    from the triplet and imports no MDV.
+    in its stored layout, plus explicit shape and a `sparse` attr. Sparse is the CSC triplet - x/i/p
+    unchanged. Dense is the flat column-major x, copied in slices so this step never holds the whole
+    matrix. The worker rebuilds the matrix from either layout and imports no MDV.
     """
     datasource = params["datasource"]
     subgroup_key = params.get("layer", "gs")
     name, is_sparse = project._resolve_rows_as_columns_subgroup(datasource, subgroup_key)
-    if not is_sparse:
-        raise NotImplementedError("matrix tray materialization only supports sparse matrices")
 
     n_cells = int(project.get_datasource_metadata(datasource)["size"])
     with project.lock("read"):
@@ -74,29 +74,34 @@ def materialize_matrix_tray(project, spec, params: dict, ws: Workspace) -> None:
         try:
             grp = h5[f"{datasource}/{name}"]
             assert isinstance(grp, h5py.Group)
-            x = np.asarray(grp["x"], dtype=np.float32)
-            i = np.asarray(grp["i"], dtype=np.uint32)
-            p = np.asarray(grp["p"])
+            with h5py.File(ws.input / "tray.h5", "w") as f:
+                if is_sparse:
+                    p = np.asarray(grp["p"])
+                    f.create_dataset("x", data=np.asarray(grp["x"], dtype=np.float32))
+                    f.create_dataset("i", data=np.asarray(grp["i"], dtype=np.uint32))
+                    f.create_dataset("p", data=p)
+                    n_genes = len(p) - 1
+                else:
+                    src = grp["x"]
+                    assert isinstance(src, h5py.Dataset)
+                    dst = f.create_dataset("x", shape=src.shape, dtype=np.float32)
+                    for start in range(0, len(src), DENSE_COPY_SLICE):
+                        dst[start : start + DENSE_COPY_SLICE] = src[start : start + DENSE_COPY_SLICE]
+                    n_genes = len(src) // n_cells
+                f.attrs["n_cells"] = n_cells
+                f.attrs["n_genes"] = n_genes
+                f.attrs["sparse"] = is_sparse
+                # route params by their declared target call: control/output params (applies_to = None) stay
+                # flat attrs; compute params bundle into kwargs.<call>, so the worker splats them into the call
+                kwargs_bundles: dict[str, dict] = {}
+                for pspec in spec.params:
+                    if pspec.type == "column" or params.get(pspec.name) is None:
+                        continue
+                    if pspec.applies_to is None:
+                        f.attrs[pspec.name] = params[pspec.name]
+                    else:
+                        kwargs_bundles.setdefault(pspec.applies_to, {})[pspec.name] = params[pspec.name]
+                for group, kw in kwargs_bundles.items():
+                    f.attrs[f"kwargs.{group}"] = json.dumps(kw)
         finally:
             h5.close()
-    n_genes = len(p) - 1
-
-    with h5py.File(ws.input / "tray.h5", "w") as f:
-        f.create_dataset("x", data=x)
-        f.create_dataset("i", data=i)
-        f.create_dataset("p", data=p)
-        f.attrs["n_cells"] = n_cells
-        f.attrs["n_genes"] = n_genes
-        f.attrs["sparse"] = True
-        # route params by their declared target call: control/output params (applies_to = None) stay
-        # flat attrs; compute params bundle into kwargs.<call>, so the worker splats them into the call
-        kwargs_bundles: dict[str, dict] = {}
-        for pspec in spec.params:
-            if pspec.type == "column" or params.get(pspec.name) is None:
-                continue
-            if pspec.applies_to is None:
-                f.attrs[pspec.name] = params[pspec.name]
-            else:
-                kwargs_bundles.setdefault(pspec.applies_to, {})[pspec.name] = params[pspec.name]
-        for group, kw in kwargs_bundles.items():
-            f.attrs[f"kwargs.{group}"] = json.dumps(kw)
