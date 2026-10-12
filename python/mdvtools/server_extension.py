@@ -40,6 +40,19 @@ class MDVProjectServerExtension(Protocol):
         ...
 
 
+class ExtensionError(RuntimeError):
+    """Raised when configured extensions cannot be activated safely."""
+
+
+@dataclass(frozen=True)
+class ExtensionNavigation:
+    """Optional catalog navigation contributed by an active extension."""
+
+    label: str
+    url: str
+    requires_admin: bool = False
+
+
 @dataclass
 class MDVServerOptions:
     """
@@ -52,4 +65,3 @@ class MDVServerOptions:
     app: Optional[Flask] = None
     backend_db: bool = False
     extensions: List[MDVProjectServerExtension] = field(default_factory=list)
-
