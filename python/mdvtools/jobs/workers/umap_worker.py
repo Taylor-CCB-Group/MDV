@@ -13,21 +13,23 @@ def run(workspace: str) -> None:
     try:
         with h5py.File(ws / "input" / "tray.h5", "r") as f:
             x = cast(h5py.Dataset, f["x"])[:]
-            i = cast(h5py.Dataset, f["i"])[:]
-            p = cast(h5py.Dataset, f["p"])[:]
             n_cells = int(cast(int, f.attrs["n_cells"]))
             n_genes = int(cast(int, f.attrs["n_genes"]))
+            # inline sanitise (inspired from _coerce_x_to_csc_without_nonfinite)
+            if f.attrs["sparse"]:
+                # rebuild the CSC matrix from the tray triplet - n_cells from metadata, NOT max(i) + 1
+                i = cast(h5py.Dataset, f["i"])[:]
+                p = cast(h5py.Dataset, f["p"])[:]
+                X = scipy.sparse.csc_matrix((x, i, p), shape=(n_cells, n_genes))
+                X.data = np.nan_to_num(X.data, nan=0.0, posinf=0.0, neginf=0.0)
+                X.eliminate_zeros()
+            else:
+                # the dense tray is the project's flat column-major layout, one gene after another
+                X = np.nan_to_num(x.reshape((n_cells, n_genes), order="F"), nan=0.0, posinf=0.0, neginf=0.0)
             out_name = cast(str, f.attrs["output_name"])
             neighbors_kwargs = json.loads(cast(str, f.attrs.get("kwargs.neighbors", "{}")))
             umap_kwargs = json.loads(cast(str, f.attrs.get("kwargs.umap", "{}")))
             pca_kwargs = json.loads(cast(str, f.attrs.get("kwargs.pca", "{}")))
-
-        # rebuild the CSC matrix from the tray triplet - n_cells from metadata, NOT max(i) + 1
-        X = scipy.sparse.csc_matrix((x, i, p), shape=(n_cells, n_genes))
-
-        # inline sanitise (inspired from _coerce_x_to_csc_without_nonfinite)
-        X.data = np.nan_to_num(X.data, nan=0.0, posinf=0.0, neginf=0.0)
-        X.eliminate_zeros()
 
         # PCA -> neighbour graph on X_pca -> embed; a graph on every gene lets noise swamp the clusters
         adata = AnnData(X=X)

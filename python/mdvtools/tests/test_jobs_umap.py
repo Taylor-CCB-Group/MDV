@@ -4,6 +4,7 @@ import json
 
 import h5py
 import numpy as np
+import pytest
 import pandas as pd
 import scipy.sparse
 import anndata as ad
@@ -82,18 +83,22 @@ def test_matrix_tray_roundtrips_stored_dense_X(tmp_path):
         assert (n_cells, n_genes) == (3, 2)
         assert np.allclose(x.reshape((n_cells, n_genes), order="F"), X)
 
-def _write_matrix_tray(ws, X, out_name="UMAP", neighbors_kwargs=None, umap_kwargs=None, pca_kwargs=None):
+def _write_matrix_tray(ws, X, out_name="UMAP", neighbors_kwargs=None, umap_kwargs=None, pca_kwargs=None, sparse=True):
     """Hand-build the tray materialize_matrix_tray would produce, so this test crosses the courier
     boundary the same way the worker will in production - and stays MDV-free, like the worker."""
-    X = scipy.sparse.csc_matrix(X)
     with h5py.File(ws.input / "tray.h5", "w") as f:
-        f.create_dataset("x", data=X.data.astype(np.float32))
-        f.create_dataset("i", data=X.indices.astype(np.uint32))
-        f.create_dataset("p", data=X.indptr)
+        if sparse:
+            X = scipy.sparse.csc_matrix(X)
+            f.create_dataset("x", data=X.data.astype(np.float32))
+            f.create_dataset("i", data=X.indices.astype(np.uint32))
+            f.create_dataset("p", data=X.indptr)
+        else:
+            X = np.asarray(X, dtype=np.float32)
+            f.create_dataset("x", data=X.flatten(order="F"))   # the project's flat column-major layout
         n_cells, n_genes = cast(tuple[int, int], X.shape)
         f.attrs["n_cells"] = n_cells
         f.attrs["n_genes"] = n_genes
-        f.attrs["sparse"] = True
+        f.attrs["sparse"] = sparse
         f.attrs["output_name"] = out_name
         if neighbors_kwargs is not None:
             f.attrs["kwargs.neighbors"] = json.dumps(neighbors_kwargs)
@@ -103,7 +108,8 @@ def _write_matrix_tray(ws, X, out_name="UMAP", neighbors_kwargs=None, umap_kwarg
             f.attrs["kwargs.pca"] = json.dumps(pca_kwargs)
 
 
-def test_umap_worker_embeds_and_survives_nonfinite(tmp_path):
+@pytest.mark.parametrize("sparse", [True, False], ids=["sparse", "dense"])
+def test_umap_worker_embeds_and_survives_nonfinite(tmp_path, sparse):
     rng = np.random.default_rng(0)
     dense = rng.random((60, 10)).astype(np.float32)
     dense[dense < 0.6] = 0.0        # ~40% nonzero -> genuinely sparse
@@ -111,7 +117,7 @@ def test_umap_worker_embeds_and_survives_nonfinite(tmp_path):
     dense[7, 1] = np.nan
 
     ws = Workspace(tmp_path / "scratch", "job1")
-    _write_matrix_tray(ws, dense, out_name="UMAP")
+    _write_matrix_tray(ws, dense, out_name="UMAP", sparse=sparse)
 
     umap_run(str(ws.root))
 
