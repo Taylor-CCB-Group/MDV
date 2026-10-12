@@ -101,4 +101,15 @@ describe("syncJobColumns", () => {
         expect(loadColumnSet).not.toHaveBeenCalled();
         expect(column(store, "UMAP_1").data).toEqual(new Float32Array([0, 0.5, 1]));
     });
+
+    test("keeps a column deleted on this page deleted", () => {
+        const store = makeStore(NAME, umapColumn("job1", [0, 1]));
+        store.softDeleteColumn("UMAP_1", true);
+        const { target } = makeTarget(store);
+
+        syncJobColumns(target, server(umapColumn("job1", [0, 1])));
+
+        expect(store.columnIndex.UMAP_1).toBeUndefined();
+        expect(store.getAllColumnsMetadata().find((c) => c.field === "UMAP_1")).toMatchObject({ deleted: true });
+    });
 });

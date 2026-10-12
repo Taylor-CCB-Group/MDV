@@ -37,6 +37,10 @@ export function syncJobColumns(target: ColumnSyncTarget, server: ServerDataSourc
             if (!id || column.deleted) continue;
             const local = store.columnIndex[column.field];
             if (!local) {
+                // a column deleted on this page keeps its metadata with `deleted` set until saved;
+                // only a re-run, which writes a new job id, brings it back
+                const deleted = store.getAllColumnsMetadata().find((c) => c.field === column.field);
+                if (deleted && jobId(deleted) === id) continue;
                 store.addColumn(column);
             } else if (jobId(local) !== id && store.replaceColumnMetadata(column)) {
                 reload.push(column.field);
