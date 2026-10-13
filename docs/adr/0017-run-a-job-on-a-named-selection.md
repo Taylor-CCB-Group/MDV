@@ -61,6 +61,8 @@ The owner's materializer reads the sidecar and writes only the selected rows int
 ADR-0004 already described for DGE's "selected cells × all genes" tray. Workers do not change and do
 not know a subset exists. For a sparse matrix the materializer keeps the CSC entries whose row is
 selected and renumbers the rows. For a dense matrix it takes the selected rows from each gene's slice.
+The manager passes the sidecar's path to the materialize and ingest owner steps as an optional fourth
+argument, so the steps still need no `records_root` (ADR-0014).
 
 ### What the output looks like
 
