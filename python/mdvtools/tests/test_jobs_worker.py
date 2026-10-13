@@ -1,3 +1,6 @@
+import subprocess
+import sys
+
 import pytest
 import h5py
 import numpy as np
@@ -38,3 +41,27 @@ def test_worker_writes_failed_marker_when_tray_missing(tmp_path):
         run(str(ws.root))
     assert ws.read_marker() == "failed"
     assert (ws.output / "error.txt").exists()
+
+
+def test_worker_import_does_not_load_mdvproject():
+    # A compute node runs `python -m mdvtools.jobs.run_worker <module:fn> <ws>`, which imports
+    # the `mdvtools` package first. A fresh interpreter shows whether that drags in MDVProject
+    # and its stack (pandas, scanpy) when the worker itself only needs h5py and numpy.
+    code = (
+        "import sys\n"
+        "import mdvtools.jobs.run_worker\n"
+        "import mdvtools.jobs.workers.concat_worker\n"
+        "print(sorted(m for m in ('mdvtools.mdvproject', 'pandas') if m in sys.modules))\n"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    ).stdout
+    assert out.strip() == "[]"
+
+
+def test_top_level_exports_still_resolve():
+    import mdvtools
+    from mdvtools.mdvproject import MDVProject
+
+    assert mdvtools.MDVProject is MDVProject
+    assert callable(mdvtools.setup_ligand_network)

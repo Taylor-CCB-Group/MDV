@@ -38,6 +38,7 @@ class JobRecord:
     created: float = field(default_factory=time.time)
     provenance: dict | None = None  # promoted at ingest (ADR0007)
     error: str | None = None # set when the owner side fails this record
+    executor: str | None = None  # name chosen at submit (ADR-0016); None = the manager's default
 
 
 # states that mean "work was in flight when we stopped" - recoverable not terminal
@@ -57,9 +58,9 @@ class JobStore:
         # malformed records moved aside by load_all; outside the *.json glob of records_dir (ADR0012)
         self.quarantine_dir = self.records_dir / "quarantine"
 
-    def new(self, tool_id: str, params: dict) -> JobRecord:
+    def new(self, tool_id: str, params: dict, executor: str | None = None) -> JobRecord:
         rec = JobRecord(
-            uuid.uuid4().hex[:12], tool_id, params
+            uuid.uuid4().hex[:12], tool_id, params, executor=executor
         )  # job_id fixed at submit
         self._write(rec)
         return rec

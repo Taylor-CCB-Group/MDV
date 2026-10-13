@@ -11,7 +11,7 @@ from . import JOBS_DIRNAME
 from .registry import get_tool, validate_params
 from .jobstore import JobRecord, JobStore, Status, ACTIVE
 from .workspace import Workspace, default_workspace_root
-from .executor import Executor, LocalSubprocessExecutor, Handle
+from .executor import ExecutorConfig, LocalSubprocessExecutor, Handle
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,11 @@ class JobManager:
     - workspace_root — ephemeral per-job scratch (ADR-0007), OUTSIDE the project; local
       temp by default, `$SCRATCH`/shared-FS on HPC, wherever the worker computes.
 
-    The job_id is the *only* link between a record and its (possibly remote) workspace."""
+    The job_id is the *only* link between a record and its (possibly remote) workspace.
+
+    `executors` names the executors this manager offers, each with its own workspace root and
+    concurrency limit (ADR-0016); the first is the default. Without it, the manager offers one
+    executor built from `executor`, `workspace_root` and `max_concurrent`."""
 
     def __init__(
         self,
@@ -35,6 +39,7 @@ class JobManager:
         executor=None,
         max_concurrent: int | None = 2,
         on_submit: Callable[[], None] | None = None,
+        executors: dict[str, ExecutorConfig] | None = None,
     ):
         self.project = project
         self.records_root = (
@@ -42,23 +47,37 @@ class JobManager:
             if records_root is not None
             else Path(project.dir) / JOBS_DIRNAME
         )
-        self.workspace_root = (
-            Path(workspace_root)
-            if workspace_root is not None
-            else default_workspace_root(project)
-        )
+        self.executors = executors or {
+            "default": ExecutorConfig(
+                executor or LocalSubprocessExecutor(max_concurrent),
+                Path(workspace_root) if workspace_root is not None else default_workspace_root(project),
+                max_concurrent,
+            )
+        }
+        self.default_executor = next(iter(self.executors))
         self.store = JobStore(self.records_root)
-        self.executor: Executor = executor or LocalSubprocessExecutor(max_concurrent)
-        self.max_concurrent = max_concurrent
         # wake-the-driver hook; the JobService passes its nudge here. None = no-op,
         # so a bare-manager callers (Local/Slurm drivers, tests) work without changing anything
         self.on_submit = on_submit
         self._reconcile_on_boot()  # ADR0005: recover in-flight jobs at startup
 
-    def _workspace(self, job_id: str) -> Workspace:
+    def _executor_name(self, rec: JobRecord) -> str:
+        return rec.executor or self.default_executor   # records older than ADR-0016 carry None
+
+    def _config(self, rec: JobRecord) -> ExecutorConfig | None:
+        return self.executors.get(self._executor_name(rec))
+
+    def _fail_unconfigured(self, rec: JobRecord) -> None:
+        # never hand the record to another executor: its handle means nothing there (ADR-0016)
+        self.store.set(
+            rec, Status.FAILED,
+            error=f"executor {self._executor_name(rec)!r} is not configured on this server",
+        )
+
+    def _workspace(self, rec: JobRecord, config: ExecutorConfig) -> Workspace:
         # job_id is the sole correlation key between the durable record (records_root)
         # and the ephemeral scratch (workspace_root) — the two roots are separate by design.
-        return Workspace(self.workspace_root, job_id)
+        return Workspace(config.workspace_root, rec.job_id)
 
     def _run_owner_step(self, step: str, rec: JobRecord, ws: Workspace) -> str:
         """Run an owner step in its own process and wait for it (ADR-0014): the HDF5 work stays off
@@ -82,40 +101,59 @@ class JobManager:
         for rec in self.store.load_all():
             if rec.status not in ACTIVE:
                 continue
-            if rec.handle is not None and self.executor.poll(Handle(**rec.handle)) != "lost":
+            config = self._config(rec)
+            if config is None:
+                self._fail_unconfigured(rec)
+            elif rec.handle is not None and config.executor.poll(Handle(**rec.handle)) != "lost":
                 self.store.set(rec, Status.RUNNING)                 # reattach
             else:
                 self.store.set(rec, Status.QUEUED, handle=None)     # re-queue, since nothing to reattach
 
-    def submit(self, tool_id: str, params: dict) -> str:
+    def submit(self, tool_id: str, params: dict, executor: str | None = None) -> str:
         spec = get_tool(tool_id)
         validate_params(spec, params, self.project)  # backend-gate
-        rec = self.store.new(tool_id, params)  # write-ahead intent
+        executor = executor or self.default_executor
+        if executor not in self.executors:
+            raise ValueError(f"executor {executor!r} is not offered; choose from {list(self.executors)}")
+        # write-ahead intent; the executor is stored by name so a later change of default
+        # does not move a queued job (ADR-0016)
+        rec = self.store.new(tool_id, params, executor=executor)
         if self.on_submit is not None:
             self.on_submit() # wake the driver; it owns dispatch + ingest via tick()
         return rec.job_id
 
 
-    def _busy(self) -> int:
-        return sum(1 for r in self.store.load_all() if r.status in ACTIVE)
+    def _has_slot(self, rec: JobRecord, records: list[JobRecord]) -> bool:
+        # the limit is per executor (ADR-0016), so a full local pool holds back no Slurm job.
+        # max_concurrent=None -> unbounded: submit every queued job and let the backend's own
+        # scheduler queue them (ADR0008); otherwise the manager enforces the bound
+        config = self._config(rec)
+        if config is None or config.max_concurrent is None:
+            return True   # an unconfigured record is let through so dispatch fails it
+        name = self._executor_name(rec)
+        busy = sum(1 for r in records if r.status in ACTIVE and self._executor_name(r) == name)
+        return busy < config.max_concurrent
 
     def _dispatch(self) -> None:
-        # max_concurrent=None -> unbounded: submit every queued job and let the backend's own
-        # scheduler queue them (ADR0008) otherwise
-        # fill every free slot the executor's bound allows (ADR0008: manager enforces the bound for LocalSubprocessExecutor)
-        while self.max_concurrent is None or self._busy() < self.max_concurrent:
+        # fill every free slot, oldest queued record first among those whose executor has room
+        while True:
+            records = self.store.load_all()
             nxt = next(
-                (r for r in self.store.load_all() if r.status == Status.QUEUED.value),
+                (r for r in records if r.status == Status.QUEUED.value and self._has_slot(r, records)),
                 None,
             )
             if not nxt:
                 return
+            config = self._config(nxt)
+            if config is None:
+                self._fail_unconfigured(nxt)
+                continue
             spec = get_tool(nxt.tool_id)
-            ws = self._workspace(nxt.job_id)
+            ws = self._workspace(nxt, config)
             self.store.set(nxt, Status.STAGING)
             try:
                 self._run_owner_step("materialize", nxt, ws)
-                handle = self.executor.submit(
+                handle = config.executor.submit(
                     spec.entrypoint, ws.root
                 ) # submit AFTER intent
             except Exception as e:
@@ -130,10 +168,14 @@ class JobManager:
         for rec in self.store.load_all():
             if rec.status != Status.RUNNING.value:
                 continue
-            ws = self._workspace(rec.job_id)
+            config = self._config(rec)
+            if config is None:
+                self._fail_unconfigured(rec)
+                continue
+            ws = self._workspace(rec, config)
             marker = ws.read_marker()
             if marker is None and rec.handle is not None: # marker is primary, if None, check the executor whether the job is still alive
-                if self.executor.poll(Handle(**rec.handle)) == "running":
+                if config.executor.poll(Handle(**rec.handle)) == "running":
                     continue
                 marker = ws.read_marker() or "failed"
             if marker == "done":

@@ -1,13 +1,15 @@
 import time
 from pathlib import Path
 
+import pytest
+
 import pandas as pd
 import numpy as np
 import scipy.sparse
 from mdvtools.mdvproject import MDVProject
 from mdvtools.jobs.manager import JobManager
 from mdvtools.jobs.jobstore import Status
-from mdvtools.jobs.executor import Handle
+from mdvtools.jobs.executor import Handle, ExecutorConfig
 
 class _FakeExecutor:
     """Backend stand-in: submit() records the call but runs NO worker (no marker is ever
@@ -37,13 +39,13 @@ def _make_project(tmp_path):
     project.add_datasource("cells", df)
     return project
 
-def _seed_record(records_root, status, handle=None):
+def _seed_record(records_root, status, handle=None, executor=None):
     """Pre-seed a durable job record so the next JobManager(records_root=...) reconciles on boot"""
     from mdvtools.jobs.jobstore import JobStore
     store = JobStore(records_root)
     return store.set(
         store.new("concat_columns", {"datasource": "cells", "column_a": "sample", "column_b": "cluster", "output_name": "out"}),
-        status, handle=handle
+        status, handle=handle, executor=executor
     )
 
 def _drive(mgr, timeout=60):
@@ -339,3 +341,131 @@ def test_materialise_failure_fails_that_record_and_dispatch_carries_on(tmp_path)
     for job_id in ids:
         assert recs[job_id].status == Status.FAILED.value   # not stuck in STAGING
         assert recs[job_id].error
+
+
+_CONCAT = {"datasource": "cells", "column_a": "sample", "column_b": "cluster"}
+
+
+def _two_executors(tmp_path, local=None, slurm=None, local_limit=2):
+    """A local and a slurm entry, each with its own fake executor and workspace root (ADR-0016)."""
+    local = local or _FakeExecutor()
+    slurm = slurm or _FakeExecutor()
+    return local, slurm, {
+        "local": ExecutorConfig(local, tmp_path / "local_scratch", local_limit),
+        "slurm": ExecutorConfig(slurm, tmp_path / "shared_scratch", None),
+    }
+
+
+def test_job_runs_on_the_executor_chosen_at_submit(tmp_path):
+    project = _make_project(tmp_path)
+    local, slurm, executors = _two_executors(tmp_path)
+    mgr = JobManager(project, executors=executors)
+
+    job_id = mgr.submit("concat_columns", {**_CONCAT, "output_name": "out"}, executor="slurm")
+    mgr.tick()
+
+    rec = mgr.store.load_all()[0]
+    assert rec.executor == "slurm"
+    assert rec.status == Status.RUNNING.value
+    assert (slurm.submits, local.submits) == (1, 0)
+    assert (tmp_path / "shared_scratch" / job_id / "input").is_dir()   # the slurm entry's root
+    assert not (tmp_path / "local_scratch" / job_id).exists()
+
+
+def test_submit_without_executor_stores_the_default(tmp_path):
+    project = _make_project(tmp_path)
+    local, slurm, executors = _two_executors(tmp_path)
+    mgr = JobManager(project, executors=executors)
+
+    mgr.submit("concat_columns", {**_CONCAT, "output_name": "out"})
+
+    # stored by name, so a later change of default does not move a queued job
+    assert mgr.store.load_all()[0].executor == "local"
+
+
+def test_submit_rejects_an_executor_the_server_does_not_offer(tmp_path):
+    project = _make_project(tmp_path)
+    mgr = JobManager(project, executors=_two_executors(tmp_path)[2])
+
+    with pytest.raises(ValueError, match="k8s"):
+        mgr.submit("concat_columns", {**_CONCAT, "output_name": "out"}, executor="k8s")
+    assert mgr.store.load_all() == []      # rejected before the write-ahead record
+
+
+def test_concurrency_limit_is_per_executor(tmp_path):
+    project = _make_project(tmp_path)
+    local, slurm, executors = _two_executors(tmp_path, local_limit=1)
+    mgr = JobManager(project, executors=executors)
+    for i in range(2):
+        mgr.submit("concat_columns", {**_CONCAT, "output_name": f"l{i}"}, executor="local")
+        mgr.submit("concat_columns", {**_CONCAT, "output_name": f"s{i}"}, executor="slurm")
+
+    mgr.tick()
+
+    by_executor = {}
+    for r in mgr.store.load_all():
+        by_executor.setdefault(r.executor, []).append(r.status)
+    assert sorted(by_executor["local"]) == [Status.QUEUED.value, Status.RUNNING.value]
+    assert by_executor["slurm"] == [Status.RUNNING.value] * 2   # a full local pool holds nothing back
+
+
+def test_tick_polls_each_records_own_executor(tmp_path):
+    project = _make_project(tmp_path)
+    local, slurm, executors = _two_executors(
+        tmp_path, local=_FakeExecutor(poll_result="lost"), slurm=_FakeExecutor(poll_result="running")
+    )
+    mgr = JobManager(project, executors=executors)
+    mgr.submit("concat_columns", {**_CONCAT, "output_name": "l"}, executor="local")
+    mgr.submit("concat_columns", {**_CONCAT, "output_name": "s"}, executor="slurm")
+
+    mgr.tick()   # dispatch both
+    mgr.tick()   # no markers: local polls lost, slurm polls running
+
+    status = {r.executor: r.status for r in mgr.store.load_all()}
+    assert status == {"local": Status.FAILED.value, "slurm": Status.RUNNING.value}
+
+
+def test_reconcile_polls_the_records_own_executor(tmp_path):
+    project = _make_project(tmp_path)
+    records_root = tmp_path / "records"
+    rec = _seed_record(records_root, Status.RUNNING, handle={"kind": "slurm", "ref": "7"}, executor="slurm")
+    local, slurm, executors = _two_executors(
+        tmp_path, local=_FakeExecutor(poll_result="lost"), slurm=_FakeExecutor(poll_result="running")
+    )
+
+    mgr = JobManager(project, records_root=records_root, executors=executors)
+
+    reloaded = {r.job_id: r for r in mgr.store.load_all()}[rec.job_id]
+    assert reloaded.status == Status.RUNNING.value      # reattached through the slurm executor
+    assert (slurm.polls, local.polls) == (1, 0)
+
+
+def test_record_without_executor_runs_on_the_default(tmp_path):
+    project = _make_project(tmp_path)
+    records_root = tmp_path / "records"
+    _seed_record(records_root, Status.QUEUED)           # written before JobRecord.executor existed
+    local, slurm, executors = _two_executors(tmp_path)
+    mgr = JobManager(project, records_root=records_root, executors=executors)
+
+    mgr.tick()
+
+    assert (local.submits, slurm.submits) == (1, 0)
+
+
+def test_records_for_an_unconfigured_executor_fail_with_an_error(tmp_path):
+    project = _make_project(tmp_path)
+    records_root = tmp_path / "records"
+    queued = _seed_record(records_root, Status.QUEUED, executor="slurm")
+    running = _seed_record(records_root, Status.RUNNING, handle={"kind": "slurm", "ref": "7"}, executor="slurm")
+    local = _FakeExecutor()
+
+    # the operator has since removed slurm from this deployment
+    mgr = JobManager(project, records_root=records_root,
+                     executors={"local": ExecutorConfig(local, tmp_path / "scratch", 2)})
+    mgr.tick()
+
+    recs = {r.job_id: r for r in mgr.store.load_all()}
+    for job_id in (queued.job_id, running.job_id):
+        assert recs[job_id].status == Status.FAILED.value
+        assert "slurm" in (recs[job_id].error or "")
+    assert local.submits == 0 and local.polls == 0     # never handed to another executor

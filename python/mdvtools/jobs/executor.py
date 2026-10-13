@@ -29,6 +29,15 @@ class Executor(Protocol):
     def locate_result(self, handle: Handle, workspace: Path) -> Path: ...
 
 
+@dataclass
+class ExecutorConfig:
+    """One named executor a manager offers (ADR-0016). Each has its own workspace root, since
+    local scratch and the shared Slurm scratch differ; max_concurrent=None = no limit."""
+    executor: Executor
+    workspace_root: Path
+    max_concurrent: int | None
+
+
 class LocalSubprocessExecutor:
     """ADR0008: local subprocess. Worker dies with owner -> requeue (ADR0005)"""
 
