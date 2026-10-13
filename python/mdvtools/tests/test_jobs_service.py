@@ -191,3 +191,65 @@ def test_recovery_scan_survives_a_corrupt_record_and_hands_it_to_quarantine(tmp_
 
     assert built == ["corrupt", "inflight"]  # the scan did not abort
     assert (records / "quarantine" / "broken.json").exists()  # building its manager quarantined it
+
+
+class _DirProject:
+    def __init__(self, tmp_path, pid="proj1"):
+        self.id = pid
+        d = tmp_path / pid
+        d.mkdir()
+        self.dir = str(d)
+
+
+def test_env_without_slurm_offers_only_local(tmp_path):
+    from mdvtools.jobs.service import JobService, manager_factory_from_env
+    from mdvtools.jobs.executor import LocalSubprocessExecutor
+    from mdvtools.jobs.workspace import default_workspace_root
+
+    project = _DirProject(tmp_path)
+    service = JobService(manager_factory=manager_factory_from_env({}))
+    mgr = service.get_or_create(project)
+
+    assert list(mgr.executors) == ["local"]
+    local = mgr.executors["local"]
+    assert isinstance(local.executor, LocalSubprocessExecutor)
+    assert local.workspace_root == default_workspace_root(project)
+    assert local.max_concurrent == 2
+    assert mgr.on_submit == service.nudge     # the factory still wires the driver's nudge
+
+
+def test_env_with_slurm_cli_adds_slurm_after_local(tmp_path):
+    from mdvtools.jobs.service import manager_factory_from_env
+    from mdvtools.jobs.executor import SlurmExecutor
+
+    project = _DirProject(tmp_path)
+    shared = tmp_path / "shared"
+    factory = manager_factory_from_env(
+        {"MDV_JOBS_SLURM": "cli", "MDV_JOBS_SLURM_WORKSPACE_ROOT": str(shared)}
+    )
+    mgr = factory(project, on_submit=None)
+
+    assert list(mgr.executors) == ["local", "slurm"]    # local stays the default
+    slurm = mgr.executors["slurm"]
+    assert isinstance(slurm.executor, SlurmExecutor)
+    assert slurm.workspace_root == shared / "proj1"     # one directory per project
+    assert slurm.max_concurrent is None                 # Slurm queues the work itself
+
+
+def test_env_with_slurm_but_no_workspace_root_fails_at_build(tmp_path):
+    import pytest
+    from mdvtools.jobs.service import manager_factory_from_env
+
+    # raised when the factory is built (server start), not on the first job request
+    with pytest.raises(ValueError, match="MDV_JOBS_SLURM_WORKSPACE_ROOT"):
+        manager_factory_from_env({"MDV_JOBS_SLURM": "cli"})
+
+
+def test_env_with_unknown_slurm_mode_fails_at_build(tmp_path):
+    import pytest
+    from mdvtools.jobs.service import manager_factory_from_env
+
+    with pytest.raises(ValueError, match="sbatch"):
+        manager_factory_from_env(
+            {"MDV_JOBS_SLURM": "sbatch", "MDV_JOBS_SLURM_WORKSPACE_ROOT": str(tmp_path)}
+        )

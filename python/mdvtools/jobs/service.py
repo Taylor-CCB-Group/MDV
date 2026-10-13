@@ -1,13 +1,16 @@
 import json
+import os
 import threading
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
 from . import JOBS_DIRNAME
+from .executor import ExecutorConfig, LocalSubprocessExecutor, SlurmExecutor
 from .jobstore import Status
 from .manager import JobManager
+from .workspace import default_workspace_root
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +36,45 @@ def _has_inflight_records(project) -> bool:
         if status in _INFLIGHT:
             return True
     return False
+
+LOCAL_MAX_CONCURRENT = 2
+_SLURM_MODES = ("cli",)
+
+
+def manager_factory_from_env(
+    environ: Mapping[str, str] = os.environ,
+) -> Callable[..., JobManager]:
+    """Build the server's manager factory from the deployment's settings (ADR-0016).
+
+    `local` is always offered and is the default. `MDV_JOBS_SLURM=cli` adds `slurm`, with its
+    workspaces under `MDV_JOBS_SLURM_WORKSPACE_ROOT` (a filesystem the compute nodes share,
+    ADR-0010). The settings are checked here, so a misconfigured server fails at start rather
+    than on its first job request."""
+    slurm_mode = environ.get("MDV_JOBS_SLURM") or None   # empty counts as unset
+    slurm_root = environ.get("MDV_JOBS_SLURM_WORKSPACE_ROOT")
+    if slurm_mode is not None:
+        if slurm_mode not in _SLURM_MODES:
+            raise ValueError(f"MDV_JOBS_SLURM={slurm_mode!r} is not supported; use one of {_SLURM_MODES}")
+        if not slurm_root:
+            raise ValueError("MDV_JOBS_SLURM_WORKSPACE_ROOT must be set when MDV_JOBS_SLURM is set")
+
+    def build(project, on_submit: Callable[[], None] | None = None) -> JobManager:
+        executors = {
+            "local": ExecutorConfig(
+                LocalSubprocessExecutor(LOCAL_MAX_CONCURRENT),
+                default_workspace_root(project),
+                LOCAL_MAX_CONCURRENT,
+            )
+        }
+        if slurm_mode is not None and slurm_root:
+            # one directory per project, as default_workspace_root does for local scratch
+            executors["slurm"] = ExecutorConfig(
+                SlurmExecutor(), Path(slurm_root) / Path(project.dir).name, None
+            )
+        return JobManager(project, executors=executors, on_submit=on_submit)
+
+    return build
+
 
 class JobService:
     """

@@ -15,7 +15,7 @@ from mdvtools.server_utils import (
 )
 from mdvtools.ucsc_proxy_extension import UcscProxyServerExtension
 from mdvtools.jobs.registry import serialize_registry
-from mdvtools.jobs.service import JobService
+from mdvtools.jobs.service import JobService, manager_factory_from_env
 
 import webbrowser
 import json
@@ -57,7 +57,8 @@ logger.info("server.py module loaded")
 
 routes = set()
 
-job_service = JobService()      # one job service driver per process
+# one job service driver per process; its executors come from MDV_JOBS_* settings (ADR-0016)
+job_service = JobService(manager_factory=manager_factory_from_env())
 
 def record_usage_event(
     project_id: Union[str, int, None],
@@ -387,19 +388,27 @@ def build_app(
     def jobs_tools():
         return jsonify(serialize_registry())
 
+    # executors this server offers, default first (ADR-0016)
+    @project_bp.route("/jobs/executors", methods=["GET"])
+    def jobs_executors():
+        return jsonify(list(job_service.get_or_create(project).executors))
+
     # submit a job with a write-ahead intent
     @project_bp.route("/jobs", methods=["POST"])
     def submit_jobs():
         data = request.get_json(silent=True) or {}
         tool_id = data.get("tool_id")
         params = data.get("params") or {}
+        executor = data.get("executor")  # optional; None = the default executor
         if not isinstance(tool_id, str) or not isinstance(params, dict):
             return jsonify({"error": "tool_id (string) and params (object) required"}), 400
+        if executor is not None and not isinstance(executor, str):
+            return jsonify({"error": "executor must be a string"}), 400
 
         try:
-            job_id = job_service.get_or_create(project).submit(tool_id, params)
+            job_id = job_service.get_or_create(project).submit(tool_id, params, executor)
         except (KeyError, ValueError) as e:
-            return jsonify({"error": str(e)}), 400 # unknown tool / bad params
+            return jsonify({"error": str(e)}), 400 # unknown tool / bad params / unoffered executor
         return jsonify({"job_id": job_id}), 202
 
     # list this project's jobs; the client-safe view drops the internal executor handle

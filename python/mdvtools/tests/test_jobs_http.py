@@ -182,3 +182,61 @@ def test_jobs_health_reports_quarantined_count(tmp_path):
 
     assert resp.status_code == 200
     assert resp.get_json() == {"quarantined": 1}
+
+
+def _app_offering_slurm(tmp_path):
+    """An app whose job service offers local and slurm, as MDV_JOBS_SLURM=cli would (ADR-0016)."""
+    from mdvtools.jobs.service import manager_factory_from_env
+
+    server_module.job_service = JobService(manager_factory=manager_factory_from_env(
+        {"MDV_JOBS_SLURM": "cli", "MDV_JOBS_SLURM_WORKSPACE_ROOT": str(tmp_path / "shared")}
+    ))
+    project = _project_with_cells(tmp_path)
+    return build_app(project, MDVServerOptions(open_browser=False, websocket=False))
+
+
+_CONCAT_PARAMS = {"datasource": "cells", "column_a": "sample", "column_b": "cluster", "output_name": "out"}
+
+
+def test_get_jobs_executors_lists_the_offered_names(tmp_path):
+    app = _app_offering_slurm(tmp_path)
+
+    resp = app.test_client().get("/jobs/executors")
+
+    assert resp.status_code == 200
+    assert resp.get_json() == ["local", "slurm"]    # first is the default
+
+
+def test_post_jobs_with_executor_stores_it_and_the_client_view_shows_it(tmp_path):
+    client = _app_offering_slurm(tmp_path).test_client()
+
+    resp = client.post("/jobs", json={
+        "tool_id": "concat_columns", "params": _CONCAT_PARAMS, "executor": "slurm",
+    })
+
+    assert resp.status_code == 202
+    job = client.get(f"/jobs/{resp.get_json()['job_id']}").get_json()
+    assert job["executor"] == "slurm"
+    assert "handle" not in job
+
+
+def test_post_jobs_with_unoffered_executor_returns_400(tmp_path):
+    client = _app_offering_slurm(tmp_path).test_client()
+
+    resp = client.post("/jobs", json={
+        "tool_id": "concat_columns", "params": _CONCAT_PARAMS, "executor": "k8s",
+    })
+
+    assert resp.status_code == 400
+    assert "k8s" in resp.get_json()["error"]
+    assert client.get("/jobs").get_json() == []     # nothing queued
+
+
+def test_post_jobs_with_non_string_executor_returns_400(tmp_path):
+    client = _app_offering_slurm(tmp_path).test_client()
+
+    resp = client.post("/jobs", json={
+        "tool_id": "concat_columns", "params": _CONCAT_PARAMS, "executor": 5,
+    })
+
+    assert resp.status_code == 400
