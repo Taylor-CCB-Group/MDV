@@ -253,3 +253,96 @@ def test_env_with_unknown_slurm_mode_fails_at_build(tmp_path):
         manager_factory_from_env(
             {"MDV_JOBS_SLURM": "sbatch", "MDV_JOBS_SLURM_WORKSPACE_ROOT": str(tmp_path)}
         )
+
+
+def test_env_slurm_python_sets_the_worker_python(tmp_path):
+    import sys
+    from mdvtools.jobs.service import manager_factory_from_env
+    from mdvtools.jobs.executor import SlurmExecutor
+
+    settings ={"MDV_JOBS_SLURM": "cli", "MDV_JOBS_SLURM_WORKSPACE_ROOT": str(tmp_path / "shared")}
+    default = manager_factory_from_env(settings)(_DirProject(tmp_path, "p1"), on_submit=None)
+    chosen = manager_factory_from_env(
+        {**settings, "MDV_JOBS_SLURM_PYTHON": "/shared/venv/bin/python"}
+    )(_DirProject(tmp_path, "p2"), on_submit=None)
+
+    default_slurm = default.executors["slurm"].executor
+    chosen_slurm = chosen.executors["slurm"].executor
+    assert isinstance(default_slurm, SlurmExecutor)
+    assert isinstance(chosen_slurm, SlurmExecutor)
+    # the server's own Python may not exist on the compute nodes
+    assert default_slurm.python == sys.executable
+    assert chosen_slurm.python == "/shared/venv/bin/python"
+
+
+def test_env_with_slurm_rest_offers_slurm_through_slurmrestd(tmp_path, fake_slurmrestd):
+    from mdvtools.jobs.service import manager_factory_from_env
+    from mdvtools.jobs.executor import SlurmRestExecutor
+
+    url, seen = fake_slurmrestd
+    token_file = tmp_path / "token"
+    token_file.write_text("jwt\n")
+    shared = tmp_path / "shared"
+    factory = manager_factory_from_env({
+        "MDV_JOBS_SLURM": "rest",
+        "MDV_JOBS_SLURM_WORKSPACE_ROOT": str(shared),
+        "MDV_JOBS_SLURM_PYTHON": "/shared/venv/bin/python",
+        "MDV_JOBS_SLURM_REST_URL": url,
+        "MDV_JOBS_SLURM_REST_TOKEN_FILE": str(token_file),
+        "MDV_JOBS_SLURM_REST_USER": "mdv",
+        "MDV_JOBS_SLURM_REST_API_VERSION": "v0.0.42",
+    })
+    mgr = factory(_DirProject(tmp_path), on_submit=None)
+
+    assert list(mgr.executors) == ["local", "slurm"]    # the user-facing name stays slurm
+    slurm = mgr.executors["slurm"]
+    assert isinstance(slurm.executor, SlurmRestExecutor)
+    assert slurm.workspace_root == shared / "proj1"
+    assert slurm.max_concurrent is None
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    slurm.executor.submit("umap_worker:run", ws)
+
+    [req] = seen
+    assert req["path"] == "/slurm/v0.0.42/job/submit"
+    assert req["token"] == "jwt"
+    assert req["user"] == "mdv"
+    assert "/shared/venv/bin/python -m mdvtools.jobs.run_worker" in req["body"]["script"]
+
+
+def test_env_with_slurm_rest_defaults_the_api_version(tmp_path, fake_slurmrestd):
+    from mdvtools.jobs.service import manager_factory_from_env
+
+    url, seen = fake_slurmrestd
+    token_file = tmp_path / "token"
+    token_file.write_text("jwt")
+    mgr = manager_factory_from_env({
+        "MDV_JOBS_SLURM": "rest",
+        "MDV_JOBS_SLURM_WORKSPACE_ROOT": str(tmp_path / "shared"),
+        "MDV_JOBS_SLURM_REST_URL": url,
+        "MDV_JOBS_SLURM_REST_TOKEN_FILE": str(token_file),
+    })(_DirProject(tmp_path), on_submit=None)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+
+    mgr.executors["slurm"].executor.submit("umap_worker:run", ws)
+
+    assert seen[0]["path"] == "/slurm/v0.0.44/job/submit"
+    assert seen[0]["user"] is None      # no user header unless the setting is given
+
+
+def test_env_with_slurm_rest_but_missing_settings_fails_at_build(tmp_path):
+    import pytest
+    from mdvtools.jobs.service import manager_factory_from_env
+
+    complete = {
+        "MDV_JOBS_SLURM": "rest",
+        "MDV_JOBS_SLURM_WORKSPACE_ROOT": str(tmp_path),
+        "MDV_JOBS_SLURM_REST_URL": "http://slurmrestd:6820",
+        "MDV_JOBS_SLURM_REST_TOKEN_FILE": str(tmp_path / "token"),
+    }
+    for missing in ("MDV_JOBS_SLURM_REST_URL", "MDV_JOBS_SLURM_REST_TOKEN_FILE"):
+        settings = {k: v for k, v in complete.items() if k != missing}
+        with pytest.raises(ValueError, match=missing):
+            manager_factory_from_env(settings)

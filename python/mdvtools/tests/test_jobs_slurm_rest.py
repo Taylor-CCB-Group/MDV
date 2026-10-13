@@ -1,7 +1,3 @@
-import json
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
 import pytest
 
 from mdvtools.jobs.executor import Handle, SlurmRestExecutor, rest_request
@@ -111,67 +107,28 @@ def test_locate_result_is_workspace_output(tmp_path):
     assert executor.locate_result(Handle("slurm", "7"), tmp_path) == tmp_path / "output"
 
 
-class _RecordingHandler(BaseHTTPRequestHandler):
-    seen: list = []
-
-    def do_POST(self):
-        length = int(self.headers.get("Content-Length", 0))
-        _RecordingHandler.seen.append({
-            "path": self.path,
-            "token": self.headers.get("X-SLURM-USER-TOKEN"),
-            "user": self.headers.get("X-SLURM-USER-NAME"),
-            "body": json.loads(self.rfile.read(length)),
-        })
-        payload = json.dumps({"job_id": 1, "errors": []}).encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        self.wfile.write(payload)
-
-    def do_GET(self):
-        payload = json.dumps({"jobs": [], "errors": [{"description": "gone"}]}).encode()
-        self.send_response(404)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        self.wfile.write(payload)
-
-    def log_message(self, format, *args):
-        pass    # keep request logs out of the test output
-
-
-@pytest.fixture
-def fake_slurmrestd():
-    _RecordingHandler.seen = []
-    server = ThreadingHTTPServer(("127.0.0.1", 0), _RecordingHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    yield f"http://127.0.0.1:{server.server_address[1]}"
-    server.shutdown()
-    server.server_close()
-
-
 def test_rest_request_reads_the_token_file_on_every_request(tmp_path, fake_slurmrestd):
     token_file = tmp_path / "token"
     token_file.write_text("first\n")
-    request = rest_request(fake_slurmrestd, token_file, user="mdv")
+    url, seen = fake_slurmrestd
+    request = rest_request(url, token_file, user="mdv")
 
     assert request("POST", "/slurm/v0.0.44/job/submit", {"script": "x"}) == (200, {"job_id": 1, "errors": []})
     token_file.write_text("second\n")    # a refresher replaced the expiring token
     request("POST", "/slurm/v0.0.44/job/submit", {"script": "y"})
 
-    assert [s["token"] for s in _RecordingHandler.seen] == ["first", "second"]
-    assert _RecordingHandler.seen[0]["user"] == "mdv"
-    assert _RecordingHandler.seen[0]["path"] == "/slurm/v0.0.44/job/submit"
-    assert _RecordingHandler.seen[0]["body"] == {"script": "x"}
+    assert [s["token"] for s in seen] == ["first", "second"]
+    assert seen[0]["user"] == "mdv"
+    assert seen[0]["path"] == "/slurm/v0.0.44/job/submit"
+    assert seen[0]["body"] == {"script": "x"}
 
 
 def test_rest_request_returns_error_statuses_instead_of_raising(tmp_path, fake_slurmrestd):
     token_file = tmp_path / "token"
     token_file.write_text("t")
 
-    status, body = rest_request(fake_slurmrestd, token_file)("GET", "/slurm/v0.0.44/job/7")
+    url, _ = fake_slurmrestd
+    status, body = rest_request(url, token_file)("GET", "/slurm/v0.0.44/job/7")
 
     assert status == 404
     assert body["errors"] == [{"description": "gone"}]

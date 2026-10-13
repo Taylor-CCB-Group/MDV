@@ -92,7 +92,7 @@ class SlurmExecutor:
 
     def __init__(self, run: Callable[[list[str]], str] | None = None, python: str | None = None):
         self._run = run or _run_cli
-        self._python = python or sys.executable
+        self.python = python or sys.executable
 
     def _render_script(self, entrypoint: str, ws: Path) -> str:
         # Basic directives only for now
@@ -102,7 +102,7 @@ class SlurmExecutor:
             f"#SBATCH --chdir={ws}\n"
             f"#SBATCH --output={ws / 'slurm-%j.out'}\n"
             f"#SBATCH --error={ws / 'slurm-%j.err'}\n"
-            + _worker_command(self._python, entrypoint, ws)
+            + _worker_command(self.python, entrypoint, ws)
         )
 
     def _squeue_state(self, job_id: str) -> str:
@@ -182,13 +182,13 @@ class SlurmRestExecutor:
     def __init__(self, request: RestRequest, api_version: str = "v0.0.44", python: str | None = None):
         self._request = request
         self._version = api_version
-        self._python = python or sys.executable
+        self.python = python or sys.executable
 
     def submit(self, entrypoint: str, workspace: Path) -> Handle:
         ws = Path(workspace)
         # slurmrestd does not read #SBATCH lines, so the directives go in the job description
         status, body = self._request("POST", f"/slurm/{self._version}/job/submit", {
-            "script": "#!/bin/bash\n" + _worker_command(self._python, entrypoint, ws) + "\n",
+            "script": "#!/bin/bash\n" + _worker_command(self.python, entrypoint, ws) + "\n",
             "job": {
                 "name": f"mdv-{ws.name}",
                 "current_working_directory": str(ws),

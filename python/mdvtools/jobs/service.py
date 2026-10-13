@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from . import JOBS_DIRNAME
-from .executor import ExecutorConfig, LocalSubprocessExecutor, SlurmExecutor
+from .executor import ExecutorConfig, LocalSubprocessExecutor, SlurmExecutor, SlurmRestExecutor, rest_request
 from .jobstore import Status
 from .manager import JobManager
 from .workspace import default_workspace_root
@@ -38,7 +38,9 @@ def _has_inflight_records(project) -> bool:
     return False
 
 LOCAL_MAX_CONCURRENT = 2
-_SLURM_MODES = ("cli",)
+_SLURM_MODES = ("cli", "rest")
+_REST_REQUIRED = ("MDV_JOBS_SLURM_REST_URL", "MDV_JOBS_SLURM_REST_TOKEN_FILE")
+DEFAULT_REST_API_VERSION = "v0.0.44"
 
 
 def manager_factory_from_env(
@@ -46,10 +48,12 @@ def manager_factory_from_env(
 ) -> Callable[..., JobManager]:
     """Build the server's manager factory from the deployment's settings (ADR-0016).
 
-    `local` is always offered and is the default. `MDV_JOBS_SLURM=cli` adds `slurm`, with its
-    workspaces under `MDV_JOBS_SLURM_WORKSPACE_ROOT` (a filesystem the compute nodes share,
-    ADR-0010). The settings are checked here, so a misconfigured server fails at start rather
-    than on its first job request."""
+    `local` is always offered and is the default. `MDV_JOBS_SLURM=cli` or `rest` adds `slurm`,
+    with its workspaces under `MDV_JOBS_SLURM_WORKSPACE_ROOT` (a filesystem the compute nodes
+    share, ADR-0010) and its workers run by `MDV_JOBS_SLURM_PYTHON` (default: this server's
+    Python). `rest` also needs `MDV_JOBS_SLURM_REST_URL` and `MDV_JOBS_SLURM_REST_TOKEN_FILE`,
+    and takes `MDV_JOBS_SLURM_REST_USER` and `MDV_JOBS_SLURM_REST_API_VERSION`. The settings are
+    checked here, so a misconfigured server fails at start rather than on its first job request."""
     slurm_mode = environ.get("MDV_JOBS_SLURM") or None   # empty counts as unset
     slurm_root = environ.get("MDV_JOBS_SLURM_WORKSPACE_ROOT")
     if slurm_mode is not None:
@@ -57,6 +61,22 @@ def manager_factory_from_env(
             raise ValueError(f"MDV_JOBS_SLURM={slurm_mode!r} is not supported; use one of {_SLURM_MODES}")
         if not slurm_root:
             raise ValueError("MDV_JOBS_SLURM_WORKSPACE_ROOT must be set when MDV_JOBS_SLURM is set")
+        if slurm_mode == "rest":
+            for name in _REST_REQUIRED:
+                if not environ.get(name):
+                    raise ValueError(f"{name} must be set when MDV_JOBS_SLURM=rest")
+    slurm_python = environ.get("MDV_JOBS_SLURM_PYTHON") or None
+
+    def slurm_executor():
+        if slurm_mode == "rest":
+            request = rest_request(
+                environ["MDV_JOBS_SLURM_REST_URL"],
+                environ["MDV_JOBS_SLURM_REST_TOKEN_FILE"],
+                user=environ.get("MDV_JOBS_SLURM_REST_USER") or None,
+            )
+            version = environ.get("MDV_JOBS_SLURM_REST_API_VERSION") or DEFAULT_REST_API_VERSION
+            return SlurmRestExecutor(request, api_version=version, python=slurm_python)
+        return SlurmExecutor(python=slurm_python)
 
     def build(project, on_submit: Callable[[], None] | None = None) -> JobManager:
         executors = {
@@ -69,7 +89,7 @@ def manager_factory_from_env(
         if slurm_mode is not None and slurm_root:
             # one directory per project, as default_workspace_root does for local scratch
             executors["slurm"] = ExecutorConfig(
-                SlurmExecutor(), Path(slurm_root) / Path(project.dir).name, None
+                slurm_executor(), Path(slurm_root) / Path(project.dir).name, None
             )
         return JobManager(project, executors=executors, on_submit=on_submit)
 
