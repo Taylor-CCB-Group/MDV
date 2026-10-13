@@ -24,7 +24,12 @@ _LAZY_EXPORTS = {
     "setup_cell_communication_network": ".network_helpers",
 }
 
-__all__ = list(_LAZY_EXPORTS)
+__all__ = [
+    "MDVProject",
+    "setup_ligand_network",
+    "create_ligand_network_view",
+    "setup_cell_communication_network",
+]
 
 
 def __getattr__(name: str):
