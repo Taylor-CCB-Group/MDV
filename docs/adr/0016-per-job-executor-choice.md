@@ -14,7 +14,9 @@ Slurm, so the person submitting the job needs to choose. BMRC also offers the Sl
 ## Decision
 
 The user chooses where a job runs, from the executors the deployment offers, when they submit it.
-The Run analysis dialog shows a dropdown only when the server offers more than one executor. The
+The Run analysis dialog shows a dropdown only when the server offers more than one executor, and
+then the job list also shows a "Run on" column with each job's executor, where a record with no
+executor shows the default. The
 operator decides once per deployment how the server reaches Slurm (the CLI with `sbatch` and
 `squeue`, or `slurmrestd`), because that depends on what the cluster allows and the user cannot act
 on it.

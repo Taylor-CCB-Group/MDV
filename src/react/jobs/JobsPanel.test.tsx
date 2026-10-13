@@ -96,11 +96,12 @@ function job(p: Partial<JobRecord> & Pick<JobRecord, "job_id">): JobRecord {
         created: 1_700_000_000,
         provenance: null,
         error: null,
+        executor: "local",
         ...p,
     };
 }
 
-type Server = { jobs: JobRecord[]; submit: { status: number; body: unknown } };
+type Server = { jobs: JobRecord[]; executors: string[]; submit: { status: number; body: unknown } };
 let server: Server;
 let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -109,9 +110,10 @@ function json(body: unknown, status = 200) {
 }
 
 beforeEach(() => {
-    server = { jobs: [], submit: { status: 202, body: { job_id: "new" } } };
+    server = { jobs: [], executors: ["local"], submit: { status: 202, body: { job_id: "new" } } };
     fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
         if (url === "/jobs/tools") return json(TOOLS);
+        if (url === "/jobs/executors") return json(server.executors);
         if (url === "/jobs" && init?.method === "POST") {
             if (server.submit.status === 202)
                 server.jobs.push(job({ job_id: "new", status: "queued", created: 2_000_000_000 }));
@@ -200,6 +202,39 @@ describe("JobsPanel", () => {
 
         expect((await screen.findByRole("alert")).textContent).toContain("Neighbors must be a whole number");
         expect(postedBody()).toBeUndefined();
+    });
+
+    test("with one executor there is no choice of where to run", async () => {
+        renderPanel();
+        await screen.findByLabelText("Tool");
+
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+        await waitFor(() => expect(postedBody()).toBeDefined());
+        expect(postedBody()).not.toHaveProperty("executor");
+        expect(screen.queryByLabelText("Run on")).toBeNull();
+    });
+
+    test("with several executors the user chooses where the job runs", async () => {
+        server.executors = ["local", "slurm"];
+        renderPanel();
+        const runOn = await screen.findByLabelText("Run on");
+        expect(inputValue(runOn)).toBe("local"); // the default comes first
+        expect(within(runOn).getByRole("option", { name: "Slurm" })).toBeTruthy();
+
+        fireEvent.change(runOn, { target: { value: "slurm" } });
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+        await waitFor(() => expect(postedBody()).toMatchObject({ tool_id: "umap", executor: "slurm" }));
+    });
+
+    test("with several executors the job list shows where each job ran", async () => {
+        server.executors = ["local", "slurm"];
+        server.jobs = [job({ job_id: "a", executor: "slurm" })];
+        renderPanel();
+
+        const row = await screen.findByRole("row", { name: /done/ });
+        expect(within(row).getByText("Slurm")).toBeTruthy();
     });
 
     test("lists jobs newest first, with the error of a failed job", async () => {

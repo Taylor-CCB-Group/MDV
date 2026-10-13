@@ -52,6 +52,8 @@ export type JobRecord = {
     created: number;
     provenance: Record<string, unknown> | null;
     error: string | null;
+    /** the executor the job runs on; `null` on records written before executors had names (ADR-0016) */
+    executor: string | null;
 };
 
 /** Parse a JSON response, throwing the server's `{error}` message when the request failed. */
@@ -66,10 +68,21 @@ export async function fetchTools(root: string): Promise<JobTool[]> {
     return readJson(await fetch(`${root}/jobs/tools`));
 }
 
-export async function submitJob(root: string, toolId: string, params: Record<string, JobParamValue>): Promise<string> {
+/** The executor names the server offers, default first (ADR-0016). */
+export async function fetchExecutors(root: string): Promise<string[]> {
+    return readJson(await fetch(`${root}/jobs/executors`));
+}
+
+/** Submit a job; leaving `executor` out runs it on the server's default executor. */
+export async function submitJob(
+    root: string,
+    toolId: string,
+    params: Record<string, JobParamValue>,
+    executor?: string,
+): Promise<string> {
     const resp = await fetch(`${root}/jobs`, {
         method: "POST",
-        body: JSON.stringify({ tool_id: toolId, params }),
+        body: JSON.stringify({ tool_id: toolId, params, executor }),
         headers: { "Content-Type": "application/json" },
     });
     const body: { job_id: string } = await readJson(resp);

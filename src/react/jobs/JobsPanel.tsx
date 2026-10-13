@@ -21,10 +21,23 @@ import {
     setParam,
     toSubmitParams,
 } from "./jobForm";
-import { type JobParamSpec, type JobParamValue, type JobStatus, fetchTools, submitJob } from "./jobsApi";
+import {
+    type JobParamSpec,
+    type JobParamValue,
+    type JobStatus,
+    fetchExecutors,
+    fetchTools,
+    submitJob,
+} from "./jobsApi";
 import { jobsQueryOptions } from "./useJobColumnSync";
 
 const FAILED: JobStatus[] = ["failed", "lost", "stale"];
+
+const EXECUTOR_LABELS: Record<string, string> = { local: "Local", slurm: "Slurm" };
+
+function executorLabel(name: string) {
+    return EXECUTOR_LABELS[name] ?? name;
+}
 
 type ParamFieldProps = {
     param: JobParamSpec;
@@ -95,9 +108,14 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
     const queryClient = useQueryClient();
     const toolsQuery = useQuery({ queryKey: ["jobs-tools", root], queryFn: () => fetchTools(root) });
     const jobsQuery = useQuery(jobsQueryOptions(root));
+    const executorsQuery = useQuery({ queryKey: ["jobs-executors", root], queryFn: () => fetchExecutors(root) });
     const submit = useMutation({
-        mutationFn: ({ toolId, params }: { toolId: string; params: Record<string, JobParamValue> }) =>
-            submitJob(root, toolId, params),
+        mutationFn: ({
+            toolId,
+            params,
+            executor,
+        }: { toolId: string; params: Record<string, JobParamValue>; executor?: string }) =>
+            submitJob(root, toolId, params, executor),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ["jobs", root] }),
     });
 
@@ -109,6 +127,13 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
     const values = tool && form?.toolId === tool.id ? form.values : tool ? initialValues(tool, sources) : {};
     const [formError, setFormError] = useState<string | null>(null);
 
+    // the first executor is the server's default (ADR-0016); with only one there is nothing to choose
+    const executors = executorsQuery.data ?? [];
+    const chooseExecutor = executors.length > 1;
+    const executorSelectId = useId();
+    const [chosenExecutor, setChosenExecutor] = useState<string | null>(null);
+    const executor = chosenExecutor ?? executors[0];
+
     const toolName = (id: string) => tools.find((t) => t.id === id)?.name ?? id;
 
     const onRun = () => {
@@ -116,13 +141,22 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
         setFormError(null);
         submit.reset();
         try {
-            submit.mutate({ toolId: tool.id, params: toSubmitParams(tool, values) });
+            submit.mutate({
+                toolId: tool.id,
+                params: toSubmitParams(tool, values),
+                executor: chooseExecutor ? executor : undefined,
+            });
         } catch (e) {
             setFormError(e instanceof Error ? e.message : String(e));
         }
     };
 
-    const error = formError ?? submit.error?.message ?? toolsQuery.error?.message ?? jobsQuery.error?.message;
+    const error =
+        formError ??
+        submit.error?.message ??
+        toolsQuery.error?.message ??
+        executorsQuery.error?.message ??
+        jobsQuery.error?.message;
     const jobs = jobsQuery.data ?? [];
 
     return (
@@ -162,6 +196,24 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
                             }
                         />
                     ))}
+                    {chooseExecutor && (
+                        <TextField
+                            id={executorSelectId}
+                            select
+                            label="Run on"
+                            value={executor}
+                            onChange={(e) => setChosenExecutor(e.target.value)}
+                            size="small"
+                            fullWidth
+                            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
+                        >
+                            {executors.map((name) => (
+                                <option key={name} value={name}>
+                                    {executorLabel(name)}
+                                </option>
+                            ))}
+                        </TextField>
+                    )}
                     <Button variant="contained" onClick={onRun} disabled={submit.isPending}>
                         Run
                     </Button>
@@ -179,6 +231,7 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
                         <TableRow>
                             <TableCell>Tool</TableCell>
                             <TableCell>Status</TableCell>
+                            {chooseExecutor && <TableCell>Run on</TableCell>}
                             <TableCell>Started</TableCell>
                             <TableCell>Details</TableCell>
                         </TableRow>
@@ -190,6 +243,10 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
                                 <TableCell>
                                     <Chip size="small" label={j.status} color={statusColor(j.status)} />
                                 </TableCell>
+                                {chooseExecutor && (
+                                    // a record from before executors had names ran on the default
+                                    <TableCell>{executorLabel(j.executor ?? executors[0])}</TableCell>
+                                )}
                                 <TableCell>{new Date(j.created * 1000).toLocaleString()}</TableCell>
                                 <TableCell>{j.error ?? ""}</TableCell>
                             </TableRow>

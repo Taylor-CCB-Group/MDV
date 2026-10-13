@@ -19,6 +19,7 @@ function job(job_id: string, status: JobStatus): JobRecord {
         created: 1_700_000_000,
         provenance: null,
         error: null,
+        executor: "local",
     };
 }
 

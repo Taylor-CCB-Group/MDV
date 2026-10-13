@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { fetchJobs, fetchTools, submitJob } from "./jobsApi";
+import { fetchExecutors, fetchJobs, fetchTools, submitJob } from "./jobsApi";
 
 function jsonResponse(body: unknown, status = 200) {
     return new Response(JSON.stringify(body), {
@@ -39,6 +39,26 @@ describe("jobsApi", () => {
                 body: JSON.stringify({ tool_id: "umap", params: { datasource: "cells" } }),
             }),
         );
+    });
+
+    test("submitJob sends the chosen executor", async () => {
+        const fetchMock = stubFetch({ job_id: "abc" }, 202);
+
+        await submitJob("", "umap", { datasource: "cells" }, "slurm");
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            "/jobs",
+            expect.objectContaining({
+                body: JSON.stringify({ tool_id: "umap", params: { datasource: "cells" }, executor: "slurm" }),
+            }),
+        );
+    });
+
+    test("fetchExecutors reads the offered executor names from the project root", async () => {
+        const fetchMock = stubFetch(["local", "slurm"]);
+
+        await expect(fetchExecutors("/project/7")).resolves.toEqual(["local", "slurm"]);
+        expect(fetchMock).toHaveBeenCalledWith("/project/7/jobs/executors");
     });
 
     test("submitJob throws the server's error message on a rejected submit", async () => {
