@@ -469,3 +469,28 @@ def test_records_for_an_unconfigured_executor_fail_with_an_error(tmp_path):
         assert recs[job_id].status == Status.FAILED.value
         assert "slurm" in (recs[job_id].error or "")
     assert local.submits == 0 and local.polls == 0     # never handed to another executor
+
+
+_UMAP_ON_SELECTION = {"datasource": "cells", "layer": "gs", "selection": "T cells", "output_name": "UMAP_T_cells"}
+
+
+def test_submit_with_rows_stores_the_selection(tmp_path):
+    project = _make_matrix_project(tmp_path)
+    mgr = JobManager(project, executor=_FakeExecutor())
+
+    job_id = mgr.submit("umap", _UMAP_ON_SELECTION, rows=[9, 1, 5])
+
+    rec = mgr.store.load_all()[0]
+    assert rec.selection_rows == 3
+    assert rec.input_filter_hash is not None
+    np.testing.assert_array_equal(mgr.store.load_rows(job_id), [1, 5, 9])
+
+
+def test_submit_rejects_bad_rows_before_the_write_ahead_record(tmp_path):
+    project = _make_matrix_project(tmp_path)   # 60 cells
+    mgr = JobManager(project, executor=_FakeExecutor())
+
+    with pytest.raises(ValueError, match="outside"):
+        mgr.submit("umap", _UMAP_ON_SELECTION, rows=[0, 60])
+    assert mgr.store.load_all() == []
+    assert not any((mgr.records_root / "selections").glob("*.npy"))

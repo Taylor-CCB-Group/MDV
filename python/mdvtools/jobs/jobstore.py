@@ -8,6 +8,10 @@ import uuid
 import os
 import logging
 
+import numpy as np
+
+from .provenance import rows_hash
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,6 +43,7 @@ class JobRecord:
     provenance: dict | None = None  # promoted at ingest (ADR0007)
     error: str | None = None # set when the owner side fails this record
     executor: str | None = None  # name chosen at submit (ADR-0016); None = the manager's default
+    selection_rows: int | None = None  # row count of the selection (ADR-0017); None = all rows
 
 
 # states that mean "work was in flight when we stopped" - recoverable not terminal
@@ -57,13 +62,33 @@ class JobStore:
         self.records_dir.mkdir(parents=True, exist_ok=True)
         # malformed records moved aside by load_all; outside the *.json glob of records_dir (ADR0012)
         self.quarantine_dir = self.records_dir / "quarantine"
+        # a selection's row indices, one sidecar per job, kept as long as its record (ADR-0017)
+        self.selections_dir = Path(records_root) / "selections"
 
-    def new(self, tool_id: str, params: dict, executor: str | None = None) -> JobRecord:
+    def new(
+        self, tool_id: str, params: dict, executor: str | None = None, rows: list[int] | None = None
+    ) -> JobRecord:
         rec = JobRecord(
             uuid.uuid4().hex[:12], tool_id, params, executor=executor
         )  # job_id fixed at submit
+        if rows is not None:
+            # sidecar first, so a record never points at rows that are not on disk
+            selected = np.sort(np.asarray(rows, dtype=np.uint32))
+            self.selections_dir.mkdir(exist_ok=True)
+            path = self.selections_dir / f"{rec.job_id}.npy"
+            tmp = path.with_suffix(".npy.tmp")
+            with open(tmp, "wb") as f:
+                np.save(f, selected)
+            os.replace(tmp, path)
+            rec.input_filter_hash = rows_hash(selected)
+            rec.selection_rows = len(selected)
         self._write(rec)
         return rec
+
+    def load_rows(self, job_id: str) -> np.ndarray | None:
+        """The sorted row indices a job runs on, or None when it runs on all rows."""
+        path = self.selections_dir / f"{job_id}.npy"
+        return np.load(path) if path.exists() else None
 
     def _write(self, rec: JobRecord) -> None:
         path = self.records_dir / f"{rec.job_id}.json"

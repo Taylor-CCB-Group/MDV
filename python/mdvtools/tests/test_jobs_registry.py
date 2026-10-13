@@ -6,12 +6,13 @@ from mdvtools.jobs.registry import ToolSpec, ParamSpec, OutputSpec
 class FakeProject:
     """Minimal stand-in for the project lookups validate_params makes"""
 
-    def __init__(self, datasources, subgroups=None):
+    def __init__(self, datasources, subgroups=None, sizes=None):
         self._ds = datasources  # {ds_name: [field, ...]}
         self._subgroups = subgroups or {}  # {ds_name: [subgroup_key, ...]}
+        self._sizes = sizes or {}  # {ds_name: row count}
 
     def get_datasource_metadata(self, name):
-        return {"columns": [{"field": f} for f in self._ds[name]]}
+        return {"columns": [{"field": f} for f in self._ds[name]], "size": self._sizes.get(name, 0)}
 
     def get_datasource_names(self):
         return list(self._ds)
@@ -201,3 +202,77 @@ def test_registry_declares_datasource_and_subgroup_types():
     assert types["layer"].type == "subgroup"
     assert types["layer"].options_from == "datasource"
     assert {p.name: p.type for p in CONCAT_COLUMNS.params}["datasource"] == "datasource"
+
+
+SELECTION_SPEC = ToolSpec(
+    id="selectiontool",
+    name="Selection tool",
+    description="test",
+    params=[
+        ParamSpec("datasource", "datasource", "Datasource"),
+        ParamSpec("selection", "selection", "Cells", options_from="datasource"),
+        ParamSpec("output_name", "text", "Name", default="OUT"),
+    ],
+    output=OutputSpec("column", "datasource", "output_name"),
+    entrypoint="x:run",
+    input_shape="matrix",
+)
+
+_SELECTED = {"datasource": "cells", "selection": "T cells", "output_name": "OUT"}
+
+
+@pytest.fixture
+def selection_project():
+    return FakeProject({"cells": ["sample"]}, sizes={"cells": 5})
+
+
+def test_named_selection_with_rows_passes(selection_project):
+    validate_params(SELECTION_SPEC, _SELECTED, selection_project, rows=[0, 3, 4])
+
+
+@pytest.mark.parametrize("name", ["", None])
+def test_no_selection_name_and_no_rows_runs_on_all_rows(selection_project, name):
+    validate_params(SELECTION_SPEC, {**_SELECTED, "selection": name}, selection_project)
+
+
+@pytest.mark.parametrize(
+    "rows, message",
+    [
+        ([], "must not be empty"),
+        ([0, 5], "outside"),
+        ([-1, 2], "outside"),
+        ([1, 3, 1], "duplicate"),
+        ([0, 1.5], "whole numbers"),
+        ([0, True], "whole numbers"),
+        (["1"], "whole numbers"),
+    ],
+)
+def test_rejects_bad_rows(selection_project, rows, message):
+    with pytest.raises(ValueError, match=message):
+        validate_params(SELECTION_SPEC, _SELECTED, selection_project, rows=rows)
+
+
+def test_rejects_a_selection_name_without_rows(selection_project):
+    with pytest.raises(ValueError, match="no rows"):
+        validate_params(SELECTION_SPEC, _SELECTED, selection_project)
+
+
+@pytest.mark.parametrize("name", ["", None])
+def test_rejects_rows_without_a_selection_name(selection_project, name):
+    with pytest.raises(ValueError, match="needs a name"):
+        validate_params(SELECTION_SPEC, {**_SELECTED, "selection": name}, selection_project, rows=[0])
+
+
+def test_rejects_rows_for_a_tool_that_cannot_run_on_a_selection(project):
+    params = {"datasource": "cells", "column_a": "sample", "column_b": "cluster", "output_name": "out"}
+    with pytest.raises(ValueError, match="cannot run on a selection"):
+        validate_params(CONCAT_COLUMNS, params, project, rows=[0])
+
+
+def test_umap_declares_a_selection_param_and_concat_does_not():
+    from mdvtools.jobs.registry import UMAP
+
+    selection = {p.name: p for p in UMAP.params}["selection"]
+    assert selection.type == "selection"
+    assert selection.options_from == "datasource"
+    assert all(p.type != "selection" for p in CONCAT_COLUMNS.params)

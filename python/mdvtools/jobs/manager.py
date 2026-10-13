@@ -109,15 +109,17 @@ class JobManager:
             else:
                 self.store.set(rec, Status.QUEUED, handle=None)     # re-queue, since nothing to reattach
 
-    def submit(self, tool_id: str, params: dict, executor: str | None = None) -> str:
+    def submit(
+        self, tool_id: str, params: dict, executor: str | None = None, rows: list[int] | None = None
+    ) -> str:
         spec = get_tool(tool_id)
-        validate_params(spec, params, self.project)  # backend-gate
+        validate_params(spec, params, self.project, rows=rows)  # backend-gate
         executor = executor or self.default_executor
         if executor not in self.executors:
             raise ValueError(f"executor {executor!r} is not offered; choose from {list(self.executors)}")
         # write-ahead intent; the executor is stored by name so a later change of default
         # does not move a queued job (ADR-0016)
-        rec = self.store.new(tool_id, params, executor=executor)
+        rec = self.store.new(tool_id, params, executor=executor, rows=rows)
         if self.on_submit is not None:
             self.on_submit() # wake the driver; it owns dispatch + ingest via tick()
         return rec.job_id

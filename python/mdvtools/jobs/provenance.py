@@ -2,6 +2,8 @@ import hashlib
 import json
 import time
 
+import numpy as np
+
 
 def content_hash(tool_id: str, params: dict, input_filter_hash: str | None) -> str:
     """Self-invalidating key: editing params or the input subset changes the hash, so a stale
@@ -12,6 +14,12 @@ def content_hash(tool_id: str, params: dict, input_filter_hash: str | None) -> s
         separators=(",", ":"),
     )
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+
+def rows_hash(rows: np.ndarray) -> str:
+    """The input_filter_hash of a selection (ADR-0005, ADR-0017): a hash of its sorted row indices,
+    so the same rows give the same hash whatever order the client sent them in."""
+    return hashlib.sha256(np.sort(rows).astype("<u4").tobytes()).hexdigest()[:16]
 
 
 def build_provenance(rec, manifest: dict | None) -> dict:

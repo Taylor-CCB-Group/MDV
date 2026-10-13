@@ -5,7 +5,7 @@ from typing import Any
 @dataclass(frozen=True)
 class ParamSpec:
     name: str
-    type: str  # "datasource" | "subgroup" | "column" | "dropdown" | "text" | "int" | "float"
+    type: str  # "datasource" | "subgroup" | "column" | "selection" | "dropdown" | "text" | "int" | "float"
     label: str
     options_from: str | None = None  # column or subgroup picker scoped to THIS datasource param
     default: Any = None
@@ -52,6 +52,8 @@ UMAP = ToolSpec(
     params=[
         ParamSpec("datasource", "datasource", "Datasource"),
         ParamSpec("layer", "subgroup", "Matrix", options_from="datasource", default="gs"),
+        # the selection's name; empty runs on all rows (ADR-0017)
+        ParamSpec("selection", "selection", "Cells", options_from="datasource"),
         ParamSpec("output_name", "text", "New column base name", default="UMAP"),
         ParamSpec("n_comps", "int", "PCA components", default=50, applies_to="pca"),
         ParamSpec("n_neighbors", "int", "Neighbors", default=15, applies_to="neighbors"),
@@ -85,9 +87,13 @@ def get_tool(tool_id: str) -> ToolSpec:
     return REGISTRY[tool_id]
 
 
-def validate_params(spec: ToolSpec, params: dict, project) -> None:
+def validate_params(spec: ToolSpec, params: dict, project, rows: list[int] | None = None) -> None:
     """ADR: 0006 backend re-validates. A "datasource" param must name a datasource; every "column"
-    or "subgroup" param must name a column or matrix of the datasource its options_from points at."""
+    or "subgroup" param must name a column or matrix of the datasource its options_from points at.
+    `rows` are the indices of a selection (ADR-0017): only a tool with a "selection" param takes
+    them, a named selection needs them, and each must be a distinct row of the datasource."""
+    if rows is not None and not any(p.type == "selection" for p in spec.params):
+        raise ValueError(f"{spec.id} cannot run on a selection")
     for p in spec.params:
         if p.type == "datasource":
             if params.get(p.name) not in project.get_datasource_names():
@@ -110,6 +116,23 @@ def validate_params(spec: ToolSpec, params: dict, project) -> None:
                 raise ValueError(
                     f"{params.get(p.name)!r} is not a column of {ds_name!r}"
                 )
+        elif p.type == "selection":
+            ds_name = params[p.options_from]
+            if not params.get(p.name):
+                if rows is not None:
+                    raise ValueError("a selection needs a name")
+            elif rows is None:
+                raise ValueError(f"selection {params[p.name]!r} has no rows")
+            elif not rows:
+                raise ValueError("selection rows must not be empty")
+            elif not all(isinstance(r, int) and not isinstance(r, bool) for r in rows):
+                raise ValueError("selection rows must be whole numbers")
+            else:
+                size = int(project.get_datasource_metadata(ds_name)["size"])
+                if min(rows) < 0 or max(rows) >= size:
+                    raise ValueError(f"selection rows fall outside {ds_name!r}, which has {size} rows")
+                if len(set(rows)) != len(rows):
+                    raise ValueError("selection rows contain duplicates")
         elif p.type in ("int", "float") and params.get(p.name) is not None:
             v = params[p.name]
             ok = (not isinstance(v, bool)) and (
