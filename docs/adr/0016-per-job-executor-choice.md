@@ -42,11 +42,27 @@ The server reads the deployment's executors from the environment when it builds 
 - `local` is always offered, with the default workspace root and a limit of 2 concurrent jobs
 - `MDV_JOBS_SLURM` set to `cli` adds `slurm`, using `SlurmExecutor` with no concurrency limit,
   since Slurm queues the work itself
+- `MDV_JOBS_SLURM` set to `rest` adds `slurm` through `slurmrestd`, using `SlurmRestExecutor`,
+  also with no concurrency limit
 - `MDV_JOBS_SLURM_WORKSPACE_ROOT` sets the shared scratch root for `slurm`, and is required when
   `MDV_JOBS_SLURM` is set; each project gets its own directory under it
+- `MDV_JOBS_SLURM_PYTHON` sets the Python that runs workers on the compute nodes in both modes,
+  and defaults to the server's own Python, which may not exist on the nodes when the server runs
+  in a container
 
-`MDV_JOBS_SLURM=rest` will select the `slurmrestd` executor once it exists. The user-facing name
-stays `slurm` in both cases.
+The user-facing name stays `slurm` in both modes. `rest` reads four more settings:
+
+- `MDV_JOBS_SLURM_REST_URL`, required, is the `slurmrestd` address, such as
+  `http://slurmrestd:6820`
+- `MDV_JOBS_SLURM_REST_TOKEN_FILE`, required, names a file holding the JWT sent as
+  `X-SLURM-USER-TOKEN`; the executor reads it on every request, because tokens expire and a
+  separate refresher can then replace the file without restarting the server
+- `MDV_JOBS_SLURM_REST_USER`, optional, is sent as `X-SLURM-USER-NAME`, which a token issued for
+  another user needs
+- `MDV_JOBS_SLURM_REST_API_VERSION`, optional, defaults to `v0.0.44` (Slurm 25.11); clusters on
+  other Slurm releases serve other versions, so the operator sets it per cluster
+
+Whether BMRC users can get a JWT for `slurmrestd` has not been confirmed with BMRC.
 
 ## Consequences
 
@@ -57,3 +73,12 @@ stays `slurm` in both cases.
 - `GET /jobs/executors` lists the names the server offers, and `POST /jobs` accepts an optional
   `executor`. The client view of a record includes `executor`, and the handle stays internal
   (ADR-0012).
+- Both Slurm executors write handles of kind `slurm` holding the Slurm job ID, so a job submitted
+  under `cli` can still be polled after the operator switches to `rest`, and the reverse.
+- The REST executor polls the scheduler endpoint first and asks accounting only when the
+  scheduler no longer holds an active job, as the CLI executor does with `squeue` and `sacct`. Any
+  status other than 200, or 404 from the scheduler, raises instead of reporting the job lost,
+  because an expired token (HTTP 511) says nothing about the job.
+- A REST submit does not copy the server's environment the way `sbatch` does. The job gets only
+  `PATH=/usr/bin:/bin`, so server secrets such as database passwords never reach Slurm, and the
+  worker is started by its absolute Python path.
