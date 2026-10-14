@@ -71,6 +71,23 @@ def test_submit_raises_slurms_message_when_rejected(tmp_path):
         SlurmRestExecutor(request).submit("umap_worker:run", tmp_path)
 
 
+def test_submit_rejection_keeps_slurms_specific_error_as_well_as_the_description(tmp_path):
+    # slurmrestd puts a generic description first and the reason in `error`
+    request, _ = _fake_api({
+        ("POST", "/slurm/v0.0.44/job/submit"): (
+            511, {"errors": [{
+                "description": "Batch job submission failed",
+                "error_number": 1007,
+                "error": "Protocol authentication error",
+                "source": "slurm_submit_batch_job()",
+            }]},
+        ),
+    })
+
+    with pytest.raises(RuntimeError, match="Batch job submission failed: Protocol authentication error"):
+        SlurmRestExecutor(request).submit("umap_worker:run", tmp_path)
+
+
 def test_poll_running_while_the_scheduler_holds_an_active_job():
     assert _poll(_scheduler("RUNNING")) == "running"
     assert _poll(_scheduler("PENDING")) == "running"

@@ -164,7 +164,12 @@ def rest_request(url: str, token_file: Path | str, user: str | None = None) -> R
 
 
 def _slurm_errors(body: dict) -> str:
-    return "; ".join(str(e.get("description") or e.get("error")) for e in body.get("errors") or [])
+    # slurmrestd often gives a generic description ("Batch job submission failed") and the
+    # actual reason in `error`, so keep both
+    return "; ".join(
+        ": ".join(str(part) for part in dict.fromkeys((e.get("description"), e.get("error"))) if part)
+        for e in body.get("errors") or []
+    )
 
 
 class SlurmRestExecutor:
