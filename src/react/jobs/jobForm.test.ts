@@ -38,10 +38,35 @@ const CONCAT: JobTool = {
     ],
 };
 
+const noRows = async () => new Uint32Array();
+
 const SOURCES: JobsDataSource[] = [
-    { name: "cells", columns: [{ field: "sample", name: "Sample" }], subgroups: ["gs", "rna"] },
-    { name: "genes", columns: [{ field: "name", name: "Name" }], subgroups: [] },
+    {
+        name: "cells",
+        columns: [{ field: "sample", name: "Sample" }],
+        subgroups: ["gs", "rna"],
+        size: 3,
+        filterSize: 3,
+        getFilteredIndices: noRows,
+    },
+    {
+        name: "genes",
+        columns: [{ field: "name", name: "Name" }],
+        subgroups: [],
+        size: 2,
+        filterSize: 2,
+        getFilteredIndices: noRows,
+    },
 ];
+
+const UMAP_ON_SELECTION: JobTool = {
+    ...UMAP,
+    params: [
+        UMAP.params[0],
+        param({ name: "selection", type: "selection", label: "Cells", options_from: "datasource" }),
+        ...UMAP.params.slice(1),
+    ],
+};
 
 describe("paramOptions", () => {
     test("a datasource param offers every datasource", () => {
@@ -141,8 +166,43 @@ describe("toSubmitParams", () => {
     });
 });
 
+describe("selection", () => {
+    test("starts unnamed", () => {
+        expect(initialValues(UMAP_ON_SELECTION, SOURCES).selection).toBe("");
+    });
+
+    test("the default output name follows the selection's name", () => {
+        let values = initialValues(UMAP_ON_SELECTION, SOURCES);
+
+        values = setParam(UMAP_ON_SELECTION, values, "selection", "T cells", SOURCES);
+        expect(values.output_name).toBe("UMAP_T_cells");
+
+        values = setParam(UMAP_ON_SELECTION, values, "selection", "CD4+ T cells", SOURCES);
+        expect(values.output_name).toBe("UMAP_CD4_T_cells");
+
+        values = setParam(UMAP_ON_SELECTION, values, "selection", "", SOURCES);
+        expect(values.output_name).toBe("UMAP");
+    });
+
+    test("an output name the user typed stays when the selection is renamed", () => {
+        let values = initialValues(UMAP_ON_SELECTION, SOURCES);
+        values = setParam(UMAP_ON_SELECTION, values, "output_name", "MyUMAP", SOURCES);
+
+        values = setParam(UMAP_ON_SELECTION, values, "selection", "T cells", SOURCES);
+
+        expect(values.output_name).toBe("MyUMAP");
+    });
+
+    test("toSubmitParams sends the trimmed name and leaves an empty one out", () => {
+        const values = initialValues(UMAP_ON_SELECTION, SOURCES);
+
+        expect(toSubmitParams(UMAP_ON_SELECTION, { ...values, selection: " T cells " }).selection).toBe("T cells");
+        expect(toSubmitParams(UMAP_ON_SELECTION, values)).not.toHaveProperty("selection");
+    });
+});
+
 describe("toJobsDataSource", () => {
-    test("keeps real columns and collects the subgroup keys of every rows_as_columns link", () => {
+    test("keeps real columns, collects the subgroup keys of every rows_as_columns link and reads the filter", async () => {
         const ds = {
             name: "cells",
             dataStore: {
@@ -154,13 +214,21 @@ describe("toJobsDataSource", () => {
                     genes: { rows_as_columns: { subgroups: { gs: {}, rna: {} } } },
                     other: {},
                 },
+                size: 3,
+                filterSize: 2,
+                getFilteredIndices: async () => new Uint32Array([0, 2]),
             },
         };
 
-        expect(toJobsDataSource(ds)).toEqual({
+        const source = toJobsDataSource(ds);
+
+        expect(source).toMatchObject({
             name: "cells",
             columns: [{ field: "sample", name: "Sample" }],
             subgroups: ["gs", "rna"],
+            size: 3,
+            filterSize: 2,
         });
+        expect(Array.from(await source.getFilteredIndices())).toEqual([0, 2]);
     });
 });

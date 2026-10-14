@@ -24,7 +24,9 @@ import {
 import {
     type JobParamSpec,
     type JobParamValue,
+    type JobRecord,
     type JobStatus,
+    type JobTool,
     fetchExecutors,
     fetchTools,
     submitJob,
@@ -91,6 +93,58 @@ function ParamField({ param, values, sources, onChange }: ParamFieldProps) {
     );
 }
 
+type SelectionFieldProps = {
+    param: JobParamSpec;
+    source: JobsDataSource;
+    selecting: boolean;
+    name: string;
+    onChoose: (selecting: boolean) => void;
+    onName: (name: string) => void;
+};
+
+/** Run on the datasource's current selection, which needs a name, or on all of its rows (ADR-0017). */
+function SelectionField({ param, source, selecting, name, onChoose, onName }: SelectionFieldProps) {
+    const choiceId = useId();
+    const nameId = useId();
+    const size = source.size.toLocaleString();
+    return (
+        <>
+            <TextField
+                id={choiceId}
+                select
+                label={param.label}
+                value={selecting ? "selection" : "all"}
+                onChange={(e) => onChoose(e.target.value === "selection")}
+                size="small"
+                fullWidth
+                slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
+            >
+                <option value="selection">{`Current selection (${source.filterSize.toLocaleString()} of ${size})`}</option>
+                <option value="all">{`All (${size})`}</option>
+            </TextField>
+            {selecting && (
+                <TextField
+                    id={nameId}
+                    label="Selection name"
+                    value={name}
+                    onChange={(e) => onName(e.target.value)}
+                    size="small"
+                    fullWidth
+                    helperText={name.trim() ? undefined : "Name the selection to run on it"}
+                />
+            )}
+        </>
+    );
+}
+
+/** "T cells (2,314)" for a job that ran on a selection, "All" otherwise. */
+function cellsLabel(job: JobRecord, tools: JobTool[]) {
+    if (job.selection_rows === null) return "All";
+    const param = tools.find((t) => t.id === job.tool_id)?.params.find((p) => p.type === "selection");
+    const name = param ? job.params[param.name] : undefined;
+    return `${name ?? "Selection"} (${job.selection_rows.toLocaleString()})`;
+}
+
 function statusColor(status: JobStatus) {
     if (status === "done") return "success";
     if (FAILED.includes(status)) return "error";
@@ -110,12 +164,21 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
     const jobsQuery = useQuery(jobsQueryOptions(root));
     const executorsQuery = useQuery({ queryKey: ["jobs-executors", root], queryFn: () => fetchExecutors(root) });
     const submit = useMutation({
-        mutationFn: ({
+        mutationFn: async ({
             toolId,
             params,
             executor,
-        }: { toolId: string; params: Record<string, JobParamValue>; executor?: string }) =>
-            submitJob(root, toolId, params, executor),
+            selectedFrom,
+        }: {
+            toolId: string;
+            params: Record<string, JobParamValue>;
+            executor?: string;
+            /** the datasource whose current selection the job runs on */
+            selectedFrom?: JobsDataSource;
+        }) => {
+            const rows = selectedFrom ? Array.from(await selectedFrom.getFilteredIndices()) : undefined;
+            return submitJob(root, toolId, params, executor, rows);
+        },
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ["jobs", root] }),
     });
 
@@ -126,6 +189,17 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
     const tool = tools.find((t) => t.id === form?.toolId) ?? tools[0];
     const values = tool && form?.toolId === tool.id ? form.values : tool ? initialValues(tool, sources) : {};
     const [formError, setFormError] = useState<string | null>(null);
+
+    // with a filter active on the job's datasource, the job runs on the selection unless the user
+    // chooses all rows (ADR-0017); the dialog is modal, so the filter cannot change while it is open
+    const selectionParam = tool?.params.find((p) => p.type === "selection");
+    const selectionSource = selectionParam
+        ? sources.find((s) => s.name === values[selectionParam.options_from ?? ""])
+        : undefined;
+    const filtered = selectionSource !== undefined && selectionSource.filterSize < selectionSource.size;
+    const [runOnAll, setRunOnAll] = useState(false);
+    const selecting = filtered && !runOnAll;
+    const needsName = selecting && selectionParam !== undefined && !(values[selectionParam.name] ?? "").trim();
 
     // the first executor is the server's default (ADR-0016); with only one there is nothing to choose
     const executors = executorsQuery.data ?? [];
@@ -145,6 +219,7 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
                 toolId: tool.id,
                 params: toSubmitParams(tool, values),
                 executor: chooseExecutor ? executor : undefined,
+                selectedFrom: selecting ? selectionSource : undefined,
             });
         } catch (e) {
             setFormError(e instanceof Error ? e.message : String(e));
@@ -185,17 +260,45 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
                     <Typography variant="body2" color="text.secondary">
                         {tool.description}
                     </Typography>
-                    {tool.params.map((p) => (
-                        <ParamField
-                            key={`${tool.id}:${p.name}`}
-                            param={p}
-                            values={values}
-                            sources={sources}
-                            onChange={(name, value) =>
-                                setForm({ toolId: tool.id, values: setParam(tool, values, name, value, sources) })
-                            }
-                        />
-                    ))}
+                    {tool.params.map((p) =>
+                        p.type === "selection" ? (
+                            filtered && (
+                                <SelectionField
+                                    key={`${tool.id}:${p.name}`}
+                                    param={p}
+                                    source={selectionSource}
+                                    selecting={selecting}
+                                    name={values[p.name] ?? ""}
+                                    onChoose={(choice) => {
+                                        setRunOnAll(!choice);
+                                        // running on all rows drops the name, and the output name it set
+                                        if (!choice) {
+                                            setForm({
+                                                toolId: tool.id,
+                                                values: setParam(tool, values, p.name, "", sources),
+                                            });
+                                        }
+                                    }}
+                                    onName={(name) =>
+                                        setForm({
+                                            toolId: tool.id,
+                                            values: setParam(tool, values, p.name, name, sources),
+                                        })
+                                    }
+                                />
+                            )
+                        ) : (
+                            <ParamField
+                                key={`${tool.id}:${p.name}`}
+                                param={p}
+                                values={values}
+                                sources={sources}
+                                onChange={(name, value) =>
+                                    setForm({ toolId: tool.id, values: setParam(tool, values, name, value, sources) })
+                                }
+                            />
+                        ),
+                    )}
                     {chooseExecutor && (
                         <TextField
                             id={executorSelectId}
@@ -214,7 +317,7 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
                             ))}
                         </TextField>
                     )}
-                    <Button variant="contained" onClick={onRun} disabled={submit.isPending}>
+                    <Button variant="contained" onClick={onRun} disabled={submit.isPending || needsName}>
                         Run
                     </Button>
                 </>
@@ -231,6 +334,7 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
                         <TableRow>
                             <TableCell>Tool</TableCell>
                             <TableCell>Status</TableCell>
+                            <TableCell>Cells</TableCell>
                             {chooseExecutor && <TableCell>Run on</TableCell>}
                             <TableCell>Started</TableCell>
                             <TableCell>Details</TableCell>
@@ -243,6 +347,7 @@ export default function JobsPanel({ root, sources }: JobsPanelProps) {
                                 <TableCell>
                                     <Chip size="small" label={j.status} color={statusColor(j.status)} />
                                 </TableCell>
+                                <TableCell>{cellsLabel(j, tools)}</TableCell>
                                 {chooseExecutor && (
                                     // a record from before executors had names ran on the default
                                     <TableCell>{executorLabel(j.executor ?? executors[0])}</TableCell>

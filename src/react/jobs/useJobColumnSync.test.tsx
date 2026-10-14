@@ -20,6 +20,7 @@ function job(job_id: string, status: JobStatus): JobRecord {
         provenance: null,
         error: null,
         executor: "local",
+        selection_rows: null,
     };
 }
 

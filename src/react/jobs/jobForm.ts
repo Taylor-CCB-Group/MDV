@@ -15,6 +15,11 @@ export type JobsDataSource = {
     columns: { field: string; name: string }[];
     /** keys of the `rows_as_columns` subgroups linked from this datasource */
     subgroups: string[];
+    size: number;
+    /** how many rows pass the current filters */
+    filterSize: number;
+    /** the rows that pass the current filters, read when a job runs on the selection (ADR-0017) */
+    getFilteredIndices: () => Promise<Uint32Array>;
 };
 
 /** The parts of a ChartManager datasource that `toJobsDataSource` reads. */
@@ -23,6 +28,9 @@ type AppDataSource = {
     dataStore: {
         columns: { field: string; name: string; subgroup?: string }[];
         links?: Record<string, { rows_as_columns?: { subgroups: Record<string, unknown> } }>;
+        size: number;
+        filterSize: number;
+        getFilteredIndices: () => Promise<Uint32Array>;
     };
 };
 
@@ -34,6 +42,9 @@ export function toJobsDataSource(ds: AppDataSource): JobsDataSource {
         subgroups: Object.values(ds.dataStore.links ?? {}).flatMap((l) =>
             Object.keys(l.rows_as_columns?.subgroups ?? {}),
         ),
+        size: ds.dataStore.size,
+        filterSize: ds.dataStore.filterSize,
+        getFilteredIndices: () => ds.dataStore.getFilteredIndices(),
     };
 }
 
@@ -77,7 +88,20 @@ export function initialValues(tool: JobTool, sources: JobsDataSource[]): JobForm
     return values;
 }
 
-/** Set one param; params bound to it through `options_from` go back to their starting value. */
+/** The output name for a selection: "T cells" turns the default "UMAP" into "UMAP_T_cells". */
+function selectionOutputName(base: string, selection: string): string {
+    const slug = selection
+        .trim()
+        .replace(/[^A-Za-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    if (!slug) return base;
+    return base ? `${base}_${slug}` : slug;
+}
+
+/**
+ * Set one param; params bound to it through `options_from` go back to their starting value. Renaming
+ * the selection renames the output too, until the user types an output name of their own.
+ */
 export function setParam(
     tool: JobTool,
     values: JobFormValues,
@@ -88,6 +112,13 @@ export function setParam(
     const next = { ...values, [name]: value };
     for (const p of tool.params) {
         if (p.options_from === name) next[p.name] = initialValue(p, next, sources);
+    }
+    const output = tool.params.find((p) => p.name === tool.output.columns_param);
+    if (output && tool.params.some((p) => p.name === name && p.type === "selection")) {
+        const base = output.default === null ? "" : String(output.default);
+        if (values[output.name] === selectionOutputName(base, values[name] ?? "")) {
+            next[output.name] = selectionOutputName(base, value);
+        }
     }
     return next;
 }
@@ -104,6 +135,9 @@ export function toSubmitParams(tool: JobTool, values: JobFormValues): Record<str
             if (!Number.isFinite(n)) throw new Error(`${p.label} must be a number`);
             if (p.type === "int" && !Number.isInteger(n)) throw new Error(`${p.label} must be a whole number`);
             params[p.name] = n;
+        } else if (p.type === "selection") {
+            // an unnamed selection means all rows, and is left out so those requests stay as they were
+            if (raw !== "") params[p.name] = raw;
         } else {
             if (raw === "" && PICKERS.includes(p.type)) throw new Error(`Choose a value for ${p.label}`);
             params[p.name] = values[p.name] ?? "";

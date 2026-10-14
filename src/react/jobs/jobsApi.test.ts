@@ -54,6 +54,23 @@ describe("jobsApi", () => {
         );
     });
 
+    test("submitJob sends the rows of a selection", async () => {
+        const fetchMock = stubFetch({ job_id: "abc" }, 202);
+
+        await submitJob("", "umap", { datasource: "cells", selection: "T cells" }, undefined, [0, 2]);
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            "/jobs",
+            expect.objectContaining({
+                body: JSON.stringify({
+                    tool_id: "umap",
+                    params: { datasource: "cells", selection: "T cells" },
+                    rows: [0, 2],
+                }),
+            }),
+        );
+    });
+
     test("fetchExecutors reads the offered executor names from the project root", async () => {
         const fetchMock = stubFetch(["local", "slurm"]);
 

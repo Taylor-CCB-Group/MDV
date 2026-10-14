@@ -23,6 +23,14 @@ const TOOLS: JobTool[] = [
                 applies_to: null,
             },
             {
+                name: "selection",
+                type: "selection",
+                label: "Cells",
+                options_from: "datasource",
+                default: null,
+                applies_to: null,
+            },
+            {
                 name: "layer",
                 type: "subgroup",
                 label: "Matrix",
@@ -84,7 +92,19 @@ const TOOLS: JobTool[] = [
 ];
 
 const SOURCES: JobsDataSource[] = [
-    { name: "cells", columns: [{ field: "sample", name: "Sample" }], subgroups: ["gs"] },
+    {
+        name: "cells",
+        columns: [{ field: "sample", name: "Sample" }],
+        subgroups: ["gs"],
+        size: 3,
+        filterSize: 3,
+        getFilteredIndices: async () => new Uint32Array([0, 1, 2]),
+    },
+];
+
+/** cells with a filter active that keeps rows 0 and 2 */
+const FILTERED: JobsDataSource[] = [
+    { ...SOURCES[0], filterSize: 2, getFilteredIndices: async () => new Uint32Array([0, 2]) },
 ];
 
 function job(p: Partial<JobRecord> & Pick<JobRecord, "job_id">): JobRecord {
@@ -97,6 +117,7 @@ function job(p: Partial<JobRecord> & Pick<JobRecord, "job_id">): JobRecord {
         provenance: null,
         error: null,
         executor: "local",
+        selection_rows: null,
         ...p,
     };
 }
@@ -129,11 +150,11 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-function renderPanel() {
+function renderPanel(sources = SOURCES) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     return render(
         <QueryClientProvider client={client}>
-            <JobsPanel root="" sources={SOURCES} />
+            <JobsPanel root="" sources={sources} />
         </QueryClientProvider>,
     );
 }
@@ -235,6 +256,65 @@ describe("JobsPanel", () => {
 
         const row = await screen.findByRole("row", { name: /done/ });
         expect(within(row).getByText("Slurm")).toBeTruthy();
+    });
+
+    test("without a filter there is no choice of cells", async () => {
+        renderPanel();
+        await screen.findByLabelText("Tool");
+
+        expect(screen.queryByLabelText("Cells")).toBeNull();
+        expect(screen.queryByLabelText("Selection name")).toBeNull();
+    });
+
+    test("with a filter active the job runs on the named current selection by default", async () => {
+        renderPanel(FILTERED);
+        const cells = await screen.findByLabelText("Cells");
+        expect(inputValue(cells)).toBe("selection");
+        expect(within(cells).getByRole("option", { name: "Current selection (2 of 3)" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", true); // needs a name
+
+        fireEvent.change(screen.getByLabelText("Selection name"), { target: { value: "T cells" } });
+        expect(inputValue(screen.getByLabelText("New column base name"))).toBe("UMAP_T_cells");
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+        await waitFor(() =>
+            expect(postedBody()).toEqual({
+                tool_id: "umap",
+                params: {
+                    datasource: "cells",
+                    selection: "T cells",
+                    layer: "gs",
+                    output_name: "UMAP_T_cells",
+                    n_neighbors: 15,
+                },
+                rows: [0, 2],
+            }),
+        );
+    });
+
+    test("with a filter active the user can still run on all cells", async () => {
+        renderPanel(FILTERED);
+        fireEvent.change(await screen.findByLabelText("Selection name"), { target: { value: "T cells" } });
+
+        fireEvent.change(screen.getByLabelText("Cells"), { target: { value: "all" } });
+        expect(screen.queryByLabelText("Selection name")).toBeNull();
+        expect(inputValue(screen.getByLabelText("New column base name"))).toBe("UMAP");
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+        await waitFor(() => expect(postedBody()).toBeDefined());
+        expect(postedBody()).not.toHaveProperty("rows");
+        expect(postedBody().params).not.toHaveProperty("selection");
+    });
+
+    test("the job list shows the cells each job ran on", async () => {
+        server.jobs = [
+            job({ job_id: "a", status: "done", params: { selection: "T cells" }, selection_rows: 30 }),
+            job({ job_id: "b", status: "failed", created: 1_600_000_000 }),
+        ];
+        renderPanel();
+
+        expect(within(await screen.findByRole("row", { name: /done/ })).getByText("T cells (30)")).toBeTruthy();
+        expect(within(screen.getByRole("row", { name: /failed/ })).getByText("All")).toBeTruthy();
     });
 
     test("lists jobs newest first, with the error of a failed job", async () => {

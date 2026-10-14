@@ -7,7 +7,7 @@
 import type { ServerDataSource } from "./jobColumns";
 
 /** How the selector renders a param; mirrors `ParamSpec.type` in `mdvtools/jobs/registry.py`. */
-export type JobParamType = "datasource" | "subgroup" | "column" | "dropdown" | "text" | "int" | "float";
+export type JobParamType = "datasource" | "subgroup" | "column" | "selection" | "dropdown" | "text" | "int" | "float";
 
 export type JobParamValue = string | number;
 
@@ -15,7 +15,7 @@ export type JobParamSpec = {
     name: string;
     type: JobParamType;
     label: string;
-    /** for "column" and "subgroup": the name of the datasource param whose columns or matrices are offered */
+    /** for "column", "subgroup" and "selection": the name of the datasource param they belong to */
     options_from: string | null;
     default: JobParamValue | null;
     applies_to: string | null;
@@ -54,6 +54,8 @@ export type JobRecord = {
     error: string | null;
     /** the executor the job runs on; `null` on records written before executors had names (ADR-0016) */
     executor: string | null;
+    /** how many rows the job's selection has; `null` when it ran on all rows (ADR-0017) */
+    selection_rows: number | null;
 };
 
 /** Parse a JSON response, throwing the server's `{error}` message when the request failed. */
@@ -73,16 +75,20 @@ export async function fetchExecutors(root: string): Promise<string[]> {
     return readJson(await fetch(`${root}/jobs/executors`));
 }
 
-/** Submit a job; leaving `executor` out runs it on the server's default executor. */
+/**
+ * Submit a job; leaving `executor` out runs it on the server's default executor, and leaving `rows`
+ * out runs it on all rows rather than a selection (ADR-0017).
+ */
 export async function submitJob(
     root: string,
     toolId: string,
     params: Record<string, JobParamValue>,
     executor?: string,
+    rows?: number[],
 ): Promise<string> {
     const resp = await fetch(`${root}/jobs`, {
         method: "POST",
-        body: JSON.stringify({ tool_id: toolId, params, executor }),
+        body: JSON.stringify({ tool_id: toolId, params, executor, rows }),
         headers: { "Content-Type": "application/json" },
     });
     const body: { job_id: string } = await readJson(resp);
