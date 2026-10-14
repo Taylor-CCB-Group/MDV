@@ -1,0 +1,177 @@
+import json
+import os
+import threading
+import logging
+from collections.abc import Callable, Mapping
+from pathlib import Path
+from typing import Any
+
+from . import JOBS_DIRNAME
+from .executor import ExecutorConfig, LocalSubprocessExecutor, SlurmExecutor, SlurmRestExecutor, rest_request
+from .jobstore import Status
+from .manager import JobManager
+from .workspace import default_workspace_root
+
+logger = logging.getLogger(__name__)
+
+# non-terminal status: a record in any of these still needs the driver to advance it.
+_INFLIGHT = frozenset({
+    Status.QUEUED.value, # queued is added so that a write-ahead intent isn't lost when the manager restarts
+    Status.STAGING.value,
+    Status.RUNNING.value,
+    Status.INGESTING.value,
+})
+
+def _has_inflight_records(project) -> bool:
+    """Peek at a project's records without building a manager of its JobStore"""
+    records_dir = Path(project.dir) / JOBS_DIRNAME / "records"
+    if not records_dir.exists():
+        return False
+    for p in records_dir.glob("*.json"):
+        try:
+            status = json.loads(p.read_text()).get("status")
+        except Exception:
+            # can't tell from a peek: build the manager and let its load_all quarantine or retry it
+            return True
+        if status in _INFLIGHT:
+            return True
+    return False
+
+LOCAL_MAX_CONCURRENT = 2
+_SLURM_MODES = ("cli", "rest")
+_REST_REQUIRED = ("MDV_JOBS_SLURM_REST_URL", "MDV_JOBS_SLURM_REST_TOKEN_FILE")
+DEFAULT_REST_API_VERSION = "v0.0.44"
+
+
+def manager_factory_from_env(
+    environ: Mapping[str, str] = os.environ,
+) -> Callable[..., JobManager]:
+    """Build the server's manager factory from the deployment's settings (ADR-0016).
+
+    `local` is always offered and is the default. `MDV_JOBS_SLURM=cli` or `rest` adds `slurm`,
+    with its workspaces under `MDV_JOBS_SLURM_WORKSPACE_ROOT` (a filesystem the compute nodes
+    share, ADR-0010) and its workers run by `MDV_JOBS_SLURM_PYTHON` (default: this server's
+    Python). `rest` also needs `MDV_JOBS_SLURM_REST_URL` and `MDV_JOBS_SLURM_REST_TOKEN_FILE`,
+    and takes `MDV_JOBS_SLURM_REST_USER` and `MDV_JOBS_SLURM_REST_API_VERSION`. The settings are
+    checked here, so a misconfigured server fails at start rather than on its first job request."""
+    slurm_mode = environ.get("MDV_JOBS_SLURM") or None   # empty counts as unset
+    slurm_root = environ.get("MDV_JOBS_SLURM_WORKSPACE_ROOT")
+    if slurm_mode is not None:
+        if slurm_mode not in _SLURM_MODES:
+            raise ValueError(f"MDV_JOBS_SLURM={slurm_mode!r} is not supported; use one of {_SLURM_MODES}")
+        if not slurm_root:
+            raise ValueError("MDV_JOBS_SLURM_WORKSPACE_ROOT must be set when MDV_JOBS_SLURM is set")
+        if slurm_mode == "rest":
+            for name in _REST_REQUIRED:
+                if not environ.get(name):
+                    raise ValueError(f"{name} must be set when MDV_JOBS_SLURM=rest")
+    slurm_python = environ.get("MDV_JOBS_SLURM_PYTHON") or None
+
+    def slurm_executor():
+        if slurm_mode == "rest":
+            request = rest_request(
+                environ["MDV_JOBS_SLURM_REST_URL"],
+                environ["MDV_JOBS_SLURM_REST_TOKEN_FILE"],
+                user=environ.get("MDV_JOBS_SLURM_REST_USER") or None,
+            )
+            version = environ.get("MDV_JOBS_SLURM_REST_API_VERSION") or DEFAULT_REST_API_VERSION
+            return SlurmRestExecutor(request, api_version=version, python=slurm_python)
+        return SlurmExecutor(python=slurm_python)
+
+    def build(project, on_submit: Callable[[], None] | None = None) -> JobManager:
+        executors = {
+            "local": ExecutorConfig(
+                LocalSubprocessExecutor(LOCAL_MAX_CONCURRENT),
+                default_workspace_root(project),
+                LOCAL_MAX_CONCURRENT,
+            )
+        }
+        if slurm_mode is not None and slurm_root:
+            # one directory per project, as default_workspace_root does for local scratch
+            executors["slurm"] = ExecutorConfig(
+                slurm_executor(), Path(slurm_root) / Path(project.dir).name, None
+            )
+        return JobManager(project, executors=executors, on_submit=on_submit)
+
+    return build
+
+
+class JobService:
+    """
+        Process-wide registry of one JobManager per project
+
+        Managers are built lazily on first request and cached by project-id, so the
+        server process holds exactly one owner side manager per project
+    """
+
+    def __init__(
+        self,
+        # injection seam: any callable returning a manager-shaped object (tests pass fakes)
+        manager_factory: Callable[..., Any] = JobManager,
+        interval: float = 1.0,
+    ):
+        self._managers: dict[str, JobManager] = {}
+        self._manager_factory = manager_factory
+        self._wake = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._interval = interval
+
+    def get_or_create(self, project) -> JobManager:
+        if project.id not in self._managers:
+            self._managers[project.id] = self._manager_factory(project, on_submit=self.nudge)
+        return self._managers[project.id]
+
+    def tick_all(self) -> None:
+        """
+        Advance each registered manager once. The driver calls this each cycle
+        One manager's failure is logged and skipped so that it doesn't exit the loop for
+        all the projects (ADR0012)
+        """
+        for manager in list(self._managers.values()):
+            try:
+                manager.tick()
+            except Exception:
+                logger.exception(
+                    "job driver: tick failed for project %s", manager.project.id
+                )
+
+    def has_active(self) -> bool:
+        """True if any manager holds a non-terminal record"""
+        for manager in self._managers.values():
+            if any(r.status in _INFLIGHT for r in manager.store.load_all()):
+                return True
+        return False
+
+    def nudge(self) -> None:
+        """Wake the driver at once (submit calls this after writing the queued record)"""
+        self._wake.set()
+
+    def _run(self) -> None:
+        while True:
+            self.tick_all()
+            # fast poll while work is in flight so completion is noticed
+            # within an interval; block until a nudge while everything is
+            # idle (ADR0012)
+            if self.has_active():
+                self._wake.wait(self._interval)
+            else:
+                self._wake.wait()
+            self._wake.clear()
+
+    def start(self) -> None:
+        """Launch the single daemon driver thread, idempotent"""
+        if self._thread is None:
+            self._thread = threading.Thread(
+                target=self._run, name="mdv-job-driver", daemon=True
+            )
+            self._thread.start()
+
+    def recovery_scan(self, projects) -> list[str]:
+        """ADR:0012: at startup, build and reconcile a manager only for projects with in-flight jobs; leave the rest
+        for lazy get_or_create. Returns the ids built"""
+        built = []
+        for project in projects:
+            if _has_inflight_records(project):
+                self.get_or_create(project)
+                built.append(project.id)
+        return built

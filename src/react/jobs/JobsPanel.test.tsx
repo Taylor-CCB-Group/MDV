@@ -1,0 +1,346 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import JobsPanel from "./JobsPanel";
+import type { JobsDataSource } from "./jobForm";
+import type { JobRecord, JobTool } from "./jobsApi";
+import { jobsRefetchInterval } from "./useJobColumnSync";
+
+const TOOLS: JobTool[] = [
+    {
+        id: "umap",
+        name: "UMAP",
+        description: "Compute a UMAP embedding",
+        input_shape: "matrix",
+        output: { shape: "column", datasource_param: "datasource", columns_param: "output_name" },
+        params: [
+            {
+                name: "datasource",
+                type: "datasource",
+                label: "Datasource",
+                options_from: null,
+                default: null,
+                applies_to: null,
+            },
+            {
+                name: "selection",
+                type: "selection",
+                label: "Cells",
+                options_from: "datasource",
+                default: null,
+                applies_to: null,
+            },
+            {
+                name: "layer",
+                type: "subgroup",
+                label: "Matrix",
+                options_from: "datasource",
+                default: "gs",
+                applies_to: null,
+            },
+            {
+                name: "output_name",
+                type: "text",
+                label: "New column base name",
+                options_from: null,
+                default: "UMAP",
+                applies_to: null,
+            },
+            {
+                name: "n_neighbors",
+                type: "int",
+                label: "Neighbors",
+                options_from: null,
+                default: 15,
+                applies_to: "neighbors",
+            },
+        ],
+    },
+    {
+        id: "concat_columns",
+        name: "Concatenate Columns",
+        description: "Concatenate two columns",
+        input_shape: "columns",
+        output: { shape: "column", datasource_param: "datasource", columns_param: "output_name" },
+        params: [
+            {
+                name: "datasource",
+                type: "datasource",
+                label: "Datasource",
+                options_from: null,
+                default: null,
+                applies_to: null,
+            },
+            {
+                name: "column_a",
+                type: "column",
+                label: "First column",
+                options_from: "datasource",
+                default: null,
+                applies_to: null,
+            },
+            {
+                name: "output_name",
+                type: "text",
+                label: "New column name",
+                options_from: null,
+                default: null,
+                applies_to: null,
+            },
+        ],
+    },
+];
+
+const SOURCES: JobsDataSource[] = [
+    {
+        name: "cells",
+        columns: [{ field: "sample", name: "Sample" }],
+        subgroups: ["gs"],
+        size: 3,
+        filterSize: 3,
+        getFilteredIndices: async () => new Uint32Array([0, 1, 2]),
+    },
+];
+
+/** cells with a filter active that keeps rows 0 and 2 */
+const FILTERED: JobsDataSource[] = [
+    { ...SOURCES[0], filterSize: 2, getFilteredIndices: async () => new Uint32Array([0, 2]) },
+];
+
+function job(p: Partial<JobRecord> & Pick<JobRecord, "job_id">): JobRecord {
+    return {
+        tool_id: "umap",
+        params: {},
+        status: "done",
+        input_filter_hash: null,
+        created: 1_700_000_000,
+        provenance: null,
+        error: null,
+        executor: "local",
+        selection_rows: null,
+        ...p,
+    };
+}
+
+type Server = { jobs: JobRecord[]; executors: string[]; submit: { status: number; body: unknown } };
+let server: Server;
+let fetchMock: ReturnType<typeof vi.fn>;
+
+function json(body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+beforeEach(() => {
+    server = { jobs: [], executors: ["local"], submit: { status: 202, body: { job_id: "new" } } };
+    fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/jobs/tools") return json(TOOLS);
+        if (url === "/jobs/executors") return json(server.executors);
+        if (url === "/jobs" && init?.method === "POST") {
+            if (server.submit.status === 202)
+                server.jobs.push(job({ job_id: "new", status: "queued", created: 2_000_000_000 }));
+            return json(server.submit.body, server.submit.status);
+        }
+        if (url === "/jobs") return json(server.jobs);
+        return json({ error: "not found" }, 404);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+});
+
+afterEach(() => {
+    vi.unstubAllGlobals();
+});
+
+function renderPanel(sources = SOURCES) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    return render(
+        <QueryClientProvider client={client}>
+            <JobsPanel root="" sources={sources} />
+        </QueryClientProvider>,
+    );
+}
+
+function inputValue(el: HTMLElement) {
+    return el instanceof HTMLInputElement || el instanceof HTMLSelectElement ? el.value : undefined;
+}
+
+function postedBody() {
+    const call = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    return call ? JSON.parse(call[1].body) : undefined;
+}
+
+describe("JobsPanel", () => {
+    test("shows the first tool's fields with their starting values", async () => {
+        renderPanel();
+
+        expect(inputValue(await screen.findByLabelText("Tool"))).toBe("umap");
+        expect(screen.getByText("Compute a UMAP embedding")).toBeTruthy();
+        expect(inputValue(screen.getByLabelText("Datasource"))).toBe("cells");
+        expect(inputValue(screen.getByLabelText("Matrix"))).toBe("gs");
+        expect(inputValue(screen.getByLabelText("New column base name"))).toBe("UMAP");
+        expect(inputValue(screen.getByLabelText("Neighbors"))).toBe("15");
+    });
+
+    test("choosing another tool shows that tool's fields", async () => {
+        renderPanel();
+
+        fireEvent.change(await screen.findByLabelText("Tool"), { target: { value: "concat_columns" } });
+
+        expect(inputValue(screen.getByLabelText("First column"))).toBe("");
+        expect(screen.queryByLabelText("Matrix")).toBeNull();
+    });
+
+    test("running a job posts the form values and lists the new job", async () => {
+        renderPanel();
+        fireEvent.change(await screen.findByLabelText("Neighbors"), { target: { value: "30" } });
+
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+        await waitFor(() =>
+            expect(postedBody()).toEqual({
+                tool_id: "umap",
+                params: { datasource: "cells", layer: "gs", output_name: "UMAP", n_neighbors: 30 },
+            }),
+        );
+        const row = await screen.findByRole("row", { name: /queued/ });
+        expect(within(row).getByText("UMAP")).toBeTruthy();
+    });
+
+    test("a rejected submit shows the server's message", async () => {
+        server.submit = { status: 400, body: { error: "'cells' is not a datasource" } };
+        renderPanel();
+        await screen.findByLabelText("Tool");
+
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+        expect((await screen.findByRole("alert")).textContent).toContain("'cells' is not a datasource");
+    });
+
+    test("a numeric param that does not parse shows a message and sends nothing", async () => {
+        renderPanel();
+        fireEvent.change(await screen.findByLabelText("Neighbors"), { target: { value: "2.5" } });
+
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+        expect((await screen.findByRole("alert")).textContent).toContain("Neighbors must be a whole number");
+        expect(postedBody()).toBeUndefined();
+    });
+
+    test("with one executor there is no choice of where to run", async () => {
+        renderPanel();
+        await screen.findByLabelText("Tool");
+
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+        await waitFor(() => expect(postedBody()).toBeDefined());
+        expect(postedBody()).not.toHaveProperty("executor");
+        expect(screen.queryByLabelText("Run on")).toBeNull();
+    });
+
+    test("with several executors the user chooses where the job runs", async () => {
+        server.executors = ["local", "slurm"];
+        renderPanel();
+        const runOn = await screen.findByLabelText("Run on");
+        expect(inputValue(runOn)).toBe("local"); // the default comes first
+        expect(within(runOn).getByRole("option", { name: "Slurm" })).toBeTruthy();
+
+        fireEvent.change(runOn, { target: { value: "slurm" } });
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+        await waitFor(() => expect(postedBody()).toMatchObject({ tool_id: "umap", executor: "slurm" }));
+    });
+
+    test("with several executors the job list shows where each job ran", async () => {
+        server.executors = ["local", "slurm"];
+        server.jobs = [job({ job_id: "a", executor: "slurm" })];
+        renderPanel();
+
+        const row = await screen.findByRole("row", { name: /done/ });
+        expect(within(row).getByText("Slurm")).toBeTruthy();
+    });
+
+    test("without a filter there is no choice of cells", async () => {
+        renderPanel();
+        await screen.findByLabelText("Tool");
+
+        expect(screen.queryByLabelText("Cells")).toBeNull();
+        expect(screen.queryByLabelText("Selection name")).toBeNull();
+    });
+
+    test("with a filter active the job runs on the named current selection by default", async () => {
+        renderPanel(FILTERED);
+        const cells = await screen.findByLabelText("Cells");
+        expect(inputValue(cells)).toBe("selection");
+        expect(within(cells).getByRole("option", { name: "Current selection (2 of 3)" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", true); // needs a name
+
+        fireEvent.change(screen.getByLabelText("Selection name"), { target: { value: "T cells" } });
+        expect(inputValue(screen.getByLabelText("New column base name"))).toBe("UMAP_T_cells");
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+        await waitFor(() =>
+            expect(postedBody()).toEqual({
+                tool_id: "umap",
+                params: {
+                    datasource: "cells",
+                    selection: "T cells",
+                    layer: "gs",
+                    output_name: "UMAP_T_cells",
+                    n_neighbors: 15,
+                },
+                rows: [0, 2],
+            }),
+        );
+    });
+
+    test("with a filter active the user can still run on all cells", async () => {
+        renderPanel(FILTERED);
+        fireEvent.change(await screen.findByLabelText("Selection name"), { target: { value: "T cells" } });
+
+        fireEvent.change(screen.getByLabelText("Cells"), { target: { value: "all" } });
+        expect(screen.queryByLabelText("Selection name")).toBeNull();
+        expect(inputValue(screen.getByLabelText("New column base name"))).toBe("UMAP");
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+        await waitFor(() => expect(postedBody()).toBeDefined());
+        expect(postedBody()).not.toHaveProperty("rows");
+        expect(postedBody().params).not.toHaveProperty("selection");
+    });
+
+    test("the job list shows the cells each job ran on", async () => {
+        server.jobs = [
+            job({ job_id: "a", status: "done", params: { selection: "T cells" }, selection_rows: 30 }),
+            job({ job_id: "b", status: "failed", created: 1_600_000_000 }),
+        ];
+        renderPanel();
+
+        expect(within(await screen.findByRole("row", { name: /done/ })).getByText("T cells (30)")).toBeTruthy();
+        expect(within(screen.getByRole("row", { name: /failed/ })).getByText("All")).toBeTruthy();
+    });
+
+    test("lists jobs newest first, with the error of a failed job", async () => {
+        server.jobs = [
+            job({ job_id: "a", tool_id: "concat_columns", status: "done", created: 1_000 }),
+            job({ job_id: "b", tool_id: "umap", status: "failed", created: 2_000, error: "worker exited 1" }),
+        ];
+        renderPanel();
+
+        await screen.findByText("worker exited 1");
+        const rows = screen.getAllByRole("row").slice(1); // skip the header row
+        expect(within(rows[0]).getByText("failed")).toBeTruthy();
+        expect(within(rows[1]).getByText("Concatenate Columns")).toBeTruthy();
+    });
+});
+
+describe("jobsRefetchInterval", () => {
+    test("polls while any job is still moving", () => {
+        expect(jobsRefetchInterval([job({ job_id: "a", status: "running" })])).toBeGreaterThan(0);
+        expect(jobsRefetchInterval([job({ job_id: "a", status: "queued" })])).toBeGreaterThan(0);
+    });
+
+    test("stops polling when every job has finished", () => {
+        expect(
+            jobsRefetchInterval([job({ job_id: "a", status: "done" }), job({ job_id: "b", status: "failed" })]),
+        ).toBe(false);
+        expect(jobsRefetchInterval(undefined)).toBe(false);
+    });
+});

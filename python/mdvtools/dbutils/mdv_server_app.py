@@ -10,7 +10,7 @@ from urllib.parse import quote
 from sqlalchemy import text, create_engine
 from sqlalchemy.exc import OperationalError
 from flask import Flask
-from mdvtools.server import add_safe_headers
+from mdvtools.server import add_safe_headers, start_driver, job_service
 from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent
@@ -439,10 +439,13 @@ def is_valid_mdv_project(path: str):
     return "views.json" in dir_list and "state.json" in dir_list and "datasources.json" in dir_list
         
 
-def serve_projects_from_db(app):
+def serve_projects_from_db(app) -> list[MDVProject]:
+    """Mount every project in the catalog. Returns the projects mounted, so the job driver's
+    recovery scan holds the same instances the routes were mounted with (ADR-0012)."""
     failed_projects: list[tuple[int, str | Exception]] = []
     failed_project_paths: list[str] = []
     projects = []
+    served: list[MDVProject] = []
     try:
         # Get all projects from the database
         logger.info("Serving the projects present in both database and filesystem. Displaying the error if the path doesn't exist for a project")
@@ -490,6 +493,7 @@ def serve_projects_from_db(app):
 
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(options=options)
+                    served.append(p)
                     logger.info(f"Serving project: {project.path}")
 
                     # Optionally update/add files in DB to reflect filesystem
@@ -527,12 +531,13 @@ def serve_projects_from_db(app):
         logger.exception(f"Error serving projects from database: {e}")
         # handle gracefully; do not propagate
     finally:
-        logger.info(f"{len(failed_projects)} projects failed to serve. ({len(projects)} projects served successfully)")
+        logger.info(f"{len(failed_projects)} projects failed to serve. ({len(served)} projects served successfully)")
         if failed_project_paths:
             logger.info(f"Failed project paths: {failed_project_paths}")
         # nb using extend rather than replacing the list, but as of now I haven't made corresponding `serve_projects_from_filesytem` changes etc
         # so we really only expect this to run once, and the list to be empty
         ProjectService.failed_projects.extend(failed_projects)
+    return served
 
 def serve_projects_from_filesystem(app, base_dir):
     created_project_ids: list[int] = []
@@ -693,7 +698,7 @@ if os.environ.get('MDV_SKIP_SERVER_STARTUP') != '1':
 
         with app.app_context():
             logger.info("Serving projects from database")
-            serve_projects_from_db(app)
+            served_projects = serve_projects_from_db(app)
             logger.info("Starting - create_projects_from_filesystem")
             serve_projects_from_filesystem(app, app.config['projects_base_dir'])
             if ENABLE_AUTH:
@@ -702,9 +707,9 @@ if os.environ.get('MDV_SKIP_SERVER_STARTUP') != '1':
                 # filled before the scan ran, so they are rebuilt here.
                 if grant_admins_ownership_of_unowned_projects():
                     cache_user_projects()
-    except ExtensionError as e:
-        logger.exception(f"Error during app initialization: {e}")
-        raise
+        # Recovery covers projects that had a row at boot. A folder discovered just now is
+        # treated like a fresh upload, and the next restart recovers it (ADR-0012).
+        start_driver(job_service, served_projects)
     except Exception as e:
         logger.exception(f"Error during app initialization: {e}")
 
