@@ -400,13 +400,16 @@ def build_app(
         tool_id = data.get("tool_id")
         params = data.get("params") or {}
         executor = data.get("executor")  # optional; None = the default executor
+        rows = data.get("rows")  # optional; a selection's row indices (ADR-0017), None = all rows
         if not isinstance(tool_id, str) or not isinstance(params, dict):
             return jsonify({"error": "tool_id (string) and params (object) required"}), 400
         if executor is not None and not isinstance(executor, str):
             return jsonify({"error": "executor must be a string"}), 400
+        if rows is not None and not isinstance(rows, list):
+            return jsonify({"error": "rows must be a list of row indices"}), 400
 
         try:
-            job_id = job_service.get_or_create(project).submit(tool_id, params, executor)
+            job_id = job_service.get_or_create(project).submit(tool_id, params, executor, rows)
         except (KeyError, ValueError) as e:
             return jsonify({"error": str(e)}), 400 # unknown tool / bad params / unoffered executor
         return jsonify({"job_id": job_id}), 202

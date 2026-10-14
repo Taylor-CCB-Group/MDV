@@ -240,3 +240,51 @@ def test_post_jobs_with_non_string_executor_returns_400(tmp_path):
     })
 
     assert resp.status_code == 400
+
+
+def _app_with_matrix(tmp_path):
+    import numpy as np
+    import scipy.sparse
+
+    project = MDVProject(str(tmp_path / "proj"), delete_existing=True)
+    project.add_datasource("cells", pd.DataFrame({"cell_id": ["c0", "c1", "c2"]}))
+    project.add_datasource("genes", pd.DataFrame({"name": ["g0", "g1"]}))
+    project.add_rows_as_columns_link("cells", "genes", "name", "Gene Expr")
+    X = scipy.sparse.csc_matrix(np.array([[1.0, 0.0], [0.0, 2.0], [3.0, 4.0]], dtype=np.float32))
+    project.add_rows_as_columns_subgroup("cells", "genes", "gs", X, name="gene_scores")
+    return build_app(project, MDVServerOptions(open_browser=False, websocket=False))
+
+
+_UMAP_ON_SELECTION = {"datasource": "cells", "layer": "gs", "selection": "T cells", "output_name": "UMAP_T_cells"}
+
+
+def test_post_jobs_with_rows_records_the_selection_and_the_client_view_shows_its_size(tmp_path):
+    client = _app_with_matrix(tmp_path).test_client()
+
+    resp = client.post("/jobs", json={"tool_id": "umap", "params": _UMAP_ON_SELECTION, "rows": [2, 0]})
+
+    assert resp.status_code == 202
+    job = client.get(f"/jobs/{resp.get_json()['job_id']}").get_json()
+    assert job["selection_rows"] == 2
+    assert job["input_filter_hash"]
+    assert "rows" not in job      # the indices stay in the sidecar
+
+
+@pytest.mark.parametrize("rows", ["0,2", {"0": 1}, 3])
+def test_post_jobs_with_rows_that_are_not_a_list_returns_400(tmp_path, rows):
+    client = _app_with_matrix(tmp_path).test_client()
+
+    resp = client.post("/jobs", json={"tool_id": "umap", "params": _UMAP_ON_SELECTION, "rows": rows})
+
+    assert resp.status_code == 400
+    assert "rows must be a list" in resp.get_json()["error"]
+
+
+def test_post_jobs_with_rows_outside_the_datasource_returns_400_and_queues_nothing(tmp_path):
+    client = _app_with_matrix(tmp_path).test_client()
+
+    resp = client.post("/jobs", json={"tool_id": "umap", "params": _UMAP_ON_SELECTION, "rows": [0, 3]})
+
+    assert resp.status_code == 400
+    assert "outside" in resp.get_json()["error"]
+    assert client.get("/jobs").get_json() == []
