@@ -4,7 +4,9 @@ import sys
 from dataclasses import asdict
 
 import h5py
+import numpy as np
 import pandas as pd
+import scipy.sparse
 from mdvtools.mdvproject import MDVProject
 from mdvtools.jobs.jobstore import JobRecord
 
@@ -16,10 +18,11 @@ def _make_project(tmp_path):
     return project
 
 
-def _run_owner_step(step, project, ws_dir, rec):
+def _run_owner_step(step, project, ws_dir, rec, rows_path=None):
     """Run an owner step the way the driver does (ADR-0014): its own process, record on stdin."""
+    extra = [str(rows_path)] if rows_path is not None else []
     return subprocess.run(
-        [sys.executable, "-m", "mdvtools.jobs.owner_step", step, project.dir, str(ws_dir)],
+        [sys.executable, "-m", "mdvtools.jobs.owner_step", step, project.dir, str(ws_dir), *extra],
         input=json.dumps(asdict(rec)),
         capture_output=True,
         text=True,
@@ -77,3 +80,27 @@ def test_ingest_step_writes_columns_and_pointer_and_prints_provenance(tmp_path):
         "tool_id": "concat_columns",
         "content_hash": provenance["content_hash"],
     }
+
+
+def test_materialize_step_cuts_the_rows_named_by_the_sidecar(tmp_path):
+    project = MDVProject(str(tmp_path / "proj"), delete_existing=True)
+    project.add_datasource("cells", pd.DataFrame({"cell_id": ["c0", "c1", "c2"]}))
+    project.add_datasource("genes", pd.DataFrame({"name": ["g0", "g1"]}))
+    project.add_rows_as_columns_link("cells", "genes", "name", "Gene Expr")
+    X = scipy.sparse.csc_matrix(np.array([[1.0, 0.0], [0.0, 2.0], [3.0, 4.0]], dtype=np.float32))
+    project.add_rows_as_columns_subgroup("cells", "genes", "gs", X, name="gene_scores")
+    rows_path = tmp_path / "rows.npy"
+    np.save(rows_path, np.array([1, 2], dtype=np.uint32))
+    rec = JobRecord(
+        job_id="job3",
+        tool_id="umap",
+        params={"datasource": "cells", "layer": "gs", "selection": "T cells", "output_name": "UMAP_T_cells"},
+        selection_rows=2,
+    )
+    ws_dir = tmp_path / "scratch" / rec.job_id
+
+    result = _run_owner_step("materialize", project, ws_dir, rec, rows_path)
+
+    assert result.returncode == 0, result.stderr
+    with h5py.File(ws_dir / "input" / "tray.h5", "r") as f:
+        assert f.attrs["n_cells"] == 2

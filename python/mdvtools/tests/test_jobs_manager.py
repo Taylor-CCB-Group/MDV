@@ -6,6 +6,7 @@ import pytest
 import pandas as pd
 import numpy as np
 import scipy.sparse
+import h5py
 from mdvtools.mdvproject import MDVProject
 from mdvtools.jobs.manager import JobManager
 from mdvtools.jobs.jobstore import Status
@@ -494,3 +495,15 @@ def test_submit_rejects_bad_rows_before_the_write_ahead_record(tmp_path):
         mgr.submit("umap", _UMAP_ON_SELECTION, rows=[0, 60])
     assert mgr.store.load_all() == []
     assert not any((mgr.records_root / "selections").glob("*.npy"))
+
+
+def test_dispatch_materializes_only_the_selected_rows(tmp_path):
+    project = _make_matrix_project(tmp_path)
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", executor=_FakeExecutor())
+    job_id = mgr.submit("umap", _UMAP_ON_SELECTION, rows=[9, 1, 5])
+
+    mgr.tick()
+
+    assert mgr.store.load_all()[0].status == Status.RUNNING.value
+    with h5py.File(tmp_path / "scratch" / job_id / "input" / "tray.h5", "r") as f:
+        assert f.attrs["n_cells"] == 3

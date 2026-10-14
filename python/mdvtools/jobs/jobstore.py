@@ -75,7 +75,7 @@ class JobStore:
             # sidecar first, so a record never points at rows that are not on disk
             selected = np.sort(np.asarray(rows, dtype=np.uint32))
             self.selections_dir.mkdir(exist_ok=True)
-            path = self.selections_dir / f"{rec.job_id}.npy"
+            path = self.rows_path(rec.job_id)
             tmp = path.with_suffix(".npy.tmp")
             with open(tmp, "wb") as f:
                 np.save(f, selected)
@@ -85,9 +85,12 @@ class JobStore:
         self._write(rec)
         return rec
 
+    def rows_path(self, job_id: str) -> Path:
+        return self.selections_dir / f"{job_id}.npy"
+
     def load_rows(self, job_id: str) -> np.ndarray | None:
         """The sorted row indices a job runs on, or None when it runs on all rows."""
-        path = self.selections_dir / f"{job_id}.npy"
+        path = self.rows_path(job_id)
         return np.load(path) if path.exists() else None
 
     def _write(self, rec: JobRecord) -> None:

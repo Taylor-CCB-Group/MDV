@@ -2,6 +2,7 @@ from pathlib import Path
 import tempfile
 import h5py
 import numpy as np
+import scipy.sparse
 import json
 
 MARKER = "STATUS"  # worker writes "done/failed" - the primary completion signal
@@ -40,9 +41,14 @@ class Workspace:
 
 
 # materialize keyed by INPUT shape, not tool
-def materialize_columns_tray(project, spec, params: dict, ws: Workspace) -> None:
+def materialize_columns_tray(
+    project, spec, params: dict, ws: Workspace, rows: np.ndarray | None = None
+) -> None:
     """Input shape 'columns': every type == 'column' param -> a string dataset named by the param;
     scalar params (separator, output_name, ...) -> attrs. Shared by all column-input tools"""
+    if rows is not None:
+        # only the matrix shape takes a selection so far (ADR-0017)
+        raise NotImplementedError("the columns input shape cannot run on a selection")
 
     col_params = [p for p in spec.params if p.type == "column"]
     s = h5py.string_dtype()
@@ -58,17 +64,23 @@ def materialize_columns_tray(project, spec, params: dict, ws: Workspace) -> None
             if p.type != "column" and params.get(p.name) is not None:
                 f.attrs[p.name] = params[p.name]
 
-def materialize_matrix_tray(project, spec, params: dict, ws: Workspace) -> None:
+def materialize_matrix_tray(
+    project, spec, params: dict, ws: Workspace, rows: np.ndarray | None = None
+) -> None:
     """Input shape 'matrix': copy the expression matrix (a rows_as_column subgroup) into its tray
     in its stored layout, plus explicit shape and a `sparse` attr. Sparse is the CSC triplet - x/i/p
     unchanged. Dense is the flat column-major x, copied in slices so this step never holds the whole
     matrix. The worker rebuilds the matrix from either layout and imports no MDV.
+
+    `rows`, the sorted indices of a selection (ADR-0017), keeps only those rows, renumbered from 0,
+    so the worker never knows it runs on a subset.
     """
     datasource = params["datasource"]
     subgroup_key = params.get("layer", "gs")
     name, is_sparse = project._resolve_rows_as_columns_subgroup(datasource, subgroup_key)
 
     n_cells = int(project.get_datasource_metadata(datasource)["size"])
+    n_rows = n_cells if rows is None else len(rows)
     with project.lock("read"):
         h5 = project._get_h5_handle(read_only = True)
         try:
@@ -76,19 +88,33 @@ def materialize_matrix_tray(project, spec, params: dict, ws: Workspace) -> None:
             assert isinstance(grp, h5py.Group)
             with h5py.File(ws.input / "tray.h5", "w") as f:
                 if is_sparse:
+                    x = np.asarray(grp["x"], dtype=np.float32)
+                    i = np.asarray(grp["i"], dtype=np.uint32)
                     p = np.asarray(grp["p"])
-                    f.create_dataset("x", data=np.asarray(grp["x"], dtype=np.float32))
-                    f.create_dataset("i", data=np.asarray(grp["i"], dtype=np.uint32))
-                    f.create_dataset("p", data=p)
                     n_genes = len(p) - 1
+                    if rows is not None:
+                        cut = scipy.sparse.csc_matrix((x, i, p), shape=(n_cells, n_genes))[rows, :].tocsc()
+                        x, i, p = cut.data.astype(np.float32), cut.indices.astype(np.uint32), cut.indptr
+                    f.create_dataset("x", data=x)
+                    f.create_dataset("i", data=i)
+                    f.create_dataset("p", data=p)
                 else:
                     src = grp["x"]
                     assert isinstance(src, h5py.Dataset)
-                    dst = f.create_dataset("x", shape=src.shape, dtype=np.float32)
-                    for start in range(0, len(src), DENSE_COPY_SLICE):
-                        dst[start : start + DENSE_COPY_SLICE] = src[start : start + DENSE_COPY_SLICE]
                     n_genes = len(src) // n_cells
-                f.attrs["n_cells"] = n_cells
+                    if rows is None:
+                        dst = f.create_dataset("x", shape=src.shape, dtype=np.float32)
+                        for start in range(0, len(src), DENSE_COPY_SLICE):
+                            dst[start : start + DENSE_COPY_SLICE] = src[start : start + DENSE_COPY_SLICE]
+                    else:
+                        # whole genes per slice, so each slice reshapes to cells x genes
+                        dst = f.create_dataset("x", shape=(n_rows * n_genes,), dtype=np.float32)
+                        step = max(1, DENSE_COPY_SLICE // n_cells)
+                        for g0 in range(0, n_genes, step):
+                            g1 = min(g0 + step, n_genes)
+                            block = src[g0 * n_cells : g1 * n_cells].reshape((n_cells, g1 - g0), order="F")
+                            dst[g0 * n_rows : g1 * n_rows] = block[rows].ravel(order="F")
+                f.attrs["n_cells"] = n_rows
                 f.attrs["n_genes"] = n_genes
                 f.attrs["sparse"] = is_sparse
                 # route params by their declared target call: control/output params (applies_to = None) stay

@@ -83,6 +83,27 @@ def test_matrix_tray_roundtrips_stored_dense_X(tmp_path):
         assert (n_cells, n_genes) == (3, 2)
         assert np.allclose(x.reshape((n_cells, n_genes), order="F"), X)
 
+@pytest.mark.parametrize("make_project", [_make_matrix_project, _make_dense_matrix_project])
+def test_matrix_tray_keeps_only_the_selected_rows(tmp_path, make_project):
+    project, X = make_project(tmp_path)
+    dense = X if isinstance(X, np.ndarray) else X.toarray()
+    ws = Workspace(tmp_path / "scratch", "job1")
+    params = {"datasource": "cells", "layer": "gs", "output_name": "UMAP"}
+
+    materialize_matrix_tray(project, UMAP_SPEC, params, ws, rows=np.array([0, 2], dtype=np.uint32))
+
+    with h5py.File(ws.input / "tray.h5", "r") as f:
+        n_cells, n_genes = int(cast(int, f.attrs["n_cells"])), int(cast(int, f.attrs["n_genes"]))
+        x = cast(h5py.Dataset, f["x"])[:]
+        if f.attrs["sparse"]:
+            i, p = cast(h5py.Dataset, f["i"])[:], cast(h5py.Dataset, f["p"])[:]
+            rebuilt = scipy.sparse.csc_matrix((x, i, p), shape=(n_cells, n_genes)).toarray()
+        else:
+            rebuilt = x.reshape((n_cells, n_genes), order="F")
+    assert (n_cells, n_genes) == (2, 2)
+    assert np.allclose(rebuilt, dense[[0, 2]])
+
+
 def _write_matrix_tray(ws, X, out_name="UMAP", neighbors_kwargs=None, umap_kwargs=None, pca_kwargs=None, sparse=True):
     """Hand-build the tray materialize_matrix_tray would produce, so this test crosses the courier
     boundary the same way the worker will in production - and stays MDV-free, like the worker."""

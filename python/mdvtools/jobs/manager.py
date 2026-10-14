@@ -83,8 +83,11 @@ class JobManager:
         """Run an owner step in its own process and wait for it (ADR-0014): the HDF5 work stays off
         the server's gevent hub and out of the process its request handlers use. Returns the
         step's stdout; a failed step raises with the last line of its stderr."""
+        cmd = [sys.executable, "-m", "mdvtools.jobs.owner_step", step, self.project.dir, str(ws.root)]
+        if rec.selection_rows is not None:
+            cmd.append(str(self.store.rows_path(rec.job_id)))   # the selection's sidecar (ADR-0017)
         result = subprocess.run(
-            [sys.executable, "-m", "mdvtools.jobs.owner_step", step, self.project.dir, str(ws.root)],
+            cmd,
             input=json.dumps(asdict(rec)),
             capture_output=True,
             text=True,
