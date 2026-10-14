@@ -366,6 +366,14 @@ class TableChart extends BaseChart {
             this.grid.unregisterPlugin(this.overlay);
             this.grid.registerPlugin(this.overlay);
         }
+        if (this._resizeTimer) {
+            clearTimeout(this._resizeTimer);
+        }
+        this._resizeTimer = setTimeout(() => {
+            this._resizeTimer = null;
+            this.setSize();
+            this.grid.setColumns(this.grid.getColumns());
+        }, 500);
     }
 
     setSize(x, y) {
@@ -385,6 +393,10 @@ class TableChart extends BaseChart {
 
     addColumns() {}
     remove() {
+        if (this._resizeTimer) {
+            clearTimeout(this._resizeTimer);
+            this._resizeTimer = null;
+        }
         this.grid.destroy();
         super.remove();
     }

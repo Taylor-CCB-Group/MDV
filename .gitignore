@@ -94,3 +94,4 @@ tests_playwright/test-data/temp/
 .docker-deploy.*.override.yml
 
 .cursor/
+.venv/

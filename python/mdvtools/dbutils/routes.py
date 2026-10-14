@@ -12,9 +12,8 @@ def register_routes(app, ENABLE_AUTH):
     """Register routes with the Flask app."""
     from flask import abort, jsonify, session, render_template, send_file
     from mdvtools.auth.authutils import active_projects_cache, user_project_cache, all_users_cache, cache_user_projects
-    from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
-    from mdvtools.dbutils.dbmodels import User
-    from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
+    from mdvtools.dbutils.mdv_server_app import grant_admins_ownership_of_unowned_projects, serve_projects_from_filesystem
+    from mdvtools.dbutils.dbservice import ProjectService
 
     def project_is_writable(project_data: dict[str, Any]) -> bool:
         project_path = project_data.get("path")
@@ -90,13 +89,16 @@ def register_routes(app, ENABLE_AUTH):
             """
             try:
                 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
+                from mdvtools.dbutils.server_options import get_active_extension
 
                 # Determine if project_manager is enabled in config.json
                 enabled_extensions = app.config.get('extensions', []) or []
                 pm_enabled = 'project_manager' in enabled_extensions
 
                 # Get the canonical set of keys from the extension, then override values
-                pm = ProjectManagerExtension()
+                pm = get_active_extension(app, "project_manager")
+                if pm is None:
+                    pm = ProjectManagerExtension()
                 ext_any: Any = pm
                 pm_config_true = ext_any.get_session_config()  # type: ignore[attr-defined]
 
@@ -135,17 +137,12 @@ def register_routes(app, ENABLE_AUTH):
                 created_ids = serve_projects_from_filesystem(app, app.config["projects_base_dir"])
                 unwritable_projects = []
 
-                # Keep rescanned projects consistent with Auth0 startup sync:
-                # every administrator owns every newly discovered project.
-                if ENABLE_AUTH and created_ids:
+                # Every administrator owns each project the scan discovers, and
+                # each project that reached the catalog at a boot with no
+                # administrator present, which no later scan would create a row for.
+                if ENABLE_AUTH:
                     try:
-                        admin_ids = [
-                            admin.id
-                            for admin in User.query.filter_by(is_admin=True).all()
-                        ]
-                        for user_id in admin_ids:
-                            for pid in created_ids:
-                                UserProjectService.add_or_update_user_project(user_id=user_id, project_id=pid, is_owner=True)
+                        grant_admins_ownership_of_unowned_projects()
                         # Refresh caches so /projects reflects new permissions
                         cache_user_projects()
                     except Exception as perm_e:
@@ -282,4 +279,3 @@ def register_routes(app, ENABLE_AUTH):
     except Exception as e:
         logger.exception(f"Error registering routes: {e}")
         raise  # Re-raise to be handled by the parent function
-

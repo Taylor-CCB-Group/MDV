@@ -54,7 +54,11 @@ export default function popoutChart(chart: BaseChart<any>) {
             popoutWindow.document.head.appendChild(newLink);
         } else if (styleElement instanceof HTMLStyleElement) {
             const newStyle = popoutWindow.document.createElement("style");
-            newStyle.innerHTML = styleElement.innerHTML;
+            const cssText = getStyleElementCssText(styleElement);
+            newStyle.textContent = cssText;
+            if (styleElement.nonce) {
+                newStyle.nonce = styleElement.nonce;
+            }
             popoutWindow.document.head.appendChild(newStyle);
         }
     };
@@ -178,4 +182,23 @@ function preloadFonts() {
             }
         `;
         return preloadContent;
+}
+
+function getStyleElementCssText(styleElement: HTMLStyleElement) {
+    if (styleElement.textContent && styleElement.textContent.trim().length > 0) {
+        return styleElement.textContent;
+    }
+
+    const sheet = styleElement.sheet;
+    if (!sheet) {
+        return "";
+    }
+
+    try {
+        return Array.from(sheet.cssRules)
+            .map((rule) => rule.cssText)
+            .join("\n");
+    } catch {
+        return styleElement.textContent || "";
+    }
 }
