@@ -104,3 +104,28 @@ def test_materialize_step_cuts_the_rows_named_by_the_sidecar(tmp_path):
     assert result.returncode == 0, result.stderr
     with h5py.File(ws_dir / "input" / "tray.h5", "r") as f:
         assert f.attrs["n_cells"] == 2
+
+
+def test_ingest_step_spreads_a_selection_and_labels_the_pointer(tmp_path):
+    project = _make_project(tmp_path)   # 3 cells
+    rows_path = tmp_path / "rows.npy"
+    np.save(rows_path, np.array([0, 2], dtype=np.uint32))
+    rec = JobRecord(
+        job_id="job4",
+        tool_id="umap",
+        params={"datasource": "cells", "layer": "gs", "selection": "T cells", "output_name": "UMAP_T_cells"},
+        selection_rows=2,
+    )
+    ws_dir = tmp_path / "scratch" / rec.job_id
+    output = ws_dir / "output"
+    output.mkdir(parents=True)
+    with h5py.File(output / "result.h5", "w") as f:
+        f.create_dataset("UMAP_T_cells_1", data=np.array([0.5, 1.5]))
+
+    result = _run_owner_step("ingest", project, ws_dir, rec, rows_path)
+
+    assert result.returncode == 0, result.stderr
+    values = np.asarray(project.get_column("cells", "UMAP_T_cells_1"), dtype=np.float64)
+    assert values[0] == 0.5 and np.isnan(values[1]) and values[2] == 1.5
+    pointer = project.get_column_metadata("cells", "UMAP_T_cells_1")["provenance"]
+    assert pointer["selection"] == {"name": "T cells", "n_rows": 2}

@@ -507,3 +507,23 @@ def test_dispatch_materializes_only_the_selected_rows(tmp_path):
     assert mgr.store.load_all()[0].status == Status.RUNNING.value
     with h5py.File(tmp_path / "scratch" / job_id / "input" / "tray.h5", "r") as f:
         assert f.attrs["n_cells"] == 3
+
+
+def test_umap_job_on_a_selection_end_to_end(tmp_path):
+    project = _make_matrix_project(tmp_path)   # 60 cells
+    mgr = JobManager(project, workspace_root=tmp_path / "scratch", max_concurrent=2)
+    rows = list(range(0, 60, 2))                # 30 cells, enough for n_neighbors=15
+    job_id = mgr.submit("umap", _UMAP_ON_SELECTION, rows=rows)
+
+    _drive(mgr, timeout=180)
+
+    rec = {r.job_id: r for r in mgr.store.load_all()}[job_id]
+    assert rec.status == Status.DONE.value, rec.error
+    for col in ("UMAP_T_cells_1", "UMAP_T_cells_2"):
+        values = np.asarray(project.get_column("cells", col), dtype=np.float64)
+        assert len(values) == 60
+        assert np.isfinite(values[rows]).all()
+        assert np.isnan(values[1::2]).all()
+        pointer = project.get_column_metadata("cells", col)["provenance"]
+        assert pointer["job_id"] == job_id
+        assert pointer["selection"] == {"name": "T cells", "n_rows": 30}

@@ -31,18 +31,22 @@ def materialize(project, rec: JobRecord, ws: Workspace, rows: np.ndarray | None 
     MATERIALIZERS[spec.input_shape](project, spec, rec.params, ws, rows)
 
 
-def ingest(project, rec: JobRecord, ws: Workspace) -> dict:
+def ingest(project, rec: JobRecord, ws: Workspace, rows: np.ndarray | None = None) -> dict:
     """Write the worker's outputs and their provenance pointers into the project; return the provenance."""
     spec = get_tool(rec.tool_id)
     with project.lock("write"):
-        result = INGESTERS[spec.output.shape](project, rec.params, ws)
+        result = INGESTERS[spec.output.shape](project, rec.params, ws, rows)
         provenance = build_provenance(rec, result["manifest"])
-        pointer = {
+        pointer: dict[str, object] = {
             "kind": "job",
             "job_id": rec.job_id,
             "tool_id": rec.tool_id,
             "content_hash": provenance["content_hash"],
         }
+        if rec.selection_rows is not None:
+            # lets a column describe its subset without opening the record (ADR-0017)
+            name = next(p.name for p in spec.params if p.type == "selection")
+            pointer["selection"] = {"name": rec.params[name], "n_rows": rec.selection_rows}
         for ds, col in result["outputs"]:
             project.set_column_metadata(ds, col, "provenance", pointer)
     return provenance
@@ -64,7 +68,7 @@ def main(argv: list[str]) -> None:
     if step == "materialize":
         materialize(project, rec, ws, rows)
     elif step == "ingest":
-        result_out.write(json.dumps(ingest(project, rec, ws)))
+        result_out.write(json.dumps(ingest(project, rec, ws, rows)))
     else:
         raise ValueError(f"unknown owner step {step!r}")
     result_out.close()

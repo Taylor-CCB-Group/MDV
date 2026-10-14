@@ -70,3 +70,18 @@ def test_ingest_lands_multiple_numeric_columns(tmp_path):
     assert cols["UMAP_1"] == "double" and cols["UMAP_2"] == "double"          # numeric, NOT text
     assert np.allclose(project.get_column("cells", "UMAP_1"), u1, atol=1e-4)
     assert np.allclose(project.get_column("cells", "UMAP_2"), u2, atol=1e-4)
+
+
+def test_ingest_places_a_selections_result_in_its_rows_and_nan_elsewhere(tmp_path):
+    project = _make_project(tmp_path)   # 3 cells
+    ws = Workspace(tmp_path / "jobs", "job1")
+    params = {"datasource": "cells", "output_name": "UMAP_T_cells"}
+    with h5py.File(ws.output / "result.h5", "w") as f:   # the worker saw 2 rows
+        f.create_dataset("UMAP_T_cells_1", data=np.array([0.5, 1.5]))
+
+    ingest_column_output(project, params, ws, rows=np.array([0, 2], dtype=np.uint32))
+
+    values = np.asarray(project.get_column("cells", "UMAP_T_cells_1"), dtype=np.float64)
+    assert len(values) == 3
+    assert values[0] == 0.5 and values[2] == 1.5
+    assert np.isnan(values[1])
