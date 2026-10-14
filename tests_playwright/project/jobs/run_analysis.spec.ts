@@ -3,13 +3,14 @@
  * the open page without a reload (ADR-0012, ADR-0009).
  *
  * The minimal synthetic project stores its expression matrix dense, so UMAP here also covers the
- * dense matrix tray.
+ * dense matrix tray. A lasso on a scatter plot covers running a job on a named selection (ADR-0017).
  *
  * Run:
  *   TEST_BASE_URL=http://127.0.0.1:5170 pnpm run playwright-test-project tests_playwright/project/jobs/run_analysis.spec.ts --project=chromium --reporter=list
  */
 
 import test, { expect, type Page } from "@playwright/test";
+import { getChartPanelByTitle, waitForChartByTitle } from "../../utils/helpers";
 import {
     type SyntheticAnndataTemporaryProjectHandle,
     createTemporaryProjectViaSyntheticAnndata,
@@ -41,6 +42,55 @@ async function jobColumns(page: Page, base: string) {
             .filter((c: any) => c.field.startsWith(prefix))
             .map((c: any) => ({ field: String(c.field), job: c.provenance?.job_id as string | undefined }));
     }, base);
+}
+
+/** Add a WGL scatter plot of two cells columns and wait for it to appear. */
+async function addScatterPlot(page: Page, title: string, x: string, y: string) {
+    await page.evaluate(
+        async (chart) => {
+            await (window as any).mdv.chartManager.addChart(
+                "cells",
+                {
+                    id: `pw-scatter-${Date.now()}`,
+                    title: chart.title,
+                    legend: "",
+                    type: "wgl_scatter_plot",
+                    param: [chart.x, chart.y],
+                    size: [500, 400],
+                    position: [20, 20],
+                },
+                true,
+            );
+        },
+        { title, x, y },
+    );
+    await waitForChartByTitle(page, title);
+}
+
+/** Drag the scatter plot's freehand lasso (its default brush) around the left half of the plot. */
+async function lassoLeftHalf(page: Page, title: string) {
+    const canvas = getChartPanelByTitle(page, title).locator("canvas").first();
+    await expect(canvas).toBeVisible();
+    const box = await canvas.boundingBox();
+    if (box === null) throw new Error("scatter plot canvas has no bounding box");
+    const at = (fx: number, fy: number) => [box.x + box.width * fx, box.y + box.height * fy] as const;
+    await page.mouse.move(...at(0.02, 0.02));
+    await page.mouse.down();
+    // the brush adds a point every 15 px, so move in small steps
+    for (const [fx, fy] of [
+        [0.02, 0.98],
+        [0.5, 0.98],
+        [0.5, 0.02],
+        [0.03, 0.02],
+    ] as const) {
+        await page.mouse.move(...at(fx, fy), { steps: 20 });
+    }
+    await page.mouse.up();
+}
+
+/** How many cells pass the page's current filters. */
+async function filteredCount(page: Page) {
+    return await page.evaluate((): number => (window as any).mdv.chartManager.dsIndex.cells.dataStore.filterSize);
 }
 
 test.describe("Run analysis", () => {
@@ -114,6 +164,77 @@ test.describe("Run analysis", () => {
             expect(after.sameObject).toBe(true);
             expect(after.values).not.toEqual(before);
             expect((await jobColumns(page, base)).map((c) => c.field)).toEqual([`${base}_1`, `${base}_2`]);
+        } finally {
+            if (handle !== undefined) {
+                await handle.cleanup();
+            }
+        }
+    });
+
+    test("running UMAP on a lasso selection fills the selected cells and leaves the rest missing", async ({ page }) => {
+        test.setTimeout(240_000);
+        let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
+        try {
+            handle = await createTemporaryProjectViaSyntheticAnndata(page, {
+                nameSegment: `jobs-selection--${Date.now()}`,
+                synthetic: SYNTHETIC,
+            });
+            const base = `UMAP${Date.now()}`;
+            await runUmap(page, base);
+            await expect.poll(async () => (await jobColumns(page, base)).length, { timeout: JOB_TIMEOUT }).toBe(2);
+
+            const title = "UMAP for the lasso";
+            await addScatterPlot(page, title, `${base}_1`, `${base}_2`);
+            await lassoLeftHalf(page, title);
+            await expect.poll(() => filteredCount(page)).toBeLessThan(SYNTHETIC.nCells);
+            const selected = await filteredCount(page);
+            expect(selected).toBeGreaterThan(15); // enough cells for UMAP's default 15 neighbours
+
+            await page.getByRole("button", { name: "Run Analysis" }).click();
+            const dialog = page.getByRole("dialog", { name: "Run analysis" });
+            await dialog.getByRole("combobox", { name: "Tool" }).selectOption("umap");
+            const cells = dialog.getByRole("combobox", { name: "Cells" });
+            await expect(cells).toHaveValue("selection");
+            await expect(cells.locator("option:checked")).toHaveText(
+                `Current selection (${selected} of ${SYNTHETIC.nCells})`,
+            );
+            await dialog.getByRole("textbox", { name: "Selection name" }).fill("T cells");
+            await expect(dialog.getByRole("textbox", { name: "New column base name" })).toHaveValue("UMAP_T_cells");
+            await dialog.getByRole("button", { name: "Run", exact: true }).click();
+            await expect(dialog.getByRole("row", { name: /T cells/ })).toContainText(`T cells (${selected})`);
+            await page.keyboard.press("Escape");
+            await expect(dialog).toBeHidden();
+
+            await expect
+                .poll(async () => (await jobColumns(page, "UMAP_T_cells")).map((c) => c.field), {
+                    timeout: JOB_TIMEOUT,
+                })
+                .toEqual(["UMAP_T_cells_1", "UMAP_T_cells_2"]);
+
+            const check = await page.evaluate(
+                async (fields) => {
+                    const mdv = (window as any).mdv;
+                    const store = mdv.chartManager.dsIndex.cells.dataStore;
+                    await new Promise<void>((resolve) => mdv.chartManager.loadColumnSet(fields, "cells", resolve));
+                    const inSelection = new Set(Array.from((await store.getFilteredIndices()) as Uint32Array));
+                    return fields.map((f) => {
+                        const column = store.columnIndex[f];
+                        const data = column.data as Float32Array;
+                        // a selected cell has a coordinate and every other cell is missing
+                        let wrong = 0;
+                        data.forEach((v, i) => {
+                            if (inSelection.has(i) === Number.isNaN(v)) wrong++;
+                        });
+                        return { length: data.length, wrong, selection: column.provenance?.selection };
+                    });
+                },
+                ["UMAP_T_cells_1", "UMAP_T_cells_2"],
+            );
+            for (const column of check) {
+                expect(column.length).toBe(SYNTHETIC.nCells);
+                expect(column.wrong).toBe(0);
+                expect(column.selection).toEqual({ name: "T cells", n_rows: selected });
+            }
         } finally {
             if (handle !== undefined) {
                 await handle.cleanup();
