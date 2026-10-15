@@ -24,12 +24,16 @@ jobs:
         id: image
         run: |
           IMAGE="${{ secrets.DOCKER_HUB_USERNAME }}/mdv:${{ github.sha }}"
-          if docker buildx imagetools inspect "$IMAGE" > /dev/null 2>&1; then
+          if OUTPUT=$(docker buildx imagetools inspect "$IMAGE" 2>&1); then
             echo "Image for ${{ github.sha }} already exists, skipping build"
             echo "exists=true" >> $GITHUB_OUTPUT
-          else
+          elif echo "$OUTPUT" | grep -q ": not found$"; then
             echo "No image for ${{ github.sha }} yet, building"
             echo "exists=false" >> $GITHUB_OUTPUT
+          else
+            echo "Could not check Docker Hub for ${{ github.sha }}:"
+            echo "$OUTPUT"
+            exit 1
           fi
 
   build-and-deploy:
@@ -37,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       !cancelled() &&
-      needs.check-image.outputs.exists != 'true' && (
+      (needs.check-image.result == 'skipped' || needs.check-image.outputs.exists == 'false') && (
         github.event_name == 'schedule' ||
         github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy]')) ||
