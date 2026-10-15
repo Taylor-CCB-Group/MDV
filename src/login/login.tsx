@@ -1,8 +1,8 @@
 import type React from "react";
 import { useEffect } from "react";
-import { Box, Button, Paper, Typography } from "@mui/material";
-import mdvLogo from "./assets/mdv_logo.png";
+import { Button, Typography } from "@mui/material";
 import { buildDashboardUrl } from "@/utils/mdvRouting";
+import AuthCard from "./AuthCard";
 
 const Login: React.FC = () => {
     useEffect(() => {
@@ -33,113 +33,79 @@ const Login: React.FC = () => {
     };
 
     return (
-        <Box
-            sx={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                bgcolor: "#f1f3f4",
-            }}
-        >
-            <Paper
-                elevation={1}
+        <AuthCard>
+            <Typography
+                variant="h5"
                 sx={{
-                    p: 6,
-                    width: "100%",
-                    maxWidth: 450,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    borderRadius: 2,
-                    border: "1px solid #dadce0",
-                    backgroundColor: "unset",
+                    mb: 1,
+                    color: "#202124",
+                    fontWeight: 400,
+                    fontSize: "24px",
                 }}
             >
-                <Box
-                    component="img"
-                    src={mdvLogo}
-                    alt="Logo"
-                    sx={{
-                        width: 300,
-                        height: "auto",
-                        mb: 4,
-                    }}
-                />
+                Sign in
+            </Typography>
 
-                <Typography
-                    variant="h5"
-                    sx={{
-                        mb: 1,
-                        color: "#202124",
-                        fontWeight: 400,
-                        fontSize: "24px",
-                    }}
-                >
-                    Sign in
-                </Typography>
+            <Typography
+                sx={{
+                    mb: 4,
+                    color: "#202124",
+                    fontSize: "16px",
+                }}
+            >
+                to continue to MDV
+            </Typography>
 
-                <Typography
-                    sx={{
-                        mb: 4,
-                        color: "#202124",
-                        fontSize: "16px",
-                    }}
-                >
-                    to continue to MDV
-                </Typography>
+            <Button
+                variant="contained"
+                onClick={handleLogin}
+                sx={{
+                    py: 1.5,
+                    px: 6,
+                    fontSize: "0.875rem",
+                    textTransform: "none",
+                    borderRadius: 5,
+                    bgcolor: "#1a73e8",
+                    "&:hover": {
+                        bgcolor: "#1557b0",
+                    },
+                    minWidth: 200,
+                }}
+            >
+                Sign in
+            </Button>
+            {/* <Typography
+                sx={{
+                    mt: 6,
+                    mb: 1,
+                    color: "#202124",
+                    fontSize: "16px",
+                }}
+            >
+                If you are an Oxford University User:
+            </Typography>
 
                 <Button
                     variant="contained"
-                    onClick={handleLogin}
                     sx={{
+                        mt: 1.5,
                         py: 1.5,
                         px: 6,
                         fontSize: "0.875rem",
                         textTransform: "none",
                         borderRadius: 5,
-                        bgcolor: "#1a73e8",
-                        "&:hover": {
-                            bgcolor: "#1557b0",
-                        },
                         minWidth: 200,
+                        backgroundColor: "white",
+                        color: "black",
+                        "&:hover": {
+                            bgcolor: "grey",
+                        },
                     }}
+                    onClick={handleLoginWithSSO}
                 >
-                    Sign in
-                </Button>
-                {/* <Typography
-                    sx={{
-                        mt: 6,
-                        mb: 1,
-                        color: "#202124",
-                        fontSize: "16px",
-                    }}
-                >
-                    If you are an Oxford University User:
-                </Typography>
-
-                    <Button
-                        variant="contained"
-                        sx={{
-                            mt: 1.5,
-                            py: 1.5,
-                            px: 6,
-                            fontSize: "0.875rem",
-                            textTransform: "none",
-                            borderRadius: 5,
-                            minWidth: 200,
-                            backgroundColor: "white",
-                            color: "black",
-                            "&:hover": {
-                                bgcolor: "grey",
-                            },
-                        }}
-                        onClick={handleLoginWithSSO}
-                    >
-                        Sign in with SSO
-                    </Button> */}
-            </Paper>
-        </Box>
+                    Sign in with SSO
+                </Button> */}
+        </AuthCard>
     );
 };
 

@@ -14,11 +14,13 @@ if TYPE_CHECKING:
 # from flask import Response
 from flask.typing import ResponseReturnValue
 from mdvtools.auth.auth_provider import AuthProvider
+from mdvtools.auth.access_denied import AccessDeniedReason, deny_access
 from mdvtools.logging_config import get_logger
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
 from auth0.management import Auth0
 from auth0.authentication import GetToken
+from auth0.rest import RestClientOptions
 from auth0.exceptions import RateLimitError
 import random
 
@@ -33,6 +35,10 @@ JWKS_CACHE_DURATION = 3600  # Cache for 1 hour
 # Rate limiting and retry parameters
 BASE_DELAY = 1  # Base delay in seconds
 MAX_DELAY = 8  # Maximum delay in seconds
+
+# Applied to every call this module makes to Auth0. Long enough for a slow
+# network; short enough that a hung call fails instead of holding a worker.
+AUTH0_TIMEOUT_SECONDS = 15
 
 class Auth0Provider(AuthProvider):
     def __init__(self, app, oauth: OAuth, client_id: str, client_secret: str, domain: str):
@@ -70,7 +76,7 @@ class Auth0Provider(AuthProvider):
             server_metadata_url = f'https://{self.domain}/.well-known/openid-configuration'
 
             # Attempt to fetch metadata to ensure it's accessible
-            response = requests.get(server_metadata_url)
+            response = requests.get(server_metadata_url, timeout=AUTH0_TIMEOUT_SECONDS)
             if response.status_code != 200:
                 logger.error(f"Failed to fetch OpenID configuration from {server_metadata_url}: {response.text}")
                 raise RuntimeError(f"Unable to fetch OpenID Connect metadata from {server_metadata_url}")
@@ -89,7 +95,9 @@ class Auth0Provider(AuthProvider):
                 client_id=self.client_id,
                 client_secret=self.client_secret,
                 server_metadata_url=server_metadata_url,
-                client_kwargs={'scope': 'openid profile email'},
+                # default_timeout covers Authlib's own calls: the metadata it
+                # loads and the token exchange after login.
+                client_kwargs={'scope': 'openid profile email', 'default_timeout': AUTH0_TIMEOUT_SECONDS},
             )
             logger.info("Auth0 OAuth provider registered successfully with OpenID Connect metadata.")
         except Exception as e:
@@ -169,7 +177,7 @@ class Auth0Provider(AuthProvider):
             headers = {"Authorization": f"Bearer {access_token}"}
 
             user_info_url = f"https://{self.domain}/userinfo"
-            response = requests.get(user_info_url, headers=headers)
+            response = requests.get(user_info_url, headers=headers, timeout=AUTH0_TIMEOUT_SECONDS)
 
             if response.status_code == 200:
                 logger.debug("User information retrieved successfully.")
@@ -303,7 +311,7 @@ class Auth0Provider(AuthProvider):
                     if needs_refresh:
                         response = requests.get(
                             url=self.app.config['AUTH0_PUBLIC_KEY_URI'],
-                            timeout=10
+                            timeout=AUTH0_TIMEOUT_SECONDS
                         )
                         if response.status_code != 200:
                             logger.error(f"Failed to fetch JWKS: {response.status_code}")
@@ -395,12 +403,21 @@ class Auth0Provider(AuthProvider):
             user = User.query.filter_by(auth_id=auth0_id).first()
 
             if user is None:
+                # Signed in at Auth0 but unknown here. Each way out records why,
+                # so the person gets a page saying so rather than a redirect to a
+                # login that Auth0 completes silently, straight back to here.
+                refusal = self._bootstrap_refusal(user_info, auth0_id, email)
+                if refusal is not None or not auth0_id:
+                    deny_access(refusal or "no_account")
+                    return None, (jsonify({"error": "User not found"}), 404)
                 try:
-                    user = self._try_bootstrap_first_admin(user_info, auth0_id, email)
+                    user = self._create_first_admin(auth0_id, email)
                 except Exception as e:
                     logger.exception(f"Bootstrap administrator creation failed: {e}")
+                    deny_access("setup_failed")
                     return None, (jsonify({"error": "Administrator bootstrap failed"}), 500)
                 if user is None:
+                    deny_access("no_account")
                     return None, (jsonify({"error": "User not found"}), 404)
             elif not user.is_active:
                 # First successful login for a pending (admin-invited) user: activate them.
@@ -419,34 +436,60 @@ class Auth0Provider(AuthProvider):
 
         except Exception as e:
             logger.exception(f"Error in validate_user: {e}")
+            # Most likely the database. Without this the failure is a redirect to
+            # login, which Auth0 completes at once - a loop for as long as it lasts.
+            deny_access("unavailable")
             return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
 
-    def _try_bootstrap_first_admin(self, user_info: Dict[str, Any], auth0_id: Optional[str], email: str):
-        """
-        Create the first local administrator, but only while the local database has zero
-        users and the verified Auth0 identity matches MDV_BOOTSTRAP_ADMIN_EMAIL. Returns
-        None (bootstrap not applicable) rather than creating anything if any check fails.
+    def _bootstrap_refusal(
+        self, user_info: Dict[str, Any], auth0_id: Optional[str], email: str
+    ) -> Optional[AccessDeniedReason]:
+        """Why this identity cannot become the first administrator, or None if it can.
 
-        This path only ever runs once per deployment: as soon as any local user exists,
-        User.query.count() > 0 and this method always returns None.
+        Bootstrap applies only while the local database has zero users, and only to
+        a verified Auth0 identity matching MDV_BOOTSTRAP_ADMIN_EMAIL. Every refusal
+        is logged: two of them used to return silently, which left an operator with
+        a login loop and nothing in the log to explain it.
+
+        The address is compared before verification is checked, so only the
+        intended administrator is ever told to verify - telling anyone else would
+        send them off to do something that cannot help.
         """
-        from mdvtools.dbutils.dbmodels import User, db
-        from sqlalchemy.exc import IntegrityError
+        from mdvtools.dbutils.dbmodels import User
 
         if not auth0_id:
-            return None
+            logger.warning("Sign-in rejected: Auth0 returned no user id.")
+            return "no_account"
+        if User.query.count() > 0:
+            logger.info(f"Signed in at Auth0 as {auth0_id}, which has no account in this deployment.")
+            return "no_account"
 
         bootstrap_email = (self.app.config.get("MDV_BOOTSTRAP_ADMIN_EMAIL") or "").strip().lower()
         if not bootstrap_email:
-            return None
-        if User.query.count() > 0:
-            return None
-        if not user_info.get("email_verified"):
-            logger.warning("Bootstrap admin login rejected: Auth0 email is not verified.")
-            return None
+            logger.warning(
+                "Sign-in refused: the users table is empty and MDV_BOOTSTRAP_ADMIN_EMAIL is not set, "
+                "so nobody can become the first administrator. Set it, then recreate the container - "
+                "a restart does not apply environment changes."
+            )
+            return "not_set_up"
         if not email or email != bootstrap_email:
             logger.warning("Bootstrap admin login rejected: email does not match MDV_BOOTSTRAP_ADMIN_EMAIL.")
-            return None
+            return "not_set_up"
+        if not user_info.get("email_verified"):
+            logger.warning("Bootstrap admin login rejected: Auth0 email is not verified.")
+            return "email_unverified"
+        return None
+
+    def _create_first_admin(self, auth0_id: str, email: str):
+        """
+        Create the first local administrator. Callers must have had None from
+        _bootstrap_refusal first: this method does no eligibility checks of its own.
+
+        This path only ever runs once per deployment: as soon as any local user exists,
+        _bootstrap_refusal refuses everyone.
+        """
+        from mdvtools.dbutils.dbmodels import User, db
+        from sqlalchemy.exc import IntegrityError
 
         user = User(
             email=email,
@@ -519,13 +562,8 @@ class Auth0Provider(AuthProvider):
 
     def _assign_admin_role(self, auth0_id: str) -> None:
         """Assign the Auth0 tenant's 'admin' role to auth0_id via the Management API."""
-        get_token = GetToken(domain=self.domain, client_id=self.client_id, client_secret=self.client_secret)
-        mgmt_api_token = get_token.client_credentials(audience=f"https://{self.domain}/api/v2/")["access_token"]
-        auth0 = Auth0(self.domain, mgmt_api_token)
-
-        roles_response = auth0.roles.list(name_filter="admin")
-        roles = roles_response.get("roles", []) if isinstance(roles_response, dict) else []
-        role_id = next((role["id"] for role in roles if role.get("name") == "admin"), None)
+        auth0, _scopes = _management_client(self.domain, self.client_id, self.client_secret)
+        role_id = _find_admin_role_id(auth0)
         if not role_id:
             raise RuntimeError("Auth0 tenant has no role named 'admin'.")
 
@@ -813,12 +851,8 @@ class Auth0Provider(AuthProvider):
             client_id = self.app.config['AUTH0_CLIENT_ID']
             client_secret = self.app.config['AUTH0_CLIENT_SECRET']
             auth0_db_connection = self.app.config['AUTH0_DB_CONNECTION']
-            audience = f"https://{auth0_domain}/api/v2/"
 
-            # Get Auth0 Management API token
-            get_token = GetToken(domain=auth0_domain, client_id=client_id, client_secret=client_secret)
-            mgmt_api_token = get_token.client_credentials(audience=audience)["access_token"]
-            auth0 = Auth0(auth0_domain, mgmt_api_token)
+            auth0, _scopes = _management_client(auth0_domain, client_id, client_secret)
 
             # Get initial database statistics
             from mdvtools.dbutils.dbmodels import User
@@ -904,3 +938,98 @@ class Auth0Provider(AuthProvider):
         except Exception as e:
             logger.exception(f"In sync_users_to_db: An unexpected error occurred: {e}")
             raise
+
+# The Management API scopes the first administrator's sign-in needs: finding the
+# 'admin' role, and assigning it.
+FIRST_ADMIN_SCOPES = ("read:roles", "update:users")
+
+
+def _management_client(domain: str, client_id: str, client_secret: str) -> tuple[Auth0, Optional[set[str]]]:
+    """A Management API client, and the scopes its token was granted.
+
+    The scopes come from the token response itself, which is what lets the
+    startup check see a missing grant without having to try the operation. None
+    when Auth0 did not report them, so a caller can tell "none" from "unknown".
+    """
+    get_token = GetToken(
+        domain=domain, client_id=client_id, client_secret=client_secret, timeout=AUTH0_TIMEOUT_SECONDS
+    )
+    response = get_token.client_credentials(audience=f"https://{domain}/api/v2/")
+    scope = response.get("scope")
+    scopes = set(scope.split()) if isinstance(scope, str) else None
+    client = Auth0(domain, response["access_token"], rest_options=RestClientOptions(timeout=AUTH0_TIMEOUT_SECONDS))
+    return client, scopes
+
+
+def _find_admin_role_id(auth0: Auth0) -> Optional[str]:
+    """The id of the tenant's role named exactly 'admin', or None if it has none."""
+    roles_response = auth0.roles.list(name_filter="admin")
+    roles = roles_response.get("roles", []) if isinstance(roles_response, dict) else []
+    return next((role["id"] for role in roles if role.get("name") == "admin"), None)
+
+
+def check_first_admin_setup(app) -> List[str]:
+    """Check at startup everything the first administrator's sign-in will need.
+
+    Runs only for Auth0 and only while the users table is empty - a deployment
+    nobody has signed in to yet. Each problem it looks for has otherwise surfaced
+    one at a time, as a login loop on someone's first attempt to sign in, with the
+    cause found by reading logs after the fact. Here they are all reported, in the
+    startup log, before anyone tries.
+
+    Logs and returns the problems found; never raises, so a check that cannot
+    reach Auth0 cannot stop the server starting.
+    """
+    from mdvtools.dbutils.dbmodels import User
+
+    if (app.config.get("DEFAULT_AUTH_METHOD") or "").lower() != "auth0":
+        return []
+    if User.query.count() > 0:
+        return []
+
+    problems: List[str] = []
+    if not (app.config.get("MDV_BOOTSTRAP_ADMIN_EMAIL") or "").strip():
+        problems.append(
+            "MDV_BOOTSTRAP_ADMIN_EMAIL is not set, so nobody can become the first administrator. "
+            "Set it, then recreate the container - a restart does not apply environment changes."
+        )
+
+    try:
+        auth0, scopes = _management_client(
+            str(app.config.get("AUTH0_DOMAIN") or ""),
+            str(app.config.get("AUTH0_CLIENT_ID") or ""),
+            str(app.config.get("AUTH0_CLIENT_SECRET") or ""),
+        )
+    except Exception as e:
+        problems.append(
+            f"Could not get an Auth0 Management API token ({e}). In Auth0, set this application's "
+            "Token Endpoint Authentication Method to Client Secret (Post), tick the Client Credentials "
+            "grant, and authorise the application for the Auth0 Management API."
+        )
+    else:
+        missing = [scope for scope in FIRST_ADMIN_SCOPES if scopes is not None and scope not in scopes]
+        if missing:
+            problems.append(
+                f"The Auth0 Management API grant is missing {', '.join(missing)}, which assigning the "
+                "first administrator's role needs. Add them under Applications > APIs > "
+                "Auth0 Management API > Machine to Machine Applications."
+            )
+        # Roles can only be looked at with permission to read them.
+        if "read:roles" not in missing:
+            try:
+                if _find_admin_role_id(auth0) is None:
+                    problems.append(
+                        "This Auth0 tenant has no role named exactly 'admin'. "
+                        "Create it under User Management > Roles."
+                    )
+            except Exception as e:
+                problems.append(f"Could not read this Auth0 tenant's roles ({e}).")
+
+    for problem in problems:
+        logger.error(f"First administrator setup: {problem}")
+    if not problems:
+        logger.info(
+            "First administrator setup is ready: the first verified sign-in by "
+            "MDV_BOOTSTRAP_ADMIN_EMAIL will become the administrator."
+        )
+    return problems

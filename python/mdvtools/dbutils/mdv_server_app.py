@@ -702,6 +702,15 @@ if os.environ.get('MDV_SKIP_SERVER_STARTUP') != '1':
                 # filled before the scan ran, so they are rebuilt here.
                 if grant_admins_ownership_of_unowned_projects():
                     cache_user_projects()
+                # On a deployment nobody has signed in to yet, report every missing
+                # first-administrator setting now, rather than one per failed login.
+                if (app.config.get("DEFAULT_AUTH_METHOD") or "").lower() == "auth0":
+                    try:
+                        from mdvtools.auth.auth0_provider import check_first_admin_setup
+
+                        check_first_admin_setup(app)
+                    except Exception as e:
+                        logger.warning(f"Could not check the first administrator setup: {e}")
     except ExtensionError as e:
         logger.exception(f"Error during app initialization: {e}")
         raise
