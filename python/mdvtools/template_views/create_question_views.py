@@ -939,10 +939,21 @@ RESPONSE_COLUMN_NAMES = {
 }
 
 
+def has_columns(
+    project_path: Path, datasources: list[dict[str, Any]], wanted: list[tuple[str, str]]
+) -> bool:
+    """Whether every (datasource, field) is both described in datasources.json and stored in the h5.
+
+    A shared datasources.json can describe columns that a copy's older datafile.h5 lacks.
+    """
+    described = {(ds["name"], c["field"]) for ds in datasources for c in ds.get("columns", [])}
+    with h5py.File(project_path / "datafile.h5", "r") as handle:
+        return all(key in described and key[1] in handle[key[0]] for key in wanted)
+
+
 def add_response_columns(project_path: Path, datasources: list[dict[str, Any]]) -> list[str]:
     """Add the derived response columns to cells; returns new fields."""
-    existing = {c["field"] for c in datasource(datasources, CELLS)["columns"]}
-    if all(f in existing for f in RESPONSE_COLUMN_NAMES):
+    if has_columns(project_path, datasources, [(CELLS, f) for f in RESPONSE_COLUMN_NAMES]):
         return []
     with h5py.File(project_path / "datafile.h5", "r") as handle:
         codes = {f: handle[CELLS][f][:] for f in (RESPONSE, TREATMENT)}
@@ -1050,8 +1061,7 @@ def compute_treatment_deg(
 
 def add_treatment_deg(project_path: Path, datasources: list[dict[str, Any]]) -> list[str]:
     """Add DEG result columns to genes; returns new fields."""
-    existing = {c["field"] for c in datasource(datasources, GENES.datasource)["columns"]}
-    if all(f in existing for f in DEG_COLUMN_NAMES):
+    if has_columns(project_path, datasources, [(GENES.datasource, f) for f in DEG_COLUMN_NAMES]):
         return []
     with h5py.File(project_path / "datafile.h5", "r") as handle:
         columns = compute_treatment_deg(handle, datasources)
@@ -1078,11 +1088,8 @@ def backup_datasources(project_path: Path) -> None:
 def add_gene_collections(project_path: Path, datasources: list[dict[str, Any]]) -> list[str]:
     """Add collection score columns to cells and a collection column to genes; returns new fields."""
     score_fields = [collection_score_field(c) for c in GENE_COLLECTIONS]
-    existing = {
-        (ds["name"], c["field"]) for ds in datasources for c in ds.get("columns", [])
-    }
     wanted = [(CELLS, f) for f in score_fields] + [(GENES.datasource, GENE_COLLECTION_FIELD)]
-    if all(key in existing for key in wanted):
+    if has_columns(project_path, datasources, wanted):
         return []
 
     with h5py.File(project_path / "datafile.h5", "r") as handle:
