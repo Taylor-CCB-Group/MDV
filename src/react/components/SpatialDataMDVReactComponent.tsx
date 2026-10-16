@@ -18,9 +18,9 @@ import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 import type { FieldName } from "@/charts/charts";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
+import RasterDataWarning, { rasterEntriesKey } from "./RasterDataWarning";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
-import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
-import { ensurePointsWorker } from "@/react/spatialdata/ensurePointsWorker";
+import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
@@ -290,8 +290,7 @@ const SpatialDataMainChart = observer(() => {
     const region = getSpatialRegionMetadata(rawRegion);
     const spatialDataUrl = region ? getSpatialDataUrl(region) : null;
     useEffect(() => {
-        ensureChunkWorker();
-        ensurePointsWorker();
+        ensureParquetWorker();
     }, []);
 
     return (
@@ -429,10 +428,11 @@ const SpatialDataViewer = observer(
             propsGeneration: chart.renderStackPropsGeneration,
             hostLayerResolver,
         });
-        const { layers, layerOrder } = useAssociatedShapesLayerInputs(spatialData ?? undefined, {
-            layers: baseLayers,
-            layerOrder: baseLayerOrder,
-        });
+        const { layers, layerOrder } = useAssociatedShapesLayerInputs(
+            spatialData ?? undefined,
+            { layers: baseLayers, layerOrder: baseLayerOrder },
+            region?.spatial?.file,
+        );
 
         const onSpatialViewStateChange = useCallback(
             (next: SpatialCanvasViewState) => {
@@ -598,6 +598,7 @@ const SpatialDataViewer = observer(
                         </Profiler>
                     </div>
                 </div>
+                <RasterDataWarning spatialData={spatialData} entriesKey={rasterEntriesKey(config.renderStack)} />
                 <SpatialDataLink />
                 {tooltipPortal}
                 {featureTooltipPortal}

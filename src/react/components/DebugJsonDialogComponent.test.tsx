@@ -20,12 +20,6 @@ vi.mock("../hooks", () => ({
     useChartManager: () => mocks.chartManager,
 }));
 
-vi.mock("../viv_loader_cache", () => ({
-    vivLoaderCacheTelemetryObservable: {
-        snapshot: { cacheEntries: 3 },
-    },
-}));
-
 vi.mock("./CustomTooltip", () => ({
     default: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
@@ -104,7 +98,6 @@ describe("DebugJsonDialogComponent", () => {
         const topLevelJsonSource = mocks.jsonViewSources.at(-1);
         expect(topLevelJsonSource).toMatchObject({
             chartTypes: [],
-            vivLoaderCacheTelemetry: { cacheEntries: 3 },
         });
         expect(topLevelJsonSource).not.toHaveProperty("validationFindings");
     });

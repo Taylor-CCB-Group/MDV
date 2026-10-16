@@ -31,6 +31,30 @@ python ligand_network_example.py
 - Linking to spatial data
 - View creation with instructional text
 
+## Column Curation
+
+### `rename_delete_columns_example.py`
+
+Renaming and hiding columns from a script, and the ordering rule that makes it work.
+
+**Run it:**
+```bash
+python rename_delete_columns_example.py
+```
+
+**Creates:**
+- A small `cells` datasource with the sort of column names a conversion produces
+- Four renamed display labels and two hidden columns
+- A default view built *after* curation, listing only the surviving columns
+
+**Features demonstrated:**
+- `rename_column()` and `soft_delete_column()` - return values and both exception types
+- `add_datasource(..., add_to_view=None)` - why curation must happen before any view exists
+- `create_view_with_all_datasources()` skipping hidden columns automatically
+- The view-reference guard refusing a deletion once a chart uses the column
+
+See `docs/rename-and-hide-columns.md` for the full guide.
+
 ## More Examples Coming Soon
 
 - Spatial data integration

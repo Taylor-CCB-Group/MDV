@@ -1,5 +1,7 @@
 import os
 import csv
+import json
+import uuid
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
 
@@ -308,21 +310,20 @@ def mdv_project_processing(app, projects_base_dir, filepath, original_filename, 
     from mdvtools.mdvproject import MDVProject
     from mdvtools.dbutils.mdv_server_app import is_valid_mdv_project
     from mdvtools.dbutils.dbservice import ProjectService
-    
+    from mdvtools.dbutils.dbmodels import db
+    from mdvtools.project_router import ProjectBlueprint
+
     print(f"Processing MDV project zip file: {original_filename}")
     print(f"Filepath: {filepath}")
 
     project_path = None
+    assigned_id = None
     try:
-        # Get next available project ID
-        from mdvtools.dbutils.dbservice import ProjectService
-        next_id = ProjectService.get_next_project_id()
-        if next_id is None:
-            raise ValidationError("Failed to determine next project ID from database")
+        # The directory name is opaque. The Project ID is assigned by the database
+        # once the files are in place.
+        project_path = os.path.join(projects_base_dir, uuid.uuid4().hex)
+        os.makedirs(project_path)
 
-        project_path = os.path.join(projects_base_dir, str(next_id))
-        os.makedirs(project_path, exist_ok=True)
-        
         # Using a temp directory for extracting files
         with tempfile.TemporaryDirectory() as temp_dir:
             with zipfile.ZipFile(filepath, 'r') as zip_file:
@@ -351,34 +352,39 @@ def mdv_project_processing(app, projects_base_dir, filepath, original_filename, 
                             break
 
                 # Copy the files to newly created project path, if project is valid
-                if extracted_project_path is not None:
-                    shutil.copytree(extracted_project_path, project_path, dirs_exist_ok=True)
-                else:
-                    # Clean up the created directory
-                    if os.path.exists(project_path):
-                        shutil.rmtree(project_path)
+                if extracted_project_path is None:
                     raise ValidationError("The uploaded file is not a valid MDV project")
+                shutil.copytree(extracted_project_path, project_path, dirs_exist_ok=True)
 
-        # Create a new MDV project out of the new path and files copied
-        mdv_project = MDVProject(project_path, backend_db=True)
-        mdv_project.set_editable(True)
-        
-        # Serve the project through the Flask app
-        print(f"Serving new project {next_id} through Flask app")
-        mdv_project.serve(app=app, open_browser=False, backend_db=True)
-        
-        # Initialize the project and register it using project name if valid
-        final_project_name = project_name if project_name else os.path.splitext(original_filename)[0]
+        # Initialize the project and register it using project name if valid. With
+        # no name supplied, keep the one the archive carries before falling back to
+        # the file name.
+        archived_name = None
+        if not project_name:
+            try:
+                with open(os.path.join(project_path, "state.json")) as state_file:
+                    archived_name = (json.load(state_file) or {}).get('name')
+            except Exception:
+                archived_name = None
+        final_project_name = project_name or archived_name or os.path.splitext(original_filename)[0]
         new_project = ProjectService.add_new_project(path=project_path, name=final_project_name)
 
         if not new_project:
-            # Clean up on failure
-            if os.path.exists(project_path):
-                shutil.rmtree(project_path)
             raise ValidationError("Failed to register project in database")
-        
-        print(f"Successfully created and served project {new_project.id} at /project/{new_project.id}/")
-        
+        assigned_id = str(new_project.id)
+
+        # Create a new MDV project out of the new path and files copied
+        mdv_project = MDVProject(project_path, id=assigned_id, backend_db=True)
+        mdv_project.set_editable(True)
+        mdv_project.set_display_name(new_project.name)
+
+        # Serve the project through the Flask app
+        print(f"Serving new project {assigned_id} through Flask app")
+        mdv_project.serve(app=app, open_browser=False, backend_db=True)
+
+        db.session.commit()
+        print(f"Successfully created and served project {new_project.id} at /project/{new_project.id}/ in {project_path}")
+
         result = {
             "success": True, 
             "message": "MDV project imported successfully",
@@ -387,17 +393,25 @@ def mdv_project_processing(app, projects_base_dir, filepath, original_filename, 
         }
         return result
         
-    except ValidationError:
-        # Re-raise ValidationError as-is
-        raise
     except Exception as e:
         print(f"Error in mdv_project_processing: {str(e)}")
-        # Clean up project directory if it was created
+        db.session.rollback()
+
+        # Clean up project directory if it was created. A rejected archive leaves
+        # one behind that nothing points at and no scan can tell from a project.
         if project_path and os.path.exists(project_path):
             try:
                 shutil.rmtree(project_path)
             except Exception:
                 pass
+
+        # Remove the route if it was registered
+        if assigned_id is not None:
+            ProjectBlueprint.blueprints.pop(assigned_id, None)
+
+        # A rejected archive is already described, so it keeps its own message.
+        if isinstance(e, ValidationError):
+            raise
         raise ValidationError(f"Failed to process MDV project: {str(e)}", status_code=400)
     
 class ValidationError(Exception):
