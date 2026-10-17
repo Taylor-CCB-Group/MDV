@@ -84,6 +84,20 @@ attribute it to. Startup and rescan give every administrator ownership of one, s
 project list only shows a user the projects they hold a permission row for.
 _Avoid_: orphan, public project, shared project
 
+## Deployment terms
+
+**Deployable image**:
+An MDV image that CI built from one commit and published to Docker Hub under a tag named after that commit. It is deployed by its digest.
+_Avoid_: build, latest image, tarball
+
+**Release image**:
+A deployable image that passed the Playwright gate and carries the `v<version>` tag of a GitHub Release.
+_Avoid_: stable image, production build
+
+**Preview**:
+A throwaway instance on bia that runs a labelled pull request's deployable image with dev auth and synthetic data.
+_Avoid_: staging, test instance, dev deployment
+
 ## SpatialData.js integration terms
 
 Canonical rendering vocabulary lives in [SpatialData.js CONTEXT.md](https://github.com/Taylor-CCB-Group/SpatialData.js/blob/main/CONTEXT.md). MDV chart code uses the same terms:
