@@ -189,7 +189,17 @@ const ParamSelection = observer(
  * adapted so we can use SettingsDialogComponent widgets
  * When the returned GuiSpec is updated, the property of config corresponding to the control is updated
 */
-function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T>, onChange: (v?: GuiValueTypes[T]) => void): GuiSpec<T> {
+/** The column chosen in another extra control, or undefined while it has none (or "None"). */
+function getSourceColumn(extra: Record<string, unknown>, sourceControl: string): string | undefined {
+    const value = extra[sourceControl];
+    return typeof value === "string" && value !== "" && value !== "__none__" ? value : undefined;
+}
+
+function controlToGuiSpec<T extends keyof GuiValueTypes>(
+    control: ExtraControl<T>,
+    onChange: (v?: GuiValueTypes[T]) => void,
+    extra: Record<string, unknown>,
+): GuiSpec<T> {
     const draftSpec = {
         type: control.type,
         label: control.label,
@@ -215,6 +225,19 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
     //if (draftSpec.type === "check" && !control.defaultVal) (draftSpec as any).current_value = false;
     // if ((draftSpec as any).type === "checkbox" && !control.defaultVal) (draftSpec as any).current_value = false;
     if ((draftSpec.type as string) === "checkbox") (draftSpec as any).type = "check";
+    const { sourceControl } = control;
+    if (sourceControl) {
+        // categories of the column chosen in another control; `extra` is observable, so the
+        // choices follow that control as it changes
+        Object.assign(draftSpec, {
+            current_value: control.defaultVal ?? [],
+            sourceColumn: () => getSourceColumn(extra, sourceControl),
+            getCurrentValue: () => {
+                const value = extra[control.name];
+                return isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+            },
+        });
+    }
     const spec = observable(draftSpec);
     // if (!spec.current_value) throw new Error(`current_value should be set - no default in '${JSON.stringify(control)}'`);
     // strict typescript warns us about spec.current_value being potentially undefined, and it's dead right.
@@ -225,7 +248,7 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
 }
 function useGuiSpecControl<T extends keyof GuiValueTypes>(control: ExtraControl<T>, config: ChartConfig): GuiSpec<T> {
     const spec = useMemo(() => {
-        const val = controlToGuiSpec(control, (v) => {config.extra[control.name] = v});
+        const val = controlToGuiSpec(control, (v) => {config.extra[control.name] = v}, config.extra);
         config.extra[control.name] = val.current_value;
         return val;
     }, [control, config]);
@@ -234,6 +257,7 @@ function useGuiSpecControl<T extends keyof GuiValueTypes>(control: ExtraControl<
 
 const ExtraControlComponent = observer(({ control, config }: { control: ExtraControl<keyof GuiValueTypes>, config: ChartConfig }) => {
     const spec = useGuiSpecControl(control, config);
+    if (control.sourceControl && !getSourceColumn(config.extra, control.sourceControl)) return null;
     return (
         <Paper elevation={6}>
             <AbstractComponent props={spec} />

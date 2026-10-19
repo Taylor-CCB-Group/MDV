@@ -10,8 +10,16 @@ const FRACTION_LEGEND_CIRCLE_X = 40;
 const FRACTION_LEGEND_TEXT_X = 70;
 const FRACTION_LEGEND_VERTICAL_PADDING = 15;
 
-function getItemPositions(items: FractionLegendSpec["items"]) {
-    const positions: number[] = [];
+const FRACTION_LEGEND_ITEM_GAP = 12;
+const FRACTION_LEGEND_LABEL_GAP = 4;
+const FRACTION_LEGEND_LEFT_PADDING = 6;
+/** Approximate width of a `text-xs` character, for sizing a horizontal legend. */
+const FRACTION_LEGEND_CHAR_WIDTH = 7;
+
+type ItemLayout = { cx: number; cy: number; textX: number };
+
+function getVerticalLayout(items: FractionLegendSpec["items"]) {
+    const layout: ItemLayout[] = [];
     let contentBottom = 0;
     let currentCy = FRACTION_LEGEND_ITEM_TOP + 6;
 
@@ -21,16 +29,68 @@ function getItemPositions(items: FractionLegendSpec["items"]) {
             const previousRadius = Number(items[i - 1].radius) || 0;
             currentCy += previousRadius + radius + FRACTION_LEGEND_CIRCLE_GAP;
         }
-        positions.push(currentCy);
+        layout.push({
+            cx: FRACTION_LEGEND_CIRCLE_X,
+            cy: currentCy,
+            textX: FRACTION_LEGEND_TEXT_X,
+        });
         contentBottom = Math.max(contentBottom, currentCy + radius);
     }
 
     return {
-        positions,
+        layout,
+        bodyWidth: FRACTION_LEGEND_WIDTH,
         bodyHeight: Math.max(
             items.length * 24 + (items.length + 2) * 2 + FRACTION_LEGEND_ITEM_TOP,
             contentBottom + 8,
         ),
+    };
+}
+
+/** Circles in one row, each followed by its label, sharing a centre line. */
+function getHorizontalLayout(items: FractionLegendSpec["items"]) {
+    const maxRadius = Math.max(
+        0,
+        ...items.map((item) => Number(item.radius) || 0),
+    );
+    const cy = FRACTION_LEGEND_ITEM_TOP + maxRadius;
+    let x = FRACTION_LEGEND_LEFT_PADDING;
+    const layout = items.map((item) => {
+        const radius = Number(item.radius) || 0;
+        const cx = x + radius;
+        const textX = cx + radius + FRACTION_LEGEND_LABEL_GAP;
+        x =
+            textX +
+            item.label.length * FRACTION_LEGEND_CHAR_WIDTH +
+            FRACTION_LEGEND_ITEM_GAP;
+        return { cx, cy, textX };
+    });
+    return { layout, bodyWidth: x, bodyHeight: cy + maxRadius + 6 };
+}
+
+function getItemLayout(spec: FractionLegendSpec) {
+    return spec.orientation === "horizontal"
+        ? getHorizontalLayout(spec.items)
+        : getVerticalLayout(spec.items);
+}
+
+/** Size the legend sets on its wrapper, so charts can lay out around it before it renders. */
+export function getFractionLegendSize(spec: FractionLegendSpec) {
+    const { bodyWidth, bodyHeight } = getItemLayout(spec);
+    const titleWidth =
+        spec.label.length * FRACTION_LEGEND_CHAR_WIDTH +
+        FRACTION_LEGEND_LEFT_PADDING * 2;
+    const autoWidth =
+        spec.orientation === "horizontal"
+            ? Math.max(bodyWidth, titleWidth)
+            : FRACTION_LEGEND_WIDTH;
+    const autoHeight =
+        bodyHeight +
+        FRACTION_LEGEND_TITLE_HEIGHT +
+        FRACTION_LEGEND_VERTICAL_PADDING;
+    return {
+        width: spec.width ?? autoWidth,
+        height: Math.min(autoHeight, spec.maxHeight ?? autoHeight),
     };
 }
 
@@ -39,14 +99,8 @@ export default function FractionLegend({
     onLayoutReady,
 }: LegendWrapperComponentProps<FractionLegendSpec>) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const { positions, bodyHeight } = getItemPositions(spec.items);
-    const autoWidth = spec.width ?? FRACTION_LEGEND_WIDTH;
-    const autoHeight =
-        bodyHeight +
-        FRACTION_LEGEND_TITLE_HEIGHT +
-        FRACTION_LEGEND_VERTICAL_PADDING;
-    const width = autoWidth;
-    const height = Math.min(autoHeight, spec.maxHeight ?? autoHeight);
+    const { layout, bodyHeight } = getItemLayout(spec);
+    const { width, height } = getFractionLegendSize(spec);
 
     useLayoutEffect(() => {
         const el = containerRef.current?.parentElement;
@@ -82,18 +136,18 @@ export default function FractionLegend({
                 <svg height={bodyHeight} width="100%" className="relative">
                     <g>
                         {spec.items.map((item, i) => {
-                            const cy = positions[i];
+                            const { cx, cy, textX } = layout[i];
                             return (
                                 <g key={item.key}>
                                     <circle
                                         cy={cy}
-                                        cx={FRACTION_LEGEND_CIRCLE_X}
+                                        cx={cx}
                                         r={item.radius}
                                         fill="gray"
                                     />
                                     <text
                                         y={cy + 5}
-                                        x={FRACTION_LEGEND_TEXT_X}
+                                        x={textX}
                                         alignmentBaseline="middle"
                                         className="fill-current text-xs"
                                     >

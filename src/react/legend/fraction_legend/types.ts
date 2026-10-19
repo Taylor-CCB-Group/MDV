@@ -9,4 +9,6 @@ export type FractionLegendSpec = {
     items: FractionLegendItem[];
     width?: number;
     maxHeight?: number;
+    /** Circles stacked in a column (default) or side by side in a row. */
+    orientation?: "vertical" | "horizontal";
 };

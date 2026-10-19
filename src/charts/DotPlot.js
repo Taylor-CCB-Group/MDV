@@ -3,8 +3,8 @@ import { easeLinear } from "d3-ease";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
 import { scaleSqrt } from "d3-scale";
-import { schemeReds } from "d3";
 import { getHierarchicalNodes } from "../utilities/clustering.js";
+import { getDotPlotPalette } from "@/react/components/dotplot/dotPlotPalettes";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
@@ -45,7 +45,7 @@ class DotPlot extends SVGChart {
         
         this.addToolTip();
         this.dim = this.dataStore.getDimension("catcol_dimension");
-        this.colorScheme = schemeReds[8];
+        this.colorScheme = getDotPlotPalette();
         console.log('setting fields for dot plot', c.param.slice(1));
         
         //this works ok because the method is decorated... which I think means if there's a query object,
@@ -84,24 +84,7 @@ class DotPlot extends SVGChart {
     }
 
     updateColorScheme() {
-        const palette = this.config.color_scale?.palette || "reds";
-        if (palette === "blue_white_red") {
-            this.colorScheme = [
-                "#313695",
-                "#4575B4",
-                "#74ADD1",
-                "#ABD9E9",
-                "#E0F3F8",
-                "#FFFFFF",
-                "#FEE090",
-                "#FDAE61",
-                "#F46D43",
-                "#D73027",
-                "#A50026",
-            ];
-            return;
-        }
-        this.colorScheme = schemeReds[8];
+        this.colorScheme = getDotPlotPalette(this.config.color_scale?.palette);
     }
     
     // removing this decorator as it muddies the waters with setParams.
