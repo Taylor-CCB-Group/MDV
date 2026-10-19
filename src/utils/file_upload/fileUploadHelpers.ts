@@ -1,3 +1,5 @@
+import { buildApiUrl } from "@/utils/mdvRouting";
+
 export function formatFileSizeMb(size: number): string {
     return (size / (1024 * 1024)).toFixed(2);
 }
@@ -7,8 +9,10 @@ export function getProjectIdFromRoot(root: string): string | null {
     return projectId ?? null;
 }
 
+/** Socket.IO `path` option for the API root. buildApiUrl resolves an api root of "/"
+ * against the page's mount path, which a prefix-stripping proxy hides from the server. */
 export function getSocketPath(mainApiRoute: string): string {
-    return `${mainApiRoute.replace(/\/$/, "")}/socket.io`;
+    return new URL(buildApiUrl("socket.io", mainApiRoute), window.location.href).pathname;
 }
 
 export function buildViewRedirectUrl(root: string, viewName: string): string {
