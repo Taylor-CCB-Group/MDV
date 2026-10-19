@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MDV Desktop Index</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='assets/catalog.css')}}">
+    {# Relative to this page, so the assets still resolve behind a proxy that strips a path prefix. #}
+    {% set static_root = '../' * (request.path.count('/') - 1) ~ url_for('static', filename='')[request.script_root|length + 1:] %}
+    <link rel="stylesheet" href="{{ static_root }}assets/catalog.css">
 </head>
 <body>
-    <script type="module" src="{{ url_for('static', filename='js/catalog.js') }}"></script>
+    <script type="module" src="{{ static_root }}js/catalog.js"></script>
 </body>
 </html>
