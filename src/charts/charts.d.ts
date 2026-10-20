@@ -366,7 +366,7 @@ export type ExtraControl<T extends GuiSpecType> = {
      * value is the column to choose categories from. This control is hidden while that one
      * has no column (or "None").
      */
-    sourceControl?: T extends "category_selection" ? string : never;
+    columnControl?: T extends "category_selection" ? string : never;
 };
 /// --- some type-testing code, could be in actual tests...
 // const a: GuiSpec<'dropdown'> = {

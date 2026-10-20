@@ -190,8 +190,8 @@ const ParamSelection = observer(
  * When the returned GuiSpec is updated, the property of config corresponding to the control is updated
 */
 /** The column chosen in another extra control, or undefined while it has none (or "None"). */
-function getSourceColumn(extra: Record<string, unknown>, sourceControl: string): string | undefined {
-    const value = extra[sourceControl];
+function getChosenColumn(extra: Record<string, unknown>, columnControl: string): string | undefined {
+    const value = extra[columnControl];
     return typeof value === "string" && value !== "" && value !== "__none__" ? value : undefined;
 }
 
@@ -225,17 +225,16 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(
     //if (draftSpec.type === "check" && !control.defaultVal) (draftSpec as any).current_value = false;
     // if ((draftSpec as any).type === "checkbox" && !control.defaultVal) (draftSpec as any).current_value = false;
     if ((draftSpec.type as string) === "checkbox") (draftSpec as any).type = "check";
-    const { sourceControl } = control;
-    if (sourceControl) {
+    const { columnControl } = control;
+    if (columnControl) {
         // categories of the column chosen in another control; `extra` is observable, so the
-        // choices follow that control as it changes
+        // choices follow that control as it changes. The selection itself lives on the spec,
+        // like any other extra control's value, and reaches `extra` through the reaction below.
+        // (No `getCurrentValue` pointing at `extra`: the widget checks it before that reaction
+        // has run, sees the old value, and clears the new selection.)
         Object.assign(draftSpec, {
             current_value: control.defaultVal ?? [],
-            sourceColumn: () => getSourceColumn(extra, sourceControl),
-            getCurrentValue: () => {
-                const value = extra[control.name];
-                return isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
-            },
+            sourceColumn: () => getChosenColumn(extra, columnControl),
         });
     }
     const spec = observable(draftSpec);
@@ -257,7 +256,7 @@ function useGuiSpecControl<T extends keyof GuiValueTypes>(control: ExtraControl<
 
 const ExtraControlComponent = observer(({ control, config }: { control: ExtraControl<keyof GuiValueTypes>, config: ChartConfig }) => {
     const spec = useGuiSpecControl(control, config);
-    if (control.sourceControl && !getSourceColumn(config.extra, control.sourceControl)) return null;
+    if (control.columnControl && !getChosenColumn(config.extra, control.columnControl)) return null;
     return (
         <Paper elevation={6}>
             <AbstractComponent props={spec} />

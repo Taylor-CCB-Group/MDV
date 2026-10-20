@@ -314,7 +314,7 @@ BaseChart.types[DOT_PLOT_REACT_TYPE] = {
             type: "category_selection",
             name: "split_values",
             label: "Split values",
-            sourceControl: "split_by",
+            columnControl: "split_by",
             defaultVal: [],
         },
     ],
