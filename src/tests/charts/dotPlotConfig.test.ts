@@ -44,7 +44,7 @@ const base = {
     size,
     title: "",
     legend: "",
-    type: "split_dot_plot",
+    type: "compound_dot_plot",
     param: ["cell_type", "gene1"],
 };
 

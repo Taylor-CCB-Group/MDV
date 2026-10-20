@@ -4,7 +4,9 @@ import type { AxisConfig2D } from "@/react/scatter_state";
 import type { RowOrder } from "./dotPlotLayout";
 import type { DotPlotPalette } from "./dotPlotPalettes";
 
-export const DOT_PLOT_REACT_TYPE = "split_dot_plot";
+export const DOT_PLOT_REACT_TYPE = "compound_dot_plot";
+/** Earlier name of the same chart, kept so configs saved with it still open. */
+export const DOT_PLOT_REACT_OLD_TYPE = "split_dot_plot";
 
 export type DotPlotColorScale = {
     palette: DotPlotPalette;

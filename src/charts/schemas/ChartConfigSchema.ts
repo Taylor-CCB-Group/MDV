@@ -227,8 +227,8 @@ export const DotPlotConfigSchema = BaseConfigSchema.extend({
     // Additional dot plot specific properties
 }).describe("Configuration for dot plots showing individual data points");
 
-export const SplitDotPlotConfigSchema = BaseConfigSchema.extend({
-    type: z.literal("split_dot_plot").describe("Split dot plot chart type"),
+export const CompoundDotPlotConfigSchema = BaseConfigSchema.extend({
+    type: z.literal("compound_dot_plot").describe("Compound dot plot chart type"),
     y_axis_order: z.enum(["data", "alphabetical"]).optional().describe("Order of the y-axis categories"),
     threshold_value: z.number().optional().describe("A value counts as expressed when it is greater than this"),
     split_by: z.string().nullable().optional().describe("Category column to split by, one panel per value; null for one panel"),
@@ -243,6 +243,11 @@ export const SplitDotPlotConfigSchema = BaseConfigSchema.extend({
     color_legend: z.object({ display: z.boolean() }).optional().describe("Show the colour legend"),
     fraction_legend: z.object({ display: z.boolean() }).optional().describe("Show the fraction legend"),
 }).describe("Configuration for React dot plots, optionally split into panels that share one colour and size scale");
+
+// earlier type name of the compound dot plot, still accepted
+export const CompoundDotPlotOldTypeConfigSchema = CompoundDotPlotConfigSchema.extend({
+    type: z.literal("split_dot_plot").describe("Earlier type name of the compound dot plot"),
+});
 
 export const BoxPlotConfigSchema = BaseConfigSchema.extend({
     ...ChartColorConfigSchema.shape,
@@ -374,7 +379,8 @@ registerChartConfigSchema("histogram", HistogramConfigSchema, { version: "1" });
 registerChartConfigSchema("heatmap", HeatmapConfigSchema, { version: "1" });
 registerChartConfigSchema("category_heatmap", CategoryHeatmapConfigSchema, { version: "1" });
 registerChartConfigSchema("dot_plot", DotPlotConfigSchema, { version: "1" });
-registerChartConfigSchema("split_dot_plot", SplitDotPlotConfigSchema, { version: "1" });
+registerChartConfigSchema("compound_dot_plot", CompoundDotPlotConfigSchema, { version: "1" });
+registerChartConfigSchema("split_dot_plot", CompoundDotPlotOldTypeConfigSchema, { version: "1" });
 registerChartConfigSchema("box_plot", BoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("violin_plot", ViolinPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("pie_chart", PieChartConfigSchema, { version: "1" });

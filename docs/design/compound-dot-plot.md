@@ -1,4 +1,4 @@
-# Split Dot Plot — prototype plan
+# Compound Dot Plot — prototype plan
 
 A new React/TypeScript chart that draws the same dot plot once per value of a
 **split by** column (e.g. Control | Disease), side by side, on **one shared
@@ -87,7 +87,7 @@ When a split column is first chosen, preselect its first two values.
 
 ```ts
 type DotPlotReactConfig = BaseConfig & {
-    type: "split_dot_plot";        // later also the legacy-replacement type
+    type: "compound_dot_plot";     // "split_dot_plot" still accepted; later also the legacy-replacement type
     param: FieldSpecs;            // [rowColumn, ...fields], same shape as dot_plot
     split_by: FieldName | null;   // text / text16 column
     split_values: string[];       // ordered, one panel each
@@ -210,9 +210,10 @@ Axes are drawn with `@visx/axis` on band scales, as
 
 ## Status
 
-Done (not committed): compute + legacy parity test, React dot plot with optional
-split, shared colour and size scale, existing legends in a band above the panels,
-Scale folder (auto/manual range, palette, log), axis controls, tooltip.
+Done: compute + legacy parity test, React dot plot with optional split, shared
+colour and size scale, existing legends in a band above the panels, Scale folder
+(auto/manual range, palette, log), axis controls, tooltip, Split by and Split
+values in the add-chart dialog (values start empty; hidden while Split by is None).
 Tried on the synthetic Control/Disease project and on the myeloid project
 ("Contrasting R vs NR … (split dot plot)" view).
 
@@ -227,13 +228,16 @@ Tried on the synthetic Control/Disease project and on the myeloid project
 - **Colour range as a double slider** instead of the Manual min / Manual max
   boxes (`doubleslider` exists). Keep a way to type values or use a log slider:
   with a 0–90 range a linear slider can't pick 0–8 accurately.
-- **Split by in the add-chart dialog**, not only in settings: `extra_controls` +
-  `init`, as `SplatterPlotReactWrapper` does for its category column, with the
-  split values defaulting from the chosen column.
 - **Limit the number of x-axis fields?** To decide. A hard cap of 5 would stop
   ordinary dot plots with 10–30 marker genes, which is common. Alternatives: a
   limit that shrinks as panels are added, or no limit and a message when the
   columns get too narrow to read. Linked gene queries already have `maxItems`.
+- **Keep legends inside the chart when it shrinks.** `LegendWrapper` places a
+  legend at a fixed left/top; `makeDraggable` keeps it inside the chart while
+  dragging, but nothing moves it back in on resize, so a legend near the right or
+  bottom edge disappears when the chart gets smaller. It affects every chart using
+  `LegendWrapper` (the legacy dot plot too), so the fix probably belongs there:
+  pull each legend back inside the content area when the chart is resized.
 - Dropped: capping split values at 4 panels.
 
 Separate task, found along the way (own branch and PR off `main`): the column
@@ -242,8 +246,46 @@ two columns with the same name (`sub_bucket` and `sub_bucket_caf`, both "Cell
 Subgroup") show up as extra, identical rows. Fix: `getOptionKey={(c) => c.field}`,
 and show the field id when names clash.
 
-Later, from the legacy dot plot: click a dot to filter, background filter
-(React charts already honour `background_filter` via `useFilteredIndices()`),
-clustering across panels, auto-fit / shorten X labels, threshold setting.
+### Parity with the legacy dot plot
+
+The new chart should do everything the legacy `dot_plot` does, then more.
+
+Priority (agreed):
+
+1. **Most important:** X axis label options, click a dot to filter cells, export
+   as SVG / PNG.
+2. **Nice to have:** Rotate Y axis labels, title follows the y-axis column.
+3. **Undecided:** cluster rows / columns.
+4. **Not needed:** background filter. Split by covers what it was used for (the
+   R/NR view used four background-filtered dot plots), and does it on one scale.
+
+What the legacy chart has that this one doesn't yet (from `DotPlot.js`, plus what
+it inherits from `SVGChart` and `BaseChart`):
+
+- **X axis label options:** Auto-fit X axis labels (on by default), Shorten long
+  X axis labels (on), Hide overlapping X axis labels (off). Reuse `layoutXLabels`
+  from `src/charts/dotplot/xAxisLabels.ts`, worked out for one panel's width,
+  since all panels are the same width. Comes with a full-name tooltip on the X
+  labels, as shortened labels need it.
+- **Click a dot to filter cells:** cells in that row category (and split value)
+  expressing that field above the threshold, with the selected dot outlined and
+  the reset button shown. The legacy chart uses `filterCatCol` on a
+  `catcol_dimension`.
+- **Cluster rows / cluster columns,** with dendrograms. Must cluster across all
+  panels together so every panel keeps the same order.
+- **Export as SVG / PNG image** from the chart menu (`getImage`, which
+  `SVGChart` provides), including the legends.
+- **Rotate Y axis labels** (axis controls).
+- **Title follows the y-axis column** when it hasn't been renamed (legacy
+  `setParams`).
+
+Deliberately not carried over: background filter (split by replaces it), Trim to
+percentile (saved but never read by the legacy chart), the colour legend brush
+(filters by the first field's per-cell values), row animations.
+
+More than the legacy chart, beyond the split itself: a way to fit long Y labels
+(e.g. `annotation_caf`'s cell states) such as an auto-fit Y axis width, and a
+threshold setting (`threshold_value` exists in both, with no UI).
+
 Before merging: Playwright smoke test (read `docs/playwright/PLAYWRIGHT_AGENT.md`
 first), synthetic demo project generator.

@@ -9,6 +9,7 @@ import type { FractionLegendSpec } from "@/react/legend/fraction_legend/types";
 import { BaseReactChart } from "../BaseReactChart";
 import DotPlotComponent from "./DotPlotComponent";
 import {
+    DOT_PLOT_REACT_OLD_TYPE,
     DOT_PLOT_REACT_TYPE,
     type DotPlotReactConfig,
     NO_COLUMN,
@@ -283,7 +284,7 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
 }
 
 BaseChart.types[DOT_PLOT_REACT_TYPE] = {
-    name: "Split Dot Plot",
+    name: "Compound Dot Plot",
     class: DotPlotReact,
     params: [
         {
@@ -323,6 +324,14 @@ BaseChart.types[DOT_PLOT_REACT_TYPE] = {
         const columnValues = field ? dataStore.columnIndex[field]?.values : undefined;
         Object.assign(config, getSplitFromDialog(extra.split_by, extra.split_values, columnValues));
     },
+};
+
+// Same chart under its earlier name, so views saved with it still open. Hidden from Add Chart,
+// and named differently because the add-chart dialog looks chart types up by name.
+BaseChart.types[DOT_PLOT_REACT_OLD_TYPE] = {
+    ...BaseChart.types[DOT_PLOT_REACT_TYPE],
+    name: "Compound Dot Plot (old type name)",
+    allow_user_add: false,
 };
 
 export default 42;
