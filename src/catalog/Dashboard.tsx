@@ -64,7 +64,10 @@ import RecycleBinDialog from "./components/RecycleBinDialog";
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states
 const Dashboard: React.FC = () => {
-    const isProduction = import.meta.env.PROD;
+    // Production builds hide project creation and import unless the build sets
+    // VITE_SHOW_PROJECT_CREATION=true, as deployments where users make their own projects do.
+    const showProjectCreation =
+        !import.meta.env.PROD || import.meta.env.VITE_SHOW_PROJECT_CREATION === "true";
     const {
         projects,
         isLoading: projectsLoading,
@@ -298,7 +301,7 @@ const Dashboard: React.FC = () => {
                         </Alert>
                     )}
                     <Grid container spacing={3} sx={{ mb: 4 }}>
-                        {!isProduction && permissions.createProject && (
+                        {showProjectCreation && permissions.createProject && (
                             <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
                                 <ButtonBase
                                     sx={{
@@ -330,7 +333,7 @@ const Dashboard: React.FC = () => {
                                 </ButtonBase>
                             </Grid>
                         )}
-                        {!isProduction && permissions.importProject && (
+                        {showProjectCreation && permissions.importProject && (
                             <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
                                 <ButtonBase
                                     sx={{
@@ -591,7 +594,7 @@ const Dashboard: React.FC = () => {
                         }
                     />
                 )}
-                {open && !isProduction && permissions.importProject && (
+                {open && showProjectCreation && permissions.importProject && (
                     <ImportProjectDialog open={open} setOpen={setOpen} />
                 )}
                 {helpDialogOpen && (
