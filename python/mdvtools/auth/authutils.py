@@ -1,6 +1,7 @@
 from functools import wraps
 
 from flask import abort, current_app, has_request_context, redirect, request, session
+from mdvtools.auth.access_denied import access_denied_reason, login_url_with_reason
 from mdvtools.logging_config import get_logger
 
 # Setup logging
@@ -182,6 +183,9 @@ def register_before_request_auth(app):
         '/login_dev',
         '/login_sso',
         '/login',
+        # Reachable without a session: someone turned away needs a way to end
+        # their identity-provider session and try another account.
+        '/logout',
         '/callback',
         '/favicon.ico',
         '/flask/js/',
@@ -204,6 +208,12 @@ def register_before_request_auth(app):
         ok, _reason = is_authenticated()
         if not ok:
             redirect_uri = app.config.get("LOGIN_REDIRECT_URL", "/login_dev")
+            # Signed in at the identity provider but refused here: the login page
+            # must say why, or signing in again just repeats the refusal.
+            reason = access_denied_reason()
+            if reason is not None:
+                logger.info(f"Access to {requested_path} denied: {reason}.")
+                return redirect(login_url_with_reason(redirect_uri, reason))
             logger.info(f"Unauthorized access to {requested_path}. Redirecting.")
             return redirect(redirect_uri)
 
