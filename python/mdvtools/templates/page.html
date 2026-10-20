@@ -8,6 +8,8 @@
         <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
         {% endif %}
         <meta charset="utf-8">
+        {# Relative to this page, so the assets still resolve behind a proxy that strips a path prefix. #}
+        {% set static_root = '../' * (request.path.count('/') - 1) ~ url_for('static', filename='')[request.script_root|length + 1:] %}
         <style>
             html,body,#holder{
                 height:100%;
@@ -15,13 +17,13 @@
             }
 
         </style>
-        <link rel="stylesheet" href="{{ url_for('static', filename='assets/mdv.css') }}">
+        <link rel="stylesheet" href="{{ static_root }}assets/mdv.css">
     </head>
     <body>
 
         <div id="holder"></div>
         <!--sw-->
-        <script charset ="utf-8" src="{{ url_for('static', filename='js/mdv.js') }}" type="module"></script>
+        <script charset ="utf-8" src="{{ static_root }}js/mdv.js" type="module"></script>
         <script>
             // tbd
             // _mdvInit('{{route}}');
