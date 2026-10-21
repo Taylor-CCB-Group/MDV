@@ -10,6 +10,11 @@ All notable changes to `mdvtools` are documented here. The format is based on
 - React Compiler is now enabled by default for Vite builds; set
   `VITE_USE_REACT_COMPILER=0` or `VITE_USE_REACT_COMPILER=false` to opt out locally.
 
+### Fixed
+- `pip install mdvtools` now installs `leidenalg` and `igraph`, so `--compute-x-umap` and
+  `convert_scanpy_to_mdv(compute_x_umap=True)` can compute Leiden clusters. They were only in
+  the `dev` dependency group before.
+
 ## [1.3.0] - 2026-06-04
 
 > ⚠️ **Behaviour change — `mdvtools convert-spatial`** now takes the path to a SpatialData
