@@ -22,7 +22,7 @@ jobs:
         working-directory: python
     strategy:
       matrix:
-        python-version: [ 3.12 ]
+        python-version: [ 3.12, 3.13 ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

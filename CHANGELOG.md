@@ -17,6 +17,7 @@ All notable changes to `mdvtools` are documented here. The format is based on
 A feature release. SQLite is now the default database for the full application, a new `SpatialData` chart overlays spatial layers, new charts show genomic data, and MDV works behind proxies that strip a path prefix, such as Verily Workbench. `pip install mdvtools` still installs the slim core.
 
 ### Added
+- Python 3.13 support. `mdvtools` now installs on Python 3.11 to 3.13.
 - SQLite database backend for the full application, chosen with `DB_BACKEND` (`sqlite` or
   `postgres`). `deploy.sh`, `deploy.bat` and `deploy_gui.sh` now set up a local Docker deployment interactively (#435).
 - A SpatialData chart, built on SpatialData.js, that overlays shapes, labels, points and image
