@@ -57,7 +57,14 @@ describe("adaptDotPlotConfig", () => {
         expect(c.color_scale).toEqual({ palette: "reds", log: false, mode: "auto" });
         expect(c.color_legend.display).toBe(true);
         expect(c.fraction_legend.display).toBe(true);
-        expect(c.axis.x).toEqual({ size: 60, tickfont: 10, rotate_labels: true });
+        expect(c.axis.x).toEqual({
+            size: 60,
+            tickfont: 10,
+            rotate_labels: true,
+            fit_labels: true,
+            truncate_labels: true,
+            thin_labels: false,
+        });
         expect(c.axis.y).toEqual({ size: 110, tickfont: 10, rotate_labels: false });
     });
 

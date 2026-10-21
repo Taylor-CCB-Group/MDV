@@ -181,3 +181,51 @@ export function layoutXLabels(
     );
     return { angle: 45, fontSize, margin: Math.ceil(margin), labels: display };
 }
+
+export type FixedXLabelLayoutInput = XLabelLayoutInput & {
+    /** the angle the user chose (rotate labels) */
+    angle: 0 | 45;
+    /** the bottom margin the user chose (x axis height) */
+    margin: number;
+};
+
+/**
+ * Labels for an axis whose angle, font size and margin are the user's settings
+ * rather than fitted (auto-fit off). With `truncate`, labels are shortened to
+ * the room those settings leave: the column width when flat, the margin (and
+ * the left edge of the chart) at 45°. With `thin`, only every nth column is
+ * labelled when labels would still overlap.
+ */
+export function layoutFixedXLabels(
+    input: FixedXLabelLayoutInput,
+    measure: MeasureText,
+): XLabelLayout {
+    const { labels, plotLeft, fontSize, titleSize, truncate, thin, angle, margin } = input;
+    const bandWidth = input.plotWidth / labels.length;
+
+    if (angle === 0) {
+        const maxWidth = truncate ? bandWidth - X_LABEL_GAP : Number.POSITIVE_INFINITY;
+        const shown = labels.map((l) => truncateMiddle(l, maxWidth, fontSize, measure));
+        const widest = Math.max(0, ...shown.map((l) => measure(l, fontSize)));
+        const step = thin ? Math.max(1, Math.ceil((widest + X_LABEL_GAP) / bandWidth)) : 1;
+        return { angle, fontSize, margin, labels: shown.map((l, i) => (i % step === 0 ? l : "")) };
+    }
+
+    const spacing = bandWidth * Math.SQRT1_2;
+    const step = thin ? Math.max(1, Math.ceil((fontSize * X_LABEL_SPACING) / spacing)) : 1;
+    // as in layoutXLabels: the margin left for text, measured along the 45° label
+    const fixed = X_TICK_OFFSET + fontSize * Math.SQRT1_2 + titleSize + X_LABEL_GAP;
+    const roomWidth = Math.max(0, (margin - fixed) / Math.SQRT1_2);
+    const shown = labels.map((label, i) => {
+        if (i % step !== 0) {
+            return "";
+        }
+        if (!truncate) {
+            return label;
+        }
+        const tickX = plotLeft + (i + 0.5) * bandWidth;
+        const maxTextWidth = Math.min(roomWidth, (tickX - X_LABEL_GAP) / Math.SQRT1_2);
+        return truncateMiddle(label, maxTextWidth, fontSize, measure);
+    });
+    return { angle, fontSize, margin, labels: shown };
+}

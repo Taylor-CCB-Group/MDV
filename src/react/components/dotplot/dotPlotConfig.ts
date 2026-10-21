@@ -1,6 +1,6 @@
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldName } from "@/charts/charts";
-import type { AxisConfig2D } from "@/react/scatter_state";
+import type { AxisConfig } from "@/react/scatter_state";
 import type { RowOrder } from "./dotPlotLayout";
 import type { DotPlotPalette } from "./dotPlotPalettes";
 
@@ -20,6 +20,16 @@ export type DotPlotColorScale = {
     max?: number;
 };
 
+/** X axis options, with the label options (and their names) of the legacy dot plot. */
+export type DotPlotXAxisConfig = AxisConfig & {
+    /** Lay labels out to fit: flat or at 45°, smaller text, the space below the axis to suit. */
+    fit_labels: boolean;
+    /** With `fit_labels`: shorten long labels from the middle. */
+    truncate_labels: boolean;
+    /** With `fit_labels`: label only every nth field when labels would overlap. */
+    thin_labels: boolean;
+};
+
 /**
  * `param` is `[rowColumn, ...fields]`, as for the legacy `dot_plot`: the categories on the y axis,
  * then the fields on the x axis.
@@ -37,7 +47,7 @@ export type DotPlotReactConfig = BaseConfig & {
     color_legend: { display: boolean; pos?: [number, number] };
     /** `position` is the legend's saved [left, top] in the chart, as in the legacy dot plot. */
     fraction_legend: { display: boolean; position?: [number, number] };
-    axis: AxisConfig2D;
+    axis: { x: DotPlotXAxisConfig; y: AxisConfig };
 };
 
 /** "None" in column dropdowns built with `DataStore.getColumnList(..., true)`. */
@@ -64,7 +74,13 @@ export function getSplitFromDialog(
 }
 
 /** Fills in defaults, matching the legacy dot plot where it has an equivalent. */
-export function adaptDotPlotConfig(original: BaseConfig & Partial<DotPlotReactConfig>): DotPlotReactConfig {
+export function adaptDotPlotConfig(
+    original: BaseConfig &
+        Partial<Omit<DotPlotReactConfig, "axis">> & {
+            /** Saved configs may lack newer axis options, e.g. the x label options. */
+            axis?: { x?: Partial<DotPlotXAxisConfig>; y?: Partial<AxisConfig> };
+        },
+): DotPlotReactConfig {
     return {
         ...original,
         y_axis_order: original.y_axis_order ?? "data",
@@ -79,7 +95,15 @@ export function adaptDotPlotConfig(original: BaseConfig & Partial<DotPlotReactCo
         color_legend: { ...original.color_legend, display: original.color_legend?.display ?? true },
         fraction_legend: { ...original.fraction_legend, display: original.fraction_legend?.display ?? true },
         axis: {
-            x: { size: 60, tickfont: 10, rotate_labels: true, ...original.axis?.x },
+            x: {
+                size: 60,
+                tickfont: 10,
+                rotate_labels: true,
+                fit_labels: true,
+                truncate_labels: true,
+                thin_labels: false,
+                ...original.axis?.x,
+            },
             y: { size: 110, tickfont: 10, rotate_labels: false, ...original.axis?.y },
         },
     };

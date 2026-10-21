@@ -12,6 +12,7 @@ import FractionLegend from "@/react/components/legend/FractionLegend";
 import LegendWrapper from "@/react/components/legend/LegendWrapper";
 import {
     canvasMeasureText,
+    layoutFixedXLabels,
     layoutXLabels,
     stripSharedSubgroupSuffix,
 } from "./dotplot/xAxisLabels";
@@ -119,6 +120,39 @@ class DotPlot extends SVGChart {
         return new Map(fieldIds.map((f, i) => [f, names[i]]));
     }
 
+    /** What the x label layouts need to know about the chart and its settings. */
+    getXLabelLayoutInput(fieldIds, labels) {
+        const ax = this.config.axis.x;
+        return {
+            labels: fieldIds.map((f) => labels.get(f)),
+            plotLeft: this.margins.left,
+            plotWidth: this.width - this.margins.left - this.margins.right,
+            chartHeight: this.height,
+            fontSize: ax.tickfont,
+            titleSize: ax.label ? (ax.textsize ?? ax.textSize ?? 13) + 6 : 0,
+            truncate: ax.truncate_labels,
+            thin: ax.thin_labels,
+        };
+    }
+
+    /**
+     * Shortens or thins the x labels to suit the axis as the user set it, when
+     * auto-fit is off (see `layoutFixedXLabels`). Run after setting the margin.
+     * @returns the labels to display, keyed by field
+     */
+    shortenXAxisLabels(fieldIds, labels) {
+        const ax = this.config.axis.x;
+        const layout = layoutFixedXLabels(
+            {
+                ...this.getXLabelLayoutInput(fieldIds, labels),
+                angle: ax.rotate_labels ? 45 : 0,
+                margin: ax.size,
+            },
+            canvasMeasureText,
+        );
+        return new Map(fieldIds.map((f, i) => [f, layout.labels[i]]));
+    }
+
     /**
      * Fits the x labels to the chart's current size (see `layoutXLabels`) and
      * sets the bottom margin to match.
@@ -127,16 +161,7 @@ class DotPlot extends SVGChart {
     fitXAxisLabels(fieldIds, labels) {
         const ax = this.config.axis.x;
         const layout = layoutXLabels(
-            {
-                labels: fieldIds.map((f) => labels.get(f)),
-                plotLeft: this.margins.left,
-                plotWidth: this.width - this.margins.left - this.margins.right,
-                chartHeight: this.height,
-                fontSize: ax.tickfont,
-                titleSize: ax.label ? (ax.textsize ?? ax.textSize ?? 13) + 6 : 0,
-                truncate: ax.truncate_labels,
-                thin: ax.thin_labels,
-            },
+            this.getXLabelLayoutInput(fieldIds, labels),
             canvasMeasureText,
         );
         this.xLabelAngle = layout.angle;
@@ -434,6 +459,7 @@ class DotPlot extends SVGChart {
             xLabels = this.fitXAxisLabels(xFieldIds, xLabels);
         } else {
             this.setAxisSize("x", ax.size);
+            xLabels = this.shortenXAxisLabels(xFieldIds, xLabels);
         }
         this.x_scale.domain(xFieldIds);
         this.x_axis_call.tickFormat((id) => xLabels.get(id));
@@ -577,6 +603,39 @@ class DotPlot extends SVGChart {
         const bfColumn = c.background_filter.column || null;
         const bgCurrentCats = c.background_filter?.categories
             || (c.background_filter?.category ? [c.background_filter.category] : []);
+        // x label options go with the other axis controls, as in the compound dot plot
+        const axisControls = settings.find(
+            (s) => s.type === "folder" && s.label === "Axis controls",
+        );
+        axisControls?.current_value.unshift(
+            {
+                type: "check",
+                label: "Auto-fit X axis labels",
+                current_value: c.axis.x.fit_labels,
+                func: (v) => {
+                    c.axis.x.fit_labels = v;
+                    this.drawChart();
+                },
+            },
+            {
+                type: "check",
+                label: "Shorten long X axis labels",
+                current_value: c.axis.x.truncate_labels,
+                func: (v) => {
+                    c.axis.x.truncate_labels = v;
+                    this.drawChart();
+                },
+            },
+            {
+                type: "check",
+                label: "Hide overlapping X axis labels",
+                current_value: c.axis.x.thin_labels,
+                func: (v) => {
+                    c.axis.x.thin_labels = v;
+                    this.drawChart();
+                },
+            },
+        );
 
         return settings.concat([
             {
@@ -606,33 +665,6 @@ class DotPlot extends SVGChart {
                     c.background_filter.categories = vals;
                     c.background_filter.category = vals[0];
                     void this.setBackgroundFilter();
-                },
-            },
-            {
-                type: "check",
-                label: "Auto-fit X axis labels",
-                current_value: c.axis.x.fit_labels,
-                func: (v) => {
-                    c.axis.x.fit_labels = v;
-                    this.drawChart();
-                },
-            },
-            {
-                type: "check",
-                label: "Shorten long X axis labels",
-                current_value: c.axis.x.truncate_labels,
-                func: (v) => {
-                    c.axis.x.truncate_labels = v;
-                    this.drawChart();
-                },
-            },
-            {
-                type: "check",
-                label: "Hide overlapping X axis labels",
-                current_value: c.axis.x.thin_labels,
-                func: (v) => {
-                    c.axis.x.thin_labels = v;
-                    this.drawChart();
                 },
             },
             {

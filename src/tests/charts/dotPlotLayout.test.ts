@@ -5,12 +5,85 @@ import {
     getDotPlotLayout,
     getDotRadius,
     getVisibleRows,
+    getXLabelLayout,
 } from "@/react/components/dotplot/dotPlotLayout";
 import { MISSING_VALUE_COLOR, binnedColorScale } from "@/react/components/dotplot/dotPlotPalettes";
 import type { DotPlotGroup } from "@/react/components/dotplot/dotPlotStats";
 import { describe, expect, it } from "vitest";
 
 const group = (count: number): DotPlotGroup => ({ count, cells: [] });
+
+describe("getXLabelLayout", () => {
+    // every character 6px wide at size 10, scaling with font size
+    const measure = (text: string, fontSize: number) => text.length * fontSize * 0.6;
+    const axis = {
+        size: 60,
+        tickfont: 10,
+        rotate_labels: true,
+        fit_labels: true,
+        truncate_labels: true,
+        thin_labels: false,
+    };
+    const space = { plotLeft: 100, plotWidth: 300, chartHeight: 400 };
+
+    it("shortens long labels to the set axis height when auto-fit is off, if asked", () => {
+        const long = "ENSG00000228253_readthrough_long_noncoding";
+        const off = { ...axis, fit_labels: false };
+        const shortened = getXLabelLayout(off, [long, long], space, measure);
+        expect(shortened.margin).toBe(60);
+        expect(shortened.labels[0]).toContain("…");
+        expect(getXLabelLayout({ ...off, truncate_labels: false }, [long, long], space, measure).labels).toEqual([
+            long,
+            long,
+        ]);
+    });
+
+    it("uses the axis settings as they are when auto-fit is off", () => {
+        const labels = ["GZMB", "NKG7"];
+        expect(getXLabelLayout({ ...axis, fit_labels: false }, labels, space, measure)).toEqual({
+            angle: 45,
+            fontSize: 10,
+            margin: 60,
+            labels,
+        });
+        expect(
+            getXLabelLayout({ ...axis, fit_labels: false, rotate_labels: false }, labels, space, measure).angle,
+        ).toBe(0);
+    });
+
+    it("lays short labels flat, with only as much height as they need", () => {
+        const placement = getXLabelLayout(axis, ["GZMB", "NKG7", "CD3E"], space, measure);
+        expect(placement.angle).toBe(0);
+        expect(placement.margin).toBeLessThan(axis.size);
+        expect(placement.labels).toEqual(["GZMB", "NKG7", "CD3E"]);
+    });
+
+    it("rotates and shortens long labels when they don't fit", () => {
+        const long = "ENSG00000228253_readthrough_long_noncoding";
+        const placement = getXLabelLayout(axis, [long, long, long, long, long, long], space, measure);
+        expect(placement.angle).toBe(45);
+        expect(placement.labels[0]).toContain("…");
+        expect(placement.labels[0].length).toBeLessThan(long.length);
+    });
+
+    it("keeps full labels with shortening off", () => {
+        const long = "ENSG00000228253_readthrough_long_noncoding";
+        const placement = getXLabelLayout({ ...axis, truncate_labels: false }, [long, long, long], space, measure);
+        expect(placement.labels).toEqual([long, long, long]);
+    });
+
+    it("leaves some fields unlabelled when hiding overlapping labels in a crowded axis", () => {
+        const labels = Array.from({ length: 60 }, (_, i) => `GENE${i}`);
+        const thinned = getXLabelLayout({ ...axis, thin_labels: true }, labels, space, measure);
+        expect(thinned.labels.some((l) => l === "")).toBe(true);
+        const all = getXLabelLayout(axis, labels, space, measure);
+        expect(all.labels.every((l) => l !== "")).toBe(true);
+    });
+
+    it("falls back to the axis settings when there's no room to fit", () => {
+        expect(getXLabelLayout(axis, ["GZMB"], { ...space, plotWidth: 0 }, measure).margin).toBe(60);
+    });
+});
 
 describe("getVisibleRows", () => {
     const values = ["T-cell", "b-cell", "NK-cell", "B10", "B2"];

@@ -1,6 +1,30 @@
+import { type MeasureText, type XLabelLayout, layoutFixedXLabels, layoutXLabels } from "@/charts/dotplot/xAxisLabels";
+import type { DotPlotXAxisConfig } from "./dotPlotConfig";
 import type { DotPlotGroup } from "./dotPlotStats";
 
 export type RowOrder = "data" | "alphabetical";
+
+/**
+ * X labels for one panel, which suits them all (same width, same fields), as the legacy dot
+ * plot lays them out: fitted with `fit_labels`, otherwise at the axis settings, shortened or
+ * thinned to suit them.
+ */
+export function getXLabelLayout(
+    axis: DotPlotXAxisConfig,
+    labels: string[],
+    space: { plotLeft: number; plotWidth: number; chartHeight: number },
+    measure: MeasureText,
+): XLabelLayout {
+    const angle = axis.rotate_labels ? 45 : 0;
+    if (labels.length === 0 || space.plotWidth <= 0) {
+        return { angle, fontSize: axis.tickfont, margin: axis.size, labels };
+    }
+    const { tickfont: fontSize, truncate_labels: truncate, thin_labels: thin } = axis;
+    const input = { labels, ...space, fontSize, titleSize: 0, truncate, thin };
+    return axis.fit_labels
+        ? layoutXLabels(input, measure)
+        : layoutFixedXLabels({ ...input, angle, margin: axis.size }, measure);
+}
 
 /** Space above the plot area, as in the legacy dot plot. */
 export const DOT_PLOT_TOP_MARGIN = 10;

@@ -1,4 +1,4 @@
-import type { AxisConfig } from "@/react/scatter_state";
+import type { XLabelLayout } from "@/charts/dotplot/xAxisLabels";
 import { AxisBottom } from "@visx/axis";
 import { scaleBand } from "@visx/scale";
 import { useMemo } from "react";
@@ -17,6 +17,17 @@ export type DotPlotHover = {
     y: number;
 };
 
+export type DotPlotLabelHover = {
+    /** Index into the fields. */
+    field: number;
+    /** Label's tick, relative to the chart. */
+    x: number;
+    y: number;
+};
+
+/** Tick length of d3's axisBottom, which `layoutXLabels`' spacing assumes. */
+const TICK_LENGTH = 6;
+
 type DotPlotPanelProps = {
     panel: number;
     title?: string;
@@ -24,13 +35,15 @@ type DotPlotPanelProps = {
     groups: DotPlotGroup[];
     /** Row category codes to draw, top to bottom. */
     rows: number[];
-    fieldLabels: string[];
+    xLabels: XLabelLayout;
     layout: DotPlotLayout;
-    xAxis: AxisConfig;
+    /** Font size for the panel title. */
+    titleFontSize: number;
     fracMax: number;
     meanColor: (mean: number) => string;
     hovered: DotPlotHover | null;
     onHover: (hover: DotPlotHover | null) => void;
+    onLabelHover: (hover: DotPlotLabelHover | null) => void;
 };
 
 /** One dot plot: a dot per (row, field), its x axis, and an optional title above. */
@@ -39,21 +52,23 @@ export default function DotPlotPanel({
     title,
     groups,
     rows,
-    fieldLabels,
+    xLabels,
     layout,
-    xAxis,
+    titleFontSize,
     fracMax,
     meanColor,
     hovered,
     onHover,
+    onLabelHover,
 }: DotPlotPanelProps) {
     const left = layout.panelLefts[panel];
     const { top, panelWidth, plotHeight, cellWidth, cellHeight, maxRadius } = layout;
+    const rotated = xLabels.angle === 45;
+    const fieldCount = xLabels.labels.length;
     const xScale = useMemo(
-        () => scaleBand({ domain: fieldLabels.map((_, f) => f), range: [0, panelWidth] }),
-        [fieldLabels, panelWidth],
+        () => scaleBand({ domain: Array.from({ length: fieldCount }, (_, f) => f), range: [0, panelWidth] }),
+        [fieldCount, panelWidth],
     );
-    const { tickfont, rotate_labels: rotate } = xAxis;
 
     return (
         <g transform={`translate(${left},${top})`}>
@@ -62,7 +77,7 @@ export default function DotPlotPanel({
                     x={panelWidth / 2}
                     y={-6}
                     textAnchor="middle"
-                    fontSize={tickfont + 2}
+                    fontSize={titleFontSize}
                     fontWeight={500}
                     fill="var(--text_color)"
                 >
@@ -95,16 +110,24 @@ export default function DotPlotPanel({
             <AxisBottom
                 top={plotHeight}
                 scale={xScale}
-                tickFormat={(f) => fieldLabels[f]}
+                tickLength={TICK_LENGTH}
+                tickFormat={(field) => xLabels.labels[field]}
                 stroke="var(--text_color)"
                 tickStroke="var(--text_color)"
-                tickLabelProps={{
+                tickLabelProps={(field) => ({
                     fill: "var(--text_color)",
-                    fontSize: tickfont,
-                    textAnchor: rotate ? "end" : "middle",
-                    verticalAnchor: rotate ? "middle" : "start",
-                    angle: rotate ? -45 : 0,
-                }}
+                    fontSize: xLabels.fontSize,
+                    textAnchor: rotated ? "end" : "middle",
+                    verticalAnchor: rotated ? "middle" : "start",
+                    angle: rotated ? -45 : 0,
+                    onPointerEnter: () =>
+                        onLabelHover({
+                            field,
+                            x: left + field * cellWidth + cellWidth / 2,
+                            y: top + plotHeight + TICK_LENGTH,
+                        }),
+                    onPointerLeave: () => onLabelHover(null),
+                })}
             />
         </g>
     );

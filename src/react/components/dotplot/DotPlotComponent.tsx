@@ -1,15 +1,15 @@
 import type { DataColumn, DataType, LoadedDataColumn, NumberDataType } from "@/charts/charts";
-import { stripSharedSubgroupSuffix } from "@/charts/dotplot/xAxisLabels";
+import { canvasMeasureText, stripSharedSubgroupSuffix } from "@/charts/dotplot/xAxisLabels";
 import { useChart, useDataStore } from "@/react/context";
 import { useChartSize, useConfig, useFieldSpec, useFilteredIndices, useParamColumnsExperimental } from "@/react/hooks";
 import { AxisLeft } from "@visx/axis";
 import { scaleBand } from "@visx/scale";
 import { observer } from "mobx-react-lite";
 import { useEffect, useMemo, useState } from "react";
-import DotPlotPanel, { type DotPlotHover } from "./DotPlotPanel";
+import DotPlotPanel, { type DotPlotHover, type DotPlotLabelHover } from "./DotPlotPanel";
 import type { DotPlotReact } from "./DotPlotReactWrapper";
 import { type DotPlotReactConfig, getColorRange } from "./dotPlotConfig";
-import { DOT_PLOT_MAX_RADIUS, getDotPlotLayout, getVisibleRows } from "./dotPlotLayout";
+import { DOT_PLOT_MAX_RADIUS, getDotPlotLayout, getVisibleRows, getXLabelLayout } from "./dotPlotLayout";
 import {
     type LegendBand,
     buildFractionLegendSpec,
@@ -105,6 +105,7 @@ const DotPlotComponent = observer(function DotPlotComponent() {
     const rows = useFilteredIndices();
     const splitSpec = useFieldSpec(config.split_by ?? undefined);
     const [hovered, setHovered] = useState<DotPlotHover | null>(null);
+    const [hoveredLabel, setHoveredLabel] = useState<DotPlotLabelHover | null>(null);
 
     // param is [rowColumn, ...fields]
     const { rowColumn, fieldColumns } = useMemo(() => {
@@ -178,20 +179,45 @@ const DotPlotComponent = observer(function DotPlotComponent() {
         showColorLegend && rangeMin !== undefined && rangeMax !== undefined
             ? getColorLegendBox([rangeMin, rangeMax])
             : null;
+    const sizes = {
+        width,
+        yAxisWidth: yAxis.size,
+        titleHeight: panelTitles ? xAxis.tickfont + 12 : 0,
+        panelGap: panelTitles ? 16 : 0,
+        panelCount: stats?.panels.length ?? 0,
+        fieldCount: fieldColumns.length,
+        rowCount: visibleRows.length,
+    };
+    // Panel widths don't depend on the x labels, but the labels' height does depend on the widths.
+    const across = getDotPlotLayout({ ...sizes, height, xAxisHeight: 0 });
+    const plotLeft = across.panelLefts[0] ?? 0;
+    const plotWidth = across.panelWidth;
+    const { fit_labels, truncate_labels, thin_labels, rotate_labels, tickfont, size: xAxisSize } = xAxis;
+    const xLabels = useMemo(
+        () =>
+            getXLabelLayout(
+                { fit_labels, truncate_labels, thin_labels, rotate_labels, tickfont, size: xAxisSize },
+                fieldLabels,
+                { plotLeft, plotWidth, chartHeight: height },
+                canvasMeasureText,
+            ),
+        [
+            fit_labels,
+            truncate_labels,
+            thin_labels,
+            rotate_labels,
+            tickfont,
+            xAxisSize,
+            fieldLabels,
+            plotLeft,
+            plotWidth,
+            height,
+        ],
+    );
     // The fraction legend's dots match the panels' dots, whose size depends on the space left
     // after the legend band: lay out for the largest dots, then again for the size that gives.
     const layoutBelow = (bandHeight: number) =>
-        getDotPlotLayout({
-            width,
-            height: height - bandHeight,
-            yAxisWidth: yAxis.size,
-            xAxisHeight: xAxis.size,
-            titleHeight: panelTitles ? xAxis.tickfont + 12 : 0,
-            panelGap: panelTitles ? 16 : 0,
-            panelCount: stats?.panels.length ?? 0,
-            fieldCount: fieldColumns.length,
-            rowCount: visibleRows.length,
-        });
+        getDotPlotLayout({ ...sizes, height: height - bandHeight, xAxisHeight: xLabels.margin });
     const bandFor = (radius: number) =>
         getLegendBand(
             width,
@@ -265,13 +291,14 @@ const DotPlotComponent = observer(function DotPlotComponent() {
                         title={panelTitles?.[panel]}
                         groups={groups}
                         rows={visibleRows}
-                        fieldLabels={fieldLabels}
+                        xLabels={xLabels}
                         layout={layout}
-                        xAxis={xAxis}
+                        titleFontSize={tickfont + 2}
                         fracMax={stats.fracMax}
                         meanColor={meanColor}
                         hovered={hovered}
                         onHover={setHovered}
+                        onLabelHover={setHoveredLabel}
                     />
                 ))}
             </svg>
@@ -296,6 +323,20 @@ const DotPlotComponent = observer(function DotPlotComponent() {
                     )}
                     <div>mean: {hoveredCell.mean.toFixed(2)}</div>
                     <div>expressing: {hoveredCell.frac.toFixed(0)}%</div>
+                </div>
+            )}
+            {hoveredLabel && (
+                // full name, as fitted labels may be shortened or left out
+                <div
+                    className="pointer-events-none absolute rounded-md px-2 py-1 text-xs"
+                    style={{
+                        left: hoveredLabel.x + 12,
+                        top: hoveredLabel.y + bandHeight + 12,
+                        backgroundColor: "rgba(15, 23, 42, 0.85)",
+                        color: "white",
+                    }}
+                >
+                    {fieldColumns[hoveredLabel.field]?.name}
                 </div>
             )}
         </div>

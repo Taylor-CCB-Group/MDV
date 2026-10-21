@@ -278,8 +278,41 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
                 },
             }),
             this.getScaleSettings(),
-            getAxisGuiSpec(c, undefined, { rotateXLabels: true }),
+            this.getAxisSettings(),
         ];
+    }
+
+    /** The shared axis controls, after the legacy dot plot's x label options. */
+    getAxisSettings() {
+        const x = this.config.axis.x;
+        const folder = getAxisGuiSpec(this.config, undefined, { rotateXLabels: true });
+        folder.current_value.unshift(
+            g({
+                type: "check",
+                label: "Auto-fit X axis labels",
+                current_value: x.fit_labels,
+                func: (v) => {
+                    x.fit_labels = v;
+                },
+            }),
+            g({
+                type: "check",
+                label: "Shorten long X axis labels",
+                current_value: x.truncate_labels,
+                func: (v) => {
+                    x.truncate_labels = v;
+                },
+            }),
+            g({
+                type: "check",
+                label: "Hide overlapping X axis labels",
+                current_value: x.thin_labels,
+                func: (v) => {
+                    x.thin_labels = v;
+                },
+            }),
+        );
+        return folder;
     }
 }
 

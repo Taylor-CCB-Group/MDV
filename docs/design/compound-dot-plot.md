@@ -252,8 +252,8 @@ The new chart should do everything the legacy `dot_plot` does, then more.
 
 Priority (agreed):
 
-1. **Most important:** X axis label options, click a dot to filter cells, export
-   as SVG / PNG.
+1. **Most important:** X axis label options (done), click a dot to filter cells,
+   export as SVG / PNG.
 2. **Nice to have:** Rotate Y axis labels, title follows the y-axis column.
 3. **Undecided:** cluster rows / columns.
 4. **Not needed:** background filter. Split by covers what it was used for (the
@@ -262,11 +262,11 @@ Priority (agreed):
 What the legacy chart has that this one doesn't yet (from `DotPlot.js`, plus what
 it inherits from `SVGChart` and `BaseChart`):
 
-- **X axis label options:** Auto-fit X axis labels (on by default), Shorten long
-  X axis labels (on), Hide overlapping X axis labels (off). Reuse `layoutXLabels`
-  from `src/charts/dotplot/xAxisLabels.ts`, worked out for one panel's width,
-  since all panels are the same width. Comes with a full-name tooltip on the X
-  labels, as shortened labels need it.
+- **X axis label options (done):** Auto-fit X axis labels (on by default),
+  Shorten long X axis labels (on), Hide overlapping X axis labels (off), at the
+  top of Axis controls in both dot plots, with a full-name tooltip on the X
+  labels. Shorten and Hide overlapping now also work with auto-fit off
+  (`layoutFixedXLabels`), in both dot plots.
 - **Click a dot to filter cells:** cells in that row category (and split value)
   expressing that field above the threshold, with the selected dot outlined and
   the reset button shown. The legacy chart uses `filterCatCol` on a
