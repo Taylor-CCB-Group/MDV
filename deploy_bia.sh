@@ -28,6 +28,7 @@ IMAGE=mdvadmin/mdv:sqlite
 PLATFORM=linux/amd64
 ARCH=amd64
 TARBALL=mdv-sqlite-amd64.tar.gz
+REMOTE_DIR=${MDV_REMOTE_DIR:-}
 
 prog=$(basename "$0")
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -57,6 +58,9 @@ Options:
 Environment:
   MDV_COMPOSE_FILE  compose file on the server
                     (default: $COMPOSE_FILE)
+  MDV_REMOTE_DIR    directory on the server that receives the image tarball,
+                    for when the home directory's disk is full
+                    (default: the home directory)
 
 Examples:
   $prog mshaikh@bia.cmd.ox.ac.uk
@@ -101,6 +105,14 @@ docker info >/dev/null 2>&1 || die "the docker daemon is not running"
 command -v rsync >/dev/null || die "rsync is not installed"
 
 tarball="${TMPDIR:-/tmp}/$TARBALL"
+# Relative to the remote home directory unless MDV_REMOTE_DIR is set.
+if [ -n "$REMOTE_DIR" ]; then
+    remote_tarball=${REMOTE_DIR%/}/$TARBALL
+    remote_shown=$remote_tarball
+else
+    remote_tarball=$TARBALL
+    remote_shown="~/$TARBALL"
+fi
 sock=$(mktemp -u "${TMPDIR:-/tmp}/mdv-ssh-XXXXXX")
 
 cleanup() {
@@ -173,22 +185,27 @@ remote sh -c 'command -v docker >/dev/null' \
 remote test -f "$COMPOSE_FILE" \
     || die "no compose file at $COMPOSE_FILE on $target
 Point somewhere else with:  MDV_COMPOSE_FILE=... $prog $target"
+if [ -n "$REMOTE_DIR" ]; then
+    remote test -d "$REMOTE_DIR" -a -w "$REMOTE_DIR" \
+        || die "$REMOTE_DIR is not a writable directory on $target"
+fi
 
 # --- transfer --------------------------------------------------------------
 
 # --partial --inplace so an interrupted 2GB transfer resumes rather than
-# starting over. The tarball lands in the home directory; docker load does not
-# care where the file sits, and the compose directory may not be writable.
-info "transferring to $target:~/$TARBALL"
-rsync -avP --partial --inplace -e "ssh -S $sock" "$tarball" "$target:$TARBALL" \
+# starting over. The tarball lands in the home directory unless MDV_REMOTE_DIR
+# says otherwise; docker load does not care where the file sits, and the
+# compose directory may not be writable.
+info "transferring to $target:$remote_shown"
+rsync -avP --partial --inplace -e "ssh -S $sock" "$tarball" "$target:$remote_tarball" \
     || die "the transfer failed"
 
-remote_sum=$(remote sh -c 'sha256sum "$1" | cut -d" " -f1' sh "$TARBALL")
+remote_sum=$(remote sh -c 'sha256sum "$1" | cut -d" " -f1' sh "$remote_tarball")
 if [ "$local_sum" != "$remote_sum" ]; then
     die "checksum mismatch after transfer.
   local   $local_sum
   remote  $remote_sum
-Delete ~/$TARBALL on $target and run this again."
+Delete $remote_shown on $target and run this again."
 fi
 info "checksum matches"
 
@@ -220,7 +237,7 @@ printf '%s\n' "$before" | sed 's/^/    /'
 # --- load ------------------------------------------------------------------
 
 info "loading the image on $target"
-loaded_id=$(remote bash -s -- "$TARBALL" "$IMAGE" "$ARCH" <<'REMOTE'
+loaded_id=$(remote bash -s -- "$remote_tarball" "$IMAGE" "$ARCH" <<'REMOTE'
 set -euo pipefail
 tarball=$1; image=$2; want_arch=$3
 
@@ -352,9 +369,9 @@ esac
 # --- tidy up ---------------------------------------------------------------
 
 if [ "$keep" -eq 0 ]; then
-    remote rm -f "$TARBALL" || warn "could not remove ~/$TARBALL on $target"
+    remote rm -f "$remote_tarball" || warn "could not remove $remote_shown on $target"
 else
-    info "kept $tarball and $target:~/$TARBALL"
+    info "kept $tarball and $target:$remote_shown"
 fi
 
 printf '\n%s deployed to %s on %s.\n' "$IMAGE" "$services" "$target"
