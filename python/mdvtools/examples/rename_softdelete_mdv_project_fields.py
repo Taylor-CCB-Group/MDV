@@ -257,9 +257,8 @@ def build_plan(
         if not display_name or not field or field not in target_columns:
             continue
         current_name = normalize_text(target_columns[field].get("name"))
-        if datasource == "cells" and (
-            display_name in CELL_RENAME_EXCLUSIONS or field in CELL_RENAME_EXCLUSIONS
-        ):
+        # Field id only. rna:bucket is displayed as "bucket" but is a different column, so the sheet still renames it.
+        if datasource == "cells" and field in CELL_RENAME_EXCLUSIONS:
             kept_fields.add(field)
             plan.append({
                 "row": None,
