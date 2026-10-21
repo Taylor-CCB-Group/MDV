@@ -2,6 +2,7 @@ import { io } from "socket.io-client";
 import type ChartManager from "../charts/ChartManager";
 import { DataModel } from "../table/DataModel";
 import { getProjectInfoBase } from "@/modules/ProjectContext";
+import { getSocketPath } from "@/utils/file_upload/fileUploadHelpers";
 
 type VuplexCallback = (event: { data: MDVMessage }) => void;
 
@@ -86,7 +87,7 @@ export default async function connectIPC(cm: ChartManager) {
     const apiRootUrl = new URL(mainApiRoute, window.location.origin);
     const projectOrigin = apiRootUrl.origin;
     const projectNamespace = `/project/${projectName}`;
-    const socketPath = `${apiRootUrl.pathname.replace(/\/$/, "")}/socket.io`;
+    const socketPath = getSocketPath(mainApiRoute);
 
     console.log(`Attempting to connect to Socket.IO namespace: ${projectNamespace} at origin: ${projectOrigin} path: ${socketPath}`);
 
