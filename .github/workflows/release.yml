@@ -130,9 +130,13 @@ jobs:
 
       - name: Install the TestPyPI wheel and smoke-test it
         run: |
-          uv venv --python 3.12 smoke
-          uv pip install --python smoke testpypi/*.whl
-          smoke/bin/python .github/scripts/smoke_test.py "$VERSION"
+          wheel=$(ls testpypi/*.whl)
+          uv venv --python 3.12 slim
+          uv pip install --python slim "$wheel"
+          slim/bin/python .github/scripts/smoke_test.py "$VERSION"
+          uv venv --python 3.12 app
+          uv pip install --python app "${wheel}[app]"
+          app/bin/python .github/scripts/smoke_test.py "$VERSION" --app
 
   pypi:
     needs: [check, smoke-test]

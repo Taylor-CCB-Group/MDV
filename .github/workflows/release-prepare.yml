@@ -84,7 +84,7 @@ jobs:
           1. Edit the \`[$VERSION]\` section of \`CHANGELOG.md\` so it describes the release for users.
              If it lists pull request titles, nobody filled in \`[Unreleased]\`, so rewrite them.
           2. Change the version if this release needs a different bump.
-          3. Close and reopen this PR so the CI checks run. Checks do not start on PRs that a workflow opens.
+          3. Approve the waiting CI runs on this PR. GitHub holds checks on a PR that a workflow opened until someone with write access approves them.
 
           Merging starts the Release workflow, which publishes to TestPyPI, tests the upload and waits for approval before it publishes to PyPI.
           EOF
