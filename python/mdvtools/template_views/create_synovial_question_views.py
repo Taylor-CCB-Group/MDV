@@ -112,7 +112,20 @@ TITLE_BY_FIELD = {
 EXACT_TITLES = {
     "annotations": "Cell Type",
     "bucket": "Cell Group",
+    "SJC28": "Swollen Joint Count (28)",
+    "Sero_status": "Serostatus",
+    "TJC28": "Tender Joint Count (28)",
+    "sex": "Sex",
+    "TNF Response": "TNF Treatment Response",
+    "Had nbDMARD": "Prior nbDMARD",
+    "Had TNF": "Prior TNF Inhibitor",
+    "diagnosis": "Diagnosis",
+    "sjc28": "Swollen Joint Count (28)",
+    "esr": "ESR",
+    "tjc28": "Tender Joint Count (28)",
+    "disease_duration": "Disease Duration",
 }
+LEGACY_VIEWS = ("metadata", "Summary", "Stroma", "MNP", "T_NK", "B_plasma", "temp")
 
 
 def collection_sentence() -> str:
@@ -496,20 +509,51 @@ def validate_project(datasources: list[dict[str, Any]]) -> None:
 
 
 def retitle_text(value: str) -> str:
-    if value in EXACT_TITLES:
-        return EXACT_TITLES[value]
+    exact = EXACT_TITLES.get(value)
+    if exact is None:
+        exact = EXACT_TITLES.get(value.strip())
+    if exact is not None:
+        return exact
     updated = value
     for field, title in sorted(TITLE_BY_FIELD.items(), key=lambda item: len(item[0]), reverse=True):
         updated = updated.replace(field, title)
     return updated
 
 
-def retitle_existing_views(views: dict[str, Any]) -> int:
+def use_tnk_umap(view: dict[str, Any]) -> int:
+    """The T_NK maps were stored on the MNP UMAP. Point them at the T_NK UMAP."""
+    changed = 0
+    charts = (view.get("initialCharts") or {}).get(CELLS) or []
+    if not isinstance(charts, list):
+        return 0
+    for chart in charts:
+        if not isinstance(chart, dict) or chart.get("param") != ["MNP:X_umap_1", "MNP:X_umap_2"]:
+            continue
+        chart["param"] = ["T_NK:X_umap_1", "T_NK:X_umap_2"]
+        axis = chart.get("axis")
+        if not isinstance(axis, dict):
+            axis = {}
+            chart["axis"] = axis
+        for key, label in (("x", "UMAP T_NK 1"), ("y", "UMAP T_NK 2")):
+            spec = axis.get(key)
+            if not isinstance(spec, dict):
+                axis[key] = {"label": label}
+            else:
+                spec["label"] = label
+        changed += 1
+    return changed
+
+
+def retitle_existing_views(views: dict[str, Any], only: set[str] | None = None) -> int:
     """Point stored titles at the sheet's final names. Field ids in param stay put."""
     changed = 0
-    for view in views.values():
+    for name, view in views.items():
+        if only is not None and name not in only:
+            continue
         if not isinstance(view, dict):
             continue
+        if name == "T_NK":
+            changed += use_tnk_umap(view)
         for charts in (view.get("initialCharts") or {}).values():
             if not isinstance(charts, list):
                 continue
@@ -597,11 +641,62 @@ def add_synovial_question_views(project_path: Path, *, dry_run: bool = False) ->
     return summary
 
 
+def update_legacy_views(project_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
+    """Retitle the non-question views and point T_NK at its own UMAP. Question views stay as stored."""
+    project_path = project_path.expanduser().resolve()
+    views_path = project_path / "views.json"
+    state_path = project_path / "state.json"
+    if not views_path.is_file() or not state_path.is_file():
+        raise FileNotFoundError(f"Not a complete MDV project; missing views or state in {project_path}")
+    h5_path = project_path / "datafile.h5"
+    before = h5_stamp(project_path) if h5_path.is_file() else None
+    views = json.loads(views_path.read_text(encoding="utf-8"))
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    question_names = set(VIEW_BUILDERS)
+    before_questions = {name: json.dumps(views[name], sort_keys=True) for name in question_names if name in views}
+    changed = retitle_existing_views(views, only=set(LEGACY_VIEWS))
+    after_questions = {name: json.dumps(views[name], sort_keys=True) for name in question_names if name in views}
+    if before_questions != after_questions:
+        raise RuntimeError("Legacy update changed a question view.")
+    missing = [name for name in LEGACY_VIEWS if name not in views]
+    if missing:
+        raise ValueError(f"Legacy views missing from the project: {missing}")
+    all_views = list(state.get("all_views") or [])
+    for name in list(views):
+        if name not in all_views:
+            all_views.append(name)
+    summary: dict[str, Any] = {
+        "project": str(project_path),
+        "legacy_views": list(LEGACY_VIEWS),
+        "question_views": [name for name in all_views if name in question_names],
+        "changed": changed,
+        "dry_run": dry_run,
+    }
+    if dry_run:
+        return summary
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    backup_path = views_path.with_name(f"{views_path.name}.bak.{timestamp}")
+    backup_path.write_bytes(views_path.read_bytes())
+    atomic_write_json(views_path, views)
+    if before is not None and h5_stamp(project_path) != before:
+        raise RuntimeError("datafile.h5 changed while updating legacy views.")
+    summary["backup"] = str(backup_path)
+    return summary
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=DEFAULT_PROJECT)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--legacy-only",
+        action="store_true",
+        help="Retitle the existing non-question views and fix the T_NK UMAP. Do not rewrite question views.",
+    )
     args = parser.parse_args()
+    if args.legacy_only:
+        print(json.dumps(update_legacy_views(args.project, dry_run=args.dry_run), indent=2))
+        return 0
     print(json.dumps(add_synovial_question_views(args.project, dry_run=args.dry_run), indent=2))
     return 0
 
