@@ -20,6 +20,7 @@ EXPECTED_HEADERS = {
     "displayed name": {"displayed name", "displayed_name"},
     "new_display_name": {"new_display_name", "new display name", "new-display-name"},
     "Final Column Name": {"final column name", "final_column_name", "final-column-name"},
+    "original name": {"original name", "original_name", "original-name"},
     "Project Id": {"project id", "project_id", "project-id", "project_name", "project name", "mdv_project", "mdv-project"},
     "datasource": {"datasource"},
 }
@@ -131,6 +132,43 @@ def resolve_datasources(project_dir: Path, excel_path: Path, project_name: str) 
     return requested
 
 
+def view_references(views: dict[str, Any], datasource: str, field: str) -> list[tuple[str, str]]:
+    """Charts in saved views whose config contains this field id."""
+
+    def references(value: Any) -> bool:
+        if isinstance(value, str):
+            return value == field
+        if isinstance(value, dict):
+            return any(references(item) for item in value.values())
+        if isinstance(value, (list, tuple)):
+            return any(references(item) for item in value)
+        return False
+
+    hits: list[tuple[str, str]] = []
+    for view_name, view in views.items():
+        if not isinstance(view, dict):
+            continue
+        charts = (view.get("initialCharts") or {}).get(datasource) or []
+        for chart in charts:
+            if not isinstance(chart, dict) or not references(chart):
+                continue
+            title = chart.get("title")
+            if isinstance(title, list):
+                title = " ".join(str(part) for part in title)
+            hits.append((view_name, str(title or chart.get("type") or chart.get("id") or "untitled chart")))
+    return hits
+
+
+def load_views(project_dir: Path) -> dict[str, Any]:
+    views_path = project_dir / "views.json"
+    if not views_path.is_file():
+        return {}
+    views = json.loads(views_path.read_text(encoding="utf-8"))
+    if not isinstance(views, dict):
+        raise TypeError(f"{views_path} must be an object")
+    return views
+
+
 def backup_project_jsons(project_dir: Path, backup_dir: Path) -> None:
     backup_dir.mkdir(parents=True, exist_ok=False)
     for path in project_dir.glob("*.json"):
@@ -167,7 +205,7 @@ def build_plan(
     excel_path: Path,
     project_name: str | None = None,
     source_project_dir: Path | None = None,
-) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+) -> tuple[list[dict[str, Any]], list[str], list[str], set[str], set[str]]:
     source_project_dir = source_project_dir or project_dir
     with (source_project_dir / "datasources.json").open("r", encoding="utf-8") as handle:
         source_datasources = json.load(handle)
@@ -183,18 +221,25 @@ def build_plan(
     displayed_header = find_header(df, EXPECTED_HEADERS["displayed name"])
     final_header = find_header(df, EXPECTED_HEADERS["Final Column Name"])
     new_header = find_header(df, EXPECTED_HEADERS["new_display_name"])
-    mappings: dict[str, set[str]] = {}
+    original_header = find_header(df, EXPECTED_HEADERS["original name"])
+    sheet_rows: list[dict[str, Any]] = []
     for index, row in df.iterrows():
         if project_name is not None and not project_matches(row.get(project_header), project_name):
             continue
         if normalize_text(row.get(datasource_header)) != datasource:
             continue
         displayed_name = normalize_text(row.get(displayed_header))
-        if not displayed_name:
+        original_name = normalize_text(row.get(original_header)) if original_header else ""
+        if not displayed_name and not original_name:
             continue
         final_name = normalize_text(row.get(final_header)) if final_header else ""
         new_name = normalize_text(row.get(new_header)) if new_header else ""
-        mappings.setdefault(displayed_name, set()).add(final_name or new_name)
+        sheet_rows.append({
+            "row": index + 2,
+            "displayed_name": displayed_name,
+            "original_name": original_name,
+            "target_name": final_name or new_name,
+        })
 
     target_columns = {
         normalize_text(column.get("field")): column
@@ -202,6 +247,8 @@ def build_plan(
         if normalize_text(column.get("field"))
     }
     plan: list[dict[str, Any]] = []
+    kept_fields: set[str] = set()
+    ambiguous_fields: set[str] = set()
     warnings: list[str] = []
     errors: list[str] = []
     for source_column in source_metadata.get("columns", []):
@@ -209,36 +256,61 @@ def build_plan(
         field = normalize_text(source_column.get("field"))
         if not display_name or not field or field not in target_columns:
             continue
-        if datasource == "cells" and display_name in CELL_RENAME_EXCLUSIONS:
+        current_name = normalize_text(target_columns[field].get("name"))
+        if datasource == "cells" and (
+            display_name in CELL_RENAME_EXCLUSIONS or field in CELL_RENAME_EXCLUSIONS
+        ):
+            kept_fields.add(field)
+            plan.append({
+                "row": None,
+                "field": field,
+                "display_name": display_name,
+                "current_name": current_name,
+                "target_name": current_name,
+                "rule": "exclusion",
+                "action": "keep",
+                "status": "noop",
+            })
             continue
-        if datasource == "cells" and display_name in CELL_RENAME_OVERRIDES:
-            target_name = CELL_RENAME_OVERRIDES[display_name]
+        if datasource == "cells" and (
+            display_name in CELL_RENAME_OVERRIDES or field in CELL_RENAME_OVERRIDES
+        ):
+            target_name = CELL_RENAME_OVERRIDES.get(display_name) or CELL_RENAME_OVERRIDES[field]
             rule = "override"
-        elif display_name in mappings:
-            targets = mappings[display_name]
+            matched_rows: list[dict[str, Any]] = []
+        else:
+            matched_rows = [
+                item for item in sheet_rows
+                if item["original_name"] == field
+                or item["displayed_name"] in {field, display_name}
+            ]
+            targets = {item["target_name"] for item in matched_rows if item["target_name"]}
             if len(targets) != 1:
-                warnings.append(
-                    f"Ambiguous workbook targets for exact displayed name {display_name!r}: {sorted(targets)}"
-                )
+                if len(targets) > 1:
+                    warnings.append(
+                        f"Ambiguous workbook targets for field {field!r}: {sorted(targets)}"
+                    )
+                    ambiguous_fields.add(field)
                 continue
             target_name = next(iter(targets))
             rule = "workbook"
-        else:
-            continue
         if not target_name:
             continue
-        current_name = normalize_text(target_columns[field].get("name"))
+        kept_fields.add(field)
         if current_name == target_name:
+            plan.append({
+                "row": matched_rows[0]["row"] if matched_rows else None,
+                "field": field,
+                "display_name": display_name,
+                "current_name": current_name,
+                "target_name": target_name,
+                "rule": rule,
+                "action": "keep",
+                "status": "noop",
+            })
             continue
-        workbook_rows = [
-            index + 2
-            for index, row in df.iterrows()
-            if normalize_text(row.get(project_header)) == project_name
-            and normalize_text(row.get(datasource_header)) == datasource
-            and normalize_text(row.get(displayed_header)) == display_name
-        ]
         plan.append({
-            "row": workbook_rows[0] if workbook_rows else None,
+            "row": matched_rows[0]["row"] if matched_rows else None,
             "field": field,
             "display_name": display_name,
             "current_name": current_name,
@@ -247,12 +319,56 @@ def build_plan(
             "action": "rename",
         })
 
-    if project_name is not None and not plan:
+    if project_name is not None and not plan and not kept_fields and not sheet_rows:
         raise ValueError(
             f"No applicable rename rows matched project '{project_name}' and datasource '{datasource}' "
             f"in worksheet '{sheet_name}'."
         )
-    return plan, warnings, errors
+    return plan, warnings, errors, kept_fields, ambiguous_fields
+
+
+def build_soft_delete_plan(
+    project_dir: Path,
+    datasource: str,
+    kept_fields: set[str],
+    ambiguous_fields: set[str],
+    views: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Columns the sheet does not keep, unless a saved view still uses them."""
+    with (project_dir / "datasources.json").open("r", encoding="utf-8") as handle:
+        datasources = json.load(handle)
+    metadata = next((item for item in datasources if item.get("name") == datasource), None)
+    if metadata is None:
+        raise ValueError(f"Datasource '{datasource}' not found in {project_dir}")
+    plan: list[dict[str, Any]] = []
+    for column in metadata.get("columns", []):
+        field = normalize_text(column.get("field"))
+        display_name = normalize_text(column.get("name"))
+        if not field or field in kept_fields or column.get("deleted"):
+            continue
+        item: dict[str, Any] = {
+            "row": None,
+            "field": field,
+            "display_name": display_name or field,
+            "action": "soft_delete",
+        }
+        if field in ambiguous_fields:
+            item["status"] = "blocked"
+            item["error"] = "ambiguous workbook targets"
+        elif column.get("sgindex") is not None or column.get("sgtype") is not None:
+            spatial_key = "sgindex" if column.get("sgindex") is not None else "sgtype"
+            item["status"] = "blocked"
+            item["error"] = f"spatial ({spatial_key}) column"
+        else:
+            hits = view_references(views, datasource, field)
+            if hits:
+                used_by = "; ".join(f"{view_name}: {label}" for view_name, label in hits)
+                item["status"] = "blocked"
+                item["error"] = f"used by {used_by}"
+            else:
+                item["status"] = "planned"
+        plan.append(item)
+    return plan
 
 
 def apply_plan(
@@ -288,6 +404,12 @@ def apply_plan(
     for item in plan:
         result = {**item}
         field = item["field"]
+        if item.get("action") == "keep":
+            result["status"] = "noop"
+            summary["keep"] += 1
+            log_lines.append(f"keep: field={field} name={item['current_name']} ({item['rule']})")
+            results.append(result)
+            continue
         column = columns_by_field.get(field)
         if column is None:
             result["status"] = "blocked"
@@ -329,6 +451,69 @@ def apply_plan(
     return summary, results, log_lines
 
 
+def apply_soft_delete_plan(
+    project_dir: Path, datasource: str, plan: list[dict[str, Any]], dry_run: bool
+) -> tuple[Counter, list[dict[str, Any]], list[str]]:
+    summary: Counter = Counter()
+    results: list[dict[str, Any]] = []
+    log_lines: list[str] = []
+    metadata_path = project_dir / "datasources.json"
+    project_datasources = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata = next((item for item in project_datasources if item.get("name") == datasource), None)
+    if metadata is None:
+        raise ValueError(f"Datasource '{datasource}' not found in {metadata_path}")
+    columns_by_field = {
+        normalize_text(column.get("field")): column for column in metadata.get("columns", [])
+    }
+    views = load_views(project_dir)
+    writes = False
+    for item in plan:
+        result = {**item}
+        field = item["field"]
+        column = columns_by_field.get(field)
+        if column is None:
+            result["status"] = "blocked"
+            result["error"] = "field is missing from target datasource"
+        elif result.get("status") == "blocked":
+            pass
+        else:
+            hits = view_references(views, datasource, field)
+            if hits:
+                used_by = "; ".join(f"{view_name}: {label}" for view_name, label in hits)
+                result["status"] = "blocked"
+                result["error"] = f"used by {used_by}"
+            else:
+                result["status"] = "planned" if dry_run else "soft_deleted"
+                summary["soft_delete"] += 1
+                if not dry_run:
+                    column["deleted"] = True
+                    writes = True
+        if result["status"] == "blocked":
+            summary["blocked"] += 1
+            log_lines.append(f"blocked soft-delete: field={field} reason={result.get('error', '')}")
+        else:
+            log_lines.append(
+                f"{'dry-run soft-delete' if dry_run else 'soft-deleted'}: "
+                f"field={field} name={item['display_name']}"
+            )
+        results.append(result)
+
+    if writes:
+        fd, temporary_path = tempfile.mkstemp(
+            prefix="datasources.", suffix=".json.tmp", dir=project_dir
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(project_datasources, handle, indent=2)
+                handle.write("\n")
+            os.replace(temporary_path, metadata_path)
+        except Exception:
+            if os.path.exists(temporary_path):
+                os.unlink(temporary_path)
+            raise
+    return summary, results, log_lines
+
+
 def build_report(
     project_dir: Path,
     project_name: str,
@@ -343,14 +528,20 @@ def build_report(
     }
     for datasource, results in outcomes.items():
         renamed = []
+        kept = []
         soft_deleted = []
         blocked = []
         for item in results:
             entry = {"displayed_name": item["display_name"], "field": item["field"]}
             if item["action"] == "rename":
                 entry["target_name"] = item["target_name"]
+                entry["current_name"] = item.get("current_name", "")
                 if item["status"] in {"renamed", "planned", "noop"}:
                     renamed.append(entry)
+            elif item["action"] == "keep":
+                entry["name"] = item.get("current_name", item["display_name"])
+                entry["rule"] = item.get("rule", "")
+                kept.append(entry)
             elif item["status"] in {"soft_deleted", "planned", "noop"}:
                 soft_deleted.append(entry)
             if item["status"] == "blocked":
@@ -358,6 +549,7 @@ def build_report(
                 blocked.append(entry)
         report["datasources"][datasource] = {
             "renamed": renamed,
+            "kept": kept,
             "soft_deleted": soft_deleted,
             "blocked": blocked,
             "warnings": warnings_by_datasource.get(datasource, []),
@@ -373,7 +565,12 @@ def print_report(report: dict[str, Any]) -> None:
         print(f"\nDatasource: {datasource}")
         print(f"  Renamed/planned: {len(payload['renamed'])}")
         for item in payload["renamed"]:
-            print(f"    - {item['displayed_name']!r} -> {item['target_name']!r} (field={item['field']})")
+            print(
+                f"    - {item['current_name']!r} -> {item['target_name']!r} (field={item['field']})"
+            )
+        print(f"  Kept: {len(payload['kept'])}")
+        for item in payload["kept"]:
+            print(f"    - {item['name']!r} (field={item['field']}, {item['rule']})")
         print(f"  Soft-deleted/planned: {len(payload['soft_deleted'])}")
         for item in payload["soft_deleted"]:
             print(f"    - {item['displayed_name']!r} (field={item['field']})")
@@ -389,8 +586,14 @@ def print_report(report: dict[str, Any]) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-dir", type=Path, default=Path("/well/cartography/shared/MDV/ondemand/projects"))
+    parser.add_argument(
+        "--source-project",
+        type=Path,
+        default=None,
+        help="Project folder to read. Defaults to SOURCE_DIR/PROJECT_NAME. --project-name remains the Excel Project Id.",
+    )
     parser.add_argument("--destination-dir", type=Path, default=Path("/well/cartography/shared/MDV"))
-    parser.add_argument("--project-name", default="myeloid_v2_testing")
+    parser.add_argument("--project-name", default="myeloid_v2_testing", help="Excel Project Id.")
     parser.add_argument("--target-name", default=None)
     parser.add_argument("--xlsx", type=Path, default=Path("/well/cartography/shared/MDV/MIM _ Nov25.xlsx"))
     parser.add_argument("--datasource", default=None, help="Optional single datasource; defaults to all project mappings.")
@@ -398,35 +601,50 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source-backup-dir", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true", help="Preview planned renames without changing project metadata.")
     parser.add_argument("--write", action="store_true", help="Apply changes; default is dry-run.")
-    parser.add_argument("--copy-project", action="store_true", help="Copy source project before planning or writing.")
+    parser.add_argument(
+        "--copy-project",
+        action="store_true",
+        help="Copy source project before writing. Ignored during a dry run.",
+    )
+    parser.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        help="Where to write the JSON report. A dry run never writes inside the project.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     target_name = args.target_name or f"{args.project_name}_fields_mutated"
-    source_project_dir = (args.source_dir / args.project_name).resolve()
+    source_project_dir = (args.source_project or (args.source_dir / args.project_name)).resolve()
     project_dir = (args.destination_dir / target_name).resolve()
     excel_path = args.xlsx.resolve()
+    dry_run = not args.write
     if not excel_path.is_file():
         raise FileNotFoundError(f"Spreadsheet does not exist: {excel_path}")
     if not source_project_dir.is_dir():
         raise FileNotFoundError(f"Source project does not exist: {source_project_dir}")
 
-    if args.copy_project:
+    if args.copy_project and not dry_run:
         project_dir = copy_project_for_mutation(source_project_dir, project_dir, args.backup_dir)
+    elif dry_run:
+        if args.copy_project:
+            print("Dry run: not copying the project.")
+        project_dir = source_project_dir
     elif not project_dir.is_dir():
         raise FileNotFoundError(f"Project directory does not exist: {project_dir}")
 
-    dry_run = not args.write
-
     datasources = [args.datasource] if args.datasource else resolve_datasources(project_dir, excel_path, args.project_name)
+    views = load_views(project_dir)
     outcomes: dict[str, list[dict[str, Any]]] = {}
     warnings_by_datasource: dict[str, list[str]] = {}
     errors_by_datasource: dict[str, list[str]] = {}
     plans: dict[str, list[dict[str, Any]]] = {}
+    soft_delete_plans: dict[str, list[dict[str, Any]]] = {}
     for datasource in datasources:
-        plan, warnings, errors = build_plan(
+        plan, warnings, errors, kept_fields, ambiguous_fields = build_plan(
             project_dir,
             datasource,
             excel_path,
@@ -434,6 +652,9 @@ def main() -> int:
             source_project_dir=source_project_dir,
         )
         plans[datasource] = plan
+        soft_delete_plans[datasource] = build_soft_delete_plan(
+            project_dir, datasource, kept_fields, ambiguous_fields, views
+        )
         warnings_by_datasource[datasource] = warnings
         errors_by_datasource[datasource] = errors
 
@@ -453,14 +674,30 @@ def main() -> int:
 
     for datasource, plan in plans.items():
         summary, results, actions = apply_plan(project_dir, datasource, plan, dry_run)
-        outcomes[datasource] = results
-        print(f"\nDatasource: {datasource}; dry_run={dry_run}; rows={len(plan)}; summary={dict(summary)}")
-        for action in actions:
+        delete_summary, delete_results, delete_actions = apply_soft_delete_plan(
+            project_dir, datasource, soft_delete_plans[datasource], dry_run
+        )
+        summary.update(delete_summary)
+        outcomes[datasource] = results + delete_results
+        print(
+            f"\nDatasource: {datasource}; dry_run={dry_run}; "
+            f"renames={len(plan)}; soft_deletes={len(soft_delete_plans[datasource])}; summary={dict(summary)}"
+        )
+        for action in actions + delete_actions:
             print(f"  - {action}")
 
     report = build_report(project_dir, args.project_name, outcomes, warnings_by_datasource, errors_by_datasource)
+    report["source_path"] = str(source_project_dir)
+    report["dry_run"] = dry_run
     print_report(report)
-    report_path = project_dir.parent / f"{project_dir.name}_report.json"
+    if args.report is not None:
+        report_path = args.report.resolve()
+    elif dry_run:
+        report_path = source_project_dir.parent / f"{source_project_dir.name}_dry_run_report.json"
+    else:
+        report_path = project_dir.parent / f"{project_dir.name}_report.json"
+    if report_path.parent == project_dir:
+        raise ValueError(f"Refusing to write the report inside the project: {report_path}")
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"\nSaved field report to: {report_path}")
     print("\nDry run complete. No project fields were changed." if dry_run else "\nWrite complete.")
