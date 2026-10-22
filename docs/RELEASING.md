@@ -70,7 +70,7 @@ TestPyPI.
 
 ## Release by hand
 
-Use these steps when the workflows cannot run, such as when GitHub Actions is down.
+Use these steps when the workflows cannot run, such as when GitHub Actions is down. Run every command from the repository root.
 
 ### Prerequisites
 
@@ -81,13 +81,23 @@ Use these steps when the workflows cannot run, such as when GitHub Actions is do
 
 ### 1. Bump the version and date the changelog
 
-From the repository root:
+On a new branch:
 
 ```bash
 previous=$(python .github/scripts/release.py current)
 (cd python && uv version --bump minor --no-sync)    # or patch or major
 python .github/scripts/release.py changelog --previous "$previous"
 ```
+
+Commit these changes and merge them into `main` through a pull request, then check out the
+merged `main`. You build and tag from that commit, so the tag matches the published package:
+
+```bash
+git switch main && git pull
+```
+
+If GitHub Actions is working again when the pull request merges, the Release workflow
+publishes the release itself, and you can stop here.
 
 ### 2. Build the frontend
 
@@ -102,21 +112,20 @@ pnpm run build-flask-vite        # writes to python/mdvtools/static
 ### 3. Build the sdist and wheel
 
 ```bash
-cd python
-uv build                         # writes the sdist and wheel to python/dist/
+(cd python && uv build)          # writes the sdist and wheel to python/dist/
 ```
 
 Check that the wheel includes `mdvtools/static` and leaves out notebooks and `*.map` files:
 
 ```bash
-python -m zipfile -l dist/mdvtools-*.whl | grep -E "static/|\.ipynb$" | head
+python -m zipfile -l python/dist/mdvtools-*.whl | grep -E "static/|\.ipynb$" | head
 ```
 
 ### 4. Publish to TestPyPI and test it
 
 ```bash
 # UV_PUBLISH_TOKEN holds your TestPyPI token
-uv publish --publish-url https://test.pypi.org/legacy/ dist/*
+uv publish --publish-url https://test.pypi.org/legacy/ python/dist/*
 ```
 
 Install the wheel in clean environments and run the smoke test against both installs:
@@ -137,18 +146,19 @@ every dependency comes from PyPI.
 
 ```bash
 # UV_PUBLISH_TOKEN now holds your PyPI token
-uv publish dist/*
+uv publish python/dist/*
 ```
 
 ### 6. Tag the release and publish the notes
 
 ```bash
 python .github/scripts/release.py notes X.Y.Z > /tmp/notes.md
-gh release create vX.Y.Z python/dist/* --title "MDV X.Y.Z" --notes-file /tmp/notes.md
+gh release create vX.Y.Z python/dist/* --target "$(git rev-parse HEAD)" \
+  --title "MDV X.Y.Z" --notes-file /tmp/notes.md
 ```
 
-`gh release create` also creates the tag. A tagged version stops the Release workflow from
-publishing it again.
+`gh release create` creates the tag on the commit you built from in step 1. A tagged version
+stops the Release workflow from publishing it again.
 
 ## Notes
 

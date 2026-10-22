@@ -96,7 +96,10 @@ jobs:
 
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
 
-      - run: uv publish --trusted-publishing always --publish-url https://test.pypi.org/legacy/ dist/*
+      # --check-url skips files TestPyPI already has, so re-running failed jobs works
+      - run: >-
+          uv publish --trusted-publishing always --publish-url https://test.pypi.org/legacy/
+          --check-url https://test.pypi.org/simple/ dist/*
 
   smoke-test:
     needs: [check, testpypi]

@@ -70,13 +70,17 @@ jobs:
           CURRENT: ${{ steps.version.outputs.current }}
         run: |
           branch="release/v$VERSION"
+          # an unmerged release PR keeps its branch, and a maintainer may have edited it
+          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+            echo "::notice::$branch already exists, so this run leaves it and its PR alone. Delete the branch to start the release again."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
           git commit -am "Release $VERSION"
-          git push --force origin "$branch"
-          if [ -z "$(gh pr list --head "$branch" --json number --jq '.[].number')" ]; then
-            gh pr create --base main --head "$branch" --title "Release $VERSION" --body-file - <<EOF
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "Release $VERSION" --body-file - <<EOF
           This PR bumps \`mdvtools\` from $CURRENT to $VERSION and dates the changelog.
 
           Before you merge it:
@@ -88,4 +92,3 @@ jobs:
 
           Merging starts the Release workflow, which publishes to TestPyPI, tests the upload and waits for approval before it publishes to PyPI.
           EOF
-          fi
