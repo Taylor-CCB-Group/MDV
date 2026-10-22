@@ -70,16 +70,21 @@ jobs:
           CURRENT: ${{ steps.version.outputs.current }}
         run: |
           branch="release/v$VERSION"
-          # an unmerged release PR keeps its branch, and a maintainer may have edited it
+          # an existing branch may hold a maintainer's edits, so never push over it
           if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
-            echo "::notice::$branch already exists, so this run leaves it and its PR alone. Delete the branch to start the release again."
-            exit 0
+            if [ "$(gh pr list --state open --base main --head "$branch" --json number --jq length)" != "0" ]; then
+              echo "::notice::$branch already has an open release PR, so this run leaves it alone."
+              exit 0
+            fi
+            # an earlier run pushed the branch but could not open the PR
+            echo "::notice::$branch exists without an open PR, so this run opens one for it."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git switch -c "$branch"
+            git commit -am "Release $VERSION"
+            git push origin "$branch"
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$branch"
-          git commit -am "Release $VERSION"
-          git push origin "$branch"
           gh pr create --base main --head "$branch" --title "Release $VERSION" --body-file - <<EOF
           This PR bumps \`mdvtools\` from $CURRENT to $VERSION and dates the changelog.
 
