@@ -193,20 +193,74 @@ Axes are drawn with `@visx/axis` on band scales, as
   plot does, if a filter-version dependency is enough).
 - Plain SVG in React. Band and sqrt scales come from `@visx/scale`, which is
   already a dependency. Size comes from `useChartSize()`.
-- Layout: a legend strip on top, then panels in a row. Panel width =
-  (width − Y axis width − gaps) / panel count. Y labels are drawn only on the
-  first panel; each panel has its split value as its title.
+- Layout: a legend band on top (when there is one), then panels in a row. Panel
+  width = (width − Y axis width − gaps) / panel count. Y labels are drawn only on
+  the first panel; each panel has its split value as its title.
 - Legends: the existing `ColorLegend` (through `BaseChart.setColorLegend()`) and
   `FractionLegend` (in a second `LegendWrapper`, with the new `orientation: "horizontal"`).
-  The component keeps a band free above the panels and the legends start there; they
-  can be dragged and resized, and their positions are saved. On a narrow chart the
-  fraction legend starts below the colour legend.
+  `getLegendLayout()` (`dotPlotLegends.ts`) decides where they start: in one row in
+  a band above the panels, shrinking the colour legend and showing fewer fraction
+  dots to fit the width. If even the most compact row is too wide, or the band
+  would take over a third of the height, there's no band and they start over the
+  plot, as in the legacy dot plot. They can be dragged and resized, and their
+  positions are saved; they don't follow the chart when it's resized later.
 - The colour legend's brush is off (`isColorLegendFilterable()`): it would filter
   cells by the first field's values, which isn't what mean expression shows.
 - Auto colour range is fixed while filtering and recalculated when the rows,
   fields, split or threshold change, as in the legacy dot plot.
 - Palettes: move the two palettes out of `DotPlot.js` into a shared TS module
   so both charts use the same colours.
+
+## Performance
+
+Measured 2026-10-22 on the Vite dev server (React development mode, so a
+production build is faster). Test data: the synthetic project's "compound dot plot
+stress" and "compound dot plot legends" views (`synth-dotplot-labels`), and the
+myeloid project (432,664 cells, 280 dots).
+
+What costs what:
+
+- **Stats (grows with cells):** `computeDotPlotStats` runs in the worker, only when
+  the filtered rows, fields, rows column, split or threshold change. Filter to
+  redrawn chart on the myeloid project: 33–79ms in total, of which the worker
+  8–46ms (46ms for all 432k cells) and the redraw after the result 1–24ms. No frame
+  over 50ms.
+- **Per-render calculations:** `getLegendLayout` (two passes) about 0.05ms,
+  `getDotPlotLayout` (three calls) about 0.002ms. Not worth optimising.
+- **Hover (grows with dots drawn):** main thread blocked per hover, median:
+  0.6–2.6ms for 20–90 dots, 3.2ms for 750, about 25ms for 6,000 (stress view;
+  occasionally 65–80ms). About 16ms per update feels instant, so only very large
+  grids lag.
+
+Why hover scales with dots: the hover state lives in `DotPlotComponent` and is
+passed to every `DotPlotPanel`, and `layout` and the visible row list are rebuilt
+as new objects on every render. So any hover, of a dot or of an x label, re-renders
+every circle in every panel; the React Compiler can't skip panels whose props
+change identity.
+
+If large grids need smooth hovering:
+
+1. Keep `layout` and the visible rows stable between renders (`useMemo`), so
+   panels skip label hovers.
+2. Draw the hovered dot's outline in a small overlay rather than passing `hovered`
+   to every panel, so a hover redraws one element instead of all of them.
+
+Re-measure on the stress view afterwards; both should bring hovers to about 1ms
+whatever the number of dots.
+
+How it was measured, to repeat it:
+
+- Hover: dispatch `pointerover` / `pointerout` on circles, and time the longest
+  gap in a `MessageChannel` ping loop while waiting for the outline to change
+  (that gap is how long the main thread was blocked). Reuse one channel: a new
+  `MessageChannel` per ping causes GC pauses that look like 100–230ms blocks.
+- Filter: apply `filterCategories` on a `category_dimension`, time the stats worker
+  by wrapping `window.Worker` for `dotPlotStatsWorker`, and watch the chart with a
+  `MutationObserver`. Check with Chrome's `long-animation-frame` entries, which
+  name the scripts in any frame over 50ms.
+- By hand: Chrome DevTools Performance tab (record, hover or filter, look for
+  long tasks on the Main track and the worker track), and the React DevTools
+  Profiler with "Record why each component rendered" on.
 
 ## Status
 

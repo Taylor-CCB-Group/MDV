@@ -16,15 +16,17 @@ import {
     adaptDotPlotConfig,
     getSplitFromDialog,
 } from "./dotPlotConfig";
-import { DOT_PLOT_LEGEND_MARGIN, type LegendBand, buildFractionLegendSpec } from "./dotPlotLegends";
+import { DOT_PLOT_LEGEND_MARGIN, type LegendLayout, buildFractionLegendSpec } from "./dotPlotLegends";
 
 /** How many split values to show when a split column is first chosen: enough to compare two. */
 const DEFAULT_SPLIT_VALUE_COUNT = 2;
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
-export type DotPlotColorLegendInput = { colors: string[]; range: [number, number] };
-export type DotPlotFractionLegendInput = { fracMax: number; maxRadius: number };
+/** `width` is the legend's content width, chosen to fit the chart (see `getLegendLayout`). */
+export type DotPlotColorLegendInput = { colors: string[]; range: [number, number]; width: number };
+/** `items` is the most dots to show, chosen to fit the chart (see `getLegendLayout`). */
+export type DotPlotFractionLegendInput = { fracMax: number; maxRadius: number; items: number };
 
 export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
     /** The automatic colour range currently drawn, used to fill in the manual range. */
@@ -32,8 +34,8 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
     fractionLegendWrapper = new LegendWrapper<FractionLegendSpec, DotPlotReactConfig>(this);
     private colorLegendInput: DotPlotColorLegendInput | null = null;
     private fractionLegendInput: DotPlotFractionLegendInput | null = null;
-    /** Where the legends start, in the band the component keeps free above the panels. */
-    private legendBand: LegendBand | null = null;
+    /** Where the legends start, normally in the band the component keeps free above the panels. */
+    private legendLayout: LegendLayout | null = null;
 
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: DotPlotReactConfig) {
         const config = adaptDotPlotConfig(originalConfig);
@@ -56,21 +58,27 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
     updateLegends(
         color: DotPlotColorLegendInput | null,
         fraction: DotPlotFractionLegendInput | null,
-        band: LegendBand,
+        legendLayout: LegendLayout,
     ) {
-        this.legendBand = band;
+        this.legendLayout = legendLayout;
         const prevColor = this.colorLegendInput;
         if (
             color &&
             (color.colors !== prevColor?.colors ||
                 color.range[0] !== prevColor.range[0] ||
-                color.range[1] !== prevColor.range[1])
+                color.range[1] !== prevColor.range[1] ||
+                color.width !== prevColor.width)
         ) {
             this.colorLegendInput = color;
             this.setColorLegend();
         }
         const prevFraction = this.fractionLegendInput;
-        if (fraction && (fraction.fracMax !== prevFraction?.fracMax || fraction.maxRadius !== prevFraction.maxRadius)) {
+        if (
+            fraction &&
+            (fraction.fracMax !== prevFraction?.fracMax ||
+                fraction.maxRadius !== prevFraction.maxRadius ||
+                fraction.items !== prevFraction.items)
+        ) {
             this.fractionLegendInput = fraction;
             this.showFractionLegend();
         }
@@ -88,7 +96,8 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
     getColorLegendSpec(): ColorLegendSpec | null {
         const input = this.colorLegendInput;
         if (!input) return null;
-        return { kind: "continuous", label: "Mean expression", column: "", colors: input.colors, range: input.range };
+        const { colors, range, width } = input;
+        return { kind: "continuous", label: "Mean expression", column: "", colors, range, width };
     }
 
     setColorLegend() {
@@ -97,8 +106,8 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
             // BaseChart calls this while the chart is still being built, before there's anything
             // to show; it would then save a default position over the panels
             if (!this.colorLegendInput) return;
-            if (!cl.pos && !this.legend && this.legendBand?.color) {
-                cl.pos = [...this.legendBand.color];
+            if (!cl.pos && !this.legend && this.legendLayout?.color) {
+                cl.pos = [...this.legendLayout.color];
             }
         }
         super.setColorLegend();
@@ -116,9 +125,9 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
             this.fractionLegendWrapper.unmount();
             return;
         }
-        const position = c.position ?? this.legendBand?.fraction ?? [DOT_PLOT_LEGEND_MARGIN, DOT_PLOT_LEGEND_MARGIN];
+        const position = c.position ?? this.legendLayout?.fraction ?? [DOT_PLOT_LEGEND_MARGIN, DOT_PLOT_LEGEND_MARGIN];
         c.position = [...position];
-        const spec = buildFractionLegendSpec(input.fracMax, input.maxRadius);
+        const spec = buildFractionLegendSpec(input.fracMax, input.maxRadius, input.items);
         this.fractionLegendWrapper.render(spec, { left: position[0], top: position[1] }, FractionLegend, {
             dragHandle: ".legend-drag-handle",
             resizable: true,

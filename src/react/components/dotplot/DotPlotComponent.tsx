@@ -10,13 +10,7 @@ import DotPlotPanel, { type DotPlotHover, type DotPlotLabelHover } from "./DotPl
 import type { DotPlotReact } from "./DotPlotReactWrapper";
 import { type DotPlotReactConfig, getColorRange } from "./dotPlotConfig";
 import { DOT_PLOT_MAX_RADIUS, getDotPlotLayout, getVisibleRows, getXLabelLayout } from "./dotPlotLayout";
-import {
-    type LegendBand,
-    buildFractionLegendSpec,
-    getColorLegendBox,
-    getFractionLegendBox,
-    getLegendBand,
-} from "./dotPlotLegends";
+import { type LegendLayout, getLegendLayout } from "./dotPlotLegends";
 import { MISSING_VALUE_COLOR, binnedColorScale, getDotPlotPalette, toCssColors } from "./dotPlotPalettes";
 import { type DotPlotStats, queryDotPlotStats } from "./dotPlotStats";
 
@@ -175,10 +169,6 @@ const DotPlotComponent = observer(function DotPlotComponent() {
     const panelTitles = splitColumn && panelCodes ? panelCodes.map((code) => splitColumn.values[code]) : null;
     const { x: xAxis, y: yAxis } = config.axis;
     const fracMax = stats?.fracMax;
-    const colorBox =
-        showColorLegend && rangeMin !== undefined && rangeMax !== undefined
-            ? getColorLegendBox([rangeMin, rangeMax])
-            : null;
     const sizes = {
         width,
         yAxisWidth: yAxis.size,
@@ -218,39 +208,42 @@ const DotPlotComponent = observer(function DotPlotComponent() {
     // after the legend band: lay out for the largest dots, then again for the size that gives.
     const layoutBelow = (bandHeight: number) =>
         getDotPlotLayout({ ...sizes, height: height - bandHeight, xAxisHeight: xLabels.margin });
-    const bandFor = (radius: number) =>
-        getLegendBand(
+    const legendLayoutFor = (radius: number) =>
+        getLegendLayout({
             width,
-            colorBox,
-            showFractionLegend && fracMax !== undefined
-                ? getFractionLegendBox(buildFractionLegendSpec(fracMax, radius))
-                : null,
-        );
-    const rawBand = bandFor(layoutBelow(bandFor(DOT_PLOT_MAX_RADIUS).height).maxRadius);
-    const layout = layoutBelow(rawBand.height);
+            height,
+            colorRange:
+                showColorLegend && rangeMin !== undefined && rangeMax !== undefined ? [rangeMin, rangeMax] : null,
+            fracMax: showFractionLegend && fracMax !== undefined ? fracMax : null,
+            maxRadius: radius,
+        });
+    const rawLegendLayout = legendLayoutFor(layoutBelow(legendLayoutFor(DOT_PLOT_MAX_RADIUS).height).maxRadius);
+    const layout = layoutBelow(rawLegendLayout.height);
     const { maxRadius } = layout;
 
     // keyed by value, so the legends are only told about a real change
-    const bandHeight = rawBand.height;
-    const [colorLeft, colorTop] = rawBand.color ?? [];
-    const [fractionLeft, fractionTop] = rawBand.fraction ?? [];
-    const band = useMemo<LegendBand>(
+    const { height: bandHeight, colorWidth, fractionItems } = rawLegendLayout;
+    const [colorLeft, colorTop] = rawLegendLayout.color ?? [];
+    const [fractionLeft, fractionTop] = rawLegendLayout.fraction ?? [];
+    const legendLayout = useMemo<LegendLayout>(
         () => ({
             height: bandHeight,
+            colorWidth,
+            fractionItems,
             color: colorLeft !== undefined && colorTop !== undefined ? [colorLeft, colorTop] : null,
             fraction: fractionLeft !== undefined && fractionTop !== undefined ? [fractionLeft, fractionTop] : null,
         }),
-        [bandHeight, colorLeft, colorTop, fractionLeft, fractionTop],
+        [bandHeight, colorWidth, fractionItems, colorLeft, colorTop, fractionLeft, fractionTop],
     );
     useEffect(() => {
         chart.updateLegends(
             legendColors && rangeMin !== undefined && rangeMax !== undefined
-                ? { colors: legendColors, range: [rangeMin, rangeMax] }
+                ? { colors: legendColors, range: [rangeMin, rangeMax], width: legendLayout.colorWidth }
                 : null,
-            fracMax !== undefined && maxRadius > 0 ? { fracMax, maxRadius } : null,
-            band,
+            fracMax !== undefined && maxRadius > 0 ? { fracMax, maxRadius, items: legendLayout.fractionItems } : null,
+            legendLayout,
         );
-    }, [chart, legendColors, rangeMin, rangeMax, fracMax, maxRadius, band]);
+    }, [chart, legendColors, rangeMin, rangeMax, fracMax, maxRadius, legendLayout]);
 
     if (error) return <Message>{`Couldn't compute the dot plot: ${error}`}</Message>;
     if (columns.length > 0 && !rowColumn) return <Message>Choose a category column for the y axis.</Message>;
