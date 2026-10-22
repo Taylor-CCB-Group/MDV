@@ -345,10 +345,21 @@ def load_config(app, config_name=None, enable_auth=False):
             app.config['DB_BACKEND'] = 'sqlite'
         else:
             app.config['PREFERRED_URL_SCHEME'] = 'https'
-            db_backend = (os.getenv('DB_BACKEND') or 'sqlite').strip().lower()
-            if db_backend not in ['sqlite', 'postgres']:
-                logger.warning(f"Unknown DB_BACKEND '{db_backend}', defaulting to sqlite")
-                db_backend = 'sqlite'
+            db_backend = (os.getenv('DB_BACKEND') or '').strip().lower()
+            if not db_backend:
+                # Configs written before DB_BACKEND existed always used postgres and set only
+                # DB_* values or Docker secrets. Defaulting those to sqlite would start the app
+                # on a new, empty database while the real one sits unused.
+                has_postgres_settings = any(
+                    os.getenv(name) for name in ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME']
+                ) or os.path.exists('/run/secrets/db_user')
+                if has_postgres_settings:
+                    logger.warning("DB_BACKEND is not set but postgres settings are present; using postgres. Set DB_BACKEND=postgres to remove this warning.")
+                    db_backend = 'postgres'
+                else:
+                    db_backend = 'sqlite'
+            elif db_backend not in ['sqlite', 'postgres']:
+                raise ValueError(f"Unknown DB_BACKEND '{db_backend}'; expected 'sqlite' or 'postgres'.")
 
             app.config['DB_BACKEND'] = db_backend
 
