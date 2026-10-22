@@ -405,6 +405,7 @@ def plan_question_views(
     project: Path,
     datasources: list[dict[str, Any]],
     views: dict[str, Any],
+    marker_genes: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build question views from columns already in the project. The h5 is read-only."""
     skipped: list[dict[str, str]] = [
@@ -427,7 +428,8 @@ def plan_question_views(
     columns = surviving_columns(cells)
     roles = choose_roles(columns)
     umap_x, umap_y = choose_umap(columns)
-    markers = present_names(gene_table, marker_names())
+    requested_markers = marker_names() if marker_genes is None else marker_genes
+    markers = present_names(gene_table, requested_markers)
     collections = present_names(gene_table, collection_names())
     group = roles.get("cell_group") or roles.get("cell_subgroup") or roles.get("cell_type")
     dot_category = roles.get("cell_type") or roles.get("cell_subgroup") or roles.get("cell_group")
