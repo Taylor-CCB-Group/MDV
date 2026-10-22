@@ -649,23 +649,39 @@ export function useDataSources() {
 }
 
 /**
+ * Creates a {Dimension} of the given type owned by the calling component, destroying it on unmount.
+ *
+ * Created in an effect rather than during render so that each mount owns a live, registered
+ * dimension. Under StrictMode the simulated unmount destroys the first one (removing it from
+ * `ds.dimensions`, and for a RangeDimension terminating its worker); if the remount kept filtering
+ * through that instance, `removeAllFilters` would no longer see it, leaving stale local filter
+ * state that corrupts the parent filter on the next transition.
+ *
+ * Returns `undefined` until the effect has run, so callers should only use it inside effects/callbacks.
+ */
+function useOwnedDimension<T extends Dimension = Dimension>(dimensionType: string) {
+    const ds = useDataStore();
+    const [dim, setDim] = useState<T>();
+    useEffect(() => {
+        //! `getDimension` is untyped JS - the caller vouches for `dimensionType` matching `T`.
+        const d = ds.getDimension(dimensionType) as T;
+        setDim(d);
+        return () => d.destroy();
+    }, [ds, dimensionType]);
+    return dim;
+}
+
+/**
  * Gets a {Dimension} object for filtering a column in the current data store context
  * and removes the filter when the component unmounts.
+ *
+ * `undefined` until the owning effect has created it - see {@link useOwnedDimension}.
  */
 export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
-    const ds = useDataStore();
     // it might be good to have something better for isTextLike, some tests for this...
     const isTextLike = (column.values !== undefined) || (column.datatype === "unique");
     const dimension_type = isTextLike ? "category_dimension" : "range_dimension";
-    const dim = useMemo(() => {
-        const dim = ds.getDimension(dimension_type);
-        return dim;
-    }, [ds, dimension_type]);
-    useEffect(() => {
-        // cleanup when component unmounts
-        return () => dim.destroy();
-    }, [dim.destroy]);
-    return dim;
+    return useOwnedDimension(dimension_type);
 }
 
 export function useLazyDimensionFilter<K extends DataType>(column: DataColumn<K>) {
@@ -691,21 +707,15 @@ export function useLazyDimensionFilter<K extends DataType>(column: DataColumn<K>
 }
 
 export function useRangeDimension2D() {
-    const ds = useDataStore();
     const s = useRegionScale();
-    const rangeDimension = useMemo(() => {
-        const dim = ds.getDimension("range_dimension") as RangeDimension;
-        return dim;
-    }, [ds]);
-    useEffect(() => {
-        return () => rangeDimension.destroy();
-    }, [rangeDimension.destroy]);
+    const rangeDimension = useOwnedDimension<RangeDimension>("range_dimension");
     // encapsulating a bit more of the Dimension API here so I'm less likely to forget it.
     const { param } = useConfig();
     if (!isArray(param)) throw "expecting param to be array";
     const cols = useMemo(() => [param[0], param[1]], [param]); //todo: 3d...
     const filterPoly = useCallback(
         (coords: [number, number][], region?: FilterPolyRegionOpts) => {
+            if (!rangeDimension) return;
             // Apply coordinate scaling if required (e.g. image vs data coordinate systems).
             const points = s === 1 ? coords : (coords.map((c) => c.map((v) => v * s)) as [number, number][]);
 
@@ -724,7 +734,7 @@ export function useRangeDimension2D() {
         },
         [rangeDimension, cols, s],
     );
-    const removeFilter = useCallback(() => rangeDimension.removeFilter(), [rangeDimension]);
+    const removeFilter = useCallback(() => rangeDimension?.removeFilter(), [rangeDimension]);
     return { filterPoly, removeFilter, rangeDimension };
 }
 
