@@ -352,16 +352,66 @@ class TestLoadConfig(unittest.TestCase):
     @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false}')
     @patch('os.path.dirname')
     @patch('os.path.abspath')
-    def test_load_config_unknown_backend_falls_back_to_sqlite(self, mock_abspath, mock_dirname, mock_file):
-        """Test that an unrecognised DB_BACKEND value falls back to sqlite."""
+    def test_load_config_unknown_backend_raises(self, mock_abspath, mock_dirname, mock_file):
+        """A mistyped DB_BACKEND must not silently switch a deployment to an empty sqlite database."""
         mock_abspath.return_value = '/test/path'
         mock_dirname.return_value = '/test'
 
-        with patch.dict(os.environ, {'DB_BACKEND': 'mongodb'}, clear=True):
+        with patch.dict(os.environ, {'DB_BACKEND': 'postgress'}, clear=True):
+            with self.assertRaises(ValueError):
+                load_config(self.app)
+
+    @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false}')
+    @patch('os.path.dirname')
+    @patch('os.path.abspath')
+    def test_load_config_unset_backend_with_postgres_env_uses_postgres(self, mock_abspath, mock_dirname, mock_file):
+        """Configs written before DB_BACKEND existed set only DB_* values and must keep using postgres."""
+        mock_abspath.return_value = '/test/path'
+        mock_dirname.return_value = '/test'
+
+        with patch.dict(os.environ, {
+            'DB_USER': 'test_user',
+            'DB_PASSWORD': 'test_password',
+            'DB_NAME': 'test_db',
+            'DB_HOST': 'test_host'
+        }, clear=True):
+            load_config(self.app)
+
+        self.assertEqual(self.app.config['DB_BACKEND'], 'postgres')
+        self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], 'postgresql://test_user:test_password@test_host/test_db')
+
+    @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false, "db_container": "test_host"}')
+    @patch('os.path.dirname')
+    @patch('os.path.abspath')
+    @patch('os.path.exists')
+    @patch('mdvtools.dbutils.mdv_server_app.read_secret')
+    def test_load_config_unset_backend_with_postgres_secrets_uses_postgres(self, mock_read_secret, mock_exists, mock_abspath, mock_dirname, mock_file):
+        """Configs written before DB_BACKEND existed may pass postgres credentials only as Docker secrets."""
+        mock_abspath.return_value = '/test/path'
+        mock_dirname.return_value = '/test'
+        mock_exists.side_effect = lambda path: path == '/run/secrets/db_user'
+        mock_read_secret.side_effect = ['secret_user', 'secret_password', 'secret_db']
+
+        with patch.dict(os.environ, {}, clear=True):
+            load_config(self.app)
+
+        self.assertEqual(self.app.config['DB_BACKEND'], 'postgres')
+        self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], 'postgresql://secret_user:secret_password@test_host/secret_db')
+
+    @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false, "db_container": "test_host"}')
+    @patch('os.path.dirname')
+    @patch('os.path.abspath')
+    @patch('os.path.exists', return_value=False)
+    def test_load_config_unset_backend_without_postgres_settings_uses_sqlite(self, mock_exists, mock_abspath, mock_dirname, mock_file):
+        """A fresh install with no database settings gets sqlite; the db_container default in config.json does not count."""
+        mock_abspath.return_value = '/test/path'
+        mock_dirname.return_value = '/test'
+
+        with patch.dict(os.environ, {}, clear=True):
             load_config(self.app)
 
         self.assertEqual(self.app.config['DB_BACKEND'], 'sqlite')
-        self.assertIn('sqlite:///', self.app.config['SQLALCHEMY_DATABASE_URI'])
+        self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], 'sqlite:////app/mdv/mdv.sqlite3')
 
     @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false}')
     @patch('os.path.dirname')
