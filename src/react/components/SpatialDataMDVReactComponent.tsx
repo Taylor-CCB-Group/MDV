@@ -9,7 +9,7 @@ import {
     type VivImagePropsResolver,
     useSpatialCanvasRendererFromLayerInputs,
 } from "@spatialdata/vis";
-import type { DeckGLProps, OrthographicViewState, PickingInfo } from "deck.gl";
+import type { DeckGLProps, DeckGLRef, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -43,6 +43,7 @@ import type { DualContourLegacyConfig } from "../contour_state";
 import { useChartID, useChartSize, useConfig, useRegion } from "../hooks";
 import useGateLayers from "../hooks/useGateLayers";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
+import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import { useOuterContainer } from "../screen_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import FieldContourLegend from "./FieldContourLegend";
@@ -99,6 +100,9 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const stack = config.renderStack;
     void chart.renderStackGeneration;
+
+    const deckRef = useRef<DeckGLRef | null>(null);
+    useRebindDeckEvents(deckRef);
 
     const extensions = useMemo(() => [new ColorPaletteExtension(), new VivContrastExtension()], []);
 
@@ -250,6 +254,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
             layerOrder={renderer.layerOrder}
             vivLayerProps={renderer.vivLayerProps.length > 0 ? renderer.vivLayerProps : undefined}
             deckProps={mergedDeckProps}
+            deckRef={deckRef}
         />
     );
 });

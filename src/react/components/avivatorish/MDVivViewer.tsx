@@ -7,7 +7,6 @@ import equal from "fast-deep-equal";
 import { ScaleBarLayer } from "@hms-dbmi/viv";
 import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } from "deck.gl";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
-import type { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 export function getVivId(id: string) {
     return `-#${id}#`;
@@ -75,7 +74,6 @@ export type VivViewerWrapperProps = {
     randomize?: boolean;
     useDevicePixels?: boolean;
     outerContainer?: HTMLElement;
-    selectionLayer?: EditableGeoJsonLayer;
 };
 export type VivViewerWrapperState = {
     viewStates: any;
@@ -162,14 +160,9 @@ class MDVivViewerWrapper extends React.PureComponent<
     }
 
 
-    /**
-     * prevent the deckMonkeypatch from double-binding etc.
-     * as of anything related to that, this is dubious and liable to need attention in the future.
-     */
-    _cleanupMouseEvents?: () => void;
     componentDidUpdate(prevProps: VivViewerWrapperProps) {
         const { props } = this;
-        const { views, outerContainer, selectionLayer } = props;
+        const { views, outerContainer } = props;
 
         if (
             outerContainer !== this.state.outerContainer &&
@@ -178,9 +171,8 @@ class MDVivViewerWrapper extends React.PureComponent<
             try {
                 this.setState({ outerContainer });
                 const deck = this.state.deckRef.current.deck;
-                this._cleanupMouseEvents?.();
-                //this should be common with DeckScatterComponent - make a helper/hook...
-                this._cleanupMouseEvents = rebindMouseEvents(deck, selectionLayer);
+                // class component, so it can't share useRebindDeckEvents
+                rebindMouseEvents(deck);
             } catch (e) {
                 console.error(
                     "attempt to reset deck eventManager element failed",
@@ -224,11 +216,6 @@ class MDVivViewerWrapper extends React.PureComponent<
             this.setState({ viewStates });
         }
     }
-    componentWillUnmount(): void {
-        this._cleanupMouseEvents?.();
-        this._cleanupMouseEvents = undefined;
-    }
-
     /**
      * This updates the viewStates' height and width with the newest height and
      * width on any call where the viewStates changes (i.e resize events),

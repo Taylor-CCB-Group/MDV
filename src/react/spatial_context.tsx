@@ -12,6 +12,7 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import { action, toJS } from "mobx";
 import { getEmptyFeatureCollection } from "./deck_state";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
+import { SELECTION_COORDINATE_SYSTEM } from "@/editable-layers/selectionModes";
 import type { FieldName } from "@/charts/charts";
 import type { Tool } from "./components/SelectionOverlay";
 import { useGateManager } from "./gates/useGateManager";
@@ -206,6 +207,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection,
             mode: selectionMode,
+            coordinateSystem: SELECTION_COORDINATE_SYSTEM,
             getFillColor,
             getLineColor,
             getLineWidth: 2,
