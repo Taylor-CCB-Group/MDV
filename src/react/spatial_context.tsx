@@ -110,7 +110,8 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
     // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that later.
     //const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<SimpleFeatureCollection>(getEmptyFeatureCollection());
-    //! it appears to drastically affect performance having this in mobx config - why?
+    // config marks this `observable.ref` (chartConfigUtils): deep observability converted the whole
+    // collection on every edit and made deck.gl read its coordinates through proxies
     const { selectionFeatureCollection } = chart.config;
     const setSelectionFeatureCollection = useCallback(action((newSelection: SimpleFeatureCollection) => {
         chart.config.selectionFeatureCollection = newSelection;
