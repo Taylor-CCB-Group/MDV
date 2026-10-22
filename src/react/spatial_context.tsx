@@ -27,7 +27,8 @@ import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "
 
 export type P = [number, number];
 export type RangeState = {
-    rangeDimension: RangeDimension;
+    /** `undefined` until the owning effect has created it. */
+    rangeDimension: RangeDimension | undefined;
     selectionFeatureCollection: SimpleFeatureCollection;
     editableLayer: MonkeyPatchEditableGeoJsonLayer;
     editingGateId: string | null;
@@ -144,12 +145,25 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         ];
     }, [editingGateId, gateManager]);
 
+    const clearSelection = useCallback(() => {
+        setSelectionFeatureCollection(getEmptyFeatureCollection());
+        setEditingGateId(null);
+    }, [setSelectionFeatureCollection]);
+
     useEffect(() => {
-        chart.removeFilter = () => {
-            setSelectionFeatureCollection(getEmptyFeatureCollection());
-            setEditingGateId(null);
-        }
-    }, [chart, setSelectionFeatureCollection]);
+        chart.removeFilter = clearSelection;
+    }, [chart, clearSelection]);
+
+    // "Reset All Filters" clears the dimension directly via `dataStore.removeAllFilters()`
+    // without going through `chart.removeFilter`, so the drawn shape needs clearing here too.
+    useEffect(() => {
+        const ds = chart.dataStore;
+        const listenerId = `${chart.config.id}_selection_layer`;
+        ds.addListener(listenerId, (type: string, data: unknown) => {
+            if (type === "filtered" && data === "all_removed") clearSelection();
+        });
+        return () => ds.removeListener(listenerId);
+    }, [chart, clearSelection]);
 
     useEffect(() => {
         if (coords.length === 0) {

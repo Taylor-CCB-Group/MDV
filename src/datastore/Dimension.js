@@ -353,7 +353,9 @@ class Dimension {
         this.removeFilter(notify);
         this.filterBuffer = null;
         this.localFilter = null;
-        this.parent.dimensions.splice(this.parent.dimensions.indexOf(this), 1);
+        const index = this.parent.dimensions.indexOf(this);
+        // guard against double-destroy: splice(-1, 1) would remove an unrelated dimension
+        if (index !== -1) this.parent.dimensions.splice(index, 1);
     }
 }
 /** @type {{[k: string]: undefined | typeof Dimension}} */

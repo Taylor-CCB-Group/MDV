@@ -115,12 +115,12 @@ const TextComponent = observer(({
 
     useEffect(() =>{
         // todo consider having ui for this state per-dimension rather than globally
-        dim.setNoClear(conf.noClearFilters);
+        dim?.setNoClear(conf.noClearFilters);
     },[dim, conf.noClearFilters]);
  
     // react to changes in value and update the filter
     useEffect(() => {
-        
+        if (!dim) return;
         // filter could be undefined - but we previously checked for null causing component to crash
         if ((!filter) || (filter.category.length === 0)) {
             dim.removeFilter();
@@ -317,6 +317,7 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
     const filter = useFilterConfig(column);
     const [initialValue] = useState(filter);
     useEffect(() => {
+        if (!dim) return;
         if (filter === null) {
             dim.removeFilter();
             return;
@@ -362,10 +363,11 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     }, [isInteger, minMax, column]);
     const [debouncedValue] = useDebounce(value, 10);
      useEffect(() =>{
-        filter.setNoClear(conf.noClearFilters);
+        filter?.setNoClear(conf.noClearFilters);
     },[filter, conf.noClearFilters]);
     // Effect to manage the filter state
     useEffect(() => {
+        if (!filter) return;
         const value = debouncedValue;
         if (!value) {
             filter.removeFilter();
