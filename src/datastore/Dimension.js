@@ -37,53 +37,56 @@ class Dimension {
     }
 
     /**
+     * Applies a filter result to this dimension's local states and the parent ref-counts.
+     * Every filter method should end here, so the 0/1/2/3 state machine lives in one place:
+     * background-hidden rows (2) are promoted to 3, rows already at 3 are left alone, and
+     * 0 <-> 1 follows `include`.
+     *
+     * @param {((i: number) => boolean) | ArrayLike<number>} include - a per-row predicate, or a
+     * mask (e.g. a Uint8Array produced by a worker) where non-zero keeps the row
+     */
+    commitFilter(include) {
+        const size = this.parent.size;
+        const isMask = typeof include !== "function";
+        if (isMask && include.length < size) {
+            throw new Error(`filter mask has ${include.length} rows, expected ${size}`);
+        }
+        const local = this.filterArray;
+        const parentFilter = this.parent.filterArray;
+        let passingDelta = 0;
+        for (let i = 0; i < size; i++) {
+            const prevState = local[i];
+            // local brush only mutates visible rows; background rows are updated when the
+            // background filter is set or cleared
+            if (prevState === 3) {
+                continue;
+            }
+            // with a local filter active, background-hidden rows are excluded too
+            if (prevState === 2) {
+                local[i] = 3;
+                if (++parentFilter[i] === 1) passingDelta--;
+                continue;
+            }
+            const keep = isMask ? include[i] !== 0 : include(i);
+            if (keep) {
+                if (prevState === 1) {
+                    local[i] = 0;
+                    if (--parentFilter[i] === 0) passingDelta++;
+                }
+            } else if (prevState === 0) {
+                local[i] = 1;
+                if (++parentFilter[i] === 1) passingDelta--;
+            }
+        }
+        this.parent.filterSize += passingDelta;
+    }
+
+    /**
      * Filters the data based on a predicate function.
      * The function should return false if the row should be filtered out.
      */
     filterPredicate(args, columns) {
-        const predicate = args.predicate;
-        // could we pass in optional filteredIndices and use those rather than processing entire array?
-        // it's not as simple as resetting the localFilter because of parent.filterSize mutation
-        // if we guarantee that users of a particular Dimension instance always go through this method,
-        // then we can fairly easily add some other properties for it to reference
-        // - this will make things like a/b comparison of predicate vs other versions of filters harder to test.
-        // - suspect preferred approach will be a new strategy for filter evaluation that doesn't attempt to use this class
-        const localFilter = this.filterArray;
-        for (let i = 0; i < this.parent.size; i++) {
-            // try ... catch to handle errors in the predicate
-            // we could probably pass something monadic in args to handle this
-            // let value = false;
-            // try {
-            //     value = !predicate(i);
-            // } catch (e) {
-            //     // console.error('Error in evaluating filterPredicate', e);
-            // }
-            //not interested in rows already in background filter
-            const prevState = localFilter[i];
-            // When a local filter is active, background-hidden rows must also
-            // contribute to exclusion scope (promote 2 -> 3 once).
-            if (prevState === 2) {
-                this._applyStateTransition(i, 3);
-                continue;
-            }
-            // local brush should only mutate visible points, so skip if background filtered
-            // wil be updated when  set/clear background filter is called           
-            if (prevState === 3) {
-                continue;
-            }
-            const shouldExclude = !predicate(i);
-            if (shouldExclude) {
-                if (prevState === 0) {
-                    this._applyStateTransition(i, 1);
-                }
-            } else if (prevState === 1) {
-                this._applyStateTransition(i, 0);
-            }
-        }
-        // xxx: why would we not notify listeners?
-        //I'm a bit dubious about the general pattern
-        //- using filter(methodName...) for now to be more in line with other things
-        //this.parent._callListeners("filtered", this);
+        return this.commitFilter(args.predicate);
     }
     /**
      * 
@@ -121,29 +124,12 @@ class Dimension {
         return this.filterArray;
     }
 
-    //needs to be removed - produces strange behaviour << review
+    /**
+     * Keeps only the rows in `indexSet`.
+     * @param {Set<number>} indexSet
+     */
     filterOnIndex(indexSet) {
-        const filter = this.parent.filterArray;
-        const len = this.parent.size;
-        const localFilter = this.filterArray;
-        const parent = this.parent;
-        for (let i = 0; i < len; i++) {
-            if (indexSet.has(i)) {
-                if (localFilter[i] === 1) {
-                    if (--filter[i] === 0) {
-                        parent.filterSize++;
-                    }
-                }
-                localFilter[i] = 0;
-            } else {
-                if (localFilter[i] === 0) {
-                    if (++filter[i] === 1) {
-                        parent.filterSize--;
-                    }
-                }
-                localFilter[i] = 1;
-            }
-        }
+        return this.commitFilter((i) => indexSet.has(i));
     }
 
     /**

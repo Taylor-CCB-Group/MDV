@@ -409,9 +409,8 @@ describe("background filters", () => {
         expect(passingRows(ds)).toEqual([2, 5]);
     });
 
-    // Known defect: these methods write 0/1 directly instead of going through the 0/1/2/3 state
-    // machine, so background-hidden rows are un-hidden (and the parent count drifts).
-    test.fails.each([
+    // these used to write 0/1 directly, un-hiding background rows and drifting the parent count
+    test.each([
         ["filterCategories", ["c"], ["a"]],
         ["filterMultipleCategories", ["c"], ["a"]],
     ])("%s honours an active background filter", (method, columns, args) => {
@@ -422,7 +421,7 @@ describe("background filters", () => {
         assertConsistent(ds);
     });
 
-    test.fails("filterOnIndex honours an active background filter", () => {
+    test("filterOnIndex honours an active background filter", () => {
         const dim = ds.getDimension("base_dimension");
         dim.setBackgroundFilter("d", "p");
         dim.filter("filterOnIndex", [], new Set([0, 1, 2]));
@@ -474,8 +473,20 @@ describe("randomized against a reference model", () => {
             predModel,
             (r) => {
                 const cats = subset(r, ["a", "b", "c"]);
-                pred.filter("filterCategoriesPredicate", ["c"], cats);
+                pred.filter(r() < 0.5 ? "filterCategories" : "filterCategoriesPredicate", ["c"], cats);
                 predModel.include = (i) => cats.includes(C[i]);
+            },
+        ]);
+
+        const base = ds.getDimension("base_dimension");
+        const baseModel: Model = { include: null, bg: null };
+        dims.push([
+            base,
+            baseModel,
+            (r) => {
+                const rows = new Set(ALL.filter(() => r() < 0.5));
+                base.filter("filterOnIndex", [], rows);
+                baseModel.include = (i) => rows.has(i);
             },
         ]);
 
