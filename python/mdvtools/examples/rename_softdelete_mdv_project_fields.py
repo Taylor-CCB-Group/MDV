@@ -55,6 +55,38 @@ def project_matches(value: Any, project_name: str) -> bool:
     }
 
 
+def duplicated_name_keys(values: list[str]) -> set[str]:
+    """Case-folded names that occur more than once. Blanks are ignored."""
+    counts = Counter(normalize_key(value) for value in values if normalize_text(value))
+    return {key for key, count in counts.items() if count > 1}
+
+
+def sheet_target_name(
+    final_name: str,
+    new_name: str,
+    displayed_name: str,
+    duplicate_finals: set[str],
+    duplicate_news: set[str],
+) -> tuple[str, str]:
+    """Pick the display name for one sheet row.
+
+    A unique Final Column Name wins. A unique new_display_name is used when Final
+    is blank or duplicated. When the name that would have been used is duplicated
+    within the project and datasource, the row's displayed name is used instead.
+    """
+    final_is_unique = bool(final_name) and normalize_key(final_name) not in duplicate_finals
+    new_is_unique = bool(new_name) and normalize_key(new_name) not in duplicate_news
+    if final_is_unique:
+        return final_name, "workbook"
+    if new_is_unique:
+        return new_name, "workbook"
+    if displayed_name and (final_name or new_name):
+        return displayed_name, "displayed_name"
+    if final_name or new_name:
+        return "", "displayed_name_blank"
+    return "", "blank"
+
+
 def find_header(df: pd.DataFrame, candidates: set[str]) -> str | None:
     for actual in df.columns:
         if normalize_key(actual) in candidates:
@@ -222,7 +254,7 @@ def build_plan(
     final_header = find_header(df, EXPECTED_HEADERS["Final Column Name"])
     new_header = find_header(df, EXPECTED_HEADERS["new_display_name"])
     original_header = find_header(df, EXPECTED_HEADERS["original name"])
-    sheet_rows: list[dict[str, Any]] = []
+    raw_rows: list[dict[str, Any]] = []
     for index, row in df.iterrows():
         if project_name is not None and not project_matches(row.get(project_header), project_name):
             continue
@@ -232,14 +264,25 @@ def build_plan(
         original_name = normalize_text(row.get(original_header)) if original_header else ""
         if not displayed_name and not original_name:
             continue
-        final_name = normalize_text(row.get(final_header)) if final_header else ""
-        new_name = normalize_text(row.get(new_header)) if new_header else ""
-        sheet_rows.append({
+        raw_rows.append({
             "row": index + 2,
             "displayed_name": displayed_name,
             "original_name": original_name,
-            "target_name": final_name or new_name,
+            "final_name": normalize_text(row.get(final_header)) if final_header else "",
+            "new_name": normalize_text(row.get(new_header)) if new_header else "",
         })
+    duplicate_finals = duplicated_name_keys([item["final_name"] for item in raw_rows])
+    duplicate_news = duplicated_name_keys([item["new_name"] for item in raw_rows])
+    sheet_rows: list[dict[str, Any]] = []
+    for item in raw_rows:
+        target_name, rule = sheet_target_name(
+            item["final_name"],
+            item["new_name"],
+            item["displayed_name"],
+            duplicate_finals,
+            duplicate_news,
+        )
+        sheet_rows.append({**item, "target_name": target_name, "rule": rule})
 
     target_columns = {
         normalize_text(column.get("field")): column
@@ -285,14 +328,23 @@ def build_plan(
             ]
             targets = {item["target_name"] for item in matched_rows if item["target_name"]}
             if len(targets) != 1:
+                blank_fallback = any(item["rule"] == "displayed_name_blank" for item in matched_rows)
                 if len(targets) > 1:
                     warnings.append(
                         f"Ambiguous workbook targets for field {field!r}: {sorted(targets)}"
                     )
                     ambiguous_fields.add(field)
+                elif blank_fallback:
+                    warnings.append(
+                        f"Displayed name is blank for duplicated sheet names on field {field!r}"
+                    )
+                    ambiguous_fields.add(field)
                 continue
             target_name = next(iter(targets))
-            rule = "workbook"
+            matched_rule = next(
+                item["rule"] for item in matched_rows if item["target_name"] == target_name
+            )
+            rule = matched_rule if matched_rule == "displayed_name" else "workbook"
         if not target_name:
             continue
         kept_fields.add(field)

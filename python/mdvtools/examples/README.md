@@ -55,6 +55,12 @@ python rename_delete_columns_example.py
 
 See `docs/rename-and-hide-columns.md` for the full guide.
 
+### `curate_mdv_project.py`
+
+Rename and soft-delete columns from the Data Cleaning sheet, then add question views, without modifying `datafile.h5`.
+
+See `docs/curate-mdv-project.md` for local and bmrc2 examples.
+
 ## More Examples Coming Soon
 
 - Spatial data integration
