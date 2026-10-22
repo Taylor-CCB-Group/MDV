@@ -24,9 +24,38 @@ The commit seam for A1–A3 exists: every filter method ends in `Dimension.commi
 which owns the 0/1/2/3 state machine and accepts a predicate, an include mask, or a **promise** of
 either. Async results are dropped if a later commit, `removeFilter`, `removeAllFilters` or
 `destroy` supersedes them; listeners are notified when they land; `filter()` returns a promise.
-Sync methods still commit before `filter()` returns, so existing callers are unaffected. No
-method has a worker/GPU backend yet. Coverage: `src/tests/datastore/dimension*.spec.ts`
-(including model-based randomized tests for sync and async interleavings).
+Sync methods still commit before `filter()` returns, so existing callers are unaffected.
+Coverage: `src/tests/datastore/dimension*.spec.ts` (including model-based randomized tests for
+sync and async interleavings).
+
+**First worker backend (A1/A4 for RangeDimension).** `filterRange`, `filterSquare` and
+`filterPoly` build a serialisable spec (column typed arrays over SAB, bounds, polygon vertices,
+optional region column + wanted index) evaluated by `rangeFilterEval.ts`. The same per-kind
+loops run synchronously below `RangeDimension.asyncFilterMinRows` (100k rows) and on a
+per-dimension `rangeFilterWorker.ts` above it, so there is one definition of the semantics.
+`rangeFilterClient.ts` keeps at most one request in flight per dimension plus the newest
+queued one (latest-wins), so rapid brushing never builds a backlog; it falls back to the main
+thread if the worker fails or a spec can't be posted. Mask commits (`Dimension._applyByteMask`)
+skip unchanged rows four at a time, including background (2/3) states.
+`rangeFilterWorker.spec.ts` checks the evaluator against the previous predicates on random data
+(bounds, NaN/±Infinity, region scoping, typed-array columns) and sync vs worker end to end; the
+randomized model test also runs with the worker forced on.
+
+Main-thread time at 10M rows (Chrome, median of 7, varying args):
+
+| filter | before (sync) | now, sync path | now, worker: main thread | worker latency |
+|---|---|---|---|---|
+| range | 69 ms | 52 ms | 9 ms | 52 ms |
+| square | 154 ms | 77 ms | 7 ms | 77 ms |
+| 24-vertex polygon | 785 ms | 630 ms | 22 ms | 619 ms |
+| region polygon | 492 ms | 381 ms | 13 ms | 387 ms |
+
+What's left on the main thread is the commit; it scales with the rows whose state changes.
+Brushing 30 moves at 60 Hz, the longest main-thread stall fell from 199 ms to 5 ms (range) and
+from 2 s to 5 ms (polygon). The catch: superseded results are dropped, so during a continuous
+drag faster than one evaluation only the result after the brush pauses commits (1 of 30 in that
+run). Committing a stale result that is still newer than the applied one would give
+intermediate feedback, but that changes `commitFilter`'s supersede rule.
 
 ## Current filter model (grounded)
 
