@@ -10,6 +10,7 @@ import { EditableGeoJsonLayer } from '@deck.gl-community/editable-layers';
 class MonkeyPatchDeck extends Deck<any> {
     declare public eventManager;
     declare public viewManager;
+    declare public layerManager;
     declare public animationLoop;
     declare public canvas;
     declare _onPointerDown: (event: unknown) => void;
@@ -84,7 +85,7 @@ const DECK_EVENT_MANAGER_EVENTS = {
  * 
  * Apply this function to a deck instance whenever the outer container changes.
  */
-export function rebindMouseEvents(deckO: Deck<any>, selectionLayer?: EditableGeoJsonLayer) {
+export function rebindMouseEvents(deckO: Deck<any>) {
     const deck = deckO as MonkeyPatchDeck;
     //! suspected source of future problems... in order for mjolnir.js to re-bind events
     // could consider more feature-detection to alert us when deck version changes etc...
@@ -146,17 +147,14 @@ export function rebindMouseEvents(deckO: Deck<any>, selectionLayer?: EditableGeo
     viewManager.controllers = {};
     viewManager._rebuildViewports();
     viewManager.setNeedsUpdate("MDV monkeypatch change event manager");
-    if (!selectionLayer) return;
-    const timer = setTimeout(() => {
-        // deferring this seems to allow it to have the right kind of internal state...
-        // needs more testing.
-        try {
-            selectionLayer.initializeState();
-        } catch (e) {
-            console.error("Error re-initializing (monkey-patching) editable layer state", e);
-        }
-    });
-    return () => {
-        clearTimeout(timer);
-    };
+
+    // Editable layers subscribe to the event manager once, in initializeState, so the ones already
+    // in the deck are still attached to the one we just destroyed. Move their existing handlers
+    // across; layers initialized after this subscribe to the new manager themselves.
+    // These are looked up in the deck rather than passed in: the instance a chart created may not
+    // be the one in the deck (SpatialData.js re-ids host layers by cloning them).
+    const layers: unknown[] = deck.layerManager?.getLayers() ?? [];
+    for (const layer of layers) {
+        if (layer instanceof EditableGeoJsonLayer) layer._addEventHandlers();
+    }
 }

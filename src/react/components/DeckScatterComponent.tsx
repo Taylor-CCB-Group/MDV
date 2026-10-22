@@ -1,4 +1,4 @@
-import DeckGL from "@deck.gl/react";
+import DeckGL, { type DeckGLRef } from "@deck.gl/react";
 import { OrthographicView, OrbitView, type PickingInfo } from "@deck.gl/core";
 import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
@@ -13,8 +13,7 @@ import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context"
 import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
-import { useOuterContainer } from "../screen_state";
-import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
+import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import useGateLayers from "../hooks/useGateLayers";
 import FieldContourLegend from "./FieldContourLegend";
 import { useFieldContourLegend, type DualContourLegacyConfig } from "../contour_state";
@@ -233,9 +232,8 @@ const DeckScatter = observer(function DeckScatterComponent({
     const layers = [greyScatterplotLayer, scatterplotLayer, gateDisplayLayer, selectionLayer, gateLabelLayer, axisLinesLayer,
     ].filter(x => x !== null);
     
-    const outerContainer = useOuterContainer();
     const deckContainerRef = useRef<HTMLDivElement | null>(null);
-    const deckRef = useRef<any>(null);
+    const deckRef = useRef<DeckGLRef | null>(null);
     const getTooltipContent = useCallback(
         (info: PickingInfo) => {
             const richInfo = getPickingInfoWithAlternates(info, deckRef.current?.deck);
@@ -271,22 +269,7 @@ const DeckScatter = observer(function DeckScatterComponent({
         // Unproject from screen coordinates to world coordinates
         return viewport.unproject([coords[0], coords[1]]);
     }, []);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: selectionLayer might change without us caring
-    useEffect(() => {
-        outerContainer; // make sure the hook runs when this changes
-        if (deckRef.current) {
-            try {
-                // const deck: Deck<any> = deckRef.current.deck;
-                const deck = deckRef.current.deck; // as Deck<any>;
-                return rebindMouseEvents(deck, selectionLayer);
-            } catch (e) {
-                console.error(
-                    "attempt to reset deck eventManager element failed - could be related to brittle deck monkeypatch",
-                    e,
-                );
-            }
-        }
-    }, [outerContainer]);
+    useRebindDeckEvents(deckRef);
 
     // we want default controller options, but we want a new one when the outerContainer changes
     // this doesn't seem to help re-register mouse events.

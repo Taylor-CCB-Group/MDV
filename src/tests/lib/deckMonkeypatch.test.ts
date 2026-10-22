@@ -37,6 +37,7 @@ vi.mock("mjolnir.js", () => {
     };
 });
 
+import { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 
 function makeDeck(parent: HTMLElement | null = null) {
@@ -107,5 +108,22 @@ describe("deckMonkeypatch", () => {
         rebindMouseEvents(makeDeck(parent));
 
         expect(eventManagerCtor.mock.calls.at(-1)?.[0]).toBe(eventRoot);
+    });
+
+    it("re-attaches editable layers found in the deck to the new event manager", () => {
+        // the instance in the deck may be a clone of the one the chart created (e.g. SpatialData.js
+        // re-ids host layers), so it has to be found in the deck rather than passed in
+        const deck = makeDeck();
+        const eventHandler = vi.fn();
+        const editable = new EditableGeoJsonLayer({ id: "deck:selection-#detail#", data: { type: "FeatureCollection", features: [] } });
+        Object.assign(editable, { context: { deck }, state: { _editableLayerState: { eventHandler } } });
+        deck.layerManager = { getLayers: () => [editable] };
+        eventManagerOn.mockClear();
+
+        rebindMouseEvents(deck);
+
+        const types = eventManagerOn.mock.calls.filter(([, handler]) => handler === eventHandler).map(([type]) => type);
+        expect(types).toEqual(expect.arrayContaining(["click", "dblclick", "pointermove", "panstart", "panmove", "panend"]));
+        expect(new Set(types).size).toBe(types.length);
     });
 });
