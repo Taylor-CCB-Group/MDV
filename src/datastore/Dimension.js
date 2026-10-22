@@ -12,13 +12,17 @@ class Dimension {
         this.filterIndexes = null;
         this.filterMethod = null;
         /**
-         * The in-flight commit of an async filter result, if any; resolves to whether it was
-         * applied (false if superseded).
+         * The latest in-flight commit of an async filter result, if any; resolves to whether it
+         * was applied.
          * @type {Promise<boolean> | null}
          */
         this.pendingFilter = null;
-        /** incremented by every commit or cancel, so stale async results can be dropped */
+        /** id of the latest commit; ids order commits by when they were requested */
         this._commitToken = 0;
+        /** id of the commit whose result is applied, so older results never replace it */
+        this._appliedToken = 0;
+        /** commits up to this id were cancelled and must not be applied */
+        this._cancelledThrough = 0;
     }
 
     _applyStateTransition(index, nextState) {
@@ -46,12 +50,17 @@ class Dimension {
      * Applies a filter result to this dimension's local states and the parent ref-counts.
      * Every filter method should end here, so the 0/1/2/3 state machine lives in one place.
      *
-     * `include` may be a promise (e.g. a mask computed by a worker or GPU kernel). The result is
-     * then committed when it resolves, unless a later commit, `removeFilter`, `removeAllFilters`
-     * or `destroy` has superseded it in the meantime; `pendingFilter` tracks it until then.
+     * `include` may be a promise (e.g. a mask computed by a worker or GPU kernel), committed when
+     * it resolves; `pendingFilter` tracks the latest one until then. A result is applied if it is
+     * newer than the one currently applied, even when a later request is still pending: while
+     * brushing faster than results arrive, each result that lands is still the freshest
+     * available, so it is shown rather than leaving the previous one up until the brush stops.
+     * It is dropped if an equal or newer result was applied first (results can land out of
+     * order, and a sync commit applies at once), or if `removeFilter`, `removeAllFilters`,
+     * `destroy` or `updateSize` cancelled it. A promise resolving to `null` has no result.
      * Sync results are committed before this returns.
      *
-     * @param {FilterInclude | PromiseLike<FilterInclude>} include
+     * @param {FilterInclude | PromiseLike<FilterInclude | null>} include
      * @returns {boolean | Promise<boolean>} whether the result was applied
      */
     commitFilter(include) {
@@ -59,12 +68,15 @@ class Dimension {
         if (!isThenable(include)) {
             this.pendingFilter = null;
             this._applyInclude(include);
+            this._appliedToken = token;
             return true;
         }
         const pending = Promise.resolve(include)
             .then((result) => {
-                if (token !== this._commitToken) return false;
+                if (result == null) return false;
+                if (token <= this._appliedToken || token <= this._cancelledThrough) return false;
                 this._applyInclude(result);
+                this._appliedToken = token;
                 return true;
             })
             .finally(() => {
@@ -74,9 +86,9 @@ class Dimension {
         return pending;
     }
 
-    /** Drops any in-flight async filter result without applying it. */
+    /** Drops every in-flight async filter result without applying it. */
     cancelPendingFilter() {
-        this._commitToken++;
+        this._cancelledThrough = this._commitToken;
         this.pendingFilter = null;
     }
 
@@ -327,6 +339,8 @@ class Dimension {
      * Will increase size of local filters
      */
     updateSize() {
+        // results in flight cover the old row count
+        this.cancelPendingFilter();
         const newBuff = new SharedArrayBuffer(this.parent.size);
         const newArr = new Uint8Array(newBuff);
         newArr.set(this.filterArray);

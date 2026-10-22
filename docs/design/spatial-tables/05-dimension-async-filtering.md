@@ -22,8 +22,10 @@ aggregation workers, not to the React-side scoping/ownership layer.
 
 The commit seam for A1–A3 exists: every filter method ends in `Dimension.commitFilter(include)`,
 which owns the 0/1/2/3 state machine and accepts a predicate, an include mask, or a **promise** of
-either. Async results are dropped if a later commit, `removeFilter`, `removeAllFilters` or
-`destroy` supersedes them; listeners are notified when they land; `filter()` returns a promise.
+either. An async result is applied when it lands if it is newer than the applied one, even while
+a later request is pending, so brushing faster than results arrive still shows each one. It is
+dropped if a newer result was applied first, or `removeFilter`, `removeAllFilters`, `destroy` or
+`updateSize` cancelled it. Listeners are notified when results land; `filter()` returns a promise.
 Sync methods still commit before `filter()` returns, so existing callers are unaffected.
 Coverage: `src/tests/datastore/dimension*.spec.ts` (including model-based randomized tests for
 sync and async interleavings).
@@ -51,11 +53,11 @@ Main-thread time at 10M rows (Chrome, median of 7, varying args):
 | region polygon | 492 ms | 381 ms | 13 ms | 387 ms |
 
 What's left on the main thread is the commit; it scales with the rows whose state changes.
-Brushing 30 moves at 60 Hz, the longest main-thread stall fell from 199 ms to 5 ms (range) and
-from 2 s to 5 ms (polygon). The catch: superseded results are dropped, so during a continuous
-drag faster than one evaluation only the result after the brush pauses commits (1 of 30 in that
-run). Committing a stale result that is still newer than the applied one would give
-intermediate feedback, but that changes `commitFilter`'s supersede rule.
+Brushing 30 moves at 60 Hz (~0.5 s), results landed during the drag 12 times for a range (~46 ms
+apart) and 8 times for a square; a 24-vertex polygon takes longer to evaluate than that drag
+lasted. The longest main-thread stall was ~80 ms (range/square) and ~0.2 s (polygon), against
+0.2 s / 1.5 s on the sync path; the largest stall is the first commit of a brush, when most rows
+change state.
 
 ## Current filter model (grounded)
 

@@ -12,9 +12,9 @@ type Job = {
  * request is in flight, and while it runs only the newest further request is kept. During rapid
  * brushing the worker therefore never works through a backlog of stale specs.
  *
- * A request that is replaced before it is dispatched resolves to `null`. Only a newer request
- * replaces one, and the dimension's commit token has moved on by then, so `commitFilter` drops
- * it without reading the value.
+ * A request that is replaced before it is dispatched resolves to `null`, which `commitFilter`
+ * treats as no result. The in-flight one still lands and, being newer than what is applied, is
+ * shown while the newest runs.
  *
  * Each request gets a fresh output buffer, so a result is never overwritten while it is being
  * committed. If the worker fails to load or crashes, outstanding and later requests are evaluated

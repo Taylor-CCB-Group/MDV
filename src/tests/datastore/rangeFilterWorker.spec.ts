@@ -293,17 +293,18 @@ describe("rapid brushing", () => {
         ds = store(3);
     });
 
-    test("only the first and latest of a burst reach the worker, and only the latest commits", async () => {
+    test("only the first and latest of a burst reach the worker, and both commit", async () => {
         const dim = ds.getDimension("range_dimension");
         const results = Array.from({ length: 10 }, (_, k) => dim.filter("filterRange", ["x"], { min: -k, max: k }));
         expect(workers[0].requests).toHaveLength(1);
 
-        expect(await Promise.all(results)).toEqual([...Array(9).fill(false), true]);
+        // the first was in flight, so it lands (and is shown) before the latest
+        expect(await Promise.all(results)).toEqual([true, ...Array(8).fill(false), true]);
         expect(workers[0].requests.map((r) => r.spec)).toMatchObject([
             { min: -0, max: 0 },
             { min: -9, max: 9 },
         ]);
-        expect(events).toEqual(["filtered"]);
+        expect(events).toEqual(["filtered", "filtered"]);
 
         const x = ds.columnIndex.x?.data;
         if (!x) throw new Error("x not loaded");

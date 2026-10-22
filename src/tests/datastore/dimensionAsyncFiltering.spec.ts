@@ -100,19 +100,62 @@ describe("async filter results", () => {
         await expect(done).resolves.toBe(true);
     });
 
-    test.each([
-        ["in order", [0, 1]],
-        ["out of order", [1, 0]],
-    ])("only the latest request is applied when results arrive %s", async (_, order) => {
+    test("an older result that lands first is shown until the latest arrives", async () => {
         const dim = deferredDimension();
         const first = dim.filter("filterDeferred", [], { keep: [1, 2] });
         const second = dim.filter("filterDeferred", [], { keep: [5] });
-        for (const i of order) dim.deliver(dim.requests[i]);
 
-        await expect(first).resolves.toBe(false);
+        dim.deliver(dim.requests[0]);
+        await expect(first).resolves.toBe(true);
+        expect(passingRows(ds)).toEqual([1, 2]);
+        expect(dim.pendingFilter).not.toBeNull();
+
+        dim.deliver(dim.requests[1]);
         await expect(second).resolves.toBe(true);
         expect(passingRows(ds)).toEqual([5]);
+        expect(events).toEqual([
+            ["filtered", dim],
+            ["filtered", dim],
+        ]);
+    });
+
+    test("an older result that lands after a newer one is dropped", async () => {
+        const dim = deferredDimension();
+        const first = dim.filter("filterDeferred", [], { keep: [1, 2] });
+        const second = dim.filter("filterDeferred", [], { keep: [5] });
+        dim.deliver(dim.requests[1]);
+        dim.deliver(dim.requests[0]);
+
+        await expect(second).resolves.toBe(true);
+        await expect(first).resolves.toBe(false);
+        expect(passingRows(ds)).toEqual([5]);
         expect(events).toEqual([["filtered", dim]]);
+    });
+
+    test("adding rows cancels results computed for the old row count", async () => {
+        const dim = deferredDimension();
+        const stale = dim.filter("filterDeferred", [], { keep: [1, 2] });
+        ds.addDataToStore(
+            [
+                { column: "x", data: new Float32Array([8, 9]).buffer },
+                { column: "d", data: new Uint8Array([0, 0]).buffer },
+            ],
+            2,
+        );
+        expect(dim.requests).toHaveLength(2);
+
+        dim.deliver(dim.requests[0]);
+        await expect(stale).resolves.toBe(false);
+        await dim.deliver(dim.requests[1]);
+        expect(passingRows(ds)).toEqual([1, 2]);
+    });
+
+    test("a result resolving to null is not applied", async () => {
+        const dim = deferredDimension();
+        const pending = dim.filter("filterDeferred", [], { keep: [1] });
+        dim.requests[0].resolve(null as never);
+        await expect(pending).resolves.toBe(false);
+        expect(passingRows(ds)).toEqual(ALL);
     });
 
     test("a sync filter supersedes a pending async one", async () => {
@@ -233,11 +276,21 @@ describe("async filter results", () => {
 
 /**
  * Random interleavings of async requests, resolutions (in any order), cancellations and
- * background changes. Counts must stay consistent at every step; once nothing is pending, each
+ * background changes. Every resolution must be applied iff it is newer than the applied result
+ * and wasn't cancelled; counts must stay consistent at every step; once nothing is pending, each
  * dimension must hold exactly the latest live request's result.
  */
 describe("randomized async interleavings", () => {
-    type Model = { applied: Set<number> | null; live: Request | null; active: boolean; bg: Set<string> | null };
+    type Model = {
+        applied: Set<number> | null;
+        live: Request | null;
+        active: boolean;
+        bg: Set<string> | null;
+        /** request order, as commitFilter numbers them */
+        seq: number;
+        appliedSeq: number;
+        cancelledThrough: number;
+    };
 
     function expectedState(m: Model, i: number) {
         if (m.bg && !m.bg.has(D[i])) return m.applied ? 3 : 2;
@@ -247,19 +300,29 @@ describe("randomized async interleavings", () => {
     test.each([1, 2, 3, 4, 5, 6, 7, 8])("seed %i", async (seed) => {
         const rand = rng(seed);
         const dims = [deferredDimension(), deferredDimension(), deferredDimension()];
-        const models: Model[] = dims.map(() => ({ applied: null, live: null, active: false, bg: null }));
-        const outstanding = new Set<[DeferredDimension, Model, Request]>();
+        const models: Model[] = dims.map(() => ({
+            applied: null,
+            live: null,
+            active: false,
+            bg: null,
+            seq: 0,
+            appliedSeq: 0,
+            cancelledThrough: 0,
+        }));
+        const outstanding = new Set<[DeferredDimension, Model, Request, number]>();
 
         const track = (i: number) => {
             const dim = dims[i];
             const request = dim.requests[dim.requests.length - 1];
-            models[i].live = request;
-            outstanding.add([dim, models[i], request]);
+            const m = models[i];
+            m.live = request;
+            outstanding.add([dim, m, request, ++m.seq]);
         };
         const cancel = (m: Model) => {
             m.live = null;
             m.applied = null;
             m.active = false;
+            m.cancelledThrough = m.seq;
         };
 
         for (let step = 0; step < 80; step++) {
@@ -275,12 +338,14 @@ describe("randomized async interleavings", () => {
                 const all = Array.from(outstanding);
                 const entry = all[Math.floor(rand() * all.length)];
                 outstanding.delete(entry);
-                const [d, model, request] = entry;
-                await d.deliver(request);
-                if (model.live === request) {
+                const [d, model, request, seq] = entry;
+                const shouldApply = seq > model.appliedSeq && seq > model.cancelledThrough;
+                await expect(d.deliver(request), `step ${step} seq ${seq}`).resolves.toBe(shouldApply);
+                if (shouldApply) {
                     model.applied = new Set(request.keep);
-                    model.live = null;
+                    model.appliedSeq = seq;
                 }
+                if (model.live === request) model.live = null;
             } else if (roll < 0.7) {
                 dim.removeFilter();
                 cancel(m);
