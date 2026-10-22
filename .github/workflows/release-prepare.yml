@@ -94,6 +94,7 @@ jobs:
              If it lists pull request titles, nobody filled in \`[Unreleased]\`, so rewrite them.
           2. Change the version if this release needs a different bump.
           3. Approve the waiting CI runs on this PR. GitHub holds checks on a PR that a workflow opened until someone with write access approves them.
+          4. If other PRs merge into \`main\` before this one, update this branch from \`main\` and move their \`[Unreleased]\` entries into the \`[$VERSION]\` section. Their code ships in this release, and the GitHub release notes come from that section.
 
           Merging starts the Release workflow, which publishes to TestPyPI, tests the upload and waits for approval before it publishes to PyPI.
           EOF
