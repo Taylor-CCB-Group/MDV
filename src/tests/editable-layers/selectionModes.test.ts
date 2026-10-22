@@ -93,38 +93,73 @@ function existingHandlePick(position: Position, positionIndexes: number[]): Pick
     };
 }
 
+/** the drawing-in-progress vertex handles DrawPolygonMode renders as guides */
+function tentativeHandlePick(position: Position, positionIndex: number): Pick {
+    return {
+        index: positionIndex,
+        isGuide: true,
+        object: {
+            type: "Feature",
+            properties: { guideType: "editHandle", editHandleType: "existing", featureIndex: -1, positionIndexes: [positionIndex] },
+            geometry: { type: "Point", coordinates: position },
+        },
+    };
+}
+
 function editTypes(onEdit: ReturnType<typeof modeProps>["onEdit"]) {
     return onEdit.mock.calls.map(([action]) => action.editType);
 }
 
 describe("selection edit modes", () => {
-    it("Polygon tool completes the polygon on double-click", () => {
+    // A double-click is recognised as one `dblclick`, not as clicks, so its position is the last vertex.
+    it("Polygon tool adds the double-clicked point as the last vertex and completes the polygon", () => {
         const mode: GeoJsonEditMode = new PolygonMode();
         const { props, onEdit } = modeProps(emptyCollection());
-        for (const p of [[0, 0], [10, 0], [10, 10], [0, 10]] satisfies XY[]) {
+        for (const p of [[0, 0], [10, 0], [10, 10]] satisfies XY[]) {
             mode.handleClick(pointerEvent(p), props);
         }
         mode.handleDoubleClick(pointerEvent([0, 10]), props);
 
-        expect(editTypes(onEdit)).toContain("addFeature");
         const added = onEdit.mock.calls.find(([a]) => a.editType === "addFeature")?.[0];
         expect(added?.updatedData.features).toHaveLength(1);
-        expect(outerRing(added?.updatedData)).toHaveLength(5);
+        expect(outerRing(added?.updatedData)).toEqual([[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]);
     });
 
-    it("Polygon tool keeps drawing if double-clicked before it has three vertices", () => {
+    it("Polygon tool completes a triangle when the third vertex is double-clicked", () => {
         const mode: GeoJsonEditMode = new PolygonMode();
         const { props, onEdit } = modeProps(emptyCollection());
         for (const p of [[0, 0], [10, 0]] satisfies XY[]) {
             mode.handleClick(pointerEvent(p), props);
         }
+        mode.handleDoubleClick(pointerEvent([10, 10]), props);
+
+        const added = onEdit.mock.calls.find(([a]) => a.editType === "addFeature")?.[0];
+        expect(outerRing(added?.updatedData)).toEqual([[0, 0], [10, 0], [10, 10], [0, 0]]);
+    });
+
+    it("Polygon tool doesn't duplicate the last vertex when its handle is double-clicked", () => {
+        const mode: GeoJsonEditMode = new PolygonMode();
+        const { props, onEdit } = modeProps(emptyCollection());
+        for (const p of [[0, 0], [10, 0], [10, 10]] satisfies XY[]) {
+            mode.handleClick(pointerEvent(p), props);
+        }
+        // nearby rather than exact: the handle is picked within a pixel radius
+        mode.handleDoubleClick(pointerEvent([10.01, 10], [tentativeHandlePick([10, 10], 2)]), props);
+
+        const added = onEdit.mock.calls.find(([a]) => a.editType === "addFeature")?.[0];
+        expect(outerRing(added?.updatedData)).toEqual([[0, 0], [10, 0], [10, 10], [0, 0]]);
+    });
+
+    it("Polygon tool keeps drawing if a double-click would leave fewer than three vertices", () => {
+        const mode: GeoJsonEditMode = new PolygonMode();
+        const { props, onEdit } = modeProps(emptyCollection());
+        mode.handleClick(pointerEvent([0, 0]), props);
         mode.handleDoubleClick(pointerEvent([10, 0]), props);
         expect(editTypes(onEdit)).not.toContain("addFeature");
 
-        mode.handleClick(pointerEvent([10, 10]), props);
         mode.handleDoubleClick(pointerEvent([10, 10]), props);
         const added = onEdit.mock.calls.find(([a]) => a.editType === "addFeature")?.[0];
-        expect(outerRing(added?.updatedData)).toHaveLength(4);
+        expect(outerRing(added?.updatedData)).toEqual([[0, 0], [10, 0], [10, 10], [0, 0]]);
     });
 
     it("Modify tool removes a vertex on double-click", () => {

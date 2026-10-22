@@ -1,160 +1,83 @@
-import { EventManager, InputDirection, Pan, Pinch, Tap } from 'mjolnir.js';
-// import { EVENT_HANDLERS, RECOGNIZERS } from '@deck.gl/core/dist/lib/constants';
+import type { EventManager } from 'mjolnir.js';
 import { Deck } from '@deck.gl/core';
 import { EditableGeoJsonLayer } from '@deck.gl-community/editable-layers';
 
-// we don't need the keys; we'll break in.
 // we aren't really using this as an actual subclass, just declaring things as public so we can access them.
 //! we don't want to keep this around for future maintenance, hopefully deck can be patched so this is less necessary
 // or we find a better way to fix things.
 class MonkeyPatchDeck extends Deck<any> {
-    declare public eventManager;
+    declare public eventManager: EventManager | null;
+    declare public eventManagers: Record<string, EventManager>;
     declare public viewManager;
     declare public layerManager;
-    declare public animationLoop;
-    declare public canvas;
-    declare _onPointerDown: (event: unknown) => void;
-    declare _onPointerMove: (event: unknown) => void;
-    declare _onPointerUp?: (event: unknown) => void;
+    declare public canvas: HTMLCanvasElement | null;
 }
-
-/**
-In editable-layers.js, click and dblclick events weren't being handled possibly because of a dependency mismatch?
-
-This should be removed when we next update deck.gl et al.
-
-```typescript
-const EVENT_TYPES = ['anyclick', 'pointermove', 'panstart', 'panmove', 'panend', 'keyup'];
-
-class EditableLayer {
-    _addEventHandlers() {
-        // @ts-expect-error accessing protected props
-        const { eventManager } = this.context.deck;
-        const { eventHandler } = this.state._editableLayerState;
-        for (const eventType of EVENT_TYPES) {
-            eventManager.on(eventType, eventHandler, {
-                // give nebula a higher priority so that it can stop propagation to deck.gl's map panning handlers
-                priority: 100
-            });
-        }
-    }
-    _forwardEventToCurrentLayer(event) {
-        const currentLayer = this.getCurrentLayer();
-        // Use a naming convention to find the event handling function for this event type
-        const func = currentLayer[`_on${event.type}`].bind(currentLayer);
-        //...
-    }
-}
-```
-*/
 
 export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {}
 
-// these mirror EVENT_HANDLERS / RECOGNIZERS in @deck.gl/core/src/lib/constants.ts, which aren't exported.
-// keep them in step with deck when updating it.
-const EVENT_HANDLERS: { [eventName: string]: string } = {
-    click: 'onClick',
-    dblclick: 'onClick',
-    panstart: 'onDragStart',
-    panmove: 'onDrag',
-    panend: 'onDragEnd'
-} as const;
-
-const RECOGNIZERS = {
-    multipan: [Pan, { threshold: 10, direction: InputDirection.Vertical, pointers: 2 }],
-    pinch: [Pinch, {}, null, ['multipan']],
-    pan: [Pan, { threshold: 1 }, ['pinch'], ['multipan']],
-    dblclick: [Tap, { event: 'dblclick', taps: 2 }],
-    // pointerdown is being handled by deck.js _onPointerDown which does picking...
-    // and then we miss out.
-    click: [Tap, { event: 'click' }, null, ['dblclick']],
-} as const;
-
-const DECK_EVENT_MANAGER_EVENTS = {
-    pointerdown: (deck: MonkeyPatchDeck) => deck._onPointerDown,
-    pointermove: (deck: MonkeyPatchDeck) => deck._onPointerMove,
-    pointerleave: (deck: MonkeyPatchDeck) => deck._onPointerMove,
-    // Without pointerup, tap/click recognizers and panend do not reliably fire.
-    pointerup: (deck: MonkeyPatchDeck) => deck._onPointerUp,
-} as const;
-
+/** Deck's own (private) helpers, so the replacement manager is configured exactly as deck would. */
+function getDeckPrivates(deck: MonkeyPatchDeck) {
+    const createEventManager: unknown = Reflect.get(deck, '_createEventManager');
+    const getEventRoot: unknown = Reflect.get(deck, '_getEventRoot');
+    const isMultiCanvasMode: unknown = Reflect.get(deck, '_isMultiCanvasMode');
+    if (typeof createEventManager !== 'function' || typeof getEventRoot !== 'function' || typeof isMultiCanvasMode !== 'function') {
+        return null;
+    }
+    return {
+        createEventManager: (root: HTMLElement): EventManager => createEventManager.call(deck, root),
+        getEventRoot: (canvas: HTMLCanvasElement): HTMLElement => getEventRoot.call(deck, canvas),
+        isMultiCanvasMode: (): boolean => isMultiCanvasMode.call(deck),
+    };
+}
 
 /**
  * This is undesirable and liable to break in the future, but we need to monkeypatch
  * deck.gl to fix issues with event handling in popout windows.
- * 
+ *
+ * mjolnir binds pointermove / pointerup to the window that owned the event root when the
+ * EventManager was created, and an EventManager's element can't be reassigned
+ * (https://visgl.github.io/mjolnir.js/docs/api-reference/event-manager), so when a chart moves
+ * to another window we replace the manager everywhere deck holds it.
+ *
  * Apply this function to a deck instance whenever the outer container changes.
+ * Written against deck.gl 9.4 - check it whenever deck is updated.
  */
 export function rebindMouseEvents(deckO: Deck<any>) {
+    // the one place we reach past deck's protected API
     const deck = deckO as MonkeyPatchDeck;
-    //! suspected source of future problems... in order for mjolnir.js to re-bind events
-    // could consider more feature-detection to alert us when deck version changes etc...
-    // I think that just adds noise, we should be aware that we want to remove this & any changes
-    // to deck.gl version are not to be taken lightly.
-
-    //we tracked down the place where the event manager is created...
-    //& have something based on that to re-create it.
-
-    const oldEventManager = deck.eventManager as EventManager;
-    if (!oldEventManager) {
+    const oldEventManager = deck.eventManager;
+    if (!oldEventManager || !deck.canvas || !deck.viewManager) {
+        // deck initializes its device asynchronously; it will create its manager in the right window.
         return;
     }
-    // https://visgl.github.io/mjolnir.js/docs/api-reference/event-manager
-    // > Element must be supplied when constructing EventManager and cannot be reassigned.
-    // > To change the event target, destroy the existing event manager instance and construct a new one.
-    // The element will be the same, but we need a new event manager so that events on window work in popout.
-    // the element is chosen the same way as in Deck._setDevice.
-    // const element = oldEventManager.getElement(); 
-    oldEventManager.destroy();
-    
-    // this causes a lot of problems... but maybe if we can somewhat replicate the relevant parts of deck.ts
-    // if (deck.device) deck.animationLoop.props.onInitialize(deck);
-
-    // first make a new event manager, then make sure the viewManager knows about it
-    
-    // it seems like the public API of EventManager won't necessarily easily let us effectively clone the old one
-    const eventRoot = deck.props.parent?.querySelector<HTMLElement>('.deck-events-root') || deck.canvas;
-    const eventManager = new EventManager(eventRoot, {
-        touchAction: deck.props.touchAction,
-        recognizers: Object.keys(RECOGNIZERS).map((eventName: string) => {
-            // Resolve recognizer settings
-            const [RecognizerConstructor, defaultOptions, recognizeWith, requireFailure] =
-                (RECOGNIZERS as any)[eventName];
-            const optionsOverride = (deck.props as any).eventRecognizerOptions?.[eventName];
-            const options = { ...defaultOptions, ...optionsOverride, event: eventName };
-            return {
-                recognizer: new RecognizerConstructor(options),
-                recognizeWith,
-                // nb: mjolnir ignores any other spelling, and click then no longer waits for dblclick
-                requireFailure
-            };
-        }),
-        events: Object.fromEntries(
-            Object.entries(DECK_EVENT_MANAGER_EVENTS)
-                .map(([eventName, getHandler]) => [eventName, getHandler(deck)])
-                .filter(([, handler]) => typeof handler === "function")
-        ),
-    });
-    deck.eventManager = eventManager;
-    for (const eventType in EVENT_HANDLERS) {
-        deck.eventManager.on(eventType, deck._onEvent);
+    const privates = getDeckPrivates(deck);
+    if (!privates) {
+        console.error("deckMonkeypatch: deck internals changed - popped-out charts may not receive mouse events");
+        return;
     }
+    // experimental multi-canvas decks keep a manager per canvas; we don't use them.
+    if (privates.isMultiCanvasMode()) return;
 
-    // we might get away with this? it uses `_eventManager` to make a `new Controller()`...
-    const viewManager = deck.viewManager as any;
-    viewManager._eventManager = eventManager;
-    // make sure it doesn't try to re-use controllers...
-    viewManager.controllers = {};
-    viewManager._rebuildViewports();
-    viewManager.setNeedsUpdate("MDV monkeypatch change event manager");
+    const eventManager = privates.createEventManager(privates.getEventRoot(deck.canvas));
+    deck.eventManager = eventManager;
+    deck.eventManagers = Object.fromEntries(
+        Object.entries(deck.eventManagers).map(([canvasId, em]) => [canvasId, em === oldEventManager ? eventManager : em]),
+    );
+    // the view manager prefers `eventManagers[canvasId]`, falling back to its own `_eventManager`;
+    // with a new manager it finalizes the old controllers and builds new ones on the next update.
+    Reflect.set(deck.viewManager, '_eventManager', eventManager);
+    deck.viewManager.setProps({ eventManagers: deck.eventManagers });
 
     // Editable layers subscribe to the event manager once, in initializeState, so the ones already
-    // in the deck are still attached to the one we just destroyed. Move their existing handlers
-    // across; layers initialized after this subscribe to the new manager themselves.
+    // in the deck are still attached to the old one. Move their existing handlers across; layers
+    // initialized after this subscribe to the new manager themselves.
     // These are looked up in the deck rather than passed in: the instance a chart created may not
     // be the one in the deck (SpatialData.js re-ids host layers by cloning them).
     const layers: unknown[] = deck.layerManager?.getLayers() ?? [];
     for (const layer of layers) {
         if (layer instanceof EditableGeoJsonLayer) layer._addEventHandlers();
     }
+
+    // only now - controllers unsubscribe from the old manager as they are finalized above.
+    oldEventManager.destroy();
 }

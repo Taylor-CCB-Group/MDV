@@ -6,6 +6,7 @@ import {
     TranslateMode,
     CompositeMode,
     DrawPolygonByDraggingMode,
+    getPickedEditHandle,
     type ClickEvent,
     type FeatureCollection,
     type GeoJsonEditMode,
@@ -41,12 +42,22 @@ class SelectionCompositeMode extends CompositeMode {
 }
 
 /**
- * Upstream finishes on any double-click, so one with fewer than three vertices (e.g. if a click
- * was lost) commits a zero-area polygon that replaces the current selection. Keep drawing instead.
+ * A double-click arrives as a single `dblclick` rather than as clicks, so upstream finishes the
+ * polygon without the double-clicked point - and with fewer than three vertices commits a
+ * zero-area polygon that replaces the current selection. Make the double-clicked point the last
+ * vertex (unless it's on an existing vertex), and keep drawing if that still isn't a polygon.
  */
 class DrawSelectionPolygonMode extends DrawPolygonMode {
     handleDoubleClick(event: ClickEvent, props: ModeProps<SimpleFeatureCollection>) {
-        if (this.getClickSequence().length < 3) return;
+        if (!getPickedEditHandle(event.picks)) this.addClickSequence(event);
+        if (this.getClickSequence().length < 3) {
+            props.onEdit({
+                updatedData: props.data,
+                editType: "addTentativePosition",
+                editContext: { position: event.mapCoords },
+            });
+            return;
+        }
         super.handleDoubleClick(event, props);
     }
 }
