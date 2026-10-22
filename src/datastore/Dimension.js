@@ -11,9 +11,15 @@ class Dimension {
         this.filterArguments = null;
         this.filterIndexes = null;
         this.filterMethod = null;
+        /**
+         * The in-flight commit of an async filter result, if any; resolves to whether it was
+         * applied (false if superseded).
+         * @type {Promise<boolean> | null}
+         */
+        this.pendingFilter = null;
+        /** incremented by every commit or cancel, so stale async results can be dropped */
+        this._commitToken = 0;
     }
-
- 
 
     _applyStateTransition(index, nextState) {
         const prevState = this.filterArray[index];
@@ -38,14 +44,48 @@ class Dimension {
 
     /**
      * Applies a filter result to this dimension's local states and the parent ref-counts.
-     * Every filter method should end here, so the 0/1/2/3 state machine lives in one place:
-     * background-hidden rows (2) are promoted to 3, rows already at 3 are left alone, and
-     * 0 <-> 1 follows `include`.
+     * Every filter method should end here, so the 0/1/2/3 state machine lives in one place.
      *
-     * @param {((i: number) => boolean) | ArrayLike<number>} include - a per-row predicate, or a
-     * mask (e.g. a Uint8Array produced by a worker) where non-zero keeps the row
+     * `include` may be a promise (e.g. a mask computed by a worker or GPU kernel). The result is
+     * then committed when it resolves, unless a later commit, `removeFilter`, `removeAllFilters`
+     * or `destroy` has superseded it in the meantime; `pendingFilter` tracks it until then.
+     * Sync results are committed before this returns.
+     *
+     * @param {FilterInclude | PromiseLike<FilterInclude>} include
+     * @returns {boolean | Promise<boolean>} whether the result was applied
      */
     commitFilter(include) {
+        const token = ++this._commitToken;
+        if (!isThenable(include)) {
+            this.pendingFilter = null;
+            this._applyInclude(include);
+            return true;
+        }
+        const pending = Promise.resolve(include)
+            .then((result) => {
+                if (token !== this._commitToken) return false;
+                this._applyInclude(result);
+                return true;
+            })
+            .finally(() => {
+                if (this.pendingFilter === pending) this.pendingFilter = null;
+            });
+        this.pendingFilter = pending;
+        return pending;
+    }
+
+    /** Drops any in-flight async filter result without applying it. */
+    cancelPendingFilter() {
+        this._commitToken++;
+        this.pendingFilter = null;
+    }
+
+    /**
+     * The synchronous 0/1/2/3 transition: background-hidden rows (2) are promoted to 3, rows
+     * already at 3 are left alone, and 0 <-> 1 follows `include`.
+     * @param {FilterInclude} include
+     */
+    _applyInclude(include) {
         const size = this.parent.size;
         const isMask = typeof include !== "function";
         if (isMask && include.length < size) {
@@ -98,6 +138,7 @@ class Dimension {
     }
 
     removeFilter(notify = true) {
+        this.cancelPendingFilter();
         if (!this.filterMethod) {
             return;
         }
@@ -140,6 +181,9 @@ class Dimension {
      * @param {object|string} args - any extra arguments for filtering
      * @param {boolean} [notify=true] - notify any listeners in the dataStore that the
      * data has been filtered
+     * @returns {Promise<boolean>} resolves once the filter is applied (and listeners notified),
+     * or to false if it was superseded first. Sync filter methods are applied before this
+     * returns, so callers that don't await still see the result.
      */
     filter(method, columns, args, notify = true) {
         const t = performance.now();
@@ -147,14 +191,44 @@ class Dimension {
         this.filterArguments = args;
         this.filterMethod = method;
         this[method](args, columns);
-        if (notify) {
-            this.parent._callListeners("filtered", this);
-        }
         if (performance.now() - t > 100) {
             console.warn(`method${method}: ${performance.now() - t}`);
         } else {
             console.log(`method${method}: ${performance.now() - t}`);
         }
+        if (this.pendingFilter) {
+            return notify ? this._notifyWhenCommitted(this.pendingFilter) : this.pendingFilter;
+        }
+        if (notify) {
+            this.parent._callListeners("filtered", this);
+        }
+        return Promise.resolve(true);
+    }
+
+    /**
+     * Re-runs the active filter, e.g. after the background filter or the data changed.
+     * @returns {Promise<boolean> | null} the pending commit if the filter method is async
+     */
+    _reapplyFilter() {
+        if (!this.filterMethod) {
+            return null;
+        }
+        this[this.filterMethod](this.filterArguments, this.filterColumns);
+        return this.pendingFilter;
+    }
+
+    /**
+     * @param {Promise<boolean>} pending
+     * @returns {Promise<boolean>}
+     */
+    _notifyWhenCommitted(pending) {
+        return pending.then((committed) => {
+            // a superseding operation is responsible for its own notification
+            if (committed) {
+                this.parent._callListeners("filtered", this);
+            }
+            return committed;
+        });
     }
 
     async getValueSet(column) {
@@ -221,6 +295,9 @@ class Dimension {
                 this.filterArguments,
                 false,
             );
+            if (this.pendingFilter) {
+                void this._notifyWhenCommitted(this.pendingFilter);
+            }
         }
     }
 
@@ -313,10 +390,7 @@ class Dimension {
             }
             this._applyStateTransition(i, nextState);
         }
-        if (this.filterMethod) {
-            this[this.filterMethod](this.filterArguments, this.filterColumns);
-        }
-        this.parent._callListeners("filtered", this);
+        return this._reapplyAndNotify();
     }
 
     clearBackgroundFilter() {
@@ -329,10 +403,22 @@ class Dimension {
                 this._applyStateTransition(i, this.filterArray[i] - 2);
             }
         }
-        if (this.filterMethod) {
-            this[this.filterMethod](this.filterArguments, this.filterColumns);
+        return this._reapplyAndNotify();
+    }
+
+    /**
+     * Background changes alone never change which rows are globally excluded (0<->2 and 1<->3
+     * are both no-ops for the parent), so with an async filter, notifying once it is re-applied
+     * is enough.
+     * @returns {Promise<boolean>}
+     */
+    _reapplyAndNotify() {
+        const pending = this._reapplyFilter();
+        if (pending) {
+            return this._notifyWhenCommitted(pending);
         }
         this.parent._callListeners("filtered", this);
+        return Promise.resolve(true);
     }
 
     destroy(notify = true) {
@@ -344,6 +430,20 @@ class Dimension {
         if (index !== -1) this.parent.dimensions.splice(index, 1);
     }
 }
+/**
+ * @param {unknown} x
+ * @returns {x is PromiseLike<any>}
+ */
+function isThenable(x) {
+    return typeof x?.then === "function";
+}
+
+/**
+ * A per-row predicate, or a mask (e.g. a Uint8Array produced by a worker or GPU kernel) where
+ * non-zero keeps the row.
+ * @typedef {((i: number) => boolean) | ArrayLike<number>} FilterInclude
+ */
+
 /** @type {{[k: string]: undefined | typeof Dimension}} */
 Dimension.types = { base_dimension: Dimension };
 export default Dimension;

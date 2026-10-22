@@ -290,6 +290,7 @@ class DataStore {
                 noclear.push(dim);
                 continue;
             }
+            dim.cancelPendingFilter();
             if (dim.bgfData){
                 for (let i = 0; i < this.size; i++) {
                     if (dim.filterArray[i] ===1 || dim.filterArray[i] === 3) {
@@ -333,11 +334,19 @@ class DataStore {
      */
     dataChanged(columns, is_dirty = true) {
         let hasFiltered = false;
+        const pending = [];
         for (const d of this.dimensions) {
             //this method will not call any listeners- wait until all done
             if (d.reFilterOnDataChanged(columns)) {
-                hasFiltered = true;
+                if (d.pendingFilter) pending.push(d.pendingFilter);
+                else hasFiltered = true;
             }
+        }
+        // async filters land later: one 'filtered' once they have all been applied
+        if (pending.length) {
+            Promise.all(pending).then((committed) => {
+                if (committed.some(Boolean)) this._callListeners("filtered");
+            });
         }
         if (is_dirty) {
             for (const c of columns) {
