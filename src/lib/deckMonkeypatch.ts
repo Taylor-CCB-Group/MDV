@@ -49,9 +49,11 @@ class EditableLayer {
 
 export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {}
 
+// these mirror EVENT_HANDLERS / RECOGNIZERS in @deck.gl/core/src/lib/constants.ts, which aren't exported.
+// keep them in step with deck when updating it.
 const EVENT_HANDLERS: { [eventName: string]: string } = {
-    click: 'onClick', //is onClick a thing?
-    anyclick: 'onClick',
+    click: 'onClick',
+    dblclick: 'onClick',
     panstart: 'onDragStart',
     panmove: 'onDrag',
     panend: 'onDragEnd'
@@ -100,7 +102,7 @@ export function rebindMouseEvents(deckO: Deck<any>, selectionLayer?: EditableGeo
     // > Element must be supplied when constructing EventManager and cannot be reassigned.
     // > To change the event target, destroy the existing event manager instance and construct a new one.
     // The element will be the same, but we need a new event manager so that events on window work in popout.
-    // using deck.props.parent || deck.canvas; - will be the same element, but keeping copied code similar
+    // the element is chosen the same way as in Deck._setDevice.
     // const element = oldEventManager.getElement(); 
     oldEventManager.destroy();
     
@@ -110,18 +112,20 @@ export function rebindMouseEvents(deckO: Deck<any>, selectionLayer?: EditableGeo
     // first make a new event manager, then make sure the viewManager knows about it
     
     // it seems like the public API of EventManager won't necessarily easily let us effectively clone the old one
-    const eventManager = new EventManager(deck.props.parent || deck.canvas, {
+    const eventRoot = deck.props.parent?.querySelector<HTMLElement>('.deck-events-root') || deck.canvas;
+    const eventManager = new EventManager(eventRoot, {
         touchAction: deck.props.touchAction,
         recognizers: Object.keys(RECOGNIZERS).map((eventName: string) => {
             // Resolve recognizer settings
-            const [RecognizerConstructor, defaultOptions, recognizeWith, requestFailure] =
+            const [RecognizerConstructor, defaultOptions, recognizeWith, requireFailure] =
                 (RECOGNIZERS as any)[eventName];
             const optionsOverride = (deck.props as any).eventRecognizerOptions?.[eventName];
             const options = { ...defaultOptions, ...optionsOverride, event: eventName };
             return {
                 recognizer: new RecognizerConstructor(options),
                 recognizeWith,
-                requestFailure
+                // nb: mjolnir ignores any other spelling, and click then no longer waits for dblclick
+                requireFailure
             };
         }),
         events: Object.fromEntries(

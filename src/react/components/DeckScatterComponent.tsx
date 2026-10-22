@@ -315,6 +315,8 @@ const DeckScatter = observer(function DeckScatterComponent({
                         layers={layers}
                         useDevicePixels={true}
                         controller={{
+                            // double-click finishes polygons / removes vertices in selection tools
+                            doubleClickZoom: false,
                             dragPan: controllerOptions.dragPan,
                         }}
                         viewState={viewState}
