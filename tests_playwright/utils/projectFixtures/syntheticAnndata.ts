@@ -11,9 +11,10 @@ import { getProjectUrl } from "../projectUrl";
 import {
     deleteProjectViaApi,
     ensurePlaywrightMdvRoot,
+    generateProjectOffShare,
     listProjectsViaApi,
+    rescanUntilRegistered,
     shouldDeleteProjectOnCleanup,
-    triggerRescanProjects,
     waitForProjectReady,
 } from "./core";
 import { buildPythonPath, getPythonCandidates, REPO_ROOT } from "./pythonEnv";
@@ -144,14 +145,10 @@ export async function createTemporaryProjectViaSyntheticAnndata(
         const projectsBefore = await listProjectsViaApi(page.request);
         const projectIdsBefore = new Set(projectsBefore.map((project) => String(project.id)));
 
-        await runSyntheticAnndataProjectCli(projectPath, options.synthetic ?? {});
-        await triggerRescanProjects(page.request);
-
-        const projectsAfter = await listProjectsViaApi(page.request);
-        const createdProject =
-            projectsAfter.find((project) => project.path === projectPath) ??
-            projectsAfter.find((project) => project.name === nameSegment) ??
-            projectsAfter.find((project) => !projectIdsBefore.has(String(project.id)));
+        await generateProjectOffShare(projectPath, (stagingPath) =>
+            runSyntheticAnndataProjectCli(stagingPath, options.synthetic ?? {}),
+        );
+        const createdProject = await rescanUntilRegistered(page.request, projectPath, projectIdsBefore);
         expect(createdProject).toBeTruthy();
         if (!createdProject) {
             throw new Error("Synthetic AnnData project was generated but was not registered by /rescan_projects.");

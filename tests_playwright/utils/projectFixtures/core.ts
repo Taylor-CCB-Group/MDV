@@ -23,6 +23,32 @@ export async function ensurePlaywrightMdvRoot() {
     return mdvRoot;
 }
 
+/**
+ * Generate a project somewhere the backend can't see it, then move it to `projectPath` in one step.
+ *
+ * Docker Desktop's file sharing takes a file's size when the host creates it and doesn't notice
+ * it growing afterwards, so a project written straight into the shared `~/mdv` (h5 files are
+ * created small and grown in place) reads as truncated in the container and `/rescan_projects`
+ * fails to register it. The staging folder sits beside the shared folder so the rename stays on
+ * one filesystem.
+ */
+export async function generateProjectOffShare(
+    projectPath: string,
+    generate: (stagingProjectPath: string) => Promise<void>,
+) {
+    const stagingRoot = await fs.mkdtemp(
+        path.join(path.dirname(path.dirname(projectPath)), ".mdv-playwright-staging-"),
+    );
+    try {
+        const stagingProjectPath = path.join(stagingRoot, path.basename(projectPath));
+        await generate(stagingProjectPath);
+        await fs.rm(projectPath, { recursive: true, force: true });
+        await fs.rename(stagingProjectPath, projectPath);
+    } finally {
+        await fs.rm(stagingRoot, { recursive: true, force: true });
+    }
+}
+
 async function sleep(ms: number) {
     await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -92,4 +118,32 @@ export async function triggerRescanProjects(request: APIRequestContext) {
         maxRedirects: 0,
         failOnStatusCode: false,
     });
+}
+
+/**
+ * Rescan until the project in `projectPath` is registered under a new id. The backend's view of a
+ * Docker Desktop shared folder can lag the host, so a single rescan may not see a folder that was
+ * just moved in (and may still see folders that were just deleted - hence matching on the folder
+ * name rather than taking whichever project is new).
+ */
+export async function rescanUntilRegistered(
+    request: APIRequestContext,
+    projectPath: string,
+    projectIdsBefore: Set<string>,
+    timeoutMs = 30_000,
+): Promise<ProjectListSummary | undefined> {
+    const folder = path.basename(projectPath);
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+        await triggerRescanProjects(request);
+        const created = (await listProjectsViaApi(request)).find(
+            (project) =>
+                !projectIdsBefore.has(String(project.id)) &&
+                (project.name === folder || path.basename(project.path ?? "") === folder),
+        );
+        if (created || Date.now() > deadline) {
+            return created;
+        }
+        await sleep(1_000);
+    }
 }
