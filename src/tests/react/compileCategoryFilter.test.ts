@@ -102,6 +102,71 @@ describe("compileCategoryFilter matches the per-row matcher it replaced", () => 
         }
     });
 
+    describe("follows column edits made after compiling", () => {
+        /** Every row agrees with the matcher that reads the column live. */
+        function expectLive(matches: (row: number) => boolean, column: Column, category: string | string[]) {
+            const rows = column.data?.length ?? 0;
+            for (let row = 0; row < rows; row++) {
+                expect(matches(row), `row ${row}`).toBe(legacyRowMatches(row, column, category));
+            }
+        }
+
+        test("a row moved to a newly appended multitext value", () => {
+            // as when a second gate or tag is added to a row, written into the existing data
+            const data = new Uint8Array([0, 1, 1]);
+            const column: Column = {
+                datatype: "multitext",
+                values: ["a", "b"],
+                stringLength: 1,
+                data,
+            };
+            const matches = compileCategoryFilter(column, "a");
+            expectLive(matches, column, "a");
+            column.values.push("a, b");
+            data[1] = 2;
+            expect(matches(1)).toBe(true);
+            expectLive(matches, column, "a");
+        });
+
+        test("values compacted and rows remapped in place", () => {
+            const data = new Uint8Array([1, 2, 1, 0]);
+            const column: Column = { datatype: "text", values: ["x", "a", "b"], data };
+            const matches = compileCategoryFilter(column, "a");
+            expect([0, 1, 2, 3].map(matches)).toEqual([true, false, true, false]);
+            // the cleanup drops the unused "x" and remaps rows without replacing `data`
+            column.values = ["a", "b"];
+            data.set([0, 1, 0, 0]);
+            expectLive(matches, column, "a");
+        });
+
+        test("values reordered in a new array of the same length", () => {
+            const data = new Uint8Array([0, 1, 2]);
+            const column: Column = { datatype: "text", values: ["a", "b", "c"], data };
+            const matches = compileCategoryFilter(column, "a");
+            column.values = ["c", "b", "a"];
+            data.set([2, 1, 0]);
+            expectLive(matches, column, "a");
+            expect(matches(0)).toBe(true);
+        });
+
+        test("rows appended by replacing the data array", () => {
+            const column: Column = { datatype: "text", values: ["a", "b"], data: new Uint8Array([0, 1]) };
+            const matches = compileCategoryFilter(column, ["a"]);
+            column.data = new Uint8Array([0, 1, 0]);
+            expect(matches(2)).toBe(true);
+            expectLive(matches, column, ["a"]);
+        });
+
+        test("data loaded after compiling", () => {
+            const column: Column = { datatype: "text", values: ["a", "b"] };
+            const matches = compileCategoryFilter(column, "b");
+            expect(matches(0)).toBe(false);
+            column.data = new Uint8Array([1, 0]);
+            expectLive(matches, column, "b");
+            expect(matches(0)).toBe(true);
+        });
+    });
+
     test("an observable category is read once, when compiling", () => {
         const category = observable(["b"]);
         const [, column] = columns(rng(1))[0];

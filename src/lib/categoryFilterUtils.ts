@@ -35,19 +35,49 @@ export function getCategoryFilterIndices(
  * Callers typically pass `category` straight from chart config, which is MobX-observable:
  * re-deriving it per row put proxy reads and string work in every iteration of whole-dataset
  * scans. Changes to `category` after compiling are not seen; compile again.
+ *
+ * Column edits are seen: the lookup is rebuilt when the column's data or values array is
+ * replaced (a new multitext layout always reallocates data) or values are appended (new gates
+ * or tags, which can give a multitext row a new combined value). That check costs a few ms per
+ * million rows; inlining the lookup into the same closure measured slower.
  */
 export function compileCategoryFilter(
     column: CategoryFilterColumn,
     category: string | string[] | null,
 ): (rowIndex: number) => boolean {
-    const data = column.data;
     const selectedValues = (isArray(category) ? [...category] : [category]).filter(
         (value): value is string => typeof value === "string" && value.length > 0,
     );
-    if (!data || selectedValues.length === 0) {
+    if (selectedValues.length === 0) {
         return () => false;
     }
+    const selected = new Set(selectedValues);
 
+    let matches = compileRowMatcher(column, selectedValues, selected);
+    let data = column.data;
+    let values = column.values;
+    let valueCount = values.length;
+    return (rowIndex) => {
+        if (column.data !== data || column.values !== values || column.values.length !== valueCount) {
+            matches = compileRowMatcher(column, selectedValues, selected);
+            data = column.data;
+            values = column.values;
+            valueCount = values.length;
+        }
+        return matches(rowIndex);
+    };
+}
+
+/** The lookup for the column as it is now; see {@link compileCategoryFilter}. */
+function compileRowMatcher(
+    column: CategoryFilterColumn,
+    selectedValues: string[],
+    selected: Set<string>,
+): (rowIndex: number) => boolean {
+    const data = column.data;
+    if (!data) {
+        return () => false;
+    }
     const values = column.values;
     const matches = new Uint8Array(values.length);
     for (const value of selectedValues) {
@@ -60,7 +90,6 @@ export function compileCategoryFilter(
     }
 
     // a multitext row also matches if any item of one of its values is selected
-    const selected = new Set(selectedValues);
     const emptyItem = inferMultitextEmptyItem(column);
     for (let valueIndex = 0; valueIndex < values.length; valueIndex++) {
         if (getMultitextValueItems(column, valueIndex, { emptyItem }).some((item) => selected.has(item))) {
