@@ -296,7 +296,9 @@ class Dimension {
                 false,
             );
             if (this.pendingFilter) {
-                void this._notifyWhenCommitted(this.pendingFilter);
+                this._notifyWhenCommitted(this.pendingFilter).catch((e) =>
+                    console.error("async refilter after resize failed", e),
+                );
             }
         }
     }

@@ -344,8 +344,13 @@ class DataStore {
         }
         // async filters land later: one 'filtered' once they have all been applied
         if (pending.length) {
-            Promise.all(pending).then((committed) => {
-                if (committed.some(Boolean)) this._callListeners("filtered");
+            Promise.allSettled(pending).then((outcomes) => {
+                let committed = false;
+                for (const o of outcomes) {
+                    if (o.status === "fulfilled") committed ||= o.value;
+                    else console.error("async refilter failed", o.reason);
+                }
+                if (committed) this._callListeners("filtered");
             });
         }
         if (is_dirty) {

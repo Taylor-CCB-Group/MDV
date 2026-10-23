@@ -210,6 +210,25 @@ describe("async filter results", () => {
         await settle();
         expect(events.map(([type]) => type)).toEqual(["data_changed", "filtered"]);
     });
+
+    test("dataChanged still notifies when one async refilter fails", async () => {
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+        const ok = deferredDimension();
+        const failing = deferredDimension();
+        ok.filter("filterDeferred", ["x"], { keep: [1] });
+        failing.filter("filterDeferred", ["x"], { keep: [2] });
+        await Promise.all([ok.deliver(), failing.deliver()]);
+        events.length = 0;
+
+        ds.dataChanged(["x"], false);
+        failing.requests[1].reject(new Error("device lost"));
+        ok.deliver();
+        await settle();
+
+        expect(events.map(([type]) => type)).toEqual(["data_changed", "filtered"]);
+        expect(error).toHaveBeenCalledWith("async refilter failed", expect.any(Error));
+        expect(passingRows(ds)).toEqual([]);
+    });
 });
 
 /**
