@@ -7,6 +7,9 @@ All notable changes to `mdvtools` are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- `mdvtools convert-spatial` default views now use the SpatialData.js viewer instead of the
+  Viv image viewer.
+- The SpatialData.js chart is now listed as "SpatialData.js viewer" in the add-chart menu.
 - React Compiler is now enabled by default for Vite builds; set
   `VITE_USE_REACT_COMPILER=0` or `VITE_USE_REACT_COMPILER=false` to opt out locally.
 
