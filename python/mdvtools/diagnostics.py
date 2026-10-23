@@ -56,10 +56,12 @@ def _install_kind() -> Optional[str]:
     direct_url = dist.read_text("direct_url.json")
     if direct_url:
         try:
-            if json.loads(direct_url).get("dir_info", {}).get("editable"):
-                return "editable"
+            record = json.loads(direct_url)
         except ValueError:
-            pass
+            record = None
+        dir_info = record.get("dir_info") if isinstance(record, dict) else None
+        if isinstance(dir_info, dict) and dir_info.get("editable"):
+            return "editable"
     return "installed"
 
 
@@ -145,6 +147,7 @@ def format_error_report(exc: BaseException, argv: Optional[list] = None) -> str:
         environment,
         rule,
         f"Error: {summary}",
+        "Before sharing, check the report for paths or values you'd rather not make public.",
         f"If this looks like a bug, please include the report above in an issue: {ISSUE_TRACKER_URL}",
     ])
 

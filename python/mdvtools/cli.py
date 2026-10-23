@@ -41,7 +41,8 @@ class ReportingGroup(click.Group):
 def _print_version(ctx, _param, value):
     if not value or ctx.resilient_parsing:
         return
-    click.echo(format_version_info())
+    # eager callbacks run during parsing, before ReportingGroup.invoke
+    click.echo(report_errors(format_version_info)())
     ctx.exit()
 
 

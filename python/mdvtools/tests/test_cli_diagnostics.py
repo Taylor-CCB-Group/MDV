@@ -48,9 +48,7 @@ def test_unexpected_error_prints_report_and_exits_1(monkeypatch):
     assert "in serve" in out
     assert "in wrapper" not in out
     assert f"mdvtools {metadata.version('mdvtools')}" in out
-    assert out.rstrip().splitlines()[-2] == (
-        "Error: FileNotFoundError: /definitely/not/a/project not found"
-    )
+    assert "Error: FileNotFoundError: /definitely/not/a/project not found" in out.splitlines()
 
 
 def test_usage_errors_are_left_to_click():
@@ -84,3 +82,28 @@ def test_format_error_report_survives_version_info_failure(monkeypatch):
     assert "command:  mdvtools serve 'my project'" in report
     assert "version information unavailable" in report
     assert "Error: ValueError: boom" in report
+
+
+def test_version_flag_failure_prints_report(monkeypatch):
+    import mdvtools.diagnostics as diagnostics
+
+    def broken(**_kwargs):
+        raise RuntimeError("no metadata")
+
+    monkeypatch.setattr(diagnostics, "get_version_info", broken)
+    result = CliRunner().invoke(cli_module.cli, ["--version"])
+    assert result.exit_code == 1
+    assert "mdvtools error report" in result.output
+    assert "Error: RuntimeError: no metadata" in result.output
+
+
+def test_build_info_ignores_inherited_git_dir(monkeypatch, tmp_path):
+    from mdvtools.build_info import _get_from_git
+
+    expected = _get_from_git()
+    if expected is None:
+        pytest.skip("mdvtools is not running from a git checkout")
+    monkeypatch.setenv("GIT_DIR", str(tmp_path))
+    actual = _get_from_git()
+    assert actual is not None
+    assert actual["git_commit_hash"] == expected["git_commit_hash"]

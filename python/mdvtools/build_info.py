@@ -10,6 +10,18 @@ import subprocess
 from typing import Optional, Dict, Any
 from datetime import datetime
 
+# Variables that point git at a different repository than the one containing
+# this module (set e.g. when mdvtools runs from inside a git hook).
+_GIT_LOCATION_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+)
+
 
 def _get_from_env() -> Optional[Dict[str, Any]]:
     """Try to get build info from environment variables."""
@@ -38,6 +50,7 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
     try:
         # Start from the directory where this module is located
         git_root = os.path.dirname(__file__)
+        git_env = {k: v for k, v in os.environ.items() if k not in _GIT_LOCATION_VARS}
         
         # Verify this module is tracked by the enclosing git repository, so a
         # pip-installed copy inside some unrelated repo (e.g. a venv in a
@@ -47,7 +60,8 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             capture_output=True,
             check=True,
             timeout=5,
-            cwd=git_root
+            cwd=git_root,
+            env=git_env,
         )
         
         # Get commit hash
@@ -56,7 +70,8 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             capture_output=True,
             text=True,
             timeout=5,
-            cwd=git_root
+            cwd=git_root,
+            env=git_env,
         )
         if result.returncode != 0:
             return None
@@ -68,7 +83,8 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             capture_output=True,
             text=True,
             timeout=5,
-            cwd=git_root
+            cwd=git_root,
+            env=git_env,
         )
         git_commit_date = result.stdout.strip() if result.returncode == 0 else None
         
@@ -78,7 +94,8 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             capture_output=True,
             text=True,
             timeout=5,
-            cwd=git_root
+            cwd=git_root,
+            env=git_env,
         )
         git_branch = result.stdout.strip() if result.returncode == 0 else None
         
@@ -88,7 +105,8 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             capture_output=True,
             text=True,
             timeout=5,
-            cwd=git_root
+            cwd=git_root,
+            env=git_env,
         )
         git_commit_message = result.stdout.strip() if result.returncode == 0 else None
         
@@ -98,7 +116,8 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
             capture_output=True,
             text=True,
             timeout=5,
-            cwd=git_root
+            cwd=git_root,
+            env=git_env,
         )
         git_dirty = len(result.stdout.strip()) > 0
         
