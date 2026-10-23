@@ -19,6 +19,7 @@ import { LockIcon, LockOpenIcon } from "lucide-react";
 import { observer } from "mobx-react-lite";
 import { useChartManager } from "../hooks";
 import DebugButton from "./DebugButton";
+import JobsButton from "../jobs/JobsButton";
 import { buildDashboardUrl, getApiRootFromDir } from "@/utils/mdvRouting";
 
 const MenuBarComponent = observer(() => {
@@ -95,6 +96,7 @@ const MenuBarComponent = observer(() => {
                                 <CloudUploadIcon />
                             </IconWithTooltip>
                         )}
+                        {isEditable && <JobsButton />}
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center" }}>
                         <CustomTooltip 

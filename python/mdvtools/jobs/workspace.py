@@ -1,0 +1,133 @@
+from pathlib import Path
+import tempfile
+import h5py
+import numpy as np
+import scipy.sparse
+import json
+
+MARKER = "STATUS"  # worker writes "done/failed" - the primary completion signal
+DENSE_COPY_SLICE = 1 << 24  # float32 elements per slice when copying a dense matrix (64 MB)
+
+
+def default_workspace_root(project) -> Path:
+    """Default ephemeral-scratch root for per-job workspaces (ADR-0007).
+
+    Lives OUTSIDE the project — never under the catalog's projects base_dir — so neither
+    the catalog scan nor the project exporter ever sees it. Namespaced by project so two
+    projects can't collide. Override on HPC to point at `$SCRATCH` / a shared mount the
+    compute node can reach. The per-job dir under it is keyed by job_id, the only link
+    back to the durable owner-side record (which lives inside the project)."""
+    return Path(tempfile.gettempdir()) / "mdv_job_workspaces" / Path(project.dir).name
+
+
+class Workspace:
+    """Fixed per-job layout under the ephemeral scratch root (ADR-0007): input/ (tray),
+    work/ (worker scratch), output/ (results). The scratch root lives OUTSIDE the project
+    — on HPC it is cluster scratch the worker reaches. The per-job dir is keyed by job_id,
+    the sole link to the durable owner-side record."""
+
+    def __init__(self, workspace_root: Path, job_id: str):
+        self.root = Path(workspace_root) / job_id
+        self.input = self.root / "input"
+        self.work = self.root / "work"
+        self.output = self.root / "output"
+
+        for d in (self.input, self.work, self.output):
+            d.mkdir(parents=True, exist_ok=True)
+
+    def read_marker(self) -> str | None:
+        p = self.root / MARKER
+        return p.read_text().strip() if p.exists() else None
+
+
+# materialize keyed by INPUT shape, not tool
+def materialize_columns_tray(
+    project, spec, params: dict, ws: Workspace, rows: np.ndarray | None = None
+) -> None:
+    """Input shape 'columns': every type == 'column' param -> a string dataset named by the param;
+    scalar params (separator, output_name, ...) -> attrs. Shared by all column-input tools"""
+    if rows is not None:
+        # only the matrix shape takes a selection so far (ADR-0017)
+        raise NotImplementedError("the columns input shape cannot run on a selection")
+
+    col_params = [p for p in spec.params if p.type == "column"]
+    s = h5py.string_dtype()
+    with project.lock("read"):
+        cols = {
+            p.name: project.get_column(params[p.options_from], params[p.name])
+            for p in col_params
+        }
+    with h5py.File(ws.input / "tray.h5", "w") as f:
+        for name, values in cols.items():
+            f.create_dataset(name, data=np.array([str(x) for x in values], dtype=s))
+        for p in spec.params:
+            if p.type != "column" and params.get(p.name) is not None:
+                f.attrs[p.name] = params[p.name]
+
+def materialize_matrix_tray(
+    project, spec, params: dict, ws: Workspace, rows: np.ndarray | None = None
+) -> None:
+    """Input shape 'matrix': copy the expression matrix (a rows_as_column subgroup) into its tray
+    in its stored layout, plus explicit shape and a `sparse` attr. Sparse is the CSC triplet - x/i/p
+    unchanged. Dense is the flat column-major x, copied in slices so this step never holds the whole
+    matrix. The worker rebuilds the matrix from either layout and imports no MDV.
+
+    `rows`, the sorted indices of a selection (ADR-0017), keeps only those rows, renumbered from 0,
+    so the worker never knows it runs on a subset.
+    """
+    datasource = params["datasource"]
+    subgroup_key = params.get("layer", "gs")
+    name, is_sparse = project._resolve_rows_as_columns_subgroup(datasource, subgroup_key)
+
+    n_cells = int(project.get_datasource_metadata(datasource)["size"])
+    n_rows = n_cells if rows is None else len(rows)
+    with project.lock("read"):
+        h5 = project._get_h5_handle(read_only = True)
+        try:
+            grp = h5[f"{datasource}/{name}"]
+            assert isinstance(grp, h5py.Group)
+            with h5py.File(ws.input / "tray.h5", "w") as f:
+                if is_sparse:
+                    x = np.asarray(grp["x"], dtype=np.float32)
+                    i = np.asarray(grp["i"], dtype=np.uint32)
+                    p = np.asarray(grp["p"])
+                    n_genes = len(p) - 1
+                    if rows is not None:
+                        cut = scipy.sparse.csc_matrix((x, i, p), shape=(n_cells, n_genes))[rows, :].tocsc()
+                        x, i, p = cut.data.astype(np.float32), cut.indices.astype(np.uint32), cut.indptr
+                    f.create_dataset("x", data=x)
+                    f.create_dataset("i", data=i)
+                    f.create_dataset("p", data=p)
+                else:
+                    src = grp["x"]
+                    assert isinstance(src, h5py.Dataset)
+                    n_genes = len(src) // n_cells
+                    if rows is None:
+                        dst = f.create_dataset("x", shape=src.shape, dtype=np.float32)
+                        for start in range(0, len(src), DENSE_COPY_SLICE):
+                            dst[start : start + DENSE_COPY_SLICE] = src[start : start + DENSE_COPY_SLICE]
+                    else:
+                        # whole genes per slice, so each slice reshapes to cells x genes
+                        dst = f.create_dataset("x", shape=(n_rows * n_genes,), dtype=np.float32)
+                        step = max(1, DENSE_COPY_SLICE // n_cells)
+                        for g0 in range(0, n_genes, step):
+                            g1 = min(g0 + step, n_genes)
+                            block = src[g0 * n_cells : g1 * n_cells].reshape((n_cells, g1 - g0), order="F")
+                            dst[g0 * n_rows : g1 * n_rows] = block[rows].ravel(order="F")
+                f.attrs["n_cells"] = n_rows
+                f.attrs["n_genes"] = n_genes
+                f.attrs["sparse"] = is_sparse
+                # route params by their declared target call: control/output params (applies_to = None) stay
+                # flat attrs; compute params bundle into kwargs.<call>, so the worker splats them into the call
+                kwargs_bundles: dict[str, dict] = {}
+                for pspec in spec.params:
+                    if pspec.type == "column" or params.get(pspec.name) is None:
+                        continue
+                    if pspec.applies_to is None:
+                        f.attrs[pspec.name] = params[pspec.name]
+                    else:
+                        kwargs_bundles.setdefault(pspec.applies_to, {})[pspec.name] = params[pspec.name]
+                for group, kw in kwargs_bundles.items():
+                    f.attrs[f"kwargs.{group}"] = json.dumps(kw)
+        finally:
+            h5.close()

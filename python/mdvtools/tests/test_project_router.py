@@ -9,6 +9,7 @@ with Flask's standard routing, particularly around:
 """
 
 import pytest
+from flask import Flask
 from mdvtools.project_router import ProjectBlueprint
 
 
@@ -201,28 +202,18 @@ class TestFlaskParity:
     def test_route_ordering(self):
         """Routes should be tried in registration order."""
         bp = ProjectBlueprint("test", "", "/test/")
-        
-        results = []
-        
+
         @bp.route("/<path:anything>")
         def catch_all(anything):
-            results.append("catch_all")
             return "catch all"
-        
+
         @bp.route("/specific")
         def specific():
-            results.append("specific")
             return "specific"
-        
+
         # Both patterns would match "/specific", but the first registered wins
         # (This is different from Werkzeug which uses specificity rules)
-        for pattern, (handler, _) in bp.routes.items():
-            if pattern.match("/specific"):
-                handler("specific")
-                break
-        
-        # Due to dict ordering (Python 3.7+), catch_all was registered first
-        assert results[0] == "catch_all"
+        assert _dispatch(bp, "GET", "/specific").get_data(as_text=True) == "catch all"
     
     def test_empty_route(self):
         """Empty route should match exactly '/'."""
@@ -283,6 +274,42 @@ class TestEdgeCases:
         
         # Should NOT match with dot as wildcard
         assert not pattern.match("/api/v1X0/users")
+
+
+def _dispatch(bp, method, path):
+    """Dispatch the way the catalog's catch-all route does, inside a request (ADR-0015)."""
+    app = Flask(__name__)
+    with app.test_request_context(path, method=method):
+        return app.make_response(bp.dispatch_request(path.lstrip("/"), "p1"))
+
+
+class TestMethodDispatch:
+    """The catalog router must choose a handler by method, as Flask does (ADR-0015)."""
+
+    def test_same_path_dispatches_by_method(self):
+        bp = ProjectBlueprint("test-methods", "", "/test/")
+
+        @bp.route("/jobs", methods=["POST"])
+        def submit():
+            return "submit"
+
+        @bp.route("/jobs", methods=["GET"])
+        def list_jobs():
+            return "list"
+
+        assert _dispatch(bp, "POST", "/jobs").get_data(as_text=True) == "submit"
+        assert _dispatch(bp, "GET", "/jobs").get_data(as_text=True) == "list"
+        assert _dispatch(bp, "PATCH", "/jobs").status_code == 405
+
+    def test_route_without_methods_accepts_any_method(self):
+        bp = ProjectBlueprint("test-any-method", "", "/test/")
+
+        @bp.route("/save")
+        def save():
+            return "saved"
+
+        assert _dispatch(bp, "POST", "/save").get_data(as_text=True) == "saved"
+        assert _dispatch(bp, "GET", "/save").get_data(as_text=True) == "saved"
 
 
 if __name__ == "__main__":
