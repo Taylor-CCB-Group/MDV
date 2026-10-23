@@ -204,6 +204,14 @@ select, input, textarea {
     overflow-x: hidden !important;
 }
 
+/* Resize handles sit outside the item (--resizer-offset) and only appear on hover.
+Layout containment makes that overhang ink overflow, so a bottom/right-edge chart
+being hovered no longer grows the grid's scroll area - which added a scrollbar and
+reflowed every chart. Handles are still painted and still receive pointer events. */
+.grid-stack > .grid-stack-item {
+    contain: layout;
+}
+
 /* Overriding grid stack resizer styling to replicate absolute view */
 .grid-stack .ui-resizable-n { 
     position: absolute !important;

@@ -116,8 +116,9 @@ A feature release. SQLite is now the default database for new installs of the fu
 - The server sends the headers that range requests need over CORS (#528).
 - A rows-as-columns link can use a `unique` column as its name column (#533).
 - Build information no longer reports the commit of an unrelated git repository when
-  `mdvtools` is installed inside one (for example a virtualenv within your own project)
-  (#592).
+  `mdvtools` is installed inside one (for example a virtualenv within your own project).
+- In the gridstack layout, hovering a chart no longer adds a scrollbar and resizes every chart
+  (#594).
 
 ## [1.3.0] - 2026-06-04
 
