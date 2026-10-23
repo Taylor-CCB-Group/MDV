@@ -8,13 +8,16 @@ All notable changes to `mdvtools` are documented here. The format is based on
 
 ## [1.4.0] - 2026-10-21
 
-> ⚠️ Behaviour changes for the full application (`mdvtools[app]`): the server now uses
-> SQLite by default and stores the database at `/app/mdv/mdv.sqlite3` unless you set
-> `SQLITE_DB_PATH`. To keep using PostgreSQL, set `DB_BACKEND=postgres` before you start the
-> server (#435). The server also records usage events, such as who opened which project and
+> ⚠️ Behaviour changes for the full application (`mdvtools[app]`): when `DB_BACKEND` is
+> unset, the server now uses SQLite unless it finds a PostgreSQL setting (`DB_HOST`,
+> `DB_USER`, `DB_PASSWORD`, `DB_NAME` or the `db_user` Docker secret). With one of those set,
+> it keeps using PostgreSQL and logs a warning asking you to set `DB_BACKEND=postgres`. SQLite
+> stores the database at `/app/mdv/mdv.sqlite3` unless you set `SQLITE_DB_PATH`. A
+> `DB_BACKEND` value other than `sqlite` or `postgres` stops the server from starting
+> (#435, #579). The server also records usage events, such as who opened which project and
 > view, in a new `usage_events` table. Set `ENABLE_USAGE_TRACKING=0` to turn this off (#540).
 
-A feature release. SQLite is now the default database for the full application, a new `SpatialData` chart overlays spatial layers, new charts show genomic data, and MDV works behind proxies that strip a path prefix, such as Verily Workbench. `pip install mdvtools` still installs the slim core.
+A feature release. SQLite is now the default database for new installs of the full application, a new `SpatialData` chart overlays spatial layers, new charts show genomic data, and MDV works behind proxies that strip a path prefix, such as Verily Workbench. `pip install mdvtools` still installs the slim core.
 
 ### Added
 - Python 3.13 support. `mdvtools` now installs on Python 3.11 to 3.13.
@@ -70,6 +73,13 @@ A feature release. SQLite is now the default database for the full application, 
 - `pip install mdvtools` now installs `leidenalg` and `igraph`, so `--compute-x-umap` and
   `convert_scanpy_to_mdv(compute_x_umap=True)` can compute Leiden clusters. They were only in
   the `dev` dependency group before (#575).
+- A PostgreSQL deployment that passes its database settings as Docker secrets, or takes its
+  host from `config.json`, now starts. The startup database check used to read only the
+  `DB_*` environment variables (#586).
+- Polygon selections in scatter plots finish on a double-click, and a double-click no longer
+  zooms the scatter plot (#582).
+- Selection tools work in a popped-out SpatialData chart (#582).
+- Reset All Filters now clears the selection shape drawn on a chart (#583).
 - File upload, Socket.IO and page assets work behind a proxy that strips a path prefix
   (#571, #572).
 - A user signed in to one deployment no longer carries their session into another
