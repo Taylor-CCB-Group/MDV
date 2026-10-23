@@ -291,11 +291,21 @@ function SpatialDataLink() {
 /** Says when the canvas is on the experimental WebGPU path, or failed to get onto it. */
 function RenderBackendBadge({ device }: { device: Extract<DeckDevice, { status: "ready" }> }) {
     if (device.backend !== "webgpu" && !device.fallbackReason) return null;
-    const label =
-        device.backend === "webgpu" ? "WebGPU (experimental)" : `WebGPU unavailable (${device.fallbackReason}); using WebGL`;
+    // Short, top-left: the legends live bottom-left and the selection toolbar grows from
+    // the top-right, so a long label collides with one or the other on narrow charts.
+    // Below the toolbar's z-index, so where they still overlap the toolbar stays usable.
+    const isWebGPU = device.backend === "webgpu";
+    const title = isWebGPU
+        ? "Rendering with WebGPU (experimental)"
+        : `WebGPU unavailable (${device.fallbackReason}); rendering with WebGL`;
     return (
-        <div className="legend-container pointer-events-none absolute bottom-2 left-2 z-[4] rounded-tr border-[0.5px] border-current text-xs">
-            {label}
+        <div
+            className="legend-container absolute top-2 left-2 cursor-help rounded border-[0.5px] border-current text-xs"
+            // inline: `.legend-container` sets its own z-index, which would beat a class here
+            style={{ zIndex: 1 }}
+            title={title}
+        >
+            {isWebGPU ? "WebGPU" : "WebGL (no WebGPU)"}
         </div>
     );
 }
