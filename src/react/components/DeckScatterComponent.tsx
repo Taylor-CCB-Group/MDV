@@ -16,7 +16,7 @@ import AxisComponent from "./AxisComponent";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import useGateLayers from "../hooks/useGateLayers";
 import FieldContourLegend from "./FieldContourLegend";
-import { useFieldContourLegend, type DualContourLegacyConfig } from "../contour_state";
+import { useCategoryContourLegend, useFieldContourLegend, type DualContourLegacyConfig } from "../contour_state";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
@@ -183,6 +183,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     } = useGateLayers();
 
     const legendFields = useFieldContourLegend(contourConfig.densityFields);
+    const legendCategories = useCategoryContourLegend(contourConfig);
     const showLegend = contourConfig.field_legend.display;
     const legendPosition = { x: 10, y: 10 };
 
@@ -319,6 +320,8 @@ const DeckScatter = observer(function DeckScatterComponent({
             {showLegend && (
                 <FieldContourLegend
                     fields={legendFields}
+                    categories={legendCategories.items}
+                    categoryLabel={legendCategories.label}
                     position={legendPosition}
                     onFieldHover={setHoveredField}
                 />

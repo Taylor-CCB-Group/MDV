@@ -5,7 +5,7 @@ import { shallow } from "zustand/shallow";
 import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import SelectionOverlay from "./SelectionOverlay";
 import FieldContourLegend from "./FieldContourLegend";
-import { useFieldContourLegend } from "../contour_state";
+import { useCategoryContourLegend, useFieldContourLegend } from "../contour_state";
 import type { DualContourLegacyConfig } from "../contour_state";
 import type { FieldName } from "@/charts/charts";
 import { useLoader, type OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
@@ -102,6 +102,7 @@ const Main = observer(
         // Get field contour legend data
         const config = useConfig<DualContourLegacyConfig>();
         const legendFields = useFieldContourLegend(config.densityFields);
+        const legendCategories = useCategoryContourLegend(config);
 
         // Legend visibility - fixed position in bottom-left
         const showLegend = config.field_legend.display;
@@ -250,9 +251,11 @@ const Main = observer(
         return (
             <>
                 <SelectionOverlay />
-                {showLegend && legendFields.length > 0 && (
+                {showLegend && (
                     <FieldContourLegend 
                         fields={legendFields} 
+                        categories={legendCategories.items}
+                        categoryLabel={legendCategories.label}
                         position={legendPosition}
                         onFieldHover={handleFieldHover}
                     />

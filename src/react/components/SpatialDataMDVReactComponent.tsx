@@ -38,7 +38,7 @@ import VivContrastExtension from "@/webgl/VivContrastExtension";
 import type { RenderStackLayerInputs } from "@spatialdata/vis";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
-import { useFieldContourLegend } from "../contour_state";
+import { useCategoryContourLegend, useFieldContourLegend } from "../contour_state";
 import type { DualContourLegacyConfig } from "../contour_state";
 import { useChartID, useChartSize, useConfig, useRegion } from "../hooks";
 import useGateLayers from "../hooks/useGateLayers";
@@ -381,6 +381,7 @@ const SpatialDataViewer = observer(
         const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
         const contourConfig = useConfig<DualContourLegacyConfig>();
         const legendFields = useFieldContourLegend(contourConfig.densityFields);
+        const legendCategories = useCategoryContourLegend(contourConfig);
         const showLegend = contourConfig.field_legend.display;
         const legendPosition = { x: 10, y: 10 };
 
@@ -551,9 +552,11 @@ const SpatialDataViewer = observer(
         return (
             <Profiler id="spatial.viewer" onRender={onSpatialProfilerRender}>
                 <SelectionOverlay />
-                {showLegend && legendFields.length > 0 && (
+                {showLegend && (
                     <FieldContourLegend
                         fields={legendFields}
+                        categories={legendCategories.items}
+                        categoryLabel={legendCategories.label}
                         position={legendPosition}
                         onFieldHover={setHoveredField}
                     />

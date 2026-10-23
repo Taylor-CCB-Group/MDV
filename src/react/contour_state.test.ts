@@ -4,6 +4,7 @@ import type { CategoricalDataType } from '@/charts/charts';
 import { autorun, makeAutoObservable, runInAction } from 'mobx';
 import {
     useCategoryContour,
+    useCategoryContourLegend,
     getDensitySettings,
     getContourVisualSettings,
     type DualContourLegacyConfig,
@@ -255,6 +256,54 @@ describe('useCategoryContour', () => {
         );
 
         expect(result.current?.contourFill).toBe(10000);
+    });
+});
+
+describe('useCategoryContourLegend', () => {
+    const mockContourParameter = {
+        field: 'cell_type',
+        name: 'Cell type',
+        values: ['T cell', 'B cell', 'NK'],
+        datatype: 'text' as CategoricalDataType,
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        (useFieldSpec as any).mockReturnValue(mockContourParameter);
+        (useDataStore as any).mockReturnValue({
+            getColumnColors: vi.fn(() => [[255, 0, 0], [0, 255, 0], [0, 0, 255]]),
+        });
+    });
+
+    const config = (category1: string[], category2: string[]) =>
+        ({ contourParameter: 'cell_type', category1, category2 }) as unknown as DualContourLegacyConfig;
+
+    test('lists each non-empty category selection under the contour parameter name', () => {
+        const { result } = renderHook(() => useCategoryContourLegend(config(['B cell'], [])));
+
+        expect(result.current.label).toBe('Cell type');
+        expect(result.current.items).toEqual([
+            { id: 'contour1', name: 'B cell', colors: [[0, 255, 0]] },
+        ]);
+    });
+
+    test('uses the shared colour range for a contour over several categories', () => {
+        const { result } = renderHook(() =>
+            useCategoryContourLegend(config(['NK'], ['T cell', 'B cell'])),
+        );
+
+        const [first, second] = result.current.items;
+        expect(first).toEqual({ id: 'contour1', name: 'NK', colors: [[0, 0, 255]] });
+        expect(second.id).toBe('contour2');
+        expect(second.name).toBe('T cell, B cell');
+        expect(second.colors.length).toBeGreaterThan(1);
+    });
+
+    test('returns no items without a contour parameter', () => {
+        (useFieldSpec as any).mockReturnValue(undefined);
+        const { result } = renderHook(() => useCategoryContourLegend(config(['NK'], [])));
+
+        expect(result.current.items).toEqual([]);
     });
 });
 
