@@ -70,6 +70,7 @@ Then verify in a clean environment — both the slim and full installs, plus a s
 python -m venv /tmp/mdv-slim && . /tmp/mdv-slim/bin/activate
 pip install --index-url https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple/ mdvtools
+mdvtools --version   # should report the version being released
 mdvtools --help
 # a full-app feature here should raise a friendly: pip install "mdvtools[app]"
 deactivate

@@ -3,6 +3,7 @@ import shutil
 import zipfile
 import os
 from os.path import exists, join, basename
+from .diagnostics import format_version_info, report_errors
 from .spatial.conversion_options import (
     DEFAULT_POINT_TRANSFORM,
     DEFAULT_TABLE_HANDLING,
@@ -30,7 +31,29 @@ def zip_and_remove(folder):
     shutil.rmtree(folder)
     click.echo("Done.")
 
-@click.group()
+class ReportingGroup(click.Group):
+    """Group whose subcommands print a full error report on unexpected failures."""
+
+    def invoke(self, ctx):
+        return report_errors(super().invoke)(ctx)
+
+
+def _print_version(ctx, _param, value):
+    if not value or ctx.resilient_parsing:
+        return
+    click.echo(format_version_info())
+    ctx.exit()
+
+
+@click.group(cls=ReportingGroup)
+@click.option(
+    '--version', '-V',
+    is_flag=True,
+    expose_value=False,
+    is_eager=True,
+    callback=_print_version,
+    help='Show mdvtools version, build and environment information, then exit.',
+)
 def cli():
     """MDV Tools CLI"""
     pass

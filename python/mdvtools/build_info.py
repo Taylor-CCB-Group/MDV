@@ -39,9 +39,11 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
         # Start from the directory where this module is located
         git_root = os.path.dirname(__file__)
         
-        # Verify we're in a git repository
+        # Verify this module is tracked by the enclosing git repository, so a
+        # pip-installed copy inside some unrelated repo (e.g. a venv in a
+        # user's project) doesn't report that repo's commit
         subprocess.run(
-            ["git", "rev-parse", "--git-dir"],
+            ["git", "ls-files", "--error-unmatch", os.path.basename(__file__)],
             capture_output=True,
             check=True,
             timeout=5,
