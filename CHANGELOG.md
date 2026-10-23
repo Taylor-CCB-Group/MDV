@@ -54,8 +54,17 @@ A feature release. SQLite is now the default database for new installs of the fu
 - The debug dialog lists validation issues in a readable form (#491).
 - The density legend lists categorical contours as well as density fields, and hovering an
   entry highlights its contour (#590).
+- `mdvtools --version` (`-V`) prints the mdvtools version, git commit, Python and platform
+  (#592).
+- When a CLI command fails unexpectedly it now prints an error report with the command line,
+  traceback, and mdvtools/dependency versions, ready to paste into an issue, and exits with
+  status 1 (#592).
 
 ### Changed
+- `mdvtools convert-spatial` default views now use the SpatialData.js viewer instead of the
+  Viv image viewer (#591).
+- The SpatialData.js chart is now listed as "SpatialData.js viewer" in the add-chart menu
+  (#591).
 - React Compiler is now enabled by default for Vite builds; set
   `VITE_USE_REACT_COMPILER=0` or `VITE_USE_REACT_COMPILER=false` to opt out locally (#502).
 - The database assigns Project IDs, and new project folders get a random `uuid4` name instead
@@ -68,8 +77,8 @@ A feature release. SQLite is now the default database for new installs of the fu
 - The fraction legend is now a React component (#503).
 - `sync_users_to_db` fetches the Auth0 admin role members once, instead of once per user
   (#526).
-- Dependency updates: `@spatialdata/*` 0.12.0, deck.gl and luma.gl 9.4, viv 0.23 (#529, #541,
-  #561).
+- Dependency updates: `@spatialdata/*` 0.13.0, deck.gl and luma.gl 9.4, viv 0.23 (#529, #541,
+  #561, #588).
 
 ### Fixed
 - `pip install mdvtools` now installs `leidenalg` and `igraph`, so `--compute-x-umap` and
@@ -103,6 +112,9 @@ A feature release. SQLite is now the default database for new installs of the fu
   exists (#501).
 - The server sends the headers that range requests need over CORS (#528).
 - A rows-as-columns link can use a `unique` column as its name column (#533).
+- Build information no longer reports the commit of an unrelated git repository when
+  `mdvtools` is installed inside one (for example a virtualenv within your own project)
+  (#592).
 
 ## [1.3.0] - 2026-06-04
 

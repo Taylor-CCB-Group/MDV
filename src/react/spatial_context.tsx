@@ -12,7 +12,8 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import { action, toJS } from "mobx";
 import { getEmptyFeatureCollection } from "./deck_state";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
-import type { FieldName } from "@/charts/charts";
+import { SELECTION_COORDINATE_SYSTEM } from "@/editable-layers/selectionModes";
+import type { HoveredContour } from "./contour_state";
 import type { Tool } from "./components/SelectionOverlay";
 import { useGateManager } from "./gates/useGateManager";
 import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "./gates/gateUtils";
@@ -26,7 +27,8 @@ import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "
 
 export type P = [number, number];
 export type RangeState = {
-    rangeDimension: RangeDimension;
+    /** `undefined` until the owning effect has created it. */
+    rangeDimension: RangeDimension | undefined;
     selectionFeatureCollection: SimpleFeatureCollection;
     editableLayer: MonkeyPatchEditableGeoJsonLayer;
     editingGateId: string | null;
@@ -48,8 +50,8 @@ export type SpatialAnnotationState = {
     rectRange: RangeState;
     measure: MeasureState;
     scatterProps: ReturnType<typeof useScatterplotLayer>;
-    hoveredFieldId?: FieldName | null;
-    setHoveredFieldId?: (fieldId: FieldName | null) => void;
+    hoveredContour?: HoveredContour | null;
+    setHoveredContour?: (contour: HoveredContour | null) => void;
 };
 
 // Could more usefully be thought of as SpatialContext?
@@ -108,7 +110,8 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
     // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that later.
     //const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<SimpleFeatureCollection>(getEmptyFeatureCollection());
-    //! it appears to drastically affect performance having this in mobx config - why?
+    // config marks this `observable.ref` (chartConfigUtils): deep observability converted the whole
+    // collection on every edit and made deck.gl read its coordinates through proxies
     const { selectionFeatureCollection } = chart.config;
     const setSelectionFeatureCollection = useCallback(action((newSelection: SimpleFeatureCollection) => {
         chart.config.selectionFeatureCollection = newSelection;
@@ -143,12 +146,25 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         ];
     }, [editingGateId, gateManager]);
 
+    const clearSelection = useCallback(() => {
+        setSelectionFeatureCollection(getEmptyFeatureCollection());
+        setEditingGateId(null);
+    }, [setSelectionFeatureCollection]);
+
     useEffect(() => {
-        chart.removeFilter = () => {
-            setSelectionFeatureCollection(getEmptyFeatureCollection());
-            setEditingGateId(null);
-        }
-    }, [chart, setSelectionFeatureCollection]);
+        chart.removeFilter = clearSelection;
+    }, [chart, clearSelection]);
+
+    // "Reset All Filters" clears the dimension directly via `dataStore.removeAllFilters()`
+    // without going through `chart.removeFilter`, so the drawn shape needs clearing here too.
+    useEffect(() => {
+        const ds = chart.dataStore;
+        const listenerId = `${chart.config.id}_selection_layer`;
+        ds.addListener(listenerId, (type: string, data: unknown) => {
+            if (type === "filtered" && data === "all_removed") clearSelection();
+        });
+        return () => ds.removeListener(listenerId);
+    }, [chart, clearSelection]);
 
     useEffect(() => {
         if (coords.length === 0) {
@@ -206,6 +222,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection,
             mode: selectionMode,
+            coordinateSystem: SELECTION_COORDINATE_SYSTEM,
             getFillColor,
             getLineColor,
             getLineWidth: 2,
@@ -266,7 +283,7 @@ function useCreateMeasure() {
     return { startPixels, setStart, endPixels, setEnd };
 }
 //add generic that extends SpatialConfig?
-function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredFieldId?: FieldName | null) {
+function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredContour?: HoveredContour | null) {
     // should we use zustand for this state?
     // doesn't matter too much as it's just used once by SpatialAnnotationProvider
     // consider for project-wide annotation stuff as opposed to ephemeral selections
@@ -274,7 +291,7 @@ function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredFieldId?:
     const measure = useCreateMeasure();
     const scatterProps = useScatterplotLayer(
         rectRange.modelMatrix,
-        hoveredFieldId,
+        hoveredContour,
         rectRange.rangeDimension,
     );
     return { rectRange, measure, scatterProps };
@@ -283,16 +300,16 @@ function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredFieldId?:
 export const SpatialAnnotationProvider = observer(function SpatialAnnotationProvider({
     chart,
     children,
-    hoveredFieldId,
-    setHoveredFieldId,
+    hoveredContour,
+    setHoveredContour,
     //add generic that extends SpatialConfig?
 }: { 
     chart: BaseChart<any>;
-    hoveredFieldId?: FieldName | null;
-    setHoveredFieldId?: (fieldId: FieldName | null) => void;
+    hoveredContour?: HoveredContour | null;
+    setHoveredContour?: (contour: HoveredContour | null) => void;
 } & React.PropsWithChildren) {
-    const annotationState = useCreateSpatialAnnotationState(chart, hoveredFieldId);
-    const stateWithHover = { ...annotationState, hoveredFieldId, setHoveredFieldId };
+    const annotationState = useCreateSpatialAnnotationState(chart, hoveredContour);
+    const stateWithHover = { ...annotationState, hoveredContour, setHoveredContour };
     return (
         <SpatialAnnotationState.Provider value={stateWithHover}>
             {children}

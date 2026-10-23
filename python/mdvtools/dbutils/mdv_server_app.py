@@ -7,7 +7,7 @@ import time
 import json
 import logging
 from urllib.parse import quote
-from sqlalchemy import text, create_engine
+from sqlalchemy import text, create_engine, make_url
 from sqlalchemy.exc import OperationalError
 from flask import Flask
 from mdvtools.server import add_safe_headers
@@ -190,32 +190,20 @@ def wait_for_database(app):
     """Wait for the database to be ready before proceeding."""
     max_retries = 30
     delay = 5  # seconds
-    db_name = os.getenv('DB_NAME')
-    
+    # Use the settings load_config resolved, which may have come from env, Docker secrets or config.json
+    target_url = make_url(app.config['SQLALCHEMY_DATABASE_URI'])
+    db_name = target_url.database
+
     if not db_name:
-        error_message = "Error: DB_NAME environment variable is not set"
+        error_message = "Error: the database URI has no database name"
         logger.error(error_message)
         raise ValueError(error_message)
 
     # First connect to postgres database to check/create our target database
-    postgres_uri = 'postgresql://{}:{}@{}/postgres'.format(
-        os.getenv('DB_USER'),
-        os.getenv('DB_PASSWORD'),
-        os.getenv('DB_HOST')
-    )
-    
-    # Construct target URI once since environment variables don't change
-    target_uri = 'postgresql://{}:{}@{}/{}'.format(
-        os.getenv('DB_USER'),
-        os.getenv('DB_PASSWORD'),
-        os.getenv('DB_HOST'),
-        db_name
-    )
-    db_schema = (os.getenv('DB_SCHEMA') or '').strip()
-    
-    # Update the database URI in the app config (this is the same as the initial URI from load_config)
-    app.config['SQLALCHEMY_DATABASE_URI'] = target_uri
-    
+    postgres_uri = target_url.set(database='postgres').render_as_string(hide_password=False)
+    target_uri = target_url.render_as_string(hide_password=False)
+    db_schema = app.config.get('DB_SCHEMA', '')
+
     for attempt in range(max_retries):
         try:
             # First connect to postgres database
@@ -345,10 +333,21 @@ def load_config(app, config_name=None, enable_auth=False):
             app.config['DB_BACKEND'] = 'sqlite'
         else:
             app.config['PREFERRED_URL_SCHEME'] = 'https'
-            db_backend = (os.getenv('DB_BACKEND') or 'sqlite').strip().lower()
-            if db_backend not in ['sqlite', 'postgres']:
-                logger.warning(f"Unknown DB_BACKEND '{db_backend}', defaulting to sqlite")
-                db_backend = 'sqlite'
+            db_backend = (os.getenv('DB_BACKEND') or '').strip().lower()
+            if not db_backend:
+                # Configs written before DB_BACKEND existed always used postgres and set only
+                # DB_* values or Docker secrets. Defaulting those to sqlite would start the app
+                # on a new, empty database while the real one sits unused.
+                has_postgres_settings = any(
+                    os.getenv(name) for name in ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME']
+                ) or os.path.exists('/run/secrets/db_user')
+                if has_postgres_settings:
+                    logger.warning("DB_BACKEND is not set but postgres settings are present; using postgres. Set DB_BACKEND=postgres to remove this warning.")
+                    db_backend = 'postgres'
+                else:
+                    db_backend = 'sqlite'
+            elif db_backend not in ['sqlite', 'postgres']:
+                raise ValueError(f"Unknown DB_BACKEND '{db_backend}'; expected 'sqlite' or 'postgres'.")
 
             app.config['DB_BACKEND'] = db_backend
 
@@ -367,6 +366,7 @@ def load_config(app, config_name=None, enable_auth=False):
                     raise ValueError("Error: One or more required secrets or configurations are missing.")
                 
                 app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+                app.config['DB_SCHEMA'] = db_schema
                 if db_schema:
                     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
                         'connect_args': {'options': f'-csearch_path={db_schema}'}

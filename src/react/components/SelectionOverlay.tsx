@@ -10,21 +10,11 @@ import { useSpatialLayers } from "../spatial_context";
 import { observer } from "mobx-react-lite";
 import GateNameDialog from "./GateNameDialog";
 import {
-    DrawPolygonMode,
     DrawPolygonByDraggingMode,
-    ModifyMode,
-    // DrawRectangleMode,
-    // TransformMode,
-    // nb: non-geospatial coordinate system support is in v9.3.1
-    // we should be able to use this and get rid of 'translate-mode-exp'
-    // but the issues when switching seem more to do with logic than coordinates
-    // or maybe we need to pass some different prop (should be inferred?)
-    // TranslateMode as TranslateModeEx,
-    CompositeMode,
+    TranslateMode,
     type GeoJsonEditMode,
 } from '@deck.gl-community/editable-layers';
-import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-mode-exp';
-import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
+import { EditMode, PolygonMode, RectangleMode } from "@/editable-layers/selectionModes";
 import useGateActions from "../hooks/useGateActions";
 import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
 import IconWithTooltip from "./IconWithTooltip";
@@ -34,58 +24,13 @@ import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
 import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
 import { useChart } from "../context";
 
-//wtf do we need this adapter for and how can the types be so confusing/wrong?
-//"Type 'ModifyMode' is not assignable to type 'GeoJsonEditMode'." etc
-//even though `class ModifyMode extends GeoJsonEditMode`
-function compositeModes(modes: unknown[]) {
-    return modes as GeoJsonEditMode[];
-}
-
-class EditMode extends CompositeMode {
-    constructor() {
-        super(compositeModes([
-            new TranslateModeEx(), //works with cartesian / non-GIS coordinates
-            new ModifyMode(),
-        ]));
-    }
-}
-
-
-class RectangleMode extends CompositeMode {
-    constructor() {
-        super(compositeModes([
-            // we pass in modeProps to the layer, not the edit mode.
-            // new DrawRectangleMode(), //with modeConfig: { dragToDraw: true }
-            //our version, which we shouldn't need but looks/works a bit different as of now
-            new DrawRectangleByDraggingMode(),
-            new TranslateModeEx(),
-        ]));
-    }
-}
-class PolygonMode extends CompositeMode {
-    constructor() {
-        super(compositeModes([
-            new DrawPolygonMode(),
-            new TranslateModeEx(),
-        ]));
-    }
-}
-// todo - figure out weird conflict behaviour with this mode...
-class FreehandMode extends CompositeMode {
-    constructor() {
-        super(compositeModes([
-            new DrawPolygonByDraggingMode(),
-            new TranslateModeEx(),
-        ]));
-    }
-}
 // material-ui icons, or font-awesome icons... or custom in some cases...
 // mui icons are hefty, not sure about this...
 export const Tools = {
     pan: {
         name: "Pan",
         ToolIcon: PanToolOutlinedIcon,
-        mode: TranslateModeEx
+        mode: TranslateMode
     },
     rectangle: {
         name: "Rectangle",
@@ -212,7 +157,6 @@ export default observer(function SelectionOverlay() {
         }
 
         //same composite mode order doesn't work for all tools, so making `mode()` be more explicit for each
-        //setSelectionMode(new CompositeMode([new mode(), new TranslateModeEx()]));
         setSelectionMode(new mode() as GeoJsonEditMode);
         setSelectedToolX(tool);
     }, [setSelectionMode, editingGateId, setSelectionFeatureCollection, setSelectedToolX]);

@@ -29,15 +29,11 @@ class TestWaitForDatabase(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.app = Flask(__name__)
-        self.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-        
-        # Mock environment variables
-        self.env_patcher = patch.dict(os.environ, {
-            'DB_USER': 'test_user',
-            'DB_PASSWORD': 'test_password',
-            'DB_HOST': 'test_host',
-            'DB_NAME': 'test_db'
-        })
+        # load_config has already resolved these from env, Docker secrets or config.json
+        self.app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://test_user:test_password@test_host/test_db'
+
+        # No DB_* environment variables, as in a deployment that passes them as Docker secrets
+        self.env_patcher = patch.dict(os.environ, {}, clear=True)
         self.env_patcher.start()
 
     def tearDown(self):
@@ -79,7 +75,7 @@ class TestWaitForDatabase(unittest.TestCase):
         mock_flask_connection.execute.assert_called_once()
         mock_flask_connection.close.assert_called_once()
         
-        # Verify config was updated
+        # Verify config was left as load_config resolved it
         expected_uri = 'postgresql://test_user:test_password@test_host/test_db'
         self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], expected_uri)
 
@@ -168,18 +164,52 @@ class TestWaitForDatabase(unittest.TestCase):
         self.assertEqual(mock_sleep.call_count, 30)
 
     def test_wait_for_database_missing_db_name(self):
-        """Test that function raises ValueError when DB_NAME is not set."""
-        # Remove DB_NAME from environment
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(ValueError) as context:
-                wait_for_database(self.app)
-            
-            self.assertIn("DB_NAME environment variable is not set", str(context.exception))
+        """Test that function raises ValueError when the database URI has no database name."""
+        self.app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://test_user:test_password@test_host'
+
+        with self.assertRaises(ValueError) as context:
+            wait_for_database(self.app)
+
+        self.assertIn("no database name", str(context.exception))
+
+    @patch('mdvtools.dbutils.mdv_server_app.create_engine')
+    @patch('mdvtools.dbutils.mdv_server_app.db')
+    def test_wait_for_database_ignores_db_env_vars(self, mock_db, mock_create_engine):
+        """Test that the resolved URI wins over DB_* environment variables, which may be absent or differ."""
+        mock_postgres_engine = MagicMock()
+        mock_postgres_engine.connect.return_value.execute.return_value.scalar.return_value = True
+        mock_create_engine.return_value = mock_postgres_engine
+
+        with patch.dict(os.environ, {'DB_USER': 'env_user', 'DB_PASSWORD': 'env_password', 'DB_HOST': 'env_host', 'DB_NAME': 'env_db'}):
+            wait_for_database(self.app)
+
+        mock_create_engine.assert_called_once_with(
+            'postgresql://test_user:test_password@test_host/postgres',
+            isolation_level="AUTOCOMMIT"
+        )
+
+    @patch('mdvtools.dbutils.mdv_server_app.create_engine')
+    @patch('mdvtools.dbutils.mdv_server_app.db')
+    def test_wait_for_database_creates_schema_from_config(self, mock_db, mock_create_engine):
+        """Test that the schema load_config resolved is created in the target database."""
+        self.app.config['DB_SCHEMA'] = 'deployment_a'
+        mock_postgres_engine = MagicMock()
+        mock_postgres_engine.connect.return_value.execute.return_value.scalar.return_value = True
+        mock_create_engine.return_value = mock_postgres_engine
+
+        wait_for_database(self.app)
+
+        mock_create_engine.assert_any_call(
+            'postgresql://test_user:test_password@test_host/test_db',
+            isolation_level="AUTOCOMMIT"
+        )
+        executed = [str(c[0][0]) for c in mock_postgres_engine.connect.return_value.execute.call_args_list]
+        self.assertIn('CREATE SCHEMA IF NOT EXISTS "deployment_a"', executed)
 
     @patch('mdvtools.dbutils.mdv_server_app.create_engine')
     @patch('mdvtools.dbutils.mdv_server_app.db')
     def test_wait_for_database_uri_construction_efficiency(self, mock_db, mock_create_engine):
-        """Test that URI is constructed only once and config is set once."""
+        """Test that only the maintenance engine is created and the resolved URI is left unchanged."""
         # Mock the engines
         mock_postgres_engine = MagicMock()
         mock_postgres_connection = MagicMock()
@@ -352,16 +382,66 @@ class TestLoadConfig(unittest.TestCase):
     @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false}')
     @patch('os.path.dirname')
     @patch('os.path.abspath')
-    def test_load_config_unknown_backend_falls_back_to_sqlite(self, mock_abspath, mock_dirname, mock_file):
-        """Test that an unrecognised DB_BACKEND value falls back to sqlite."""
+    def test_load_config_unknown_backend_raises(self, mock_abspath, mock_dirname, mock_file):
+        """A mistyped DB_BACKEND must not silently switch a deployment to an empty sqlite database."""
         mock_abspath.return_value = '/test/path'
         mock_dirname.return_value = '/test'
 
-        with patch.dict(os.environ, {'DB_BACKEND': 'mongodb'}, clear=True):
+        with patch.dict(os.environ, {'DB_BACKEND': 'postgress'}, clear=True):
+            with self.assertRaises(ValueError):
+                load_config(self.app)
+
+    @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false}')
+    @patch('os.path.dirname')
+    @patch('os.path.abspath')
+    def test_load_config_unset_backend_with_postgres_env_uses_postgres(self, mock_abspath, mock_dirname, mock_file):
+        """Configs written before DB_BACKEND existed set only DB_* values and must keep using postgres."""
+        mock_abspath.return_value = '/test/path'
+        mock_dirname.return_value = '/test'
+
+        with patch.dict(os.environ, {
+            'DB_USER': 'test_user',
+            'DB_PASSWORD': 'test_password',
+            'DB_NAME': 'test_db',
+            'DB_HOST': 'test_host'
+        }, clear=True):
+            load_config(self.app)
+
+        self.assertEqual(self.app.config['DB_BACKEND'], 'postgres')
+        self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], 'postgresql://test_user:test_password@test_host/test_db')
+
+    @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false, "db_container": "test_host"}')
+    @patch('os.path.dirname')
+    @patch('os.path.abspath')
+    @patch('os.path.exists')
+    @patch('mdvtools.dbutils.mdv_server_app.read_secret')
+    def test_load_config_unset_backend_with_postgres_secrets_uses_postgres(self, mock_read_secret, mock_exists, mock_abspath, mock_dirname, mock_file):
+        """Configs written before DB_BACKEND existed may pass postgres credentials only as Docker secrets."""
+        mock_abspath.return_value = '/test/path'
+        mock_dirname.return_value = '/test'
+        mock_exists.side_effect = lambda path: path == '/run/secrets/db_user'
+        mock_read_secret.side_effect = ['secret_user', 'secret_password', 'secret_db']
+
+        with patch.dict(os.environ, {}, clear=True):
+            load_config(self.app)
+
+        self.assertEqual(self.app.config['DB_BACKEND'], 'postgres')
+        self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], 'postgresql://secret_user:secret_password@test_host/secret_db')
+
+    @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false, "db_container": "test_host"}')
+    @patch('os.path.dirname')
+    @patch('os.path.abspath')
+    @patch('os.path.exists', return_value=False)
+    def test_load_config_unset_backend_without_postgres_settings_uses_sqlite(self, mock_exists, mock_abspath, mock_dirname, mock_file):
+        """A fresh install with no database settings gets sqlite; the db_container default in config.json does not count."""
+        mock_abspath.return_value = '/test/path'
+        mock_dirname.return_value = '/test'
+
+        with patch.dict(os.environ, {}, clear=True):
             load_config(self.app)
 
         self.assertEqual(self.app.config['DB_BACKEND'], 'sqlite')
-        self.assertIn('sqlite:///', self.app.config['SQLALCHEMY_DATABASE_URI'])
+        self.assertEqual(self.app.config['SQLALCHEMY_DATABASE_URI'], 'sqlite:////app/mdv/mdv.sqlite3')
 
     @patch('builtins.open', new_callable=mock_open, read_data='{"track_modifications": false}')
     @patch('os.path.dirname')

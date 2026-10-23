@@ -28,7 +28,7 @@
           "y",
           "x"
         ],
-        "type": "VivMdvRegionReact",
+        "type": "SpatialDataMdvRegionReact",
         "region": "<SPATIAL_REGION_NAME>",
         "color_by": {
           "linkedDsName": "genes",
@@ -44,15 +44,6 @@
         },
         "color_legend": {
           "display": false
-        },
-        "roi": {
-          "min_x": 0,
-          "min_y": 0,
-          "max_x": 1000,
-          "max_y": 1000
-        },
-        "viv": {
-          "channels": []
         },
         "contourParameter": "x",
         "id": "3PZt1J",

@@ -37,10 +37,10 @@ def set_default_spatial_image_view(
     make_default: bool = True,
 ) -> None:
     for region_name, region_data in mdv.get_datasource_metadata(obs_datasource_name)["regions"]["all_regions"].items():
-        if "viv_image" in region_data:
+        if "spatial" in region_data:
             break
     else:
-        raise ValueError("No region with a viv_image found")
+        raise ValueError("No region with spatial metadata found")
 
     emit(f"Using region '{region_name}' for view '{view_name}'", verbose_only=True)
     with open(template_path, "r") as f:

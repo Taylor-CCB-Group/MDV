@@ -4,9 +4,11 @@ import type { CategoricalDataType } from '@/charts/charts';
 import { autorun, makeAutoObservable, runInAction } from 'mobx';
 import {
     useCategoryContour,
+    useCategoryContourLegend,
     getDensitySettings,
     getContourVisualSettings,
     type DualContourLegacyConfig,
+    type HoveredContour,
 } from './contour_state';
 import type { CategoryContourProps } from './contour_state';
 import type { BaseConfig } from '@/charts/BaseChart';
@@ -147,6 +149,32 @@ describe('useCategoryContour', () => {
         expect(typeof result.current?.getPosition).toBe('function');
     });
 
+    test('emphasises the contour hovered in the legend and attenuates it while another is hovered', () => {
+        (useFieldSpec as any).mockReturnValue({
+            field: 'test-field',
+            values: ['cat1'],
+            data: new Uint8Array([0]),
+            datatype: 'text' as CategoricalDataType,
+        });
+        (useCategoryFilterIndices as any).mockReturnValue(new Uint32Array([0]));
+
+        const { result, rerender } = renderHook(
+            ({ hoveredContour }) =>
+                useCategoryContour({ ...baseProps, parameter: 'test-field', category: 'cat1', hoveredContour }),
+            { initialProps: { hoveredContour: { type: 'category', id: 'test-contour' } as HoveredContour | null } },
+        );
+        expect(result.current?.fillOpacity).toBeCloseTo(0.75);
+        expect(result.current?.contourOpacity).toBe(1);
+
+        rerender({ hoveredContour: { type: 'field', field: 'some-field' } });
+        expect(result.current?.fillOpacity).toBeCloseTo(0.4);
+        expect(result.current?.contourOpacity).toBeCloseTo(0.64);
+
+        rerender({ hoveredContour: null });
+        expect(result.current?.fillOpacity).toBe(0.5);
+        expect(result.current?.contourOpacity).toBe(0.8);
+    });
+
     test('recomputes contour colors when the active category column gains a new value in place', () => {
         const mockContourParameter = {
             field: 'test-field',
@@ -255,6 +283,54 @@ describe('useCategoryContour', () => {
         );
 
         expect(result.current?.contourFill).toBe(10000);
+    });
+});
+
+describe('useCategoryContourLegend', () => {
+    const mockContourParameter = {
+        field: 'cell_type',
+        name: 'Cell type',
+        values: ['T cell', 'B cell', 'NK'],
+        datatype: 'text' as CategoricalDataType,
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        (useFieldSpec as any).mockReturnValue(mockContourParameter);
+        (useDataStore as any).mockReturnValue({
+            getColumnColors: vi.fn(() => [[255, 0, 0], [0, 255, 0], [0, 0, 255]]),
+        });
+    });
+
+    const config = (category1: string[], category2: string[]) =>
+        ({ contourParameter: 'cell_type', category1, category2 }) as unknown as DualContourLegacyConfig;
+
+    test('lists each non-empty category selection under the contour parameter name', () => {
+        const { result } = renderHook(() => useCategoryContourLegend(config(['B cell'], [])));
+
+        expect(result.current.label).toBe('Cell type');
+        expect(result.current.items).toEqual([
+            { id: 'contour1', name: 'B cell', colors: [[0, 255, 0]] },
+        ]);
+    });
+
+    test('uses the shared colour range for a contour over several categories', () => {
+        const { result } = renderHook(() =>
+            useCategoryContourLegend(config(['NK'], ['T cell', 'B cell'])),
+        );
+
+        const [first, second] = result.current.items;
+        expect(first).toEqual({ id: 'contour1', name: 'NK', colors: [[0, 0, 255]] });
+        expect(second.id).toBe('contour2');
+        expect(second.name).toBe('T cell, B cell');
+        expect(second.colors.length).toBeGreaterThan(1);
+    });
+
+    test('returns no items without a contour parameter', () => {
+        (useFieldSpec as any).mockReturnValue(undefined);
+        const { result } = renderHook(() => useCategoryContourLegend(config(['NK'], [])));
+
+        expect(result.current.items).toEqual([]);
     });
 });
 

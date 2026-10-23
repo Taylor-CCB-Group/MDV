@@ -142,6 +142,7 @@ pip download --no-deps --only-binary :all: --index-url https://test.pypi.org/sim
   -d /tmp/testpypi "mdvtools==X.Y.Z"
 uv venv --python 3.12 /tmp/mdv-slim && uv pip install --python /tmp/mdv-slim /tmp/testpypi/*.whl
 /tmp/mdv-slim/bin/python .github/scripts/smoke_test.py X.Y.Z
+/tmp/mdv-slim/bin/mdvtools --version   # should report X.Y.Z and the release commit
 uv venv --python 3.12 /tmp/mdv-app && uv pip install --python /tmp/mdv-app "$(ls /tmp/testpypi/*.whl)[app]"
 /tmp/mdv-app/bin/python .github/scripts/smoke_test.py X.Y.Z --app
 ```
