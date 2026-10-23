@@ -18,6 +18,16 @@ ownership** work in the `useFilteredIndices` cluster still run **synchronously o
 substrate for GPU/WASM, but "everything derived is already off-thread" applies to the Dimension
 aggregation workers, not to the React-side scoping/ownership layer.
 
+## Status (2026-10)
+
+The commit seam for A1–A3 exists: every filter method ends in `Dimension.commitFilter(include)`,
+which owns the 0/1/2/3 state machine and accepts a predicate, an include mask, or a **promise** of
+either. Async results are dropped if a later commit, `removeFilter`, `removeAllFilters` or
+`destroy` supersedes them; listeners are notified when they land; `filter()` returns a promise.
+Sync methods still commit before `filter()` returns, so existing callers are unaffected. No
+method has a worker/GPU backend yet. Coverage: `src/tests/datastore/dimension*.spec.ts`
+(including model-based randomized tests for sync and async interleavings).
+
 ## Current filter model (grounded)
 
 - A `DataStore` owns one global filter byte-array (`filterArray` over a `SharedArrayBuffer`,

@@ -19,7 +19,7 @@ class CatColDimension extends Dimension {
             const d = colData[i];
             return catData[i] === cat && !Number.isNaN(d) && d > thr;
         };
-        this.filterPredicate({ predicate }, columns);
+        return this.filterPredicate({ predicate }, columns);
     }
 
     getAverages(callback, columns, config = {}) {
