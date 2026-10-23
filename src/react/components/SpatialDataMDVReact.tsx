@@ -19,6 +19,7 @@ import { getSharedScatterSettings } from "./sharedScatterSettings";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
+import { browserHasWebGPU, type DeckBackend } from "@/react/spatialdata/deck_backend";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import {
@@ -32,6 +33,8 @@ export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     background_filter: CategoryFilter;
     renderStack?: RenderStack;
     viewState?: SpatialDataSerializableViewState | null;
+    /** Experimental; null (or absent) follows the `MDV_WEBGPU` dev flag (see `deck_backend.ts`). */
+    render_backend?: DeckBackend | null;
 };
 
 function adaptSpatialDataConfig(
@@ -47,6 +50,9 @@ function adaptSpatialDataConfig(
     if (config.renderStack === undefined) {
         config.renderStack = createHostOnlyRenderStack();
     }
+    // Must exist before makeAutoObservable(config) for later changes to be observed, and
+    // survive initialiseChartConfig's JSON copy, so null rather than undefined.
+    config.render_backend = config.render_backend ?? null;
     config.param = [...dataStore.regions.position_fields];
     if (typeof config.contourParameter === "string") {
         const column = dataStore.columnIndex[config.contourParameter];
@@ -205,6 +211,19 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 label: "Category Filters",
                 current_value: filters,
             }),
+            ...(browserHasWebGPU() || config.render_backend
+                ? [
+                      g({
+                          type: "dropdown",
+                          label: "Rendering backend (experimental)",
+                          current_value: config.render_backend ?? "default",
+                          values: [renderBackendOptions, "name", "value"],
+                          func(value) {
+                              config.render_backend = value === "webgl" || value === "webgpu" ? value : null;
+                          },
+                      }),
+                  ]
+                : []),
         ]);
     }
 
@@ -217,9 +236,17 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         if (this.config.renderStack) {
             config.renderStack = this.config.renderStack;
         }
+        // null only exists to keep the key observable; leave it out of saved views
+        if (config.render_backend === null) config.render_backend = undefined;
         return config;
     }
 }
+
+const renderBackendOptions = [
+    { name: "Default (WebGL unless MDV_WEBGPU is set)", value: "default" },
+    { name: "WebGL", value: "webgl" },
+    { name: "WebGPU (experimental)", value: "webgpu" },
+];
 
 function spatialRegionOptions(dataStore: DataStore) {
     return Object.keys(dataStore.regions?.all_regions ?? {})

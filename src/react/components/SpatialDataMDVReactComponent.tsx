@@ -21,6 +21,7 @@ import RasterDataWarning, { rasterEntriesKey } from "./RasterDataWarning";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
+import { type DeckDevice, resolveDeckBackend, useDeckDevice } from "@/react/spatialdata/deck_backend";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
 import { createPointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
@@ -287,6 +288,18 @@ function SpatialDataLink() {
     );
 }
 
+/** Says when the canvas is on the experimental WebGPU path, or failed to get onto it. */
+function RenderBackendBadge({ device }: { device: Extract<DeckDevice, { status: "ready" }> }) {
+    if (device.backend !== "webgpu" && !device.fallbackReason) return null;
+    const label =
+        device.backend === "webgpu" ? "WebGPU (experimental)" : `WebGPU unavailable (${device.fallbackReason}); using WebGL`;
+    return (
+        <div className="legend-container pointer-events-none absolute bottom-2 left-2 z-[4] rounded-tr border-[0.5px] border-current text-xs">
+            {label}
+        </div>
+    );
+}
+
 const SpatialDataMainChart = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
@@ -383,6 +396,8 @@ const SpatialDataViewer = observer(
         const legendCategories = useCategoryContourLegend(contourConfig);
         const showLegend = contourConfig.field_legend.display;
         const legendPosition = { x: 10, y: 10 };
+        const deckDevice = useDeckDevice(resolveDeckBackend(config.render_backend));
+        const deviceProps = deckDevice.status === "ready" ? deckDevice.deviceProps : undefined;
 
         useViewStateLink();
 
@@ -524,8 +539,9 @@ const SpatialDataViewer = observer(
                     doubleClickZoom: false,
                     dragPan: controllerOptions.dragPan,
                 },
+                ...(deviceProps && { deviceProps }),
             }),
-            [id, getPortalTooltip, controllerOptions],
+            [id, getPortalTooltip, controllerOptions, deviceProps],
         );
 
         if (!coordinateSystem || !region?.spatial?.file) {
@@ -546,6 +562,10 @@ const SpatialDataViewer = observer(
 
         if (!config.renderStack?.entries.length) {
             return <div className="h-full w-full p-2">Preparing layer stack…</div>;
+        }
+
+        if (deckDevice.status === "pending") {
+            return <div className="h-full w-full p-2">Starting WebGPU…</div>;
         }
 
         return (
@@ -578,6 +598,8 @@ const SpatialDataViewer = observer(
                     <div style={{ width, height, position: "relative" }}>
                         <Profiler id="spatial.canvas" onRender={onSpatialProfilerRender}>
                             <ErrorBoundary
+                                // deck picks its device once, when created: remount on a backend change.
+                                key={deckDevice.backend}
                                 fallbackRender={(props) => <SpatialCanvasErrorFallback {...props} layers={layers} />}
                                 // Retry when the layer set actually changes, so a canvas
                                 // felled by one bad layer recovers once it is removed or
@@ -607,6 +629,7 @@ const SpatialDataViewer = observer(
                 </div>
                 <RasterDataWarning spatialData={spatialData} entriesKey={rasterEntriesKey(config.renderStack)} />
                 <SpatialDataLink />
+                <RenderBackendBadge device={deckDevice} />
                 {tooltipPortal}
                 {featureTooltipPortal}
             </Profiler>

@@ -19,8 +19,8 @@ import type { ViewState } from "./components/VivScatterComponent";
 import SpatialLayer from "@/webgl/SpatialLayer";
 import { ScatterSquareExtension, ScatterDensityExension } from "../webgl/ScatterDeckExtension";
 import type { LayerExtension } from "@deck.gl/core";
-import { ScatterplotLayer } from "@deck.gl/layers";
-import { DataFilterExtension } from "@deck.gl/extensions";
+import { MdvScatterplotLayer } from "@/webgl/MdvScatterplotLayer";
+import { MdvDataFilterExtension } from "@/webgl/MdvDataFilterExtension";
 import { isDatatypeCategorical } from "@/lib/utils";
 import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
 import { type DualContourLegacyConfig, type HoveredContour, useLegacyDualContour } from "./contour_state";
@@ -509,7 +509,7 @@ export function useScatterplotLayer(
         const exts: LayerExtension[] = [];
         if (point_shape === "gaussian") exts.push(new ScatterDensityExension());
         else if (point_shape !== "circle") exts.push(new ScatterSquareExtension());
-        exts.push(new DataFilterExtension({ filterSize: 1 }));
+        exts.push(new MdvDataFilterExtension({ filterSize: 1 }));
         return exts;
     }, [point_shape]);
     const scatterplotLayer = useMemo(() => {
@@ -615,7 +615,7 @@ export function useScatterplotLayer(
     const greyData = useMemo(() => ({ length: rowCount }), [rowCount]);
     const greyScatterplotLayer = useMemo(
         () =>
-            new ScatterplotLayer({
+            new MdvScatterplotLayer({
                 id: `scatter-grey_${getVivId(`${id}detail-react`)}`,
                 data: greyData,
                 opacity,
@@ -633,7 +633,9 @@ export function useScatterplotLayer(
                 billboard: true,
                 modelMatrix,
                 parameters: {
-                    depthTest: false,
+                    // portable form of WebGL's `depthTest: false`, which WebGPU rejects
+                    depthCompare: "always",
+                    depthWriteEnabled: false,
                 },
                 getFilterValue: (_: unknown, { index }: { index: number }) => {
                     if (!isExternallyFiltered(index)) return 0;
@@ -647,7 +649,7 @@ export function useScatterplotLayer(
                         : false,
                     getPosition: [cx.data, cy.data, cz?.data],
                 },
-                extensions: [new DataFilterExtension()],
+                extensions: [new MdvDataFilterExtension()],
                 visible: greyOnFilter,
             }),
         [

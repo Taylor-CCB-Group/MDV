@@ -13,7 +13,20 @@ class MonkeyPatchDeck extends Deck<any> {
     declare public canvas: HTMLCanvasElement | null;
 }
 
-export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {}
+export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
+    /**
+     * editable-layers picks synchronously on every pointer event, which deck.gl cannot
+     * do on a WebGPU device: it throws, and the throw aborts the click before deck
+     * dispatches it to the other layers (so scatter points could not be clicked).
+     * On WebGPU, report no picks: drawing new selection shapes still works, but an
+     * existing shape's handles cannot be picked to edit it. Remove once
+     * editable-layers picks asynchronously.
+     */
+    getPicks(screenCoords: Parameters<EditableGeoJsonLayer["getPicks"]>[0]) {
+        if (this.context.device.type === "webgpu") return [];
+        return super.getPicks(screenCoords);
+    }
+}
 
 /** Deck's own (private) helpers, so the replacement manager is configured exactly as deck would. */
 function getDeckPrivates(deck: MonkeyPatchDeck) {

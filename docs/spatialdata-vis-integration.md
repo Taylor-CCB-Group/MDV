@@ -267,6 +267,42 @@ would replace that page-global backend without the cache.
 
 The pins in `package.json` are the enforcement; keep them at or above these.
 
+## WebGPU (experimental)
+
+SpatialData.js 0.12 renders images, labels, shapes and points on WebGPU when the canvas
+is given `deckProps.deviceProps = { type: "webgpu", adapters: [webgpuAdapter] }`. The
+SpatialData chart opts in per chart (`render_backend` setting, "Rendering backend
+(experimental)"), defaulting to the `MDV_WEBGPU` dev flag — see
+`src/react/spatialdata/deck_backend.ts`. It falls back to WebGL, with a notice on the
+canvas, when the browser has no WebGPU adapter. deck picks its device once, so changing
+the backend remounts the canvas.
+
+Host layers (MDV's scatter, grey-out, gate and selection overlays) go into the same Deck
+unadapted, so they must work on WebGPU themselves:
+
+- deck 9.4 has **no WGSL shader hooks**, so GLSL `inject`-based extensions cannot simply
+  carry over. `MdvScatterplotLayer` stands in for them: extensions implementing
+  `WGSLLayerExtension` (`src/webgl/wgslLayerExtension.ts`) edit deck's scatterplot WGSL at
+  exact anchors, which `src/tests/webgl/wgslLayerExtensions.test.ts` pins against the
+  installed deck. The square and gaussian point shapes work this way.
+- **`DataFilterExtension` is GLSL-only upstream.** `MdvDataFilterExtension` keeps
+  upstream's JS (attribute, uniforms) and supplies a WGSL `dataFilter` module plus a luma
+  `ShaderPlugin` vertex input, for the subset MDV uses (`filterSize: 1`, no categories,
+  soft range, fp64 or `countItems`). Retire both once deck has WGSL hooks and a WebGPU
+  data filter; luma 9.4.2's `filterShaderPlugin` targets a `FILTER_POSITION` hook that
+  deck's layers do not call yet, which is the likely shape of an upstream PR.
+- **Contours**: `TriangleLayerContours` is GLSL-only and is not ported; on WebGPU the
+  heatmap uses deck's own WGSL triangle layer (plain shading, no contour lines). Contours
+  are expected to move to KDE splatting with a separate presentation shader.
+- **Synchronous picking throws on WebGPU** (`readPixelsToArrayWebGL: not implemented`).
+  editable-layers picks synchronously on every pointer event, which aborted clicks before
+  deck dispatched them to the scatter layer; `MonkeyPatchEditableGeoJsonLayer` reports no
+  picks on WebGPU, so selection shapes can still be drawn but not picked for editing.
+- Use luma's portable parameters (`depthCompare`, `depthWriteEnabled`), not WebGL ones
+  like `depthTest`, which WebGPU rejects.
+- SpatialData.js drops Viv image extensions on WebGPU, so `VivContrastExtension`'s tone
+  controls have no effect there.
+
 ## Avivatorish comparison
 
 MDV currently carries a local `src/react/components/avivatorish` implementation and also depends on `@spatialdata/avivatorish`. Treat the local copy as the integration shim for now, not as a desired long-term fork.
