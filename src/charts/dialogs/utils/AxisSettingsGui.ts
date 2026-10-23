@@ -1,5 +1,5 @@
 import { g } from "@/lib/utils";
-import type { AxisConfig, ScatterPlotConfig2D } from "@/react/scatter_state";
+import type { AxisConfig, AxisConfig2D } from "@/react/scatter_state";
 
 // premature abstraction?
 const axisNames = {
@@ -8,7 +8,7 @@ const axisNames = {
     z: "Z Axis",
     ry: "Right Y Axis",
     tx: "Top X Axis",
-}
+};
 const sizeLabel = (label: string) => {
     // 🙄 this is a bit dumb
     if (label.toLowerCase().includes("y")) return "Width";
@@ -16,20 +16,23 @@ const sizeLabel = (label: string) => {
     return "Size";
 };
 
-function axisGui(axis: AxisConfig, label: string, callback?: () => void) {
+function axisGui(axis: AxisConfig, label: string, callback?: () => void, rotateLabels = false) {
+    // rotate_labels is not so useful for scatterplots - numbers tend to look ok
+    const rotate = rotateLabels
+        ? [
+              g({
+                  type: "check",
+                  label: `Rotate ${label} labels`,
+                  current_value: axis.rotate_labels,
+                  func: (x) => {
+                      axis.rotate_labels = x;
+                      callback?.();
+                  },
+              }),
+          ]
+        : [];
     return [
-        // rotate_labels is a bit of a pain to get working
-        // and not so useful for scatterplots - numbers tend to look ok
-        // will want to review axis settings for other charts
-        // g({
-        //     type: "check",
-        //     label: `Rotate ${label} labels`,
-        //     current_value: axis.rotate_labels,
-        //     func: (x) => {
-        //         axis.rotate_labels = x;
-        //         callback?.();
-        //     }
-        // }),
+        ...rotate,
         g({
             type: "slider",
             max: 20,
@@ -40,7 +43,7 @@ function axisGui(axis: AxisConfig, label: string, callback?: () => void) {
             func: (x) => {
                 axis.tickfont = x;
                 callback?.();
-            }
+            },
         }),
         g({
             type: "slider",
@@ -51,25 +54,31 @@ function axisGui(axis: AxisConfig, label: string, callback?: () => void) {
             func: (x) => {
                 axis.size = x;
                 callback?.();
-            }
+            },
         }),
     ];
 }
 
-export default function getAxisGuiSpec(config: ScatterPlotConfig2D, callback?: () => void) {
+export type AxisGuiOptions = {
+    /** Show a "Rotate X axis labels" control, for charts with long category labels. */
+    rotateXLabels?: boolean;
+};
+
+export default function getAxisGuiSpec(
+    config: { axis?: AxisConfig2D },
+    callback?: () => void,
+    { rotateXLabels = false }: AxisGuiOptions = {},
+) {
     if (!config.axis) {
         throw new Error("No axis config found");
     }
     const { axis } = config;
     // mobx doesn't like this Object.entries?
     // const arr = Object.entries(axis).flatMap(([key, value]) => axisGui(value, key, callback));
-    const arr = [
-        ...axisGui(axis.x, axisNames.x, callback),
-        ...axisGui(axis.y, axisNames.y, callback),
-    ];
+    const arr = [...axisGui(axis.x, axisNames.x, callback, rotateXLabels), ...axisGui(axis.y, axisNames.y, callback)];
     return g({
         type: "folder",
         label: "Axis Controls",
         current_value: arr,
     });
-};
+}

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+    type FixedXLabelLayoutInput,
+    layoutFixedXLabels,
     layoutXLabels,
     type MeasureText,
     stripSharedSubgroupSuffix,
@@ -197,5 +199,76 @@ describe("layoutXLabels", () => {
             expect(labelled).toHaveLength(20);
             expect(labelled.slice(0, 3)).toEqual([0, 3, 6]);
         });
+    });
+});
+
+describe("layoutFixedXLabels", () => {
+    // 10 columns, 56px each
+    const base: FixedXLabelLayoutInput = {
+        labels: Array.from({ length: 10 }, (_, i) => `LONG_GENE_NAME_${i}_abcd`),
+        plotLeft: 110,
+        plotWidth: 560,
+        chartHeight: 400,
+        fontSize: 10,
+        titleSize: 0,
+        truncate: true,
+        thin: false,
+        angle: 45,
+        margin: 60,
+    };
+    const width = (label: string) => measure(label, base.fontSize);
+
+    it("keeps the user's angle, font size and margin", () => {
+        const layout = layoutFixedXLabels(base, measure);
+        expect(layout).toMatchObject({ angle: 45, fontSize: 10, margin: 60 });
+    });
+
+    it("shortens 45° labels to the room the axis height leaves", () => {
+        const layout = layoutFixedXLabels(base, measure);
+        // (60 - (9 + 10·sin45 + 4)) / sin45 ≈ 56px of text
+        for (const label of layout.labels) {
+            expect(label).toContain("…");
+            expect(width(label)).toBeLessThanOrEqual(57);
+        }
+    });
+
+    it("keeps more of each label on a taller axis", () => {
+        const short = layoutFixedXLabels(base, measure);
+        const tall = layoutFixedXLabels({ ...base, margin: 120 }, measure);
+        expect(tall.labels[5].length).toBeGreaterThan(short.labels[5].length);
+    });
+
+    it("shortens flat labels to the column width", () => {
+        const layout = layoutFixedXLabels({ ...base, angle: 0 }, measure);
+        for (const label of layout.labels) {
+            expect(label).toContain("…");
+            expect(width(label)).toBeLessThanOrEqual(56 - 4);
+        }
+    });
+
+    it("leaves labels as they are with neither option on", () => {
+        for (const angle of [0, 45] as const) {
+            const layout = layoutFixedXLabels({ ...base, angle, truncate: false }, measure);
+            expect(layout.labels).toEqual(base.labels);
+        }
+    });
+
+    it("labels only every nth column when full flat labels overlap", () => {
+        const layout = layoutFixedXLabels(
+            { ...base, angle: 0, truncate: false, thin: true },
+            measure,
+        );
+        // 132px labels in 56px columns → every 3rd column
+        const labelled = layout.labels
+            .map((l, i) => (l === "" ? null : i))
+            .filter((i) => i !== null);
+        expect(labelled).toEqual([0, 3, 6, 9]);
+    });
+
+    it("labels only every nth column when 45° labels are too close", () => {
+        // 60 columns in 315px: 10px · 1.1 / (5.25 · sin45) → every 3rd column
+        const crowded = { ...base, plotWidth: 315, labels: Array(60).fill("GENE00"), thin: true };
+        const labelled = layoutFixedXLabels(crowded, measure).labels.filter((l) => l !== "");
+        expect(labelled).toHaveLength(20);
     });
 });
