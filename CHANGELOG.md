@@ -25,6 +25,8 @@ All notable changes to `mdvtools` are documented here. The format is based on
   the `dev` dependency group before.
 - Build information no longer reports the commit of an unrelated git repository when
   `mdvtools` is installed inside one (for example a virtualenv within your own project).
+- In the gridstack layout, hovering a chart no longer adds a scrollbar and resizes every chart
+  (#594).
 
 ## [1.3.0] - 2026-06-04
 
