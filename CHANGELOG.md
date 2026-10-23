@@ -52,6 +52,8 @@ A feature release. SQLite is now the default database for new installs of the fu
 - When a host frames MDV without cross-origin isolation, the catalog and project pages offer
   to open MDV in a new tab, where data loading works (#573).
 - The debug dialog lists validation issues in a readable form (#491).
+- The density legend lists categorical contours as well as density fields, and hovering an
+  entry highlights its contour (#590).
 
 ### Changed
 - React Compiler is now enabled by default for Vite builds; set
