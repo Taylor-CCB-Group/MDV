@@ -310,6 +310,31 @@ function RenderBackendBadge({ device }: { device: Extract<DeckDevice, { status: 
     );
 }
 
+type DeckLayerError = { message: string; layerId?: string };
+
+/**
+ * A layer error from deck, shown on the canvas rather than only in the console. Below the
+ * selection toolbar, which spans most of a narrow chart's top edge.
+ */
+function DeckErrorNotice({ error, onDismiss }: { error: DeckLayerError; onDismiss: () => void }) {
+    const layer = error.layerId?.replace(/-#.*#$/, "");
+    return (
+        <div
+            role="alert"
+            className="legend-container absolute top-16 left-2 flex max-w-[calc(100%-1rem)] items-start gap-2 rounded border-[0.5px] border-current text-xs"
+            style={{ zIndex: 4 }}
+            title={layer ? `${layer}: ${error.message}` : error.message}
+        >
+            <span className="line-clamp-3 break-words">
+                ⚠ {layer ? "A layer failed to draw" : "Rendering error"}: {error.message}
+            </span>
+            <button type="button" className="shrink-0 cursor-pointer" aria-label="Dismiss" onClick={onDismiss}>
+                ×
+            </button>
+        </div>
+    );
+}
+
 const SpatialDataMainChart = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
@@ -408,6 +433,22 @@ const SpatialDataViewer = observer(
         const legendPosition = { x: 10, y: 10 };
         const deckDevice = useDeckDevice(resolveDeckBackend(config.render_backend));
         const deviceProps = deckDevice.status === "ready" ? deckDevice.deviceProps : undefined;
+        // deck reports a layer that fails (e.g. a shader that will not compile on this
+        // backend) through `onError`, which by default only reaches the console.
+        const [deckError, setDeckError] = useState<DeckLayerError | null>(null);
+        const onDeckError = useCallback((error: Error, layer?: { id: string } | null) => {
+            console.error(error);
+            const layerId = layer?.id;
+            // keep the previous object for a repeat, so an error raised every frame cannot re-render every frame
+            setDeckError((prev) =>
+                prev?.message === error.message && prev.layerId === layerId ? prev : { message: error.message, layerId },
+            );
+        }, []);
+        // a new backend is a new Deck: whatever failed before may not fail again
+        useEffect(() => {
+            void deckDevice;
+            setDeckError(null);
+        }, [deckDevice]);
 
         useViewStateLink();
 
@@ -550,8 +591,9 @@ const SpatialDataViewer = observer(
                     dragPan: controllerOptions.dragPan,
                 },
                 ...(deviceProps && { deviceProps }),
+                onError: onDeckError,
             }),
-            [id, getPortalTooltip, controllerOptions, deviceProps],
+            [id, getPortalTooltip, controllerOptions, deviceProps, onDeckError],
         );
 
         if (!coordinateSystem || !region?.spatial?.file) {
@@ -640,6 +682,7 @@ const SpatialDataViewer = observer(
                 <RasterDataWarning spatialData={spatialData} entriesKey={rasterEntriesKey(config.renderStack)} />
                 <SpatialDataLink />
                 <RenderBackendBadge device={deckDevice} />
+                {deckError && <DeckErrorNotice error={deckError} onDismiss={() => setDeckError(null)} />}
                 {tooltipPortal}
                 {featureTooltipPortal}
             </Profiler>
