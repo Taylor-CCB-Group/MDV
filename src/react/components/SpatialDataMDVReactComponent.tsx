@@ -23,6 +23,7 @@ import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import { type DeckDevice, resolveDeckBackend, useDeckDevice } from "@/react/spatialdata/deck_backend";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
+import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
 import { createPointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import {
@@ -31,6 +32,7 @@ import {
     useRenderStackAdapter,
 } from "@/react/spatialdata/render_stack_adapter";
 import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack_control";
+import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
@@ -310,30 +312,55 @@ function RenderBackendBadge({ device }: { device: Extract<DeckDevice, { status: 
     );
 }
 
-type DeckLayerError = { message: string; layerId?: string };
-
 /**
- * A layer error from deck, shown on the canvas rather than only in the console. Below the
- * selection toolbar, which spans most of a narrow chart's top edge.
+ * Render errors on the canvas rather than only in the console: layers that failed and
+ * were turned off, and errors that could not be tied to a layer. Below the selection
+ * toolbar, which spans most of a narrow chart's top edge.
  */
-function DeckErrorNotice({ error, onDismiss }: { error: DeckLayerError; onDismiss: () => void }) {
-    const layer = error.layerId?.replace(/-#.*#$/, "");
+const RenderErrorNotice = observer(function RenderErrorNotice() {
+    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    const entries = chart.config.renderStack?.entries ?? [];
+    const lines: Array<{ key: string; text: string; title: string }> = [];
+    for (const [entryId, failure] of chart.layerFailures) {
+        if (failure.dismissed) continue;
+        const entry = entries.find((item) => item.id === entryId);
+        const name = entry ? renderStackEntryDisplayName(entry) : entryId;
+        lines.push({
+            key: entryId,
+            text: `${name} failed and was turned off: ${failure.reason}`,
+            title: [failure.reason, failure.detail].filter(Boolean).join("\n\n"),
+        });
+    }
+    for (const error of chart.canvasErrors) {
+        const repeats = error.count > 1 ? ` (×${error.count})` : "";
+        lines.push({ key: `canvas:${error.message}`, text: `Rendering error${repeats}: ${error.message}`, title: error.message });
+    }
+    if (lines.length === 0) return null;
     return (
         <div
             role="alert"
             className="legend-container absolute top-16 left-2 flex max-w-[calc(100%-1rem)] items-start gap-2 rounded border-[0.5px] border-current text-xs"
             style={{ zIndex: 4 }}
-            title={layer ? `${layer}: ${error.message}` : error.message}
         >
-            <span className="line-clamp-3 break-words">
-                ⚠ {layer ? "A layer failed to draw" : "Rendering error"}: {error.message}
-            </span>
-            <button type="button" className="shrink-0 cursor-pointer" aria-label="Dismiss" onClick={onDismiss}>
+            <div className="flex min-w-0 flex-col gap-1">
+                {lines.map((line) => (
+                    <span key={line.key} className="line-clamp-3 break-words" title={line.title}>
+                        ⚠ {line.text}
+                    </span>
+                ))}
+                <span className="opacity-70">Details are in the layer dialog.</span>
+            </div>
+            <button
+                type="button"
+                className="shrink-0 cursor-pointer"
+                aria-label="Dismiss"
+                onClick={() => chart.dismissRenderErrors()}
+            >
                 ×
             </button>
         </div>
     );
-}
+});
 
 const SpatialDataMainChart = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
@@ -432,23 +459,37 @@ const SpatialDataViewer = observer(
         const showLegend = contourConfig.field_legend.display;
         const legendPosition = { x: 10, y: 10 };
         const deckDevice = useDeckDevice(resolveDeckBackend(config.render_backend));
-        const deviceProps = deckDevice.status === "ready" ? deckDevice.deviceProps : undefined;
-        // deck reports a layer that fails (e.g. a shader that will not compile on this
-        // backend) through `onError`, which by default only reaches the console.
-        const [deckError, setDeckError] = useState<DeckLayerError | null>(null);
-        const onDeckError = useCallback((error: Error, layer?: { id: string } | null) => {
-            console.error(error);
-            const layerId = layer?.id;
-            // keep the previous object for a repeat, so an error raised every frame cannot re-render every frame
-            setDeckError((prev) =>
-                prev?.message === error.message && prev.layerId === layerId ? prev : { message: error.message, layerId },
-            );
-        }, []);
-        // a new backend is a new Deck: whatever failed before may not fail again
-        useEffect(() => {
-            void deckDevice;
-            setDeckError(null);
-        }, [deckDevice]);
+        // Layer errors (deck's `onError`) and WebGPU device errors (luma's) otherwise only
+        // reach the console, and a device error repeats every frame. The tracker ties them
+        // to render-stack entries, which the chart turns off and reports.
+        const failureTracker = useMemo(
+            () =>
+                new LayerFailureTracker({
+                    entryIds: () => chart.config.renderStack?.entries.map((entry) => entry.id) ?? [],
+                    fail: (entryId, failure) => chart.recordLayerFailure(entryId, failure),
+                    canvas: (message) => chart.recordCanvasError(message),
+                }),
+            [chart],
+        );
+        useEffect(() => () => failureTracker.dispose(), [failureTracker]);
+        const onDeckError = useCallback(
+            (error: Error, layer?: { id: string } | null) => failureTracker.layer(error, layer?.id),
+            [failureTracker],
+        );
+        const deviceProps = useMemo(
+            () =>
+                deckDevice.status === "ready" && deckDevice.deviceProps
+                    ? {
+                          ...deckDevice.deviceProps,
+                          // true: handled, so luma does not also log it (once per frame)
+                          onError: (error: Error) => {
+                              failureTracker.device(error);
+                              return true;
+                          },
+                      }
+                    : undefined,
+            [deckDevice, failureTracker],
+        );
 
         useViewStateLink();
 
@@ -682,7 +723,7 @@ const SpatialDataViewer = observer(
                 <RasterDataWarning spatialData={spatialData} entriesKey={rasterEntriesKey(config.renderStack)} />
                 <SpatialDataLink />
                 <RenderBackendBadge device={deckDevice} />
-                {deckError && <DeckErrorNotice error={deckError} onDismiss={() => setDeckError(null)} />}
+                <RenderErrorNotice />
                 {tooltipPortal}
                 {featureTooltipPortal}
             </Profiler>

@@ -2,7 +2,10 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
+    Alert,
+    AlertTitle,
     Autocomplete,
     Checkbox,
     Collapse,
@@ -76,6 +79,35 @@ function isLayerConfigOfType<TType extends LayerConfig["type"]>(
 ): layer is Extract<LayerConfig, { type: TType }> {
     return layer?.type === type;
 }
+
+/** Why a layer was turned off; shown above its properties until it is turned back on. */
+const LayerFailureDetails = observer(function LayerFailureDetails({ entryId }: { entryId: string }) {
+    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    const failure = chart.layerFailures.get(entryId);
+    if (!failure) return null;
+    return (
+        <Alert severity="warning" sx={{ mb: 1, "& .MuiAlert-message": { minWidth: 0 } }}>
+            <AlertTitle>This layer failed to draw and was turned off</AlertTitle>
+            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                {failure.reason}
+            </Typography>
+            {failure.detail && (
+                <Typography
+                    variant="caption"
+                    component="pre"
+                    sx={{ mt: 1, whiteSpace: "pre-wrap", wordBreak: "break-word", opacity: 0.8 }}
+                >
+                    {failure.detail}
+                </Typography>
+            )}
+            <Typography variant="caption" component="p" sx={{ mt: 1 }}>
+                {failure.source === "webgpu" ? "WebGPU" : "deck.gl"} error
+                {failure.count > 1 ? `, reported ${failure.count} times` : ""}. Turn the layer back on to try
+                again.
+            </Typography>
+        </Alert>
+    );
+});
 
 const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: string }) {
     const dataStore = useDataStore();
@@ -155,7 +187,9 @@ const LayerTreeRow = observer(function LayerTreeRow({
     onRemove: (entryId: string) => void;
     indent?: boolean;
 }) {
+    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const { entry, patchEntry, patchProps } = useRenderStackEntry(entryId);
+    const failure = chart.layerFailures.get(entryId);
     const {
         attributes,
         listeners,
@@ -180,8 +214,9 @@ const LayerTreeRow = observer(function LayerTreeRow({
         <div
             ref={setNodeRef}
             style={style}
-            className={`flex items-center gap-1 py-0.5 cursor-pointer rounded ${indent ? "pl-5 pr-1" : "px-1"} ${selected ? "bg-blue-100 dark:bg-blue-900/30" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
+            className={`flex items-center gap-1 py-0.5 cursor-pointer rounded ${indent ? "pl-5 pr-1" : "px-1"} ${selected ? "bg-blue-100 dark:bg-blue-900/30" : failure ? "bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:hover:bg-amber-900/50" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
             onClick={() => onSelect(entryId)}
+            title={failure ? `Failed and turned off: ${failure.reason}` : undefined}
         >
             <IconButton
                 {...attributes}
@@ -196,9 +231,14 @@ const LayerTreeRow = observer(function LayerTreeRow({
                 size="small"
                 checked={entry.visible}
                 onClick={(e) => e.stopPropagation()}
-                onChange={(e) => patchEntry({ visible: e.target.checked })}
+                onChange={(e) => {
+                    // turning a failed layer back on is a retry: forget the failure so it can be reported again
+                    if (e.target.checked) chart.clearLayerFailure(entryId);
+                    patchEntry({ visible: e.target.checked });
+                }}
                 sx={{ p: 0.25, flexShrink: 0 }}
             />
+            {failure && <WarningAmberIcon fontSize="small" color="warning" sx={{ flexShrink: 0 }} />}
             <Typography variant="body2" className="grow truncate select-none">
                 {renderStackEntryDisplayName(entry)}
             </Typography>
@@ -339,9 +379,10 @@ const SpatialLayerDialogComponent = observer(() => {
     const onRemove = useCallback(
         (id: string) => {
             mutateStack((current) => removeRenderStackEntry(current, id));
+            chart.clearLayerFailure(id);
             if (selectedEntryId === id) setSelectedEntryId(null);
         },
-        [mutateStack, selectedEntryId],
+        [chart, mutateStack, selectedEntryId],
     );
 
     if (!stack?.entries.length) {
@@ -438,6 +479,7 @@ const SpatialLayerDialogComponent = observer(() => {
                             />
                         )}
                     >
+                        <LayerFailureDetails entryId={selectedEntryId} />
                         <LayerDetails entryId={selectedEntryId} />
                     </ErrorBoundary>
                 ) : (

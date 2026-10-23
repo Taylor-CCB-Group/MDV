@@ -17,6 +17,7 @@ import {
 } from "./avivatorish/state";
 import { getSharedScatterSettings } from "./sharedScatterSettings";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
+import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
 import { browserHasWebGPU, type DeckBackend } from "@/react/spatialdata/deck_backend";
@@ -107,6 +108,46 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         this.pointsLayerRegistry = registry;
     }
 
+    /**
+     * Render-stack entries that failed to draw and were turned off, by entry id. Runtime
+     * only, never saved: turning the layer back on clears it, so a retry can fail and be
+     * reported again. See `layer_failures.ts`.
+     */
+    layerFailures = new Map<string, LayerFailure>();
+    /** Render errors that could not be tied to a layer. */
+    canvasErrors: CanvasError[] = [];
+
+    /** Record a failure and turn the entry off, so the rest of the canvas can draw again. */
+    recordLayerFailure(entryId: string, failure: Omit<LayerFailure, "count" | "dismissed">) {
+        const existing = this.layerFailures.get(entryId);
+        if (existing) {
+            existing.count++;
+            return;
+        }
+        this.layerFailures.set(entryId, { ...failure, count: 1, dismissed: false });
+        const entry = this.config.renderStack?.entries.find((item) => item.id === entryId);
+        if (entry?.visible) {
+            entry.visible = false;
+            this.bumpRenderStackGeneration();
+        }
+    }
+
+    clearLayerFailure(entryId: string) {
+        this.layerFailures.delete(entryId);
+    }
+
+    recordCanvasError(message: string) {
+        const existing = this.canvasErrors.find((item) => item.message === message);
+        if (existing) existing.count++;
+        else this.canvasErrors.push({ message, count: 1, dismissed: false });
+    }
+
+    /** Hide the canvas notice; failing layers stay marked in the layer dialog. */
+    dismissRenderErrors() {
+        for (const failure of this.layerFailures.values()) failure.dismissed = true;
+        this.canvasErrors = [];
+    }
+
     constructor(
         dataStore: DataStore,
         div: HTMLDivElement,
@@ -133,6 +174,12 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             // deeply observable would have MobX walk a live render-path object.
             pointsLayerRegistry: observable.ref,
             setPointsLayerRegistry: action,
+            layerFailures: observable,
+            canvasErrors: observable,
+            recordLayerFailure: action,
+            clearLayerFailure: action,
+            recordCanvasError: action,
+            dismissRenderErrors: action,
         });
         this.vivStores = createVivStores();
         this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener(
