@@ -249,7 +249,17 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             onHover(pickingInfo, event) {
                 if ((pickingInfo as any).featureType === "points") return;
                 // -- try to avoid selecting invisible features etc - refer to notes in aosta prototype
-                setSelectedFeatureIndexes(pickingInfo.index !== -1 ? [pickingInfo.index] : []);
+                if (pickingInfo.index === -1) {
+                    setSelectedFeatureIndexes([]);
+                    return;
+                }
+                // Only a feature pick selects a feature. An edit handle's index is the handle's,
+                // not a feature's, and on WebGPU a pick on the outline can come back with a
+                // garbage index and no object; either way keep the current selection, or the
+                // shape loses its handles and can no longer be modified or translated.
+                const isGuide = "isGuide" in pickingInfo && pickingInfo.isGuide;
+                if (!pickingInfo.object || isGuide) return;
+                setSelectedFeatureIndexes([pickingInfo.index]);
             },
             modeConfig: {
                 // dragToDraw: true,
