@@ -13,7 +13,7 @@ import { action, toJS } from "mobx";
 import { getEmptyFeatureCollection } from "./deck_state";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import { SELECTION_COORDINATE_SYSTEM } from "@/editable-layers/selectionModes";
-import type { FieldName } from "@/charts/charts";
+import type { HoveredContour } from "./contour_state";
 import type { Tool } from "./components/SelectionOverlay";
 import { useGateManager } from "./gates/useGateManager";
 import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "./gates/gateUtils";
@@ -50,8 +50,8 @@ export type SpatialAnnotationState = {
     rectRange: RangeState;
     measure: MeasureState;
     scatterProps: ReturnType<typeof useScatterplotLayer>;
-    hoveredFieldId?: FieldName | null;
-    setHoveredFieldId?: (fieldId: FieldName | null) => void;
+    hoveredContour?: HoveredContour | null;
+    setHoveredContour?: (contour: HoveredContour | null) => void;
 };
 
 // Could more usefully be thought of as SpatialContext?
@@ -282,7 +282,7 @@ function useCreateMeasure() {
     return { startPixels, setStart, endPixels, setEnd };
 }
 //add generic that extends SpatialConfig?
-function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredFieldId?: FieldName | null) {
+function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredContour?: HoveredContour | null) {
     // should we use zustand for this state?
     // doesn't matter too much as it's just used once by SpatialAnnotationProvider
     // consider for project-wide annotation stuff as opposed to ephemeral selections
@@ -290,7 +290,7 @@ function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredFieldId?:
     const measure = useCreateMeasure();
     const scatterProps = useScatterplotLayer(
         rectRange.modelMatrix,
-        hoveredFieldId,
+        hoveredContour,
         rectRange.rangeDimension,
     );
     return { rectRange, measure, scatterProps };
@@ -299,16 +299,16 @@ function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredFieldId?:
 export const SpatialAnnotationProvider = observer(function SpatialAnnotationProvider({
     chart,
     children,
-    hoveredFieldId,
-    setHoveredFieldId,
+    hoveredContour,
+    setHoveredContour,
     //add generic that extends SpatialConfig?
 }: { 
     chart: BaseChart<any>;
-    hoveredFieldId?: FieldName | null;
-    setHoveredFieldId?: (fieldId: FieldName | null) => void;
+    hoveredContour?: HoveredContour | null;
+    setHoveredContour?: (contour: HoveredContour | null) => void;
 } & React.PropsWithChildren) {
-    const annotationState = useCreateSpatialAnnotationState(chart, hoveredFieldId);
-    const stateWithHover = { ...annotationState, hoveredFieldId, setHoveredFieldId };
+    const annotationState = useCreateSpatialAnnotationState(chart, hoveredContour);
+    const stateWithHover = { ...annotationState, hoveredContour, setHoveredContour };
     return (
         <SpatialAnnotationState.Provider value={stateWithHover}>
             {children}

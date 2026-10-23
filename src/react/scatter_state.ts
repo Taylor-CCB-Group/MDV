@@ -23,8 +23,8 @@ import { ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
 import { isDatatypeCategorical } from "@/lib/utils";
 import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
-import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
-import type { ColumnName, DataColumn, DataType, FieldName } from "@/charts/charts";
+import { type DualContourLegacyConfig, type HoveredContour, useLegacyDualContour } from "./contour_state";
+import type { ColumnName, DataColumn, DataType } from "@/charts/charts";
 import type { SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -338,7 +338,7 @@ export function getMissingColorFilterValue(
  */
 export function useScatterplotLayer(
     modelMatrix: Matrix4,
-    hoveredFieldId?: FieldName | null,
+    hoveredContour?: HoveredContour | null,
     filterOwner?: FilterOwner | null,
 ) {
     const id = useChartID();
@@ -402,7 +402,7 @@ export function useScatterplotLayer(
         const visibleRows = new Set<number>(data as Iterable<number>);
         return highlightedIndices.filter((rowIndex) => visibleRows.has(rowIndex));
     }, [data, highlightedIndices]);
-    const contourLayers = useLegacyDualContour(hoveredFieldId);
+    const contourLayers = useLegacyDualContour(hoveredContour);
     const updateHighlightedRows = useCallback(
         (
             rowIndex: number,
