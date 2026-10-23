@@ -1,6 +1,7 @@
 import type { EventManager } from 'mjolnir.js';
 import { Deck } from '@deck.gl/core';
 import { EditableGeoJsonLayer } from '@deck.gl-community/editable-layers';
+import { cpuEditablePicks } from '@/editable-layers/cpuPicks';
 
 // we aren't really using this as an actual subclass, just declaring things as public so we can access them.
 //! we don't want to keep this around for future maintenance, hopefully deck can be patched so this is less necessary
@@ -14,20 +15,6 @@ class MonkeyPatchDeck extends Deck<any> {
 }
 
 type EditablePicks = ReturnType<EditableGeoJsonLayer["getPicks"]>;
-type AsyncPickState = {
-    /** The latest completed pick, and where it was taken. */
-    last: { x: number; y: number; picks: EditablePicks } | null;
-    inFlight: boolean;
-    /** A position requested while a pick was in flight; only the newest is kept. */
-    next: [number, number] | null;
-};
-/** How far, in CSS pixels, the pointer may have moved since the cached pick was taken. */
-const ASYNC_PICK_TOLERANCE = 4;
-/**
- * Keyed on the layer's `state`: deck builds a new layer instance on every update and moves
- * `state` across (`_transferState`), so an instance field would not survive.
- */
-const asyncPickStates = new WeakMap<object, AsyncPickState>();
 
 export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
     /**
@@ -35,65 +22,26 @@ export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
      * which deck.gl cannot do on a WebGPU device: it throws, and the throw aborted the
      * click before deck dispatched it to the other layers.
      *
-     * On WebGPU, answer from the latest async pick instead. Each pointer event requests a
-     * fresh one around the cursor, so by the time a press starts a drag (modify,
-     * translate) the cache matches where the pointer is; until the first one completes,
-     * there are no picks, which only delays hover feedback by an event. The async pick
-     * returns only the top object within the picking radius, not a depth stack: an edit
-     * handle near a vertex, the feature inside it, which is what modify and translate
-     * look for. Remove once editable-layers picks asynchronously.
+     * On WebGPU, compute the picks on the CPU instead (`cpuEditablePicks`): the layer holds
+     * one shape and its handles, so this is cheap and exact, and answers for where the
+     * pointer is now. An async GPU pick could only answer for where it was, so a quick move
+     * then press drew a new shape rather than moving the existing one. It also sidesteps two
+     * deck 9.4 WebGPU picking bugs met along the way: rectangle picks throw under
+     * @spatialdata's picking fix, and the outline's path sublayer returns garbage indices.
+     * Remove once editable-layers picks asynchronously.
      */
-    getPicks(screenCoords: Parameters<EditableGeoJsonLayer["getPicks"]>[0]) {
+    getPicks(screenCoords: Parameters<EditableGeoJsonLayer["getPicks"]>[0]): EditablePicks {
         if (this.context.device.type !== "webgpu") return super.getPicks(screenCoords);
-        const pickState = this.asyncPickState();
-        this.requestAsyncPicks(pickState, screenCoords[0], screenCoords[1]);
-        const { last } = pickState;
-        const near =
-            last &&
-            Math.abs(last.x - screenCoords[0]) <= ASYNC_PICK_TOLERANCE &&
-            Math.abs(last.y - screenCoords[1]) <= ASYNC_PICK_TOLERANCE;
-        return near ? last.picks : [];
-    }
-
-    private asyncPickState(): AsyncPickState {
-        let pickState = asyncPickStates.get(this.state);
-        if (!pickState) {
-            pickState = { last: null, inFlight: false, next: null };
-            asyncPickStates.set(this.state, pickState);
-        }
-        return pickState;
-    }
-
-    private requestAsyncPicks(pickState: AsyncPickState, x: number, y: number) {
-        if (pickState.inFlight) {
-            pickState.next = [x, y];
-            return;
-        }
-        // a finalized layer has no deck; stop rather than pick for nobody
-        const deck = this.context?.deck;
-        if (!deck) return;
-        pickState.inFlight = true;
-        const radius = this.props.pickingRadius ?? 0;
-        // A point pick, not `pickObjectsAsync`: deck 9.4 builds a rectangle pick assuming
-        // WebGL's bottom-left origin, which @spatialdata's WebGPU picking fix (correctly, for
-        // points) turns off, so the rectangle comes out with a negative height and throws.
-        deck
-            .pickObjectAsync({ x, y, radius, layerIds: [this.props.id] })
-            .then((pick) => {
-                // On WebGPU a pick on the outline (path) sublayer can come back with a garbage
-                // index and no object; editable-layers treats any non-guide pick as a feature
-                // and reads `pick.object.geometry`, so drop those rather than crash the layer.
-                pickState.last = { x, y, picks: pick?.object ? [pick] : [] };
-            })
-            .catch(() => {
-                pickState.last = null;
-            })
-            .finally(() => {
-                pickState.inFlight = false;
-                const next = pickState.next;
-                pickState.next = null;
-                if (next) this.requestAsyncPicks(pickState, next[0], next[1]);
-            });
+        const [x, y] = screenCoords;
+        const guides = this.getActiveMode().getGuides(this.getModeProps(this.props));
+        const picks = cpuEditablePicks({
+            features: this.props.data.features,
+            guides: guides?.features ?? [],
+            point: screenCoords,
+            project: (position) => this.project([position[0], position[1], 0]),
+            radius: this.props.pickingRadius ?? 0,
+        });
+        return picks.map((pick) => ({ ...pick, color: null, layer: this, x, y, pixelRatio: 1 }));
     }
 }
 

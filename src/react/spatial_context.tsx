@@ -210,7 +210,11 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             cancelled = true;
         }
     }, [coords, filterPoly, removeFilter, chart, gateManager, editingGateId]);
-    const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
+    // The collection holds at most one shape (see `onEdit`), and it is always the one being
+    // edited. Selecting it on hover made translate-vs-draw depend on whether a hover pick had
+    // landed before the press, which on WebGPU (async picking) it often had not.
+    const hasShape = selectionFeatureCollection.features.length > 0;
+    const selectedFeatureIndexes = useMemo(() => (hasShape ? [0] : []), [hasShape]);
     
     // we might be able to pass this to modeConfig, if it knows what to do with it?
     // const outerContainer = useOuterContainer();
@@ -246,21 +250,6 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
                     features: isSimpleFeature(feature) ? [feature] : []
                 });
             }),
-            onHover(pickingInfo, event) {
-                if ((pickingInfo as any).featureType === "points") return;
-                // -- try to avoid selecting invisible features etc - refer to notes in aosta prototype
-                if (pickingInfo.index === -1) {
-                    setSelectedFeatureIndexes([]);
-                    return;
-                }
-                // Only a feature pick selects a feature. An edit handle's index is the handle's,
-                // not a feature's, and on WebGPU a pick on the outline can come back with a
-                // garbage index and no object; either way keep the current selection, or the
-                // shape loses its handles and can no longer be modified or translated.
-                const isGuide = "isGuide" in pickingInfo && pickingInfo.isGuide;
-                if (!pickingInfo.object || isGuide) return;
-                setSelectedFeatureIndexes([pickingInfo.index]);
-            },
             modeConfig: {
                 // dragToDraw: true,
                 // hopefully there is something here we can pass outerContainer to...
