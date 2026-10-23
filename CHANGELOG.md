@@ -46,7 +46,7 @@ A feature release. SQLite is now the default database for new installs of the fu
   `mdv.extensions` entry point and enabled by name in config (#540).
 - Scripts in `mdvtools/scripts` for cleaning project data: `column_name_report.py` groups
   field names that differ only by case or separator, and `project_json_history.py` snapshots
-  and restores `datasources.json`, `views.json` and `state.json` (#557).
+  and restores `datasources.json`, `views.json` and `state.json` (#557, #593).
 - `VITE_SHOW_PROJECT_CREATION=true` at build time shows the new project and import project
   cards in a production build (#570).
 - When a host frames MDV without cross-origin isolation, the catalog and project pages offer
@@ -74,6 +74,9 @@ A feature release. SQLite is now the default database for new installs of the fu
   them read-only without saying so (#544).
 - Image layers support up to 10 channels after the viv update, and channel histograms are
   computed in a worker. MDV warns when an image's data layout will load slowly (#490, #565).
+- Range, rectangle and polygon filters on datasources over 100,000 rows run on a worker, so
+  brushing stays responsive and shows results during a drag rather than when it pauses.
+  Editing a selection on a spatial scatter chart is also faster (#585).
 - The fraction legend is now a React component (#503).
 - `sync_users_to_db` fetches the Auth0 admin role members once, instead of once per user
   (#526).
