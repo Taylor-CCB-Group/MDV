@@ -8,6 +8,7 @@ import {
     getDensitySettings,
     getContourVisualSettings,
     type DualContourLegacyConfig,
+    type HoveredContour,
 } from './contour_state';
 import type { CategoryContourProps } from './contour_state';
 import type { BaseConfig } from '@/charts/BaseChart';
@@ -146,6 +147,32 @@ describe('useCategoryContour', () => {
         expect(result.current?.contourFill).toBe(2);
         expect(result.current?.pickable).toBe(false);
         expect(typeof result.current?.getPosition).toBe('function');
+    });
+
+    test('emphasises the contour hovered in the legend and attenuates it while another is hovered', () => {
+        (useFieldSpec as any).mockReturnValue({
+            field: 'test-field',
+            values: ['cat1'],
+            data: new Uint8Array([0]),
+            datatype: 'text' as CategoricalDataType,
+        });
+        (useCategoryFilterIndices as any).mockReturnValue(new Uint32Array([0]));
+
+        const { result, rerender } = renderHook(
+            ({ hoveredContour }) =>
+                useCategoryContour({ ...baseProps, parameter: 'test-field', category: 'cat1', hoveredContour }),
+            { initialProps: { hoveredContour: { type: 'category', id: 'test-contour' } as HoveredContour | null } },
+        );
+        expect(result.current?.fillOpacity).toBeCloseTo(0.75);
+        expect(result.current?.contourOpacity).toBe(1);
+
+        rerender({ hoveredContour: { type: 'field', field: 'some-field' } });
+        expect(result.current?.fillOpacity).toBeCloseTo(0.4);
+        expect(result.current?.contourOpacity).toBeCloseTo(0.64);
+
+        rerender({ hoveredContour: null });
+        expect(result.current?.fillOpacity).toBe(0.5);
+        expect(result.current?.contourOpacity).toBe(0.8);
     });
 
     test('recomputes contour colors when the active category column gains a new value in place', () => {

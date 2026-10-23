@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, test } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, test, vi } from "vitest";
 import FieldContourLegend, { type CategoryLegendItem, type FieldLegendItem } from "./FieldContourLegend";
 
 const fields: FieldLegendItem[] = [{ name: "CD3", field: "cd3", color: [10, 20, 30] }];
@@ -36,5 +36,18 @@ describe("FieldContourLegend", () => {
         const gradient = container.querySelector("linearGradient");
         expect(gradient?.querySelectorAll("stop")).toHaveLength(2);
         expect(swatches[1]).toBe(`url(#${gradient?.id})`);
+    });
+
+    test("reports hovered categorical contours and fields", () => {
+        const onContourHover = vi.fn();
+        render(<FieldContourLegend fields={fields} categories={categories} onContourHover={onContourHover} />);
+
+        fireEvent.mouseEnter(screen.getByText("T cell", { selector: "text" }));
+        expect(onContourHover).toHaveBeenLastCalledWith({ type: "category", id: "contour1" });
+        fireEvent.mouseLeave(screen.getByText("T cell", { selector: "text" }));
+        expect(onContourHover).toHaveBeenLastCalledWith(null);
+
+        fireEvent.mouseEnter(screen.getByText("CD3"));
+        expect(onContourHover).toHaveBeenLastCalledWith({ type: "field", field: "cd3" });
     });
 });

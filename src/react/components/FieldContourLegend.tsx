@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { FieldName } from "@/charts/charts";
+import type { HoveredContour } from "../contour_state";
 
 export interface FieldLegendItem {
     name: string;
@@ -22,13 +23,19 @@ export interface FieldContourLegendProps {
     categoryLabel?: string;
     label?: string;
     position?: { x: number; y: number };
-    onFieldHover?: (fieldId: FieldName | null) => void;
+    onContourHover?: (contour: HoveredContour | null) => void;
 }
 
 type LegendRow =
     | { type: "heading"; key: string; text: string }
     | { type: "category"; key: string; item: CategoryLegendItem }
     | { type: "field"; key: string; item: FieldLegendItem };
+
+function isSameContour(a: HoveredContour | null, b: HoveredContour) {
+    if (a?.type === "field" && b.type === "field") return a.field === b.field;
+    if (a?.type === "category" && b.type === "category") return a.id === b.id;
+    return false;
+}
 
 // Convert RGB array to CSS color string
 const rgbToCss = (rgb: readonly number[]): string => {
@@ -38,6 +45,7 @@ const rgbToCss = (rgb: readonly number[]): string => {
 /**
  * React component for displaying a legend of density contours with their colors:
  * categorical contours (grouped under the contour parameter's name) and density fields.
+ * Hovering an item highlights its contour via `onContourHover`.
  * The legend is fixed in position (typically bottom-left).
  *
  * Note: SVG is used for the legend content to ensure compatibility with figure export
@@ -49,11 +57,11 @@ export default function FieldContourLegend({
     categoryLabel = "Categories",
     label = categories.length > 0 ? "Density" : "Density Fields",
     position,
-    onFieldHover,
+    onContourHover,
 }: FieldContourLegendProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const bodyRef = useRef<HTMLDivElement>(null);
-    const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
+    const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
     // gradient ids must be unique within the document; useId's colons are awkward in url(#...)
     const gradientIdPrefix = `contour-legend-${useId().replace(/:/g, "")}`;
 
@@ -87,14 +95,33 @@ export default function FieldContourLegend({
     const maxHeight = 215;
     const containerHeight = height > maxHeight ? maxHeight + 35 : height + 35;
 
-    const handleMouseEnter = (fieldId: FieldName) => {
-        setHoveredField(fieldId);
-        onFieldHover?.(fieldId);
+    const handleMouseEnter = (contour: HoveredContour) => {
+        setHoveredContour(contour);
+        onContourHover?.(contour);
     };
 
     const handleMouseLeave = () => {
-        setHoveredField(null);
-        onFieldHover?.(null);
+        setHoveredContour(null);
+        onContourHover?.(null);
+    };
+
+    // props for the row and swatch of an item whose contour can be hovered
+    const getHoverProps = (contour: HoveredContour) => {
+        const isHovered = isSameContour(hoveredContour, contour);
+        return {
+            groupProps: {
+                onMouseEnter: () => handleMouseEnter(contour),
+                onMouseLeave: handleMouseLeave,
+                className: "cursor-pointer",
+                style: {
+                    opacity: isHovered ? 1 : hoveredContour ? 0.4 : 1,
+                },
+            },
+            swatchProps: {
+                stroke: isHovered ? "currentColor" : "none",
+                strokeWidth: isHovered ? 2 : 0,
+            },
+        };
     };
 
     const renderRow = (row: LegendRow, y: number) => {
@@ -114,8 +141,9 @@ export default function FieldContourLegend({
             const { item } = row;
             const gradientId = `${gradientIdPrefix}-${item.id}`;
             const isGradient = item.colors.length > 1;
+            const { groupProps, swatchProps } = getHoverProps({ type: "category", id: item.id });
             return (
-                <g key={row.key}>
+                <g key={row.key} {...groupProps}>
                     <title>{item.name}</title>
                     {isGradient && (
                         <defs>
@@ -137,6 +165,7 @@ export default function FieldContourLegend({
                         height="10"
                         width="10"
                         fill={isGradient ? `url(#${gradientId})` : rgbToCss(item.colors[0])}
+                        {...swatchProps}
                     />
                     <text
                         y={y + 6 + 3}
@@ -150,25 +179,16 @@ export default function FieldContourLegend({
         }
         const field = row.item;
         const color = rgbToCss(field.color);
-        const isHovered = hoveredField === field.field;
+        const { groupProps, swatchProps } = getHoverProps({ type: "field", field: field.field });
         return (
-            <g
-                key={row.key}
-                onMouseEnter={() => handleMouseEnter(field.field)}
-                onMouseLeave={handleMouseLeave}
-                className="cursor-pointer"
-                style={{
-                    opacity: isHovered ? 1 : hoveredField ? 0.4 : 1,
-                }}
-            >
+            <g key={row.key} {...groupProps}>
                 <rect
                     y={y}
                     x={2}
                     height="10"
                     width="10"
                     fill={color}
-                    stroke={isHovered ? "currentColor" : "none"}
-                    strokeWidth={isHovered ? 2 : 0}
+                    {...swatchProps}
                 />
                 <text
                     y={y + 6 + 3}
