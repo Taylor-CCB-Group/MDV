@@ -2,7 +2,16 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type DataStore from "@/datastore/DataStore";
 import type Dimension from "@/datastore/Dimension";
 import CategoryDimension from "@/datastore/CategoryDimension";
-import { assertConsistent, createStore, passingRows, rng, stubWorker } from "./dimensionHarness";
+import RangeDimension from "@/datastore/RangeDimension";
+import {
+    assertConsistent,
+    createStore,
+    type InProcessFilterWorker,
+    passingRows,
+    rng,
+    settleFilters,
+    stubWorker,
+} from "./dimensionHarness";
 
 /**
  * Characterization tests for the Dimension filtering engine, run against a real DataStore.
@@ -194,6 +203,51 @@ describe("base Dimension", () => {
         expect(passingRows(ds)).toEqual([1, 3]);
         dim.filter("filterOnIndex", [], new Set([3, 4]));
         expect(passingRows(ds)).toEqual([3, 4]);
+    });
+
+    /**
+     * Byte masks commit four rows at a time, skipping words that are already right. Every mask
+     * form must leave the same states as the equivalent predicate, including tail rows, mask
+     * bytes other than 0/1, masks not aligned to 4 bytes, and background states.
+     */
+    test.each([1, 2, 3, 4, 5])("mask commits match predicate commits, seed %i", (seed) => {
+        const rand = rng(seed);
+        const size = 37;
+        const cats = Array.from({ length: size }, () => (rand() < 0.5 ? "p" : "q"));
+        const variants = {
+            predicate: (keep: boolean[]) => (i: number) => keep[i],
+            bytes: (keep: boolean[]) => Uint8Array.from(keep, (k) => (k ? 1 : 0)),
+            wideBytes: (keep: boolean[]) => Uint8Array.from(keep, (k, i) => (k ? [1, 2, 255][i % 3] : 0)),
+            misaligned: (keep: boolean[]) => Uint8Array.from([9, ...keep.map((k) => (k ? 1 : 0))]).subarray(1),
+            array: (keep: boolean[]) => keep.map((k) => (k ? 1 : 0)),
+        };
+        const runs = Object.entries(variants).map(([name, toInclude]) => {
+            const store = createStore(size, [{ field: "d", datatype: "text", data: cats }]);
+            const other = store.getDimension("base_dimension");
+            other.commitFilter(() => true);
+            const dim = store.getDimension("base_dimension");
+            const r = rng(seed * 7);
+            const states: number[][] = [];
+            let keep = Array.from({ length: size }, () => r() < 0.6);
+            for (let step = 0; step < 12; step++) {
+                const roll = r();
+                if (roll < 0.15) dim.setBackgroundFilter("d", r() < 0.5 ? "p" : "q");
+                else if (roll < 0.2) dim.clearBackgroundFilter();
+                else if (roll < 0.25) other.commitFilter(Uint8Array.from({ length: size }, () => (r() < 0.7 ? 1 : 0)));
+                else {
+                    // small changes from the previous mask, as when brushing
+                    keep = keep.map((k) => (r() < 0.15 ? !k : k));
+                    dim.commitFilter(toInclude(keep));
+                }
+                assertConsistent(store);
+                states.push(Array.from(dim.filterArray));
+            }
+            return [name, states] as const;
+        });
+        const [, expected] = runs[0];
+        for (const [name, states] of runs.slice(1)) {
+            expect(states, name).toEqual(expected);
+        }
     });
 });
 
@@ -433,8 +487,31 @@ describe("background filters", () => {
 /**
  * Model-based test: applies a random sequence of operations to several dimensions and, after
  * each step, compares every local state against an independent model of the 0/1/2/3 rules.
+ *
+ * In "async worker" mode RangeDimension evaluates every filter on its (in-process) worker, and
+ * the test only lets results land on some steps, so requests pile up and get superseded. A
+ * dimension with a filter still pending is only checked for count consistency.
  */
-describe("randomized against a reference model", () => {
+describe.each([
+    ["sync", false],
+    ["async worker", true],
+])("randomized against a reference model (%s)", (_, forceAsync) => {
+    let restoreMinRows: number;
+    let workers: InProcessFilterWorker[] = [];
+    beforeEach(() => {
+        restoreMinRows = RangeDimension.asyncFilterMinRows;
+        if (forceAsync) {
+            RangeDimension.asyncFilterMinRows = 0;
+            workers = stubWorker({ rangeFilter: true }).rangeFilterWorkers;
+            ds = fixture();
+        }
+    });
+    afterEach(async () => {
+        await settleFilters(ds);
+        RangeDimension.asyncFilterMinRows = restoreMinRows;
+        if (forceAsync) expect(workers[0]?.requests.length).toBeGreaterThan(0);
+    });
+
     type Model = { include: ((i: number) => boolean) | null; bg: Set<string> | null };
     type Op = (rand: () => number) => void;
 
@@ -449,8 +526,9 @@ describe("randomized against a reference model", () => {
         return m.include && !m.include(i) ? 1 : 0;
     }
 
-    test.each([1, 2, 3, 4, 5, 6, 7, 8])("seed %i", (seed) => {
+    test.each([1, 2, 3, 4, 5, 6, 7, 8])("seed %i", async (seed) => {
         const rand = rng(seed);
+        const settleRand = rng(seed + 1000);
         const dims: [Dimension, Model, Op][] = [];
 
         const range = ds.getDimension("range_dimension");
@@ -461,8 +539,27 @@ describe("randomized against a reference model", () => {
             (r) => {
                 const a = Math.floor(r() * 8) - 1;
                 const b = a + Math.floor(r() * 6);
-                range.filter("filterRange", ["x"], { min: a, max: b });
-                rangeModel.include = (i) => X[i] >= a && X[i] <= b;
+                const kind = r();
+                if (kind < 0.4) {
+                    void range.filter("filterRange", ["x"], { min: a, max: b });
+                    rangeModel.include = (i) => X[i] >= a && X[i] <= b;
+                    return;
+                }
+                const c = Math.floor(r() * 30) - 1;
+                const d = c + Math.floor(r() * 25);
+                if (kind < 0.7) {
+                    void range.filter("filterSquare", ["x", "y"], { range1: [a, b], range2: [c, d] });
+                } else {
+                    // X and Y are integers, so this rectangle has no data on its edges
+                    const poly = [
+                        [a - 0.5, c - 0.5],
+                        [b + 0.5, c - 0.5],
+                        [b + 0.5, d + 0.5],
+                        [a - 0.5, d + 0.5],
+                    ];
+                    void range.filter("filterPoly", ["x", "y"], poly);
+                }
+                rangeModel.include = (i) => X[i] >= a && X[i] <= b && Y[i] >= c && Y[i] <= d;
             },
         ]);
 
@@ -523,7 +620,9 @@ describe("randomized against a reference model", () => {
                     model.bg = null;
                 }
             }
+            if (forceAsync && settleRand() < 0.5) await settleFilters(ds);
             for (const [dim, model] of dims) {
+                if (dim.pendingFilter) continue;
                 const expected = ALL.map((i) => expectedState(model, i));
                 expect(Array.from(dim.filterArray), `step ${step}`).toEqual(expected);
             }

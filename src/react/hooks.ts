@@ -13,7 +13,7 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
 import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
 import type { SelectionDialogConfig } from "./components/SelectionDialogReact";
-import { getCategoryFilterIndices, rowMatchesCategoryFilter, type CategoryFilterColumn } from "@/lib/categoryFilterUtils";
+import { compileCategoryFilter, getCategoryFilterIndices, type CategoryFilterColumn } from "@/lib/categoryFilterUtils";
 import { shouldRefreshFilteredIndices } from "./filteredIndicesUtils";
 import {
     getOwnerVisibleRows,
@@ -478,10 +478,17 @@ export function useChartScopeFilterPredicate() {
             return null;
         }
 
-        return (rowIndex: number) =>
-            filtersWithColumns.every(({ filter, column }) =>
-                rowMatchesCategoryFilter(rowIndex, column, filter.category ?? null),
-            );
+        // compiled once per filter change: the per-row test must not read (observable) config
+        const matchers = filtersWithColumns.map(({ filter, column }) =>
+            compileCategoryFilter(column, filter.category ?? null),
+        );
+        if (matchers.length === 1) return matchers[0];
+        return (rowIndex: number) => {
+            for (const matches of matchers) {
+                if (!matches(rowIndex)) return false;
+            }
+            return true;
+        };
     }, [dataStore.columnIndex, filterKey, loadedFilterKey]);
 
     return {
@@ -551,6 +558,29 @@ export type FilterOwner = {
     filterMethod?: unknown;
 };
 
+/**
+ * Returns a function that hands back the rows it was last given while their contents are
+ * unchanged. The owner's own filter never changes which rows it draws (rows only it excludes
+ * stay visible), so while a selection is being edited every refresh would otherwise produce an
+ * equal but new array, and deck.gl regenerates every attribute when `data` changes identity.
+ */
+function createRowsStabilizer() {
+    let last: Uint32Array | null = null;
+    return (rows: Uint32Array) => {
+        if (last && sameRows(last, rows)) return last;
+        last = rows;
+        return rows;
+    };
+}
+
+function sameRows(a: Uint32Array, b: Uint32Array) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
+}
+
 export function useOwnedFilteredIndices(filterOwner?: FilterOwner | null) {
     const chartScope = useChartScopeFilterPredicate();
     const aggregateFilteredRows = useScopedFilteredIndices(chartScope);
@@ -558,17 +588,21 @@ export function useOwnedFilteredIndices(filterOwner?: FilterOwner | null) {
     const localFilter = filterOwner?.getLocalFilter() ?? null;
     const localFilterIsActive = Boolean(filterOwner?.filterMethod || filterOwner?.bgfArray);
     const { predicate, ready } = chartScope;
+    const [keepIfUnchanged] = useState(createRowsStabilizer);
 
     const ownerVisibleRows = useMemo(() => {
-        if (!ready) return new Uint32Array(0);
-        return getOwnerVisibleRows({
-            aggregateRows: aggregateFilteredRows,
-            globalFilter,
-            localFilter,
-            localFilterIsActive,
-            scopePredicate: predicate,
-        });
+        if (!ready) return keepIfUnchanged(new Uint32Array(0));
+        return keepIfUnchanged(
+            getOwnerVisibleRows({
+                aggregateRows: aggregateFilteredRows,
+                globalFilter,
+                localFilter,
+                localFilterIsActive,
+                scopePredicate: predicate,
+            }),
+        );
     }, [
+        keepIfUnchanged,
         aggregateFilteredRows,
         globalFilter,
         localFilter,

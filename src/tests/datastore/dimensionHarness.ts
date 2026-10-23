@@ -1,17 +1,27 @@
 import { expect, vi } from "vitest";
 import DataStore from "@/datastore/DataStore";
 import type Dimension from "@/datastore/Dimension";
+import { type FilterRequest, type FilterResponse, handleFilterRequest } from "@/datastore/rangeFilterEval";
 
 /**
  * Shared helpers for Dimension filtering tests.
  *
  * Dimension subclasses and DataStore construct Workers eagerly; jsdom has none, so callers must
  * `stubWorker()` before constructing a store (the aggregation workers are not under test here).
+ *
+ * With `rangeFilter: true`, the range filter worker is replaced by {@link InProcessFilterWorker},
+ * which runs the real message handler a task later, like a worker would.
  */
-export function stubWorker() {
+export function stubWorker({ rangeFilter = false } = {}) {
+    const rangeFilterWorkers: InProcessFilterWorker[] = [];
     vi.stubGlobal(
         "Worker",
-        vi.fn().mockImplementation(function MockWorker() {
+        vi.fn().mockImplementation(function MockWorker(url: URL | string) {
+            if (rangeFilter && String(url).includes("rangeFilterWorker")) {
+                const worker = new InProcessFilterWorker();
+                rangeFilterWorkers.push(worker);
+                return worker;
+            }
             return {
                 addEventListener: vi.fn(),
                 removeEventListener: vi.fn(),
@@ -20,6 +30,37 @@ export function stubWorker() {
             };
         }),
     );
+    return { rangeFilterWorkers };
+}
+
+/**
+ * Stands in for `rangeFilterWorker.ts`: clones the request as `postMessage` would (so shared
+ * buffers stay shared and unclonable specs throw), and responds a task later unless terminated.
+ */
+export class InProcessFilterWorker {
+    onmessage: ((event: { data: FilterResponse }) => void) | null = null;
+    onerror: ((event: unknown) => void) | null = null;
+    requests: FilterRequest[] = [];
+    terminated = false;
+
+    postMessage(message: FilterRequest) {
+        const request = structuredClone(message);
+        this.requests.push(request);
+        setTimeout(() => {
+            if (!this.terminated) this.onmessage?.({ data: handleFilterRequest(request) });
+        }, 0);
+    }
+
+    terminate() {
+        this.terminated = true;
+    }
+}
+
+/** Resolves after every dimension's pending async filter (and anything it queued) has landed. */
+export async function settleFilters(ds: DataStore) {
+    do {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    } while ((ds.dimensions as Dimension[]).some((d) => d.pendingFilter));
 }
 
 export type ColumnSpec =

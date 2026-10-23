@@ -1,6 +1,6 @@
 import { getRandomString } from "@/utilities/Utilities";
 import type BaseChart from "./BaseChart";
-import { action, makeAutoObservable } from "mobx";
+import { action, makeAutoObservable, observable } from "mobx";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { RowsAsColsQuery, type RowsAsColsQuerySerialized } from "@/links/link_utils";
 import type { FieldName } from "./charts";
@@ -250,7 +250,12 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             // current BaseChart.setParams() should probably be replaced.
             //! - maybe better to have separate methods given that we start need logic like update legend based on color/params
             // this should only happen with config objects that haven't been observed yet...
-            makeAutoObservable(config);
+            // the selection is replaced wholesale on every pointer move while it's edited; deep
+            // observability would convert it each time and put every deck.gl read of its
+            // coordinates behind a proxy
+            makeAutoObservable<typeof config, "selectionFeatureCollection">(config, {
+                selectionFeatureCollection: observable.ref,
+            });
         },
     });
 
