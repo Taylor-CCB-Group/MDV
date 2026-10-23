@@ -24,17 +24,24 @@ written during the 4 months become the release notes.
 1. At 9am UTC on 1 February, 1 June and 1 October, the Prepare release workflow
    (`.github/workflows/release-prepare.yml`) opens a pull request named "Release X.Y.Z". It
    bumps the minor version with `uv version --bump minor` and dates the changelog. If nothing
-   has merged since the last release, it does nothing. If `[Unreleased]` is empty, it fills
-   the new section with the titles of the pull requests merged since the last release.
-2. A maintainer reviews the release pull request:
+   has merged since the last release, it does nothing. If `[Unreleased]` is empty, it lists
+   the titles of the pull requests merged since the last release under `### To rewrite` in
+   the new section.
+2. While the release pull request is open, each push to `main` runs the same workflow's
+   `sync` job. It merges `main` into the release branch and adds the titles of the newly
+   merged pull requests to the `### To rewrite` list. If the merge conflicts, it comments on
+   the release pull request with the titles instead, and someone merges `main` into the
+   branch by hand.
+3. A maintainer reviews the release pull request:
    - Approve its waiting CI runs. GitHub holds checks on a pull request that a workflow
      opened until someone with write access approves them.
-   - Edit the new `CHANGELOG.md` section so it describes the release for users, and rewrite
-     any pull request titles the workflow filled in.
+   - Edit the new `CHANGELOG.md` section so it describes the release for users. Rewrite the
+     titles under `### To rewrite` into `Added`, `Changed` or `Fixed` entries, then delete
+     the heading. The Release workflow stops while the heading is there.
    - Change the version if the release needs a patch or major bump instead. Follow
      [Semantic Versioning](https://semver.org/spec/v2.0.0.html): major for changes that
      break existing use, minor for new features, patch for fixes only.
-3. Merging the pull request changes the version in `python/pyproject.toml` on `main`, which
+4. Merging the pull request changes the version in `python/pyproject.toml` on `main`, which
    starts the Release workflow (`.github/workflows/release.yml`). It:
    - builds the frontend and the sdist and wheel
    - publishes them to TestPyPI
@@ -43,7 +50,7 @@ written during the 4 months become the release notes.
    - waits for a maintainer to approve the `pypi` environment
    - publishes to PyPI
    - tags `vX.Y.Z` and creates the GitHub release, with the changelog section as its notes
-4. Approve the PyPI step from the workflow run once the TestPyPI checks have passed. Install
+5. Approve the PyPI step from the workflow run once the TestPyPI checks have passed. Install
    from TestPyPI yourself first if the release needs more testing than the smoke test does.
 
 To release outside the schedule, run the Prepare release workflow from the Actions tab and
@@ -169,5 +176,8 @@ stops the Release workflow from publishing it again.
   quickstart when the API changes. `CHANGELOG.md` appears on GitHub only.
 - `uv build` and `uv publish` do not read `uv.lock`. The lock matters for `uv sync` in
   development, Docker and CI.
+- After each `sync` push to the release branch, the new CI runs on the release pull request
+  wait for someone with write access to approve them. GitHub holds every pull request run
+  that a `GITHUB_TOKEN` push starts.
 - PyPI and TestPyPI never accept the same file twice. If a release fails after its TestPyPI
   upload, bump to the next patch version rather than rebuilding the same one.

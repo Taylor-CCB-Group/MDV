@@ -2,12 +2,14 @@
 
     python .github/scripts/release.py current
     python .github/scripts/release.py changelog --previous 1.3.0 [--date 2026-10-21] [--fallback-notes notes.md]
+    python .github/scripts/release.py to-rewrite 1.4.0 entries.md
     python .github/scripts/release.py notes 1.4.0
 
 Bump the version with `uv version --bump minor` (from python/) before running `changelog`.
 `changelog` turns the CHANGELOG.md `[Unreleased]` section into a dated section for the
-version now in python/pyproject.toml. Paths are relative to the repository root, so run it
-from there.
+version now in python/pyproject.toml. `to-rewrite` adds lines to that section's
+`### To rewrite` list, and `notes` refuses to print a section that still has one. Paths are
+relative to the repository root, so run it from there.
 """
 
 import argparse
@@ -20,6 +22,8 @@ from pathlib import Path
 PYPROJECT = Path("python/pyproject.toml")
 CHANGELOG = Path("CHANGELOG.md")
 REPO_URL = "https://github.com/Taylor-CCB-Group/MDV"
+# heading for PR titles a person still has to rewrite into changelog entries
+TO_REWRITE = "### To rewrite"
 
 
 def current_version() -> str:
@@ -61,8 +65,7 @@ def date_changelog(previous: str, date: str, fallback_notes: Path | None) -> str
     return new
 
 
-def notes(version: str) -> str:
-    changelog = CHANGELOG.read_text()
+def section(changelog: str, version: str) -> re.Match[str]:
     match = re.search(
         rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## \[|^\[Unreleased\]: )",
         changelog,
@@ -70,7 +73,36 @@ def notes(version: str) -> str:
     )
     if not match:
         sys.exit(f"no CHANGELOG.md section for {version}")
-    return match.group(1).strip()
+    return match
+
+
+def add_to_rewrite(version: str, entries: Path) -> None:
+    changelog = CHANGELOG.read_text()
+    match = section(changelog, version)
+    body = match.group(1).rstrip()
+    lines = entries.read_text().strip()
+    if re.search(rf"^{TO_REWRITE}$", body, re.MULTILINE):
+        # add to the end of the existing list, wherever the reviewer has left it
+        body = re.sub(
+            rf"(^{TO_REWRITE}$.*?)(?=\n\n|\n#|\Z)",
+            lambda list_match: f"{list_match.group(1)}\n{lines}",
+            body,
+            count=1,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+    else:
+        body += f"\n\n{TO_REWRITE}\n{lines}"
+    CHANGELOG.write_text(f"{changelog[: match.start(1)]}{body}\n\n{changelog[match.end(1) :]}")
+
+
+def notes(version: str) -> str:
+    body = section(CHANGELOG.read_text(), version).group(1)
+    if re.search(rf"^{TO_REWRITE}$", body, re.MULTILINE):
+        sys.exit(
+            f"the [{version}] section of CHANGELOG.md still has a '{TO_REWRITE}' list; "
+            "rewrite it into changelog entries and delete the heading"
+        )
+    return body.strip()
 
 
 def main() -> None:
@@ -83,6 +115,9 @@ def main() -> None:
     changelog_parser.add_argument(
         "--fallback-notes", type=Path, help="notes to use when [Unreleased] is empty"
     )
+    to_rewrite_parser = commands.add_parser("to-rewrite")
+    to_rewrite_parser.add_argument("version")
+    to_rewrite_parser.add_argument("entries", type=Path, help="lines to add to the list")
     notes_parser = commands.add_parser("notes")
     notes_parser.add_argument("version")
     args = parser.parse_args()
@@ -91,6 +126,8 @@ def main() -> None:
         print(current_version())
     elif args.command == "changelog":
         print(date_changelog(args.previous, args.date, args.fallback_notes))
+    elif args.command == "to-rewrite":
+        add_to_rewrite(args.version, args.entries)
     else:
         print(notes(args.version))
 

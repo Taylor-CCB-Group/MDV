@@ -2,7 +2,11 @@ name: Prepare release
 
 # Opens a release PR every 4 months. Merging that PR starts release.yml, which publishes
 # to TestPyPI, smoke-tests the upload, waits for approval, then publishes to PyPI.
+# While the PR is open, each push to main is merged into it (the sync job).
 on:
+  push:
+    branches:
+      - main
   schedule:
     # 09:00 UTC on 1 February, 1 June and 1 October
     - cron: "0 9 1 2,6,10 *"
@@ -20,6 +24,7 @@ permissions:
 
 jobs:
   prepare:
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -55,7 +60,8 @@ jobs:
           # The v-next tag does not exist, so GitHub needs the commit to end the list at.
           gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
             -f tag_name="v-next" -f target_commitish="$GITHUB_SHA" -f previous_tag_name="$LAST_TAG" \
-            --jq .body | sed -e 's/^## /### /' -e '/^\*\*Full Changelog\*\*/d' > "$RUNNER_TEMP/notes.md"
+            --jq .body | sed -e "s/^## What's Changed$/### To rewrite/" -e 's/^## /### /' \
+            -e '/^\*\*Full Changelog\*\*/d' > "$RUNNER_TEMP/notes.md"
           # updates the version in pyproject.toml and uv.lock
           (cd python && uv version --bump "$BUMP" --no-sync)
           version=$(python3 .github/scripts/release.py changelog \
@@ -91,10 +97,63 @@ jobs:
           Before you merge it:
 
           1. Edit the \`[$VERSION]\` section of \`CHANGELOG.md\` so it describes the release for users.
-             If it lists pull request titles, nobody filled in \`[Unreleased]\`, so rewrite them.
+             Rewrite any pull request titles under \`### To rewrite\` into \`Added\`, \`Changed\` or \`Fixed\` entries, then delete the heading. The Release workflow stops while that heading is there.
           2. Change the version if this release needs a different bump.
           3. Approve the waiting CI runs on this PR. GitHub holds checks on a PR that a workflow opened until someone with write access approves them.
-          4. If other PRs merge into \`main\` before this one, update this branch from \`main\` and move their \`[Unreleased]\` entries into the \`[$VERSION]\` section. Their code ships in this release, and the GitHub release notes come from that section.
+          4. Each PR that merges into \`main\` before this one is merged into this branch, and its title is added under \`### To rewrite\`. Rewrite those too. If the merge conflicts, the workflow comments here instead, and someone has to merge \`main\` into this branch by hand.
 
           Merging starts the Release workflow, which publishes to TestPyPI, tests the upload and waits for approval before it publishes to PyPI.
           EOF
+
+  sync:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-sync
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Merge main into the open release PR and list the new PRs
+        run: |
+          pr=$(gh pr list --state open --base main --json number,headRefName \
+            --jq '[.[] | select(.headRefName | startswith("release/v"))][0] // empty | "\(.number) \(.headRefName)"')
+          if [ -z "$pr" ]; then
+            echo "No release PR is open, so there is nothing to update."
+            exit 0
+          fi
+          read -r number branch <<< "$pr"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch "$branch"
+          version=$(python3 .github/scripts/release.py current)
+
+          # one line per change, oldest first; a commit pushed straight to main has no PR
+          : > "$RUNNER_TEMP/entries.md"
+          for sha in $(git log --first-parent --reverse --format=%H "$branch"..origin/main); do
+            entry=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/pulls" \
+              --jq '[.[] | select(.merged_at != null)][0] // empty | "- \(.title) (#\(.number))"')
+            [ -n "$entry" ] || entry="- $(git log -1 --format=%s "$sha") (${sha:0:8})"
+            echo "$entry" >> "$RUNNER_TEMP/entries.md"
+          done
+          if [ ! -s "$RUNNER_TEMP/entries.md" ]; then
+            echo "$branch already has everything on main."
+            exit 0
+          fi
+
+          if ! git merge --no-edit origin/main; then
+            git merge --abort
+            {
+              echo "Merging \`main\` into \`$branch\` conflicts, so the workflow could not add these changes to the \`[$version]\` section of the changelog. Merge \`main\` into this branch by hand, resolve the conflicts and add entries for them:"
+              echo
+              cat "$RUNNER_TEMP/entries.md"
+            } | gh pr comment "$number" --body-file -
+            exit 1
+          fi
+          python3 .github/scripts/release.py to-rewrite "$version" "$RUNNER_TEMP/entries.md"
+          git commit -am "List the changes merged into main in the $version changelog"
+          git push origin "$branch"
