@@ -43,9 +43,21 @@ function modelMatrixScale(matrix: Matrix4 | null | undefined): number {
     return Number.isFinite(scale) && scale > 0 ? scale : 1;
 }
 
-type WeightCacheEntry = { getWeight: unknown; length: number; weights: Float32Array };
-/** Keyed on the index list's identity, which is stable until the filter or category changes. */
-const weightCache = new WeakMap<object, WeightCacheEntry>();
+/**
+ * Identifies what a `getWeight` computes, since the function itself is a new closure on
+ * every render (field contours rebuild their props on each zoom step): an object compared
+ * by identity (e.g. the field's data), then values compared by value (e.g. its min/max).
+ */
+export type WeightKey = readonly [object, ...unknown[]];
+
+type WeightCacheEntry = { params: readonly unknown[]; length: number; weights: Float32Array };
+const UNWEIGHTED = {};
+/**
+ * Keyed on the index list's identity, which is stable until the filter or category
+ * changes, then on the weight key's object, so fields sharing one index list each keep
+ * their own entry.
+ */
+const weightCache = new WeakMap<object, WeakMap<object, WeightCacheEntry>>();
 
 /**
  * 1 (or the field weight) at the indices a contour draws from, 0 elsewhere.
@@ -54,23 +66,46 @@ const weightCache = new WeakMap<object, WeightCacheEntry>();
  * `(value - min) / range`). The WebGL heatmap's blending happens to drop those; splatted
  * here, one NaN poisons every cell its kernel touches, so they are left out explicitly.
  */
-function weightsFor(indices: ArrayLike<number>, length: number, getWeight?: (i: number) => number) {
-    const cached = weightCache.get(indices);
-    if (cached && cached.getWeight === getWeight && cached.length === length) return cached.weights;
+function weightsFor(
+    indices: ArrayLike<number>,
+    length: number,
+    getWeight?: (i: number) => number,
+    weightKey?: WeightKey,
+) {
+    // without a key, a weighted call caches on the closure: right, but only while it lives
+    const [keyObject, ...params]: WeightKey = getWeight ? (weightKey ?? [getWeight]) : [UNWEIGHTED];
+    let byKey = weightCache.get(indices);
+    if (!byKey) {
+        byKey = new WeakMap();
+        weightCache.set(indices, byKey);
+    }
+    const cached = byKey.get(keyObject);
+    if (
+        cached &&
+        cached.length === length &&
+        cached.params.length === params.length &&
+        cached.params.every((p, k) => Object.is(p, params[k]))
+    ) {
+        return cached.weights;
+    }
     const weights = new Float32Array(length);
     for (let k = 0; k < indices.length; k++) {
         const i = indices[k];
         const w = getWeight ? getWeight(i) : 1;
         weights[i] = Number.isFinite(w) ? w : 0;
     }
-    weightCache.set(indices, { getWeight, length, weights });
+    byKey.set(keyObject, { params, length, weights });
     return weights;
 }
 
 export function contourToDensityProps(
-    props: NonNullable<ContourLayerProps> & { getWeight?: (i: number) => number; modelMatrix?: Matrix4 | null },
+    props: NonNullable<ContourLayerProps> & {
+        getWeight?: (i: number) => number;
+        weightKey?: WeightKey;
+        modelMatrix?: Matrix4 | null;
+    },
 ): DensityLayerProps {
-    const { id, x, y, data, getWeight, bandwidth, fillOpacity, contourOpacity, contourFill, colorRange } = props;
+    const { id, x, y, data, getWeight, weightKey, bandwidth, fillOpacity, contourOpacity, contourFill, colorRange } = props;
     // radiusPixels / 6 screen pixels, and `radiusPixels = 30 · bandwidth · 2^zoom`: 5 · bandwidth world units.
     const sigma = (5 * bandwidth) / modelMatrixScale(props.modelMatrix);
     const perDensity = HEATMAP_WEIGHT_PER_DENSITY * sigma * sigma;
@@ -78,7 +113,7 @@ export function contourToDensityProps(
         id,
         x,
         y,
-        weights: weightsFor(data, x.length, getWeight),
+        weights: weightsFor(data, x.length, getWeight, weightKey),
         bandwidth: sigma,
         scale: "absolute",
         colorRange: colorRange.map((c) => [c[0], c[1], c[2]] as const),

@@ -303,6 +303,8 @@ export function useFieldContour(props: FieldContourProps) {
                     const normalizedValue = (value - min) / range;
                     return normalizedValue;
                 },
+                // what getWeight computes, so WebGPU's weight array survives a new closure
+                weightKey: [fieldData, minMax[0], minMax[1]] as const,
                 transitions: {
                     // nb - failed to get this working
                     // will need changes to the HeatmapContourExtension implementation
