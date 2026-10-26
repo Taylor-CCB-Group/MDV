@@ -12,7 +12,8 @@ Every repro was run against a bare `Deck` (no MDV code). Environment:
 - `@deck.gl-community/editable-layers` 9.4.1; the 9.4.8 source was also checked
 
 Each cause was also checked against deck.gl `master` at `b04c8f2bda` (2026-10-06), where it is
-still present. No existing issues or PRs were found for any of them.
+still present. No existing issue or PR reports any of these WebGPU failures. One is related:
+deck.gl #9733 lists `pickMultipleObjectsAsync()` as a TODO (see issue 4).
 
 | # | Repo | Issue |
 |---|------|-------|
