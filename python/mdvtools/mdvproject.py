@@ -1118,11 +1118,9 @@ class MDVProject:
         return join(image_meta["original_folder"], filename)
 
     def _get_h5_handle(self, read_only=False, attempt=0) -> h5py.File:
-        mode = "r"
-        if not exists(self.h5file):
-            mode = "w"
-        elif not read_only:
-            mode = "a"
+        # "a" creates a missing file for writers, and "r" raises for readers rather than
+        # creating an empty one.
+        mode = "r" if read_only else "a"
         try:
             handle = h5py.File(self.h5file, mode)
             return handle
