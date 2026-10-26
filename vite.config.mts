@@ -165,6 +165,12 @@ reactCompiler.rolldown.filter.id = /\.tsx(?:$|\?)/;
 const useReactCompiler = process.env.VITE_USE_REACT_COMPILER !== "0" && process.env.VITE_USE_REACT_COMPILER !== "false";
 const enableBundleAnalysis = process.env.VITE_BUNDLE_ANALYZE === "1" || process.env.VITE_BUNDLE_ANALYZE === "true";
 
+// The Flask build hashes its entry files too. An unhashed js/mdv.js outlives a deploy in
+// browser and proxy caches, then imports chunk hashes from the previous build that no longer
+// exist. Flask templates find the hashed names via the manifest (python/mdvtools/entry_assets.py).
+const hashFlaskEntries = build === "desktop_pt";
+const entryHash = hashFlaskEntries ? "-[hash]" : "";
+
 /** Same rules as main's per-build assetFileNames, plus fonts under assets/ (Rolldown emits url(./font) next to assets/mdv.css). */
 function flaskAssetFileNames(assetInfo: { name?: string }): string {
     const name = assetInfo.name ?? "";
@@ -174,9 +180,9 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
         if (build  === "production"){
             return `assets/mdv${version}.css`;
         }
-        return "assets/mdv.css";
+        return `assets/mdv${entryHash}.css`;
     }
-    if (name === "catalog.css") return "assets/catalog.css";
+    if (name === "catalog.css") return `assets/catalog${entryHash}.css`;
     if (process.env.VITE_ENTRYPOINT) {
         const { name: entryBase } = path.parse(process.env.VITE_ENTRYPOINT);
         if (name === `${entryBase}.css`) return "assets/mdv.css";
@@ -190,6 +196,8 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
     if (ext === "wasm") return "assets/[name]-[hash][extname]";
     if (["woff", "woff2", "ttf", "eot"].includes(ext)) return "assets/[name][extname]";
     if (ext === "svg" && /^fa-(brands|regular|solid)-/.test(name)) return "assets/[name][extname]";
+    // CSS of lazily loaded chunks (BaseChart, ChartManager) goes stale the same way as entries.
+    if (ext === "css") return `img/[name]${entryHash}[extname]`;
     return "img/[name][extname]";
 }
 
@@ -223,7 +231,7 @@ function getRollupOptions() {
                 login: "src/login/login_index.tsx",
             },
             output: {
-                entryFileNames: "js/[name].js",
+                entryFileNames: "js/[name]-[hash].js",
                 assetFileNames: flaskAssetFileNames,
             },
         };
@@ -335,6 +343,9 @@ export default defineConfig(async (): Promise<UserConfig> => {
         publicDir: process.env.exclude_dir ? false : "examples", //used for netlify.toml??... the rest is noise.
         build: {
             sourcemap: !process.env.nomap,
+            // Not under .vite/: the wheel and Docker copies of the static folder should not
+            // depend on dot-directories surviving.
+            manifest: hashFlaskEntries ? "manifest.json" : false,
             rollupOptions: {
                 ...getRollupOptions(),
                 external: ["./python/**"],

@@ -23,8 +23,8 @@ import { ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
 import { isDatatypeCategorical } from "@/lib/utils";
 import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
-import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
-import type { ColumnName, DataColumn, DataType, FieldName } from "@/charts/charts";
+import { type DualContourLegacyConfig, type HoveredContour, useLegacyDualContour } from "./contour_state";
+import type { ColumnName, DataColumn, DataType } from "@/charts/charts";
 import type { SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -338,7 +338,7 @@ export function getMissingColorFilterValue(
  */
 export function useScatterplotLayer(
     modelMatrix: Matrix4,
-    hoveredFieldId?: FieldName | null,
+    hoveredContour?: HoveredContour | null,
     filterOwner?: FilterOwner | null,
 ) {
     const id = useChartID();
@@ -402,7 +402,7 @@ export function useScatterplotLayer(
         const visibleRows = new Set<number>(data as Iterable<number>);
         return highlightedIndices.filter((rowIndex) => visibleRows.has(rowIndex));
     }, [data, highlightedIndices]);
-    const contourLayers = useLegacyDualContour(hoveredFieldId);
+    const contourLayers = useLegacyDualContour(hoveredContour);
     const updateHighlightedRows = useCallback(
         (
             rowIndex: number,
@@ -609,11 +609,15 @@ export function useScatterplotLayer(
     ]);
 
     const greyOnFilter = config.on_filter === "grey";
+    // deck.gl regenerates every attribute when `data` changes identity (and updates hidden
+    // layers too), so this must not be a fresh object each time the layer is rebuilt
+    const rowCount = cx.data.length;
+    const greyData = useMemo(() => ({ length: rowCount }), [rowCount]);
     const greyScatterplotLayer = useMemo(
         () =>
             new ScatterplotLayer({
                 id: `scatter-grey_${getVivId(`${id}detail-react`)}`,
-                data: { length: cx.data.length },
+                data: greyData,
                 opacity,
                 stroked: false,
                 filled: true,
@@ -637,13 +641,10 @@ export function useScatterplotLayer(
                 },
                 filterRange: [0.5, 1],
                 updateTriggers: {
-                    getFilterValue: [
-                        aggregateFilteredRows,
-                        isExternallyFiltered,
-                        colorColumn,
-                        shouldFilterMissing,
-                        fallbackOnZero,
-                    ],
+                    // a full pass over every row; only worth redoing while the layer is shown
+                    getFilterValue: greyOnFilter
+                        ? [aggregateFilteredRows, isExternallyFiltered, colorColumn, shouldFilterMissing, fallbackOnZero]
+                        : false,
                     getPosition: [cx.data, cy.data, cz?.data],
                 },
                 extensions: [new DataFilterExtension()],
@@ -651,6 +652,7 @@ export function useScatterplotLayer(
             }),
         [
             id,
+            greyData,
             cx,
             cy,
             cz,

@@ -1,4 +1,4 @@
-import DeckGL from "@deck.gl/react";
+import DeckGL, { type DeckGLRef } from "@deck.gl/react";
 import { OrthographicView, OrbitView, type PickingInfo } from "@deck.gl/core";
 import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
@@ -7,17 +7,21 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { useChart } from "../context";
 import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 import { action } from "mobx";
-import type { DataColumn, FieldName, LoadedDataColumn, NumberDataType } from "@/charts/charts";
+import type { DataColumn, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
-import { useOuterContainer } from "../screen_state";
-import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
+import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import useGateLayers from "../hooks/useGateLayers";
 import FieldContourLegend from "./FieldContourLegend";
-import { useFieldContourLegend, type DualContourLegacyConfig } from "../contour_state";
+import {
+    useCategoryContourLegend,
+    useFieldContourLegend,
+    type DualContourLegacyConfig,
+    type HoveredContour,
+} from "../contour_state";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
@@ -127,9 +131,9 @@ function useZoomOnFilter(data: Uint32Array) {
  * - axis configuration (including via direct manipulation)
  */
 const DeckScatter = observer(function DeckScatterComponent({
-    setHoveredField,
+    setHoveredContour,
 }: {
-    setHoveredField: (fieldId: FieldName | null) => void;
+    setHoveredContour: (contour: HoveredContour | null) => void;
 }) {
     const id = useId();
     const [width, height] = useChartSize();
@@ -184,6 +188,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     } = useGateLayers();
 
     const legendFields = useFieldContourLegend(contourConfig.densityFields);
+    const legendCategories = useCategoryContourLegend(contourConfig);
     const showLegend = contourConfig.field_legend.display;
     const legendPosition = { x: 10, y: 10 };
 
@@ -233,9 +238,8 @@ const DeckScatter = observer(function DeckScatterComponent({
     const layers = [greyScatterplotLayer, scatterplotLayer, gateDisplayLayer, selectionLayer, gateLabelLayer, axisLinesLayer,
     ].filter(x => x !== null);
     
-    const outerContainer = useOuterContainer();
     const deckContainerRef = useRef<HTMLDivElement | null>(null);
-    const deckRef = useRef<any>(null);
+    const deckRef = useRef<DeckGLRef | null>(null);
     const getTooltipContent = useCallback(
         (info: PickingInfo) => {
             const richInfo = getPickingInfoWithAlternates(info, deckRef.current?.deck);
@@ -271,22 +275,7 @@ const DeckScatter = observer(function DeckScatterComponent({
         // Unproject from screen coordinates to world coordinates
         return viewport.unproject([coords[0], coords[1]]);
     }, []);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: selectionLayer might change without us caring
-    useEffect(() => {
-        outerContainer; // make sure the hook runs when this changes
-        if (deckRef.current) {
-            try {
-                // const deck: Deck<any> = deckRef.current.deck;
-                const deck = deckRef.current.deck; // as Deck<any>;
-                return rebindMouseEvents(deck, selectionLayer);
-            } catch (e) {
-                console.error(
-                    "attempt to reset deck eventManager element failed - could be related to brittle deck monkeypatch",
-                    e,
-                );
-            }
-        }
-    }, [outerContainer]);
+    useRebindDeckEvents(deckRef);
 
     // we want default controller options, but we want a new one when the outerContainer changes
     // this doesn't seem to help re-register mouse events.
@@ -315,6 +304,8 @@ const DeckScatter = observer(function DeckScatterComponent({
                         layers={layers}
                         useDevicePixels={true}
                         controller={{
+                            // double-click finishes polygons / removes vertices in selection tools
+                            doubleClickZoom: false,
                             dragPan: controllerOptions.dragPan,
                         }}
                         viewState={viewState}
@@ -334,8 +325,10 @@ const DeckScatter = observer(function DeckScatterComponent({
             {showLegend && (
                 <FieldContourLegend
                     fields={legendFields}
+                    categories={legendCategories.items}
+                    categoryLabel={legendCategories.label}
                     position={legendPosition}
-                    onFieldHover={setHoveredField}
+                    onContourHover={setHoveredContour}
                 />
             )}
         </>
@@ -344,13 +337,13 @@ const DeckScatter = observer(function DeckScatterComponent({
 
 export default () => {
     const chart = useChart();
-    const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
+    const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
     // in order for SelectionOverlay to work, we need to review how our implementation works
     // vs useScatterplotLayer in spatial_context.tsx
     return (
-        <SpatialAnnotationProvider chart={chart} hoveredFieldId={hoveredField} setHoveredFieldId={setHoveredField}>
+        <SpatialAnnotationProvider chart={chart} hoveredContour={hoveredContour} setHoveredContour={setHoveredContour}>
             <SelectionOverlay />
-            <DeckScatter setHoveredField={setHoveredField} />
+            <DeckScatter setHoveredContour={setHoveredContour} />
         </SpatialAnnotationProvider>
     );
 };

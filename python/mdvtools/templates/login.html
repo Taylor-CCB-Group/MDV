@@ -4,8 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Login</title>
+    {# Relative to this page, so the assets still resolve behind a proxy that strips a path prefix. #}
+    {% set static_root = '../' * (request.path.count('/') - 1) ~ url_for('static', filename='')[request.script_root|length + 1:] %}
+    {% set login = entry_assets('login') %}
+    {% for css in login.css %}
+    <link rel="stylesheet" href="{{ static_root }}{{ css }}">
+    {% endfor %}
   </head>
   <body>
-    <script type="module" src="{{ url_for('static', filename='js/login.js') }}"></script>
+    <script type="module" src="{{ static_root }}{{ login.js }}"></script>
   </body>
 </html>

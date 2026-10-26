@@ -147,6 +147,20 @@ def test_log_one_project_and_a_tree(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert str(pbmc.resolve()) in tree
 
 
+def test_revisions_in_the_same_second_list_newest_first(tmp_path: Path):
+    from datetime import datetime, timezone
+
+    project = tmp_path / "pbmc3k"
+    _write_project(project, b"{}\n")
+    when = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    created = [
+        _history.snapshot_project(project, run="0123456789abcdef", message=str(i), when=when)
+        for i in range(8)
+    ]
+    listed = [item["id"] for item in _history.list_revisions(project)]
+    assert listed == list(reversed(created))
+
+
 def test_restore_one_revision_puts_bytes_back_and_appends_history(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     project = tmp_path / "pbmc3k"
     original_ds = b'[{"field": "Cell Type"}]\n'

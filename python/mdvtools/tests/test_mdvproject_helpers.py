@@ -1,6 +1,8 @@
 import logging
+import os
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
 from mdvtools import mdvproject as mp
@@ -162,3 +164,13 @@ def test_get_h5_handle_retries_on_lock_contention(tmp_path):
             out = p._get_h5_handle(read_only=True)
     assert out is handle
     assert mock_file.call_count == 2
+
+
+def test_reading_a_column_without_a_data_file_raises_and_creates_no_file(tmp_path):
+    p = mp.MDVProject(str(tmp_path / "proj"), delete_existing=True)
+    p.add_datasource("cells", pd.DataFrame({"x": [1.0, 2.0]}))
+    os.remove(p.h5file)
+
+    with pytest.raises(FileNotFoundError):
+        p.get_column("cells", "x")
+    assert not os.path.exists(p.h5file)

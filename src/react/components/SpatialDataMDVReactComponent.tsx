@@ -9,14 +9,13 @@ import {
     type VivImagePropsResolver,
     useSpatialCanvasRendererFromLayerInputs,
 } from "@spatialdata/vis";
-import type { DeckGLProps, OrthographicViewState, PickingInfo } from "deck.gl";
+import type { DeckGLProps, DeckGLRef, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
-import type { FieldName } from "@/charts/charts";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import RasterDataWarning, { rasterEntriesKey } from "./RasterDataWarning";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
@@ -38,11 +37,12 @@ import VivContrastExtension from "@/webgl/VivContrastExtension";
 import type { RenderStackLayerInputs } from "@spatialdata/vis";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
-import { useFieldContourLegend } from "../contour_state";
-import type { DualContourLegacyConfig } from "../contour_state";
+import { useCategoryContourLegend, useFieldContourLegend } from "../contour_state";
+import type { DualContourLegacyConfig, HoveredContour } from "../contour_state";
 import { useChartID, useChartSize, useConfig, useRegion } from "../hooks";
 import useGateLayers from "../hooks/useGateLayers";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
+import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import { useOuterContainer } from "../screen_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import FieldContourLegend from "./FieldContourLegend";
@@ -99,6 +99,9 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const stack = config.renderStack;
     void chart.renderStackGeneration;
+
+    const deckRef = useRef<DeckGLRef | null>(null);
+    useRebindDeckEvents(deckRef);
 
     const extensions = useMemo(() => [new ColorPaletteExtension(), new VivContrastExtension()], []);
 
@@ -250,6 +253,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
             layerOrder={renderer.layerOrder}
             vivLayerProps={renderer.vivLayerProps.length > 0 ? renderer.vivLayerProps : undefined}
             deckProps={mergedDeckProps}
+            deckRef={deckRef}
         />
     );
 });
@@ -285,7 +289,7 @@ function SpatialDataLink() {
 
 const SpatialDataMainChart = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
-    const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
+    const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
     const rawRegion = useRegion();
     const region = getSpatialRegionMetadata(rawRegion);
     const spatialDataUrl = region ? getSpatialDataUrl(region) : null;
@@ -295,8 +299,8 @@ const SpatialDataMainChart = observer(() => {
 
     return (
         <SpatialDataProvider source={spatialDataUrl ?? undefined}>
-            <SpatialAnnotationProvider chart={chart} hoveredFieldId={hoveredField} setHoveredFieldId={setHoveredField}>
-                <SpatialDataViewer setHoveredField={setHoveredField} />
+            <SpatialAnnotationProvider chart={chart} hoveredContour={hoveredContour} setHoveredContour={setHoveredContour}>
+                <SpatialDataViewer setHoveredContour={setHoveredContour} />
             </SpatialAnnotationProvider>
         </SpatialDataProvider>
     );
@@ -355,9 +359,9 @@ function summariseLayersForError(layers: RenderStackLayerInputs["layers"]) {
 
 const SpatialDataViewer = observer(
     ({
-        setHoveredField,
+        setHoveredContour,
     }: {
-        setHoveredField: (fieldId: FieldName | null) => void;
+        setHoveredContour: (contour: HoveredContour | null) => void;
     }) => {
         const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
         const config = useConfig<SpatialDataMdvReactConfig>();
@@ -376,6 +380,7 @@ const SpatialDataViewer = observer(
         const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
         const contourConfig = useConfig<DualContourLegacyConfig>();
         const legendFields = useFieldContourLegend(contourConfig.densityFields);
+        const legendCategories = useCategoryContourLegend(contourConfig);
         const showLegend = contourConfig.field_legend.display;
         const legendPosition = { x: 10, y: 10 };
 
@@ -546,11 +551,13 @@ const SpatialDataViewer = observer(
         return (
             <Profiler id="spatial.viewer" onRender={onSpatialProfilerRender}>
                 <SelectionOverlay />
-                {showLegend && legendFields.length > 0 && (
+                {showLegend && (
                     <FieldContourLegend
                         fields={legendFields}
+                        categories={legendCategories.items}
+                        categoryLabel={legendCategories.label}
                         position={legendPosition}
-                        onFieldHover={setHoveredField}
+                        onContourHover={setHoveredContour}
                     />
                 )}
                 <div

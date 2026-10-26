@@ -2135,7 +2135,7 @@ dependencies = [
     { name = "polars" },
     { name = "pyranges" },
     { name = "pysam" },
-    { name = "scanpy" },
+    { name = "scanpy", extra = ["leiden"] },
     { name = "scipy" },
     { name = "spatialdata" },
     { name = "spatialdata-io" },
@@ -2198,7 +2198,6 @@ app = [
 dev = [
     { name = "dummy-spatialdata", marker = "python_full_version >= '3.12'" },
     { name = "jupyterlab" },
-    { name = "leidenalg" },
     { name = "ome-types" },
     { name = "packaging" },
     { name = "pillow" },
@@ -2209,7 +2208,6 @@ dev = [
     { name = "setuptools" },
     { name = "spatialdata-plot" },
     { name = "statsmodels" },
-    { name = "umap-learn" },
 ]
 docs = [
     { name = "sphinx" },
@@ -2256,7 +2254,7 @@ requires-dist = [
     { name = "regex", marker = "extra == 'app'", specifier = ">=2024.5.15,<2025" },
     { name = "requests", marker = "extra == 'app'", specifier = ">=2.32.3,<3" },
     { name = "ruff", marker = "extra == 'app'", specifier = ">=0.3.7,<0.4" },
-    { name = "scanpy", specifier = "==1.11.4" },
+    { name = "scanpy", extras = ["leiden"], specifier = "==1.11.4" },
     { name = "scipy", specifier = ">=1.11.3,<2" },
     { name = "spatialdata", specifier = ">=0.7.2,<0.8" },
     { name = "spatialdata-io", specifier = ">=0.6.0,<0.7" },
@@ -2269,7 +2267,6 @@ provides-extras = ["app", "all"]
 dev = [
     { name = "dummy-spatialdata", marker = "python_full_version == '3.12.*'", specifier = ">=0.1.9,<0.2" },
     { name = "jupyterlab", specifier = "==4.4.9" },
-    { name = "leidenalg", specifier = ">=0.10.2,<0.11" },
     { name = "ome-types", specifier = ">=0.5.0,<0.6" },
     { name = "packaging", specifier = ">=24.0,<25" },
     { name = "pillow", specifier = ">=10.3.0,<11" },
@@ -2280,7 +2277,6 @@ dev = [
     { name = "setuptools", specifier = "==80.9.0" },
     { name = "spatialdata-plot", specifier = ">=0.2.12,<0.3" },
     { name = "statsmodels", specifier = ">=0.14.2,<0.15" },
-    { name = "umap-learn", specifier = ">=0.5.6,<0.6" },
 ]
 docs = [
     { name = "sphinx", specifier = ">=7.3.7,<8" },
@@ -3873,6 +3869,12 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/8e/1a/1570cba6fc910853dd0296c48a0700b75e4f5398d6f8a8e5ee8193b36bca/scanpy-1.11.4.tar.gz", hash = "sha256:333189ecac9c7009bf55d416ee2e272e1c490d54c719478f7b4dd1fc294d2f95", size = 14091636, upload-time = "2025-07-30T14:34:30.496Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e6/d0/af2ebd8750a9a5e4ce88b54265047e858d7217f81b83613bba27e1a8ba2e/scanpy-1.11.4-py3-none-any.whl", hash = "sha256:f4ab68ab89e97e88a4faed07b1bc51533fb2e67f797a65a4683591910abfab95", size = 2102520, upload-time = "2025-07-30T14:34:28.155Z" },
+]
+
+[package.optional-dependencies]
+leiden = [
+    { name = "igraph" },
+    { name = "leidenalg" },
 ]
 
 [[package]]

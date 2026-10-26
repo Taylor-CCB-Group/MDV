@@ -361,8 +361,16 @@ class DotPlot extends SVGChart {
             threshold: this.config.threshold_value,
         };
         const p = [this.config.param[0], ...this.fieldNames];
+        // The worker answers every request in turn, so an answer can arrive after the fields have
+        // changed again. Only the latest request matches the current fields - applying an older
+        // answer would also freeze its range as the colour scale (see getColorScaleRange).
+        const requestId = (this.averagesRequestId ?? 0) + 1;
+        this.averagesRequestId = requestId;
         this.dim.getAverages(
             (data) => {
+                if (requestId !== this.averagesRequestId) {
+                    return;
+                }
                 this.data = data;
                 this.clusterRows();
                 this.clusterColumns();

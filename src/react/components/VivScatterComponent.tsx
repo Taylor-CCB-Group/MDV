@@ -5,9 +5,8 @@ import { shallow } from "zustand/shallow";
 import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import SelectionOverlay from "./SelectionOverlay";
 import FieldContourLegend from "./FieldContourLegend";
-import { useFieldContourLegend } from "../contour_state";
-import type { DualContourLegacyConfig } from "../contour_state";
-import type { FieldName } from "@/charts/charts";
+import { useCategoryContourLegend, useFieldContourLegend } from "../contour_state";
+import type { DualContourLegacyConfig, HoveredContour } from "../contour_state";
 import { useLoader, type OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
@@ -28,11 +27,11 @@ export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move
 /** somewhat comparable to avivator `<Viewer />` */
 export const VivScatter = () => {
     const chart = useChart();
-    const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
+    const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
 
     return (
-        <SpatialAnnotationProvider chart={chart} hoveredFieldId={hoveredField} setHoveredFieldId={setHoveredField}>
-            <Main hoveredField={hoveredField} setHoveredField={setHoveredField} />
+        <SpatialAnnotationProvider chart={chart} hoveredContour={hoveredContour} setHoveredContour={setHoveredContour}>
+            <Main hoveredContour={hoveredContour} setHoveredContour={setHoveredContour} />
         </SpatialAnnotationProvider>
     );
 };
@@ -70,11 +69,11 @@ const useJsonLayer = (showJson: boolean) => {
 
 const Main = observer(
     ({
-        hoveredField,
-        setHoveredField,
+        hoveredContour,
+        setHoveredContour,
     }: {
-        hoveredField: FieldName | null;
-        setHoveredField: (fieldId: FieldName | null) => void;
+        hoveredContour: HoveredContour | null;
+        setHoveredContour: (contour: HoveredContour | null) => void;
     }) => {
         // type of this to be sorted - before we accessed ome.data, but maybe this is the 'data'...
         const ome = useLoader() as OME_TIFF["data"]; // useOmeTiff();
@@ -102,16 +101,13 @@ const Main = observer(
         // Get field contour legend data
         const config = useConfig<DualContourLegacyConfig>();
         const legendFields = useFieldContourLegend(config.densityFields);
+        const legendCategories = useCategoryContourLegend(config);
 
         // Legend visibility - fixed position in bottom-left
         const showLegend = config.field_legend.display;
 
         // Fixed bottom-left position: 10px from left, 10px from bottom
         const legendPosition = { x: 10, y: 10 };
-
-        const handleFieldHover = (fieldId: FieldName | null) => {
-            setHoveredField(fieldId);
-        };
 
         // maybe more efficient to pick out properties like this... but it's very repetitive/verbose
         const { colors, contrastLimits, channelsVisible, selections, brightness, contrast } = useChannelsStore(
@@ -250,11 +246,13 @@ const Main = observer(
         return (
             <>
                 <SelectionOverlay />
-                {showLegend && legendFields.length > 0 && (
+                {showLegend && (
                     <FieldContourLegend 
                         fields={legendFields} 
+                        categories={legendCategories.items}
+                        categoryLabel={legendCategories.label}
                         position={legendPosition}
-                        onFieldHover={handleFieldHover}
+                        onContourHover={setHoveredContour}
                     />
                 )}
                 <div
@@ -273,7 +271,6 @@ const Main = observer(
                 >
                     <MDVivViewer
                         outerContainer={outerContainer}
-                        selectionLayer={selectionLayer}
                         views={[detailView]}
                         layerProps={[layerConfig]}
                         viewStates={[{ ...viewState, id: detailId }]}

@@ -124,113 +124,34 @@ class CategoryDimension extends Dimension {
         );
     }
 
-    filterCategoriesPredicate(args, columns) {
-        const category = args;
-        const col = this.parent.columnIndex[columns[0]];
-        const data = col.data;
-        const vals = col.values;
-
-        if (col.datatype === "multitext") {
-            const predicate = createMultitextCategoryPredicate(col, category);
-            return this.filterPredicate({ predicate });
-        }
-
-        if (typeof category === "string") {
-            const ind = vals.indexOf(category);
-            const predicate = (i) => data[i] === ind;
-            return this.filterPredicate({ predicate });
-        }
-
-        const cats = new Set();
-        for (const cat of category) {
-            cats.add(vals.indexOf(cat));
-        }
-
-        const catsArr = Array.from(cats);
-        // special cases for 1 or 2 categories; marginally faster than Set.has
-        if (catsArr.length === 1) {
-            const val = catsArr[0];
-            const predicate = (i) => data[i] === val;
-            return this.filterPredicate({ predicate });
-        }
-        if (catsArr.length === 2) {
-            const val1 = catsArr[0];
-            const val2 = catsArr[1];
-            const predicate = (i) => data[i] === val1 || data[i] === val2;
-            return this.filterPredicate({ predicate });
-        }
-        //this appears to be taking about twice as long as non-predicate version??
-        const predicate = (i) => cats.has(data[i]);
-        // const predicate = i => catsArr.includes(data[i]);
-        return this.filterPredicate({ predicate });
-    }
+    /**
+     * Keeps rows whose category is `args` (a string) or one of `args` (a list).
+     * Multitext columns match individual items; a list with `operand: "and"` requires all of them.
+     */
     filterCategories(args, columns) {
-        if (window.predicateTest)
-            return this.filterCategoriesPredicate(args, columns);
-        const category = args;
-        const parent = this.parent;
-        const col = parent.columnIndex[columns[0]];
-        const data = col.data;
-        const filter = parent.filterArray;
-        const localFilter = this.filterArray;
-
-        const vals = col.values;
-        const cats = new Set();
-        const len = this.parent.size;
-
+        const col = this.parent.columnIndex[columns[0]];
         if (col.datatype === "multitext") {
-            return this.filterPredicate({
-                predicate: createMultitextCategoryPredicate(col, category),
-            });
+            return this.commitFilter(createMultitextCategoryPredicate(col, args));
         }
-
-        if (typeof category === "string") {
-            const ind = vals.indexOf(category);
-
-            for (let i = 0; i < len; i++) {
-                if (data[i] === ind) {
-                    if (localFilter[i] === 1) {
-                        if (--filter[i] === 0) {
-                            parent.filterSize++;
-                        }
-                    }
-                    localFilter[i] = 0;
-                } else {
-                    if (localFilter[i] === 0) {
-                        if (++filter[i] === 1) {
-                            parent.filterSize--;
-                        }
-                    }
-                    localFilter[i] = 1;
-                }
-            }
-        } else {
-            for (const cat of category) {
-                cats.add(vals.indexOf(cat));
-            }
-
-            for (let i = 0; i < len; i++) {
-                if (cats.has(data[i])) {
-                    if (localFilter[i] === 1) {
-                        if (--filter[i] === 0) {
-                            parent.filterSize++;
-                        }
-                    }
-                    localFilter[i] = 0;
-                } else {
-                    if (localFilter[i] === 0) {
-                        if (++filter[i] === 1) {
-                            parent.filterSize--;
-                        }
-                    }
-                    localFilter[i] = 1;
-                }
-            }
+        const data = col.data;
+        // lookup table indexed by category code; faster than Set.has per row
+        const keep = new Uint8Array(col.values.length);
+        for (const cat of typeof args === "string" ? [args] : args) {
+            const index = col.values.indexOf(cat);
+            if (index !== -1) keep[index] = 1;
         }
+        return this.commitFilter((i) => keep[data[i]] === 1);
     }
 
+    /** @deprecated same as {@link filterCategories} */
+    filterCategoriesPredicate(args, columns) {
+        return this.filterCategories(args, columns);
+    }
+
+    /**
+     * Keeps rows where each column `columns[n]` has the category `args[n]`.
+     */
     filterMultipleCategories(args, columns) {
-        const categories = args;
         const parent = this.parent;
         const data = [];
         const indexes = [];
@@ -239,33 +160,12 @@ class CategoryDimension extends Dimension {
             data.push(col.data);
             indexes.push(col.values.indexOf(args[i]));
         }
-        const filter = parent.filterArray;
-        const localFilter = this.filterArray;
-        const len = parent.size;
-        for (let i = 0; i < len; i++) {
-            let con = true;
+        return this.commitFilter((i) => {
             for (let n = 0; n < data.length; n++) {
-                if (data[n][i] !== indexes[n]) {
-                    con = false;
-                    break;
-                }
+                if (data[n][i] !== indexes[n]) return false;
             }
-            if (con) {
-                if (localFilter[i] === 1) {
-                    if (--filter[i] === 0) {
-                        parent.filterSize++;
-                    }
-                }
-                localFilter[i] = 0;
-            } else {
-                if (localFilter[i] === 0) {
-                    if (++filter[i] === 1) {
-                        parent.filterSize--;
-                    }
-                }
-                localFilter[i] = 1;
-            }
-        }
+            return true;
+        });
     }
 
     filterCategoryPair(args, columns) {

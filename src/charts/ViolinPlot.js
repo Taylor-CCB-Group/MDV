@@ -179,7 +179,10 @@ class ViolinPlot extends WGLChart {
             return;
         }
 
-        if (dim !== this.dim) {
+        if (dim === this.dim) {
+            // large datasets filter on a worker, so our own result can land after filter() returns
+            this.app.refresh();
+        } else {
             if (dim === "all_removed") {
                 this.app.clearBrush();
                 this.app.setFilter(false);
