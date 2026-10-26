@@ -11,6 +11,7 @@ from sqlalchemy import text, create_engine, make_url
 from sqlalchemy.exc import OperationalError
 from flask import Flask
 from mdvtools.server import add_safe_headers
+from mdvtools.entry_assets import register_entry_assets
 from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent
@@ -60,6 +61,7 @@ def create_flask_app(config_name=None):
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
     app.url_map.strict_slashes = False
     app.after_request(add_safe_headers)
+    register_entry_assets(app)
     
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,   # Prevent JavaScript from accessing cookies

@@ -13,6 +13,7 @@ def create_test_app():
         return Response("<!doctype html><div id='holder'></div>", mimetype="text/html")
 
     @app.route("/static/js/<path:name>")
+    @app.route("/flask/js/<path:name>")
     def js(name):
         response = Response("console.log('ok')", mimetype="text/javascript")
         response.headers["Cache-Control"] = "public, max-age=31536000"
@@ -53,6 +54,7 @@ def test_stable_vite_entry_assets_revalidate():
         "/static/js/login.js",
         "/static/assets/mdv.css",
         "/static/assets/catalog.css",
+        "/flask/js/mdv.js",
     ]:
         assert (
             client.get(path).headers["Cache-Control"]

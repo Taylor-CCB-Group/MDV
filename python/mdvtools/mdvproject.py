@@ -29,6 +29,7 @@ import copy
 import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
+from mdvtools.entry_assets import entry_assets
 from mdvtools.logging_config import get_logger
 from mdvtools.project_protocols import RowsAsColumnsLinkSource
 
@@ -2218,6 +2219,12 @@ class MDVProject:
         page = open(template).read()
         # make sure the static files are referenced correctly
         page = page.replace("/static", "static")
+        mdv = entry_assets(join(fdir, "static"), "mdv")
+        page = page.replace("static/js/mdv.js", f"static/{mdv.js}")
+        page = page.replace(
+            '<link rel="stylesheet" href="static/assets/mdv.css">',
+            "\n".join(f'<link rel="stylesheet" href="static/{css}">' for css in mdv.css),
+        )
         # call init with no route, will be interpreted as static page (at /)
         page = page.replace(
             "_mdvInit('{{route}}')", "_mdvInit()"
