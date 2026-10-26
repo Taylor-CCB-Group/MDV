@@ -537,3 +537,19 @@ def test_import_and_upload_take_the_name_from_the_archive(app, tmp_path):
     with app.app_context():
         assert db.session.get(Project, imported).name == "Tumour atlas"
         assert db.session.get(Project, uploaded).name == "Pilot cohort"
+
+
+def test_startup_returns_the_projects_it_served(app, tmp_path):
+    """The job driver's recovery scan takes these, so it holds the same instance
+    the project's routes were mounted with (ADR-0012)."""
+    with app.app_context():
+        served = ProjectService.add_new_project(path=str(write_project_directory(tmp_path / "served")), name="served")
+        deleted = ProjectService.add_new_project(path=str(write_project_directory(tmp_path / "deleted")), name="deleted")
+        ProjectService.add_new_project(path=str(tmp_path / "missing"), name="missing")
+        db.session.commit()
+        ProjectService.soft_delete_projects([deleted.id])
+
+        projects = serve_projects_from_db(app)
+
+        assert [p.id for p in projects] == [str(served.id)]
+        assert all(isinstance(p, MDVProject) for p in projects)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,7 @@ _spec.loader.exec_module(_history)
 
 discover_projects = getattr(_history, "discover_projects")
 main = getattr(_history, "main")
+stamp = getattr(_history, "_stamp")
 
 
 def _write_project(
@@ -121,7 +123,13 @@ def test_project_with_only_datasources_json(tmp_path: Path, capsys: pytest.Captu
     assert not (project / "history" / rev / "views.json").exists()
 
 
-def test_log_one_project_and_a_tree(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+def test_log_one_project_and_a_tree(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    # Same-second snapshots whose ids sort the opposite way to the order they were taken.
+    suffixes = iter(["ffffff", "fffffe", "000000"])
+    monkeypatch.setattr(_history, "_new_revision_id", lambda when: f"{stamp(when)}-{next(suffixes)}")
+    monkeypatch.setattr(_history, "_utc_now", lambda: datetime(2026, 10, 12, 8, 32, tzinfo=timezone.utc))
     liver = tmp_path / "liver"
     pbmc = tmp_path / "pbmc3k"
     _write_project(liver, b"{}\n")

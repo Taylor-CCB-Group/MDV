@@ -192,7 +192,15 @@ def list_revisions(project: Path) -> list[dict[str, object]]:
         ),
         reverse=True,
     )
-    return manifests
+    # Timestamps only resolve to the second, so follow the parent chain from HEAD
+    # for the true order; revisions off that chain keep their timestamp order after it.
+    by_id = {str(item.get("id", "")): item for item in manifests}
+    chain: list[dict[str, object]] = []
+    rev = _read_head(project)
+    while isinstance(rev, str) and rev in by_id:
+        chain.append(by_id.pop(rev))
+        rev = chain[-1].get("parent")
+    return chain + [item for item in manifests if str(item.get("id", "")) in by_id]
 
 
 def _revision_dir(project: Path, rev_id: str) -> Path:

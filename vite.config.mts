@@ -264,7 +264,7 @@ function getRollupOptions() {
 const proxyOptions = { target: flaskURL, changeOrigin: true };
 // ... and then this is a bit more concise than
 const proxy = [
-    "^/(get_|images|tracks|save|chat|spatial).*", // single-project Flask routes (incl. /spatial zarr etc.)
+    "^/(get_|images|tracks|save|chat|spatial|jobs).*", // single-project Flask routes (incl. /spatial zarr, /jobs etc.)
     "^/project/[^/]+/.+", // proxy nested project routes, but keep /project/:id for the Vite app shell
     "^/.*\\.(json|b|gz)$",
     "/projects",

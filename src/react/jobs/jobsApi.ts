@@ -1,0 +1,108 @@
+/**
+ * Client for the per-project jobs routes (ADR-0012 "HTTP surface").
+ *
+ * `root` is the project root from `useProject()`: "" in single-project mode, "/project/<id>" in
+ * multi-project mode.
+ */
+import type { ServerDataSource } from "./jobColumns";
+
+/** How the selector renders a param; mirrors `ParamSpec.type` in `mdvtools/jobs/registry.py`. */
+export type JobParamType = "datasource" | "subgroup" | "column" | "selection" | "dropdown" | "text" | "int" | "float";
+
+export type JobParamValue = string | number;
+
+export type JobParamSpec = {
+    name: string;
+    type: JobParamType;
+    label: string;
+    /** for "column", "subgroup" and "selection": the name of the datasource param they belong to */
+    options_from: string | null;
+    default: JobParamValue | null;
+    applies_to: string | null;
+};
+
+export type JobTool = {
+    id: string;
+    name: string;
+    description: string;
+    params: JobParamSpec[];
+    output: { shape: string; datasource_param: string; columns_param: string };
+    input_shape: string;
+};
+
+export type JobStatus =
+    | "queued"
+    | "staging"
+    | "running"
+    | "ingesting"
+    | "done"
+    | "failed"
+    | "cancelled"
+    | "stale"
+    | "lost";
+
+/** The client-safe view of a job record (`_client_view` in `server.py`). */
+export type JobRecord = {
+    job_id: string;
+    tool_id: string;
+    params: Record<string, JobParamValue>;
+    status: JobStatus;
+    input_filter_hash: string | null;
+    /** seconds since the epoch */
+    created: number;
+    provenance: Record<string, unknown> | null;
+    error: string | null;
+    /** the executor the job runs on; `null` on records written before executors had names (ADR-0016) */
+    executor: string | null;
+    /** how many rows the job's selection has; `null` when it ran on all rows (ADR-0017) */
+    selection_rows: number | null;
+};
+
+/** Parse a JSON response, throwing the server's `{error}` message when the request failed. */
+async function readJson(resp: Response) {
+    if (resp.ok) return resp.json();
+    // a Flask 500 is an HTML page, so the body may not be JSON
+    const body = await resp.json().catch(() => null);
+    throw new Error(typeof body?.error === "string" ? body.error : `${resp.status} ${resp.statusText}`);
+}
+
+export async function fetchTools(root: string): Promise<JobTool[]> {
+    return readJson(await fetch(`${root}/jobs/tools`));
+}
+
+/** The executor names the server offers, default first (ADR-0016). */
+export async function fetchExecutors(root: string): Promise<string[]> {
+    return readJson(await fetch(`${root}/jobs/executors`));
+}
+
+/**
+ * Submit a job; leaving `executor` out runs it on the server's default executor, and leaving `rows`
+ * out runs it on all rows rather than a selection (ADR-0017).
+ */
+export async function submitJob(
+    root: string,
+    toolId: string,
+    params: Record<string, JobParamValue>,
+    executor?: string,
+    rows?: number[],
+): Promise<string> {
+    const resp = await fetch(`${root}/jobs`, {
+        method: "POST",
+        body: JSON.stringify({ tool_id: toolId, params, executor, rows }),
+        headers: { "Content-Type": "application/json" },
+    });
+    const body: { job_id: string } = await readJson(resp);
+    return body.job_id;
+}
+
+/** The project's datasource metadata, as the page loaded it, including columns jobs have written since. */
+export async function fetchConfigs(root: string): Promise<{ datasources: ServerDataSource[] }> {
+    return readJson(await fetch(`${root}/get_configs`));
+}
+
+/** Every job of the project, newest first. */
+export async function fetchJobs(root: string): Promise<JobRecord[]> {
+    // GET /jobs returns records in no fixed order
+    const jobs: JobRecord[] = await readJson(await fetch(`${root}/jobs`));
+    return jobs.sort((a, b) => b.created - a.created);
+}
