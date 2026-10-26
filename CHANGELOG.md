@@ -94,6 +94,9 @@ A feature release. SQLite is now the default database for new installs of the fu
   zooms the scatter plot (#582).
 - Selection tools work in a popped-out SpatialData chart (#582).
 - Reset All Filters now clears the selection shape drawn on a chart (#583).
+- Reading a column from a project with no `datafile.h5` raises `FileNotFoundError` and leaves no file behind. It used to create an empty `datafile.h5` and then fail with a `KeyError` (#595).
+- A rescan of the projects folder no longer registers hidden folders, or folders that lack
+  `views.json`, `state.json` or `datasources.json`, such as one still being copied in. It used to turn them into empty projects (#596).
 - File upload, Socket.IO and page assets work behind a proxy that strips a path prefix
   (#571, #572).
 - A user signed in to one deployment no longer carries their session into another
