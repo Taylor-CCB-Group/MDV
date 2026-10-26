@@ -74,6 +74,16 @@ async function probeWebGPU(): Promise<DeckDevice> {
     try {
         const adapter = await navigator.gpu.requestAdapter();
         if (!adapter) return fallback("no WebGPU adapter is available");
+        // DensityLayer's faster path blends into r32float. Optional: without it
+        // (Firefox, for one) the layer falls back to an exact compute splat.
+        const optionalFeatures = ["float32-blendable"] as const;
+        // An adapter can still refuse a device. Make the request deck will make (luma's
+        // default "core" level asks for just the supported optional features), so that
+        // failure falls back here instead of leaving deck with no device.
+        const probe = await adapter.requestDevice({
+            requiredFeatures: optionalFeatures.filter((feature) => adapter.features.has(feature)),
+        });
+        probe.destroy();
         const { webgpuAdapter } = await import("@luma.gl/webgpu");
         return {
             status: "ready",
@@ -81,9 +91,7 @@ async function probeWebGPU(): Promise<DeckDevice> {
             deviceProps: {
                 type: "webgpu",
                 adapters: [webgpuAdapter],
-                // DensityLayer's faster path blends into r32float. Optional: without it
-                // (Firefox, for one) the layer falls back to an exact compute splat.
-                optionalFeatures: ["float32-blendable"],
+                optionalFeatures,
             },
         };
     } catch (error) {
