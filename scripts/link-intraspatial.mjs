@@ -6,8 +6,8 @@
  *   INTRASPATIAL_ROOT=~/code/intraspatial pnpm link:intraspatial
  *   pnpm unlink:intraspatial
  *
- * Nothing is published yet, so `@intraspatial/deck` is a dependency only while linked:
- * unlink removes it rather than restoring a range. Rebuild upstream when you change it:
+ * Unlink restores the published `@intraspatial/deck` range. Rebuild upstream when you
+ * change it:
  *   (cd "$INTRASPATIAL_ROOT" && pnpm build:lib && cd packages/deck && pnpm build)
  *
  * `typegpu` is a peer of both packages and stays a real MDV dependency either way.
@@ -28,8 +28,13 @@ const PACKAGE_DIRS = {
     intraspatial: ".",
     "@intraspatial/deck": "packages/deck",
 };
-/** Added to `dependencies` while linked; the others only need an override. */
-const DIRECT_DEPENDENCIES = ["@intraspatial/deck"];
+/**
+ * Direct dependencies, and the range `unlink` restores for each; the others only need an
+ * override. Keep in step with package.json: this is a separate copy of the range.
+ */
+const PUBLISHED_RANGES = {
+    "@intraspatial/deck": "^0.1.0",
+};
 
 function expandHome(p) {
     if (p.startsWith("~/")) return path.join(os.homedir(), p.slice(2));
@@ -78,7 +83,7 @@ function link() {
     for (const [name, rel] of Object.entries(PACKAGE_DIRS)) {
         const spec = `link:${path.join(root, rel)}`;
         pkg.pnpm.overrides[name] = spec;
-        if (DIRECT_DEPENDENCIES.includes(name)) pkg.dependencies[name] = spec;
+        if (name in PUBLISHED_RANGES) pkg.dependencies[name] = spec;
     }
 
     writePackageJson(pkg);
@@ -96,13 +101,11 @@ function unlinkPackages() {
 
     for (const name of Object.keys(PACKAGE_DIRS)) {
         if (pkg.pnpm.overrides[name]?.startsWith("link:")) delete pkg.pnpm.overrides[name];
-        if (DIRECT_DEPENDENCIES.includes(name) && pkg.dependencies[name]?.startsWith("link:")) {
-            delete pkg.dependencies[name];
-        }
     }
+    for (const [name, range] of Object.entries(PUBLISHED_RANGES)) pkg.dependencies[name] = range;
 
     writePackageJson(pkg);
-    console.log("Removed the intraspatial links (nothing published to restore)");
+    console.log("Restored the published @intraspatial/deck range");
     console.log("Running pnpm install…");
     execSync("pnpm install", { cwd: mdvRoot, stdio: "inherit" });
 }
