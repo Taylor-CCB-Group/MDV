@@ -321,10 +321,12 @@ const RenderErrorNotice = observer(function RenderErrorNotice() {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const entries = chart.config.renderStack?.entries ?? [];
     const lines: Array<{ key: string; text: string; title: string }> = [];
+    let hasLayerFailure = false;
     for (const [entryId, failure] of chart.layerFailures) {
         if (failure.dismissed) continue;
         const entry = entries.find((item) => item.id === entryId);
         const name = entry ? renderStackEntryDisplayName(entry) : entryId;
+        hasLayerFailure = true;
         lines.push({
             key: entryId,
             text: `${name} failed and was turned off: ${failure.reason}`,
@@ -348,7 +350,12 @@ const RenderErrorNotice = observer(function RenderErrorNotice() {
                         ⚠ {line.text}
                     </span>
                 ))}
-                <span className="opacity-70">Details are in the layer dialog.</span>
+                {/* only failures tied to a layer appear in the layer dialog */}
+                <span className="opacity-70">
+                    {hasLayerFailure
+                        ? "Details are in the layer dialog and the browser console."
+                        : "Details are in the browser console."}
+                </span>
             </div>
             <button
                 type="button"
