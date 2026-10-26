@@ -1,6 +1,6 @@
 import { type RenderBackend, renderBackendSetting } from "@/lib/browserSettings";
 import type { CreateDeviceProps } from "@luma.gl/core";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * Which deck.gl device backend the SpatialData chart renders with. WebGPU is
@@ -111,9 +111,22 @@ async function probeWebGPU(): Promise<DeckDevice> {
     }
 }
 
-/** Resolve the requested backend to deck `deviceProps`, falling back to WebGL. */
-export function useDeckDevice(backend: DeckBackend): DeckDevice {
+/**
+ * Resolve the requested backend to deck `deviceProps`, falling back to WebGL.
+ *
+ * `fallBack` is for a WebGPU device deck could not create although the probe passed
+ * (luma's device setup, or the canvas's WebGPU context): it puts this chart on WebGL
+ * until its backend changes. It is per chart because a canvas context can fail alone.
+ */
+export function useDeckDevice(backend: DeckBackend): { device: DeckDevice; fallBack: (reason: string) => void } {
     const [webgpu, setWebgpu] = useState<DeckDevice>({ status: "pending" });
+    const [failure, setFailure] = useState<string | null>(null);
+    // A backend change gives WebGPU another try (React's reset-on-prop-change pattern).
+    const [lastBackend, setLastBackend] = useState(backend);
+    if (backend !== lastBackend) {
+        setLastBackend(backend);
+        setFailure(null);
+    }
     useEffect(() => {
         if (backend !== "webgpu") return;
         let cancelled = false;
@@ -125,5 +138,8 @@ export function useDeckDevice(backend: DeckBackend): DeckDevice {
             cancelled = true;
         };
     }, [backend]);
-    return backend === "webgpu" ? webgpu : WEBGL;
+    const fallBack = useCallback((reason: string) => setFailure(reason), []);
+    if (backend !== "webgpu") return { device: WEBGL, fallBack };
+    if (failure) return { device: { ...WEBGL, fallbackReason: failure }, fallBack };
+    return { device: webgpu, fallBack };
 }

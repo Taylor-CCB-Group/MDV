@@ -366,7 +366,7 @@ const SpatialDataViewer = observer(
         const legendCategories = useCategoryContourLegend(contourConfig);
         const showLegend = contourConfig.field_legend.display;
         const legendPosition = { x: 10, y: 10 };
-        const deckDevice = useDeckDevice(resolveDeckBackend(config.render_backend));
+        const { device: deckDevice, fallBack: fallBackToWebGL } = useDeckDevice(resolveDeckBackend(config.render_backend));
         // Layer errors (deck's `onError`) and WebGPU device errors (luma's) otherwise only
         // reach the console, and a device error repeats every frame. The tracker ties them
         // to render-stack entries, which the chart turns off and reports.
@@ -380,9 +380,23 @@ const SpatialDataViewer = observer(
             [chart],
         );
         useEffect(() => () => failureTracker.dispose(), [failureTracker]);
+        // The backend whose device deck last finished creating. A failed device creation
+        // reaches deck's `onError` (from luma's AnimationLoop), never the device's own.
+        const initializedBackend = useRef<string | null>(null);
+        const onDeviceInitialized = useCallback((device: { type: string }) => {
+            initializedBackend.current = device.type;
+        }, []);
         const onDeckError = useCallback(
-            (error: Error, layer?: { id: string } | null) => failureTracker.layer(error, layer?.id),
-            [failureTracker],
+            (error: Error, layer?: { id: string } | null) => {
+                if (!layer && deckDevice.status === "ready" && deckDevice.backend === "webgpu" && initializedBackend.current !== "webgpu") {
+                    // deck has no device, so nothing will draw: retry this chart on WebGL
+                    console.error(error);
+                    fallBackToWebGL(`creating the WebGPU device failed: ${error.message}`);
+                    return;
+                }
+                failureTracker.layer(error, layer?.id);
+            },
+            [deckDevice, failureTracker, fallBackToWebGL],
         );
         const deviceProps = useMemo(
             () =>
@@ -540,9 +554,10 @@ const SpatialDataViewer = observer(
                     dragPan: controllerOptions.dragPan,
                 },
                 ...(deviceProps && { deviceProps }),
+                onDeviceInitialized,
                 onError: onDeckError,
             }),
-            [id, getPortalTooltip, controllerOptions, deviceProps, onDeckError],
+            [id, getPortalTooltip, controllerOptions, deviceProps, onDeviceInitialized, onDeckError],
         );
 
         if (!coordinateSystem || !region?.spatial?.file) {
