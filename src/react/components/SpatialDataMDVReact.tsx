@@ -16,6 +16,7 @@ import {
     createVivStores,
 } from "./avivatorish/state";
 import { getSharedScatterSettings } from "./sharedScatterSettings";
+import { createEl } from "@/utilities/ElementsTyped";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
@@ -68,6 +69,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     declare dataStore: DataStore;
     vivStores: VivContextType;
     layerDialog?: SpatialLayerDialogReactWrapper;
+    /** Title-bar slot that `SpatialStatusIndicator` portals into. */
+    statusIndicatorHost: HTMLSpanElement;
     ignoreStateUpdate = false;
     /**
      * Intentional version token for in-place renderStack edits. The adapter reads this
@@ -142,7 +145,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         else this.canvasErrors.push({ message, count: 1, dismissed: false });
     }
 
-    /** Hide the canvas notice; failing layers stay marked in the layer dialog. */
+    /** Clear the status indicator's error count; failing layers stay marked in the layer dialog. */
     dismissRenderErrors() {
         for (const failure of this.layerFailures.values()) failure.dismissed = true;
         this.canvasErrors = [];
@@ -184,13 +187,20 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         this.vivStores = createVivStores();
         this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener(
             "click",
-            () => {
-                if (!this.layerDialog) {
-                    this.layerDialog = new SpatialLayerDialogReactWrapper(this);
-                    this.dialogs.push(this.layerDialog);
-                }
-            },
+            () => this.openLayerDialog(),
         );
+        // Between the title and the menu icons, so icons added later don't move it.
+        this.statusIndicatorHost = createEl("span", {
+            styles: { display: "flex", alignItems: "center", margin: "0px 1px" },
+        });
+        this.titleBar.insertBefore(this.statusIndicatorHost, this.menuSpace);
+    }
+
+    openLayerDialog() {
+        if (!this.layerDialog) {
+            this.layerDialog = new SpatialLayerDialogReactWrapper(this);
+            this.dialogs.push(this.layerDialog);
+        }
     }
 
     colorBy?: (i: number) => [r: number, g: number, b: number];

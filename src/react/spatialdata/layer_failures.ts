@@ -25,7 +25,7 @@ export type LayerFailure = {
     source: "webgpu" | "deck";
     /** How many errors were attributed to it. */
     count: number;
-    /** The canvas notice was dismissed; the layer dialog still shows the failure. */
+    /** Dismissed from the status indicator's count; the layer dialog still shows the failure. */
     dismissed: boolean;
 };
 

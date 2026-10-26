@@ -17,11 +17,10 @@ import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
-import RasterDataWarning, { rasterEntriesKey } from "./RasterDataWarning";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
-import { type DeckDevice, resolveDeckBackend, useDeckDevice } from "@/react/spatialdata/deck_backend";
+import { resolveDeckBackend, useDeckDevice } from "@/react/spatialdata/deck_backend";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
@@ -32,7 +31,6 @@ import {
     useRenderStackAdapter,
 } from "@/react/spatialdata/render_stack_adapter";
 import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack_control";
-import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
@@ -50,6 +48,7 @@ import { useOuterContainer } from "../screen_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import FieldContourLegend from "./FieldContourLegend";
 import SelectionOverlay from "./SelectionOverlay";
+import SpatialStatusIndicator from "./SpatialStatusIndicator";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import { VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 
@@ -270,104 +269,6 @@ function SpatialDataChartRoot() {
         </VivProvider>
     );
 }
-
-function SpatialDataLink() {
-    const { spatialData } = useSpatialData();
-    const spatialDataUrl = spatialData?.url;
-    if (!spatialDataUrl) return null;
-    const demoUrl = `https://taylor-ccb-group.github.io/SpatialData.js/docs/demo/?url=${encodeURIComponent(spatialDataUrl)}`;
-    return (
-        <div className="legend-container pointer-events-auto absolute bottom-2 right-2 z-[4] rounded-tl border-[0.5px] border-current">
-            <a
-                href={demoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-current no-underline hover:underline whitespace-nowrap"
-            >
-                Open in spatialdata.js
-            </a>
-        </div>
-    );
-}
-
-/** Says when the canvas is on the experimental WebGPU path, or failed to get onto it. */
-function RenderBackendBadge({ device }: { device: Extract<DeckDevice, { status: "ready" }> }) {
-    if (device.backend !== "webgpu" && !device.fallbackReason) return null;
-    // Short, top-left: the legends live bottom-left and the selection toolbar grows from
-    // the top-right, so a long label collides with one or the other on narrow charts.
-    // Below the toolbar's z-index, so where they still overlap the toolbar stays usable.
-    const isWebGPU = device.backend === "webgpu";
-    const title = isWebGPU
-        ? "Rendering with WebGPU (experimental)"
-        : `WebGPU unavailable (${device.fallbackReason}); rendering with WebGL`;
-    return (
-        <div
-            className="legend-container absolute top-2 left-2 cursor-help rounded border-[0.5px] border-current text-xs"
-            // inline: `.legend-container` sets its own z-index, which would beat a class here
-            style={{ zIndex: 1 }}
-            title={title}
-        >
-            {isWebGPU ? "WebGPU" : "WebGL (no WebGPU)"}
-        </div>
-    );
-}
-
-/**
- * Render errors on the canvas rather than only in the console: layers that failed and
- * were turned off, and errors that could not be tied to a layer. Below the selection
- * toolbar, which spans most of a narrow chart's top edge.
- */
-const RenderErrorNotice = observer(function RenderErrorNotice() {
-    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
-    const entries = chart.config.renderStack?.entries ?? [];
-    const lines: Array<{ key: string; text: string; title: string }> = [];
-    let hasLayerFailure = false;
-    for (const [entryId, failure] of chart.layerFailures) {
-        if (failure.dismissed) continue;
-        const entry = entries.find((item) => item.id === entryId);
-        const name = entry ? renderStackEntryDisplayName(entry) : entryId;
-        hasLayerFailure = true;
-        lines.push({
-            key: entryId,
-            text: `${name} failed and was turned off: ${failure.reason}`,
-            title: [failure.reason, failure.detail].filter(Boolean).join("\n\n"),
-        });
-    }
-    for (const error of chart.canvasErrors) {
-        const repeats = error.count > 1 ? ` (×${error.count})` : "";
-        lines.push({ key: `canvas:${error.message}`, text: `Rendering error${repeats}: ${error.message}`, title: error.message });
-    }
-    if (lines.length === 0) return null;
-    return (
-        <div
-            role="alert"
-            className="legend-container absolute top-16 left-2 flex max-w-[calc(100%-1rem)] items-start gap-2 rounded border-[0.5px] border-current text-xs"
-            style={{ zIndex: 4 }}
-        >
-            <div className="flex min-w-0 flex-col gap-1">
-                {lines.map((line) => (
-                    <span key={line.key} className="line-clamp-3 break-words" title={line.title}>
-                        ⚠ {line.text}
-                    </span>
-                ))}
-                {/* only failures tied to a layer appear in the layer dialog */}
-                <span className="opacity-70">
-                    {hasLayerFailure
-                        ? "Details are in the layer dialog and the browser console."
-                        : "Details are in the browser console."}
-                </span>
-            </div>
-            <button
-                type="button"
-                className="shrink-0 cursor-pointer"
-                aria-label="Dismiss"
-                onClick={() => chart.dismissRenderErrors()}
-            >
-                ×
-            </button>
-        </div>
-    );
-});
 
 const SpatialDataMainChart = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
@@ -727,10 +628,7 @@ const SpatialDataViewer = observer(
                         </Profiler>
                     </div>
                 </div>
-                <RasterDataWarning spatialData={spatialData} entriesKey={rasterEntriesKey(config.renderStack)} />
-                <SpatialDataLink />
-                <RenderBackendBadge device={deckDevice} />
-                <RenderErrorNotice />
+                <SpatialStatusIndicator spatialData={spatialData} device={deckDevice} />
                 {tooltipPortal}
                 {featureTooltipPortal}
             </Profiler>
