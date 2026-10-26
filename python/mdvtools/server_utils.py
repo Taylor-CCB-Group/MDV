@@ -11,12 +11,14 @@ import mimetypes
 from flask import request, send_file as sf, Response
 
 
+# Entry files of builds that don't hash them (see entry_assets.py). Matched by suffix
+# because the static URL prefix varies: /static/ by default, /flask/ in the Docker app.
 UNCACHED_STATIC_ENTRY_PATHS = {
-    "/static/js/mdv.js",
-    "/static/js/catalog.js",
-    "/static/js/login.js",
-    "/static/assets/mdv.css",
-    "/static/assets/catalog.css",
+    "/js/mdv.js",
+    "/js/catalog.js",
+    "/js/login.js",
+    "/assets/mdv.css",
+    "/assets/catalog.css",
 }
 
 

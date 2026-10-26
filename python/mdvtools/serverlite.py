@@ -28,6 +28,7 @@ from mdvtools.server_utils import (
     get_range,
     add_safe_headers,
 )
+from mdvtools.entry_assets import register_entry_assets
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ def create_app(
     """
     app = Flask(__name__)
     app.after_request(add_safe_headers)
+    register_entry_assets(app)
     resolved_track_directories = [
         os.path.abspath(project.trackfolder),
         *[

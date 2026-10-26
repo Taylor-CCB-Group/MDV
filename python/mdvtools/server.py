@@ -13,6 +13,7 @@ from mdvtools.server_utils import (
     get_range,
     add_safe_headers,
 )
+from mdvtools.entry_assets import register_entry_assets
 from mdvtools.ucsc_proxy_extension import UcscProxyServerExtension
 
 import webbrowser
@@ -202,6 +203,7 @@ def create_app(
         log(f"created Flask {app}")
         # add headers to allow web workers
         app.after_request(add_safe_headers)
+        register_entry_assets(app)
 
         # Register app-wide routes once on the single-project Flask instance.
         # In multi-project/catalog mode, global extension routes are registered

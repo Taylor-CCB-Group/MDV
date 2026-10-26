@@ -13,6 +13,8 @@ from urllib.parse import urljoin
 import pytest
 from flask import Flask, render_template
 
+from mdvtools.entry_assets import register_entry_assets
+
 TEMPLATES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 PROXY_ROOT = "https://workbench.example.org/app/abc/proxy/5055/"
 
@@ -22,6 +24,7 @@ def create_test_app():
     # URL is /flask/..., not Flask's default /static/...
     app = Flask(__name__, template_folder=TEMPLATES, static_folder="/app/dist/flask")
     app.url_map.strict_slashes = False
+    register_entry_assets(app)
 
     @app.route("/")
     def index():
