@@ -594,8 +594,9 @@ def serve_projects_from_filesystem(app, base_dir):
         projects_in_db = {project.path for project in Project.query.with_entities(Project.path).all()}
         logger.info(f"Project paths in DB: {projects_in_db}")
 
-        # Get all project directories in the filesystem, leaving out hidden folders
-        project_paths_in_fs = {os.path.join(base_dir, d) for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d)) and d != 'lost+found' and not d.startswith('.')}
+        # Get all project directories in the filesystem, leaving out hidden folders and
+        # folders that do not hold a whole project
+        project_paths_in_fs = {os.path.join(base_dir, d) for d in os.listdir(base_dir) if d != 'lost+found' and not d.startswith('.') and is_valid_mdv_project(os.path.join(base_dir, d))}
         logger.info(f"Project paths in filesystem: {project_paths_in_fs}")
 
         # Determine which project paths are in the filesystem but not in the database

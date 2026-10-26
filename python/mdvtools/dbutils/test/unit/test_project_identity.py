@@ -242,6 +242,19 @@ def test_rescan_skips_folders_whose_names_start_with_a_dot(app, tmp_path):
         assert Project.query.count() == 0
 
 
+def test_rescan_skips_a_folder_that_is_not_a_whole_project(app, tmp_path):
+    """A folder still being copied in has only some of a project's files. The scan
+    leaves it alone rather than registering it and filling in the rest."""
+    arriving = tmp_path / "arriving"
+    arriving.mkdir()
+    (arriving / "datasources.json").write_text(json.dumps([]))
+
+    with app.app_context():
+        assert serve_projects_from_filesystem(app, str(tmp_path)) == []
+        assert Project.query.count() == 0
+    assert sorted(os.listdir(arriving)) == ["datasources.json"]
+
+
 def test_rescan_skips_a_failing_project_without_leaving_a_row(app, tmp_path, monkeypatch):
     """One directory that cannot be served does not stop the scan, and the row
     started for it is discarded rather than committed with the next project."""
