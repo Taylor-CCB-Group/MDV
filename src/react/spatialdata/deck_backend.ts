@@ -68,21 +68,33 @@ const WEBGL = { status: "ready", backend: "webgl" } as const satisfies DeckDevic
 // Module-level, so every chart shares one probe and one stable `deviceProps` object.
 let webgpuDevice: Promise<DeckDevice> | null = null;
 
+/** Every limit the adapter reports, at its own value: what luma's "max" level requests. */
+function adapterLimits(limits: GPUSupportedLimits): Record<string, number> {
+    const required: Record<string, number> = {};
+    // The limits are getters on the prototype, so `for...in` rather than `Object.entries`.
+    for (const name in limits) {
+        const value: unknown = Reflect.get(limits, name);
+        if (typeof value === "number") required[name] = value;
+    }
+    return required;
+}
+
 async function probeWebGPU(): Promise<DeckDevice> {
     const fallback = (fallbackReason: string): DeckDevice => ({ ...WEBGL, fallbackReason });
     if (!browserHasWebGPU()) return fallback("this browser does not support WebGPU");
     try {
         const adapter = await navigator.gpu.requestAdapter();
         if (!adapter) return fallback("no WebGPU adapter is available");
-        // DensityLayer's faster path blends into r32float. Optional: without it
-        // (Firefox, for one) the layer falls back to an exact compute splat.
-        const optionalFeatures = ["float32-blendable"] as const;
-        // An adapter can still refuse a device. Make the request deck will make (luma's
-        // default "core" level asks for just the supported optional features), so that
-        // failure falls back here instead of leaving deck with no device.
-        const probe = await adapter.requestDevice({
-            requiredFeatures: optionalFeatures.filter((feature) => adapter.features.has(feature)),
-        });
+        // luma's default "core" level gets WebGPU's spec-minimum limits, so a 10M-point
+        // scatter (480MB of instance attributes) overflows the 256MB `maxBufferSize`.
+        // "max" asks for every limit and feature at the adapter's own value. That also
+        // covers DensityLayer's faster path, which blends into r32float
+        // ("float32-blendable"); without it (Firefox, for one) the layer falls back to an
+        // exact compute splat.
+        // An adapter can still refuse a device. Ask for the limits deck will ask for (the
+        // features are the adapter's own, so cannot be refused), so that failure falls
+        // back here instead of leaving deck with no device.
+        const probe = await adapter.requestDevice({ requiredLimits: adapterLimits(adapter.limits) });
         probe.destroy();
         const { webgpuAdapter } = await import("@luma.gl/webgpu");
         return {
@@ -91,7 +103,7 @@ async function probeWebGPU(): Promise<DeckDevice> {
             deviceProps: {
                 type: "webgpu",
                 adapters: [webgpuAdapter],
-                optionalFeatures,
+                featureLevel: "max",
             },
         };
     } catch (error) {
