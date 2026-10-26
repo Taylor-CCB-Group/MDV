@@ -20,7 +20,7 @@ import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registr
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
-import { browserHasWebGPU, type DeckBackend } from "@/react/spatialdata/deck_backend";
+import { browserHasWebGPU, type DeckBackend, defaultDeckBackend } from "@/react/spatialdata/deck_backend";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import {
@@ -34,7 +34,7 @@ export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     background_filter: CategoryFilter;
     renderStack?: RenderStack;
     viewState?: SpatialDataSerializableViewState | null;
-    /** Experimental; null (or absent) follows the `MDV_WEBGPU` dev flag (see `deck_backend.ts`). */
+    /** Experimental; null (or absent) follows the browser's default (see `deck_backend.ts`). */
     render_backend?: DeckBackend | null;
 };
 
@@ -264,7 +264,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                           type: "dropdown",
                           label: "Rendering backend (experimental)",
                           current_value: config.render_backend ?? "default",
-                          values: [renderBackendOptions, "name", "value"],
+                          values: [renderBackendOptions(), "name", "value"],
                           func(value) {
                               config.render_backend = value === "webgl" || value === "webgpu" ? value : null;
                           },
@@ -289,11 +289,15 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     }
 }
 
-const renderBackendOptions = [
-    { name: "Default (WebGL unless MDV_WEBGPU is set)", value: "default" },
-    { name: "WebGL", value: "webgl" },
-    { name: "WebGPU (experimental)", value: "webgpu" },
-];
+/** "Default" names what the default currently is; it is set in the Debug dialog, per browser. */
+function renderBackendOptions() {
+    const current = defaultDeckBackend() === "webgpu" ? "WebGPU" : "WebGL";
+    return [
+        { name: `Browser default (${current})`, value: "default" },
+        { name: "WebGL", value: "webgl" },
+        { name: "WebGPU (experimental)", value: "webgpu" },
+    ];
+}
 
 function spatialRegionOptions(dataStore: DataStore) {
     return Object.keys(dataStore.regions?.all_regions ?? {})

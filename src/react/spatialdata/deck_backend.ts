@@ -1,3 +1,4 @@
+import { type RenderBackend, renderBackendSetting } from "@/lib/browserSettings";
 import type { CreateDeviceProps } from "@luma.gl/core";
 import { useEffect, useState } from "react";
 
@@ -8,39 +9,42 @@ import { useEffect, useState } from "react";
  * image extensions on WebGPU, so the image channel contrast/brightness (tone)
  * controls from `VivContrastExtension` have no effect there.
  *
- * The default comes from a dev flag; a chart's `render_backend` setting overrides it.
- *
- *   localStorage.MDV_WEBGPU = "1"   // then reload; sticky, like MDV_SPATIAL_PERF
- *   delete localStorage.MDV_WEBGPU  // then reload
- *   ?webgpu  /  ?webgpu=0           // per page load, overrides localStorage
+ * The default is the "Default rendering backend" browser setting (Debug dialog; see
+ * `renderBackendSetting` in `src/lib/browserSettings.ts`); a chart's own `render_backend`
+ * setting overrides it, and `?webgpu` / `?webgpu=0` in the URL overrides the default for
+ * one page load. The setting is observable, so charts following the default switch as
+ * soon as it changes.
  *
  * deck chooses its device once, when it is created, so a change here remounts the canvas.
  */
-export type DeckBackend = "webgl" | "webgpu";
+export type DeckBackend = RenderBackend;
 
-const FLAG = "MDV_WEBGPU";
-
-function readFlag(): boolean {
-    if (typeof window === "undefined") return false;
+function urlOverride(): DeckBackend | undefined {
+    if (typeof window === "undefined") return undefined;
     try {
         const param = new URLSearchParams(window.location.search).get("webgpu");
-        if (param !== null) return param !== "0" && param !== "false";
-        return window.localStorage?.getItem(FLAG) === "1";
+        if (param === null) return undefined;
+        return param === "0" || param === "false" ? "webgl" : "webgpu";
     } catch {
-        return false;
+        return undefined;
     }
 }
 
-const FLAG_SET = readFlag();
-if (FLAG_SET) {
+const URL_OVERRIDE = urlOverride();
+if ((URL_OVERRIDE ?? renderBackendSetting.get()) === "webgpu") {
     console.warn(
-        `[MDV] WebGPU is the default backend for SpatialData charts (${FLAG} flag or ?webgpu). ` +
-            `This is experimental; \`delete localStorage.${FLAG}\` and reload to turn it off.`,
+        "[MDV] WebGPU is the default backend for SpatialData charts in this browser. This is " +
+            "experimental; change 'Default rendering backend' in the Debug dialog to turn it off.",
     );
 }
 
+/** The backend for charts that leave it at the default. Observable (reads the browser setting). */
+export function defaultDeckBackend(): DeckBackend {
+    return URL_OVERRIDE ?? renderBackendSetting.get();
+}
+
 export function resolveDeckBackend(configured: DeckBackend | null | undefined): DeckBackend {
-    return configured ?? (FLAG_SET ? "webgpu" : "webgl");
+    return configured ?? defaultDeckBackend();
 }
 
 /** Cheap synchronous check, for deciding whether to offer WebGPU at all. */

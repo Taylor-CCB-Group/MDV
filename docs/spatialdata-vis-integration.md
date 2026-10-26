@@ -272,7 +272,10 @@ The pins in `package.json` are the enforcement; keep them at or above these.
 SpatialData.js 0.12 renders images, labels, shapes and points on WebGPU when the canvas
 is given `deckProps.deviceProps = { type: "webgpu", adapters: [webgpuAdapter] }`. The
 SpatialData chart opts in per chart (`render_backend` setting, "Rendering backend
-(experimental)"), defaulting to the `MDV_WEBGPU` dev flag — see
+(experimental)"). Charts left at the default follow the "Default rendering backend"
+browser setting in the Debug dialog (`src/lib/browserSettings.ts`, stored in
+localStorage, and it replaces the old `MDV_WEBGPU` flag, which it still reads), and
+`?webgpu` / `?webgpu=0` overrides that for one page load — see
 `src/react/spatialdata/deck_backend.ts`. It falls back to WebGL, with a notice on the
 canvas, when the browser has no WebGPU adapter. deck picks its device once, so changing
 the backend remounts the canvas.

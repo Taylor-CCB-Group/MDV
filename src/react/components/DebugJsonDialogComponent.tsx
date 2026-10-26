@@ -11,6 +11,7 @@ import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Divider, Li
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
 import { useChartManager } from "../hooks";
+import BrowserSettingsSection from "./BrowserSettingsSection";
 import CustomTooltip from "./CustomTooltip";
 import type ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import type { ValidationFinding } from "@/lib/ValidationFindingsStore";
@@ -354,6 +355,21 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                             </Button>
                         </CustomTooltip>
                     </Box>
+                </AccordionDetails>
+            </Accordion>
+
+            <Accordion sx={{
+                border: "1px solid var(--border_menu_bar_color)",
+                mb: 2,
+            }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="h6">
+                        Browser settings
+                    </Typography>
+                </AccordionSummary>
+                <Divider />
+                <AccordionDetails sx={{ mt: 1 }}>
+                    <BrowserSettingsSection />
                 </AccordionDetails>
             </Accordion>
 
