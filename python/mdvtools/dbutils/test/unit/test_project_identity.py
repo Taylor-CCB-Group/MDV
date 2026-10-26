@@ -232,6 +232,16 @@ def test_rescan_creates_nothing_when_there_is_nothing_new(app, tmp_path):
         assert Project.query.count() == 0
 
 
+def test_rescan_skips_folders_whose_names_start_with_a_dot(app, tmp_path):
+    """A hidden folder in the project root, such as a sync tool's staging area, is
+    never registered, even when it holds a project's files."""
+    write_project_directory(tmp_path / ".mdv-sync")
+
+    with app.app_context():
+        assert serve_projects_from_filesystem(app, str(tmp_path)) == []
+        assert Project.query.count() == 0
+
+
 def test_rescan_skips_a_failing_project_without_leaving_a_row(app, tmp_path, monkeypatch):
     """One directory that cannot be served does not stop the scan, and the row
     started for it is discarded rather than committed with the next project."""
