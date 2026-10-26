@@ -291,13 +291,20 @@ unadapted, so they must work on WebGPU themselves:
   soft range, fp64 or `countItems`). Retire both once deck has WGSL hooks and a WebGPU
   data filter; luma 9.4.2's `filterShaderPlugin` targets a `FILTER_POSITION` hook that
   deck's layers do not call yet, which is the likely shape of an upstream PR.
-- **Contours**: `TriangleLayerContours` is GLSL-only and is not ported; on WebGPU the
-  heatmap uses deck's own WGSL triangle layer (plain shading, no contour lines). Contours
-  are expected to move to KDE splatting with a separate presentation shader.
+- **Contours**: `TriangleLayerContours` is GLSL-only, so on WebGPU contours are drawn by
+  `@intraspatial/deck`'s `DensityLayer` (KDE splatting in data units, WGSL presentation
+  shader). `src/webgl/intraspatialDensity.ts` converts the heatmap props exactly: σ is
+  `5 · bandwidth` world units, and heatmap weight is `density · 12√π · σ²`, so MDV's fill
+  threshold and contour spacing carry over. For local IntraSpatial development,
+  `INTRASPATIAL_ROOT=… pnpm link:intraspatial` links a checkout (`pnpm unlink:intraspatial`
+  to undo).
 - **Synchronous picking throws on WebGPU** (`readPixelsToArrayWebGL: not implemented`).
   editable-layers picks synchronously on every pointer event, which aborted clicks before
-  deck dispatched them to the scatter layer; `MonkeyPatchEditableGeoJsonLayer` reports no
-  picks on WebGPU, so selection shapes can still be drawn but not picked for editing.
+  deck dispatched them to the scatter layer. On WebGPU, `MonkeyPatchEditableGeoJsonLayer`
+  computes the selection layer's picks on the CPU (`src/editable-layers/cpuPicks.ts`), and
+  the single selection shape is always selected, so translate, modify and draw do not race
+  async picks. This is a short-term workaround: GPU picking should be fixed upstream
+  (deck.gl, editable-layers) rather than worked around further in MDV.
 - Use luma's portable parameters (`depthCompare`, `depthWriteEnabled`), not WebGL ones
   like `depthTest`, which WebGPU rejects.
 - SpatialData.js drops Viv image extensions on WebGPU, so `VivContrastExtension`'s tone

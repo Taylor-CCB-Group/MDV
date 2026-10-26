@@ -4,6 +4,8 @@ import { ScatterplotLayer } from "@deck.gl/layers";
 import { TriangleLayerContours } from "./HeatmapContourExtension";
 import type { ContourLayerProps } from "@/react/contour_state";
 import { HeatmapLayer } from "deck.gl";
+import { DensityLayer } from "@intraspatial/deck";
+import { contourToDensityProps } from "./intraspatialDensity";
 import { MdvScatterplotLayer } from "./MdvScatterplotLayer";
 import { isWebGPULayer } from "./wgslLayerExtension";
 
@@ -32,19 +34,18 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
             highlightRadiusScale,
             highlightLineColor = [255, 255, 255],
         } = this.props;
-        // TriangleLayerContours is GLSL-only. On WebGPU the heatmap keeps deck's own
-        // (WGSL) triangle layer: plain heatmap shading, no contour lines. Contours are
-        // expected to move to KDE splatting with a separate presentation shader rather
-        // than be ported as they are.
-        const contourSubLayerProps = isWebGPULayer(this)
-            ? {}
-            : {
-                  triangle: {
-                      type: TriangleLayerContours,
-                  },
-              };
+        // TriangleLayerContours is GLSL-only. On WebGPU, contours are @intraspatial/deck's
+        // DensityLayer instead: KDE splatting in data units with a WGSL presentation shader,
+        // converted from the heatmap props in `intraspatialDensity.ts`.
+        const isWebGPU = isWebGPULayer(this);
+        const contourSubLayerProps = {
+            triangle: {
+                type: TriangleLayerContours,
+            },
+        };
         const densityLayers = contourLayers.filter((l) => l).map(props => {
             const { extensions, ...p } = this.getSubLayerProps(props);
+            if (isWebGPU) return new DensityLayer(contourToDensityProps(p));
             return new HeatmapLayer({
                 ...p,
                 _subLayerProps: {

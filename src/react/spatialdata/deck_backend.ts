@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 
 /**
  * Which deck.gl device backend the SpatialData chart renders with. WebGPU is
- * experimental: MDV's own scatter layers support it (see `MdvScatterplotLayer`),
- * but on WebGPU contours lose their contour lines, and SpatialData.js drops Viv
- * image extensions, so the image channel contrast/brightness (tone) controls from
- * `VivContrastExtension` have no effect.
+ * experimental: MDV's own scatter layers support it (see `MdvScatterplotLayer`), and
+ * contours are drawn by @intraspatial/deck's `DensityLayer`. SpatialData.js drops Viv
+ * image extensions on WebGPU, so the image channel contrast/brightness (tone)
+ * controls from `VivContrastExtension` have no effect there.
  *
  * The default comes from a dev flag; a chart's `render_backend` setting overrides it.
  *
@@ -71,7 +71,17 @@ async function probeWebGPU(): Promise<DeckDevice> {
         const adapter = await navigator.gpu.requestAdapter();
         if (!adapter) return fallback("no WebGPU adapter is available");
         const { webgpuAdapter } = await import("@luma.gl/webgpu");
-        return { status: "ready", backend: "webgpu", deviceProps: { type: "webgpu", adapters: [webgpuAdapter] } };
+        return {
+            status: "ready",
+            backend: "webgpu",
+            deviceProps: {
+                type: "webgpu",
+                adapters: [webgpuAdapter],
+                // DensityLayer's faster path blends into r32float. Optional: without it
+                // (Firefox, for one) the layer falls back to an exact compute splat.
+                optionalFeatures: ["float32-blendable"],
+            },
+        };
     } catch (error) {
         return fallback(error instanceof Error ? error.message : String(error));
     }
