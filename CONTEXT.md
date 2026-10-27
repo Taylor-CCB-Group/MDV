@@ -95,7 +95,7 @@ A deployable image that passed the Playwright gate and carries the `v<version>` 
 _Avoid_: stable image, production build
 
 **Preview**:
-A throwaway instance on bia that runs a labelled pull request's deployable image with dev auth and synthetic data.
+One of the SQLite instances on bia running a labelled pull request's deployable image until the label comes off, when the instance goes back to `:sqlite` and its database is restored.
 _Avoid_: staging, test instance, dev deployment
 
 ## SpatialData.js integration terms
