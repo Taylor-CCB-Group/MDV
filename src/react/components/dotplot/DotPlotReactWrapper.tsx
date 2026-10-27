@@ -1,13 +1,16 @@
 import BaseChart from "@/charts/BaseChart";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import type DataStore from "@/datastore/DataStore";
+import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
 import FractionLegend from "@/react/components/legend/FractionLegend";
 import LegendWrapper from "@/react/components/legend/LegendWrapper";
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import type { FractionLegendSpec } from "@/react/legend/fraction_legend/types";
+import { makeObservable, observable, runInAction } from "mobx";
 import { BaseReactChart } from "../BaseReactChart";
 import DotPlotComponent from "./DotPlotComponent";
+import type { DotPlotDot } from "./DotPlotPanel";
 import {
     DOT_PLOT_REACT_OLD_TYPE,
     DOT_PLOT_REACT_TYPE,
@@ -28,6 +31,14 @@ export type DotPlotColorLegendInput = { colors: string[]; range: [number, number
 /** `items` is the most dots to show, chosen to fit the chart (see `getLegendLayout`). */
 export type DotPlotFractionLegendInput = { fracMax: number; maxRadius: number; items: number };
 
+type FilterColumn = { field: string; data: ArrayLike<number> };
+/** The columns a dot's cells are picked from: its rows, its field, and the split if there is one. */
+export type DotPlotDotColumns = {
+    rowColumn: FilterColumn;
+    fieldColumn: FilterColumn;
+    split?: { column: FilterColumn; code: number };
+};
+
 export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
     /** The automatic colour range currently drawn, used to fill in the manual range. */
     autoMeanRange: [number, number] | null = null;
@@ -36,6 +47,10 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
     private fractionLegendInput: DotPlotFractionLegendInput | null = null;
     /** Where the legends start, normally in the band the component keeps free above the panels. */
     private legendLayout: LegendLayout | null = null;
+    /** Filters the other charts to a clicked dot's cells; this chart keeps showing all its dots. */
+    dim: Dimension;
+    /** The dot whose cells are filtered, if any. */
+    selectedDot: DotPlotDot | null = null;
 
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: DotPlotReactConfig) {
         const config = adaptDotPlotConfig(originalConfig);
@@ -44,6 +59,60 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
             config.title = dataStore.getColumnName(rowField) ?? rowField;
         }
         super(dataStore, div, config, DotPlotComponent);
+        this.dim = this.dataStore.getDimension("base_dimension");
+        makeObservable(this, { selectedDot: observable.ref });
+    }
+
+    /**
+     * Filters to a dot's cells, as the legacy dot plot does (`filterCatCol`): cells in its row
+     * category (and split value) whose value for its field is above the threshold. Clicking the
+     * filtered dot again clears the filter.
+     */
+    filterToDot(dot: DotPlotDot, { rowColumn, fieldColumn, split }: DotPlotDotColumns) {
+        const current = this.selectedDot;
+        if (current?.panel === dot.panel && current.row === dot.row && current.field === dot.field) {
+            this.removeFilter();
+            this.resetButton.style.display = "none";
+            return;
+        }
+        const threshold = this.config.threshold_value ?? 0;
+        const rows = rowColumn.data;
+        const values = fieldColumn.data;
+        const splitCodes = split?.column.data;
+        const splitCode = split?.code;
+        // false for NaN values, as in the stats
+        const predicate = (i: number) =>
+            rows[i] === dot.row && (splitCodes === undefined || splitCodes[i] === splitCode) && values[i] > threshold;
+        const columns = [rowColumn.field, fieldColumn.field, ...(split ? [split.column.field] : [])];
+        this.dim.filter("filterPredicate", columns, { predicate });
+        runInAction(() => {
+            this.selectedDot = dot;
+        });
+        this.resetButton.style.display = "inline";
+    }
+
+    /** Clears the dot filter, e.g. when the rows, fields or split change and the dot means something else. */
+    clearDotFilter() {
+        if (!this.selectedDot) return;
+        this.removeFilter();
+        this.resetButton.style.display = "none";
+    }
+
+    removeFilter() {
+        this.dim.removeFilter();
+        runInAction(() => {
+            this.selectedDot = null;
+        });
+    }
+
+    onDataFiltered(dim?: unknown) {
+        // "remove all filters" has already cleared the dimension's filter
+        if (dim === "all_removed") {
+            runInAction(() => {
+                this.selectedDot = null;
+            });
+            this.resetButton.style.display = "none";
+        }
     }
 
     setAutoMeanRange(range: [number, number] | null) {
@@ -144,6 +213,8 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
 
     remove() {
         this.fractionLegendWrapper.unmount();
+        // also lifts the dot filter from the other charts
+        this.dim.destroy();
         super.remove();
     }
 

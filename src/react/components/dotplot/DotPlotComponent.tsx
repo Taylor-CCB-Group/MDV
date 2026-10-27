@@ -1,12 +1,19 @@
 import type { DataColumn, DataType, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { canvasMeasureText, stripSharedSubgroupSuffix } from "@/charts/dotplot/xAxisLabels";
 import { useChart, useDataStore } from "@/react/context";
-import { useChartSize, useConfig, useFieldSpec, useFilteredIndices, useParamColumnsExperimental } from "@/react/hooks";
+import {
+    useChartSize,
+    useConfig,
+    useFieldSpec,
+    useOwnedFilteredIndices,
+    useParamColumnsExperimental,
+} from "@/react/hooks";
+import { escapeHtml } from "@/utilities/Utilities";
 import { AxisLeft } from "@visx/axis";
 import { scaleBand } from "@visx/scale";
 import { observer } from "mobx-react-lite";
 import { useEffect, useMemo, useState } from "react";
-import DotPlotPanel, { type DotPlotHover, type DotPlotLabelHover } from "./DotPlotPanel";
+import DotPlotPanel, { type DotPlotDot } from "./DotPlotPanel";
 import type { DotPlotReact } from "./DotPlotReactWrapper";
 import { type DotPlotReactConfig, getColorRange } from "./dotPlotConfig";
 import { DOT_PLOT_MAX_RADIUS, getDotPlotLayout, getVisibleRows, getXLabelLayout } from "./dotPlotLayout";
@@ -96,10 +103,9 @@ const DotPlotComponent = observer(function DotPlotComponent() {
     const dataStore = useDataStore();
     const [width, height] = useChartSize();
     const columns = useParamColumnsExperimental();
-    const rows = useFilteredIndices();
+    // rows passing every filter but this chart's own dot filter, so its dots stay visible
+    const { ownerVisibleRows: rows } = useOwnedFilteredIndices(chart.dim);
     const splitSpec = useFieldSpec(config.split_by ?? undefined);
-    const [hovered, setHovered] = useState<DotPlotHover | null>(null);
-    const [hoveredLabel, setHoveredLabel] = useState<DotPlotLabelHover | null>(null);
 
     // param is [rowColumn, ...fields]
     const { rowColumn, fieldColumns } = useMemo(() => {
@@ -131,6 +137,12 @@ const DotPlotComponent = observer(function DotPlotComponent() {
     useEffect(() => {
         chart.setAutoMeanRange(autoRange);
     }, [chart, autoRange]);
+
+    // a filtered dot would mean something else once the rows, fields or split change
+    // biome-ignore lint/correctness/useExhaustiveDependencies: runs when `inputs` changes
+    useEffect(() => {
+        chart.clearDotFilter();
+    }, [chart, inputs]);
 
     const fieldLabels = useMemo(
         () =>
@@ -256,7 +268,30 @@ const DotPlotComponent = observer(function DotPlotComponent() {
     if (visibleRows.length === 0) return <Message>No rows pass the current filters.</Message>;
 
     const yScale = scaleBand({ domain: visibleRows, range: [0, layout.plotHeight] });
-    const hoveredCell = hovered && stats.panels[hovered.panel]?.[hovered.row]?.cells[hovered.field];
+
+    // the same tooltip as the legacy dot plot, plus the split value
+    const onDotPointer = (event: MouseEvent, { panel, row, field }: DotPlotDot) => {
+        const cell = stats.panels[panel]?.[row]?.cells[field];
+        if (!cell) return;
+        const lines = [
+            fieldColumns[field]?.name ?? "",
+            `${rowColumn.name}: ${rowColumn.values[row]}`,
+            ...(splitColumn && panelTitles ? [`${splitColumn.name}: ${panelTitles[panel]}`] : []),
+            `percentage: ${cell.frac.toFixed(0)}%`,
+        ];
+        chart.showToolTip(event, lines.map(escapeHtml).join("<br>"));
+    };
+    // full name, as fitted labels may be shortened or left out
+    const onLabelPointer = (event: MouseEvent, field: number) => {
+        chart.showToolTip(event, escapeHtml(fieldColumns[field]?.name ?? ""));
+    };
+    const onPointerLeave = () => chart.hideToolTip();
+    const onDotClick = (dot: DotPlotDot) => {
+        const fieldColumn = fieldColumns[dot.field];
+        if (!fieldColumn) return;
+        const split = splitColumn && panelCodes ? { column: splitColumn, code: panelCodes[dot.panel] } : undefined;
+        chart.filterToDot(dot, { rowColumn, fieldColumn, split });
+    };
 
     return (
         <div className="relative h-full w-full">
@@ -290,49 +325,14 @@ const DotPlotComponent = observer(function DotPlotComponent() {
                         titleFontSize={tickfont + 2}
                         fracMax={stats.fracMax}
                         meanColor={meanColor}
-                        hovered={hovered}
-                        onHover={setHovered}
-                        onLabelHover={setHoveredLabel}
+                        selected={chart.selectedDot}
+                        onDotPointer={onDotPointer}
+                        onDotClick={onDotClick}
+                        onLabelPointer={onLabelPointer}
+                        onPointerLeave={onPointerLeave}
                     />
                 ))}
             </svg>
-            {hovered && hoveredCell && (
-                <div
-                    className="pointer-events-none absolute rounded-md px-2 py-1 text-xs"
-                    style={{
-                        left: hovered.x + 12,
-                        top: hovered.y + bandHeight + 12,
-                        backgroundColor: "rgba(15, 23, 42, 0.85)",
-                        color: "white",
-                    }}
-                >
-                    <div>{fieldColumns[hovered.field]?.name}</div>
-                    <div>
-                        {rowColumn.name}: {rowColumn.values[hovered.row]}
-                    </div>
-                    {splitColumn && panelTitles && (
-                        <div>
-                            {splitColumn.name}: {panelTitles[hovered.panel]}
-                        </div>
-                    )}
-                    <div>mean: {hoveredCell.mean.toFixed(2)}</div>
-                    <div>expressing: {hoveredCell.frac.toFixed(0)}%</div>
-                </div>
-            )}
-            {hoveredLabel && (
-                // full name, as fitted labels may be shortened or left out
-                <div
-                    className="pointer-events-none absolute rounded-md px-2 py-1 text-xs"
-                    style={{
-                        left: hoveredLabel.x + 12,
-                        top: hoveredLabel.y + bandHeight + 12,
-                        backgroundColor: "rgba(15, 23, 42, 0.85)",
-                        color: "white",
-                    }}
-                >
-                    {fieldColumns[hoveredLabel.field]?.name}
-                </div>
-            )}
         </div>
     );
 });

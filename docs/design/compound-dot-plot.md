@@ -133,8 +133,9 @@ It also returns the shared `meanRange` (min/max over every panel, row and
 field) and `fracMax`. Rows with zero cells in a panel are kept, so every panel
 has the same rows.
 
-No `Dimension` is needed: the chart doesn't filter in v1, so the worker only
-needs the global filter buffer and the column buffers.
+The chart filters through its own `Dimension` (click a dot), so it reads rows with
+`useOwnedFilteredIndices`: every filter except its own. Its dots stay put while
+its filter is on, as in the legacy chart.
 
 ## Files
 
@@ -232,7 +233,12 @@ What costs what:
   occasionally 65–80ms). About 16ms per update feels instant, so only very large
   grids lag.
 
-Why hover scales with dots: the hover state lives in `DotPlotComponent` and is
+Update: the tooltip now uses the legacy `showToolTip`, which keeps no React state,
+so hovering no longer re-renders the panels. The numbers above and the notes below
+are from before that change; clicking a dot (which outlines it) still re-renders
+them.
+
+Why hover scaled with dots: the hover state lived in `DotPlotComponent` and was
 passed to every `DotPlotPanel`, and `layout` and the visible row list are rebuilt
 as new objects on every render. So any hover, of a dot or of an x label, re-renders
 every circle in every panel; the React Compiler can't skip panels whose props
@@ -321,8 +327,8 @@ The new chart should do everything the legacy `dot_plot` does, then more.
 
 Priority (agreed):
 
-1. **Most important:** X axis label options (done), click a dot to filter cells,
-   export as SVG / PNG.
+1. **Most important:** X axis label options (done), click a dot to filter cells
+   (done), export as SVG / PNG.
 2. **Nice to have:** Rotate Y axis labels, title follows the y-axis column.
 3. **Undecided:** cluster rows / columns.
 4. **Not needed:** background filter. Split by covers what it was used for (the
@@ -337,10 +343,15 @@ it inherits from `SVGChart` and `BaseChart`):
   Hide overlapping also work with auto-fit off (`layoutFixedXLabels`). The
   matching legacy dot plot changes (the same fix, and moving its checkboxes into
   Axis controls) are on the follow-up branch, see below.
-- **Click a dot to filter cells:** cells in that row category (and split value)
-  expressing that field above the threshold, with the selected dot outlined and
-  the reset button shown. The legacy chart uses `filterCatCol` on a
-  `catcol_dimension`.
+- **Click a dot to filter cells (done):** cells in that row category (and split
+  value) expressing that field above the threshold, with the selected dot outlined
+  and the reset button shown. Clicking it again, the reset button or "remove all
+  filters" clears it; changing the rows, fields, split or threshold clears it too.
+  The legacy chart uses `filterCatCol` on a `catcol_dimension`; this one uses a
+  predicate on `base_dimension` because of the split column.
+- **Tooltip (done):** the legacy one (`showToolTip`): field, row value, split
+  value, percentage. No hover outline, so hovering no longer re-renders the
+  panels (see Performance).
 - **Cluster rows / cluster columns,** with dendrograms. Must cluster across all
   panels together so every panel keeps the same order.
 - **Export as SVG / PNG image** from the chart menu (`getImage`, which

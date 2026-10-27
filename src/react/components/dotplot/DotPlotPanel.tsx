@@ -6,27 +6,13 @@ import type { DotPlotLayout } from "./dotPlotLayout";
 import { getDotRadius } from "./dotPlotLayout";
 import type { DotPlotGroup } from "./dotPlotStats";
 
-export type DotPlotHover = {
-    panel: number;
-    /** Row category code. */
-    row: number;
-    /** Index into the fields. */
-    field: number;
-    /** Dot centre, relative to the chart. */
-    x: number;
-    y: number;
-};
-
-export type DotPlotLabelHover = {
-    /** Index into the fields. */
-    field: number;
-    /** Label's tick, relative to the chart. */
-    x: number;
-    y: number;
-};
+/** One dot: which panel, row category code and field (index into the fields). */
+export type DotPlotDot = { panel: number; row: number; field: number };
 
 /** Tick length of d3's axisBottom, which `layoutXLabels`' spacing assumes. */
 const TICK_LENGTH = 6;
+/** Outline of the dot whose cells are filtered, as in the legacy dot plot. */
+const SELECTED_STROKE_WIDTH = 4;
 
 type DotPlotPanelProps = {
     panel: number;
@@ -41,9 +27,12 @@ type DotPlotPanelProps = {
     titleFontSize: number;
     fracMax: number;
     meanColor: (mean: number) => string;
-    hovered: DotPlotHover | null;
-    onHover: (hover: DotPlotHover | null) => void;
-    onLabelHover: (hover: DotPlotLabelHover | null) => void;
+    /** The dot whose cells are filtered, if any. */
+    selected: DotPlotDot | null;
+    onDotPointer: (event: MouseEvent, dot: DotPlotDot) => void;
+    onDotClick: (dot: DotPlotDot) => void;
+    onLabelPointer: (event: MouseEvent, field: number) => void;
+    onPointerLeave: () => void;
 };
 
 /** One dot plot: a dot per (row, field), its x axis, and an optional title above. */
@@ -57,9 +46,11 @@ export default function DotPlotPanel({
     titleFontSize,
     fracMax,
     meanColor,
-    hovered,
-    onHover,
-    onLabelHover,
+    selected,
+    onDotPointer,
+    onDotClick,
+    onLabelPointer,
+    onPointerLeave,
 }: DotPlotPanelProps) {
     const left = layout.panelLefts[panel];
     const { top, panelWidth, plotHeight, cellWidth, cellHeight, maxRadius } = layout;
@@ -89,20 +80,22 @@ export default function DotPlotPanel({
                 const cells = groups[row]?.cells ?? [];
                 const cy = i * cellHeight + cellHeight / 2;
                 return cells.map(({ mean, frac }, field) => {
-                    const cx = field * cellWidth + cellWidth / 2;
-                    const isHovered = hovered?.panel === panel && hovered.row === row && hovered.field === field;
+                    const dot = { panel, row, field };
+                    const isSelected = selected?.panel === panel && selected.row === row && selected.field === field;
                     return (
                         <circle
                             // biome-ignore lint/suspicious/noArrayIndexKey: fields have a fixed order
                             key={`${row}-${field}`}
-                            cx={cx}
+                            cx={field * cellWidth + cellWidth / 2}
                             cy={cy}
                             r={getDotRadius(frac, fracMax, maxRadius)}
                             fill={meanColor(mean)}
                             stroke="black"
-                            strokeWidth={isHovered ? 2 : 1}
-                            onPointerEnter={() => onHover({ panel, row, field, x: left + cx, y: top + cy })}
-                            onPointerLeave={() => onHover(null)}
+                            strokeWidth={isSelected ? SELECTED_STROKE_WIDTH : 1}
+                            cursor="pointer"
+                            onPointerMove={(e) => onDotPointer(e.nativeEvent, dot)}
+                            onPointerLeave={onPointerLeave}
+                            onClick={() => onDotClick(dot)}
                         />
                     );
                 });
@@ -120,13 +113,8 @@ export default function DotPlotPanel({
                     textAnchor: rotated ? "end" : "middle",
                     verticalAnchor: rotated ? "middle" : "start",
                     angle: rotated ? -45 : 0,
-                    onPointerEnter: () =>
-                        onLabelHover({
-                            field,
-                            x: left + field * cellWidth + cellWidth / 2,
-                            y: top + plotHeight + TICK_LENGTH,
-                        }),
-                    onPointerLeave: () => onLabelHover(null),
+                    onPointerMove: (e) => onLabelPointer(e.nativeEvent, field),
+                    onPointerLeave,
                 })}
             />
         </g>
