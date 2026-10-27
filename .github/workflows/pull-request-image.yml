@@ -1,0 +1,120 @@
+name: Pull Request Image
+
+# Builds a Docker Hub image of a pull request labelled preview, once all its
+# tests pass, for the preview poller on bia (ADR 0018). Pull requests without
+# the label get no image.
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+    branches:
+      - main
+
+concurrency:
+  # Adding any other label starts a run too. Its own group stops it from
+  # cancelling a build in progress.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}${{ github.event.action == 'labeled' && github.event.label.name != 'preview' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: true
+
+jobs:
+  # Forks are left out, because GitHub does not pass them the Docker Hub
+  # secrets. A labeled run only counts when the label added is preview.
+  image:
+    if: |
+      github.event.pull_request.head.repo.full_name == github.repository && (
+        (github.event.action == 'labeled' && github.event.label.name == 'preview') ||
+        (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'preview'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+
+    steps:
+      # The tests already run in Python CI and TypeScript/JS CI for every pull
+      # request, so this waits for those runs instead of running them again.
+      # A label added after they finish finds them already done.
+      - name: Wait for the tests to pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Python CI only runs when python/** changes, like its paths filter.
+          required="ts_ci.yml"
+          if gh pr diff "$PR" --repo "$GITHUB_REPOSITORY" --name-only | grep -q '^python/'; then
+            required="$required py_ci.yml"
+          fi
+          deadline=$((SECONDS + 3600))
+          while :; do
+            waiting=""
+            for workflow in $required; do
+              run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" \
+                --commit "$SHA" --event pull_request --limit 1 \
+                --json status,conclusion --jq '.[0] // empty | "\(.status) \(.conclusion)"')
+              case "$run" in
+                "completed success") ;;
+                completed*)
+                  echo "$workflow did not pass ($run), so no image is built"
+                  exit 1 ;;
+                *) waiting="$waiting $workflow" ;;
+              esac
+            done
+            [ -z "$waiting" ] && break
+            if [ $SECONDS -ge $deadline ]; then
+              echo "timed out waiting for:$waiting"
+              exit 1
+            fi
+            echo "waiting for:$waiting"
+            sleep 30
+          done
+
+
+      - name: Checkout pull request head
+        uses: actions/checkout@v5
+        with:
+          # The head commit, not the merge commit GitHub makes with main.
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build and push linux/amd64 image
+        env:
+          BUILDX_BUILDER: ${{ steps.buildx.outputs.name }}
+          IMAGE: ${{ secrets.DOCKER_HUB_USERNAME }}/mdv
+          # Passed through the environment so a branch name or commit message
+          # is never pasted into the script.
+          BRANCH: ${{ github.head_ref }}
+          SOURCE: ${{ github.repositoryUrl }}
+        run: |
+          COMMIT=$(git rev-parse HEAD)
+          SUBJECT=$(git show -s --format=%s)
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "Building $IMAGE:pr-$COMMIT"
+          # The pr- prefix keeps a bare hash tag meaning a commit of main. This
+          # build never moves :latest, and it reads the cache without writing
+          # it, so a branch cannot replace the cache that main builds reuse.
+          docker buildx build --platform linux/amd64 \
+            --build-arg GIT_COMMIT_DATE="$(git log -1 --format=%cI)" \
+            --build-arg GIT_BRANCH_NAME="$BRANCH" \
+            --build-arg GIT_COMMIT_HASH="$COMMIT" \
+            --build-arg GIT_LAST_COMMIT_MESSAGE="$SUBJECT" \
+            --build-arg BUILD_DATE="$BUILD_DATE" \
+            --build-arg GIT_DIRTY=false \
+            --label "org.opencontainers.image.version=$COMMIT" \
+            --label "org.opencontainers.image.revision=$COMMIT" \
+            --label "org.opencontainers.image.created=$BUILD_DATE" \
+            --label "org.opencontainers.image.source=$SOURCE" \
+            --label "org.opencontainers.image.description=$(git log -1 --pretty=format:'%h - %s')" \
+            -t "$IMAGE:pr-$COMMIT" \
+            --cache-from=type=registry,ref=$IMAGE:cache \
+            --push .
