@@ -367,6 +367,11 @@ const SpatialDataViewer = observer(
         const showLegend = contourConfig.field_legend.display;
         const legendPosition = { x: 10, y: 10 };
         const { device: deckDevice, fallBack: fallBackToWebGL } = useDeckDevice(resolveDeckBackend(config.render_backend));
+        const activeBackend = deckDevice.status === "ready" ? deckDevice.backend : null;
+        useEffect(() => {
+            chart.setActiveBackend(activeBackend);
+            return () => chart.setActiveBackend(null);
+        }, [chart, activeBackend]);
         // Layer errors (deck's `onError`) and WebGPU device errors (luma's) otherwise only
         // reach the console, and a device error repeats every frame. The tracker ties them
         // to render-stack entries, which the chart turns off and reports.

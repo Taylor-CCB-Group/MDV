@@ -112,6 +112,16 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     }
 
     /**
+     * The backend the canvas is drawing with, after any fallback to WebGL; null until the
+     * device is chosen. Runtime only. For UI outside the canvas tree, such as the layer
+     * dialog's image tone controls, which have no effect on WebGPU.
+     */
+    activeBackend: DeckBackend | null = null;
+    setActiveBackend(backend: DeckBackend | null) {
+        this.activeBackend = backend;
+    }
+
+    /**
      * Render-stack entries that failed to draw and were turned off, by entry id. Runtime
      * only, never saved: turning the layer back on clears it, so a retry can fail and be
      * reported again. See `layer_failures.ts`.
@@ -177,6 +187,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             // deeply observable would have MobX walk a live render-path object.
             pointsLayerRegistry: observable.ref,
             setPointsLayerRegistry: action,
+            activeBackend: observable,
+            setActiveBackend: action,
             layerFailures: observable,
             canvasErrors: observable,
             recordLayerFailure: action,

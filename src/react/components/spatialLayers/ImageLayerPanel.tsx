@@ -49,6 +49,12 @@ export type SpatialImagePanelContextValue = {
     /** Tone, derived from the entry's `vivLayerProps` (host-owned sibling of `channels`). */
     brightness: number[];
     contrast: number[];
+    /**
+     * Why the contrast/brightness controls do nothing here, or null when they work.
+     * SpatialData.js drops Viv image extensions on WebGPU, so `VivContrastExtension`
+     * never runs there.
+     */
+    toneUnavailable: string | null;
     selections: Array<{ z: number; c: number; t: number }>;
     setChannels: ReturnType<typeof useLayerChannelState>["setChannels"];
     addChannel: () => void;
@@ -112,6 +118,9 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
     const channelsStore = useChannelsStoreApi();
     const viewerStore = useViewerStoreApi();
     const persistedKeyRef = useRef("");
+    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    const toneUnavailable =
+        chart.activeBackend === "webgpu" ? "Contrast and brightness are not yet supported on WebGPU." : null;
 
     const config = layer;
     const channels = config.channels ?? EMPTY_CHANNELS;
@@ -234,6 +243,7 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
             channelsVisible,
             brightness: tone.brightness,
             contrast: tone.contrast,
+            toneUnavailable,
             selections: selections.map(
                 (selection: (typeof selections)[number]) => ({
                     z: selection.z ?? 0,
@@ -262,6 +272,7 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
             removeChannel,
             tone.brightness,
             tone.contrast,
+            toneUnavailable,
             addChannelWithSelection,
             patchVivLayerProps,
             patchToneAtIndex,

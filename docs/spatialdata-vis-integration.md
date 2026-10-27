@@ -311,7 +311,9 @@ unadapted, so they must work on WebGPU themselves:
 - Use luma's portable parameters (`depthCompare`, `depthWriteEnabled`), not WebGL ones
   like `depthTest`, which WebGPU rejects.
 - SpatialData.js drops Viv image extensions on WebGPU, so `VivContrastExtension`'s tone
-  controls have no effect there.
+  controls have no effect there. The layer dialog disables them while the chart draws with
+  WebGPU: the chart publishes its effective backend as `activeBackend` (after any fallback
+  to WebGL), and the image panel context passes `toneUnavailable` to `BrightnessContrast`.
 
 ## Avivatorish comparison
 
