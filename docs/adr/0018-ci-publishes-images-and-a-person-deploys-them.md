@@ -18,7 +18,7 @@ We decided instead that CI builds every image and publishes it to Docker Hub, an
 
 ### Images
 
-The Docker Hub workflow keeps building `main` as it does now. It also builds the head of every pull request opened from this repository, for amd64, and pushes it as `mdvadmin/mdv:pr-<full commit hash>`. The prefix keeps a bare hash tag meaning a commit of `main`, and a pull request build never moves `:latest`. Pull request builds read the shared build cache but do not write to it, so a branch cannot replace the cache that `main` builds reuse. Pull requests from forks get no image, because GitHub does not pass the Docker Hub secrets to their workflows.
+The Docker Hub workflow keeps building `main` as it does now. A second workflow builds a pull request opened from this repository only when it carries the `preview` label, and runs again on each new commit while the label stays. It first calls the Python and TypeScript CI workflows, so pytest, pyright, the TypeScript type check, the Vite build and Vitest must all pass before anything is built. It then builds the head commit for amd64 and pushes it as `mdvadmin/mdv:pr-<full commit hash>`. The prefix keeps a bare hash tag meaning a commit of `main`, and a pull request build never moves `:latest`. Pull request builds read the shared build cache but do not write to it, so a branch cannot replace the cache that `main` builds reuse. Pull requests from forks get no image, because GitHub does not pass the Docker Hub secrets to their workflows.
 
 Playwright runs against each `main` image inside the CI job, with `ENABLE_AUTH=0`. Publishing a GitHub Release adds a `v<version>` tag to the existing image for that commit if its Playwright run passed. Nothing is rebuilt for a release. The `:stable` workflow stays as it is.
 
@@ -32,7 +32,7 @@ Rolling back means pointing the image name at the rollback tag, or deploying the
 
 ### Previews
 
-A preview is a throwaway instance of a pull request on bia. A cron job under a team member's account on bia polls GitHub every 5 minutes for open pull requests that carry the `preview` label. For each one, it runs that pull request's image as a single SQLite container with dev auth and a fixed synthetic project, in one of a few reserved port slots, and comments the link on the pull request. When the pull request gets a new commit, the job redeploys it and edits the same comment. When the pull request closes or loses the label, the job removes the preview. When every slot is busy, it comments that the pull request is waiting. The job uses a fine-grained token that can only write pull request comments on MDV.
+A preview is a throwaway instance of a pull request on bia. A cron job under a team member's account on bia polls GitHub every 5 minutes for open pull requests that carry the `preview` label. For each one whose head commit has an image, it runs that image as a single SQLite container with dev auth and a fixed synthetic project, in one of a few reserved port slots, and comments the link on the pull request. When the pull request gets a new commit, the job redeploys it and edits the same comment. When the pull request closes or loses the label, the job removes the preview. When every slot is busy, it comments that the pull request is waiting. The job uses a fine-grained token that can only write pull request comments on MDV.
 
 ## Why
 
@@ -53,6 +53,9 @@ The release gate tests the image inside CI because that is how the Playwright su
 - CI deploying to both servers through runners, as in the earlier plan, for the reasons above.
 - CI deploying previews to bia automatically while people deploy production. This still needs a runner on bia.
 - Publishing to a public GHCR package alongside Docker Hub. The package would sit under the repository's own permissions, but each `main` commit would exist in two registries, and the Postgres servers already pull from Docker Hub.
+- An image for every pull request. Most pull requests never get deployed, so building each one wastes CI time and fills Docker Hub.
+- Building from a `workflow_run` trigger once the test workflows finish, so the tests run only once. It runs from `main`'s copy of the workflow with secrets, has to ask the API whether every check passed, and needs separate handling for a label added after the tests finish.
+- Merging the Python and TypeScript workflows into one, so the image job can wait on their jobs directly. It needs a third-party action for the Python path filter and changes the check names that branch protection uses.
 - One deploy script in this repository for every server. It would have to take production service names and paths as configuration, and the repository is public.
 - Skipping the backup on bia because its instances are for testing. The startup writes described above happen there too.
 - A compose file that reads the digest from a variable. It is cleaner, but it needs write access to the compose directory.
@@ -67,6 +70,7 @@ The release gate tests the image inside CI because that is how the Playwright su
 - Database migrations stay manual. The release notes name any migration, and an operator runs it with the app stopped before deploying that release.
 - Retagging moves a tag for every service on the server that uses it. A service that the script was not asked to recreate picks up the new image the next time anyone recreates it.
 - The Postgres script lives outside the repository, so each person's copy on a server can drift from the operations notes, and a change to the shared steps has to be made in both scripts.
+- A labelled pull request runs its tests twice on each commit, once in the normal workflows and once before the image build. The tests also run on GitHub's merge commit with `main`, while the image is built from the head commit.
 - Pull request images stay on Docker Hub, and nothing removes them.
 - Docker Hub limits how often anonymous clients can pull. If the preview poller reaches that limit, it can log in with a read-only Docker Hub token.
 - `playwright.yml` has never passed, and it has to be fixed before the release gate can work.
