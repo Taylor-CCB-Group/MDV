@@ -2,7 +2,7 @@ import { schemeReds } from "d3";
 
 export type DotPlotPalette = "reds" | "blue_white_red";
 
-/** Colour stops for the dot plot's mean expression scale; shared by the legacy and React dot plots. */
+/** Colour stops for the dot plot's mean expression scale; the same as the legacy `DotPlot.js` uses. */
 export const DOT_PLOT_PALETTES: Record<DotPlotPalette, readonly string[]> = {
     reds: schemeReds[8],
     blue_white_red: [

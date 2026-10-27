@@ -160,7 +160,7 @@ src/react/components/dotplot/
     dotPlotConfig.ts            config type, defaults, colour range choice
     dotPlotLayout.ts            visible rows, panel layout, dot radius
     dotPlotLegends.ts           legend band and fraction legend spec
-    dotPlotPalettes.ts          palettes (moved out of DotPlot.js), colour binning
+    dotPlotPalettes.ts          palettes (as in DotPlot.js), colour binning
 src/tests/charts/dotPlot{Stats,StatsLegacyParity,Layout,Config,Legends}.test.ts
 ```
 
@@ -208,8 +208,8 @@ Axes are drawn with `@visx/axis` on band scales, as
   cells by the first field's values, which isn't what mean expression shows.
 - Auto colour range is fixed while filtering and recalculated when the rows,
   fields, split or threshold change, as in the legacy dot plot.
-- Palettes: move the two palettes out of `DotPlot.js` into a shared TS module
-  so both charts use the same colours.
+- Palettes: `dotPlotPalettes.ts` has the same two palettes as `DotPlot.js`.
+  Making the legacy chart use this module too is on the follow-up branch.
 
 ## Performance
 
@@ -271,6 +271,21 @@ values in the add-chart dialog (values start empty; hidden while Split by is Non
 Tried on the synthetic Control/Disease project and on the myeloid project
 ("Contrasting R vs NR … (split dot plot)" view).
 
+## Follow-up branch
+
+`feature/settings-greying-and-legacy-dotplot` holds work kept out of this branch
+so the compound dot plot can ship on its own. It's based on this branch, so
+rebase it onto `main` once this one is merged:
+
+- Greying out settings that another setting overrides: `disabledReason` on
+  `GuiSpec`, drawn by `AbstractComponent` in `SettingsDialogComponent.tsx`; used
+  for X rotate/height under Auto-fit, Manual min/max under Auto colour range, and
+  Keep legend space with no legends shown, in both dot plots.
+- `settingsConstants.ts`: settings text shared between charts or matched by code.
+- Legacy dot plot: Shorten / Hide overlapping working with auto-fit off, its
+  x label checkboxes moved into Axis controls, and its palettes from
+  `dotPlotPalettes.ts`.
+
 ## TODO
 
 - **Scale each gene (0–1).** A colour option alongside mean expression: each
@@ -318,9 +333,10 @@ it inherits from `SVGChart` and `BaseChart`):
 
 - **X axis label options (done):** Auto-fit X axis labels (on by default),
   Shorten long X axis labels (on), Hide overlapping X axis labels (off), at the
-  top of Axis controls in both dot plots, with a full-name tooltip on the X
-  labels. Shorten and Hide overlapping now also work with auto-fit off
-  (`layoutFixedXLabels`), in both dot plots.
+  top of Axis Controls, with a full-name tooltip on the X labels. Shorten and
+  Hide overlapping also work with auto-fit off (`layoutFixedXLabels`). The
+  matching legacy dot plot changes (the same fix, and moving its checkboxes into
+  Axis controls) are on the follow-up branch, see below.
 - **Click a dot to filter cells:** cells in that row category (and split value)
   expressing that field above the threshold, with the selected dot outlined and
   the reset button shown. The legacy chart uses `filterCatCol` on a
