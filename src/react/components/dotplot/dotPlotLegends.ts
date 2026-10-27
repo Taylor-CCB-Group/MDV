@@ -91,6 +91,8 @@ export type LegendLayoutInput = {
     fracMax: number | null;
     /** Radius of the largest dot in the panels, so legend dots match them. */
     maxRadius: number;
+    /** Keep a band free above the panels for the legends; when false they start over the plot. */
+    reserveSpace: boolean;
 };
 
 /**
@@ -98,9 +100,17 @@ export type LegendLayoutInput = {
  * that fits the chart's width: the colour legend gets narrower and the fraction legend shows
  * fewer dots before anything is stacked. If even the most compact row is too wide, or the band
  * would take more than a third of the height, there's no band and the legends start over the
- * top left of the plot, as in the legacy dot plot, so the plot always keeps its space.
+ * top left of the plot, as in the legacy dot plot, so the plot always keeps its space. Without
+ * `reserveSpace` they start in the same row but there's no band, so the plot fills the height.
  */
-export function getLegendLayout({ width, height, colorRange, fracMax, maxRadius }: LegendLayoutInput): LegendLayout {
+export function getLegendLayout({
+    width,
+    height,
+    colorRange,
+    fracMax,
+    maxRadius,
+    reserveSpace,
+}: LegendLayoutInput): LegendLayout {
     const m = DOT_PLOT_LEGEND_MARGIN;
     const boxesFor = (sizes: LegendSizes) => ({
         color: colorRange ? getColorLegendBox(colorRange, sizes.colorWidth) : null,
@@ -118,10 +128,10 @@ export function getLegendLayout({ width, height, colorRange, fracMax, maxRadius 
         if (rowWidth > width) continue;
         const bandHeight = m + Math.max(color?.height ?? 0, fraction?.height ?? 0);
         // more compact legends are no shorter, so a band this tall won't fit at all
-        if (bandHeight > height * MAX_LEGEND_BAND_FRACTION) break;
+        if (reserveSpace && bandHeight > height * MAX_LEGEND_BAND_FRACTION) break;
         return {
             ...sizes,
-            height: bandHeight,
+            height: reserveSpace ? bandHeight : 0,
             color: color ? [m, m] : null,
             fraction: fraction ? [fractionLeft(color), m] : null,
         };

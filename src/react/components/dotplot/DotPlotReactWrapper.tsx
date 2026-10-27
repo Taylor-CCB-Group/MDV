@@ -251,7 +251,7 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
         const settings = super.getSettings();
         // split by belongs with the other columns the chart is built from
         const params = settings.find((s) => s.type === "folder" && s.label === "Parameters");
-        if (params && Array.isArray(params.current_value)) {
+        if (params?.type === "folder") {
             params.current_value.push(...this.getSplitSettings());
         }
         return [
@@ -284,6 +284,14 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
                 func: (v) => {
                     c.fraction_legend.display = v;
                     this.showFractionLegend();
+                },
+            }),
+            g({
+                type: "check",
+                label: "Keep space above the plot for legends",
+                current_value: c.reserve_legend_space,
+                func: (v) => {
+                    c.reserve_legend_space = v;
                 },
             }),
             this.getScaleSettings(),

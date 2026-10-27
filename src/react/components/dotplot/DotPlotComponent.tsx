@@ -215,6 +215,7 @@ const DotPlotComponent = observer(function DotPlotComponent() {
             colorRange:
                 showColorLegend && rangeMin !== undefined && rangeMax !== undefined ? [rangeMin, rangeMax] : null,
             fracMax: showFractionLegend && fracMax !== undefined ? fracMax : null,
+            reserveSpace: config.reserve_legend_space,
             maxRadius: radius,
         });
     const rawLegendLayout = legendLayoutFor(layoutBelow(legendLayoutFor(DOT_PLOT_MAX_RADIUS).height).maxRadius);

@@ -12,12 +12,27 @@ import type { FractionLegendSpec } from "@/react/legend/fraction_legend/types";
 import { describe, expect, it } from "vitest";
 
 const colorRange: [number, number] = [0, 90];
-const input = { width: 1200, height: 800, colorRange, fracMax: 100, maxRadius: 25 };
+const input = { width: 1200, height: 800, colorRange, fracMax: 100, maxRadius: 25, reserveSpace: true };
 /** Width of a one-row band at full size: colour legend, then the fraction legend beside it. */
 const fullRowWidth =
     m + getColorLegendBox(colorRange).width + m + getFractionLegendBox(buildFractionLegendSpec(100, 25)).width + m;
 
 describe("getLegendLayout", () => {
+    it("starts the legends in the same row but keeps no band when space isn't kept for them", () => {
+        const kept = getLegendLayout(input);
+        const notKept = getLegendLayout({ ...input, reserveSpace: false });
+        expect(notKept.height).toBe(0);
+        expect(notKept.color).toEqual(kept.color);
+        expect(notKept.fraction).toEqual(kept.fraction);
+        expect(notKept.fractionItems).toBe(kept.fractionItems);
+    });
+
+    it("keeps full-size legends on a short chart when space isn't kept, as there's no band to cap", () => {
+        const short = getLegendLayout({ ...input, height: 150, reserveSpace: false });
+        expect(short.height).toBe(0);
+        expect(short.fractionItems).toBe(Number.POSITIVE_INFINITY);
+    });
+
     it("puts both legends at full size in one row when there's room", () => {
         const layout = getLegendLayout(input);
         expect(layout.fractionItems).toBe(Number.POSITIVE_INFINITY);

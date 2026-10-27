@@ -57,6 +57,8 @@ describe("adaptDotPlotConfig", () => {
         expect(c.color_scale).toEqual({ palette: "reds", log: false, mode: "auto" });
         expect(c.color_legend.display).toBe(true);
         expect(c.fraction_legend.display).toBe(true);
+        expect(c.reserve_legend_space).toBe(true);
+        expect(adaptDotPlotConfig({ ...base, reserve_legend_space: false }).reserve_legend_space).toBe(false);
         expect(c.axis.x).toEqual({
             size: 60,
             tickfont: 10,

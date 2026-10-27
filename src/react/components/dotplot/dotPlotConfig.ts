@@ -47,6 +47,8 @@ export type DotPlotReactConfig = BaseConfig & {
     color_legend: { display: boolean; pos?: [number, number] };
     /** `position` is the legend's saved [left, top] in the chart, as in the legacy dot plot. */
     fraction_legend: { display: boolean; position?: [number, number] };
+    /** Keep a band free above the panels where the legends start; off, the plot fills the height. */
+    reserve_legend_space: boolean;
     axis: { x: DotPlotXAxisConfig; y: AxisConfig };
 };
 
@@ -94,6 +96,7 @@ export function adaptDotPlotConfig(
         },
         color_legend: { ...original.color_legend, display: original.color_legend?.display ?? true },
         fraction_legend: { ...original.fraction_legend, display: original.fraction_legend?.display ?? true },
+        reserve_legend_space: original.reserve_legend_space ?? true,
         axis: {
             x: {
                 size: 60,
