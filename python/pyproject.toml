@@ -39,11 +39,10 @@ dependencies = [
     "polars>=1.31.0,<2",
     # spatial stays in core (preserves current PyPI behaviour). jp2k.py imports
     # generate-tiff-offsets at module level, so it must be core too.
-    "spatialdata>=0.7.2,<0.8",
-    "spatialdata-io>=0.6.0,<0.7",
+    "spatialdata>=0.8.0,<0.9",
+    "spatialdata-io>=0.7.1,<0.8",
     "generate-tiff-offsets>=0.1.7,<0.2",
-    # its `write` extra needs spatialdata>=0.8, so core only for now
-    "spatialdata-js-util>=0.1.0,<0.2",
+    "spatialdata-js-util[write]>=0.1.0,<0.2",
     # genomic operations
     "pysam==0.24.0",
     "pyranges>=0.1.4,<0.2",
