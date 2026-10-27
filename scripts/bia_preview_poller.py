@@ -105,6 +105,10 @@ class DeployError(Exception):
     pass
 
 
+class PullError(DeployError):
+    """The image could not be fetched, so nothing on the slot changed."""
+
+
 def log(message):
     print(time.strftime("%Y-%m-%d %H:%M:%S"), message, flush=True)
 
@@ -129,11 +133,12 @@ class GitHub:
             link = response.headers.get("Link", "")
             return json.loads(response.read().decode() or "null"), link
 
-    def get_all(self, path):
+    def get_all(self, path, key=None):
+        """Follows pagination. key names the list in endpoints that wrap it in an object."""
         items = []
         while path:
             page, link = self.request("GET", path)
-            items.extend(page)
+            items.extend(page if key is None else page[key])
             match = re.search(r'<([^>]+)>; rel="next"', link)
             path = match.group(1) if match else None
         return items
@@ -161,8 +166,15 @@ class GitHub:
         runs = runs["workflow_runs"]
         if any(run["status"] != "completed" for run in runs):
             return "pending"
-        if any(run["conclusion"] == "success" for run in runs):
-            return "ready"
+        # Adding another label starts a run whose jobs are all skipped, and
+        # that run can still succeed, so only a successful image job counts.
+        for run in runs:
+            jobs = self.get_all(
+                "/repos/{}/actions/runs/{}/jobs?per_page=100".format(REPO, run["id"]), "jobs"
+            )
+            if any(job["name"] == "image" and job["conclusion"] == "success" for job in jobs):
+                return "ready"
+        # Failed tests skip the image job, so the run says whether they failed.
         if any(run["conclusion"] == "failure" for run in runs):
             return "failed"
         return "missing"
@@ -171,6 +183,14 @@ class GitHub:
         """Keeps one comment per pull request, edited in place."""
         body = body + "\n\n" + MARKER
         known = state["comments"].get(str(number))
+        if known is None and not self.dry_run:
+            # The state file was lost or reset, so look for the marker before
+            # posting a second comment.
+            comments = self.get_all("/repos/{}/issues/{}/comments?per_page=100".format(REPO, number))
+            found = next((c for c in comments if MARKER in (c["body"] or "")), None)
+            if found:
+                known = {"id": found["id"], "body": found["body"]}
+                state["comments"][str(number)] = known
         if known and known["body"] == body:
             return
         log("comment on #{}: {}".format(number, body.splitlines()[0]))
@@ -186,8 +206,9 @@ class GitHub:
                 known["body"] = body
                 return
             except urllib.error.HTTPError as error:
-                # Someone deleted the comment, so post a new one.
-                if error.code != 404:
+                # The comment was deleted, or someone else wrote the marker
+                # into theirs, so post a new one.
+                if error.code not in (403, 404):
                     raise
         created, _ = self.request(
             "POST", "/repos/{}/issues/{}/comments".format(REPO, number), {"body": body}
@@ -248,7 +269,10 @@ class Docker:
 
     def pull(self, sha):
         ref = "{}:pr-{}".format(IMAGE, sha)
-        self.run(["docker", "pull", "--platform", PLATFORM, ref])
+        try:
+            self.run(["docker", "pull", "--platform", PLATFORM, ref])
+        except DeployError as error:
+            raise PullError(str(error))
         arch = self.run(["docker", "image", "inspect", "-f", "{{.Architecture}}", ref])
         if arch != ARCH:
             raise DeployError("{} is {}, not {}".format(ref, arch, ARCH))
@@ -418,6 +442,12 @@ def poll(github, docker, config, state):
                     continue
             try:
                 digest = deploy(docker, state, service, number, sha)
+            except PullError as error:
+                # A rate limit or network error says nothing about the commit,
+                # and the slot is untouched, so the next run tries again.
+                failures += 1
+                log("could not pull the image for #{}: {}".format(number, error))
+                continue
             except DeployError as error:
                 failures += 1
                 log("could not deploy #{} to {}: {}".format(number, service, error))
@@ -506,9 +536,12 @@ def main():
     state = load_state()
     github = GitHub(config["token"], args.dry_run)
     docker = Docker(config["compose_file"], os.path.join(STATE_DIR, "override.yml"), args.dry_run)
-    failures = poll(github, docker, config, state)
-    if not args.dry_run:
-        save_state(state)
+    # Saved even when poll raises, so comment IDs and failed commits survive.
+    try:
+        failures = poll(github, docker, config, state)
+    finally:
+        if not args.dry_run:
+            save_state(state)
     # A non-zero exit makes cron mail the log to the account's owner.
     return 1 if failures else 0
 
