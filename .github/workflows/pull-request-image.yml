@@ -18,28 +18,59 @@ concurrency:
 jobs:
   # Forks are left out, because GitHub does not pass them the Docker Hub
   # secrets. A labeled run only counts when the label added is preview.
-  python:
-    if: |
-      github.event.pull_request.head.repo.full_name == github.repository && (
-        (github.event.action == 'labeled' && github.event.label.name == 'preview') ||
-        (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'preview'))
-      )
-    uses: ./.github/workflows/py_ci.yml
-
-  typescript:
-    if: |
-      github.event.pull_request.head.repo.full_name == github.repository && (
-        (github.event.action == 'labeled' && github.event.label.name == 'preview') ||
-        (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'preview'))
-      )
-    uses: ./.github/workflows/ts_ci.yml
-
-  # Skipped unless both test workflows pass.
   image:
-    needs: [python, typescript]
+    if: |
+      github.event.pull_request.head.repo.full_name == github.repository && (
+        (github.event.action == 'labeled' && github.event.label.name == 'preview') ||
+        (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'preview'))
+      )
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
 
     steps:
+      # The tests already run in Python CI and TypeScript/JS CI for every pull
+      # request, so this waits for those runs instead of running them again.
+      # A label added after they finish finds them already done.
+      - name: Wait for the tests to pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Python CI only runs when python/** changes, like its paths filter.
+          required="ts_ci.yml"
+          if gh pr diff "$PR" --repo "$GITHUB_REPOSITORY" --name-only | grep -q '^python/'; then
+            required="$required py_ci.yml"
+          fi
+          deadline=$((SECONDS + 3600))
+          while :; do
+            waiting=""
+            for workflow in $required; do
+              run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" \
+                --commit "$SHA" --event pull_request --limit 1 \
+                --json status,conclusion --jq '.[0] // empty | "\(.status) \(.conclusion)"')
+              case "$run" in
+                "completed success") ;;
+                completed*)
+                  echo "$workflow did not pass ($run), so no image is built"
+                  exit 1 ;;
+                *) waiting="$waiting $workflow" ;;
+              esac
+            done
+            [ -z "$waiting" ] && break
+            if [ $SECONDS -ge $deadline ]; then
+              echo "timed out waiting for:$waiting"
+              exit 1
+            fi
+            echo "waiting for:$waiting"
+            sleep 30
+          done
+
+
       - name: Checkout pull request head
         uses: actions/checkout@v5
         with:

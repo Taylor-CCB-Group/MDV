@@ -331,7 +331,7 @@ def deploy(docker, state, service, number, sha):
     slots = state["slots"]
     if docker.dry_run:
         log("would deploy #{} ({}) to {}".format(number, sha[:7], service))
-        return "unknown"
+        return
     image_id, digest = docker.pull(sha)
 
     if service not in slots:
@@ -354,8 +354,7 @@ def deploy(docker, state, service, number, sha):
     save_state(state)
     docker.compose("up", "-d", "--no-deps", "--force-recreate", service, override=True)
     docker.check_started(service, image_id)
-    log("#{} ({}) runs on {}".format(number, sha[:7], service))
-    return digest
+    log("#{} ({}) runs on {} from {}@{}".format(number, sha[:7], service, IMAGE, digest))
 
 
 def tear_down(docker, state, service):
@@ -396,7 +395,7 @@ def poll(github, docker, config, state):
             tear_down(docker, state, service)
             github.comment(
                 state, number,
-                "Preview removed. `{}` is back on `{}` with its database restored.".format(service, BASE_TAG),
+                "Preview removed.",
             )
         except (DeployError, urllib.error.URLError) as error:
             failures += 1
@@ -435,13 +434,10 @@ def poll(github, docker, config, state):
             if service is None:
                 service = next((s for s in slots if s not in state["slots"]), None)
                 if service is None:
-                    github.comment(
-                        state, number,
-                        "Waiting for a free instance. All {} bia SQLite instances are running other previews.".format(len(slots)),
-                    )
+                    github.comment(state, number, "Waiting for a free preview slot.")
                     continue
             try:
-                digest = deploy(docker, state, service, number, sha)
+                deploy(docker, state, service, number, sha)
             except PullError as error:
                 # A rate limit or network error says nothing about the commit,
                 # and the slot is untouched, so the next run tries again.
@@ -452,24 +448,12 @@ def poll(github, docker, config, state):
                 failures += 1
                 log("could not deploy #{} to {}: {}".format(number, service, error))
                 state["failed"][str(number)] = sha
-                outcome = "`{}` was not changed.".format(service)
                 if service in state["slots"]:
                     tear_down(docker, state, service)
-                    outcome = "`{}` went back to `{}` with its database restored.".format(service, BASE_TAG)
-                github.comment(
-                    state, number,
-                    "The preview of {} did not start: {}. {}".format(sha[:7], error, outcome),
-                )
+                # The reason is in the poller's log on bia.
+                github.comment(state, number, "The preview of {} did not start.".format(sha[:7]))
                 continue
-            github.comment(
-                state, number,
-                "Preview of {} is running at {}\n\n"
-                "Instance `{}`, image `{}@{}`. It updates on each new commit while the `{}` label stays. "
-                "When the label comes off or the pull request closes, the instance goes back to `{}` "
-                "and its database is restored. Edits to project files are not rolled back.".format(
-                    sha[:7], slots[service], service, IMAGE, digest, LABEL, BASE_TAG
-                ),
-            )
+            github.comment(state, number, "Preview of {} is running at {}".format(sha[:7], slots[service]))
             state["failed"].pop(str(number), None)
         except (DeployError, urllib.error.URLError) as error:
             failures += 1

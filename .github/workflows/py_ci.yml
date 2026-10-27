@@ -10,13 +10,9 @@ on:
       - main
     paths:
       - 'python/**'
-  # Called by pull-request-image.yml, where the paths filter does not apply.
-  workflow_call:
 
 concurrency:
-  # A called run sees the caller's github.workflow, so the literal keeps it
-  # from cancelling the caller or the TypeScript run beside it.
-  group: ${{ github.workflow }}-python-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
