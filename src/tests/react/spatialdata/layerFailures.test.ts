@@ -84,11 +84,13 @@ describe("LayerFailureTracker", () => {
         expect(fail).toHaveBeenCalledWith(POINTS, { reason: DRAW, source: "webgpu" });
     });
 
-    it("attributes deck layer errors by layer id, or to the canvas", () => {
-        tracker.layer(new Error("shader failed"), `${POINTS}-#spatial-detail-x#-scatter`);
-        expect(fail).toHaveBeenCalledWith(POINTS, { reason: "shader failed", source: "deck" });
-        tracker.layer(new Error("no layer"), undefined);
-        expect(canvas).toHaveBeenCalledWith("no layer");
+    it("attributes deck layer errors by layer id, or to the canvas, keeping their stacks", () => {
+        const shaderError = new Error("shader failed");
+        tracker.layer(shaderError, `${POINTS}-#spatial-detail-x#-scatter`);
+        expect(fail).toHaveBeenCalledWith(POINTS, { reason: "shader failed", source: "deck", stack: shaderError.stack });
+        const unattributed = new Error("no layer");
+        tracker.layer(unattributed, undefined);
+        expect(canvas).toHaveBeenCalledWith("no layer", unattributed.stack);
     });
 
     it("logs each kind of message once, however often it repeats", () => {

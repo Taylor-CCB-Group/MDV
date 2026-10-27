@@ -1,4 +1,5 @@
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
+import { formatRenderReport } from "@/react/spatialdata/render_report";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { Popover } from "@mui/material";
 import type { SpatialData } from "@spatialdata/core";
@@ -42,6 +43,7 @@ const SpatialStatusIndicator = observer(function SpatialStatusIndicator({
 }) {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+    const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
     const rasterIssues = useRasterIssues(spatialData, rasterEntriesKey(chart.config.renderStack));
     const entries = chart.config.renderStack?.entries ?? [];
     const failures = [...chart.layerFailures].map(([entryId, failure]) => {
@@ -51,6 +53,27 @@ const SpatialStatusIndicator = observer(function SpatialStatusIndicator({
     const errorCount = failures.filter((item) => !item.failure.dismissed).length + chart.canvasErrors.length;
     const hasNotice = failures.length > 0 || rasterIssues.length > 0;
     const spatialDataUrl = spatialData.url;
+
+    const copyDetails = async () => {
+        const report = formatRenderReport({
+            renderer: backendLabel(device),
+            gpu: chart.gpuDescription,
+            userAgent: navigator.userAgent,
+            url: window.location.href,
+            failures: failures.map(({ name, failure }) => ({ name, failure })),
+            canvasErrors: chart.canvasErrors,
+        });
+        try {
+            await navigator.clipboard.writeText(report);
+            setCopyState("copied");
+        } catch (error) {
+            // e.g. no clipboard permission: the console still has it
+            console.info(report);
+            console.warn("Could not copy the render report:", error);
+            setCopyState("failed");
+        }
+        setTimeout(() => setCopyState("idle"), 2000);
+    };
 
     const summary = [
         errorCount > 0 && `${errorCount} rendering ${errorCount === 1 ? "problem" : "problems"}`,
@@ -128,14 +151,26 @@ const SpatialStatusIndicator = observer(function SpatialStatusIndicator({
                             <p className="opacity-70">Details are in the browser console.</p>
                         </Section>
                     )}
-                    {errorCount > 0 && (
-                        <button
-                            type="button"
-                            className="cursor-pointer self-start rounded border border-current bg-transparent px-2 py-0.5 text-inherit"
-                            onClick={() => chart.dismissRenderErrors()}
-                        >
-                            Dismiss errors
-                        </button>
+                    {(errorCount > 0 || failures.length > 0) && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                className="cursor-pointer rounded border border-current bg-transparent px-2 py-0.5 text-inherit"
+                                onClick={copyDetails}
+                            >
+                                {copyState === "copied" ? "Copied" : "Copy details"}
+                            </button>
+                            {errorCount > 0 && (
+                                <button
+                                    type="button"
+                                    className="cursor-pointer rounded border border-current bg-transparent px-2 py-0.5 text-inherit"
+                                    onClick={() => chart.dismissRenderErrors()}
+                                >
+                                    Dismiss errors
+                                </button>
+                            )}
+                            {copyState === "failed" && <span className="opacity-70">Could not copy; logged to the console.</span>}
+                        </div>
                     )}
                     {rasterIssues.length > 0 && (
                         <Section title="Slow image data">

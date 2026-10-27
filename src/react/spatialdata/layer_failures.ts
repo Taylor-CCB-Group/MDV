@@ -23,14 +23,19 @@ export type LayerFailure = {
     /** The message that tied the failure to this layer, when it differs from the reason. */
     detail?: string;
     source: "webgpu" | "deck";
+    /**
+     * Where it was thrown, for errors thrown in JS (deck's). WebGPU validation errors arrive
+     * asynchronously, so their stack only shows how luma reported them, and is left out.
+     */
+    stack?: string;
     /** How many errors were attributed to it. */
     count: number;
     /** Dismissed from the status indicator's count; the layer dialog still shows the failure. */
     dismissed: boolean;
 };
 
-/** An error that could not be tied to a layer. */
-export type CanvasError = { message: string; count: number; dismissed: boolean };
+/** An error that could not be tied to a layer. `stack` as for `LayerFailure`. */
+export type CanvasError = { message: string; stack?: string; count: number; dismissed: boolean };
 
 /** How long an unattributed message waits to be claimed as the cause of an attributed one. */
 export const CAUSE_WINDOW_MS = 1000;
@@ -67,7 +72,7 @@ function logKey(message: string) {
 export type LayerFailureSink = {
     entryIds: () => readonly string[];
     fail: (entryId: string, failure: Omit<LayerFailure, "count" | "dismissed">) => void;
-    canvas: (message: string) => void;
+    canvas: (message: string, stack?: string) => void;
 };
 
 /** One per chart: attributes errors, pairs them with their cause, and logs each kind once. */
@@ -105,8 +110,9 @@ export class LayerFailureTracker {
     layer(error: Error, layerId: string | undefined): void {
         this.logOnce(error);
         const entryId = layerId ? entryForLabel(layerId, this.sink.entryIds()) : undefined;
-        if (entryId) this.sink.fail(entryId, { reason: error.message, source: "deck" });
-        else this.sink.canvas(error.message);
+        const stack = error.stack ? { stack: error.stack } : {};
+        if (entryId) this.sink.fail(entryId, { reason: error.message, source: "deck", ...stack });
+        else this.sink.canvas(error.message, error.stack);
     }
 
     /** Report a held message nothing claimed as a canvas-level error. */

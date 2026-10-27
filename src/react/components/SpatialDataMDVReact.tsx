@@ -121,6 +121,12 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         this.activeBackend = backend;
     }
 
+    /** The GPU deck's device runs on, as luma reports it; for error reports. Runtime only. */
+    gpuDescription: string | null = null;
+    setGpuDescription(description: string | null) {
+        this.gpuDescription = description;
+    }
+
     /**
      * Render-stack entries that failed to draw and were turned off, by entry id. Runtime
      * only, never saved: turning the layer back on clears it, so a retry can fail and be
@@ -149,10 +155,10 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         this.layerFailures.delete(entryId);
     }
 
-    recordCanvasError(message: string) {
+    recordCanvasError(message: string, stack?: string) {
         const existing = this.canvasErrors.find((item) => item.message === message);
         if (existing) existing.count++;
-        else this.canvasErrors.push({ message, count: 1, dismissed: false });
+        else this.canvasErrors.push({ message, ...(stack ? { stack } : {}), count: 1, dismissed: false });
     }
 
     /** Clear the status indicator's error count; failing layers stay marked in the layer dialog. */
@@ -189,6 +195,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             setPointsLayerRegistry: action,
             activeBackend: observable,
             setActiveBackend: action,
+            gpuDescription: observable,
+            setGpuDescription: action,
             layerFailures: observable,
             canvasErrors: observable,
             recordLayerFailure: action,

@@ -9,6 +9,7 @@ import {
     type VivImagePropsResolver,
     useSpatialCanvasRendererFromLayerInputs,
 } from "@spatialdata/vis";
+import type { DeviceInfo } from "@luma.gl/core";
 import type { DeckGLProps, DeckGLRef, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -32,6 +33,7 @@ import {
 } from "@/react/spatialdata/render_stack_adapter";
 import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack_control";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
+import { describeGpu } from "@/react/spatialdata/render_report";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
@@ -397,7 +399,7 @@ const SpatialDataViewer = observer(
                         }
                         chart.recordLayerFailure(entryId, failure);
                     },
-                    canvas: (message) => chart.recordCanvasError(message),
+                    canvas: (message, stack) => chart.recordCanvasError(message, stack),
                 }),
             [chart, fallBackToWebGL],
         );
@@ -407,9 +409,10 @@ const SpatialDataViewer = observer(
         const initializedBackend = useRef<string | null>(null);
         const currentDevice = useRef<unknown>(null);
         const onDeviceInitialized = useCallback(
-            (device: { type: string; handle: unknown }) => {
+            (device: { type: string; handle: unknown; info: DeviceInfo }) => {
                 initializedBackend.current = device.type;
                 currentDevice.current = device;
+                chart.setGpuDescription(describeGpu(device.info));
                 // deck only watches for a lost WebGL context; a lost GPUDevice (GPU process
                 // crash or reset) would leave the canvas dark. "destroyed" is our own teardown.
                 if (device.type !== "webgpu" || !(device.handle instanceof GPUDevice)) return;
@@ -419,7 +422,7 @@ const SpatialDataViewer = observer(
                     fallBackToWebGL(`the WebGPU device was lost: ${info.message || "no reason given"}`);
                 });
             },
-            [fallBackToWebGL],
+            [chart, fallBackToWebGL],
         );
         const onDeckError = useCallback(
             (error: Error, layer?: { id: string } | null) => {
