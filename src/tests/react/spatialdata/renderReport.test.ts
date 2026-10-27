@@ -59,3 +59,12 @@ describe("describeGpu", () => {
         expect(describeGpu(info)).toBe("webgpu: apple metal-3 (apple, metal)");
     });
 });
+
+describe("formatRenderReport trace", () => {
+    test("includes the WebGPU call trace when tracing is on, and says how to turn it on otherwise", () => {
+        const off = formatRenderReport({ ...base, failures: [], canvasErrors: [] });
+        expect(off).toContain("WebGPU call tracing: off");
+        const on = formatRenderReport({ ...base, failures: [], canvasErrors: [], trace: "finish() on encoder\nat x" });
+        expect(on).toContain("WebGPU call trace:\n    finish() on encoder\n    at x");
+    });
+});

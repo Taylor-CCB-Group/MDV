@@ -294,6 +294,15 @@ reason in its status indicator, when:
 Unattributed WebGPU validation errors are reported, not treated as a reason to fall back.
 Changing a chart's backend setting gives WebGPU another try.
 
+**Diagnosing WebGPU errors.** A chart's status popover has "Copy details": a plain-text
+report of the renderer, GPU, browser and each failure. Validation errors arrive
+asynchronously, so their own stack never shows the caller. For those, turn on "WebGPU call
+tracing" in the Debug dialog's browser settings and reload: `webgpu_trace.ts` then wraps
+the WebGPU encoder API before any device exists, reports a pass still open when its
+encoder is finished (with both stacks), logs the recent encoder calls before each
+uncaptured error, and adds both to "Copy details". Turn it off when done; it slows
+rendering a little.
+
 **Tested** (macOS, Apple silicon): Chrome (Dawn/Metal) end to end; Safari and Firefox by
 hand. Known issue: Firefox does not support the `float32-filterable` feature, which some
 WebGPU code paths need; there a failing layer moves default-following charts to WebGL.

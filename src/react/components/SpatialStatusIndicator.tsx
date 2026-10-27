@@ -1,6 +1,7 @@
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
 import { formatRenderReport } from "@/react/spatialdata/render_report";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
+import { webgpuTraceReport } from "@/react/spatialdata/webgpu_trace";
 import { Popover } from "@mui/material";
 import type { SpatialData } from "@spatialdata/core";
 import { observer } from "mobx-react-lite";
@@ -62,6 +63,7 @@ const SpatialStatusIndicator = observer(function SpatialStatusIndicator({
             url: window.location.href,
             failures: failures.map(({ name, failure }) => ({ name, failure })),
             canvasErrors: chart.canvasErrors,
+            trace: webgpuTraceReport(),
         });
         try {
             await navigator.clipboard.writeText(report);

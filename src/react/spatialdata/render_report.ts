@@ -23,6 +23,8 @@ export type RenderReportInput = {
     url: string;
     failures: Array<{ name: string; failure: LayerFailure }>;
     canvasErrors: readonly CanvasError[];
+    /** `webgpuTraceReport()`: null while tracing is off. */
+    trace?: string | null;
 };
 
 function indent(text: string) {
@@ -51,5 +53,6 @@ export function formatRenderReport(input: RenderReportInput): string {
         if (error.stack) lines.push("  Stack:", indent(error.stack));
     }
     if (input.failures.length === 0 && input.canvasErrors.length === 0) lines.push("", "No rendering problems recorded.");
+    lines.push("", input.trace ? `WebGPU call trace:\n${indent(input.trace)}` : "WebGPU call tracing: off (Debug dialog > Browser settings)");
     return `${lines.join("\n")}\n`;
 }

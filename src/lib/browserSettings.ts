@@ -79,5 +79,20 @@ export const renderBackendSetting = defineChoiceSetting<RenderBackend>({
     legacy: () => (readStorage("MDV_WEBGPU") === "1" ? "webgpu" : undefined),
 });
 
+/** Diagnostics for WebGPU validation errors; see `src/react/spatialdata/webgpu_trace.ts`. */
+export const webgpuTraceSetting = defineChoiceSetting<"off" | "on">({
+    key: "mdv.settings.webgpuTrace",
+    label: "WebGPU call tracing",
+    description:
+        "For diagnosing WebGPU errors: records recent command encoder calls, reports passes " +
+        "left open when an encoder is finished, and adds both to a chart's Copy details. " +
+        "Slows rendering a little. Takes effect when the page is reloaded.",
+    choices: [
+        { value: "off", label: "Off" },
+        { value: "on", label: "On (after reload)" },
+    ],
+    defaultValue: "off",
+});
+
 /** Every browser setting, in the order the Debug dialog lists them. */
-export const browserSettings: readonly BrowserSetting[] = [renderBackendSetting];
+export const browserSettings: readonly BrowserSetting[] = [renderBackendSetting, webgpuTraceSetting];

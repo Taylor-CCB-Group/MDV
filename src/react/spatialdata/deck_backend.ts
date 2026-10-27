@@ -1,6 +1,8 @@
 import { type RenderBackend, renderBackendSetting } from "@/lib/browserSettings";
 import type { CreateDeviceProps } from "@luma.gl/core";
 import { useCallback, useEffect, useState } from "react";
+// Side effect: when "WebGPU call tracing" is on, wrap the WebGPU API before any device exists.
+import "./webgpu_trace";
 
 /**
  * Which deck.gl device backend the SpatialData chart renders with. WebGPU is the
