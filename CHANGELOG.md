@@ -13,6 +13,9 @@ All notable changes to `mdvtools` are documented here. The format is based on
   status 1.
 
 ### Changed
+- Supported Python is now `>=3.12,<3.13`; Python 3.11 is no longer supported.
+- `mdvtools` now depends on `spatialdata-js-util`. Installing it on Python 3.12 upgrades
+  `zarr` to 3.3 or later.
 - `mdvtools convert-spatial` default views now use the SpatialData.js viewer instead of the
   Viv image viewer.
 - The SpatialData.js chart is now listed as "SpatialData.js viewer" in the add-chart menu.
