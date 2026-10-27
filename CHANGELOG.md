@@ -14,8 +14,10 @@ All notable changes to `mdvtools` are documented here. The format is based on
 
 ### Changed
 - Supported Python is now `>=3.12,<3.13`; Python 3.11 is no longer supported.
-- `mdvtools` now depends on `spatialdata-js-util`. Installing it on Python 3.12 upgrades
-  `zarr` to 3.3 or later.
+- `mdvtools` now depends on `spatialdata-js-util` (with its `write` extra), which needs
+  `zarr` 3.3 or later.
+- Upgraded `spatialdata` to 0.8 and `spatialdata-io` to 0.7.1 (from 0.7.2 and 0.6.0).
+  `spatialdata-io` 0.7.1 indexes Xenium shapes by `cell_id`.
 - `mdvtools convert-spatial` default views now use the SpatialData.js viewer instead of the
   Viv image viewer.
 - The SpatialData.js chart is now listed as "SpatialData.js viewer" in the add-chart menu.

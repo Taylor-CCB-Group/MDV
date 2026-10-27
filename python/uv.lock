@@ -537,7 +537,7 @@ wheels = [
 
 [[package]]
 name = "dask"
-version = "2026.1.1"
+version = "2026.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -548,9 +548,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "toolz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1e/46/61ecde57bac647ca7eb6ffef8dcd90af6c1c649020874cd7fd8738003d62/dask-2026.1.1.tar.gz", hash = "sha256:12b1dbb0d6e92f287feb4076871600b2fba3a843d35ff214776ada5e9e7a1529", size = 10994732, upload-time = "2026-01-16T12:35:30.258Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/33/a7/6b3c7ac32b642fbbe0821111654e0bd8cfbe88f68560bcf23cc78ab35c71/dask-2026.8.0.tar.gz", hash = "sha256:8a94c37b5de6d869343340dc26c3c3acca7ec48a3abdabe00ea3abb1125884d5", size = 11561752, upload-time = "2026-08-24T19:21:25.906Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e9/4b/9cc373120658a2516aa5f6dcdde631c95d714b876d29ad8f8e009d793f3f/dask-2026.1.1-py3-none-any.whl", hash = "sha256:146b0ef2918eb581e06139183a88801b4a8c52d7c37758a91f8c3b75c54b0e15", size = 1481492, upload-time = "2026-01-16T12:35:22.602Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/3a/4fc99e788bcfa1b3b3f21abf57da45898d807d007e7f6fd1c7300904eb70/dask-2026.8.0-py3-none-any.whl", hash = "sha256:ccc0c83a189b0398602435189771d28dad7b5773b6089bb8dce14ae732dd782c", size = 1492182, upload-time = "2026-08-24T19:21:23.997Z" },
 ]
 
 [package.optional-dependencies]
@@ -648,8 +648,20 @@ wheels = [
 ]
 
 [[package]]
+name = "deprecated"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f7/9c/16649913bf14c73e0a9453782e148362ff2657067deff6aa9c7ebcddcc31/deprecated-3.0.0.tar.gz", hash = "sha256:16850204d3a1e6bb0acd06bff48d96e8b0a0d25d1c52f71705405a0f4894192d", size = 166912, upload-time = "2026-09-26T13:58:10.675Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/83/ae/676feae8e4644a6d7169951a97f61c56f416c73f67bf1761f2461d75cc81/deprecated-3.0.0-py3-none-any.whl", hash = "sha256:58204cf4a7f6270d547af5c278ee7a6bb56045a4b3d8441a1cd11660f41b7939", size = 21912, upload-time = "2026-09-26T13:58:09.458Z" },
+]
+
+[[package]]
 name = "distributed"
-version = "2026.1.1"
+version = "2026.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -665,12 +677,11 @@ dependencies = [
     { name = "tblib" },
     { name = "toolz" },
     { name = "tornado" },
-    { name = "urllib3" },
     { name = "zict" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/45/19/0c13efdffc55cb311594f66c1c8d36a3c4711e427c820155fb9c59138b5e/distributed-2026.1.1.tar.gz", hash = "sha256:3d2709a43912797df3c345af3bb333bbf1a386ec1e9e6a134e5f050521373dbd", size = 2102870, upload-time = "2026-01-16T12:34:58.258Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/18/1c98f0a36eccfcce109f054456f38767ac5d4b3fac124dcd5a35b1cd6167/distributed-2026.8.0.tar.gz", hash = "sha256:6f55008ecacf96ba945309fc12e680544764995e27bd63cc5e109afb97d7044d", size = 2465942, upload-time = "2026-08-24T19:36:00.554Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b9/dc/6d709bcf8fed7611d8a510aeed23b0436cf6db5b61e63c8eb8451eb0d4d8/distributed-2026.1.1-py3-none-any.whl", hash = "sha256:506759b1ed88e45e12ba65e2a429de9911862db55d27dd8bb293c6268430374e", size = 1008417, upload-time = "2026-01-16T12:34:55.535Z" },
+    { url = "https://files.pythonhosted.org/packages/28/d4/017e2d39d797eaa38a52b4459c8bea875d5e0ada335a62aafe98193041a6/distributed-2026.8.0-py3-none-any.whl", hash = "sha256:3bd8882861a2cf497453f28c6b61135fa8ef2bb1d6885ad3b9f27e887e9c0e01", size = 1008640, upload-time = "2026-08-24T19:35:58.622Z" },
 ]
 
 [[package]]
@@ -1912,7 +1923,7 @@ dependencies = [
     { name = "scipy" },
     { name = "spatialdata" },
     { name = "spatialdata-io" },
-    { name = "spatialdata-js-util" },
+    { name = "spatialdata-js-util", extra = ["write"] },
     { name = "werkzeug" },
 ]
 
@@ -2030,9 +2041,9 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'app'", specifier = ">=0.3.7,<0.4" },
     { name = "scanpy", extras = ["leiden"], specifier = "==1.11.4" },
     { name = "scipy", specifier = ">=1.11.3,<2" },
-    { name = "spatialdata", specifier = ">=0.7.2,<0.8" },
-    { name = "spatialdata-io", specifier = ">=0.6.0,<0.7" },
-    { name = "spatialdata-js-util", specifier = ">=0.1.0,<0.2" },
+    { name = "spatialdata", specifier = ">=0.8.0,<0.9" },
+    { name = "spatialdata-io", specifier = ">=0.7.1,<0.8" },
+    { name = "spatialdata-js-util", extras = ["write"], specifier = ">=0.1.0,<0.2" },
     { name = "tabulate", marker = "extra == 'app'", specifier = ">=0.9.0,<0.10" },
     { name = "werkzeug", specifier = ">=3.0.2,<4" },
 ]
@@ -2413,22 +2424,39 @@ wheels = [
 
 [[package]]
 name = "ome-zarr"
-version = "0.13.0"
+version = "0.18.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "dask" },
+    { name = "deprecated" },
     { name = "fsspec", extra = ["s3"] },
     { name = "numpy" },
+    { name = "ome-zarr-models" },
     { name = "rangehttpserver" },
     { name = "requests" },
     { name = "scikit-image" },
     { name = "toolz" },
     { name = "zarr" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b5/13/566a1a84b88aad11dea5d920b665eeea0df0885b312a4e1b706885ae50ae/ome_zarr-0.13.0.tar.gz", hash = "sha256:29c0ab52045c1b9d3037444dab691876591ec1db74c4a01e10cb0f0f4288a6e5", size = 71802, upload-time = "2026-02-06T14:00:57.619Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/59/98/f39cf0ec00ad64996ed2d2d6059d15a30c7b8f559cd2a216589885001a6a/ome_zarr-0.18.0.tar.gz", hash = "sha256:5cc0fc682b0c177fa32e54f4479b2436f79850a171e83ad4c6b08fec32e66cd0", size = 106039, upload-time = "2026-06-17T16:22:07.76Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/f8/9d2945ef9a64de619f52158b8bd27eecad971ff327139b8082796319f858/ome_zarr-0.13.0-py3-none-any.whl", hash = "sha256:895e9530bc81c487a6281644a16b2888ca8d992685ec116bb529a5386aa7d4a2", size = 42109, upload-time = "2026-02-06T14:00:56.646Z" },
+    { url = "https://files.pythonhosted.org/packages/20/be/2cf9389c9a7b80ceefae88bd713afa6a4b488cb47e524e7dadae44260efd/ome_zarr-0.18.0-py3-none-any.whl", hash = "sha256:aaf6ea6ac5790623290210efc566ad49f92da170b50b07e9113b6b06a0870cc5", size = 57947, upload-time = "2026-06-17T16:22:06.732Z" },
+]
+
+[[package]]
+name = "ome-zarr-models"
+version = "1.8.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pydantic" },
+    { name = "pydantic-zarr" },
+    { name = "zarr" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ce/dc/40862badc53b5f7188b88bbaa44f86e59b66f3d0ce42aa154990eaeaded2/ome_zarr_models-1.8.1.tar.gz", hash = "sha256:df51b4007151e46e2400460ada140bc6f793b4cfc50cdbfc932969350ec7137b", size = 60603, upload-time = "2026-09-02T10:25:43.946Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2d/70/9ab676f57fe2cb5457db80dd0cc4648b02cbe777d47f159e357391a1e00a/ome_zarr_models-1.8.1-py3-none-any.whl", hash = "sha256:8231b4f2ceae70992c0b3bbf0e7405016eb14998aaf1546d83c9ff87c0349638", size = 75524, upload-time = "2026-09-02T10:25:42.456Z" },
 ]
 
 [[package]]
@@ -2880,6 +2908,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/20/c5/dbbc27b814c71676593d1c3f718e6cd7d4f00652cefa24b75f7aa3efb25e/pydantic_settings-2.11.0.tar.gz", hash = "sha256:d0e87a1c7d33593beb7194adb8470fc426e95ba02af83a0f23474a04c9a08180", size = 188394, upload-time = "2025-09-24T14:19:11.764Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/83/d6/887a1ff844e64aa823fb4905978d882a633cfe295c32eacad582b78a7d8b/pydantic_settings-2.11.0-py3-none-any.whl", hash = "sha256:fe2cea3413b9530d10f3a5875adffb17ada5c1e1bab0b2885546d7310415207c", size = 48608, upload-time = "2025-09-24T14:19:10.015Z" },
+]
+
+[[package]]
+name = "pydantic-zarr"
+version = "0.10.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2f/57/aac9e500abe15719b7406d55871fc8787e7d0ebf83de5f98d44471139f70/pydantic_zarr-0.10.0.tar.gz", hash = "sha256:996b5b4225fb05757e7fff831ee7a75c61f54514a4c2493c7b79635bade7b415", size = 80374, upload-time = "2026-04-23T14:23:12.575Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/05/04af0ca9c5747c95591a549509ebbb0a986155015de59f1e4c984e3af9ab/pydantic_zarr-0.10.0-py3-none-any.whl", hash = "sha256:d15769dab43346b070051fdf6e83509d7f55259dd00c6d12be2400935117e230", size = 52809, upload-time = "2026-04-23T14:23:11.011Z" },
 ]
 
 [[package]]
@@ -3653,7 +3695,7 @@ wheels = [
 
 [[package]]
 name = "spatialdata"
-version = "0.7.2"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anndata" },
@@ -3685,14 +3727,14 @@ dependencies = [
     { name = "xarray-spatial" },
     { name = "zarr" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/81/b4/3cd97a7f473def2cf0fdb94d980efd5982274e8aedae944af144327b979c/spatialdata-0.7.2.tar.gz", hash = "sha256:17cfa4be157dd00d5dfc009038b2f0ba5ceaaad4fb15cf58cb8b53b7e28fc75e", size = 347975, upload-time = "2026-02-09T15:45:07.182Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b7/70/e575bc26b0410cf1349f5115b55d8d119edd6b2cf18e32ab84e222ee17e3/spatialdata-0.8.0.tar.gz", hash = "sha256:14143788a1de83302f8e83a29dd723b2d4e82f5b130d840409822fbf3a778e25", size = 369880, upload-time = "2026-07-02T20:42:20.597Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/eb/15962d23094016d13f057e9de97021f8cd6b16bc39f21bab8e55e3f0a63e/spatialdata-0.7.2-py3-none-any.whl", hash = "sha256:c41f985dee9c272b790dca0ab54130128af426591df61c8d12556d6aa86c70b5", size = 192281, upload-time = "2026-02-09T15:45:06.061Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/08/f5cac3e58d1bb092bfb6015104e6cce925bbe10a2cae44428c790d4e5d06/spatialdata-0.8.0-py3-none-any.whl", hash = "sha256:75139b0df0e27c4573141a8dbe6b3301b47231571505926ad6a633c046ec1010", size = 202596, upload-time = "2026-07-02T20:42:19.268Z" },
 ]
 
 [[package]]
 name = "spatialdata-io"
-version = "0.6.0"
+version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anndata" },
@@ -3711,9 +3753,9 @@ dependencies = [
     { name = "tifffile" },
     { name = "xmltodict" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8c/42/ba460f8f00137aa306ca14808fe8010cdc8a38bdb6da91320c8ada2fce89/spatialdata_io-0.6.0.tar.gz", hash = "sha256:082e3ac7765861503e16dba865cbe4fc97b9e7a8eb9554dfb3c7f555987bfa2b", size = 109941, upload-time = "2026-01-30T12:50:36.22Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/72/54/326c8d9a72ebc2b31e5f8c1311e11810c3e3b50d1fa1ae252931267bcb6e/spatialdata_io-0.7.1.tar.gz", hash = "sha256:4754365b7bc8e1db297ee0c63c41c88ce98062398234e8bcc5e6382754e9afbc", size = 120368, upload-time = "2026-07-02T20:45:25.918Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/47/61ecea47decdda234b93077fb9195ad6ae579f2a64c122c5c3b8c17c7515/spatialdata_io-0.6.0-py3-none-any.whl", hash = "sha256:8e1c69ac17fded7f9a787c802812bf50693aaf775f8918a4e82c3fbfe5075b42", size = 97783, upload-time = "2026-01-30T12:50:35.186Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/81/6a081a0db19b9bde838cbed6d46f3e3e540da6673d6c50469287a3719775/spatialdata_io-0.7.1-py3-none-any.whl", hash = "sha256:2627c09a9a59a62793696ee773a147e6425556190f700ff358f03227423b39f0", size = 102591, upload-time = "2026-07-02T20:45:24.547Z" },
 ]
 
 [[package]]
@@ -3731,6 +3773,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/71/fd/79b2aa7b579d3664fdd252c7b901d09f9bf31247be079fd41595fff8fea1/spatialdata_js_util-0.1.0.tar.gz", hash = "sha256:b384a97d89e8410d4d6720200d8df2ea47f3a4bbd1f89a7f4869994a3edba7f7", size = 301708, upload-time = "2026-10-26T18:13:32.621Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f5/79/1d739c4fc3ecde308c140f4d1c3f447d601440985706656111ef4567902c/spatialdata_js_util-0.1.0-py3-none-any.whl", hash = "sha256:8f249e6182637a8d0a8bd90f0f84d10e92911281a28d1196ffd274fb6521068f", size = 274861, upload-time = "2026-10-26T18:13:30.909Z" },
+]
+
+[package.optional-dependencies]
+write = [
+    { name = "anndata" },
+    { name = "dask", extra = ["array"] },
+    { name = "ome-zarr" },
+    { name = "scipy" },
+    { name = "spatialdata" },
 ]
 
 [[package]]
