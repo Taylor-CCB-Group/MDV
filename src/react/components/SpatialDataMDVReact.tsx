@@ -284,7 +284,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 ? [
                       g({
                           type: "dropdown",
-                          label: "Rendering backend (experimental)",
+                          label: "Rendering backend",
                           current_value: config.render_backend ?? "default",
                           values: [renderBackendOptions(), "name", "value"],
                           func(value) {
@@ -317,7 +317,7 @@ function renderBackendOptions() {
     return [
         { name: `Browser default (${current})`, value: "default" },
         { name: "WebGL", value: "webgl" },
-        { name: "WebGPU (experimental)", value: "webgpu" },
+        { name: "WebGPU", value: "webgpu" },
     ];
 }
 

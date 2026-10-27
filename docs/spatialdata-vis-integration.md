@@ -267,18 +267,36 @@ would replace that page-global backend without the cache.
 
 The pins in `package.json` are the enforcement; keep them at or above these.
 
-## WebGPU (experimental)
+## WebGPU
 
 SpatialData.js 0.12 renders images, labels, shapes and points on WebGPU when the canvas
-is given `deckProps.deviceProps = { type: "webgpu", adapters: [webgpuAdapter] }`. The
-SpatialData chart opts in per chart (`render_backend` setting, "Rendering backend
-(experimental)"). Charts left at the default follow the "Default rendering backend"
-browser setting in the Debug dialog (`src/lib/browserSettings.ts`, stored in
-localStorage, and it replaces the old `MDV_WEBGPU` flag, which it still reads), and
-`?webgpu` / `?webgpu=0` overrides that for one page load — see
-`src/react/spatialdata/deck_backend.ts`. It falls back to WebGL, with a notice on the
-canvas, when the browser has no WebGPU adapter. deck picks its device once, so changing
-the backend remounts the canvas.
+is given `deckProps.deviceProps = { type: "webgpu", adapters: [webgpuAdapter] }`.
+**WebGPU is the default** for SpatialData charts wherever the browser has it. A chart can
+choose its own backend (`render_backend`, "Rendering backend" in its settings); charts
+left at the default follow the "Default rendering backend" browser setting in the Debug
+dialog (`src/lib/browserSettings.ts`, stored in localStorage; it replaced the old
+`MDV_WEBGPU` flag, which it still reads), and `?webgpu` / `?webgpu=0` overrides that for
+one page load — see `src/react/spatialdata/deck_backend.ts`. deck picks its device once,
+so changing the backend remounts the canvas.
+
+**Falling back to WebGL.** A chart moves to WebGL for the rest of its session, with the
+reason in its status indicator, when:
+
+- the browser has no WebGPU, no adapter, or the adapter refuses the device deck will ask
+  for (probed once per page, `probeWebGPU`);
+- deck cannot create the device anyway (luma's device setup, or the canvas's WebGPU
+  context), or the device is lost later, e.g. a GPU process crash or reset;
+- it follows the default backend and a layer fails on WebGPU, or the canvas throws there.
+  The layer stays on, since it most likely works on WebGL; a failure on WebGL is reported
+  and the layer turned off as usual. A chart set to WebGPU explicitly stays on it, and the
+  failing layer is turned off and reported instead.
+
+Unattributed WebGPU validation errors are reported, not treated as a reason to fall back.
+Changing a chart's backend setting gives WebGPU another try.
+
+**Tested** (macOS, Apple silicon): Chrome (Dawn/Metal) end to end; Safari and Firefox by
+hand. Known issue: Firefox does not support the `float32-filterable` feature, which some
+WebGPU code paths need; there a failing layer moves default-following charts to WebGL.
 
 Host layers (MDV's scatter, grey-out, gate and selection overlays) go into the same Deck
 unadapted, so they must work on WebGPU themselves:

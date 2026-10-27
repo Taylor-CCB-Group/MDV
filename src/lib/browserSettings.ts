@@ -67,12 +67,14 @@ export const renderBackendSetting = defineChoiceSetting<RenderBackend>({
     label: "Default rendering backend",
     description:
         "Used by SpatialData charts whose own Rendering backend setting is left at the default. " +
-        "WebGPU is experimental. ?webgpu or ?webgpu=0 in the URL overrides this for one page load.",
+        "Where WebGPU is unavailable or fails, those charts use WebGL. On WebGPU, image " +
+        "contrast and brightness are not yet supported. ?webgpu or ?webgpu=0 in the URL " +
+        "overrides this for one page load.",
     choices: [
+        { value: "webgpu", label: "WebGPU" },
         { value: "webgl", label: "WebGL" },
-        { value: "webgpu", label: "WebGPU (experimental)" },
     ],
-    defaultValue: "webgl",
+    defaultValue: "webgpu",
     // the dev flag this setting replaced
     legacy: () => (readStorage("MDV_WEBGPU") === "1" ? "webgpu" : undefined),
 });

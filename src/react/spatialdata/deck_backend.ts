@@ -3,11 +3,16 @@ import type { CreateDeviceProps } from "@luma.gl/core";
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * Which deck.gl device backend the SpatialData chart renders with. WebGPU is
- * experimental: MDV's own scatter layers support it (see `MdvScatterplotLayer`), and
+ * Which deck.gl device backend the SpatialData chart renders with. WebGPU is the
+ * default: MDV's own scatter layers support it (see `MdvScatterplotLayer`), and
  * contours are drawn by @intraspatial/deck's `DensityLayer`. SpatialData.js drops Viv
  * image extensions on WebGPU, so the image channel contrast/brightness (tone)
  * controls from `VivContrastExtension` have no effect there.
+ *
+ * A chart falls back to WebGL, for the rest of its session, when WebGPU is unavailable
+ * (the probe below), when deck cannot create the device or loses it, and, if the chart
+ * follows the default, when a layer fails or the canvas throws on WebGPU (see
+ * `SpatialDataMDVReactComponent`). A chart set to WebGPU explicitly keeps it for those.
  *
  * The default is the "Default rendering backend" browser setting (Debug dialog; see
  * `renderBackendSetting` in `src/lib/browserSettings.ts`); a chart's own `render_backend`
@@ -31,12 +36,6 @@ function urlOverride(): DeckBackend | undefined {
 }
 
 const URL_OVERRIDE = urlOverride();
-if ((URL_OVERRIDE ?? renderBackendSetting.get()) === "webgpu") {
-    console.warn(
-        "[MDV] WebGPU is the default backend for SpatialData charts in this browser. This is " +
-            "experimental; change 'Default rendering backend' in the Debug dialog to turn it off.",
-    );
-}
 
 /** The backend for charts that leave it at the default. Observable (reads the browser setting). */
 export function defaultDeckBackend(): DeckBackend {

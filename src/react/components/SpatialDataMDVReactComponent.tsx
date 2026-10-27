@@ -31,6 +31,7 @@ import {
     useRenderStackAdapter,
 } from "@/react/spatialdata/render_stack_adapter";
 import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack_control";
+import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
@@ -375,14 +376,30 @@ const SpatialDataViewer = observer(
         // Layer errors (deck's `onError`) and WebGPU device errors (luma's) otherwise only
         // reach the console, and a device error repeats every frame. The tracker ties them
         // to render-stack entries, which the chart turns off and reports.
+        //
+        // On WebGPU, a chart following the default backend instead moves to WebGL with the
+        // layer still on: the failure is most likely WebGPU's, and a failure on WebGL is
+        // reported as usual. A chart set to WebGPU explicitly stays on it.
         const failureTracker = useMemo(
             () =>
                 new LayerFailureTracker({
                     entryIds: () => chart.config.renderStack?.entries.map((entry) => entry.id) ?? [],
-                    fail: (entryId, failure) => chart.recordLayerFailure(entryId, failure),
+                    fail: (entryId, failure) => {
+                        const onWebGPU = failure.source === "webgpu" || chart.activeBackend === "webgpu";
+                        if (onWebGPU && chart.config.render_backend == null) {
+                            // after the switch, the old WebGPU device's errors are stale
+                            if (chart.activeBackend !== "webgpu") return;
+                            const entry = chart.config.renderStack?.entries.find((item) => item.id === entryId);
+                            const name = entry ? renderStackEntryDisplayName(entry) : entryId;
+                            console.error(`[MDV] ${name} failed on WebGPU; using WebGL:`, failure.reason);
+                            fallBackToWebGL(`${name} failed on WebGPU: ${failure.reason}`);
+                            return;
+                        }
+                        chart.recordLayerFailure(entryId, failure);
+                    },
                     canvas: (message) => chart.recordCanvasError(message),
                 }),
-            [chart],
+            [chart, fallBackToWebGL],
         );
         useEffect(() => () => failureTracker.dispose(), [failureTracker]);
         // The backend whose device deck last finished creating. A failed device creation
@@ -634,10 +651,11 @@ const SpatialDataViewer = observer(
                             <ErrorBoundary
                                 // deck picks its device once, when created: remount on a backend change.
                                 key={deckDevice.backend}
-                                // On WebGPU, retry on WebGL before showing the error: WebGL is the
-                                // established path, and a failure there too is still reported.
+                                // On WebGPU, a chart following the default retries on WebGL before
+                                // showing the error; a failure there too is still reported.
                                 onError={(error) => {
                                     if (deckDevice.status !== "ready" || deckDevice.backend !== "webgpu") return;
+                                    if (config.render_backend != null) return;
                                     const message = error instanceof Error ? error.message : String(error);
                                     fallBackToWebGL(`the canvas failed on WebGPU: ${message}`);
                                 }}

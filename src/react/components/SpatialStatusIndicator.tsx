@@ -13,7 +13,7 @@ import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDa
 type ReadyDevice = Extract<DeckDevice, { status: "ready" }>;
 
 function backendLabel(device: ReadyDevice) {
-    if (device.backend === "webgpu") return "WebGPU (experimental)";
+    if (device.backend === "webgpu") return "WebGPU";
     if (device.fallbackReason) return `WebGL (WebGPU unavailable: ${device.fallbackReason})`;
     return "WebGL";
 }
