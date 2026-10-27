@@ -480,6 +480,9 @@ def load_config():
     with open(path) as handle:
         config = json.load(handle)
     for service in config["slots"]:
+        # Shares the compose file with the slots but is not a dev server.
+        if service == "mdv_public":
+            sys.exit("refusing to use mdv_public as a preview slot")
         if not re.fullmatch(r"[A-Za-z0-9._-]+", service):
             sys.exit("invalid service name in config: {!r}".format(service))
     return config
