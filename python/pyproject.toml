@@ -6,7 +6,7 @@ authors = [
     { name = "Martin Sergeant", email = "m.j.sergeant1@googlemail.com" },
     { name = "PeterTodd", email = "peter.todd@well.ox.ac.uk" },
 ]
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.12,<3.13"
 # Standalone PyPI long description (rendered on the package page, no repo context).
 # Dev-facing setup lives in README.md; release process in ../docs/RELEASING.md.
 readme = "PYPI_README.md"
@@ -14,7 +14,6 @@ license = "GPL-3.0-only"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
 # Slim core: project manipulation, viewing, MDVProject.serve(), and spatial.
@@ -43,6 +42,8 @@ dependencies = [
     "spatialdata>=0.7.2,<0.8",
     "spatialdata-io>=0.6.0,<0.7",
     "generate-tiff-offsets>=0.1.7,<0.2",
+    # its `write` extra needs spatialdata>=0.8, so core only for now
+    "spatialdata-js-util>=0.1.0,<0.2",
     # genomic operations
     "pysam==0.24.0",
     "pyranges>=0.1.4,<0.2",
@@ -121,7 +122,7 @@ dev = [
     "seaborn>=0.13.2,<0.14",
     "statsmodels>=0.14.2,<0.15",
     "spatialdata-plot>=0.2.12,<0.3",
-    "dummy-spatialdata>=0.1.9,<0.2 ; python_full_version >= '3.12' and python_full_version < '3.13'",
+    "dummy-spatialdata>=0.1.9,<0.2",
     # also a runtime dep of the chat feature (see `app` extra); kept here for `make lint`/`make format`
     "ruff>=0.3.7,<0.4",
 ]
