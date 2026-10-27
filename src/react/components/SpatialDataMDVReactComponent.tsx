@@ -388,9 +388,22 @@ const SpatialDataViewer = observer(
         // The backend whose device deck last finished creating. A failed device creation
         // reaches deck's `onError` (from luma's AnimationLoop), never the device's own.
         const initializedBackend = useRef<string | null>(null);
-        const onDeviceInitialized = useCallback((device: { type: string }) => {
-            initializedBackend.current = device.type;
-        }, []);
+        const currentDevice = useRef<unknown>(null);
+        const onDeviceInitialized = useCallback(
+            (device: { type: string; handle: unknown }) => {
+                initializedBackend.current = device.type;
+                currentDevice.current = device;
+                // deck only watches for a lost WebGL context; a lost GPUDevice (GPU process
+                // crash or reset) would leave the canvas dark. "destroyed" is our own teardown.
+                if (device.type !== "webgpu" || !(device.handle instanceof GPUDevice)) return;
+                device.handle.lost.then((info) => {
+                    if (info.reason === "destroyed" || currentDevice.current !== device) return;
+                    console.error("[MDV] WebGPU device lost:", info.message);
+                    fallBackToWebGL(`the WebGPU device was lost: ${info.message || "no reason given"}`);
+                });
+            },
+            [fallBackToWebGL],
+        );
         const onDeckError = useCallback(
             (error: Error, layer?: { id: string } | null) => {
                 if (!layer && deckDevice.status === "ready" && deckDevice.backend === "webgpu" && initializedBackend.current !== "webgpu") {
@@ -621,6 +634,13 @@ const SpatialDataViewer = observer(
                             <ErrorBoundary
                                 // deck picks its device once, when created: remount on a backend change.
                                 key={deckDevice.backend}
+                                // On WebGPU, retry on WebGL before showing the error: WebGL is the
+                                // established path, and a failure there too is still reported.
+                                onError={(error) => {
+                                    if (deckDevice.status !== "ready" || deckDevice.backend !== "webgpu") return;
+                                    const message = error instanceof Error ? error.message : String(error);
+                                    fallBackToWebGL(`the canvas failed on WebGPU: ${message}`);
+                                }}
                                 fallbackRender={(props) => <SpatialCanvasErrorFallback {...props} layers={layers} />}
                                 // Retry when the layer set actually changes, so a canvas
                                 // felled by one bad layer recovers once it is removed or
