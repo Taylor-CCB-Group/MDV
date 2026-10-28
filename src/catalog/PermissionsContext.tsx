@@ -38,6 +38,7 @@ interface PermissionsContextType {
     isLoading: boolean;
     error: string | null;
     isPublicPage: boolean;
+    isAdmin: boolean;
 }
 
 const PermissionsContext = createContext<PermissionsContextType | undefined>(
@@ -56,6 +57,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
     const [error, setError] = useState<string | null>(null);
     //! Public page is true by default
     const [isPublicPage, setIsPublicPage] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     const fetchPermissions = useCallback(async () => {
         setIsLoading(true);
@@ -71,6 +73,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
                 return;
             }
             const data = await response.json();
+            setIsAdmin(data.is_admin === true);
 
             if (data.project_manager) {
                 const project_manager = data.project_manager;
@@ -110,7 +113,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
         fetchPermissions();
     }, [fetchPermissions]);
 
-    const value = { permissions, isLoading, error, isPublicPage };
+    const value = { permissions, isLoading, error, isPublicPage, isAdmin };
 
     return (
         <PermissionsContext.Provider value={value}>

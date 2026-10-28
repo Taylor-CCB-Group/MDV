@@ -108,8 +108,15 @@ def register_routes(app, ENABLE_AUTH):
                     # Same keys, all set to False
                     pm_config = {k: False for k in pm_config_true.keys()}
 
+                # Same rule /rescan_projects enforces, so the UI can hide admin-only actions
+                is_admin = True
+                if ENABLE_AUTH:
+                    user = session.get('user')
+                    is_admin = bool(user and user.get("is_admin", False))
+
                 return jsonify({
-                    "project_manager": pm_config
+                    "project_manager": pm_config,
+                    "is_admin": is_admin,
                 })
             except Exception as e:
                 logger.exception(f"Error in /extension_config: {e}")

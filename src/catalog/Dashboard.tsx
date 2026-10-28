@@ -89,7 +89,7 @@ const Dashboard: React.FC = () => {
         exportProject,
         rescanProjects,
     } = useProjects();
-    const { permissions, isLoading: permissionsLoading, isPublicPage } = usePermissions();
+    const { permissions, isLoading: permissionsLoading, isPublicPage, isAdmin } = usePermissions();
 
     // Check if auth is enabled
     const authEnabled = useAuthEnabled();
@@ -394,8 +394,8 @@ const Dashboard: React.FC = () => {
                                     />
                                 </>
                             )}
-                            {/* Hide rescan projects on public page */}
-                            {!isPublicPage && (
+                            {/* Rescan is admin-only, and never shown on the public page */}
+                            {!isPublicPage && isAdmin && (
                                 <DashboardActionButton
                                     icon={<RefreshCwIcon />}
                                     label="Rescan Projects"
