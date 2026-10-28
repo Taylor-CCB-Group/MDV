@@ -19,6 +19,7 @@ import {
     adaptDotPlotConfig,
     getSplitFromDialog,
 } from "./dotPlotConfig";
+import { buildChartSvg } from "./dotPlotImage";
 import { DOT_PLOT_LEGEND_MARGIN, type LegendLayout, buildFractionLegendSpec } from "./dotPlotLegends";
 
 /** How many split values to show when a split column is first chosen: enough to compare two. */
@@ -201,6 +202,22 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
             dragHandle: ".legend-drag-handle",
             resizable: true,
         });
+    }
+
+    /** For the chart menu's "create svg/png image": the plot with its legends, black text. */
+    getImage(callback: (image: string | HTMLCanvasElement) => void, type: "png" | "svg") {
+        const style = this.contentDiv.style;
+        const textColor = style.getPropertyValue("--text_color");
+        style.setProperty("--text_color", "black");
+        const svg = buildChartSvg(this.contentDiv);
+        if (textColor) style.setProperty("--text_color", textColor);
+        else style.removeProperty("--text_color");
+
+        if (type === "svg") {
+            callback(new XMLSerializer().serializeToString(svg));
+            return;
+        }
+        this.getImageFromSVG(svg, (canvas) => callback(canvas));
     }
 
     getConfig() {

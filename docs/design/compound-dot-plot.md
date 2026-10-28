@@ -162,7 +162,8 @@ src/react/components/dotplot/
     dotPlotLayout.ts            visible rows, panel layout, dot radius
     dotPlotLegends.ts           legend band and fraction legend spec
     dotPlotPalettes.ts          palettes (as in DotPlot.js), colour binning
-src/tests/charts/dotPlot{Stats,StatsLegacyParity,Layout,Config,Legends}.test.ts
+    dotPlotImage.ts             SVG / PNG export: one standalone SVG of plot and legends
+src/tests/charts/dotPlot{Stats,StatsLegacyParity,Layout,Config,Legends,Image}.test.ts
 ```
 
 Plus one import in [registerChartModules.ts](../../src/charts/registerChartModules.ts)
@@ -328,7 +329,7 @@ The new chart should do everything the legacy `dot_plot` does, then more.
 Priority (agreed):
 
 1. **Most important:** X axis label options (done), click a dot to filter cells
-   (done), export as SVG / PNG.
+   (done), export as SVG / PNG (done).
 2. **Nice to have:** Rotate Y axis labels, title follows the y-axis column.
 3. **Undecided:** cluster rows / columns.
 4. **Not needed:** background filter. Split by covers what it was used for (the
@@ -354,8 +355,13 @@ it inherits from `SVGChart` and `BaseChart`):
   panels (see Performance).
 - **Cluster rows / cluster columns,** with dendrograms. Must cluster across all
   panels together so every panel keeps the same order.
-- **Export as SVG / PNG image** from the chart menu (`getImage`, which
-  `SVGChart` provides), including the legends.
+- **Export as SVG / PNG image (done)** from the chart menu ("create svg/png
+  image"). `getImage` builds one standalone SVG: every SVG in the chart (plot and
+  legends) nested at its place on screen, HTML legend titles as text, computed
+  styles inlined so CSS variables and Tailwind classes aren't needed. Text is
+  black on a transparent background, as the legacy export does. PNG reuses
+  `BaseChart.getImageFromSVG`. The legacy `SVGChart` export moves one `<g>` per
+  legend into the chart SVG, which would drop the fraction legend's HTML title.
 - **Rotate Y axis labels** (axis controls).
 - **Title follows the y-axis column** when it hasn't been renamed (legacy
   `setParams`).
