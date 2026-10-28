@@ -1,10 +1,14 @@
 import type { LayerChannelConfig } from "@spatialdata/avivatorish";
 import type { SpatialData, SpatialElement } from "@spatialdata/core";
 import {
+    findRenderStackEntry,
+    migrateRenderStack,
     RENDER_STACK_SCHEMA_VERSION,
     type RenderStack,
     type RenderStackEntry,
     type RenderStackSpatialElementType,
+    type RenderStackV1,
+    walkRenderStackEntries,
 } from "@spatialdata/layers";
 
 import { getRandomString } from "@/utilities/Utilities";
@@ -141,7 +145,9 @@ export function insertDefaultImageLayer(
     coordinateSystem: string,
     imageProps?: DefaultImageLayerProps,
 ): boolean {
-    const hasImage = stack.entries.some((entry) => entry.kind === "spatial" && entry.source.elementType === "image");
+    const hasImage = Array.from(walkRenderStackEntries(stack.entries)).some(
+        (entry) => entry.kind === "spatial" && entry.source.elementType === "image",
+    );
     if (hasImage) return false;
 
     const imageEntry = firstImageSpatialEntry(spatialData, coordinateSystem, imageProps);
@@ -157,17 +163,48 @@ export function insertDefaultImageLayer(
 }
 
 /**
- * Ensure required host overlay entries exist. Never injects spatial layers —
- * persisted stacks with zero spatial layers stay as saved.
+ * A saved stack as the current schema. Saved projects may hold a v1 stack, which
+ * `RenderStack` can't describe, so this is the first thing to touch one on load.
+ * Notices are child ids a v1 group named that the migration had to drop.
+ */
+export function migrateSavedRenderStack(saved: RenderStackV1 | RenderStack): RenderStack {
+    const { stack, notices } = migrateRenderStack(saved);
+    for (const notice of notices) {
+        console.warn(
+            `Render stack migration dropped '${notice.childId}' from group '${notice.groupId}' (${notice.reason})`,
+        );
+    }
+    return stack;
+}
+
+/** `migrateSavedRenderStack` for a stack that is already observable: patched in place. */
+function migrateRenderStackInPlace(stack: RenderStack): boolean {
+    const migrated = migrateSavedRenderStack(stack);
+    if (migrated === stack) return false;
+    stack.schemaVersion = migrated.schemaVersion;
+    stack.entries.splice(0, stack.entries.length, ...migrated.entries);
+    return true;
+}
+
+/**
+ * Ensure required host overlay entries exist, at any depth. A missing one goes at the
+ * top level, just above the entry that holds the overlay it follows in drawing order.
+ * Never injects spatial layers — persisted stacks with zero spatial layers stay as saved.
  */
 export function normalizeRenderStack(stack: RenderStack | undefined): RenderStack {
     if (!stack?.entries?.length) {
         return createHostOnlyRenderStack();
     }
+    const migrated = migrateSavedRenderStack(stack);
 
     const entriesById = new Map<string, RenderStackEntry>();
-    for (const entry of stack.entries) {
-        entriesById.set(entry.id, entry);
+    // The top-level entry each entry sits under (itself, at the top level).
+    const topLevelOf = new Map<string, string>();
+    for (const top of migrated.entries) {
+        for (const entry of walkRenderStackEntries([top])) {
+            entriesById.set(entry.id, entry);
+            topLevelOf.set(entry.id, top.id);
+        }
     }
     const added = new Set<string>();
     for (const deckId of DECK_OVERLAY_IDS) {
@@ -190,19 +227,24 @@ export function normalizeRenderStack(stack: RenderStack | undefined): RenderStac
 
     // A missing overlay goes just above the overlay it follows in drawing order, so one
     // added to MDV later (e.g. density, above the data points) is not drawn over the rest.
-    const order = stack.entries.map((entry) => entry.id);
+    // An overlay inside a group stands for the group's top-level position.
+    const order = migrated.entries.map((entry) => entry.id);
+    const positionOf = (deckId: (typeof DECK_OVERLAY_IDS)[number]) => {
+        const id = deckHostLayerId(deckId);
+        return order.indexOf(topLevelOf.get(id) ?? id);
+    };
     DECK_OVERLAY_IDS.forEach((deckId, index) => {
         const id = deckHostLayerId(deckId);
-        if (order.includes(id)) return;
+        if (!added.has(id)) return;
         const below = DECK_OVERLAY_IDS.slice(0, index)
-            .map((previous) => order.indexOf(deckHostLayerId(previous)))
+            .map(positionOf)
             .filter((position) => position >= 0);
         if (below.length > 0) {
             order.splice(Math.max(...below) + 1, 0, id);
             return;
         }
         const above = DECK_OVERLAY_IDS.slice(index + 1)
-            .map((next) => order.indexOf(deckHostLayerId(next)))
+            .map(positionOf)
             .filter((position) => position >= 0);
         if (above.length > 0) order.splice(Math.min(...above), 0, id);
         else order.push(id);
@@ -217,11 +259,12 @@ export function normalizeRenderStack(stack: RenderStack | undefined): RenderStac
 }
 
 export function mergeHostOverlayEntriesInPlace(stack: RenderStack): boolean {
+    const migrated = migrateRenderStackInPlace(stack);
     const normalized = normalizeRenderStack(stack);
     const beforeIds = stack.entries.map((entry) => entry.id).join("\0");
     const afterIds = normalized.entries.map((entry) => entry.id).join("\0");
     if (beforeIds === afterIds) {
-        return false;
+        return migrated;
     }
 
     const existingById = new Map(stack.entries.map((entry) => [entry.id, entry]));
@@ -240,10 +283,10 @@ export function mergeHostOverlayEntriesInPlace(stack: RenderStack): boolean {
 export function syncOverlayFollowerVisibility(stack: RenderStack): void {
     for (const leaderId of DECK_OVERLAY_IDS) {
         const followers = DECK_OVERLAY_VISIBILITY_FOLLOWERS[leaderId];
-        const leader = stack.entries.find((entry) => entry.id === deckHostLayerId(leaderId));
+        const leader = findRenderStackEntry(stack, deckHostLayerId(leaderId));
         if (!followers || !leader) continue;
         for (const followerId of followers) {
-            const follower = stack.entries.find((entry) => entry.id === deckHostLayerId(followerId));
+            const follower = findRenderStackEntry(stack, deckHostLayerId(followerId));
             if (follower) follower.visible = leader.visible;
         }
     }

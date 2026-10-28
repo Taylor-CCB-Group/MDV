@@ -1,5 +1,6 @@
 import type { PickingInfo } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
+import { IsolatedGroupLayer } from "@spatialdata/layers";
 import { describe, expect, it } from "vitest";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { combineTooltipContent, getCombinedScatterTooltip } from "@/lib/scatterTooltip";
@@ -54,5 +55,27 @@ describe("scatterTooltip", () => {
         expect(combineTooltipContent("A < B", { text: "C > D" })).toMatchObject({
             html: 'A &lt; B<div style="border-top: 1px solid rgba(255,255,255,0.35); margin: 6px 0;"></div>C &gt; D',
         });
+    });
+
+    it("finds the SpatialData chart's scatter inside a layer group", () => {
+        const group = new IsolatedGroupLayer({
+            id: "group:dev-scatter-#detail#",
+            layers: [layer("deck:scatter-#detail#")],
+        });
+        // As the group draws it: under an id scoped to the group.
+        const member = group.renderLayers().flat()[0];
+        if (!(member instanceof ScatterplotLayer)) throw new Error("expected the scatter member");
+        // As deck reports it once the pick has bubbled up to the group.
+        const info = group.getPickingInfo({
+            info: { ...pickingInfo("group:dev-scatter-#detail#", 4, 4), layer: group, sourceLayer: member },
+            mode: "hover",
+            sourceLayer: member,
+        });
+
+        expect(
+            getCombinedScatterTooltip(info, {
+                getPointTooltip: (picked) => (picked ? `row ${picked.index}` : null),
+            }),
+        ).toEqual({ html: "row 4" });
     });
 });

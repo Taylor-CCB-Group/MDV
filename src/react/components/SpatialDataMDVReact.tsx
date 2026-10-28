@@ -1,4 +1,4 @@
-import type { RenderStack } from "@spatialdata/layers";
+import { findRenderStackEntry, type RenderStack, type RenderStackGroupBlendMode } from "@spatialdata/layers";
 import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
@@ -8,8 +8,14 @@ import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registr
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import {
+    type DevScatterGroupProps,
+    getDevScatterGroup,
+    setDevScatterGroup,
+} from "@/react/spatialdata/render_stack_control";
+import {
     createHostOnlyRenderStack,
     type DefaultImageLayerProps,
+    migrateSavedRenderStack,
     syncOverlayFollowerVisibility,
 } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
@@ -54,6 +60,7 @@ function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataS
     if (config.renderStack === undefined) {
         config.renderStack = createHostOnlyRenderStack();
     } else {
+        config.renderStack = migrateSavedRenderStack(config.renderStack);
         syncOverlayFollowerVisibility(config.renderStack);
     }
     // Must exist before makeAutoObservable(config) for later changes to be observed, and
@@ -158,7 +165,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             return;
         }
         this.layerFailures.set(entryId, { ...failure, count: 1, dismissed: false });
-        const entry = this.config.renderStack?.entries.find((item) => item.id === entryId);
+        const entry = this.config.renderStack && findRenderStackEntry(this.config.renderStack, entryId);
         if (entry?.visible) {
             entry.visible = false;
             this.bumpRenderStackGeneration();
@@ -195,14 +202,10 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
 
     /** Failed layers by display name, and a one-line summary of the chart's problems. */
     get renderStatus() {
-        const entries = this.config.renderStack?.entries ?? [];
+        const stack = this.config.renderStack;
         const failures = [...this.layerFailures].map(([entryId, failure]) => {
-            const entry = entries.find((item) => item.id === entryId);
-            return {
-                entryId,
-                failure,
-                name: entry ? renderStackEntryDisplayName(entry, this.config.renderStack) : entryId,
-            };
+            const entry = stack && findRenderStackEntry(stack, entryId);
+            return { entryId, failure, name: entry ? renderStackEntryDisplayName(entry, stack) : entryId };
         });
         const errorCount = failures.filter((item) => !item.failure.dismissed).length + this.canvasErrors.length;
         const summary = [
@@ -386,7 +389,73 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 label: "Category Filters",
                 current_value: filters,
             }),
+            ...(import.meta.env.DEV ? [this.devScatterGroupSettings()] : []),
         ];
+    }
+
+    /** Dev-only control for layer groups, until the layer dialog can make them. */
+    devScatterGroupSettings() {
+        const stack = this.config.renderStack;
+        const group = stack && getDevScatterGroup(stack);
+        const current: DevScatterGroupProps = {
+            opacity: group?.props.opacity ?? 1,
+            blendMode: group?.props.blendMode ?? "pass-through",
+            isolate: group?.props.isolate ?? true,
+        };
+        // Any group control turns the group on: on its own it would have nothing to act on.
+        const apply = (enabled: boolean, patch: Partial<DevScatterGroupProps> = {}) => {
+            if (!this.config.renderStack) return;
+            Object.assign(current, patch);
+            const structural = setDevScatterGroup(this.config.renderStack, enabled ? { ...current } : null);
+            if (structural) this.bumpRenderStackGeneration();
+            else this.bumpRenderStackPropsGeneration();
+        };
+        const blendModes: RenderStackGroupBlendMode[] = [
+            "pass-through",
+            "normal",
+            "additive",
+            "multiply",
+            "screen",
+            "max",
+            "min",
+        ];
+        return g({
+            type: "folder",
+            label: "Layer group (dev)",
+            current_value: [
+                g({
+                    type: "check",
+                    label: "group grey scatter + scatter",
+                    current_value: !!group,
+                    func: (value) => apply(value),
+                }),
+                g({
+                    type: "check",
+                    label: "isolate",
+                    current_value: current.isolate,
+                    func: (value) => apply(true, { isolate: value }),
+                }),
+                g({
+                    type: "slider",
+                    label: "group opacity",
+                    current_value: current.opacity,
+                    min: 0,
+                    max: 1,
+                    continuous: true,
+                    func: (value) => apply(true, { opacity: value }),
+                }),
+                g({
+                    type: "dropdown",
+                    label: "group blend mode",
+                    current_value: current.blendMode,
+                    values: [blendModes.map((mode) => ({ name: mode, value: mode })), "name", "value"],
+                    func: (value) => {
+                        const blendMode = blendModes.find((mode) => mode === value);
+                        if (blendMode) apply(true, { blendMode });
+                    },
+                }),
+            ],
+        });
     }
 
     getConfig() {

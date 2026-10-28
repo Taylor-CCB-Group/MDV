@@ -1,5 +1,5 @@
 import type { SpatialData } from "@spatialdata/core";
-import type { RenderStack } from "@spatialdata/layers";
+import { type RenderStack, walkRenderStackEntries } from "@spatialdata/layers";
 import { useEffect, useState } from "react";
 import {
     assessRasterLevels,
@@ -20,7 +20,7 @@ const NO_ISSUES: ElementIssues[] = [];
  */
 export function rasterEntriesKey(stack: RenderStack | undefined) {
     const keys = new Set<string>();
-    for (const entry of stack?.entries ?? []) {
+    for (const entry of walkRenderStackEntries(stack?.entries ?? [])) {
         if (entry.kind !== "spatial") continue;
         const { elementType, elementKey } = entry.source;
         if (elementType === "image" || elementType === "labels") keys.add(`${elementType}:${elementKey}`);

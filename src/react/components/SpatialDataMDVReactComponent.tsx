@@ -1,6 +1,7 @@
 import { ColorPaletteExtension } from "@hms-dbmi/viv";
 import { Button } from "@mui/material";
 import { viewStateFromBounds } from "@spatialdata/core";
+import { findRenderStackEntry, getRenderStackEntryIds } from "@spatialdata/layers";
 import type { RenderStackLayerInputs } from "@spatialdata/vis";
 import {
     resolvePickedEntryId,
@@ -35,6 +36,7 @@ import {
     createMdvHostLayerResolver,
     type MdvDeckOverlayLayers,
     useRenderStackAdapter,
+    useRenderStackStructure,
 } from "@/react/spatialdata/render_stack_adapter";
 import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack_control";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
@@ -106,6 +108,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const stack = config.renderStack;
     void chart.renderStackGeneration;
+    const stackStructure = useRenderStackStructure(stack);
 
     const deckRef = useRef<DeckGLRef | null>(null);
     useRebindDeckEvents(deckRef);
@@ -115,7 +118,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     const vivImagePropsResolver = useCallback<VivImagePropsResolver>(
         (ctx: VivImageLayerContext) => {
             if (!stack) return undefined;
-            const entry = stack.entries.find((item) => item.id === ctx.layerId);
+            const entry = findRenderStackEntry(stack, ctx.layerId);
             if (!entry || entry.kind !== "spatial") return undefined;
             const saved = entry.props.vivLayerProps;
             if (!saved || typeof saved !== "object") return undefined;
@@ -213,7 +216,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
                 onFeatureHoverEnd();
                 return;
             }
-            // Inside an isolated group `info.layer` names the group; this names the member.
+            // Looks through isolated groups to the member, and drops the view token.
             const entryId = resolvePickedEntryId(info);
             const event = renderer.getFeaturePickEvent(entryId, {
                 index: info.index,
@@ -252,6 +255,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
             onViewStateChange={onSpatialViewStateChange}
             layers={renderer.deckLayers}
             layerOrder={renderer.layerOrder}
+            renderStack={stackStructure}
             vivLayerProps={renderer.vivLayerProps.length > 0 ? renderer.vivLayerProps : undefined}
             // A prop, not part of `deckProps`: `SpatialViewer` spreads `deckProps` and then
             // sets `onHover` from this prop, so one passed inside `deckProps` is overwritten
@@ -385,13 +389,14 @@ const SpatialDataViewer = observer(
         const failureTracker = useMemo(
             () =>
                 new LayerFailureTracker({
-                    entryIds: () => chart.config.renderStack?.entries.map((entry) => entry.id) ?? [],
+                    entryIds: () => (chart.config.renderStack ? getRenderStackEntryIds(chart.config.renderStack) : []),
                     fail: (entryId, failure) => {
                         const onWebGPU = failure.source === "webgpu" || chart.activeBackend === "webgpu";
                         if (onWebGPU && chart.config.render_backend == null) {
                             // after the switch, the old WebGPU device's errors are stale
                             if (chart.activeBackend !== "webgpu") return;
-                            const entry = chart.config.renderStack?.entries.find((item) => item.id === entryId);
+                            const entry =
+                                chart.config.renderStack && findRenderStackEntry(chart.config.renderStack, entryId);
                             const name = entry ? renderStackEntryDisplayName(entry, chart.config.renderStack) : entryId;
                             console.error(`[MDV] ${name} failed on WebGPU; using WebGL:`, failure.reason);
                             fallBackToWebGL(`${name} failed on WebGPU: ${failure.reason}`);

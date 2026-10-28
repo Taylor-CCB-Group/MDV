@@ -1,21 +1,13 @@
 import type { Layer } from "@deck.gl/core";
 import type { SpatialData } from "@spatialdata/core";
-import { RENDER_STACK_SCHEMA_VERSION, type RenderStack, type RenderStackEntry } from "@spatialdata/layers";
+import {
+    getRenderStackEntryIds,
+    RENDER_STACK_SCHEMA_VERSION,
+    type RenderStack,
+    type RenderStackEntry,
+    type RenderStackV1,
+} from "@spatialdata/layers";
 import { describe, expect, test, vi } from "vitest";
-
-vi.mock("@spatialdata/vis", () => ({
-    layerConfig: (type: string, base: Record<string, unknown>, props: Record<string, unknown> = {}) => ({
-        ...props,
-        ...base,
-        type,
-    }),
-    renderStackToLayerInputs: (stack: RenderStack) => ({
-        layers: {},
-        layerOrder: stack.entries.filter((entry) => entry.kind === "spatial").map((entry) => entry.id),
-    }),
-    renderStackOrder: (stack: RenderStack | undefined, fallback: string[]) =>
-        stack ? stack.entries.filter((entry) => entry.kind === "spatial").map((entry) => entry.id) : fallback,
-}));
 
 vi.mock("@/react/context", () => ({
     useChart: vi.fn(),
@@ -25,21 +17,24 @@ vi.mock("@/react/hooks", () => ({
     useConfig: vi.fn(),
 }));
 
-import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
+import { DECK_OVERLAY_IDS, deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 import {
     createRenderStackLayerInputsCache,
     resolveCachedHostDeckLayers,
     syncRenderStackLayerInputs,
 } from "@/react/spatialdata/render_stack_adapter";
 import {
+    DEV_SCATTER_GROUP_ID,
     patchRenderStackEntry,
     patchRenderStackEntryPropsInPlace,
     removeRenderStackEntry,
     seedRenderStackFromSpatialData,
+    setDevScatterGroup,
 } from "@/react/spatialdata/render_stack_control";
 import {
     createHostOnlyRenderStack,
     mergeHostOverlayEntriesInPlace,
+    migrateSavedRenderStack,
     normalizeRenderStack,
     syncOverlayFollowerVisibility,
 } from "@/react/spatialdata/render_stack_defaults";
@@ -529,5 +524,104 @@ describe("render stack defaults", () => {
         expect(normalized.entries[0]).toBe(savedImage);
         expect(normalized.entries.some((entry) => entry.kind === "host")).toBe(true);
         expect(normalized.entries.filter((entry) => entry.kind === "spatial").length).toBe(1);
+    });
+});
+
+describe("render stack groups", () => {
+    const hostIds = DECK_OVERLAY_IDS.map(deckHostLayerId);
+
+    function groupedStack(groupProps: Record<string, unknown> = {}, visible = true): RenderStack {
+        return renderStack([
+            spatialEntry({ id: "image-a", elementKey: "imageA" }),
+            {
+                kind: "group",
+                id: "points",
+                visible,
+                props: groupProps,
+                children: [
+                    hostEntry(deckHostLayerId("grey_scatter")),
+                    hostEntry(deckHostLayerId("scatter")),
+                    spatialEntry({ id: "shapes-a", elementKey: "cells", elementType: "shapes" }),
+                ],
+            },
+            ...hostIds.slice(2).map((id) => hostEntry(id)),
+        ]);
+    }
+
+    test("a saved v1 stack loads unchanged, at v2", () => {
+        // MDV's default stack as saved before v2: an image, then the host overlays.
+        const v1: RenderStackV1 = {
+            schemaVersion: 1,
+            entries: [
+                spatialEntry({ id: "image-a", elementKey: "imageA", props: { vivLayerProps: { contrast: 2 } } }),
+                ...hostIds.map((id) => hostEntry(id, id !== deckHostLayerId("grey_scatter"))),
+            ],
+        };
+        const before = structuredClone(v1);
+
+        const loaded = migrateSavedRenderStack(v1);
+
+        expect(loaded).toEqual({ ...before, schemaVersion: 2 });
+        expect(normalizeRenderStack(loaded)).toEqual(loaded);
+    });
+
+    test("normalizing finds host entries inside groups, and migrates a v1 group", () => {
+        const stack = groupedStack();
+        expect(getRenderStackEntryIds(normalizeRenderStack(stack))).toEqual(getRenderStackEntryIds(stack));
+
+        const v1 = {
+            schemaVersion: 1,
+            entries: [
+                hostEntry(deckHostLayerId("grey_scatter")),
+                { kind: "group", id: "g", visible: true, props: {}, children: [deckHostLayerId("grey_scatter")] },
+            ],
+        } satisfies RenderStackV1;
+        const live = v1 as unknown as RenderStack;
+        expect(mergeHostOverlayEntriesInPlace(live)).toBe(true);
+        expect(live.schemaVersion).toBe(2);
+        expect(getRenderStackEntryIds(live)).toEqual(["g", ...hostIds]);
+    });
+
+    test("a missing overlay goes just above the group holding the overlay it follows", () => {
+        const stack = groupedStack();
+        const group = stack.entries[1];
+        stack.entries.splice(2, 1); // drop deck:density, which sits right after the group
+        expect(stack.entries.map((entry) => entry.id)).not.toContain(deckHostLayerId("density"));
+
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        expect(stack.entries.map((entry) => entry.id)).toEqual([
+            "image-a",
+            "points",
+            deckHostLayerId("density"),
+            ...hostIds.slice(3),
+        ]);
+        expect(stack.entries[1]).toBe(group);
+    });
+
+    test("syncs spatial entries and resolves host entries at any depth, inheriting visibility", () => {
+        const visible = syncRenderStackLayerInputs(groupedStack(), createRenderStackLayerInputsCache());
+        expect(Object.keys(visible.layers)).toEqual(["image-a", "shapes-a"]);
+        expect(visible.layerOrder).toEqual(["image-a", ...hostIds.slice(0, 2), "shapes-a", ...hostIds.slice(2)]);
+
+        const hidden = groupedStack({}, false);
+        const inputs = syncRenderStackLayerInputs(hidden, createRenderStackLayerInputsCache());
+        expect(inputs.layers["shapes-a"]?.visible).toBe(false);
+
+        const resolver = (entry: HostEntry) => fakeDeckLayer(entry.id).sourceLayer;
+        expect(resolveCachedHostDeckLayers(groupedStack(), resolver).map((layer) => layer.id)).toEqual(hostIds);
+        expect(resolveCachedHostDeckLayers(hidden, resolver).map((layer) => layer.id)).toEqual(hostIds.slice(2));
+    });
+
+    test("the dev scatter group wraps both scatter entries in place, and unwraps them", () => {
+        const stack = createHostOnlyRenderStack();
+        const props = { opacity: 0.5, blendMode: "pass-through" as const, isolate: true };
+
+        expect(setDevScatterGroup(stack, props)).toBe(true);
+        expect(getRenderStackEntryIds(stack)).toEqual([DEV_SCATTER_GROUP_ID, ...hostIds]);
+        expect(setDevScatterGroup(stack, { ...props, blendMode: "multiply" })).toBe(false);
+        expect(stack.entries[0]).toMatchObject({ props: { blendMode: "multiply" } });
+
+        expect(setDevScatterGroup(stack, null)).toBe(true);
+        expect(getRenderStackEntryIds(stack)).toEqual(hostIds);
     });
 });

@@ -17,7 +17,7 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import type { RenderStackSpatialElementType } from "@spatialdata/layers";
+import { findRenderStackEntry, type RenderStackSpatialElementType } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { observer } from "mobx-react-lite";
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -418,11 +418,10 @@ const OverlayGroupRow = observer(function OverlayGroupRow({
     const config = useConfig<SpatialDataMdvReactConfig>();
     const setEntriesVisible = useSetEntriesVisible();
     const [collapsed, setCollapsed] = useState(true);
-    const entryIds = deckIds
-        .map(deckHostLayerId)
-        .filter((id) => config.renderStack?.entries.some((entry) => entry.id === id));
+    const stack = config.renderStack;
+    const entryIds = deckIds.map(deckHostLayerId).filter((id) => stack && findRenderStackEntry(stack, id));
     if (entryIds.length === 0) return null;
-    const shown = entryIds.filter((id) => config.renderStack?.entries.find((entry) => entry.id === id)?.visible);
+    const shown = entryIds.filter((id) => stack && findRenderStackEntry(stack, id)?.visible);
 
     return (
         <>

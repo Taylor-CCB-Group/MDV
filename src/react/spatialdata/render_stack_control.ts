@@ -1,10 +1,13 @@
 import type { LayerChannelConfig } from "@spatialdata/avivatorish";
 import type { SpatialData } from "@spatialdata/core";
-import type {
-    LabelsChannelProps,
-    RenderStack,
-    RenderStackEntry,
-    RenderStackSpatialElementType,
+import {
+    findRenderStackEntry,
+    type LabelsChannelProps,
+    type RenderStack,
+    type RenderStackEntry,
+    type RenderStackGroupBlendMode,
+    type RenderStackGroupEntry,
+    type RenderStackSpatialElementType,
 } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { isObservable, runInAction, set } from "mobx";
@@ -114,7 +117,7 @@ export function patchRenderStackEntry(
         props?: Record<string, unknown>;
     },
 ): void {
-    const entry = stack.entries.find((item) => item.id === entryId);
+    const entry = findRenderStackEntry(stack, entryId);
     if (!entry) return;
     if (patch.visible !== undefined) {
         entry.visible = patch.visible;
@@ -223,6 +226,52 @@ export function seedRenderStackFromSpatialData(
     });
 }
 
+/** Dev-only group of the two scatter layers, until the layer dialog can make groups. */
+export const DEV_SCATTER_GROUP_ID = "group:dev-scatter";
+const DEV_SCATTER_GROUP_MEMBERS = [deckHostLayerId("grey_scatter"), deckHostLayerId("scatter")];
+
+export type DevScatterGroupProps = {
+    opacity: number;
+    blendMode: RenderStackGroupBlendMode;
+    isolate: boolean;
+};
+
+export function getDevScatterGroup(stack: RenderStack): RenderStackGroupEntry | undefined {
+    const entry = stack.entries.find((item) => item.id === DEV_SCATTER_GROUP_ID);
+    return entry?.kind === "group" ? entry : undefined;
+}
+
+/**
+ * Dev-only: put `deck:grey_scatter` and `deck:scatter` in one top-level group, at the
+ * lower one's place, or take them back out (`props` null). Only moves top-level
+ * entries. Returns whether the stack's structure changed; a props-only edit to an
+ * existing group is patched in place and returns false.
+ */
+export function setDevScatterGroup(stack: RenderStack, props: DevScatterGroupProps | null): boolean {
+    const group = getDevScatterGroup(stack);
+    if (!props) {
+        if (!group) return false;
+        stack.entries.splice(stack.entries.indexOf(group), 1, ...group.children);
+        return true;
+    }
+    if (group) {
+        Object.assign(group.props, props);
+        return false;
+    }
+    const members = stack.entries.filter((entry) => DEV_SCATTER_GROUP_MEMBERS.includes(entry.id));
+    if (members.length === 0) return false;
+    const at = stack.entries.indexOf(members[0]);
+    for (const member of members) stack.entries.splice(stack.entries.indexOf(member), 1);
+    stack.entries.splice(at, 0, {
+        kind: "group",
+        id: DEV_SCATTER_GROUP_ID,
+        visible: true,
+        props: { ...props },
+        children: members,
+    });
+    return true;
+}
+
 export function isRemovableRenderStackEntry(entry: RenderStackEntry): boolean {
     if (entry.kind === "host") {
         return deckIdFromHostLayerId(entry.source.hostLayerId) !== null;
@@ -262,7 +311,7 @@ export function useRenderStackMutation() {
 export function useRenderStackEntry(entryId: string) {
     const config = useConfig<SpatialDataMdvReactConfig>();
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
-    const entry = config.renderStack?.entries.find((item) => item.id === entryId);
+    const entry = config.renderStack && findRenderStackEntry(config.renderStack, entryId);
     touchRenderStackEntry(entry);
 
     const patchEntry = useCallback(

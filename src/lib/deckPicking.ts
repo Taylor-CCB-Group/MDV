@@ -1,4 +1,5 @@
 import type { PickingInfo } from "@deck.gl/core";
+import { getIsolatedGroupMemberId } from "@spatialdata/layers";
 
 type DeckPicker = {
     pickMultipleObjects: (options: {
@@ -99,8 +100,13 @@ export function getPickingInfoSourceLayerId(info: PickingInfo | null | undefined
     return info?.sourceLayer?.id ?? "";
 }
 
+/**
+ * Whether the pick came from a layer the predicate accepts: the picked layer, the
+ * sublayer under it, or, inside an isolated layer group, the group member.
+ */
 export function pickingInfoMatchesLayer(info: PickingInfo | null | undefined, predicate: (layerId: string) => boolean) {
     const layerId = getPickingInfoLayerId(info);
     const sourceLayerId = getPickingInfoSourceLayerId(info);
-    return predicate(layerId) || predicate(sourceLayerId);
+    const memberId = info ? (getIsolatedGroupMemberId(info) ?? "") : "";
+    return predicate(layerId) || predicate(sourceLayerId) || (memberId !== "" && predicate(memberId));
 }

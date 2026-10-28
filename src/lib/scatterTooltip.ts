@@ -58,7 +58,11 @@ function getScatterPickingInfo(info: PickableInfo) {
     return findPickedInfo(info, (pickedInfo) =>
         pickingInfoMatchesLayer(
             pickedInfo,
-            (layerId) => layerId.includes("scatter_") || layerId.includes("spatial.scatterplot"),
+            (layerId) =>
+                layerId.includes("scatter_") ||
+                layerId.includes("spatial.scatterplot") ||
+                // the SpatialData chart's scatter entry, as a member of a layer group
+                layerId.startsWith("deck:scatter"),
         ),
     );
 }

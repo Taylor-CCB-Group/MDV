@@ -1,4 +1,4 @@
-import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
+import { type RenderStack, type RenderStackEntry, walkRenderStackEntries } from "@spatialdata/layers";
 
 import { DECK_OVERLAY_LABELS, deckIdFromHostLayerId } from "./host_overlay_ids";
 
@@ -58,7 +58,9 @@ export function renderStackEntryDisplayName(entry: RenderStackEntry, stack?: Ren
 export function numberedDefaultName(entry: RenderStackEntry, stack?: RenderStack): string {
     const name = defaultRenderStackEntryName(entry);
     if (!stack || entry.kind !== "spatial") return name;
-    const siblings = stack.entries.filter((item) => sameSpatialElement(item, entry));
+    const siblings = Array.from(walkRenderStackEntries(stack.entries)).filter((item) =>
+        sameSpatialElement(item, entry),
+    );
     if (siblings.length < 2) return name;
     return `${name} (${siblings.indexOf(entry) + 1})`;
 }

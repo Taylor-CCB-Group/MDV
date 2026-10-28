@@ -1,4 +1,4 @@
-import type { RenderStack } from "@spatialdata/layers";
+import { type RenderStack, walkRenderStackEntries } from "@spatialdata/layers";
 import type { ImageLoaderData, LayerLoadState } from "@spatialdata/vis";
 
 export type ImageLayerRegistry = {
@@ -11,7 +11,7 @@ export function getLayerLoadStateByElementKey(
     stack: RenderStack,
     getLayerLoadState: (layerId?: string) => LayerLoadState | undefined,
 ): LayerLoadState | undefined {
-    for (const entry of stack.entries) {
+    for (const entry of walkRenderStackEntries(stack.entries)) {
         if (
             entry.kind === "spatial" &&
             entry.source.elementType === "image" &&
