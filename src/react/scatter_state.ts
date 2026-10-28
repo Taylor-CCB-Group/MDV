@@ -264,7 +264,13 @@ function useZoomOnFilter(modelMatrix: Matrix4, data: Uint32Array) {
  *
  * Also note that we would like in future to be able to set the size of individual points
  * based on some property of the data - but for now we just return a number.
+ *
+ * The result is in data units, ~`radius * course_radius / 10000` of the data range, so on screen
+ * it scales with chart size and zoom: in a small chart even the largest slider value can be
+ * sub-pixel. Layers using it should also set `radiusMinPixels: SCATTER_RADIUS_MIN_PIXELS`.
  */
+export const SCATTER_RADIUS_MIN_PIXELS = 1;
+
 export function useScatterRadius() {
     const { radius, course_radius } = useConfig<ScatterPlotConfig>();
     const params = useParamColumns();
@@ -521,6 +527,7 @@ export function useScatterplotLayer(
             data,
             opacity,
             radiusScale,
+            radiusMinPixels: SCATTER_RADIUS_MIN_PIXELS,
             billboard: true,
             // antialiasing has artefacts on edges in 3d.
             // may also consider option to turn off antialiasing for performance?
@@ -622,6 +629,7 @@ export function useScatterplotLayer(
                 stroked: false,
                 filled: true,
                 radiusScale,
+                radiusMinPixels: SCATTER_RADIUS_MIN_PIXELS,
                 getPosition: (_: unknown, { target, index }: { target: number[]; index: number }) => {
                     target[0] = cx.data[index];
                     target[1] = cy.data[index];
