@@ -61,15 +61,15 @@ export function defineChoiceSetting<T extends string>(definition: ChoiceSettingD
 
 export type RenderBackend = "webgl" | "webgpu";
 
-/** Which deck.gl backend SpatialData charts use when a chart does not choose one itself. */
+/** Which deck.gl backend SpatialData charts and scatter plots use when a chart does not choose one itself. */
 export const renderBackendSetting = defineChoiceSetting<RenderBackend>({
     key: "mdv.settings.renderBackend",
     label: "Default rendering backend",
     description:
-        "Used by SpatialData charts whose own Rendering backend setting is left at the default. " +
-        "Where WebGPU is unavailable or fails, those charts use WebGL. On WebGPU, image " +
-        "contrast and brightness are not yet supported. ?webgpu or ?webgpu=0 in the URL " +
-        "overrides this for one page load.",
+        "Used by SpatialData charts and scatter plots whose own Rendering backend setting is left " +
+        "at the default. Where WebGPU is unavailable or fails, those charts use WebGL. On " +
+        "WebGPU, image contrast and brightness are not yet supported. ?webgpu or ?webgpu=0 " +
+        "in the URL overrides this for one page load.",
     choices: [
         { value: "webgpu", label: "WebGPU" },
         { value: "webgl", label: "WebGL" },

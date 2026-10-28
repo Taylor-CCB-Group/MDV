@@ -1,11 +1,11 @@
 import DeckGL, { type DeckGLRef } from "@deck.gl/react";
-import { OrthographicView, OrbitView, type PickingInfo } from "@deck.gl/core";
+import { type Layer, OrthographicView, OrbitView, type PickingInfo } from "@deck.gl/core";
 import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
 import { LineLayer } from "@deck.gl/layers";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useChart } from "../context";
-import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
+import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
 import { action } from "mobx";
 import type { DataColumn, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { allNumeric } from "@/lib/columnTypeHelpers";
@@ -25,6 +25,18 @@ import {
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
+import {
+    type DeckDevice,
+    type DeckErrorHandlers,
+    resolveDeckBackend,
+    useDeckDevice,
+    useDeckDeviceProps,
+} from "@/react/spatialdata/deck_backend";
+import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
+import { ErrorBoundary } from "react-error-boundary";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 //todo this should be in a common place etc.
 const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -111,6 +123,73 @@ function useZoomOnFilter(data: Uint32Array) {
             chart.ignoreStateUpdate = false;
         })();
     }, [data, cx, cy, cz, width, height, config, pendingRecenter, chart]);
+}
+
+/**
+ * The device deck draws with (see `deck_backend.ts`), and what to do when it fails. On
+ * WebGPU, a chart following the default backend moves to WebGL when a layer, the device or
+ * the canvas fails; one set to WebGPU explicitly stays on it, with the errors in the console
+ * (each kind once: a WebGPU validation error otherwise repeats every frame).
+ */
+function useScatterDeckDevice(layerIds: readonly string[]) {
+    const chart = useChart<DeckScatterConfig, DeckScatterReact>();
+    const config = useConfig<DeckScatterConfig>();
+    const { device, fallBack } = useDeckDevice(resolveDeckBackend(config.render_backend));
+    const activeBackend = device.status === "ready" ? device.backend : null;
+    const fallbackReason = device.status === "ready" ? device.fallbackReason : undefined;
+    useEffect(() => {
+        chart.setActiveBackend(activeBackend, fallbackReason);
+        return () => chart.setActiveBackend(null);
+    }, [chart, activeBackend, fallbackReason]);
+    const layerIdsRef = useRef(layerIds);
+    layerIdsRef.current = layerIds;
+    /** Fall back to WebGL, if this chart is on WebGPU because it follows the default. */
+    const failedOnWebGPU = useCallback(
+        (reason: string) => {
+            // after the switch, the old WebGPU device's errors are stale
+            if (chart.activeBackend !== "webgpu" || chart.config.render_backend != null) return;
+            console.error(`[MDV] ${reason}; using WebGL`);
+            fallBack(reason);
+        },
+        [chart, fallBack],
+    );
+    const failureTracker = useMemo(
+        () =>
+            new LayerFailureTracker({
+                entryIds: () => layerIdsRef.current,
+                fail: (layerId, failure) => failedOnWebGPU(`${layerId} failed on WebGPU: ${failure.reason}`),
+                canvas: (message) => failedOnWebGPU(`the canvas failed on WebGPU: ${message}`),
+            }),
+        [failedOnWebGPU],
+    );
+    useEffect(() => () => failureTracker.dispose(), [failureTracker]);
+    const handlers = useMemo<DeckErrorHandlers>(
+        () => ({
+            device: (error) => failureTracker.device(error),
+            layer: (error, layerId) => failureTracker.layer(error, layerId),
+        }),
+        [failureTracker],
+    );
+    const deckProps = useDeckDeviceProps(device, fallBack, handlers);
+    return { device, failedOnWebGPU, ...deckProps };
+}
+
+/**
+ * A deck layer instance belongs to the first Deck that draws it: its models and buffers are
+ * on that Deck's device. These layers are memoised outside the canvas, so a Deck remounted
+ * for another backend would inherit the old device's state and fail to draw. Give each
+ * device its own copies, one per layer instance.
+ */
+function useLayersForDevice(layers: Layer[], device: DeckDevice): Layer[] {
+    // biome-ignore lint/correctness/useExhaustiveDependencies: a new device is the trigger
+    const copies = useMemo(() => new WeakMap<Layer, Layer>(), [device]);
+    return layers.map((layer) => {
+        const cached = copies.get(layer);
+        if (cached) return cached;
+        const copy: Layer = layer.clone({});
+        copies.set(layer, copy);
+        return copy;
+    });
 }
 
 /**
@@ -236,13 +315,19 @@ const DeckScatter = observer(function DeckScatterComponent({
 
     //! deck doesn't like it if we change the layers array - better to toggle visibility
     const layers = [greyScatterplotLayer, scatterplotLayer, gateDisplayLayer, selectionLayer, gateLabelLayer, axisLinesLayer,
-    ].filter(x => x !== null);
-    
+    ].filter((layer): layer is NonNullable<typeof layer> => layer != null);
+    const { device, failedOnWebGPU, deviceProps, onDeviceInitialized, onError } = useScatterDeckDevice(
+        layers.map((layer) => layer.id),
+    );
+    // deck picks synchronously only on WebGL; on WebGPU the hover pick is all there is
+    const pickAlternates = device.status === "ready" && device.backend === "webgl";
+    const deckLayers = useLayersForDevice(layers, device);
+
     const deckContainerRef = useRef<HTMLDivElement | null>(null);
     const deckRef = useRef<DeckGLRef | null>(null);
     const getTooltipContent = useCallback(
         (info: PickingInfo) => {
-            const richInfo = getPickingInfoWithAlternates(info, deckRef.current?.deck);
+            const richInfo = getPickingInfoWithAlternates(info, pickAlternates ? deckRef.current?.deck : null);
             return getCombinedScatterTooltip(
                 richInfo,
                 {
@@ -252,7 +337,7 @@ const DeckScatter = observer(function DeckScatterComponent({
                 },
             );
         },
-        [gateDisplayLayer?.id, gateLabelLayer?.id, getTooltip],
+        [gateDisplayLayer?.id, gateLabelLayer?.id, getTooltip, pickAlternates],
     );
     const {
         clearTooltip,
@@ -299,26 +384,50 @@ const DeckScatter = observer(function DeckScatterComponent({
                         setScatterKeyboardActive(false);
                     }}
                 >
-                    <DeckGL
-                        ref={deckRef}
-                        layers={layers}
-                        useDevicePixels={true}
-                        controller={{
-                            // double-click finishes polygons / removes vertices in selection tools
-                            doubleClickZoom: false,
-                            dragPan: controllerOptions.dragPan,
-                        }}
-                        viewState={viewState}
-                        // initialViewState={viewState} //consider not using react state for this        
-                        views={view}
-                        onViewStateChange={(v) => {
-                            action(() => (config.viewState = v.viewState))();
-                        }}
-                        getTooltip={getPortalTooltip}
-                        getCursor={({ isDragging }) => {
-                            return isDragging ? "grabbing" : "crosshair";
-                        }}
-                    />
+                    {device.status === "pending" ? (
+                        <div className="h-full w-full p-2">Starting WebGPU…</div>
+                    ) : (
+                        <ErrorBoundary
+                            // deck picks its device once, when created: remount on a backend change.
+                            key={device.backend}
+                            onError={(error) => {
+                                if (device.backend === "webgpu") failedOnWebGPU(`the canvas failed on WebGPU: ${errorMessage(error)}`);
+                            }}
+                            fallbackRender={({ error }) => (
+                                <ErrorComponentReactWrapper
+                                    error={{
+                                        message: errorMessage(error),
+                                        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+                                    }}
+                                    title="Error showing scatter plot canvas"
+                                />
+                            )}
+                        >
+                            <DeckGL
+                                ref={deckRef}
+                                layers={deckLayers}
+                                {...(deviceProps && { deviceProps })}
+                                onDeviceInitialized={onDeviceInitialized}
+                                onError={onError}
+                                useDevicePixels={true}
+                                controller={{
+                                    // double-click finishes polygons / removes vertices in selection tools
+                                    doubleClickZoom: false,
+                                    dragPan: controllerOptions.dragPan,
+                                }}
+                                viewState={viewState}
+                                // initialViewState={viewState} //consider not using react state for this        
+                                views={view}
+                                onViewStateChange={(v) => {
+                                    action(() => (config.viewState = v.viewState))();
+                                }}
+                                getTooltip={getPortalTooltip}
+                                getCursor={({ isDragging }) => {
+                                    return isDragging ? "grabbing" : "crosshair";
+                                }}
+                            />
+                        </ErrorBoundary>
+                    )}
                 </div>
             </AxisComponent>
             {tooltipPortal}

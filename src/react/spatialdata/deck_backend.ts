@@ -1,20 +1,21 @@
 import { type RenderBackend, renderBackendSetting } from "@/lib/browserSettings";
-import type { CreateDeviceProps } from "@luma.gl/core";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { CreateDeviceProps, Device } from "@luma.gl/core";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // Side effect: when "WebGPU call tracing" is on, wrap the WebGPU API before any device exists.
 import "./webgpu_trace";
 
 /**
- * Which deck.gl device backend the SpatialData chart renders with. WebGPU is the
+ * Which deck.gl device backend the SpatialData chart and the deck scatter plot render with. WebGPU is the
  * default: MDV's own scatter layers support it (see `MdvScatterplotLayer`), and
  * contours are drawn by @intraspatial/deck's `DensityLayer`. SpatialData.js drops Viv
  * image extensions on WebGPU, so the image channel contrast/brightness (tone)
  * controls from `VivContrastExtension` have no effect there.
  *
  * A chart falls back to WebGL, for the rest of its session, when WebGPU is unavailable
- * (the probe below), when deck cannot create the device or loses it, and, if the chart
- * follows the default, when a layer fails or the canvas throws on WebGPU (see
- * `SpatialDataMDVReactComponent`). A chart set to WebGPU explicitly keeps it for those.
+ * (the probe below), when deck cannot create the device or loses it (`useDeckDeviceProps`),
+ * and, if the chart follows the default, when a layer fails or the canvas throws on WebGPU
+ * (see `SpatialDataMDVReactComponent` and `DeckScatterComponent`). A chart set to WebGPU
+ * explicitly keeps it for those.
  *
  * The default is the "Default rendering backend" browser setting (Debug dialog; see
  * `renderBackendSetting` in `src/lib/browserSettings.ts`); a chart's own `render_backend`
@@ -145,4 +146,73 @@ export function useDeckDevice(backend: DeckBackend): { device: DeckDevice; fallB
     if (backend !== "webgpu") return { device: WEBGL, fallBack };
     if (fallenBack) return { device: fallenBack, fallBack };
     return { device: webgpu, fallBack };
+}
+
+/** What a chart does with the errors deck and luma report, besides the device failures `useDeckDeviceProps` handles. */
+export type DeckErrorHandlers = {
+    /** luma's device `onError`: WebGPU validation errors, which arrive asynchronously. */
+    device: (error: Error) => void;
+    /** deck's `onError`, for a layer (or, with no layer id, the canvas) once deck has a device. */
+    layer: (error: Error, layerId: string | undefined) => void;
+    /** deck has created its device. */
+    initialized?: (device: Device) => void;
+};
+
+/**
+ * deck props for the device `useDeckDevice` chose: `deviceProps`, `onDeviceInitialized`
+ * and `onError`. A device deck fails to create, or loses, falls back to WebGL through
+ * `fallBack`; every other error goes to `handlers`, which should be memoised.
+ */
+export function useDeckDeviceProps(
+    device: DeckDevice,
+    fallBack: (reason: string) => void,
+    handlers: DeckErrorHandlers,
+) {
+    // The backend whose device deck last finished creating. A failed device creation
+    // reaches deck's `onError` (from luma's AnimationLoop), never the device's own.
+    const initializedBackend = useRef<string | null>(null);
+    const currentDevice = useRef<Device | null>(null);
+    const onDeviceInitialized = useCallback(
+        (created: Device) => {
+            initializedBackend.current = created.type;
+            currentDevice.current = created;
+            handlers.initialized?.(created);
+            // deck only watches for a lost WebGL context; a lost GPUDevice (GPU process
+            // crash or reset) would leave the canvas dark. "destroyed" is our own teardown.
+            if (created.type !== "webgpu" || !(created.handle instanceof GPUDevice)) return;
+            created.handle.lost.then((info) => {
+                if (info.reason === "destroyed" || currentDevice.current !== created) return;
+                console.error("[MDV] WebGPU device lost:", info.message);
+                fallBack(`the WebGPU device was lost: ${info.message || "no reason given"}`);
+            });
+        },
+        [handlers, fallBack],
+    );
+    const onError = useCallback(
+        (error: Error, layer?: { id: string } | null) => {
+            if (!layer && device.status === "ready" && device.backend === "webgpu" && initializedBackend.current !== "webgpu") {
+                // deck has no device, so nothing will draw: retry this chart on WebGL
+                console.error(error);
+                fallBack(`creating the WebGPU device failed: ${error.message}`);
+                return;
+            }
+            handlers.layer(error, layer?.id);
+        },
+        [device, handlers, fallBack],
+    );
+    const deviceProps = useMemo(
+        () =>
+            device.status === "ready" && device.deviceProps
+                ? {
+                      ...device.deviceProps,
+                      // true: handled, so luma does not also log it (once per frame)
+                      onError: (error: Error) => {
+                          handlers.device(error);
+                          return true;
+                      },
+                  }
+                : undefined,
+        [device, handlers],
+    );
+    return { deviceProps, onDeviceInitialized, onError };
 }

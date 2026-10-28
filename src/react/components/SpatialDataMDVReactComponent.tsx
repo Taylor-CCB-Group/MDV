@@ -9,7 +9,6 @@ import {
     type VivImagePropsResolver,
     useSpatialCanvasRendererFromLayerInputs,
 } from "@spatialdata/vis";
-import type { DeviceInfo } from "@luma.gl/core";
 import type { DeckGLProps, DeckGLRef, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -21,7 +20,12 @@ import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
-import { resolveDeckBackend, useDeckDevice } from "@/react/spatialdata/deck_backend";
+import {
+    type DeckErrorHandlers,
+    resolveDeckBackend,
+    useDeckDevice,
+    useDeckDeviceProps,
+} from "@/react/spatialdata/deck_backend";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
@@ -405,52 +409,19 @@ const SpatialDataViewer = observer(
             [chart, fallBackToWebGL],
         );
         useEffect(() => () => failureTracker.dispose(), [failureTracker]);
-        // The backend whose device deck last finished creating. A failed device creation
-        // reaches deck's `onError` (from luma's AnimationLoop), never the device's own.
-        const initializedBackend = useRef<string | null>(null);
-        const currentDevice = useRef<unknown>(null);
-        const onDeviceInitialized = useCallback(
-            (device: { type: string; handle: unknown; info: DeviceInfo }) => {
-                initializedBackend.current = device.type;
-                currentDevice.current = device;
-                chart.setGpuDescription(describeGpu(device.info));
-                // deck only watches for a lost WebGL context; a lost GPUDevice (GPU process
-                // crash or reset) would leave the canvas dark. "destroyed" is our own teardown.
-                if (device.type !== "webgpu" || !(device.handle instanceof GPUDevice)) return;
-                device.handle.lost.then((info) => {
-                    if (info.reason === "destroyed" || currentDevice.current !== device) return;
-                    console.error("[MDV] WebGPU device lost:", info.message);
-                    fallBackToWebGL(`the WebGPU device was lost: ${info.message || "no reason given"}`);
-                });
-            },
-            [chart, fallBackToWebGL],
+        const deckErrorHandlers = useMemo<DeckErrorHandlers>(
+            () => ({
+                device: (error) => failureTracker.device(error),
+                layer: (error, layerId) => failureTracker.layer(error, layerId),
+                initialized: (device) => chart.setGpuDescription(describeGpu(device.info)),
+            }),
+            [chart, failureTracker],
         );
-        const onDeckError = useCallback(
-            (error: Error, layer?: { id: string } | null) => {
-                if (!layer && deckDevice.status === "ready" && deckDevice.backend === "webgpu" && initializedBackend.current !== "webgpu") {
-                    // deck has no device, so nothing will draw: retry this chart on WebGL
-                    console.error(error);
-                    fallBackToWebGL(`creating the WebGPU device failed: ${error.message}`);
-                    return;
-                }
-                failureTracker.layer(error, layer?.id);
-            },
-            [deckDevice, failureTracker, fallBackToWebGL],
-        );
-        const deviceProps = useMemo(
-            () =>
-                deckDevice.status === "ready" && deckDevice.deviceProps
-                    ? {
-                          ...deckDevice.deviceProps,
-                          // true: handled, so luma does not also log it (once per frame)
-                          onError: (error: Error) => {
-                              failureTracker.device(error);
-                              return true;
-                          },
-                      }
-                    : undefined,
-            [deckDevice, failureTracker],
-        );
+        const {
+            deviceProps,
+            onDeviceInitialized,
+            onError: onDeckError,
+        } = useDeckDeviceProps(deckDevice, fallBackToWebGL, deckErrorHandlers);
 
         useViewStateLink();
 

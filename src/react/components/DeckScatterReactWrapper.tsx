@@ -15,13 +15,17 @@ import type { OrbitViewState } from "deck.gl";
 import { g } from "@/lib/utils";
 import type DataStore from "@/datastore/DataStore";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
-import { getSharedScatterSettings } from "./sharedScatterSettings";
+import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
+import type { DeckBackend } from "@/react/spatialdata/deck_backend";
 
 const MainChart = observer(() => {
     return <DeckScatterComponent />;
 });
 
-export type DeckScatterConfig = ScatterPlotConfig2D | ScatterPlotConfig3D;
+export type DeckScatterConfig = (ScatterPlotConfig2D | ScatterPlotConfig3D) & {
+    /** null (or absent) follows the browser's default (see `deck_backend.ts`). */
+    render_backend?: DeckBackend | null;
+};
 export type DeckScatterConfigWithRegion = DeckScatterConfig & { region?: string };
 export const DECK_CONTOUR_SCATTER_TYPE = "DeckContourScatter";
 const deckContourScatterTypes = new Set([DECK_CONTOUR_SCATTER_TYPE, "DeckDensity"]);
@@ -55,6 +59,9 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     // so if it is explicitly "3d", we have no axis settings, otherwise it will be "2d" | undefined
     const defaults = originalConfig.dimension !== "3d" ? { axis: scatterAxisDefaults } : {};
     const config = { ...scatterDefaults, ...defaults, ...defaultViewState, ...originalConfig };
+    // Must exist before the config is made observable for later changes to be observed, and
+    // survive initialiseChartConfig's JSON copy, so null rather than undefined.
+    config.render_backend = config.render_backend ?? null;
     const legacyContourParameter = originalConfig.param?.[2];
     if (
         !config.contourParameter &&
@@ -67,7 +74,20 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     return config;
 }
 
-class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
+const RendererStatus = observer(({ chart }: { chart: DeckScatterReact }) => {
+    const { activeBackend, backendFallbackReason } = chart;
+    const label =
+        activeBackend === "webgpu"
+            ? "WebGPU"
+            : activeBackend === null
+              ? "not chosen yet"
+              : backendFallbackReason
+                ? `WebGL (WebGPU unavailable: ${backendFallbackReason})`
+                : "WebGL";
+    return <p className="text-sm">Renderer: {label}</p>;
+});
+
+export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
     pendingRecenter = false;
@@ -82,7 +102,21 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             colorByColumn: action,
             colorByDefault: action,
             pendingRecenter: observable,
+            activeBackend: observable,
+            backendFallbackReason: observable,
+            setActiveBackend: action,
         });
+    }
+    /** The backend the canvas is drawing with, after any fallback to WebGL; null until the device is chosen. */
+    activeBackend: DeckBackend | null = null;
+    /** Why WebGPU was requested but not used, when it wasn't. */
+    backendFallbackReason: string | null = null;
+    setActiveBackend(backend: DeckBackend | null, fallbackReason?: string) {
+        this.activeBackend = backend;
+        this.backendFallbackReason = fallbackReason ?? null;
+    }
+    getDebugPanel() {
+        return <RendererStatus chart={this} />;
     }
     colorBy?: (i: number) => [r: number, g: number, b: number];
     colorByColumn(col?: ColumnName) {
@@ -116,7 +150,9 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             orbitSerialized.rotationOrbit = v.rotationOrbit;
             orbitSerialized.rotationX = v.rotationX;
         }
-        return { ...c, viewState };
+        // null only exists to keep the key observable; leave it out of saved views
+        const render_backend = c.render_backend ?? undefined;
+        return { ...c, viewState, render_backend };
     }
 
     getSettings() {
@@ -133,6 +169,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                 includeDensitySettings: deckContourScatterTypes.has(c.type),
                 includePointShape: true,
             }),
+            ...getRenderBackendSettings(c),
             g({
                 type: "button",
                 label: "Center Plot",
