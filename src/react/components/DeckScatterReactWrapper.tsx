@@ -220,8 +220,10 @@ BaseChart.types["DeckDensity"] = {
         },
     ],
 };
+// The 2D scatter plot offered in the Add Chart dialog; density is an option that is off by default.
 BaseChart.types[DECK_CONTOUR_SCATTER_TYPE] = {
     ...BaseChart.types["DeckDensity"],
+    name: "2D Scatter Plot",
     allow_user_add: true,
 };
 BaseChart.types["DeckScatter3D"] = {
@@ -248,9 +250,9 @@ BaseChart.types["DeckScatter3D"] = {
     },
 };
 BaseChart.types["wgl_scatter_plot_dev"] = {
-    name: "2D Scatter Plot",
+    name: "2D Scatter Plot (no density)",
     class: DeckScatterReact,
-    allow_user_add: true,
+    legacy: true,
     params: [
         {
             type: "number",

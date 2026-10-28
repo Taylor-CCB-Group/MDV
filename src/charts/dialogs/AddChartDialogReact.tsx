@@ -27,6 +27,7 @@ import { Close as CloseIcon } from "@mui/icons-material";
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper.js";
 import { preloadLazyChartTypesForPicker } from "@/charts/lazyChartRegistrations";
+import { legacyChartsSetting } from "@/lib/browserSettings";
 
 // Draft chart config: param slots are FieldSpec / FieldSpecs until we emit a flat `param` for ChartManager.
 
@@ -282,10 +283,12 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
         };
     }, []);
 
+    const showLegacy = legacyChartsSetting.get() === "show";
     const chartTypes = useMemo(() => {
         lazyTypesReady;
         return Object.values(BaseChart.types).filter(t => {
             if (t.allow_user_add === false) return false;
+            if (t.legacy && !showLegacy) return false;
             if (t.required) {
                 console.log(t.name, "required", t.required);
                 if (typeof t.required === "function") {
@@ -299,7 +302,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
             }
             return true;
         });
-    }, [dataStore, lazyTypesReady]);
+    }, [dataStore, lazyTypesReady, showLegacy]);
     const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
     // biome-ignore lint/correctness/useExhaustiveDependencies: need to figure out mobx/biome linting...

@@ -94,5 +94,19 @@ export const webgpuTraceSetting = defineChoiceSetting<"off" | "on">({
     defaultValue: "off",
 });
 
+/** Whether the Add Chart dialog offers chart types marked `legacy` in their `BaseChart.types` entry. */
+export const legacyChartsSetting = defineChoiceSetting<"hide" | "show">({
+    key: "mdv.settings.legacyCharts",
+    label: "Legacy charts",
+    description:
+        "Show chart types that have been superseded (such as the classic scatter plots) in the " +
+        "Add Chart dialog. Existing charts of those types are unaffected.",
+    choices: [
+        { value: "hide", label: "Hide" },
+        { value: "show", label: "Show" },
+    ],
+    defaultValue: "hide",
+});
+
 /** Every browser setting, in the order the Debug dialog lists them. */
-export const browserSettings: readonly BrowserSetting[] = [renderBackendSetting, webgpuTraceSetting];
+export const browserSettings: readonly BrowserSetting[] = [renderBackendSetting, webgpuTraceSetting, legacyChartsSetting];

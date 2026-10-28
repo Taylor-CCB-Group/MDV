@@ -877,6 +877,7 @@ class WGLScatterPlot extends WGLChart {
 BaseChart.types["wgl_scatter_plot"] = {
     name: "2D Scatter Plot (Classic)",
     class: WGLScatterPlot,
+    legacy: true,
     params: [
         {
             type: "number",

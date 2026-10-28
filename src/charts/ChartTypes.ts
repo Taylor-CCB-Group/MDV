@@ -54,6 +54,11 @@ export type ChartType<T extends BaseConfig> = {
     /** @deprecated in favour of {@link loadColumnData} decorator */
     methodsUsingColumns?: string[];
     allow_user_add?: boolean;
+    /**
+     * Superseded by another chart type. Hidden from the 'add chart' dialog unless the
+     * "Show legacy charts" browser setting is on; existing charts of this type still load.
+     */
+    legacy?: boolean;
 };
 
 export type ChartTypeMap = Record<string, ChartType<any>>;
