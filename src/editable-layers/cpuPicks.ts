@@ -12,6 +12,8 @@
  * Edit handles come first, nearest first, as the layer draws them on top.
  */
 
+import { isPointInPolygon } from "@/react/gates/gateUtils";
+
 type Position = readonly number[];
 type Geometry = { type: string; coordinates?: unknown };
 type Feature = { type: "Feature"; geometry: Geometry | null; properties?: Record<string, unknown> | null };
@@ -47,8 +49,9 @@ function segmentDistance(p: readonly number[], a: readonly number[], b: readonly
     return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
 }
 
-/** Inside (even-odd, so holes count) or within `radius` of an edge, in screen space. */
+/** Inside (even-odd across rings, so holes count) or within `radius` of an edge, in screen space. */
 function hitsPolygon(rings: Position[][], point: readonly number[], project: Project, radius: number): boolean {
+    const target: [number, number] = [point[0], point[1]];
     let inside = false;
     for (const ring of rings) {
         const positions = ring.filter(isPosition);
@@ -57,13 +60,9 @@ function hitsPolygon(rings: Position[][], point: readonly number[], project: Pro
             .filter((p): p is [number, number] => p !== null);
         if (pts.length !== positions.length) continue;
         for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-            const [xi, yi] = pts[i];
-            const [xj, yj] = pts[j];
             if (segmentDistance(point, pts[j], pts[i]) <= radius) return true;
-            if (yi > point[1] !== yj > point[1] && point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi) {
-                inside = !inside;
-            }
         }
+        if (isPointInPolygon(target, pts)) inside = !inside;
     }
     return inside;
 }
