@@ -1,6 +1,6 @@
 import { type RenderBackend, renderBackendSetting } from "@/lib/browserSettings";
 import type { CreateDeviceProps } from "@luma.gl/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 // Side effect: when "WebGPU call tracing" is on, wrap the WebGPU API before any device exists.
 import "./webgpu_trace";
 
@@ -140,7 +140,9 @@ export function useDeckDevice(backend: DeckBackend): { device: DeckDevice; fallB
         };
     }, [backend]);
     const fallBack = useCallback((reason: string) => setFailure(reason), []);
+    // Stable per failure: the viewer's deck props and error handler depend on the device.
+    const fallenBack = useMemo(() => (failure ? { ...WEBGL, fallbackReason: failure } : null), [failure]);
     if (backend !== "webgpu") return { device: WEBGL, fallBack };
-    if (failure) return { device: { ...WEBGL, fallbackReason: failure }, fallBack };
+    if (fallenBack) return { device: fallenBack, fallBack };
     return { device: webgpu, fallBack };
 }

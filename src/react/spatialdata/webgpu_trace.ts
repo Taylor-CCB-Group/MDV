@@ -23,6 +23,8 @@ const RECENT_CALLS = 40;
 const MAX_FINDINGS = 20;
 const recent: TracedCall[] = [];
 const findings: string[] = [];
+/** Findings past `MAX_FINDINGS`: a failure that repeats every frame would flood the console. */
+let dropped = 0;
 
 /**
  * The caller's frames, without the "Error" header Chrome adds (Safari has none) and
@@ -48,8 +50,12 @@ function record(call: string, label: string, stack: string) {
 }
 
 function report(finding: string) {
-    console.error(`[MDV WebGPU trace] ${finding}`);
-    if (findings.length < MAX_FINDINGS) findings.push(finding);
+    if (findings.length < MAX_FINDINGS) {
+        findings.push(finding);
+        console.error(`[MDV WebGPU trace] ${finding}`);
+        return;
+    }
+    if (dropped++ === 0) console.warn(`[MDV WebGPU trace] ${MAX_FINDINGS} findings recorded; not logging any more.`);
 }
 
 function formatRecent(count = RECENT_CALLS) {
@@ -131,6 +137,9 @@ if (webgpuTraceEnabled) install();
 /** What tracing found, for a chart's "Copy details"; null while tracing is off. */
 export function webgpuTraceReport(): string | null {
     if (!webgpuTraceEnabled) return null;
-    if (findings.length) return findings.join("\n\n");
+    if (findings.length) {
+        const more = dropped ? `\n\n…and ${dropped} more, not recorded.` : "";
+        return `${findings.join("\n\n")}${more}`;
+    }
     return `Nothing found. Last encoder calls, oldest first:\n${formatRecent(8)}`;
 }
