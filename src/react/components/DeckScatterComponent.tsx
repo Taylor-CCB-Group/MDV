@@ -12,6 +12,7 @@ import { allNumeric } from "@/lib/columnTypeHelpers";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
+import { fitOrthographicView } from "../axisScaling";
 import AxisComponent from "./AxisComponent";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import useGateLayers from "../hooks/useGateLayers";
@@ -81,28 +82,10 @@ function useZoomOnFilter(data: Uint32Array) {
             chart.ignoreStateUpdate = true;
             chart.pendingRecenter = false;
 
-            // Calculate range
-            const dx = maxX - minX;
-            const dy = maxY - minY;
-
-            // Use relative epsilon based on data scale or absolute minimum
-            const epsilon = Math.max(1e-9, Math.min(Math.abs(minX), Math.abs(maxX)) * 1e-6);
-            const safeDx = Math.max(epsilon, dx);
-            const safeDy = Math.max(epsilon, dy);
-
-            // Calculate zoom with fallback and NaN check
-            let zoom = Math.log2(Math.min(width / safeDx, height / safeDy)) - 0.6;
-            if (!Number.isFinite(zoom)) {
-                console.warn("Invalid zoom value detected, using fallback");
-                zoom = 0; // Default zoom fallback
-            }
-
-            config.viewState = {
-                target: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
-                zoom,
-                // any kind of interpolator would probably mean changing how we handle viewState
-                // transitionInterpolator: new FlyToInterpolator({speed: 1.2}),
-            };
+            const scaling = config.dimension === "2d" ? (config.axis_scaling ?? "equal") : "equal";
+            config.viewState = fitOrthographicView({ minX, maxX, minY, maxY }, width, height, scaling);
+            // any kind of interpolator would probably mean changing how we handle viewState
+            // transitionInterpolator: new FlyToInterpolator({speed: 1.2}),
             if (config.dimension === "3d") {
                 const vs = config.viewState;
                 vs.rotationOrbit = vs.rotationOrbit || 0;

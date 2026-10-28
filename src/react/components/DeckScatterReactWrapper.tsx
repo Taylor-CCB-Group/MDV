@@ -17,6 +17,7 @@ import type DataStore from "@/datastore/DataStore";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 import type { DeckBackend } from "@/react/spatialdata/deck_backend";
+import { serialisableZoom } from "../axisScaling";
 
 const MainChart = observer(() => {
     return <DeckScatterComponent />;
@@ -62,6 +63,8 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     // Must exist before the config is made observable for later changes to be observed, and
     // survive initialiseChartConfig's JSON copy, so null rather than undefined.
     config.render_backend = config.render_backend ?? null;
+    // charts saved before this setting kept both axes at one scale
+    if (config.dimension !== "3d") config.axis_scaling = config.axis_scaling ?? "equal";
     const legacyContourParameter = originalConfig.param?.[2];
     if (
         !config.contourParameter &&
@@ -142,7 +145,7 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         // that don't de-serialize properly, so we explicity extract the properties we want
         const viewState = {
             target: c.viewState.target,
-            zoom: c.viewState.zoom,
+            ...serialisableZoom(c.viewState, c.dimension === "2d" ? (c.axis_scaling ?? "equal") : "equal"),
         };
         if (c.dimension === "3d") {
             const v = c.viewState;
@@ -162,6 +165,23 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         if (c.dimension === "2d") {
             const axisSettings = getAxisGuiSpec(c);
             settings.push(axisSettings);
+            settings.push(
+                g({
+                    type: "radiobuttons",
+                    label: "Axis scaling",
+                    choices: [
+                        ["Equal (same scale on both axes)", "equal"],
+                        ["Fit (each axis to the chart)", "fit"],
+                    ],
+                    current_value: c.axis_scaling ?? "equal",
+                    func: (value) => {
+                        //@ts-expect-error value is a string, but we have a narrow "equal" | "fit" type
+                        c.axis_scaling = value;
+                        // the current view is for the other scaling
+                        this.pendingRecenter = true;
+                    },
+                }),
+            );
         }
         return settings.concat([
             ...getSharedScatterSettings(c, {
@@ -225,6 +245,10 @@ BaseChart.types[DECK_CONTOUR_SCATTER_TYPE] = {
     ...BaseChart.types["DeckDensity"],
     name: "2D Scatter Plot",
     allow_user_add: true,
+    init: (config: ScatterPlotConfig) => {
+        // new charts show columns with very different ranges properly; see `AxisScaling`
+        config.axis_scaling = "fit";
+    },
 };
 BaseChart.types["DeckScatter3D"] = {
     name: "3D Scatter Plot (new)",

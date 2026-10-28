@@ -30,6 +30,7 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { getEmptyFeatureCollection } from "./deck_state";
 import { escapeHtml } from "@/utilities/Utilities";
+import { type AxisScaling, radiusReferenceRange } from "./axisScaling";
 
 //!!! temporary fix for tsgo preview compatibility
 // import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
@@ -78,6 +79,8 @@ export type ScatterPlotConfig = {
     on_filter: "hide" | "grey"; //todo...
     zoom_on_filter: boolean;
     point_shape: "circle" | "square" | "gaussian";
+    /** 2D only; absent is `equal`. See `AxisScaling`. */
+    axis_scaling?: AxisScaling;
     dimension: "2d" | "3d";
     selectionFeatureCollection: SimpleFeatureCollection;
 } & TooltipConfig &
@@ -272,7 +275,9 @@ function useZoomOnFilter(modelMatrix: Matrix4, data: Uint32Array) {
 export const SCATTER_RADIUS_MIN_PIXELS = 1;
 
 export function useScatterRadius() {
-    const { radius, course_radius } = useConfig<ScatterPlotConfig>();
+    const { radius, course_radius, axis_scaling, dimension } = useConfig<ScatterPlotConfig>();
+    const [width, height] = useChartSize();
+    const scaling = dimension === "2d" ? (axis_scaling ?? "equal") : "equal";
     const params = useParamColumns();
     const [cx, cy] = params;
     const scale = useRegionScale();
@@ -291,11 +296,11 @@ export function useScatterRadius() {
             // how does this come to be? is it a spatial conversion thing?
             const xRange = Math.abs(cx.minMax[1] - cx.minMax[0]);
             const yRange = Math.abs(cy.minMax[1] - cy.minMax[0]);
-            const r = 10000 / Math.max(xRange, yRange);
+            const r = 10000 / radiusReferenceRange(xRange, yRange, { width, height }, scaling);
             return radiusScale / r;
         }
         return radiusScale;
-    }, [cx.minMax, cy.minMax, radiusScale, cx, cy]);
+    }, [cx.minMax, cy.minMax, radiusScale, cx, cy, width, height, scaling]);
 }
 
 // type Tooltip = (PickingInfo) => string;
