@@ -25,17 +25,18 @@ In:
 - Scale: auto (shared) or manual min/max, palette, log
 - Y-axis order: data or alphabetical
 - Basic axis controls
-- Hover tooltip
+- Hover tooltip (the legacy one)
 - Reacts to global filters
+- Click a dot to filter cells
+- Auto-fit / shorten / hide overlapping X labels (`src/charts/dotplot/xAxisLabels.ts`)
+- Export as SVG / PNG
 
 Out (later, if asked for; also what the legacy `dot_plot` still has that this lacks):
 
-- Click a dot to filter cells (legacy `filterCategories`)
 - Row/column clustering (must run across all panels together)
 - Background filter
 - Interleaved or stacked layouts
 - Independent scales per panel
-- Auto-fit / shorten / hide overlapping X labels (reuse `src/charts/dotplot/xAxisLabels.ts`)
 - Threshold UI (`threshold_value` exists, no setting today)
 - Replacing / migrating legacy `dot_plot` configs
 

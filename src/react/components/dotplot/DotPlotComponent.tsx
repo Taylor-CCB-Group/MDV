@@ -122,7 +122,9 @@ const DotPlotComponent = observer(function DotPlotComponent() {
     const panelCodes = useMemo(() => {
         if (!splitColumn) return null;
         const values: string[] = JSON.parse(splitValuesKey);
-        return values.map((v) => splitColumn.values.indexOf(v)).filter((code) => code >= 0);
+        // one panel per value, in first-seen order, even if a saved config repeats one
+        const codes = values.map((v) => splitColumn.values.indexOf(v)).filter((code) => code >= 0);
+        return [...new Set(codes)];
     }, [splitColumn, splitValuesKey]);
 
     const threshold = config.threshold_value;
@@ -249,6 +251,11 @@ const DotPlotComponent = observer(function DotPlotComponent() {
         [bandHeight, colorWidth, fractionItems, colorLeft, colorTop, fractionLeft, fractionTop],
     );
     useEffect(() => {
+        // nothing to show (e.g. a split with no values): no legends, not the last ones
+        if (!inputs) {
+            chart.clearLegends();
+            return;
+        }
         chart.updateLegends(
             legendColors && rangeMin !== undefined && rangeMax !== undefined
                 ? { colors: legendColors, range: [rangeMin, rangeMax], width: legendLayout.colorWidth }
@@ -256,7 +263,7 @@ const DotPlotComponent = observer(function DotPlotComponent() {
             fracMax !== undefined && maxRadius > 0 ? { fracMax, maxRadius, items: legendLayout.fractionItems } : null,
             legendLayout,
         );
-    }, [chart, legendColors, rangeMin, rangeMax, fracMax, maxRadius, legendLayout]);
+    }, [chart, inputs, legendColors, rangeMin, rangeMax, fracMax, maxRadius, legendLayout]);
 
     if (error) return <Message>{`Couldn't compute the dot plot: ${error}`}</Message>;
     if (columns.length > 0 && !rowColumn) return <Message>Choose a category column for the y axis.</Message>;

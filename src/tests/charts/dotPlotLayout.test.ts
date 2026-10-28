@@ -152,6 +152,15 @@ describe("getDotPlotLayout", () => {
         expect(layout.plotHeight).toBe(0);
         expect(layout.maxRadius).toBe(0);
     });
+
+    it("drops the panel gaps when there's no room, so panels stay inside the chart", () => {
+        // 10px left for three panels and two 20px gaps
+        const layout = getDotPlotLayout({ ...input, width: 120, panelCount: 3 });
+        expect(layout.panelWidth).toBeCloseTo(10 / 3);
+        for (const left of layout.panelLefts) {
+            expect(left + layout.panelWidth).toBeLessThanOrEqual(120 - DOT_PLOT_RIGHT_MARGIN + 1e-9);
+        }
+    });
 });
 
 describe("getDotRadius", () => {

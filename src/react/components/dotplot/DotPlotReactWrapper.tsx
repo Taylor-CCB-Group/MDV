@@ -154,6 +154,26 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
         }
     }
 
+    /**
+     * Removes both legends, e.g. while the split has no values to show; unlike a null input to
+     * `updateLegends`, which keeps them while stats recompute. Their positions are kept.
+     */
+    clearLegends() {
+        const legend = this.legend;
+        if (legend) {
+            runInAction(() => {
+                this.config.color_legend.pos = [legend.offsetLeft, legend.offsetTop];
+            });
+            this.colorLegendWrapper.unmount();
+            this.legend = undefined;
+        }
+        this.colorLegendInput = null;
+        if (this.fractionLegendInput) {
+            this.fractionLegendInput = null;
+            runInAction(() => this.showFractionLegend());
+        }
+    }
+
     /** Brushing would filter cells by one field's values, which isn't what mean expression shows. */
     isColorLegendFilterable() {
         return false;

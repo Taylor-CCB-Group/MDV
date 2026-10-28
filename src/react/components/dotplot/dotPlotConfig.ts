@@ -115,7 +115,13 @@ export function adaptDotPlotConfig(
 /** Colour range to draw with: the manual one if it's set and valid, otherwise the automatic one. */
 export function getColorRange(scale: DotPlotColorScale, autoRange: [number, number] | null): [number, number] | null {
     const { mode, min, max } = scale;
-    if (mode === "manual" && typeof min === "number" && typeof max === "number" && Number.isFinite(min + max)) {
+    if (
+        mode === "manual" &&
+        typeof min === "number" &&
+        typeof max === "number" &&
+        Number.isFinite(min) &&
+        Number.isFinite(max)
+    ) {
         return min <= max ? [min, max] : [max, min];
     }
     return autoRange;

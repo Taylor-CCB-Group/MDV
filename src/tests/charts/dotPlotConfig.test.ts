@@ -111,4 +111,8 @@ describe("getColorRange", () => {
         expect(getColorRange({ ...scale, mode: "manual", min: 0 }, [1, 2])).toEqual([1, 2]);
         expect(getColorRange({ ...scale, mode: "manual", min: 0, max: Number.NaN }, [1, 2])).toEqual([1, 2]);
     });
+
+    it("accepts large finite bounds whose sum overflows", () => {
+        expect(getColorRange({ ...scale, mode: "manual", min: 1e308, max: 1e308 }, [1, 2])).toEqual([1e308, 1e308]);
+    });
 });

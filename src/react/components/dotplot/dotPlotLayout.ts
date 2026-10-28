@@ -87,9 +87,12 @@ export function getDotPlotLayout({
 }: DotPlotLayoutInput): DotPlotLayout {
     const top = DOT_PLOT_TOP_MARGIN + titleHeight;
     const plotHeight = Math.max(0, height - top - xAxisHeight);
-    const gaps = panelGap * Math.max(0, panelCount - 1);
-    const panelWidth = panelCount > 0 ? Math.max(0, width - yAxisWidth - DOT_PLOT_RIGHT_MARGIN - gaps) / panelCount : 0;
-    const panelLefts = Array.from({ length: panelCount }, (_, p) => yAxisWidth + p * (panelWidth + panelGap));
+    const room = width - yAxisWidth - DOT_PLOT_RIGHT_MARGIN;
+    // drop the gaps when there's no room for them, so later panels don't start past the edge
+    const gap = panelGap * Math.max(0, panelCount - 1) < room ? panelGap : 0;
+    const gaps = gap * Math.max(0, panelCount - 1);
+    const panelWidth = panelCount > 0 ? Math.max(0, room - gaps) / panelCount : 0;
+    const panelLefts = Array.from({ length: panelCount }, (_, p) => yAxisWidth + p * (panelWidth + gap));
     const cellWidth = fieldCount > 0 ? panelWidth / fieldCount : 0;
     const cellHeight = rowCount > 0 ? plotHeight / rowCount : 0;
     const maxRadius = Math.min(Math.min(cellWidth, cellHeight) / 2, DOT_PLOT_MAX_RADIUS);
