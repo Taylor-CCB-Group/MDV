@@ -38,6 +38,7 @@ import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
+import { convertLegacyChartConfig } from "./legacyCharts";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -1388,6 +1389,26 @@ export class ChartManager {
         return id;
     }
 
+    /**
+     * Tells the user that a chart was loaded as its current equivalent. A view loads its charts
+     * together, so they share one alert whose count is updated as each is converted.
+     */
+    _reportLegacyConversion() {
+        const alert = this._legacyConversionAlert;
+        const count = alert && this.infoAlerts[alert.id] ? alert.count + 1 : 1;
+        const msg =
+            count === 1
+                ? "A legacy chart was converted to its current equivalent (see Convert legacy charts in Browser settings)"
+                : `${count} legacy charts were converted to their current equivalents (see Convert legacy charts in Browser settings)`;
+        if (count === 1) {
+            const id = this.createInfoAlert(msg, { duration: 6000 });
+            this._legacyConversionAlert = { id, count };
+        } else {
+            this.updateInfoAlert(alert.id, msg);
+            alert.count = count;
+        }
+    }
+
     updateInfoAlert(id, msg, config = {}) {
         const al = this.infoAlerts[id];
         if (al) {
@@ -1822,6 +1843,11 @@ export class ChartManager {
      * a chart has been loaded
      */
     async addChart(dataSource, config, notify = false) {
+        const convertedFrom = convertLegacyChartConfig(config);
+        if (convertedFrom) {
+            console.log(`Loading legacy chart '${config.title}' (${convertedFrom}) as ${config.type}`);
+            this._reportLegacyConversion();
+        }
         if (!BaseChart.types[config.type]) {
             await ensureLazyChartTypeRegistered(config.type);
         }

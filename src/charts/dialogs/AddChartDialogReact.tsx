@@ -28,6 +28,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper.js";
 import { preloadLazyChartTypesForPicker } from "@/charts/lazyChartRegistrations";
 import { legacyChartsSetting } from "@/lib/browserSettings";
+import { isLegacyChartType } from "@/charts/legacyCharts";
 
 // Draft chart config: param slots are FieldSpec / FieldSpecs until we emit a flat `param` for ChartManager.
 
@@ -288,7 +289,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
         lazyTypesReady;
         return Object.values(BaseChart.types).filter(t => {
             if (t.allow_user_add === false) return false;
-            if (t.legacy && !showLegacy) return false;
+            if (!showLegacy && isLegacyChartType(t, dataStore)) return false;
             if (t.required) {
                 console.log(t.name, "required", t.required);
                 if (typeof t.required === "function") {

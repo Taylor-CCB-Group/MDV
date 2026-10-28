@@ -333,6 +333,12 @@ BaseChart.types["VivMdvRegionReact"] = {
     },
     class: VivMdvReact,
     name: "Spatial Image Viewer",
+    // superseded by the SpatialData.js viewer, but still the only option for a region that has
+    // a Viv image and is not SpatialData
+    legacy: (ds) => {
+        const regions = ds.regions?.all_regions ?? {};
+        return !Object.keys(regions).some((key) => regions[key].viv_image && !regions[key].spatial);
+    },
 };
 
 export type VivMdvReactType = typeof VivMdvReact;

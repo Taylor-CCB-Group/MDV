@@ -56,9 +56,11 @@ export type ChartType<T extends BaseConfig> = {
     allow_user_add?: boolean;
     /**
      * Superseded by another chart type. Hidden from the 'add chart' dialog unless the
-     * "Show legacy charts" browser setting is on; existing charts of this type still load.
+     * "Legacy charts" browser setting is on; existing charts of this type still load.
+     * A function says whether it is superseded for a given data store, for types that
+     * are still needed by some data (see `isLegacyChartType`).
      */
-    legacy?: boolean;
+    legacy?: boolean | ((dataStore: DataStore) => boolean);
 };
 
 export type ChartTypeMap = Record<string, ChartType<any>>;
