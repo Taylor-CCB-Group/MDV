@@ -442,7 +442,7 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
 }
 
 BaseChart.types[DOT_PLOT_REACT_TYPE] = {
-    name: "Compound Dot Plot",
+    name: "Dot Plot (Compound)",
     class: DotPlotReact,
     params: [
         {
@@ -488,7 +488,7 @@ BaseChart.types[DOT_PLOT_REACT_TYPE] = {
 // and named differently because the add-chart dialog looks chart types up by name.
 BaseChart.types[DOT_PLOT_REACT_OLD_TYPE] = {
     ...BaseChart.types[DOT_PLOT_REACT_TYPE],
-    name: "Compound Dot Plot (old type name)",
+    name: "Dot Plot (Compound)",
     allow_user_add: false,
 };
 
