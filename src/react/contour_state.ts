@@ -2,6 +2,7 @@ import type {
     AnyGuiSpec,
     CategoricalDataType,
     DataColumn,
+    DataType,
     Disposer,
     LoadedDataColumn,
     FieldName,
@@ -21,7 +22,7 @@ import { useViewState } from "./deck_state";
 import { g, isArray } from "@/lib/utils";
 import { reaction, toJS } from "mobx";
 import type { BaseConfig } from "@/charts/BaseChart";
-import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import { type FieldSpec, type FieldSpecs, isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { getFieldColor } from "./fieldColorManager";
 import type { CategoryLegendItem, FieldLegendItem } from "./components/FieldContourLegend";
 // import { DataFilterExtension } from '@deck.gl/extensions';
@@ -235,6 +236,15 @@ export function useCategoryContour(props: CategoryContourProps) {
 }
 /** pending better definition */
 export type ContourLayerProps = ReturnType<typeof useCategoryContour>;
+/**
+ * A density field ready to weigh: numeric, with its data and range. A column whose load
+ * failed or is still under way is left out rather than read, as the weight cache reads
+ * `minMax` as soon as the layer props are built.
+ */
+function isLoadedDoubleColumn(column: DataColumn<DataType>): column is LoadedDataColumn<"double"> {
+    return column.datatype === "double" && isColumnLoaded(column) && column.minMax !== undefined;
+}
+
 export function useFieldContour(props: FieldContourProps) {
     const { id, fill, bandwidth, intensity, opacity, fillThreshold, fields, hoveredContour } =
         props;
@@ -632,7 +642,7 @@ export function useLegacyDualContour(hoveredContour?: HoveredContour | null): Co
     const fieldContours = useFieldContour({
         ...commonProps,
         id: "fieldContours",
-        fields: fields.filter(field => field.datatype === "double") as LoadedDataColumn<"double">[],
+        fields: fields.filter(isLoadedDoubleColumn),
     });
     const contour1 = useCategoryContour({
         ...commonProps,

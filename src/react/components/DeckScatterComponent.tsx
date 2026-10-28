@@ -248,11 +248,12 @@ const DeckScatter = observer(function DeckScatterComponent({
                   },
         [is2d, xSize, ySize],
     );
-    const chartWidth = width - margin.left - margin.right;
+    // never negative (a chart narrower than its axes): WebGPU rejects a negative viewport
+    const chartWidth = Math.max(0, width - margin.left - margin.right);
     //there could be a potential off-by-one/two error somewhere down the line
     //if we don't fully understand reasons for `- 3.5` here.
     //prevents overlapping with x-axis.
-    const chartHeight = height - margin.top - margin.bottom - 3.5;
+    const chartHeight = Math.max(0, height - margin.top - margin.bottom - 3.5);
     useZoomOnFilter(data);
 
     const { scatterProps, selectionLayer } = useSpatialLayers();
