@@ -30,7 +30,10 @@ function hasTooltipContent(content: TooltipContent | undefined): content is Excl
 function renderTooltipContent(content: Exclude<TooltipContent, null>) {
     if (typeof content === "string") return content;
     if (content.html !== undefined) {
-        return <span dangerouslySetInnerHTML={{ __html: content.html }} />;
+        return (
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: getCombinedScatterTooltip escapes data values before building html
+            <span dangerouslySetInnerHTML={{ __html: content.html }} />
+        );
     }
     return content.text ?? null;
 }
