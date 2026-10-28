@@ -590,6 +590,19 @@ class BaseChart<T extends BaseConfig> {
         }
     }
     
+    /**
+     * Whether clicking or brushing the color legend filters rows by the legend's column.
+     * Charts whose legend doesn't show a column's per-row values should return false.
+     */
+    isColorLegendFilterable(): boolean {
+        return true;
+    }
+
+    /** Whether a continuous color legend can be resized (categorical legends always can). */
+    isColorLegendResizable(): boolean {
+        return false;
+    }
+
     getColorLegendSpec(): ColorLegendSpec | null {
         const colorBy = this.config.color_by;
         if (!colorBy || typeof colorBy !== "string") {
@@ -670,24 +683,29 @@ class BaseChart<T extends BaseConfig> {
             this.legend = undefined;
             return;
         }
-        restoreColorLegendFilter(this, spec);
+        const filterable = this.isColorLegendFilterable();
+        if (filterable) {
+            restoreColorLegendFilter(this, spec);
+        }
         const ColorLegendWithInteractions = (
             props: LegendWrapperComponentProps<ColorLegendSpec>,
         ) =>
             createElement(ColorLegend, {
                 ...props,
-                activeCategoricalValue: getActiveCategoricalColorLegendValue(
-                    this,
-                    spec,
-                ),
-                onCategoricalItemClick: (value: string) =>
-                    toggleCategoricalColorLegendFilter(this, spec, value),
-                activeContinuousRange: getActiveContinuousColorLegendRange(
-                    this,
-                    spec,
-                ),
-                onContinuousRangeChange: (range: [number, number] | null) =>
-                    setContinuousColorLegendFilter(this, spec, range),
+                ...(filterable && {
+                    activeCategoricalValue: getActiveCategoricalColorLegendValue(
+                        this,
+                        spec,
+                    ),
+                    onCategoricalItemClick: (value: string) =>
+                        toggleCategoricalColorLegendFilter(this, spec, value),
+                    activeContinuousRange: getActiveContinuousColorLegendRange(
+                        this,
+                        spec,
+                    ),
+                    onContinuousRangeChange: (range: [number, number] | null) =>
+                        setContinuousColorLegendFilter(this, spec, range),
+                }),
             });
         this.colorLegendWrapper.render(
             spec,
@@ -700,6 +718,7 @@ class BaseChart<T extends BaseConfig> {
                   }
                 : {
                       dragHandle: ".legend-continuous-drag-handle",
+                      resizable: this.isColorLegendResizable(),
                   },
         );
         this.legend = this.colorLegendWrapper.getWrapperElement() ?? undefined;

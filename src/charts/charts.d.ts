@@ -361,6 +361,12 @@ export type ExtraControl<T extends GuiSpecType> = {
     label: string;
     values?: Array<{ name: string; value: string }>;
     defaultVal?: GuiValueTypes[T];
+    /**
+     * For `"category_selection"`: the `name` of another extra control in the same dialog whose
+     * value is the column to choose categories from. This control is hidden while that one
+     * has no column (or "None").
+     */
+    columnControl?: T extends "category_selection" ? string : never;
 };
 /// --- some type-testing code, could be in actual tests...
 // const a: GuiSpec<'dropdown'> = {

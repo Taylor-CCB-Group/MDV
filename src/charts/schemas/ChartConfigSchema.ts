@@ -227,6 +227,29 @@ export const DotPlotConfigSchema = BaseConfigSchema.extend({
     // Additional dot plot specific properties
 }).describe("Configuration for dot plots showing individual data points");
 
+export const CompoundDotPlotConfigSchema = BaseConfigSchema.extend({
+    type: z.literal("compound_dot_plot").describe("Compound dot plot chart type"),
+    y_axis_order: z.enum(["data", "alphabetical"]).optional().describe("Order of the y-axis categories"),
+    threshold_value: z.number().optional().describe("A value counts as expressed when it is greater than this"),
+    split_by: z.string().nullable().optional().describe("Category column to split by, one panel per value; null for one panel"),
+    split_values: z.array(z.string()).optional().describe("Values of split_by to show, in panel order"),
+    color_scale: z.object({
+        palette: z.enum(["reds", "blue_white_red"]).optional().describe("Colour palette for mean expression"),
+        log: z.boolean().optional().describe("Use a log colour scale"),
+        mode: z.enum(["auto", "manual"]).optional().describe("auto: from the data, shared by all panels; manual: from min and max"),
+        min: z.number().optional().describe("Colour range minimum when mode is manual"),
+        max: z.number().optional().describe("Colour range maximum when mode is manual"),
+    }).optional().describe("Colour scale for mean expression, shared by all panels"),
+    color_legend: z.object({ display: z.boolean() }).optional().describe("Show the colour legend"),
+    fraction_legend: z.object({ display: z.boolean() }).optional().describe("Show the fraction legend"),
+    reserve_legend_space: z.boolean().optional().describe("Keep space above the plot for the legends; off, the plot fills the height"),
+}).describe("Configuration for React dot plots, optionally split into panels that share one colour and size scale");
+
+// earlier type name of the compound dot plot, still accepted
+export const CompoundDotPlotOldTypeConfigSchema = CompoundDotPlotConfigSchema.extend({
+    type: z.literal("split_dot_plot").describe("Earlier type name of the compound dot plot"),
+});
+
 export const BoxPlotConfigSchema = BaseConfigSchema.extend({
     ...ChartColorConfigSchema.shape,
     type: z.literal("box_plot").describe("Box plot chart type"),
@@ -357,6 +380,8 @@ registerChartConfigSchema("histogram", HistogramConfigSchema, { version: "1" });
 registerChartConfigSchema("heatmap", HeatmapConfigSchema, { version: "1" });
 registerChartConfigSchema("category_heatmap", CategoryHeatmapConfigSchema, { version: "1" });
 registerChartConfigSchema("dot_plot", DotPlotConfigSchema, { version: "1" });
+registerChartConfigSchema("compound_dot_plot", CompoundDotPlotConfigSchema, { version: "1" });
+registerChartConfigSchema("split_dot_plot", CompoundDotPlotOldTypeConfigSchema, { version: "1" });
 registerChartConfigSchema("box_plot", BoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("violin_plot", ViolinPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("pie_chart", PieChartConfigSchema, { version: "1" });
