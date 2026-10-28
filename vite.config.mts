@@ -139,6 +139,27 @@ function workerFormat(): "es" | "iife" {
 
 const spatialdataFsAllow = linkedSpatialdataRoots();
 
+/**
+ * The IntraSpatial checkout root when `pnpm link:intraspatial` has wired one up, from the
+ * resolved symlink like `linkedSpatialdataRoots`: `<root>/packages/deck` → `<root>`.
+ * Null for no install, and for a registry install inside this project.
+ */
+function linkedIntraspatialRoot(): string | null {
+    try {
+        const real = fs.realpathSync(path.join(configDir, "node_modules", "@intraspatial/deck"));
+        const rel = path.relative(configDir, real);
+        const inside = rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+        return inside ? null : path.resolve(real, "../..");
+    } catch {
+        return null;
+    }
+}
+
+const intraspatialRoot = linkedIntraspatialRoot();
+const linkedIntraspatialNames = intraspatialRoot ? ["intraspatial", "@intraspatial/deck"] : [];
+/** Roots outside this project that Vite must read from, for any linked checkout. */
+const linkedFsAllow = [...spatialdataFsAllow, ...(intraspatialRoot ? [intraspatialRoot] : [])];
+
 // zarrita needed a polyfill for Buffer - seems like a bug
 // seems ok without as long we don't use ZipFileStore (marked experimental anyway)
 // having the polyfill means the build works, but devserver fails with 'cannot import outside a module'
@@ -338,7 +359,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
             port,
             strictPort: true,
             proxy,
-            ...(spatialdataFsAllow.length ? { fs: { allow: [configDir, ...spatialdataFsAllow] } } : {}),
+            ...(linkedFsAllow.length ? { fs: { allow: [configDir, ...linkedFsAllow] } } : {}),
         },
         publicDir: process.env.exclude_dir ? false : "examples", //used for netlify.toml??... the rest is noise.
         build: {
@@ -398,7 +419,9 @@ export default defineConfig(async (): Promise<UserConfig> => {
             // knows — "DECKGL_FILTER_COLOR: no matching overloaded function"), two Reacts
             // (invalid hook call), two Matrix4. Collapse the packages that cross the
             // boundary onto MDV's copy. Only when linked, so a registry install is untouched.
-            ...(spatialdataFsAllow.length
+            // The same applies to a linked IntraSpatial checkout, whose deck layer must share
+            // MDV's @deck.gl/core / @luma.gl/* (and its typegpu) to run on MDV's device.
+            ...(linkedFsAllow.length
                 ? {
                       dedupe: [
                           "react",
@@ -413,12 +436,14 @@ export default defineConfig(async (): Promise<UserConfig> => {
                           "@luma.gl/engine",
                           "@luma.gl/shadertools",
                           "@luma.gl/webgl",
+                          "@luma.gl/webgpu",
                           "@luma.gl/constants",
                           "@math.gl/core",
                           "@hms-dbmi/viv",
                           "@vivjs/views",
                           "@vivjs/constants",
                           "zarrita",
+                          "typegpu",
                       ],
                   }
                 : {}),
@@ -451,7 +476,8 @@ export default defineConfig(async (): Promise<UserConfig> => {
             // function rather than reading `Le (…/.vite/deps/@spatialdata_layers.js)`.
             // (An `optimizeDeps.esbuildOptions.sourcemap` lived here for that; under
             // Vite 8 it is deprecated, it warns, and removing it changes no output.)
-            exclude: ["@spatialdata/core", "zod", ...linkedSpatialdataNames],
+            // A linked IntraSpatial checkout is excluded for the same reason: its dist changes.
+            exclude: ["@spatialdata/core", "zod", ...linkedSpatialdataNames, ...linkedIntraspatialNames],
         },
     } as UserConfig;
 });

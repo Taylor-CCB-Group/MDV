@@ -6,6 +6,16 @@
  * Merge `vite.config.mts` so test transforms match production (Babel decorators, glsl, aliases).
  */
 import { defineConfig, mergeConfig } from 'vitest/config';
+import * as fs from 'node:fs';
+
+/** `pnpm link:intraspatial` leaves a symlink here; a registry install never has one yet. */
+const intraspatialLinked = (() => {
+    try {
+        return fs.lstatSync(new URL('./node_modules/@intraspatial/deck', import.meta.url)).isSymbolicLink();
+    } catch {
+        return false;
+    }
+})();
 
 export default defineConfig(async () => {
     // Path aliases are not applied by Node's dynamic import(); file URL resolves at runtime.
@@ -23,6 +33,11 @@ export default defineConfig(async () => {
                 optimizer: {
                     client: {
                         enabled: true,
+                        // With IntraSpatial linked, its dist imports `typegpu`, `typegpu/data` and
+                        // `typegpu/std`. Un-bundled, typegpu's modules are reached by more than one id
+                        // and evaluated twice, which throws ("Cannot redefine property: add");
+                        // bundling them gives one instance.
+                        ...(intraspatialLinked ? { include: ['typegpu', 'typegpu/data', 'typegpu/std'] } : {}),
                     },
                     ssr: {
                         enabled: true,

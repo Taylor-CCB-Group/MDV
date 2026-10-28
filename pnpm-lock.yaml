@@ -79,6 +79,9 @@ importers:
       '@hms-dbmi/viv':
         specifier: 0.23.0
         version: 0.23.0(ed0d233fb9efaa5b1ba8511931f32921)
+      '@intraspatial/deck':
+        specifier: ^0.1.0
+        version: 0.1.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))))(@luma.gl/core@9.4.2)(@luma.gl/engine@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))(typegpu@0.11.9)
       '@luma.gl/constants':
         specifier: 9.4.2
         version: 9.4.2
@@ -97,6 +100,9 @@ importers:
       '@luma.gl/webgl':
         specifier: 9.4.2
         version: 9.4.2(@luma.gl/core@9.4.2)
+      '@luma.gl/webgpu':
+        specifier: 9.4.2
+        version: 9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))
       '@math.gl/core':
         specifier: 4.1.0
         version: 4.1.0
@@ -122,20 +128,20 @@ importers:
         specifier: 10.6.0
         version: 10.6.0
       '@spatialdata/avivatorish':
-        specifier: ^0.13.0
-        version: 0.13.0(e4bea2acd8db7a7ca06bf617c7d3a0f3)
+        specifier: ^0.13.2
+        version: 0.13.2(e4bea2acd8db7a7ca06bf617c7d3a0f3)
       '@spatialdata/core':
-        specifier: ^0.13.0
-        version: 0.13.0
+        specifier: ^0.13.2
+        version: 0.13.2
       '@spatialdata/layers':
-        specifier: ^0.13.0
-        version: 0.13.0(e7f8cebde3e11ec1588ca409120e6853)
+        specifier: ^0.13.2
+        version: 0.13.2(e7f8cebde3e11ec1588ca409120e6853)
       '@spatialdata/react':
-        specifier: ^0.13.0
-        version: 0.13.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.4)
+        specifier: ^0.13.2
+        version: 0.13.2(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.5)
       '@spatialdata/vis':
-        specifier: ^0.13.0
-        version: 0.13.0(17fe6aa7bf939f21bb4c12f01572ab97)
+        specifier: ^0.13.2
+        version: 0.13.2(121ba8625c9580156c762805ee09f693)
       '@tanstack/react-query':
         specifier: ^5.80.0
         version: 5.80.6(react@19.2.6)
@@ -358,6 +364,9 @@ importers:
       tippy.js:
         specifier: ^6.3.7
         version: 6.3.7
+      typegpu:
+        specifier: ^0.11.9
+        version: 0.11.9
       use-debounce:
         specifier: ^10.0.2
         version: 10.0.3(react@19.2.6)
@@ -368,8 +377,8 @@ importers:
         specifier: ^1.2.2
         version: 1.2.2
       zarrextra:
-        specifier: 0.5.1
-        version: 0.5.1
+        specifier: 0.7.0
+        version: 0.7.0
       zod:
         specifier: ^3.25.49
         version: 3.25.49
@@ -1326,6 +1335,15 @@ packages:
 
   '@interactjs/types@1.10.27':
     resolution: {integrity: sha512-BUdv0cvs4H5ODuwft2Xp4eL8Vmi3LcihK42z0Ft/FbVJZoRioBsxH+LlsBdK4tAie7PqlKGy+1oyOncu1nQ6eA==}
+
+  '@intraspatial/deck@0.1.0':
+    resolution: {integrity: sha512-zcsH64t7G3JQ/Ln1yVUIn4vkTXv1Rvqxsc4K5oqqBqUaRDFAyCjCvQtQl5bLG0hTTPfcfVnmI3CFjXhlEQXKFA==}
+    peerDependencies:
+      '@deck.gl/core': ~9.4.0
+      '@luma.gl/core': ~9.4.2
+      '@luma.gl/engine': ~9.4.2
+      '@luma.gl/shadertools': ~9.4.2
+      typegpu: ^0.11.9
 
   '@isaacs/cliui@8.0.2':
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
@@ -2288,17 +2306,17 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
-  '@spatialdata/avivatorish@0.13.0':
-    resolution: {integrity: sha512-krl+9xQTmRGf/keQ+v4Pn0wcrkFcMLtrvrbFbQ1xS3wHd5fHOFTTxUYYGHf79gikwOmf12YOiwJxnwGDpFuXbA==}
+  '@spatialdata/avivatorish@0.13.2':
+    resolution: {integrity: sha512-ugL2OCrpuJM9DGD6gzpfZnTXGKfBWB0NxAFmKkpVwf44YoNtP4WSo1Hj8LubmzqP94iPjrRurBlPoFa8PvE+Yg==}
     peerDependencies:
       react: '>=18 <20'
       react-dom: '>=18 <20'
 
-  '@spatialdata/core@0.13.0':
-    resolution: {integrity: sha512-hWu30fjeMAEB1MVOAeFy6rZOJoz7UjbKT2Djj6xyYtCXsW0Cr5WY2lgJMgRoMgGvrXqU1GbNrdnFu1XpNke24Q==}
+  '@spatialdata/core@0.13.2':
+    resolution: {integrity: sha512-bgJYBuOhmwHJY2TplYuyvv/gqqk1XYi/jJuPgmr4YPQgF0PjfQT2QW7gvQj5/4o0hc3HUF8vvZPT3EiDpZNWSw==}
 
-  '@spatialdata/layers@0.13.0':
-    resolution: {integrity: sha512-vHOJRLPjRhhw/d7oad/OCxMULG5TUk5m6A/e7+VIr4fNjqNN0WYL5Pt0jKadbTMCVmKRDWJObjTOPtnTQHF47A==}
+  '@spatialdata/layers@0.13.2':
+    resolution: {integrity: sha512-QxIDBTcwpOVmb5xxoulmOcBUetBU8fbaf0BJlxP9LjxJaRfYnrxIq5h0bVlZg81xDf4RxG2S0KJs8HFnwhKVzQ==}
     peerDependencies:
       '@deck.gl/core': ~9.4.0
       '@deck.gl/geo-layers': ~9.4.0
@@ -2306,16 +2324,16 @@ packages:
       '@deck.gl/react': ~9.4.0
       '@deck.gl/widgets': ~9.4.0
 
-  '@spatialdata/react@0.13.0':
-    resolution: {integrity: sha512-9w3bvsYh7U9sPLBUaeDe1YHBy5hwaBlXpDXamPVuXEQDw8UMS6TDt/RrK8J84biJjC6B5IAQTtKybL71NCY7lA==}
+  '@spatialdata/react@0.13.2':
+    resolution: {integrity: sha512-tp5zdvsyB/SlBViQZmsu2GCE/lj4SqfEO3goGFm1Zmy7AS1LnE82mQJXbAqbEowJuGhdWL1tDUzo8OFpM28Zkg==}
     peerDependencies:
       anndata.js: ^0.0.2
       react: '>=18 <20'
       react-dom: '>=18 <20'
       zarrita: ^0.7.1
 
-  '@spatialdata/vis@0.13.0':
-    resolution: {integrity: sha512-7qODBU7bQhGJHZFf6ji5Vg5/Tp8PZIEZcdkFcYyfyluQmBP+hlx0YoT6WJyECMnKpNpwfgVa+AJxJVGEoTmsTQ==}
+  '@spatialdata/vis@0.13.2':
+    resolution: {integrity: sha512-vKtN/XZFVV02xinYd8GZD27MGDZYEF0Wkkj6Vz2NQ5UKbCJJU1SZ3ZQVuImf4l9H+Scqa9ECteac9F6VY+WWwA==}
     peerDependencies:
       '@deck.gl/core': ~9.4.0
       '@deck.gl/geo-layers': ~9.4.0
@@ -4409,6 +4427,10 @@ packages:
     resolution: {integrity: sha512-PT6uoF5a1+kbC3tHmZSUsLHBp2QJlHasxxxxPW47QIY1VBKpFB+FcDvX+MxER6UzgLQZ0xDzJ9s48B9JbOCTqA==}
     engines: {node: '>=10.19'}
 
+  geotiff@3.0.5:
+    resolution: {integrity: sha512-OWcL9S9+yDZ6iAlXMt32T1iwUApJM8UiD47xbm6ZP1h33d10fqkPs14EG/ttT5EnefpZSx3G15iDFC5FxUNUwA==}
+    engines: {node: '>=10.19'}
+
   geotiff@3.1.0-beta.0:
     resolution: {integrity: sha512-wbVwOaQYuN+ywly5NoMXn37nHslwkQg5EFHqMeUTtjDACrSag0EEVlFsc+2DK3Pzmmp6XzJW2RTZOamPsBM6ng==}
     engines: {node: '>=10.19'}
@@ -4600,6 +4622,16 @@ packages:
   internmap@2.0.3:
     resolution: {integrity: sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==}
     engines: {node: '>=12'}
+
+  intraspatial@0.1.0:
+    resolution: {integrity: sha512-LgC1EOB60rZ/dcLjXgM5cvrslkeffpfFrqu5KctzxYzsw6FLYh+1/cwCSGBMZy5nC1334F0DoduejbINhQQAyg==}
+    engines: {node: '>=20.11'}
+    peerDependencies:
+      typegpu: ^0.11.9
+      webgpu: ^0.4.0
+    peerDependenciesMeta:
+      webgpu:
+        optional: true
 
   is-alphabetical@2.0.1:
     resolution: {integrity: sha512-FWyyY60MeTNyeSRpkM2Iry0G9hpr7/9kD40mD/cGQEuilcZYS4okz8SN2Q6rLCJ8gbCt6fN+rC+6tMGS99LaxQ==}
@@ -5965,6 +5997,10 @@ packages:
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
 
+  tinyest@0.3.2:
+    resolution: {integrity: sha512-1wqSt97RLezWzeogLSVXHr+E3jpYO8jxyaK2AIdJeGoZZTCubwNxQ9IqU5gbQpJVcxlbPugPAsII+m9/gqpPSA==}
+    engines: {node: '>=12.20.0'}
+
   tinyexec@1.1.2:
     resolution: {integrity: sha512-dAqSqE/RabpBKI8+h26GfLq6Vb3JVXs30XYQjdMjaj/c2tS8IYYMbIzP599KtRj7c57/wYApb3QjgRgXmrCukA==}
     engines: {node: '>=18'}
@@ -6030,6 +6066,9 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
+  tsover-runtime@0.0.7:
+    resolution: {integrity: sha512-FHHwMJzZbnP23+fU1PxXljy7j0RRRosL2r1/CRUNTqfW+l7m35JsUkM615x/cAzw4GqRdXPIl3axKMj9qzpZtQ==}
+
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
     engines: {node: '>= 0.8.0'}
@@ -6037,6 +6076,9 @@ packages:
   type-fest@4.41.0:
     resolution: {integrity: sha512-TeTSQ6H5YHvpqVwBRcnLDCBnDOHWYu7IvGbHT6N8AOymcr9PJGjc1GTtiWZTYg0NCgYwvnYWEkVChQAr9bjfwA==}
     engines: {node: '>=16'}
+
+  typed-binary@4.3.3:
+    resolution: {integrity: sha512-W2hLsSzt3k/tg38gDE4Fn/QiwcoqGuUHBc2cb3mXuH7KcYxe/GM57vzW14s2/bawB4R5knGgGq8Xb57vsaJ4Sg==}
 
   typedoc-plugin-missing-exports@4.0.0:
     resolution: {integrity: sha512-Z4ei+853xppDEhcqzyeyRs4+R0kUuKQWnMK1EtSTEd5LFkgkdW5Bdn8vfo/rsCGbYVJxOWU99fxgM1mROw5Fug==}
@@ -6054,6 +6096,11 @@ packages:
     hasBin: true
     peerDependencies:
       typescript: 5.0.x || 5.1.x || 5.2.x || 5.3.x || 5.4.x || 5.5.x || 5.6.x || 5.7.x || 5.8.x || 5.9.x || 6.0.x
+
+  typegpu@0.11.9:
+    resolution: {integrity: sha512-AqBV6P9lW2jA7pEVDeiMD7Qoza9doPgueQbwyUyf09u4ndb9jOttHwpZ18c+BEzwLHaPlV50jw0hx5QsmVJGNg==}
+    engines: {node: '>=12.20.0'}
+    hasBin: true
 
   typescript-eslint@8.63.0:
     resolution: {integrity: sha512-xgwXyzG4sK9ALkBxbyGkTMMOS+imnW65iPhxCQMK83KhxyoDNW7l+IDqEf9vMdoUidHpOoS967RCq4eMiTexwQ==}
@@ -6115,6 +6162,10 @@ packages:
 
   unzipit@2.0.0:
     resolution: {integrity: sha512-DVeVIWUZCAQPNzm5sB0hpsG1GygTTdBnzNtYYEpInkttx5evkyqRgZi6rTczoySqp8hO5jHVKzrH0f23X8FZLg==}
+    engines: {node: '>=18'}
+
+  unzipit@2.1.1:
+    resolution: {integrity: sha512-GNIM737c1VV8Z5VD2gSs3SERnqe7KS+dHAmqN9GzdXHB3k4NfXcgNv0+z0br7gJZdhJvv8+MCxBwLvRy7fOhyg==}
     engines: {node: '>=18'}
 
   update-browserslist-db@1.2.3:
@@ -6270,6 +6321,9 @@ packages:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
     engines: {node: '>=12'}
 
+  wgpu-matrix@3.4.2:
+    resolution: {integrity: sha512-IfZFbG7olEYBD76VCZy2TzqM57GKy3LT++AZh37tMHPPByO6R2h61zXGBZFNPi2IzxNivNi8y5dvze5PjaczjA==}
+
   whatwg-encoding@3.1.1:
     resolution: {integrity: sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ==}
     engines: {node: '>=18'}
@@ -6382,8 +6436,8 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zarrextra@0.5.1:
-    resolution: {integrity: sha512-ZOe0uHL3Kw9k/OH/XQLz4Rn+9oobBvrMGQJhfrWVyA3nLHaaTEF+u0U9mgPJpUuNoCl/rld3KlSqVuIFtH11lA==}
+  zarrextra@0.7.0:
+    resolution: {integrity: sha512-ElDlzOvZexREUhILTtwrAZwmIiBWe/SqYYUOIL3H41nsyhyWN0fnF7Y4pRjq6FQYRsKMjyr1UsdXv4FK2TzzsQ==}
 
   zarrita@0.5.1:
     resolution: {integrity: sha512-cyujP70BOl5DiXuLtM+0j9nq/pAov4SKXRYIQQOVnk2TfBg/jopX+FXLbqkq3ULOxFLB5AwkPbSp5KvZXoJrbQ==}
@@ -6391,8 +6445,8 @@ packages:
   zarrita@0.5.4:
     resolution: {integrity: sha512-i88iN2+HqIQ+uiCEWLfhjbYNXAJD7IrM4h3lFwFclfqEOOhxp10amRWtqmgN5jbuy3+h0LwdyLVVzk4y9rTLgg==}
 
-  zarrita@0.7.4:
-    resolution: {integrity: sha512-NChufj86SceFj45z4CYjndmI98dphaG7hU8Wj0UGpMyT21o0V3HTY6zo87aSobYWts1tNFivSXzH2AR1AkaWjA==}
+  zarrita@0.7.5:
+    resolution: {integrity: sha512-ZriOSEne+Wf2iuM0yjDZvUKpHNlug3dO7qJ6mAxXoOgsYV18DPOkAkwB9e0rf21bHcKcOffFuwoZwn5g6pvUeA==}
 
   zod-validation-error@4.0.2:
     resolution: {integrity: sha512-Q6/nZLe6jxuU80qb/4uJ4t5v2VEZ44lzQjPDhYJNztRQ4wyWc6VF3D3Kb/fAuPetZQnhS3hnajCf9CsWesghLQ==}
@@ -7402,10 +7456,10 @@ snapshots:
     dependencies:
       fflate: 0.8.2
 
-  '@fideus-labs/fizarrita@3.0.0(zarrita@0.7.4)':
+  '@fideus-labs/fizarrita@3.0.0(zarrita@0.7.5)':
     dependencies:
       '@fideus-labs/worker-pool': 2.1.0
-      zarrita: 0.7.4
+      zarrita: 0.7.5
     optional: true
 
   '@fideus-labs/worker-pool@2.1.0':
@@ -7507,6 +7561,17 @@ snapshots:
       mlly: 1.8.2
 
   '@interactjs/types@1.10.27': {}
+
+  '@intraspatial/deck@0.1.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))))(@luma.gl/core@9.4.2)(@luma.gl/engine@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))(typegpu@0.11.9)':
+    dependencies:
+      '@deck.gl/core': 9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))
+      '@luma.gl/core': 9.4.2
+      '@luma.gl/engine': 9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))
+      '@luma.gl/shadertools': 9.4.2(@luma.gl/core@9.4.2)
+      intraspatial: 0.1.0(typegpu@0.11.9)
+      typegpu: 0.11.9
+    transitivePeerDependencies:
+      - webgpu
 
   '@isaacs/cliui@8.0.2':
     dependencies:
@@ -8682,13 +8747,13 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@spatialdata/avivatorish@0.13.0(e4bea2acd8db7a7ca06bf617c7d3a0f3)':
+  '@spatialdata/avivatorish@0.13.2(e4bea2acd8db7a7ca06bf617c7d3a0f3)':
     dependencies:
       '@hms-dbmi/viv': 0.23.0(ed0d233fb9efaa5b1ba8511931f32921)
       '@math.gl/core': 4.1.0
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
-      zarrextra: 0.5.1
+      zarrextra: 0.7.0
       zustand: 5.0.14(@types/react@19.2.14)(react@19.2.6)(use-sync-external-store@1.6.0(react@19.2.6))
     transitivePeerDependencies:
       - '@deck.gl/core'
@@ -8705,7 +8770,7 @@ snapshots:
       - immer
       - use-sync-external-store
 
-  '@spatialdata/core@0.13.0':
+  '@spatialdata/core@0.13.2':
     dependencies:
       '@math.gl/core': 4.1.0
       '@zarrita/storage': 0.2.0
@@ -8713,11 +8778,11 @@ snapshots:
       apache-arrow: 21.2.0
       earcut: 3.2.3
       ol: 10.10.0
-      zarrextra: 0.5.1
-      zarrita: 0.7.4
+      zarrextra: 0.7.0
+      zarrita: 0.7.5
       zod: 4.4.3
 
-  '@spatialdata/layers@0.13.0(e7f8cebde3e11ec1588ca409120e6853)':
+  '@spatialdata/layers@0.13.2(e7f8cebde3e11ec1588ca409120e6853)':
     dependencies:
       '@deck.gl/core': 9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))
       '@deck.gl/geo-layers': 9.4.0(46ae1f768e6c29027c21cd6e3e19c265)
@@ -8728,7 +8793,7 @@ snapshots:
       '@luma.gl/core': 9.4.2
       '@luma.gl/engine': 9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))
       '@math.gl/core': 4.1.0
-      '@spatialdata/core': 0.13.0
+      '@spatialdata/core': 0.13.2
       zod: 4.4.3
     transitivePeerDependencies:
       - '@luma.gl/constants'
@@ -8736,15 +8801,15 @@ snapshots:
       - '@luma.gl/webgl'
       - react
 
-  '@spatialdata/react@0.13.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.4)':
+  '@spatialdata/react@0.13.2(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.5)':
     dependencies:
-      '@spatialdata/core': 0.13.0
+      '@spatialdata/core': 0.13.2
       anndata.js: 0.0.2
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
-      zarrita: 0.7.4
+      zarrita: 0.7.5
 
-  '@spatialdata/vis@0.13.0(17fe6aa7bf939f21bb4c12f01572ab97)':
+  '@spatialdata/vis@0.13.2(121ba8625c9580156c762805ee09f693)':
     dependencies:
       '@deck.gl/core': 9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))
       '@deck.gl/geo-layers': 9.4.0(46ae1f768e6c29027c21cd6e3e19c265)
@@ -8755,10 +8820,10 @@ snapshots:
       '@luma.gl/core': 9.4.2
       '@luma.gl/webgpu': 9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))
       '@math.gl/core': 4.1.0
-      '@spatialdata/avivatorish': 0.13.0(e4bea2acd8db7a7ca06bf617c7d3a0f3)
-      '@spatialdata/core': 0.13.0
-      '@spatialdata/layers': 0.13.0(e7f8cebde3e11ec1588ca409120e6853)
-      '@spatialdata/react': 0.13.0(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.4)
+      '@spatialdata/avivatorish': 0.13.2(e4bea2acd8db7a7ca06bf617c7d3a0f3)
+      '@spatialdata/core': 0.13.2
+      '@spatialdata/layers': 0.13.2(e7f8cebde3e11ec1588ca409120e6853)
+      '@spatialdata/react': 0.13.2(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.5)
       '@tanstack/react-virtual': 3.14.10(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@uidotdev/usehooks': 2.4.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@uiw/react-json-view': 2.0.0-alpha.43(@babel/runtime@7.29.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -8767,8 +8832,8 @@ snapshots:
       fast-deep-equal: 3.1.3
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
-      zarrextra: 0.5.1
-      zarrita: 0.7.4
+      zarrextra: 0.7.0
+      zarrita: 0.7.5
       zustand: 5.0.14(@types/react@19.2.14)(react@19.2.6)(use-sync-external-store@1.6.0(react@19.2.6))
     transitivePeerDependencies:
       - '@babel/runtime'
@@ -11290,6 +11355,17 @@ snapshots:
       xml-utils: 1.10.2
       zstddec: 0.1.0
 
+  geotiff@3.0.5:
+    dependencies:
+      '@petamoriken/float16': 3.9.3
+      lerc: 3.0.0
+      pako: 2.1.0
+      parse-headers: 2.0.6
+      quick-lru: 6.1.2
+      web-worker: 1.5.0
+      xml-utils: 1.10.2
+      zstddec: 0.2.0
+
   geotiff@3.1.0-beta.0:
     dependencies:
       '@petamoriken/float16': 3.9.3
@@ -11529,6 +11605,14 @@ snapshots:
   internmap@1.0.1: {}
 
   internmap@2.0.3: {}
+
+  intraspatial@0.1.0(typegpu@0.11.9):
+    dependencies:
+      '@zarrita/storage': 0.2.0
+      geotiff: 3.0.5
+      typegpu: 0.11.9
+      wgpu-matrix: 3.4.2
+      zarrita: 0.7.5
 
   is-alphabetical@2.0.1: {}
 
@@ -12398,7 +12482,7 @@ snapshots:
       geotiff: 3.1.0-beta.0
       pbf: 5.1.2
       rbush: 4.0.1
-      zarrita: 0.7.4
+      zarrita: 0.7.5
 
   open@11.0.0:
     dependencies:
@@ -13192,6 +13276,8 @@ snapshots:
 
   tinybench@2.9.0: {}
 
+  tinyest@0.3.2: {}
+
   tinyexec@1.1.2: {}
 
   tinyglobby@0.2.16:
@@ -13243,11 +13329,15 @@ snapshots:
 
   tslib@2.8.1: {}
 
+  tsover-runtime@0.0.7: {}
+
   type-check@0.4.0:
     dependencies:
       prelude-ls: 1.2.1
 
   type-fest@4.41.0: {}
+
+  typed-binary@4.3.3: {}
 
   typedoc-plugin-missing-exports@4.0.0(typedoc@0.28.19(typescript@6.0.3)):
     dependencies:
@@ -13266,6 +13356,12 @@ snapshots:
       minimatch: 10.2.5
       typescript: 6.0.3
       yaml: 2.8.4
+
+  typegpu@0.11.9:
+    dependencies:
+      tinyest: 0.3.2
+      tsover-runtime: 0.0.7
+      typed-binary: 4.3.3
 
   typescript-eslint@8.63.0(eslint@10.6.0(jiti@1.21.7))(typescript@6.0.3):
     dependencies:
@@ -13340,6 +13436,8 @@ snapshots:
       uzip-module: 1.0.3
 
   unzipit@2.0.0: {}
+
+  unzipit@2.1.1: {}
 
   update-browserslist-db@1.2.3(browserslist@4.28.1):
     dependencies:
@@ -13441,6 +13539,8 @@ snapshots:
 
   webidl-conversions@7.0.0: {}
 
+  wgpu-matrix@3.4.2: {}
+
   whatwg-encoding@3.1.1:
     dependencies:
       iconv-lite: 0.6.3
@@ -13530,12 +13630,13 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zarrextra@0.5.1:
+  zarrextra@0.7.0:
     dependencies:
-      zarrita: 0.7.4
+      unzipit: 2.1.1
+      zarrita: 0.7.5
     optionalDependencies:
       '@cornerstonejs/codec-openjpeg': 1.3.1
-      '@fideus-labs/fizarrita': 3.0.0(zarrita@0.7.4)
+      '@fideus-labs/fizarrita': 3.0.0(zarrita@0.7.5)
       '@fideus-labs/worker-pool': 2.1.0
       openjph-wasm: 0.1.0
 
@@ -13549,7 +13650,7 @@ snapshots:
       '@zarrita/storage': 0.1.3
       numcodecs: 0.3.2
 
-  zarrita@0.7.4:
+  zarrita@0.7.5:
     dependencies:
       '@zarrita/storage': 0.2.0
       numcodecs: 0.3.2

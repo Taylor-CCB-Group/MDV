@@ -140,16 +140,21 @@ function createBaseContourLayerProps(params: {
     cx: { data: ArrayLike<number> };
     cy: { data: ArrayLike<number> };
     radiusPixels: number;
+    /** The configured bandwidth, for layers that size their kernel in data units. */
+    bandwidth: number;
     fillOpacity: number;
     contourOpacity: number;
     contourFill: number;
     colorRange: readonly (readonly number[])[];
 }) {
-    const { id, data, cx, cy, radiusPixels, fillOpacity, contourOpacity, contourFill, colorRange } = params;
+    const { id, data, cx, cy, radiusPixels, bandwidth, fillOpacity, contourOpacity, contourFill, colorRange } = params;
     
     return {
         id,
         data,
+        // the coordinate columns themselves, for layers that take arrays rather than accessors
+        x: cx.data,
+        y: cy.data,
         fillOpacity,
         contourOpacity,
         contourFill,
@@ -164,6 +169,7 @@ function createBaseContourLayerProps(params: {
         },
         colorRange,
         radiusPixels,
+        bandwidth,
         debounce: 1000,
         weightsTextureSize: 256, // Intermediate value for balanced performance and quality
         pickable: false,
@@ -204,6 +210,7 @@ export function useCategoryContour(props: CategoryContourProps) {
             cx,
             cy,
             radiusPixels,
+            bandwidth,
             fillOpacity: getHoverEmphasis(intensity, isHovered, hoveredContour),
             contourOpacity: getHoverEmphasis(opacity, isHovered, hoveredContour),
             contourFill: fill ? fillThreshold : 10000,
@@ -272,6 +279,7 @@ export function useFieldContour(props: FieldContourProps) {
                 cx,
                 cy,
                 radiusPixels,
+                bandwidth,
                 fillOpacity: adjustedIntensity,
                 contourOpacity: adjustedOpacity,
                 contourFill: fill ? fillThreshold : 10000,
@@ -295,6 +303,8 @@ export function useFieldContour(props: FieldContourProps) {
                     const normalizedValue = (value - min) / range;
                     return normalizedValue;
                 },
+                // what getWeight computes, so WebGPU's weight array survives a new closure
+                weightKey: [fieldData, minMax[0], minMax[1]] as const,
                 transitions: {
                     // nb - failed to get this working
                     // will need changes to the HeatmapContourExtension implementation

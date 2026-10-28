@@ -369,6 +369,8 @@ const BrightnessContrast = ({ index }: { index: number }) => {
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     const contrastValue = contrast[index] ?? DEFAULT_BRIGHTNESS_CONTRAST;
     const brightnessValue = brightness[index] ?? DEFAULT_BRIGHTNESS_CONTRAST;
+    const toneUnavailable = spatial?.toneUnavailable ?? null;
+    const disabled = Boolean(isChannelLoading[index]) || toneUnavailable !== null;
     return (
         <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
             <div className="flex items-center gap-2">
@@ -377,7 +379,7 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                 </span>
                 <Slider
                     size="small"
-                    disabled={isChannelLoading[index]}
+                    disabled={disabled}
                     value={contrastValue}
                     min={0.1}
                     max={0.9}
@@ -409,7 +411,7 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                 </span>
                 <Slider
                     size="small"
-                    disabled={isChannelLoading[index]}
+                    disabled={disabled}
                     value={brightnessValue}
                     min={0.01}
                     max={0.99}
@@ -435,6 +437,11 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                     }}
                 />
             </div>
+            {toneUnavailable && (
+                <span className="text-[10px] text-[hsl(var(--muted-foreground))] sm:col-span-2">
+                    {toneUnavailable}
+                </span>
+            )}
         </div>
     );
 };

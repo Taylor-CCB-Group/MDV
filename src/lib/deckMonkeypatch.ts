@@ -1,6 +1,7 @@
 import type { EventManager } from 'mjolnir.js';
 import { Deck } from '@deck.gl/core';
 import { EditableGeoJsonLayer } from '@deck.gl-community/editable-layers';
+import { cpuEditablePicks } from '@/editable-layers/cpuPicks';
 
 // we aren't really using this as an actual subclass, just declaring things as public so we can access them.
 //! we don't want to keep this around for future maintenance, hopefully deck can be patched so this is less necessary
@@ -13,7 +14,36 @@ class MonkeyPatchDeck extends Deck<any> {
     declare public canvas: HTMLCanvasElement | null;
 }
 
-export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {}
+type EditablePicks = ReturnType<EditableGeoJsonLayer["getPicks"]>;
+
+export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
+    /**
+     * editable-layers picks synchronously on every pointer event (`pickMultipleObjects`),
+     * which deck.gl cannot do on a WebGPU device: it throws, and the throw aborted the
+     * click before deck dispatched it to the other layers.
+     *
+     * On WebGPU, compute the picks on the CPU instead (`cpuEditablePicks`): the layer holds
+     * one shape and its handles, so this is cheap and exact, and answers for where the
+     * pointer is now. An async GPU pick could only answer for where it was, so a quick move
+     * then press drew a new shape rather than moving the existing one. It also sidesteps two
+     * deck 9.4 WebGPU picking bugs met along the way: rectangle picks throw under
+     * @spatialdata's picking fix, and the outline's path sublayer returns garbage indices.
+     * Remove once editable-layers picks asynchronously.
+     */
+    getPicks(screenCoords: Parameters<EditableGeoJsonLayer["getPicks"]>[0]): EditablePicks {
+        if (this.context.device.type !== "webgpu") return super.getPicks(screenCoords);
+        const [x, y] = screenCoords;
+        const guides = this.getActiveMode().getGuides(this.getModeProps(this.props));
+        const picks = cpuEditablePicks({
+            features: this.props.data.features,
+            guides: guides?.features ?? [],
+            point: screenCoords,
+            project: (position) => this.project([position[0], position[1], 0]),
+            radius: this.props.pickingRadius ?? 0,
+        });
+        return picks.map((pick) => ({ ...pick, color: null, layer: this, x, y, pixelRatio: 1 }));
+    }
+}
 
 /** Deck's own (private) helpers, so the replacement manager is configured exactly as deck would. */
 function getDeckPrivates(deck: MonkeyPatchDeck) {

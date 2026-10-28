@@ -4,13 +4,14 @@ import "react18-json-view/src/style.css";
 // If dark mode is needed, import `dark.css`.
 import "react18-json-view/src/dark.css";
 import { observer } from "mobx-react-lite";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
 import "../../utilities/css/JsonDialogStyles.css";
 import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Divider, Link, Typography } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
 import { useChartManager } from "../hooks";
+import BrowserSettingsSection from "./BrowserSettingsSection";
 import CustomTooltip from "./CustomTooltip";
 import type ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import type { ValidationFinding } from "@/lib/ValidationFindingsStore";
@@ -264,10 +265,13 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     json,
     header,
     showValidationSection = false,
+    chartPanel,
 }: {
     json: any;
     header?: string;
     showValidationSection?: boolean;
+    /** The chart's own status and problems (`BaseChart.getDebugPanel`), shown first. */
+    chartPanel?: ReactNode;
 }) {
     const [filter, setFilter] = useState("");
     const [debouncedFilter] = useDebounce(filter, 300); //why is this returning a tuple?
@@ -290,6 +294,25 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     return (
         <div className="overflow-auto p-4" style={{ userSelect: "text" }}>
             {header && <h2 className="text-lg font-semibold mb-4">{header}</h2>}
+            {chartPanel && (
+                <Accordion
+                    defaultExpanded
+                    sx={{
+                        border: "1px solid var(--border_menu_bar_color)",
+                        mb: 2,
+                    }}
+                >
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="h6">
+                            Chart status
+                        </Typography>
+                    </AccordionSummary>
+                    <Divider />
+                    <AccordionDetails sx={{ mt: 1 }}>
+                        {chartPanel}
+                    </AccordionDetails>
+                </Accordion>
+            )}
             <Accordion sx={{
                 border: "1px solid var(--border_menu_bar_color)",
                 mb: 2,
@@ -354,6 +377,21 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                             </Button>
                         </CustomTooltip>
                     </Box>
+                </AccordionDetails>
+            </Accordion>
+
+            <Accordion sx={{
+                border: "1px solid var(--border_menu_bar_color)",
+                mb: 2,
+            }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="h6">
+                        Browser settings
+                    </Typography>
+                </AccordionSummary>
+                <Divider />
+                <AccordionDetails sx={{ mt: 1 }}>
+                    <BrowserSettingsSection />
                 </AccordionDetails>
             </Accordion>
 

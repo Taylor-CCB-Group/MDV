@@ -9,6 +9,7 @@ import {
     type VivImagePropsResolver,
     useSpatialCanvasRendererFromLayerInputs,
 } from "@spatialdata/vis";
+import type { DeviceInfo } from "@luma.gl/core";
 import type { DeckGLProps, DeckGLRef, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,11 +18,12 @@ import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
-import RasterDataWarning, { rasterEntriesKey } from "./RasterDataWarning";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
+import { resolveDeckBackend, useDeckDevice } from "@/react/spatialdata/deck_backend";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
+import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
 import { createPointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import {
@@ -30,6 +32,8 @@ import {
     useRenderStackAdapter,
 } from "@/react/spatialdata/render_stack_adapter";
 import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack_control";
+import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
+import { describeGpu } from "@/react/spatialdata/render_report";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
@@ -47,6 +51,7 @@ import { useOuterContainer } from "../screen_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import FieldContourLegend from "./FieldContourLegend";
 import SelectionOverlay from "./SelectionOverlay";
+import { rasterEntriesKey, useRasterIssues } from "./RasterIssues";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import { VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 
@@ -268,25 +273,6 @@ function SpatialDataChartRoot() {
     );
 }
 
-function SpatialDataLink() {
-    const { spatialData } = useSpatialData();
-    const spatialDataUrl = spatialData?.url;
-    if (!spatialDataUrl) return null;
-    const demoUrl = `https://taylor-ccb-group.github.io/SpatialData.js/docs/demo/?url=${encodeURIComponent(spatialDataUrl)}`;
-    return (
-        <div className="legend-container pointer-events-auto absolute bottom-2 right-2 z-[4] rounded-tl border-[0.5px] border-current">
-            <a
-                href={demoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-current no-underline hover:underline whitespace-nowrap"
-            >
-                Open in spatialdata.js
-            </a>
-        </div>
-    );
-}
-
 const SpatialDataMainChart = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
@@ -383,6 +369,88 @@ const SpatialDataViewer = observer(
         const legendCategories = useCategoryContourLegend(contourConfig);
         const showLegend = contourConfig.field_legend.display;
         const legendPosition = { x: 10, y: 10 };
+        const { device: deckDevice, fallBack: fallBackToWebGL } = useDeckDevice(resolveDeckBackend(config.render_backend));
+        const activeBackend = deckDevice.status === "ready" ? deckDevice.backend : null;
+        const fallbackReason = deckDevice.status === "ready" ? deckDevice.fallbackReason : undefined;
+        useEffect(() => {
+            chart.setActiveBackend(activeBackend, fallbackReason);
+            return () => chart.setActiveBackend(null);
+        }, [chart, activeBackend, fallbackReason]);
+        // Layer errors (deck's `onError`) and WebGPU device errors (luma's) otherwise only
+        // reach the console, and a device error repeats every frame. The tracker ties them
+        // to render-stack entries, which the chart turns off and reports.
+        //
+        // On WebGPU, a chart following the default backend instead moves to WebGL with the
+        // layer still on: the failure is most likely WebGPU's, and a failure on WebGL is
+        // reported as usual. A chart set to WebGPU explicitly stays on it.
+        const failureTracker = useMemo(
+            () =>
+                new LayerFailureTracker({
+                    entryIds: () => chart.config.renderStack?.entries.map((entry) => entry.id) ?? [],
+                    fail: (entryId, failure) => {
+                        const onWebGPU = failure.source === "webgpu" || chart.activeBackend === "webgpu";
+                        if (onWebGPU && chart.config.render_backend == null) {
+                            // after the switch, the old WebGPU device's errors are stale
+                            if (chart.activeBackend !== "webgpu") return;
+                            const entry = chart.config.renderStack?.entries.find((item) => item.id === entryId);
+                            const name = entry ? renderStackEntryDisplayName(entry) : entryId;
+                            console.error(`[MDV] ${name} failed on WebGPU; using WebGL:`, failure.reason);
+                            fallBackToWebGL(`${name} failed on WebGPU: ${failure.reason}`);
+                            return;
+                        }
+                        chart.recordLayerFailure(entryId, failure);
+                    },
+                    canvas: (message, stack) => chart.recordCanvasError(message, stack),
+                }),
+            [chart, fallBackToWebGL],
+        );
+        useEffect(() => () => failureTracker.dispose(), [failureTracker]);
+        // The backend whose device deck last finished creating. A failed device creation
+        // reaches deck's `onError` (from luma's AnimationLoop), never the device's own.
+        const initializedBackend = useRef<string | null>(null);
+        const currentDevice = useRef<unknown>(null);
+        const onDeviceInitialized = useCallback(
+            (device: { type: string; handle: unknown; info: DeviceInfo }) => {
+                initializedBackend.current = device.type;
+                currentDevice.current = device;
+                chart.setGpuDescription(describeGpu(device.info));
+                // deck only watches for a lost WebGL context; a lost GPUDevice (GPU process
+                // crash or reset) would leave the canvas dark. "destroyed" is our own teardown.
+                if (device.type !== "webgpu" || !(device.handle instanceof GPUDevice)) return;
+                device.handle.lost.then((info) => {
+                    if (info.reason === "destroyed" || currentDevice.current !== device) return;
+                    console.error("[MDV] WebGPU device lost:", info.message);
+                    fallBackToWebGL(`the WebGPU device was lost: ${info.message || "no reason given"}`);
+                });
+            },
+            [chart, fallBackToWebGL],
+        );
+        const onDeckError = useCallback(
+            (error: Error, layer?: { id: string } | null) => {
+                if (!layer && deckDevice.status === "ready" && deckDevice.backend === "webgpu" && initializedBackend.current !== "webgpu") {
+                    // deck has no device, so nothing will draw: retry this chart on WebGL
+                    console.error(error);
+                    fallBackToWebGL(`creating the WebGPU device failed: ${error.message}`);
+                    return;
+                }
+                failureTracker.layer(error, layer?.id);
+            },
+            [deckDevice, failureTracker, fallBackToWebGL],
+        );
+        const deviceProps = useMemo(
+            () =>
+                deckDevice.status === "ready" && deckDevice.deviceProps
+                    ? {
+                          ...deckDevice.deviceProps,
+                          // true: handled, so luma does not also log it (once per frame)
+                          onError: (error: Error) => {
+                              failureTracker.device(error);
+                              return true;
+                          },
+                      }
+                    : undefined,
+            [deckDevice, failureTracker],
+        );
 
         useViewStateLink();
 
@@ -407,6 +475,18 @@ const SpatialDataViewer = observer(
             if (loading || !spatialData || !coordinateSystem) return;
             seedRenderStackFromSpatialData(config, spatialData, coordinateSystem, chart);
         }, [chart, config, coordinateSystem, loading, spatialData]);
+
+        // For the chart's status (its menu pip and debug dialog), which live outside this tree.
+        const rasterIssues = useRasterIssues(spatialData, rasterEntriesKey(config.renderStack));
+        useEffect(() => {
+            chart.setRasterIssues(rasterIssues);
+            return () => chart.setRasterIssues([]);
+        }, [chart, rasterIssues]);
+        const storeUrl = spatialData?.url ?? null;
+        useEffect(() => {
+            chart.setSpatialDataUrl(storeUrl);
+            return () => chart.setSpatialDataUrl(null);
+        }, [chart, storeUrl]);
 
         useProjectMdvFieldSpecs(config, chart);
 
@@ -524,8 +604,11 @@ const SpatialDataViewer = observer(
                     doubleClickZoom: false,
                     dragPan: controllerOptions.dragPan,
                 },
+                ...(deviceProps && { deviceProps }),
+                onDeviceInitialized,
+                onError: onDeckError,
             }),
-            [id, getPortalTooltip, controllerOptions],
+            [id, getPortalTooltip, controllerOptions, deviceProps, onDeviceInitialized, onDeckError],
         );
 
         if (!coordinateSystem || !region?.spatial?.file) {
@@ -546,6 +629,10 @@ const SpatialDataViewer = observer(
 
         if (!config.renderStack?.entries.length) {
             return <div className="h-full w-full p-2">Preparing layer stack…</div>;
+        }
+
+        if (deckDevice.status === "pending") {
+            return <div className="h-full w-full p-2">Starting WebGPU…</div>;
         }
 
         return (
@@ -578,6 +665,16 @@ const SpatialDataViewer = observer(
                     <div style={{ width, height, position: "relative" }}>
                         <Profiler id="spatial.canvas" onRender={onSpatialProfilerRender}>
                             <ErrorBoundary
+                                // deck picks its device once, when created: remount on a backend change.
+                                key={deckDevice.backend}
+                                // On WebGPU, a chart following the default retries on WebGL before
+                                // showing the error; a failure there too is still reported.
+                                onError={(error) => {
+                                    if (deckDevice.status !== "ready" || deckDevice.backend !== "webgpu") return;
+                                    if (config.render_backend != null) return;
+                                    const message = error instanceof Error ? error.message : String(error);
+                                    fallBackToWebGL(`the canvas failed on WebGPU: ${message}`);
+                                }}
                                 fallbackRender={(props) => <SpatialCanvasErrorFallback {...props} layers={layers} />}
                                 // Retry when the layer set actually changes, so a canvas
                                 // felled by one bad layer recovers once it is removed or
@@ -605,8 +702,6 @@ const SpatialDataViewer = observer(
                         </Profiler>
                     </div>
                 </div>
-                <RasterDataWarning spatialData={spatialData} entriesKey={rasterEntriesKey(config.renderStack)} />
-                <SpatialDataLink />
                 {tooltipPortal}
                 {featureTooltipPortal}
             </Profiler>

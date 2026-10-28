@@ -1,7 +1,7 @@
 import type { RenderStack } from "@spatialdata/layers";
-import { action, makeObservable, observable } from "mobx";
+import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
 
-import BaseChart from "../../charts/BaseChart";
+import BaseChart, { type MenuPip } from "../../charts/BaseChart";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
@@ -17,8 +17,13 @@ import {
 } from "./avivatorish/state";
 import { getSharedScatterSettings } from "./sharedScatterSettings";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
+import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
+import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
+import type { ElementIssues } from "./RasterIssues";
+import SpatialStatusPanel from "./SpatialStatusPanel";
+import { browserHasWebGPU, type DeckBackend, defaultDeckBackend } from "@/react/spatialdata/deck_backend";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import {
@@ -32,6 +37,8 @@ export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     background_filter: CategoryFilter;
     renderStack?: RenderStack;
     viewState?: SpatialDataSerializableViewState | null;
+    /** Experimental; null (or absent) follows the browser's default (see `deck_backend.ts`). */
+    render_backend?: DeckBackend | null;
 };
 
 function adaptSpatialDataConfig(
@@ -47,6 +54,9 @@ function adaptSpatialDataConfig(
     if (config.renderStack === undefined) {
         config.renderStack = createHostOnlyRenderStack();
     }
+    // Must exist before makeAutoObservable(config) for later changes to be observed, and
+    // survive initialiseChartConfig's JSON copy, so null rather than undefined.
+    config.render_backend = config.render_backend ?? null;
     config.param = [...dataStore.regions.position_fields];
     if (typeof config.contourParameter === "string") {
         const column = dataStore.columnIndex[config.contourParameter];
@@ -101,6 +111,115 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         this.pointsLayerRegistry = registry;
     }
 
+    /**
+     * The backend the canvas is drawing with, after any fallback to WebGL; null until the
+     * device is chosen. Runtime only. For UI outside the canvas tree, such as the layer
+     * dialog's image tone controls, which have no effect on WebGPU.
+     */
+    activeBackend: DeckBackend | null = null;
+    /** Why WebGPU was requested but not used, when it wasn't. */
+    backendFallbackReason: string | null = null;
+    setActiveBackend(backend: DeckBackend | null, fallbackReason?: string) {
+        this.activeBackend = backend;
+        this.backendFallbackReason = fallbackReason ?? null;
+    }
+
+    get rendererLabel() {
+        if (this.activeBackend === "webgpu") return "WebGPU";
+        if (this.activeBackend === null) return "not chosen yet";
+        if (this.backendFallbackReason) return `WebGL (WebGPU unavailable: ${this.backendFallbackReason})`;
+        return "WebGL";
+    }
+
+    /** The GPU deck's device runs on, as luma reports it; for error reports. Runtime only. */
+    gpuDescription: string | null = null;
+    setGpuDescription(description: string | null) {
+        this.gpuDescription = description;
+    }
+
+    /**
+     * Render-stack entries that failed to draw and were turned off, by entry id. Runtime
+     * only, never saved: turning the layer back on clears it, so a retry can fail and be
+     * reported again. See `layer_failures.ts`.
+     */
+    layerFailures = new Map<string, LayerFailure>();
+    /** Render errors that could not be tied to a layer. */
+    canvasErrors: CanvasError[] = [];
+
+    /** Record a failure and turn the entry off, so the rest of the canvas can draw again. */
+    recordLayerFailure(entryId: string, failure: Omit<LayerFailure, "count" | "dismissed">) {
+        const existing = this.layerFailures.get(entryId);
+        if (existing) {
+            existing.count++;
+            return;
+        }
+        this.layerFailures.set(entryId, { ...failure, count: 1, dismissed: false });
+        const entry = this.config.renderStack?.entries.find((item) => item.id === entryId);
+        if (entry?.visible) {
+            entry.visible = false;
+            this.bumpRenderStackGeneration();
+        }
+    }
+
+    clearLayerFailure(entryId: string) {
+        this.layerFailures.delete(entryId);
+    }
+
+    recordCanvasError(message: string, stack?: string) {
+        const existing = this.canvasErrors.find((item) => item.message === message);
+        if (existing) existing.count++;
+        else this.canvasErrors.push({ message, ...(stack ? { stack } : {}), count: 1, dismissed: false });
+    }
+
+    /** Image and labels elements in the stack that are slow to load (`useRasterIssues`). Runtime only. */
+    rasterIssues: ElementIssues[] = [];
+    setRasterIssues(issues: ElementIssues[]) {
+        this.rasterIssues = issues;
+    }
+
+    /** The store the canvas is showing, for linking to it. Runtime only. */
+    spatialDataUrl: string | null = null;
+    setSpatialDataUrl(url: string | null) {
+        this.spatialDataUrl = url;
+    }
+
+    /** Failed layers by display name, and a one-line summary of the chart's problems. */
+    get renderStatus() {
+        const entries = this.config.renderStack?.entries ?? [];
+        const failures = [...this.layerFailures].map(([entryId, failure]) => {
+            const entry = entries.find((item) => item.id === entryId);
+            return { entryId, failure, name: entry ? renderStackEntryDisplayName(entry) : entryId };
+        });
+        const errorCount = failures.filter((item) => !item.failure.dismissed).length + this.canvasErrors.length;
+        const summary = [
+            errorCount > 0 && `${errorCount} rendering ${errorCount === 1 ? "problem" : "problems"}`,
+            errorCount === 0 &&
+                failures.length > 0 &&
+                `${failures.length} ${failures.length === 1 ? "layer" : "layers"} turned off`,
+            this.rasterIssues.length > 0 && "slow image data",
+        ]
+            .filter(Boolean)
+            .join(" · ");
+        return { failures, errorCount, summary };
+    }
+
+    get statusPip(): MenuPip | null {
+        const { failures, errorCount, summary } = this.renderStatus;
+        if (errorCount > 0) return { level: "error", tooltip: summary };
+        if (failures.length > 0 || this.rasterIssues.length > 0) return { level: "notice", tooltip: summary };
+        return null;
+    }
+
+    getDebugPanel() {
+        return <SpatialStatusPanel chart={this} />;
+    }
+
+    /** Clear the error count on the menu pip; failing layers stay marked in the layer dialog. */
+    dismissRenderErrors() {
+        for (const failure of this.layerFailures.values()) failure.dismissed = true;
+        this.canvasErrors = [];
+    }
+
     constructor(
         dataStore: DataStore,
         div: HTMLDivElement,
@@ -127,17 +246,44 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             // deeply observable would have MobX walk a live render-path object.
             pointsLayerRegistry: observable.ref,
             setPointsLayerRegistry: action,
+            activeBackend: observable,
+            backendFallbackReason: observable,
+            setActiveBackend: action,
+            rendererLabel: computed,
+            gpuDescription: observable,
+            setGpuDescription: action,
+            layerFailures: observable,
+            canvasErrors: observable,
+            recordLayerFailure: action,
+            clearLayerFailure: action,
+            recordCanvasError: action,
+            dismissRenderErrors: action,
+            rasterIssues: observable.ref,
+            setRasterIssues: action,
+            spatialDataUrl: observable,
+            setSpatialDataUrl: action,
+            renderStatus: computed,
+            statusPip: computed,
         });
+        this.reactionDisposers.push(
+            reaction(
+                () => this.statusPip,
+                (pip) => this.setMenuPip(pip),
+                { fireImmediately: true, equals: comparer.structural },
+            ),
+        );
         this.vivStores = createVivStores();
         this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener(
             "click",
-            () => {
-                if (!this.layerDialog) {
-                    this.layerDialog = new SpatialLayerDialogReactWrapper(this);
-                    this.dialogs.push(this.layerDialog);
-                }
-            },
+            () => this.openLayerDialog(),
         );
+    }
+
+    openLayerDialog() {
+        if (!this.layerDialog) {
+            this.layerDialog = new SpatialLayerDialogReactWrapper(this);
+            this.dialogs.push(this.layerDialog);
+        }
     }
 
     colorBy?: (i: number) => [r: number, g: number, b: number];
@@ -205,6 +351,19 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 label: "Category Filters",
                 current_value: filters,
             }),
+            ...(browserHasWebGPU() || config.render_backend
+                ? [
+                      g({
+                          type: "dropdown",
+                          label: "Rendering backend",
+                          current_value: config.render_backend ?? "default",
+                          values: [renderBackendOptions(), "name", "value"],
+                          func(value) {
+                              config.render_backend = value === "webgl" || value === "webgpu" ? value : null;
+                          },
+                      }),
+                  ]
+                : []),
         ]);
     }
 
@@ -217,8 +376,20 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         if (this.config.renderStack) {
             config.renderStack = this.config.renderStack;
         }
+        // null only exists to keep the key observable; leave it out of saved views
+        if (config.render_backend === null) config.render_backend = undefined;
         return config;
     }
+}
+
+/** "Default" names what the default currently is; it is set in the Debug dialog, per browser. */
+function renderBackendOptions() {
+    const current = defaultDeckBackend() === "webgpu" ? "WebGPU" : "WebGL";
+    return [
+        { name: `Browser default (${current})`, value: "default" },
+        { name: "WebGL", value: "webgl" },
+        { name: "WebGPU", value: "webgpu" },
+    ];
 }
 
 function spatialRegionOptions(dataStore: DataStore) {

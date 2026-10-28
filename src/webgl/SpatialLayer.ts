@@ -1,10 +1,13 @@
-import { CompositeLayer, Layer, type LayersList } from "@deck.gl/core";
-import type { LayerContext } from "@deck.gl/core";
-import { type ScatterplotLayerProps, ScatterplotLayer } from "@deck.gl/layers";
+import { CompositeLayer, type Layer, type LayersList } from "@deck.gl/core";
+import type { ScatterplotLayerProps } from "@deck.gl/layers";
+import { ScatterplotLayer } from "@deck.gl/layers";
 import { TriangleLayerContours } from "./HeatmapContourExtension";
 import type { ContourLayerProps } from "@/react/contour_state";
 import { HeatmapLayer } from "deck.gl";
-import type { Framebuffer } from "@luma.gl/core";
+import { DensityLayer } from "@intraspatial/deck";
+import { contourToDensityProps } from "./intraspatialDensity";
+import { MdvScatterplotLayer } from "./MdvScatterplotLayer";
+import { isWebGPULayer } from "./wgslLayerExtension";
 
 export type SpatialLayerProps = ScatterplotLayerProps & {
     //pending typing that allows for other kinds of layers etc
@@ -14,76 +17,13 @@ export type SpatialLayerProps = ScatterplotLayerProps & {
     highlightRadiusScale?: number;
     highlightLineColor?: [number, number, number];
 };
-type DensityLayerProps = ScatterplotLayerProps & {
-    // are framebuffers appropriate for use as props?
-    framebuffer: Framebuffer;
-};
-class DensityLayer extends Layer<DensityLayerProps> {
-    layerName = "DensityLayer";
-    static defaultProps = {};
-    constructor(props: DensityLayerProps) {
-        super(props);
-        console.log("DensityLayer constructor, very much under construction");
-    }
-    initializeState(context: LayerContext) {
-        const { device } = context;
-        // how should we tell what dimensions to use?
-        const size = {
-            width: 256,
-            height: 256,
-        };
-        //https://luma.gl/docs/api-reference/core/resources/framebuffer/
-        //maybe we can have a composite layer with a '2d-array' that gets passed in...
-        console.log(`Initialising DensityLayer '${this.props.id}'`);
-        const framebuffer = device.createFramebuffer({
-            ...size,
-            colorAttachments: [device.createTexture({ format: "r32float", ...size })],
-        });
-        this.setState({ framebuffer });
-    }
-    draw() {
-        // const { framebuffer } = this.props;
-        const models = this.getModels();
-        // models.forEach(model => model.);
-    }
-}
 
 export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     static layerName = "SpatialLayer";
     static defaultProps = ScatterplotLayer.defaultProps;
-    static bufferExperiment = false;
     // biome-ignore lint/complexity/noUselessConstructor: tsc error if we remove this?
     constructor(props: SpatialLayerProps) {
         super(props);
-    }
-    /** "usually not needed for composite layers" but I think this is the right place to setup framebuffers */
-    initializeState(context: LayerContext): void {
-        super.initializeState(context);
-        if (!SpatialLayer.bufferExperiment) {
-            // console.log('longing for the day we render field density sensibly - should be much more efficient');
-            return;
-        }
-        // this will change with new deck.gl version, context.device rather than context.gl...
-        // still considering how to structure coomposite layers...
-        // const framebuffer = new Framebuffer(context.gl, {});
-        // many ways to skin a cat here... want to render each contourLayer into a lower resolution (float?) fbo,
-        // with a gaussian scatterplot to be used as a density map
-        // that should then be fed into a shader that can take these densities and do some calculations
-        // const framebuffer = this.context.device.createFramebuffer({width: 256, height: 256})
-        const { device } = context;
-        const size = {
-            width: 256, //tbd, some fraction of the original size
-            height: 256,
-            depth: 256, //<- should be the number of fields/layers
-        };
-        const texture = device.createTexture({
-            // dimension: "3d",
-            format: "r32float",
-            ...size,
-        });
-        const framebuffer = device.createFramebuffer({
-            colorAttachments: [texture],
-        });
     }
     renderLayers(): Layer<SpatialLayerProps> | LayersList {
         // order matters here, we should make a ui where we can easily control it
@@ -94,21 +34,22 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
             highlightRadiusScale,
             highlightLineColor = [255, 255, 255],
         } = this.props;
-        // future work:
-        // const densityLayers = contourLayers.map((layer) => {
-        //     const { extensions, ...p } = this.getSubLayerProps(layer);
-        //     return new DensityLayer({
-        //         ...p,
-        //     });
-        // });
+        // TriangleLayerContours is GLSL-only. On WebGPU, contours are @intraspatial/deck's
+        // DensityLayer instead: KDE splatting in data units with a WGSL presentation shader,
+        // converted from the heatmap props in `intraspatialDensity.ts`.
+        const isWebGPU = isWebGPULayer(this);
+        const contourSubLayerProps = {
+            triangle: {
+                type: TriangleLayerContours,
+            },
+        };
         const densityLayers = contourLayers.filter((l) => l).map(props => {
             const { extensions, ...p } = this.getSubLayerProps(props);
+            if (isWebGPU) return new DensityLayer(contourToDensityProps(p));
             return new HeatmapLayer({
                 ...p,
                 _subLayerProps: {
-                    triangle: {
-                        type: TriangleLayerContours,
-                    },
+                    ...contourSubLayerProps,
                     "triangle-layer": {
                         contourOpacity: p.contourOpacity,
                         contourFill: p.contourFill,
@@ -121,7 +62,7 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
             // add 'grey-out' layer here... that implies a different type of data being passed.
             // it might want to know about background_filter...
 
-            new ScatterplotLayer(
+            new MdvScatterplotLayer(
                 this.getSubLayerProps({
                     ...this.props,
                     // ...this.props was not including `data`, so we need to add it manually
@@ -134,7 +75,7 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 }),
             ),
             highlightedData.length > 0
-                ? new ScatterplotLayer(
+                ? new MdvScatterplotLayer(
                       this.getSubLayerProps({
                           ...this.props,
                           data: highlightedData,
@@ -149,13 +90,8 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                       }),
                   )
                 : null,
-            // now we need more layers, using gaussian density.
             // consider trying to render density map at lower resolution, then upscaling on debounce.
             ...densityLayers,
         ].filter(Boolean) as LayersList;
-    }
-    draw(opts: any) {
-        super.draw(opts);
-        //? draw sublayers into framebuffer(s) and then use that in rendering with a custom shader
     }
 }

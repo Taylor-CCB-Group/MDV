@@ -1,6 +1,7 @@
 /**
  * Creates a context menu the - the function should return a list describing the menu
- * The list should contain objects with text,icon,ghosted,func and subitems
+ * The list should contain objects with text,icon,ghosted,func,subitems and pip
+ * ("error" or "notice", a coloured dot after the text)
  */
 class ContextMenu {
     /** @type {Document | undefined} */
@@ -119,6 +120,12 @@ class ContextMenu {
         const sp = document.createElement("span");
         sp.appendChild(document.createTextNode(item.text));
         el.append(sp);
+        if (item.pip) {
+            // see BaseChart.setMenuPip
+            const pip = document.createElement("span");
+            pip.classList.add("ciview-menu-pip", `ciview-menu-pip-${item.pip}`);
+            sp.appendChild(pip);
+        }
         if (item.subitems) {
             const caret = document.createElement("i");
             caret.classList.add(
