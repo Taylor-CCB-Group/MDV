@@ -30,7 +30,7 @@ export type LayerFailure = {
     stack?: string;
     /** How many errors were attributed to it. */
     count: number;
-    /** Dismissed from the status indicator's count; the layer dialog still shows the failure. */
+    /** Dismissed from the chart's error count (its menu pip); the layer dialog still shows the failure. */
     dismissed: boolean;
 };
 

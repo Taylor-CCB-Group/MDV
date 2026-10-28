@@ -594,6 +594,28 @@ reflowed every chart. Handles are still painted and still receive pointer events
     margin: 0px 2px;
 }
 
+/* BaseChart.setMenuPip: a dot on the "more" icon, and on its debug menu item */
+.ciview-menu-pip{
+    position:absolute;
+    top:-2px;
+    right:-1px;
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    pointer-events:none;
+}
+.ciview-ctm-item .ciview-menu-pip{
+    position:static;
+    display:inline-block;
+    margin-left:2px;
+}
+.ciview-menu-pip-error{
+    background-color:var(--icon_color_error);
+}
+.ciview-menu-pip-notice{
+    background-color:#f2c94c;
+}
+
 .mdv-image-label {
     position:absolute;
     text-align: center;

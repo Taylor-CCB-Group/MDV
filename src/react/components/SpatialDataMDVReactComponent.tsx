@@ -51,7 +51,7 @@ import { useOuterContainer } from "../screen_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import FieldContourLegend from "./FieldContourLegend";
 import SelectionOverlay from "./SelectionOverlay";
-import SpatialStatusIndicator from "./SpatialStatusIndicator";
+import { rasterEntriesKey, useRasterIssues } from "./RasterIssues";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import { VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 
@@ -371,10 +371,11 @@ const SpatialDataViewer = observer(
         const legendPosition = { x: 10, y: 10 };
         const { device: deckDevice, fallBack: fallBackToWebGL } = useDeckDevice(resolveDeckBackend(config.render_backend));
         const activeBackend = deckDevice.status === "ready" ? deckDevice.backend : null;
+        const fallbackReason = deckDevice.status === "ready" ? deckDevice.fallbackReason : undefined;
         useEffect(() => {
-            chart.setActiveBackend(activeBackend);
+            chart.setActiveBackend(activeBackend, fallbackReason);
             return () => chart.setActiveBackend(null);
-        }, [chart, activeBackend]);
+        }, [chart, activeBackend, fallbackReason]);
         // Layer errors (deck's `onError`) and WebGPU device errors (luma's) otherwise only
         // reach the console, and a device error repeats every frame. The tracker ties them
         // to render-stack entries, which the chart turns off and reports.
@@ -474,6 +475,18 @@ const SpatialDataViewer = observer(
             if (loading || !spatialData || !coordinateSystem) return;
             seedRenderStackFromSpatialData(config, spatialData, coordinateSystem, chart);
         }, [chart, config, coordinateSystem, loading, spatialData]);
+
+        // For the chart's status (its menu pip and debug dialog), which live outside this tree.
+        const rasterIssues = useRasterIssues(spatialData, rasterEntriesKey(config.renderStack));
+        useEffect(() => {
+            chart.setRasterIssues(rasterIssues);
+            return () => chart.setRasterIssues([]);
+        }, [chart, rasterIssues]);
+        const storeUrl = spatialData?.url ?? null;
+        useEffect(() => {
+            chart.setSpatialDataUrl(storeUrl);
+            return () => chart.setSpatialDataUrl(null);
+        }, [chart, storeUrl]);
 
         useProjectMdvFieldSpecs(config, chart);
 
@@ -689,7 +702,6 @@ const SpatialDataViewer = observer(
                         </Profiler>
                     </div>
                 </div>
-                <SpatialStatusIndicator spatialData={spatialData} device={deckDevice} />
                 {tooltipPortal}
                 {featureTooltipPortal}
             </Profiler>

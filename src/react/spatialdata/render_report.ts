@@ -2,7 +2,7 @@ import type { DeviceInfo } from "@luma.gl/core";
 import type { CanvasError, LayerFailure } from "./layer_failures";
 
 /**
- * A SpatialData chart's render problems as plain text, for the status indicator's "Copy
+ * A SpatialData chart's render problems as plain text, for the chart status panel's "Copy
  * details". Plain text rather than JSON (as `DebugErrorComponent` copies), so stacks keep
  * their line breaks when pasted into an issue.
  */

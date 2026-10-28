@@ -1,7 +1,7 @@
 import type { RenderStack } from "@spatialdata/layers";
-import { action, makeObservable, observable } from "mobx";
+import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
 
-import BaseChart from "../../charts/BaseChart";
+import BaseChart, { type MenuPip } from "../../charts/BaseChart";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
@@ -16,11 +16,13 @@ import {
     createVivStores,
 } from "./avivatorish/state";
 import { getSharedScatterSettings } from "./sharedScatterSettings";
-import { createEl } from "@/utilities/ElementsTyped";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
+import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
+import type { ElementIssues } from "./RasterIssues";
+import SpatialStatusPanel from "./SpatialStatusPanel";
 import { browserHasWebGPU, type DeckBackend, defaultDeckBackend } from "@/react/spatialdata/deck_backend";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
@@ -69,8 +71,6 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     declare dataStore: DataStore;
     vivStores: VivContextType;
     layerDialog?: SpatialLayerDialogReactWrapper;
-    /** Title-bar slot that `SpatialStatusIndicator` portals into. */
-    statusIndicatorHost: HTMLSpanElement;
     ignoreStateUpdate = false;
     /**
      * Intentional version token for in-place renderStack edits. The adapter reads this
@@ -117,8 +117,18 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
      * dialog's image tone controls, which have no effect on WebGPU.
      */
     activeBackend: DeckBackend | null = null;
-    setActiveBackend(backend: DeckBackend | null) {
+    /** Why WebGPU was requested but not used, when it wasn't. */
+    backendFallbackReason: string | null = null;
+    setActiveBackend(backend: DeckBackend | null, fallbackReason?: string) {
         this.activeBackend = backend;
+        this.backendFallbackReason = fallbackReason ?? null;
+    }
+
+    get rendererLabel() {
+        if (this.activeBackend === "webgpu") return "WebGPU";
+        if (this.activeBackend === null) return "not chosen yet";
+        if (this.backendFallbackReason) return `WebGL (WebGPU unavailable: ${this.backendFallbackReason})`;
+        return "WebGL";
     }
 
     /** The GPU deck's device runs on, as luma reports it; for error reports. Runtime only. */
@@ -161,7 +171,50 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         else this.canvasErrors.push({ message, ...(stack ? { stack } : {}), count: 1, dismissed: false });
     }
 
-    /** Clear the status indicator's error count; failing layers stay marked in the layer dialog. */
+    /** Image and labels elements in the stack that are slow to load (`useRasterIssues`). Runtime only. */
+    rasterIssues: ElementIssues[] = [];
+    setRasterIssues(issues: ElementIssues[]) {
+        this.rasterIssues = issues;
+    }
+
+    /** The store the canvas is showing, for linking to it. Runtime only. */
+    spatialDataUrl: string | null = null;
+    setSpatialDataUrl(url: string | null) {
+        this.spatialDataUrl = url;
+    }
+
+    /** Failed layers by display name, and a one-line summary of the chart's problems. */
+    get renderStatus() {
+        const entries = this.config.renderStack?.entries ?? [];
+        const failures = [...this.layerFailures].map(([entryId, failure]) => {
+            const entry = entries.find((item) => item.id === entryId);
+            return { entryId, failure, name: entry ? renderStackEntryDisplayName(entry) : entryId };
+        });
+        const errorCount = failures.filter((item) => !item.failure.dismissed).length + this.canvasErrors.length;
+        const summary = [
+            errorCount > 0 && `${errorCount} rendering ${errorCount === 1 ? "problem" : "problems"}`,
+            errorCount === 0 &&
+                failures.length > 0 &&
+                `${failures.length} ${failures.length === 1 ? "layer" : "layers"} turned off`,
+            this.rasterIssues.length > 0 && "slow image data",
+        ]
+            .filter(Boolean)
+            .join(" · ");
+        return { failures, errorCount, summary };
+    }
+
+    get statusPip(): MenuPip | null {
+        const { failures, errorCount, summary } = this.renderStatus;
+        if (errorCount > 0) return { level: "error", tooltip: summary };
+        if (failures.length > 0 || this.rasterIssues.length > 0) return { level: "notice", tooltip: summary };
+        return null;
+    }
+
+    getDebugPanel() {
+        return <SpatialStatusPanel chart={this} />;
+    }
+
+    /** Clear the error count on the menu pip; failing layers stay marked in the layer dialog. */
     dismissRenderErrors() {
         for (const failure of this.layerFailures.values()) failure.dismissed = true;
         this.canvasErrors = [];
@@ -194,7 +247,9 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             pointsLayerRegistry: observable.ref,
             setPointsLayerRegistry: action,
             activeBackend: observable,
+            backendFallbackReason: observable,
             setActiveBackend: action,
+            rendererLabel: computed,
             gpuDescription: observable,
             setGpuDescription: action,
             layerFailures: observable,
@@ -203,17 +258,25 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             clearLayerFailure: action,
             recordCanvasError: action,
             dismissRenderErrors: action,
+            rasterIssues: observable.ref,
+            setRasterIssues: action,
+            spatialDataUrl: observable,
+            setSpatialDataUrl: action,
+            renderStatus: computed,
+            statusPip: computed,
         });
+        this.reactionDisposers.push(
+            reaction(
+                () => this.statusPip,
+                (pip) => this.setMenuPip(pip),
+                { fireImmediately: true, equals: comparer.structural },
+            ),
+        );
         this.vivStores = createVivStores();
         this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener(
             "click",
             () => this.openLayerDialog(),
         );
-        // Between the title and the menu icons, so icons added later don't move it.
-        this.statusIndicatorHost = createEl("span", {
-            styles: { display: "flex", alignItems: "center", margin: "0px 1px" },
-        });
-        this.titleBar.insertBefore(this.statusIndicatorHost, this.menuSpace);
     }
 
     openLayerDialog() {

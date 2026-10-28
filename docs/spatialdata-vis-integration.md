@@ -280,7 +280,7 @@ one page load — see `src/react/spatialdata/deck_backend.ts`. deck picks its de
 so changing the backend remounts the canvas.
 
 **Falling back to WebGL.** A chart moves to WebGL for the rest of its session, with the
-reason in its status indicator, when:
+reason in its debug dialog's "Chart status", when:
 
 - the browser has no WebGPU, no adapter, or the adapter refuses the device deck will ask
   for (probed once per page, `probeWebGPU`);
@@ -294,7 +294,12 @@ reason in its status indicator, when:
 Unattributed WebGPU validation errors are reported, not treated as a reason to fall back.
 Changing a chart's backend setting gives WebGPU another try.
 
-**Diagnosing WebGPU errors.** A chart's status popover has "Copy details": a plain-text
+**Chart status.** A dot on a chart's "more" (☰) menu icon, and on its "debug / report
+chart" item, flags problems: red for render errors nobody has dismissed, yellow while
+layers stay off or image data is slow. The details are under "Chart status" in that
+debug dialog (`BaseChart.setMenuPip` / `getDebugPanel`; `SpatialStatusPanel`).
+
+**Diagnosing WebGPU errors.** A chart's "Chart status" has "Copy details": a plain-text
 report of the renderer, GPU, browser and each failure. Validation errors arrive
 asynchronously, so their own stack never shows the caller. For those, turn on "WebGPU call
 tracing" in the Debug dialog's browser settings and reload: `webgpu_trace.ts` then wraps

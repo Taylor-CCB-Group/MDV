@@ -5,6 +5,7 @@ import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./DebugJsonDialogComponent";
 import type BaseChart from "../../charts/BaseChart";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import type { ReactNode } from "react";
 
 type DebugChartReactWrapperOptions = {
     showValidationSection?: boolean;
@@ -13,6 +14,7 @@ type DebugChartReactWrapperOptions = {
 type DebugDialogContent = {
     json: any;
     showValidationSection?: boolean;
+    chartPanel?: ReactNode;
 };
 
 const DebugChart = observer(
@@ -20,14 +22,16 @@ const DebugChart = observer(
         chart,
         header,
         showValidationSection = false,
+        chartPanel,
     }: {
         chart: any;
         header?: string;
         showValidationSection?: boolean;
+        chartPanel?: ReactNode;
     }) => {
         return (
             <>
-                <Gui json={chart} header={header} showValidationSection={showValidationSection} />
+                <Gui json={chart} header={header} showValidationSection={showValidationSection} chartPanel={chartPanel} />
                 <ReactQueryDevtools initialIsOpen={false}  />
             </>
         );
@@ -61,12 +65,17 @@ class DebugChartReactWrapper extends BaseDialog {
         super(config, {
             json,
             showValidationSection: options.showValidationSection,
+            chartPanel: chart?.getDebugPanel?.(),
         });
     }
     init(content: DebugDialogContent) {
         const div = createEl("div", {}, this.dialog);
         this.root = createMdvPortal(
-            <DebugChart chart={content.json} showValidationSection={content.showValidationSection} />,
+            <DebugChart
+                chart={content.json}
+                showValidationSection={content.showValidationSection}
+                chartPanel={content.chartPanel}
+            />,
             div,
             this,
         );

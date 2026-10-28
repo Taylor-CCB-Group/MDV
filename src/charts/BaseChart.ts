@@ -33,8 +33,10 @@ import {
     toggleCategoricalColorLegendFilter,
     type ColorLegendFilter,
 } from "@/react/legend/color_legend/colorLegendFilter";
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 export type ChartEventType = string;
+/** A dot on a chart's "more" menu icon, for a problem described in its debug dialog. */
+export type MenuPip = { level: "error" | "notice"; tooltip: string };
 export type Listener = (type: ChartEventType, data: any) => void;
 export type LegacyColorBy = { column: DataColumn<any> }
 export type BaseConfig = {
@@ -65,7 +67,7 @@ export type ColorConfig = {
 };
 export type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
 export type ColorOptions = any;
-export type ContextMenuItem = { text: string, icon: string, func: () => void };
+export type ContextMenuItem = { text: string, icon: string, func: () => void, pip?: MenuPip["level"] };
 export type SettingsDialogFolderState = {
     isOpen: boolean;
     isOpenBeforeSearch: boolean;
@@ -100,6 +102,9 @@ class BaseChart<T extends BaseConfig> {
     width = 0;
     height = 0;
     menuTooltips:TippyInstance[]=[];
+    /** The "more" (hamburger) menu icon, which `setMenuPip` marks. */
+    moreIcon: HTMLSpanElement;
+    menuPip: MenuPip | null = null;
     legend: HTMLDivElement | undefined;
     colorLegendWrapper: LegendWrapper<ColorLegendSpec, T>;
     colorLegendFilterDimension: Dimension | null = null;
@@ -229,6 +234,7 @@ class BaseChart<T extends BaseConfig> {
             menu.push({
                 text: "debug / report chart",
                 icon: "fas fa-bug",
+                pip: this.menuPip?.level,
                 func: () => {
                     window.mdv.debugChart = this;
                     this.dialogs.push(
@@ -247,9 +253,8 @@ class BaseChart<T extends BaseConfig> {
             return menu;
         });
 
-        this.addMenuIcon("fas fa-bars", "more").addEventListener("click", (e) =>
-            this.contextMenu.show(e),
-        );
+        this.moreIcon = this.addMenuIcon("fas fa-bars", "more");
+        this.moreIcon.addEventListener("click", (e) => this.contextMenu.show(e));
 
         this.addMenuIcon("fas fa-cog", "settings").addEventListener(
             "click",
@@ -510,6 +515,26 @@ class BaseChart<T extends BaseConfig> {
         }
         return sp;
     }
+
+    /**
+     * Mark the "more" menu icon, and its "debug / report chart" item, with a dot for a problem
+     * whose details are in the chart's debug dialog (see `getDebugPanel`); null removes it.
+     */
+    setMenuPip(pip: MenuPip | null) {
+        this.menuPip = pip;
+        this.moreIcon.querySelector(".ciview-menu-pip")?.remove();
+        const tooltip = this.menuTooltips.find((t) => t.reference === this.moreIcon);
+        tooltip?.setContent(pip ? `more · ${pip.tooltip}` : "more");
+        if (!pip) return;
+        this.moreIcon.style.position = "relative";
+        createEl("span", { classes: ["ciview-menu-pip", `ciview-menu-pip-${pip.level}`] }, this.moreIcon);
+    }
+
+    /**
+     * Chart-specific content for the top of the chart's debug dialog, such as the problems
+     * `setMenuPip` points to. Optional.
+     */
+    getDebugPanel?(): ReactNode;
 
     /**
      * needs to be implemented by subclasses
