@@ -1,5 +1,6 @@
 import BaseChart from "@/charts/BaseChart";
 import "@/charts/DensityScatterPlot";
+import "@/charts/TableChart";
 import "@/charts/WGLScatterPlot";
 import "@/react/components/DeckScatterReactWrapper";
 import "@/react/components/VivMDVReact";
@@ -35,6 +36,20 @@ describe("convertLegacyChartConfig", () => {
             },
         );
 
+        test("converts a classic table, keeping its sort in the new form", () => {
+            convertLegacyChartsSetting.set("on");
+            const config = { type: "table_chart", sort: { columnId: "x", sortAsc: false } };
+            expect(convertLegacyChartConfig(config)).toBe("table_chart");
+            expect(config).toEqual({ type: "table_chart_react", sort: { columnId: "x", ascending: false } });
+        });
+
+        test("converts a classic table that is not sorted", () => {
+            convertLegacyChartsSetting.set("on");
+            const config = { type: "table_chart" };
+            expect(convertLegacyChartConfig(config)).toBe("table_chart");
+            expect(config).toEqual({ type: "table_chart_react" });
+        });
+
         test("does not convert a chart using a background filter the deck chart ignores", () => {
             convertLegacyChartsSetting.set("on");
             const config = { type: "wgl_scatter_plot", background_filter: { column: "cell_type", category: "T" } };
@@ -57,6 +72,10 @@ describe("convertLegacyChartConfig", () => {
             }
         });
     });
+});
+
+test("the classic table is legacy", () => {
+    expect(BaseChart.types.table_chart.legacy).toBe(true);
 });
 
 describe("the Spatial Image Viewer", () => {

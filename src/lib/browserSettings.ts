@@ -111,9 +111,9 @@ export const legacyChartsSetting = defineChoiceSetting<"hide" | "show">({
 /** Whether charts of a `legacy` type are loaded as their current equivalent; see `src/charts/legacyCharts.ts`. */
 export const convertLegacyChartsSetting = defineChoiceSetting<"off" | "on">({
     key: "mdv.settings.convertLegacyCharts",
-    label: "Convert legacy charts",
+    label: "Convert legacy charts (experimental)",
     description:
-        "Load charts of a legacy type (such as the classic scatter plots) as their current " +
+        "For developers; the behaviour is likely to change. Load charts of a legacy type (such as the classic scatter plots) as their current " +
         "equivalent. The conversion is saved if the view is saved. Charts with no equivalent, " +
         "or that the equivalent could not show faithfully, are left as they are.",
     choices: [

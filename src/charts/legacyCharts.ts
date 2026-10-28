@@ -12,6 +12,8 @@ type LegacyConversion = {
     to: string;
     /** False where the replacement would not show what the saved chart does. */
     canConvert?: (config: any) => boolean;
+    /** Rewrites config keys that the replacement reads differently. */
+    adapt?: (config: any) => void;
 };
 
 const scatterBackgroundFilterIsUnset = (config: any) => {
@@ -28,6 +30,13 @@ const legacyConversions: Record<string, LegacyConversion> = {
     wgl_scatter_plot: { to: "DeckContourScatter", canConvert: scatterBackgroundFilterIsUnset },
     // same chart class; `DeckContourScatter` only adds density settings, which are off by default
     wgl_scatter_plot_dev: { to: "DeckContourScatter" },
+    // the sort direction is stored as `ascending` rather than `sortAsc`; the rest is shared
+    table_chart: {
+        to: "table_chart_react",
+        adapt: (config) => {
+            if (config.sort) config.sort = { columnId: config.sort.columnId, ascending: !!config.sort.sortAsc };
+        },
+    },
     // `param[2]` (the category column) becomes `contourParameter` when the deck chart loads
     density_scatter_plot: {
         to: "DeckContourScatter",
@@ -46,5 +55,6 @@ export function convertLegacyChartConfig(config: { type: string }): string | und
     if (!conversion || conversion.canConvert?.(config) === false) return undefined;
     const from = config.type;
     config.type = conversion.to;
+    conversion.adapt?.(config);
     return from;
 }
