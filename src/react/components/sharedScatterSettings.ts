@@ -1,6 +1,7 @@
 import type BaseChart from "@/charts/BaseChart";
 import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
 import { g } from "@/lib/utils";
+import { browserHasWebGPU, type DeckBackend, defaultDeckBackend } from "@/react/spatialdata/deck_backend";
 import { getDensitySettings } from "../contour_state";
 import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
 
@@ -113,4 +114,30 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
     }
 
     return settings;
+}
+
+/** "Default" names what the default currently is; it is set in the Debug dialog, per browser. */
+function renderBackendOptions() {
+    const current = defaultDeckBackend() === "webgpu" ? "WebGPU" : "WebGL";
+    return [
+        { name: `Browser default (${current})`, value: "default" },
+        { name: "WebGL", value: "webgl" },
+        { name: "WebGPU", value: "webgpu" },
+    ];
+}
+
+/** A chart's own choice of deck backend (see `deck_backend.ts`), offered where WebGPU is, or already chosen. */
+export function getRenderBackendSettings(config: { render_backend?: DeckBackend | null }) {
+    if (!browserHasWebGPU() && !config.render_backend) return [];
+    return [
+        g({
+            type: "dropdown",
+            label: "Rendering backend",
+            current_value: config.render_backend ?? "default",
+            values: [renderBackendOptions(), "name", "value"],
+            func(value) {
+                config.render_backend = value === "webgl" || value === "webgpu" ? value : null;
+            },
+        }),
+    ];
 }

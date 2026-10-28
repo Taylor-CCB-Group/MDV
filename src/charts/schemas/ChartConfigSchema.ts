@@ -189,6 +189,7 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
     selectionFeatureCollection: z.unknown().optional().describe("Serialized selection overlay geometry"),
     region: z.string().optional().describe("Associated region identifier when rendering spatial scatter plots"),
     hideMissing: z.boolean().optional().describe("Whether to hide points with missing numeric color values"),
+    render_backend: z.enum(["webgl", "webgpu"]).nullable().optional().describe("deck.gl rendering backend; absent follows the browser's default"),
 }).describe("Shared configuration for deck.gl scatter charts");
 
 // Chart-specific configuration schemas
