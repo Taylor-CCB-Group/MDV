@@ -1,17 +1,16 @@
 {
-	"$schema": "https://biomejs.dev/schemas/1.8.3/schema.json",
-	"organizeImports": {
-		"enabled": true
-	},
+	"$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+	"assist": { "actions": { "source": { "organizeImports": "on" } } },
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true,
+			"preset": "recommended",
 			"complexity": {
 				"useLiteralKeys": "off",
 				"noForEach": "off",
 				"noUselessSwitchCase": "info",
-				"noUselessFragments": "off"
+				"noUselessFragments": "off",
+				"noArguments": "off"
 			},
 			"suspicious": {
 				"noExplicitAny": "off",
@@ -28,8 +27,7 @@
 				"noParameterAssign": "off",
 				"useTemplate": "info",
 				"useSingleVarDeclarator": "info",
-				"noUselessElse": "off",
-				"noArguments": "off"
+				"noUselessElse": "off"
 			},
 			"a11y": {
 				"useKeyWithClickEvents": "off",
@@ -48,16 +46,17 @@
 	},
 	"files": {
 		// todo - fix other code and remove these ignores (notwithstanding legacy)
-		"ignore": [
-			"./src/legacy/**/*",
-			"./src/browser/**/*",
-			"./src/table/Slick*",
-			"./src/venn/**/*",
-			"./src/table/css/slick*",
-			"./src/tailwind.css",
-			"./src/utilities/css/**/*",
-			"./src/css/**/*",
-			"./src/utilities/jpeg2000/chafey/**/*"
+		"includes": [
+			"**",
+			"!src/legacy/**/*",
+			"!src/browser/**/*",
+			"!src/table/Slick*",
+			"!src/venn/**/*",
+			"!src/table/css/slick*",
+			"!src/tailwind.css",
+			"!src/utilities/css/**/*",
+			"!src/css/**/*",
+			"!src/utilities/jpeg2000/chafey/**/*"
 		]
 	}
 }

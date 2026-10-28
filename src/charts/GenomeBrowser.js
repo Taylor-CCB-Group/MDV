@@ -1,7 +1,6 @@
 import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
-import { useDataSources } from "@/react/hooks";
 import {loadColumn} from "@/dataloaders/DataLoaderUtil"
 
 
@@ -86,7 +85,7 @@ class GenomeBrowser extends BaseChart {
             //i.e. the browser update if a region is highlighted in another datastore
            
             if (c.sync_with_datastores){
-                const dsources = useDataSources();  
+                const dsources = window.mdv.chartManager.dataSources;
                 for (let ds of c.sync_with_datastores){
                     const dobj= dsources.find(x=>x.name===ds);
                     if (dobj){
