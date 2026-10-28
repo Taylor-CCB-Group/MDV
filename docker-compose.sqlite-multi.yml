@@ -1,0 +1,61 @@
+# Multi-instance MDV sqlite deployment (pre-loaded image, no postgres).
+#
+# Usage on the target VM:
+#   docker load -i mdv-sqlite.tar
+#   docker tag mdvadmin/mdv:sqlite mdvadmin/mdv_sqlite:stable   # if tag differs after load
+#   docker compose -f docker-compose.sqlite-multi.yml up -d
+#
+# Requires:
+#   - config/user_config.json on the host
+#   - .env.sqlite_1, .env.sqlite_2, .env.sqlite_3 (see repo; gitignored)
+
+x-mdv-sqlite-common: &mdv-sqlite-common
+  image: mdvadmin/mdv:sqlite
+  pull_policy: never
+  restart: always
+  volumes:
+    - ./config/user_config.json:/config/user_config.json
+  logging:
+    driver: local
+    options:
+      max-size: 50m
+      max-file: "5"
+
+services:
+  mdv_sqlite_1:
+    <<: *mdv-sqlite-common
+    container_name: mdv_sqlite_1
+    ports:
+      - "5059:5055"
+    volumes:
+      - mdv_sqlite-1-data:/app/mdv
+      - ./config/user_config.json:/config/user_config.json
+    env_file:
+      - .env.sqlite_1
+
+  mdv_sqlite_2:
+    <<: *mdv-sqlite-common
+    container_name: mdv_sqlite_2
+    ports:
+      - "5060:5055"
+    volumes:
+      - mdv_sqlite-2-data:/app/mdv
+      - ./config/user_config.json:/config/user_config.json
+    env_file:
+      - .env.sqlite_2
+
+  mdv_sqlite_3:
+    <<: *mdv-sqlite-common
+    container_name: mdv_sqlite_3
+    ports:
+      - "5061:5055"
+    volumes:
+      - mdv_sqlite-3-data:/app/mdv
+      - ./config/user_config.json:/config/user_config.json
+    env_file:
+      - .env.sqlite_3
+
+volumes:
+  mdv_sqlite-1-data:
+  mdv_sqlite-2-data:
+  mdv_sqlite-3-data:

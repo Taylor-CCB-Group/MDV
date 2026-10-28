@@ -13,7 +13,7 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
 import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
 import type { SelectionDialogConfig } from "./components/SelectionDialogReact";
-import { getCategoryFilterIndices, rowMatchesCategoryFilter, type CategoryFilterColumn } from "@/lib/categoryFilterUtils";
+import { compileCategoryFilter, getCategoryFilterIndices, type CategoryFilterColumn } from "@/lib/categoryFilterUtils";
 import { shouldRefreshFilteredIndices } from "./filteredIndicesUtils";
 import {
     getOwnerVisibleRows,
@@ -478,10 +478,17 @@ export function useChartScopeFilterPredicate() {
             return null;
         }
 
-        return (rowIndex: number) =>
-            filtersWithColumns.every(({ filter, column }) =>
-                rowMatchesCategoryFilter(rowIndex, column, filter.category ?? null),
-            );
+        // compiled once per filter change: the per-row test must not read (observable) config
+        const matchers = filtersWithColumns.map(({ filter, column }) =>
+            compileCategoryFilter(column, filter.category ?? null),
+        );
+        if (matchers.length === 1) return matchers[0];
+        return (rowIndex: number) => {
+            for (const matches of matchers) {
+                if (!matches(rowIndex)) return false;
+            }
+            return true;
+        };
     }, [dataStore.columnIndex, filterKey, loadedFilterKey]);
 
     return {
@@ -551,6 +558,29 @@ export type FilterOwner = {
     filterMethod?: unknown;
 };
 
+/**
+ * Returns a function that hands back the rows it was last given while their contents are
+ * unchanged. The owner's own filter never changes which rows it draws (rows only it excludes
+ * stay visible), so while a selection is being edited every refresh would otherwise produce an
+ * equal but new array, and deck.gl regenerates every attribute when `data` changes identity.
+ */
+function createRowsStabilizer() {
+    let last: Uint32Array | null = null;
+    return (rows: Uint32Array) => {
+        if (last && sameRows(last, rows)) return last;
+        last = rows;
+        return rows;
+    };
+}
+
+function sameRows(a: Uint32Array, b: Uint32Array) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
+}
+
 export function useOwnedFilteredIndices(filterOwner?: FilterOwner | null) {
     const chartScope = useChartScopeFilterPredicate();
     const aggregateFilteredRows = useScopedFilteredIndices(chartScope);
@@ -558,17 +588,21 @@ export function useOwnedFilteredIndices(filterOwner?: FilterOwner | null) {
     const localFilter = filterOwner?.getLocalFilter() ?? null;
     const localFilterIsActive = Boolean(filterOwner?.filterMethod || filterOwner?.bgfArray);
     const { predicate, ready } = chartScope;
+    const [keepIfUnchanged] = useState(createRowsStabilizer);
 
     const ownerVisibleRows = useMemo(() => {
-        if (!ready) return new Uint32Array(0);
-        return getOwnerVisibleRows({
-            aggregateRows: aggregateFilteredRows,
-            globalFilter,
-            localFilter,
-            localFilterIsActive,
-            scopePredicate: predicate,
-        });
+        if (!ready) return keepIfUnchanged(new Uint32Array(0));
+        return keepIfUnchanged(
+            getOwnerVisibleRows({
+                aggregateRows: aggregateFilteredRows,
+                globalFilter,
+                localFilter,
+                localFilterIsActive,
+                scopePredicate: predicate,
+            }),
+        );
     }, [
+        keepIfUnchanged,
         aggregateFilteredRows,
         globalFilter,
         localFilter,
@@ -649,23 +683,39 @@ export function useDataSources() {
 }
 
 /**
+ * Creates a {Dimension} of the given type owned by the calling component, destroying it on unmount.
+ *
+ * Created in an effect rather than during render so that each mount owns a live, registered
+ * dimension. Under StrictMode the simulated unmount destroys the first one (removing it from
+ * `ds.dimensions`, and for a RangeDimension terminating its worker); if the remount kept filtering
+ * through that instance, `removeAllFilters` would no longer see it, leaving stale local filter
+ * state that corrupts the parent filter on the next transition.
+ *
+ * Returns `undefined` until the effect has run, so callers should only use it inside effects/callbacks.
+ */
+function useOwnedDimension<T extends Dimension = Dimension>(dimensionType: string) {
+    const ds = useDataStore();
+    const [dim, setDim] = useState<T>();
+    useEffect(() => {
+        //! `getDimension` is untyped JS - the caller vouches for `dimensionType` matching `T`.
+        const d = ds.getDimension(dimensionType) as T;
+        setDim(d);
+        return () => d.destroy();
+    }, [ds, dimensionType]);
+    return dim;
+}
+
+/**
  * Gets a {Dimension} object for filtering a column in the current data store context
  * and removes the filter when the component unmounts.
+ *
+ * `undefined` until the owning effect has created it - see {@link useOwnedDimension}.
  */
 export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
-    const ds = useDataStore();
     // it might be good to have something better for isTextLike, some tests for this...
     const isTextLike = (column.values !== undefined) || (column.datatype === "unique");
     const dimension_type = isTextLike ? "category_dimension" : "range_dimension";
-    const dim = useMemo(() => {
-        const dim = ds.getDimension(dimension_type);
-        return dim;
-    }, [ds, dimension_type]);
-    useEffect(() => {
-        // cleanup when component unmounts
-        return () => dim.destroy();
-    }, [dim.destroy]);
-    return dim;
+    return useOwnedDimension(dimension_type);
 }
 
 export function useLazyDimensionFilter<K extends DataType>(column: DataColumn<K>) {
@@ -691,21 +741,15 @@ export function useLazyDimensionFilter<K extends DataType>(column: DataColumn<K>
 }
 
 export function useRangeDimension2D() {
-    const ds = useDataStore();
     const s = useRegionScale();
-    const rangeDimension = useMemo(() => {
-        const dim = ds.getDimension("range_dimension") as RangeDimension;
-        return dim;
-    }, [ds]);
-    useEffect(() => {
-        return () => rangeDimension.destroy();
-    }, [rangeDimension.destroy]);
+    const rangeDimension = useOwnedDimension<RangeDimension>("range_dimension");
     // encapsulating a bit more of the Dimension API here so I'm less likely to forget it.
     const { param } = useConfig();
     if (!isArray(param)) throw "expecting param to be array";
     const cols = useMemo(() => [param[0], param[1]], [param]); //todo: 3d...
     const filterPoly = useCallback(
         (coords: [number, number][], region?: FilterPolyRegionOpts) => {
+            if (!rangeDimension) return;
             // Apply coordinate scaling if required (e.g. image vs data coordinate systems).
             const points = s === 1 ? coords : (coords.map((c) => c.map((v) => v * s)) as [number, number][]);
 
@@ -724,7 +768,7 @@ export function useRangeDimension2D() {
         },
         [rangeDimension, cols, s],
     );
-    const removeFilter = useCallback(() => rangeDimension.removeFilter(), [rangeDimension]);
+    const removeFilter = useCallback(() => rangeDimension?.removeFilter(), [rangeDimension]);
     return { filterPoly, removeFilter, rangeDimension };
 }
 

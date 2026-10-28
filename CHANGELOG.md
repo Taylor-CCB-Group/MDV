@@ -6,9 +6,27 @@ All notable changes to `mdvtools` are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `mdvtools --version` (`-V`) prints the mdvtools version, git commit, Python and platform.
+- When a CLI command fails unexpectedly it now prints an error report with the command line,
+  traceback, and mdvtools/dependency versions, ready to paste into an issue, and exits with
+  status 1.
+
 ### Changed
+- `mdvtools convert-spatial` default views now use the SpatialData.js viewer instead of the
+  Viv image viewer.
+- The SpatialData.js chart is now listed as "SpatialData.js viewer" in the add-chart menu.
 - React Compiler is now enabled by default for Vite builds; set
   `VITE_USE_REACT_COMPILER=0` or `VITE_USE_REACT_COMPILER=false` to opt out locally.
+
+### Fixed
+- `pip install mdvtools` now installs `leidenalg` and `igraph`, so `--compute-x-umap` and
+  `convert_scanpy_to_mdv(compute_x_umap=True)` can compute Leiden clusters. They were only in
+  the `dev` dependency group before.
+- Build information no longer reports the commit of an unrelated git repository when
+  `mdvtools` is installed inside one (for example a virtualenv within your own project).
+- In the gridstack layout, hovering a chart no longer adds a scrollbar and resizes every chart
+  (#594).
 
 ## [1.3.0] - 2026-06-04
 

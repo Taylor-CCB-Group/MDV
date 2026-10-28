@@ -7,6 +7,7 @@ import { getProjectName } from "./ProjectContext";
 import { getProjectBootstrapContext, loadProjectRuntime, type LoadedProjectRuntime } from "./projectRuntime";
 import type { DataSource } from "@/charts/charts";
 import type ChartManager from "@/charts/ChartManager";
+import { offerOwnTabIfFramed } from "@/utils/ownTabNotice";
 
 type CreateMdvPortalFn = typeof import("@/react/react_utils").createMdvPortal;
 type ProjectStateHandlerWrapperType = typeof import("@/react/ProjectStateHandler").default;
@@ -304,4 +305,7 @@ const closeBootstrapOverlay = () => {
     bootstrapOverlayContainer.remove();
 };
 
+// Before the project loads, so a framed page without isolation explains itself instead of
+// failing on data loading.
+offerOwnTabIfFramed();
 bootstrapRoot.render(<BootstrapApp onComplete={closeBootstrapOverlay} />);

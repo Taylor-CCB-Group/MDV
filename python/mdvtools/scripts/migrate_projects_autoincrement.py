@@ -14,6 +14,11 @@ do not declare, which can be a table, column, index, trigger, view or non-zero
 user_version. Pass --keep-extras to copy those into the new database. Rows that
 already break a foreign key are copied as they are and listed.
 
+SQLite cannot check a foreign key that references a column with no unique index,
+which an export from PostgreSQL can leave behind by dropping the UNIQUE. Each such
+table is listed and its rows are not excused, so a row in it that the new
+database's foreign keys reject stops the run.
+
 The run also stops if a -journal, -wal or -shm file sits beside the database, or if
 the database is in WAL mode. If a copied row breaks a constraint, the run stops,
 removes the file it was building and leaves the original untouched.
@@ -120,7 +125,25 @@ def _print_list(heading, lines, file=None):
         print(f"  {line}", file=file)
 
 
-def _print_report(comparison, violations, rows, next_id):
+def _check_foreign_keys(connection):
+    """Return the rows PRAGMA foreign_key_check reports, and the tables it cannot
+    check because a foreign key references a column with no unique index."""
+    violations = []
+    unchecked = []
+    tables = connection.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+    ).fetchall()
+    for (table_name,) in tables:
+        try:
+            violations += connection.execute(f"PRAGMA foreign_key_check({_quote(table_name)})").fetchall()
+        except sqlite3.OperationalError as error:
+            if "foreign key mismatch" not in str(error):
+                raise
+            unchecked.append(table_name)
+    return violations, unchecked
+
+
+def _print_report(comparison, violations, unchecked, rows, next_id):
     for heading, lines in (
         ("Tables the models declare and the database lacks, created empty:", comparison.missing_tables),
         ("Columns the models declare and the database lacks, left empty:", comparison.missing_columns),
@@ -128,6 +151,11 @@ def _print_report(comparison, violations, rows, next_id):
         (
             "Rows that already break a foreign key, copied as they are:",
             [f"{table} row {rowid} has no matching row in {parent}" for table, rowid, parent, _ in violations],
+        ),
+        (
+            "Tables not checked in the original, because a foreign key references a column"
+            " with no unique index:",
+            unchecked,
         ),
         ("Rows per table:", [f"{name}: {count}" for name, count in rows.items()]),
     ):
@@ -351,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
         highest_id = 0
         if "id" in comparison.copy_columns.get("projects", []):
             highest_id = original.execute("SELECT max(id) FROM projects").fetchone()[0] or 0
-        violations = original.execute("PRAGMA foreign_key_check").fetchall()
+        violations, unchecked = _check_foreign_keys(original)
 
     backup_path = db_path.with_name(db_path.name + BACKUP_SUFFIX)
     if backup_path.exists():
@@ -376,7 +404,7 @@ def main(argv: list[str] | None = None) -> int:
     sequence = highest_id if args.min_next_id is None else max(highest_id, args.min_next_id - 1)
     next_id = sequence + 1
     if args.dry_run:
-        _print_report(comparison, violations, rows, next_id)
+        _print_report(comparison, violations, unchecked, rows, next_id)
         print("This was a dry run, so nothing was written.")
         return 0
 
@@ -403,7 +431,7 @@ def main(argv: list[str] | None = None) -> int:
     os.rename(new_path, db_path)
     _fsync(db_path.parent)
 
-    _print_report(comparison, violations, rows, next_id)
+    _print_report(comparison, violations, unchecked, rows, next_id)
     print(f"The original database is now at {backup_path}")
     return 0
 

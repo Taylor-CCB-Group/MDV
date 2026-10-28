@@ -269,7 +269,7 @@ BaseChart.types.SpatialDataMdvRegionReact = {
         // but this means that if e.g. ChatMDV was generating a config object, it wouldn't necessarily need to fill in all those details
     },
     class: SpatialDataMdvReact,
-    name: "SpatialData.js Image Viewer (experimental)",
+    name: "SpatialData.js viewer",
 };
 
 export { SpatialDataMdvReact };
