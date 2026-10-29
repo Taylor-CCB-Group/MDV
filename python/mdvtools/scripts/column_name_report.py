@@ -137,6 +137,7 @@ _CHART_FIELD_KEYS = (
     "color_by",
     "tooltip",
     "background_filter",
+    "split_by",
     "densityFields",
     "contourParameter",
     "category",
