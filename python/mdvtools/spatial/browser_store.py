@@ -13,6 +13,7 @@ rewrites only ever touch the project's copy, so they cannot be combined with lin
 
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
@@ -116,14 +117,54 @@ def resolve_browser_store_options(
     return replace(BROWSER_PRESETS[preset], **overrides)
 
 
+def check_browser_store_encoders(options: BrowserStoreOptions) -> None:
+    """Raise before any conversion work if *options* needs an encoder that isn't installed."""
+    if options.image_codec != "htj2k":
+        return
+    from spatialdata_js_util import htj2k_available
+
+    if not htj2k_available():
+        raise RuntimeError(
+            "HTJ2K image recompression needs an HTJ2K encoder backend, and none is available "
+            "(run `spatialdata-js-util codecs info` for details). Pass --image-codec none to skip it."
+        )
+
+
 def write_spatialdata_store(
     sdata: SpatialData,
     dest: str | Path,
     options: BrowserStoreOptions,
     progress: Callable[[str], None] = print,
 ) -> None:
-    """Write *sdata* to *dest*, then apply the rewrites *options* asks for in place."""
+    """Write *sdata* to *dest*, applying the rewrites *options* asks for.
+
+    With rewrites, the store is built in a hidden sibling directory and only moved to
+    *dest* once every rewrite has succeeded, so a failure leaves no half-rewritten store.
+    """
     dest = Path(dest)
+    if not options.enabled:
+        sdata.write(dest)
+        return
+    check_browser_store_encoders(options)
+    staging = dest.with_name(f".{dest.name}.partial")
+    if staging.exists():
+        shutil.rmtree(staging)
+    try:
+        _write_and_rewrite(sdata, staging, options, progress, name=dest.name)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    staging.rename(dest)
+
+
+def _write_and_rewrite(
+    sdata: SpatialData,
+    store: Path,
+    options: BrowserStoreOptions,
+    progress: Callable[[str], None],
+    *,
+    name: str,
+) -> None:
     image_keys = _recompressible_image_keys(sdata) if options.image_codec is not None else []
     if options.image_codec is not None:
         for key in sdata.images:
@@ -132,16 +173,16 @@ def write_spatialdata_store(
                     f"Not recompressing images/{key}: browser codecs need integer pixels of 16 bits or fewer"
                 )
     if options.image_codec is None or not image_keys:
-        sdata.write(dest)
+        sdata.write(store)
     else:
         from spatialdata_js_util import recompress_spatialdata
 
-        progress(f"Writing '{dest.name}' with {options.image_codec} images ({options.image_preset})")
+        progress(f"Writing '{name}' with {options.image_codec} images ({options.image_preset})")
         # Writes the store, then recompresses the listed rasters; single-level images
         # get a pyramid first, existing pyramids are kept.
         recompress_spatialdata(
             sdata,
-            dest,
+            store,
             config={"images": {key: {} for key in image_keys}},
             codec=_CODEC_NAMES[options.image_codec],
             preset=_image_preset(options.image_preset),
@@ -152,8 +193,8 @@ def write_spatialdata_store(
     if options.csc_tables:
         from spatialdata_js_util import convert_store_tables_to_csc
 
-        progress(f"Converting tables in '{dest.name}' to CSC")
-        convert_store_tables_to_csc(dest, manifest=False)
+        progress(f"Converting tables in '{name}' to CSC")
+        convert_store_tables_to_csc(store, manifest=False)
 
     if options.points_zarr or options.morton_points:
         import pyarrow.dataset as ds
@@ -165,22 +206,22 @@ def write_spatialdata_store(
             read_points_element_attrs,
         )
 
-        for points_key in list_points_keys(dest):
+        for points_key in list_points_keys(store):
             if options.points_zarr:
-                if read_points_element_attrs(dest, points_key)["feature_key"] is None:
+                if read_points_element_attrs(store, points_key)["feature_key"] is None:
                     progress(f"No points-zarr copy of points/{points_key}: it declares no feature_key")
                 else:
                     progress(f"Adding points-zarr copy of points/{points_key}")
-                    add_points_zarr_to_store(None, dest, points_key=points_key, progress=progress)
+                    add_points_zarr_to_store(None, store, points_key=points_key, progress=progress)
             if options.morton_points:
-                schema = ds.dataset(points_parquet_path(dest, points_key), format="parquet").schema
+                schema = ds.dataset(points_parquet_path(store, points_key), format="parquet").schema
                 if MORTON_CODE_2D_COLUMN in schema.names:
                     # Already Morton-indexed, possibly in a deliberate order such as
                     # feature-then-Morton that a plain re-sort would undo.
                     progress(f"Keeping points/{points_key}: already Morton-indexed")
                 else:
                     progress(f"Morton-sorting points/{points_key}")
-                    run_morton_points_from_zarr(dest, points_key=points_key)
+                    run_morton_points_from_zarr(store, points_key=points_key)
 
 
 def _recompressible_image_keys(sdata: SpatialData) -> list[str]:

@@ -130,6 +130,21 @@ def test_conversion_rejects_browser_store_rewrites_with_link_before_reading(tmp_
         convert_spatialdata_to_mdv(args)
 
 
+def test_conversion_fails_early_without_an_htj2k_encoder(tmp_path, monkeypatch):
+    import spatialdata_js_util
+
+    monkeypatch.setattr(spatialdata_js_util, "htj2k_available", lambda: False)
+    args = SpatialDataConversionArgs(
+        spatialdata_path=str(tmp_path / "missing.zarr"),
+        output_folder=str(tmp_path / "out"),
+        temp_folder=str(tmp_path),
+        browser_store=BROWSER_PRESETS["standard"],
+    )
+    # Raised before the (missing) source is read, rather than after the whole conversion.
+    with pytest.raises(RuntimeError, match="--image-codec none"):
+        convert_spatialdata_to_mdv(args)
+
+
 def _zarr_json(path: Path) -> dict:
     return json.loads((path / "zarr.json").read_text())
 
@@ -215,6 +230,21 @@ def test_write_applies_experimental_rewrites(small_sdata, tmp_path):
     assert set(sdata.points) == set(small_sdata.points)
     assert sdata.tables["table"].n_obs == small_sdata.tables["table"].n_obs
     assert any("Morton-sorting" in message for message in messages)
+
+
+def test_failed_rewrite_leaves_no_store_behind(small_sdata, tmp_path, monkeypatch):
+    import spatialdata_js_util
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("CSC conversion failed")
+
+    monkeypatch.setattr(spatialdata_js_util, "convert_store_tables_to_csc", fail)
+    dest = tmp_path / "spatial" / "store.zarr"
+    dest.parent.mkdir()
+    with pytest.raises(RuntimeError, match="CSC conversion failed"):
+        write_spatialdata_store(small_sdata, dest, BrowserStoreOptions(csc_tables=True), progress=lambda message: None)
+
+    assert list(dest.parent.iterdir()) == []
 
 
 def test_write_skips_points_zarr_for_points_without_feature_key(small_sdata, tmp_path):

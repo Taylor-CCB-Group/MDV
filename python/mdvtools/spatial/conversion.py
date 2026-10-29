@@ -9,7 +9,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 import numpy as np
 from ..serverlite import serve_project
-from .browser_store import BrowserStoreOptions, write_spatialdata_store
+from .browser_store import (
+    BrowserStoreOptions,
+    check_browser_store_encoders,
+    write_spatialdata_store,
+)
 from .conversion_options import (
     DEFAULT_POINT_TRANSFORM,
     DEFAULT_TABLE_HANDLING,
@@ -1434,6 +1438,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             f"Browser store rewrites ({args.browser_store.describe()}) apply to the project's "
             "copy of the store and cannot be combined with --link."
         )
+    check_browser_store_encoders(args.browser_store)
     sdata_paths = _discover_spatialdata_paths(args.spatialdata_path, batch=args.batch)
     single_source_input = _is_single_spatialdata_source(args.spatialdata_path, sdata_paths)
     _validate_table_handling(args.table_handling)
