@@ -2270,7 +2270,18 @@ export class ChartManager {
         // Also setParams() itself *should* always work - but depends on the chart implementation,
         // and not all charts implement that.
         const originalParam = config.param.map(p => deserialiseParam(ds, p));
-        config.param = originalParam.flatMap(getConcreteFieldNames);
+        let fields = originalParam.flatMap(getConcreteFieldNames);
+        if (originalParam.some(p => typeof p !== 'string')) {
+            // Linked fields can change while loading (e.g. the linked datasource's initial filter
+            // is applied), and some constructors read column data synchronously.
+            for (let attempt = 0; attempt < 3; attempt++) {
+                await this._getColumnsAsync(dataSource, fields);
+                const resolved = originalParam.flatMap(getConcreteFieldNames);
+                if (resolved.join() === fields.join()) break;
+                fields = resolved;
+            }
+        }
+        config.param = fields;
         const chart = new chartType.class(ds.dataStore, div, config);
         if (originalParam.some(p => typeof p !== 'string')) {
             console.log('setting param with active queries in timeout');
