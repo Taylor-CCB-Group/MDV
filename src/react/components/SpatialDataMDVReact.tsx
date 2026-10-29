@@ -180,9 +180,9 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
 
     /**
      * The chart's read of its store, shared by the canvas and the layer dialog
-     * (`useChartSpatialData`). Not observable: the hook subscribes to the read itself.
+     * (`useChartSpatialData`). Not observable: the hook subscribes to the reader itself.
      */
-    readonly readSpatialData = createSpatialDataReader();
+    readonly spatialDataReader = createSpatialDataReader();
 
     /** The store the canvas is showing, for linking to it. Runtime only. */
     spatialDataUrl: string | null = null;

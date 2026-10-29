@@ -1,4 +1,5 @@
 import { ColorPaletteExtension } from "@hms-dbmi/viv";
+import { Button } from "@mui/material";
 import { viewStateFromBounds } from "@spatialdata/core";
 import {
     type ViewState as SpatialCanvasViewState,
@@ -580,7 +581,14 @@ const SpatialDataViewer = observer(
         }
 
         if (error) {
-            return <div className="h-full w-full p-2">Failed to load SpatialData store: {error.message}</div>;
+            return (
+                <div className="h-full w-full p-2">
+                    Failed to load SpatialData store: {error.message}
+                    <Button size="small" onClick={() => chart.spatialDataReader.retry()}>
+                        Retry
+                    </Button>
+                </div>
+            );
         }
 
         if (loading || !spatialData) {

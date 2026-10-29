@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import { useChart } from "../context";
 import { useRegion } from "../hooks";
@@ -17,23 +17,11 @@ export function spatialDataUrlForRegion(region: unknown): string | null {
 /**
  * The chart's `SpatialData`, for any tree under its `ChartProvider` — the canvas and
  * the layer dialog alike. A tree that mounts after the read settled gets it on its
- * first render.
+ * first render, and every tree sees a `retry`.
  */
 export function useChartSpatialData(): SpatialDataState {
-    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    const reader = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>().spatialDataReader;
     const url = spatialDataUrlForRegion(useRegion());
-    const read = url ? chart.readSpatialData(url) : null;
-    const [, rerender] = useReducer((n: number) => n + 1, 0);
-    const pending = read?.state.loading ?? false;
-    useEffect(() => {
-        if (!read || !pending) return;
-        let mounted = true;
-        // the reader's own handlers were attached first, so `read.state` is final here
-        const settle = () => mounted && rerender();
-        read.promise.then(settle, settle);
-        return () => {
-            mounted = false;
-        };
-    }, [read, pending]);
-    return read?.state ?? NO_SPATIAL_DATA;
+    const getSnapshot = useCallback(() => (url ? reader.read(url).state : NO_SPATIAL_DATA), [reader, url]);
+    return useSyncExternalStore(reader.subscribe, getSnapshot);
 }
