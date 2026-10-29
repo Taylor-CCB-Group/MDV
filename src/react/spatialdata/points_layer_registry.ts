@@ -3,7 +3,7 @@ import type { PointsDataEngine, PointsLoadTarget } from "@spatialdata/vis";
 /**
  * The live points engine, published from the chart so the layer dialog can reach it.
  *
- * The dialog is its own React tree — a portal with its own `SpatialDataProvider` —
+ * The dialog is its own React tree — a portal under the chart's `ChartProvider` —
  * so it cannot see the renderer hook's result, and the engine is not something to
  * rebuild on the other side: it owns the resident window, the feature catalog and
  * the in-flight scans, and a second instance would load everything again and answer
