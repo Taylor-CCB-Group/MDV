@@ -19,6 +19,7 @@ import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScat
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
+import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import type { ElementIssues } from "./RasterIssues";
@@ -176,6 +177,12 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     setRasterIssues(issues: ElementIssues[]) {
         this.rasterIssues = issues;
     }
+
+    /**
+     * The chart's read of its store, shared by the canvas and the layer dialog
+     * (`useChartSpatialData`). Not observable: the hook subscribes to the read itself.
+     */
+    readonly readSpatialData = createSpatialDataReader();
 
     /** The store the canvas is showing, for linking to it. Runtime only. */
     spatialDataUrl: string | null = null;

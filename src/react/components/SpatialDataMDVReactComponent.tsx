@@ -1,6 +1,5 @@
 import { ColorPaletteExtension } from "@hms-dbmi/viv";
 import { viewStateFromBounds } from "@spatialdata/core";
-import { SpatialDataProvider, useSpatialData } from "@spatialdata/react";
 import {
     type ViewState as SpatialCanvasViewState,
     type SpatialFeaturePickEvent,
@@ -16,7 +15,6 @@ import { createPortal } from "react-dom";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
-import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
@@ -38,6 +36,8 @@ import {
 import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack_control";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { describeGpu } from "@/react/spatialdata/render_report";
+import { useChartSpatialData } from "@/react/spatialdata/shared_spatial_data";
+import type { SpatialDataState } from "@/react/spatialdata/spatial_data_reader";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
@@ -71,12 +71,6 @@ function getSpatialRegionMetadata(region: unknown): SpatialRegionMetadata | null
     return region;
 }
 
-function getSpatialDataUrl(region: SpatialRegionMetadata) {
-    const file = region.spatial?.file;
-    if (!file) return null;
-    return getProjectURL(`spatial/${file}`);
-}
-
 const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderStack({
     spatialData,
     coordinateSystem,
@@ -91,7 +85,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     onFeatureHover,
     onFeatureHoverEnd,
 }: {
-    spatialData: NonNullable<ReturnType<typeof useSpatialData>["spatialData"]>;
+    spatialData: NonNullable<SpatialDataState["spatialData"]>;
     coordinateSystem: string;
     spatialViewState: ReturnType<typeof toSpatialViewState>;
     onSpatialViewStateChange: (next: SpatialCanvasViewState) => void;
@@ -280,19 +274,14 @@ function SpatialDataChartRoot() {
 const SpatialDataMainChart = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
-    const rawRegion = useRegion();
-    const region = getSpatialRegionMetadata(rawRegion);
-    const spatialDataUrl = region ? getSpatialDataUrl(region) : null;
     useEffect(() => {
         ensureParquetWorker();
     }, []);
 
     return (
-        <SpatialDataProvider source={spatialDataUrl ?? undefined}>
-            <SpatialAnnotationProvider chart={chart} hoveredContour={hoveredContour} setHoveredContour={setHoveredContour}>
-                <SpatialDataViewer setHoveredContour={setHoveredContour} />
-            </SpatialAnnotationProvider>
-        </SpatialDataProvider>
+        <SpatialAnnotationProvider chart={chart} hoveredContour={hoveredContour} setHoveredContour={setHoveredContour}>
+            <SpatialDataViewer setHoveredContour={setHoveredContour} />
+        </SpatialAnnotationProvider>
     );
 });
 
@@ -358,7 +347,7 @@ const SpatialDataViewer = observer(
         const rawRegion = useRegion();
         const region = getSpatialRegionMetadata(rawRegion);
         const coordinateSystem = region?.spatial?.coordinate_system ?? null;
-        const { spatialData, loading, error } = useSpatialData();
+        const { spatialData, loading, error } = useChartSpatialData();
         const viewerStore = useViewerStoreApi();
         const viewState = useViewerStore((store) => store.viewState);
         const spatialViewState = toSpatialViewState(viewState);

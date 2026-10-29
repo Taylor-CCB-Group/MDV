@@ -30,7 +30,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { RenderStackSpatialElementType } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
-import { useSpatialData } from "@spatialdata/react";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -58,6 +57,7 @@ import {
     defaultPropsForSpatialElement,
     listAvailableSpatialEntries,
 } from "@/react/spatialdata/render_stack_defaults";
+import { useChartSpatialData } from "@/react/spatialdata/shared_spatial_data";
 import { useElementTableAssociation } from "@/react/spatialdata/table_association";
 import { useChart, useDataStore } from "../context";
 import { useConfig, useDataSources } from "../hooks";
@@ -112,7 +112,7 @@ const LayerFailureDetails = observer(function LayerFailureDetails({ entryId }: {
 const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: string }) {
     const dataStore = useDataStore();
     const dataSources = useDataSources();
-    const { spatialData } = useSpatialData();
+    const { spatialData } = useChartSpatialData();
     const { entry, layer, patchLayer } = useRenderStackEntry(entryId);
     const spatialElementType = entry?.kind === "spatial" ? entry.source.elementType : undefined;
     const spatialElementKey = entry?.kind === "spatial" ? entry.source.elementKey : undefined;
@@ -279,7 +279,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
 const SpatialLayerDialogComponent = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const config = useConfig<SpatialDataMdvReactConfig>();
-    const { spatialData } = useSpatialData();
+    const { spatialData } = useChartSpatialData();
     const stack = config.renderStack;
     const mutateStack = useRenderStackMutation();
     const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
