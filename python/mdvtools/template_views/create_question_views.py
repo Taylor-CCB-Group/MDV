@@ -525,7 +525,7 @@ def feature_list(title: str, names: list[str]) -> dict[str, Any]:
 
 def feature_table(title: str, extra_columns: tuple[str, ...] = ()) -> dict[str, Any]:
     return {
-        "type": "table_chart",
+        "type": "table_chart_react",
         "title": title,
         "legend": "",
         "param": [NAME_FIELD, *extra_columns],

@@ -192,28 +192,17 @@ def bar_axes(stacked: bool) -> dict[str, Any]:
 
 
 def umap_chart(roles: Roles, color_by: Column, grid: dict[str, Any], position: list[int]) -> dict[str, Any]:
-    def axis(label: str, size: int) -> dict[str, Any]:
-        return {"label": label, "size": size, "textSize": 13, "textsize": 13, "tickfont": 10}
-
-    return {
-        "type": "wgl_scatter_plot",
-        "title": color_by.name,
-        "param": [roles.umap_x.field, roles.umap_y.field],
-        "color_by": color_by.field,
-        "axis": {"x": axis(roles.umap_x.name, 30), "y": axis(roles.umap_y.name, 45)},
-        "background_filter": {"categories": [], "column": None},
-        "brush": "poly",
-        "color_legend": {"display": True, "pos": [12, 12]},
-        "default_color": "#377eb8",
+    chart = questions.scatter(
+        color_by.name, [roles.umap_x.field, roles.umap_y.field], color_by.field, color_by.field
+    )
+    chart.update({
         "on_filter": "hide",
         "opacity": 0.8,
-        "queries": {"setBackgroundFilter": None},
-        "radius": 3,
-        "tooltip": {"show": False},
         "position": [0, 0],
         "gsposition": position,
         **grid,
-    }
+    })
+    return chart
 
 
 def stacked_chart(rows: Column, stacks: Column, position: list[int]) -> dict[str, Any]:
