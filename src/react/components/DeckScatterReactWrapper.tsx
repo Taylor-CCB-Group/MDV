@@ -31,6 +31,9 @@ export type DeckScatterConfigWithRegion = DeckScatterConfig & { region?: string 
 export const DECK_CONTOUR_SCATTER_TYPE = "DeckContourScatter";
 const deckContourScatterTypes = new Set([DECK_CONTOUR_SCATTER_TYPE, "DeckDensity"]);
 
+/** The "None" choice of a column dropdown, as the classic scatter plot spells it. */
+const NO_COLUMN = "__none__";
+
 const defaultViewState = {
     viewState: {
         target: [0, 0, 0],
@@ -63,6 +66,8 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     // Must exist before the config is made observable for later changes to be observed, and
     // survive initialiseChartConfig's JSON copy, so null rather than undefined.
     config.render_backend = config.render_backend ?? null;
+    // same for the background filter, which is replaced as a whole by its settings
+    config.background_filter = config.background_filter ?? null;
     // charts saved before this setting kept both axes at one scale
     if (config.dimension !== "3d") config.axis_scaling = config.axis_scaling ?? "equal";
     const legacyContourParameter = originalConfig.param?.[2];
@@ -155,7 +160,36 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         }
         // null only exists to keep the key observable; leave it out of saved views
         const render_backend = c.render_backend ?? undefined;
-        return { ...c, viewState, render_backend };
+        const background_filter = c.background_filter ?? undefined;
+        return { ...c, viewState, render_backend, background_filter };
+    }
+
+    /** Choose a column and the categories of it to keep; other rows are hidden from this chart only. */
+    getBackgroundFilterSettings() {
+        const c = this.config;
+        const textColumns = this.dataStore.getColumnList("string");
+        return [
+            g({
+                type: "dropdown",
+                label: "Background Filter Column",
+                current_value: c.background_filter?.column ?? NO_COLUMN,
+                values: [[...textColumns, { name: "None", field: NO_COLUMN }], "name", "field"],
+                func: (column) => {
+                    c.background_filter = column === NO_COLUMN ? null : { column, category: [] };
+                },
+            }),
+            g({
+                type: "category_selection",
+                label: "Background Filter Categories",
+                current_value: [],
+                sourceColumn: () => c.background_filter?.column ?? undefined,
+                getCurrentValue: () => [c.background_filter?.category ?? []].flat(),
+                func: (category: string[]) => {
+                    const column = c.background_filter?.column;
+                    if (column) c.background_filter = { column, category };
+                },
+            }),
+        ];
     }
 
     getSettings() {
@@ -184,6 +218,7 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             );
         }
         return settings.concat([
+            ...this.getBackgroundFilterSettings(),
             ...getSharedScatterSettings(c, {
                 chart: this,
                 includeDensitySettings: deckContourScatterTypes.has(c.type),

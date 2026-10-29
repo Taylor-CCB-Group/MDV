@@ -16,9 +16,20 @@ type LegacyConversion = {
     adapt?: (config: any) => void;
 };
 
-const scatterBackgroundFilterIsUnset = (config: any) => {
-    const column = config.background_filter?.column;
-    return !column || column === "__none__";
+/**
+ * The classic scatter keeps the selected values in `categories` (older charts in `category`) and
+ * counts a column of `__none__` or no categories as unset; the deck scatter reads `category`.
+ */
+const adaptScatterBackgroundFilter = (config: any) => {
+    const filter = config.background_filter;
+    if (!filter) return;
+    const categories: unknown[] = filter.categories?.length ? filter.categories : [filter.category];
+    const category = categories.filter((x) => typeof x === "string" && x !== "");
+    if (!filter.column || filter.column === "__none__" || category.length === 0) {
+        config.background_filter = undefined;
+    } else {
+        config.background_filter = { column: filter.column, category };
+    }
 };
 
 /**
@@ -26,10 +37,9 @@ const scatterBackgroundFilterIsUnset = (config: any) => {
  * Only these are converted: the Viv image viewer's config has no direct SpatialData.js equivalent.
  */
 const legacyConversions: Record<string, LegacyConversion> = {
-    // the deck scatter ignores the classic charts' background filter, so a chart using one would change
-    wgl_scatter_plot: { to: "DeckContourScatter", canConvert: scatterBackgroundFilterIsUnset },
+    wgl_scatter_plot: { to: "DeckContourScatter", adapt: adaptScatterBackgroundFilter },
     // same chart class; `DeckContourScatter` only adds density settings, which are off by default
-    wgl_scatter_plot_dev: { to: "DeckContourScatter" },
+    wgl_scatter_plot_dev: { to: "DeckContourScatter", adapt: adaptScatterBackgroundFilter },
     // the sort direction is stored as `ascending` rather than `sortAsc`; the rest is shared
     table_chart: {
         to: "table_chart_react",
@@ -40,7 +50,8 @@ const legacyConversions: Record<string, LegacyConversion> = {
     // `param[2]` (the category column) becomes `contourParameter` when the deck chart loads
     density_scatter_plot: {
         to: "DeckContourScatter",
-        canConvert: (config) => !config.viv && scatterBackgroundFilterIsUnset(config),
+        canConvert: (config) => !config.viv,
+        adapt: adaptScatterBackgroundFilter,
     },
 };
 

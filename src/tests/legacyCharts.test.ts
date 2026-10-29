@@ -50,17 +50,40 @@ describe("convertLegacyChartConfig", () => {
             expect(config).toEqual({ type: "table_chart_react" });
         });
 
-        test("does not convert a chart using a background filter the deck chart ignores", () => {
+        test("converts a background filter, keeping the selected categories", () => {
             convertLegacyChartsSetting.set("on");
-            const config = { type: "wgl_scatter_plot", background_filter: { column: "cell_type", category: "T" } };
-            expect(convertLegacyChartConfig(config)).toBeUndefined();
-            expect(config.type).toBe("wgl_scatter_plot");
+            const config = {
+                type: "wgl_scatter_plot",
+                background_filter: { column: "cell_type", categories: ["T", "B"], category: "T" },
+            };
+            expect(convertLegacyChartConfig(config)).toBe("wgl_scatter_plot");
+            expect(config).toEqual({
+                type: "DeckContourScatter",
+                background_filter: { column: "cell_type", category: ["T", "B"] },
+            });
         });
 
-        test("converts a chart whose background filter is the unset default", () => {
+        test("converts a background filter saved with a single category", () => {
             convertLegacyChartsSetting.set("on");
-            const config = { type: "wgl_scatter_plot", background_filter: { column: "__none__" } };
-            expect(convertLegacyChartConfig(config)).toBe("wgl_scatter_plot");
+            const config = { type: "wgl_scatter_plot", background_filter: { column: "cell_type", category: "T" } };
+            convertLegacyChartConfig(config);
+            expect(config).toEqual({
+                type: "DeckContourScatter",
+                background_filter: { column: "cell_type", category: ["T"] },
+            });
+        });
+
+        test("drops a background filter that was not selecting anything", () => {
+            convertLegacyChartsSetting.set("on");
+            for (const background_filter of [
+                { column: "__none__" },
+                { column: null, categories: [] },
+                { column: "cell_type", categories: [] },
+            ]) {
+                const config: { type: string; background_filter?: unknown } = { type: "wgl_scatter_plot", background_filter };
+                expect(convertLegacyChartConfig(config)).toBe("wgl_scatter_plot");
+                expect(config.background_filter).toBeUndefined();
+            }
         });
 
         test("leaves types with no equivalent alone", () => {

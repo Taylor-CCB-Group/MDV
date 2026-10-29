@@ -64,6 +64,14 @@ export type CategoryFilter = {
     category: string | string[];
     // consider properties like 'invert' or 'exclude', or 'color'...
 };
+/**
+ * Hides rows outside `category` of `column` from this chart (`null` when unset).
+ * Read by `useChartScopeFilterPredicate`; it does not filter other charts.
+ */
+export type BackgroundFilter = {
+    column: ColumnName | null;
+    category: string | string[];
+};
 //viewState should be persisted... maybe a way of saving different snapshots?
 //now using MobX for this, in a way that's common to viv & non-viv charts
 export type ScatterPlotConfig = {
@@ -76,6 +84,7 @@ export type ScatterPlotConfig = {
     //     // todo: add more options here...
     // };
     category_filters: Array<CategoryFilter>;
+    background_filter?: BackgroundFilter | null;
     on_filter: "hide" | "grey"; //todo...
     zoom_on_filter: boolean;
     point_shape: "circle" | "square" | "gaussian";
