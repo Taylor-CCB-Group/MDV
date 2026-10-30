@@ -187,11 +187,24 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             if (originalViewBox === null) axes.removeAttribute("viewBox");
             else axes.setAttribute("viewBox", originalViewBox);
         };
-        this.getImageFromSVG(axes, (axesCanvas) => {
+        try {
+            this.getImageFromSVG(
+                axes,
+                (axesCanvas) => {
+                    restore();
+                    ctx.drawImage(axesCanvas, 0, 0, out.width, out.height);
+                    callback(out);
+                },
+                (error) => {
+                    restore();
+                    console.error("Could not draw the axes for the image", error);
+                    callback(out);
+                },
+            );
+        } catch (error) {
             restore();
-            ctx.drawImage(axesCanvas, 0, 0, out.width, out.height);
-            callback(out);
-        });
+            throw error;
+        }
     }
 
     /** The backend the canvas is drawing with, after any fallback to WebGL; null until the device is chosen. */

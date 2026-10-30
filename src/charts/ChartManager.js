@@ -38,7 +38,6 @@ import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
-import { convertLegacyChartConfig } from "./legacyCharts";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -885,6 +884,7 @@ export class ChartManager {
         const chartPromises = [];
         for (const ds in charts) {
             for (const ch of charts[ds]) {
+                this.viewManager.convertLegacyChartOnLoad(ds, ch);
                 chartPromises.push(this.addChart(ds, ch));
             }
         }
@@ -1823,11 +1823,6 @@ export class ChartManager {
      * a chart has been loaded
      */
     async addChart(dataSource, config, notify = false) {
-        const convertedFrom = convertLegacyChartConfig(config, this.dsIndex[dataSource]?.dataStore);
-        if (convertedFrom) {
-            console.log(`Loading legacy chart '${config.title}' (${convertedFrom}) as ${config.type}`);
-            this.viewManager.reportLegacyConversion();
-        }
         if (!BaseChart.types[config.type]) {
             await ensureLazyChartTypeRegistered(config.type);
         }

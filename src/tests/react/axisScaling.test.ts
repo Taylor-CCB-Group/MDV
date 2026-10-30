@@ -106,3 +106,11 @@ describe("deckRadiusForClassicRadius", () => {
         expect(deckRadiusForClassicRadius(Number.NaN, [300, 300])).toBeUndefined();
     });
 });
+
+describe("fitOrthographicView with a constant column", () => {
+    test("sizes the minimum span of each axis from its own bounds", () => {
+        const view = fitOrthographicView({ minX: 1e6, maxX: 1e6, minY: 1, maxY: 1 }, 400, 400, "fit");
+        // y is a constant near 1: its span is about 1e-6, not the 1 that x's bounds would give
+        expect(view.zoomY).toBeGreaterThan((view.zoomX ?? 0) + 10);
+    });
+});

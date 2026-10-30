@@ -232,7 +232,11 @@ class BaseChart<T extends BaseConfig> {
 
         // so that the menu item offering to convert this chart can name what it converts to
         const legacyTarget = getLegacyConversionTarget(config, dataStore);
-        if (legacyTarget) ensureLazyChartTypeRegistered(legacyTarget);
+        if (legacyTarget) {
+            ensureLazyChartTypeRegistered(legacyTarget)?.catch((error) =>
+                console.warn(`Failed to load chart type '${legacyTarget}'`, error),
+            );
+        }
 
         //set up context menu and icon which opens it
         this.contextMenu = new ContextMenu((data) => {
@@ -1321,7 +1325,11 @@ class BaseChart<T extends BaseConfig> {
         }
     }
 
-    getImageFromSVG(svg: any|SVGElement, callback: (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => void) {
+    getImageFromSVG(
+        svg: any | SVGElement,
+        callback: (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => void,
+        onError?: (error: unknown) => void,
+    ) {
         const copy = svg.cloneNode(true);
         copyStylesInline(copy, svg);
         const canvas = document.createElement("canvas");
@@ -1343,6 +1351,11 @@ class BaseChart<T extends BaseConfig> {
         img.onload = () => {
             ctx.drawImage(img, 0, 0);
             callback(canvas, ctx);
+        };
+        img.onerror = (error) => {
+            DOMURL.revokeObjectURL(url);
+            if (onError) onError(error);
+            else console.error("Could not draw the SVG as an image", error);
         };
     }
     /**

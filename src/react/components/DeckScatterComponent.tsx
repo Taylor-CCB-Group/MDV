@@ -47,8 +47,7 @@ const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1
  * there should be hooks getting the range of a filtered column
  * so that multiple charts can re-use the computation (but if not used, it's not computed)
  */
-function useZoomOnFilter(data: Uint32Array) {
-    const [width, height] = useChartSize();
+function useZoomOnFilter(data: Uint32Array, width: number, height: number) {
     const [cx, cy, cz] = useParamColumns();
     // const data = useFilteredIndices(); //<< does calling this multiple times mean wasting space?
     const config = useConfig<DeckScatterConfig>();
@@ -213,6 +212,9 @@ const DeckScatter = observer(function DeckScatterComponent({
     //todo this shouldn't be repeated here and in AxisComponent
     const xSize = is2d ? config.axis.x.size : 0;
     const ySize = is2d ? config.axis.y.size : 0;
+    // the area the points are drawn in, which excludes the axes (as in `AxisComponent`)
+    const plotWidth = width - (is2d ? ySize + 10 : 0);
+    const plotHeight = height - (is2d ? xSize + 10 : 0) - 2;
 
     const margin = useMemo(
         () =>
@@ -237,7 +239,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     //if we don't fully understand reasons for `- 3.5` here.
     //prevents overlapping with x-axis.
     const chartHeight = Math.max(0, height - margin.top - margin.bottom - 3.5);
-    useZoomOnFilter(data);
+    useZoomOnFilter(data, plotWidth, plotHeight);
 
     const { scatterProps, selectionLayer } = useSpatialLayers();
     // this is now somewhat able to render for "2d", pending further tweaks
@@ -315,6 +317,8 @@ const DeckScatter = observer(function DeckScatterComponent({
             const deck = deckRef.current?.deck;
             // drawing now lets the canvas be read before the browser clears it
             deck?.redraw("image export");
+            // WebGPU work is submitted at the end of a frame, which this is not part of
+            deck?.getCanvasContext()?.device?.submit();
             return deck?.getCanvas() ?? null;
         };
         return () => {

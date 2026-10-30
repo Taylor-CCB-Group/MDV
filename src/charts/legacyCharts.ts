@@ -33,10 +33,21 @@ const adaptScatterBackgroundFilter = (config: any) => {
     }
 };
 
+/** The chart's size, from `size` or else from `location`, which `addChart` turns into a size and position. */
+const chartSize = (config: any): [number, number] => {
+    if (Array.isArray(config.size) && config.size.length === 2) return config.size as [number, number];
+    const l = config.location;
+    if (l && typeof l.width === "number" && typeof l.height === "number") {
+        const b = 5;
+        return [l.width * 90 + l.width * b - b, l.height * 40 + l.height * b - b];
+    }
+    return [300, 300];
+};
+
 /** The classic scatter's point size is in pixels, and the deck chart's is relative to the chart. */
 const adaptClassicScatter = (config: any) => {
     adaptScatterBackgroundFilter(config);
-    const size = Array.isArray(config.size) && config.size.length === 2 ? config.size : [300, 300];
+    const size = chartSize(config);
     const sizing = deckRadiusForClassicRadius(config.radius ?? 2, size);
     if (sizing) Object.assign(config, sizing);
 };

@@ -30,9 +30,10 @@ export function fitOrthographicView(
 ): OrthographicFit {
     const { minX, maxX, minY, maxY } = bounds;
     // a relative epsilon, so that a single point or a constant column still gives a finite zoom
-    const epsilon = Math.max(1e-9, Math.min(Math.abs(minX), Math.abs(maxX)) * 1e-6);
-    const dx = Math.max(epsilon, maxX - minX);
-    const dy = Math.max(epsilon, maxY - minY);
+    const epsilonX = Math.max(1e-9, Math.min(Math.abs(minX), Math.abs(maxX)) * 1e-6);
+    const epsilonY = Math.max(1e-9, Math.min(Math.abs(minY), Math.abs(maxY)) * 1e-6);
+    const dx = Math.max(epsilonX, maxX - minX);
+    const dy = Math.max(epsilonY, maxY - minY);
     const target: [number, number, number] = [(minX + maxX) / 2, (minY + maxY) / 2, 0];
     const zoomX = Math.log2(width / dx) - FIT_PADDING_ZOOM;
     const zoomY = Math.log2(height / dy) - FIT_PADDING_ZOOM;
