@@ -91,3 +91,9 @@ def test_link_warns_about_large_chunks_and_leaves_source_unchanged(tmp_path, cap
 
     assert "WARNING: --link keeps the source chunks" in capsys.readouterr().out
     assert _chunk_shape(store / "images" / "img" / "0") == [2, 64, 64]
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_negative_chunk_size_is_rejected(tmp_path):
+    with pytest.raises(ValueError, match="0 or more"):
+        _convert(tmp_path, chunk_edge=64, image_chunk_size=-1)

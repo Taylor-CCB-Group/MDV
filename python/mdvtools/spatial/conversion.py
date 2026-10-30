@@ -1310,6 +1310,13 @@ def _validate_table_handling(table_handling: str) -> None:
         )
 
 
+def _validate_image_chunk_size(image_chunk_size: int) -> None:
+    if image_chunk_size < 0:
+        raise ValueError(
+            f"Image chunk size must be 0 or more, got {image_chunk_size}. 0 keeps the source chunks."
+        )
+
+
 def _group_spatial_table_records(
     records: list[SpatialTableRecord],
     args: SpatialDataConversionArgs,
@@ -1463,6 +1470,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     sdata_paths = _discover_spatialdata_paths(args.spatialdata_path, batch=args.batch)
     single_source_input = _is_single_spatialdata_source(args.spatialdata_path, sdata_paths)
     _validate_table_handling(args.table_handling)
+    _validate_image_chunk_size(args.image_chunk_size)
 
     _progress(
         f"Converting {len(sdata_paths)} SpatialData entr{'y' if len(sdata_paths) == 1 else 'ies'} "

@@ -246,7 +246,7 @@ def patch_spatial_annotations(project_dir, annotation_csv, datasource, spatialda
 @click.option(
     '--image-chunk-size',
     default=DEFAULT_IMAGE_CHUNK_SIZE,
-    type=int,
+    type=click.IntRange(min=0),
     show_default=True,
     help='Largest chunk edge in pixels for copied images and labels, one channel per chunk. 0 keeps the source chunks.',
 )

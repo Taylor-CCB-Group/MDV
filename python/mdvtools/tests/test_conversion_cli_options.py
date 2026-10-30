@@ -101,3 +101,13 @@ def test_convert_spatial_cli_defaults_to_by_region_table_handling(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert captured["args"].table_handling == "by-region"
+
+
+def test_convert_spatial_cli_rejects_negative_image_chunk_size(monkeypatch):
+    monkeypatch.setattr(spatial_conversion_module, "convert_spatialdata_to_mdv", lambda args: None)
+
+    runner = CliRunner()
+    result = runner.invoke(cli_module.cli, ["convert-spatial", "out", "spatial", "--image-chunk-size", "-1"])
+
+    assert result.exit_code != 0
+    assert "--image-chunk-size" in result.output
