@@ -11,8 +11,21 @@ All notable changes to `mdvtools` are documented here. The format is based on
 - When a CLI command fails unexpectedly it now prints an error report with the command line,
   traceback, and mdvtools/dependency versions, ready to paste into an issue, and exits with
   status 1.
+- `mdvtools convert-spatial --browser-preset standard|experimental` rewrites the project's copy
+  of each store for SpatialData.js: `standard` recompresses images as HTJ2K (adding a
+  pyramid to single-level images), stores table matrices as CSC and Morton-sorts points;
+  `experimental` also adds a points-zarr copy beside each points element. `--image-codec`,
+  `--image-preset`, `--csc-tables`, `--morton-points` and `--points-zarr` override the
+  preset. Images that browser codecs can't encode, points without a `feature_key` (for
+  points-zarr) and points that are already Morton-indexed are left as they are. The
+  presets will change as the formats do, and none of this works with `--link`.
 
 ### Changed
+- Supported Python is now `>=3.12,<3.13`; Python 3.11 is no longer supported.
+- `mdvtools` now depends on `spatialdata-js-util` (with its `write` extra), which needs
+  `zarr` 3.3 or later.
+- Upgraded `spatialdata` to 0.8 and `spatialdata-io` to 0.7.1 (from 0.7.2 and 0.6.0).
+  `spatialdata-io` 0.7.1 indexes Xenium shapes by `cell_id`.
 - `mdvtools convert-spatial` default views now use the SpatialData.js viewer instead of the
   Viv image viewer.
 - The SpatialData.js chart is now listed as "SpatialData.js viewer" in the add-chart menu.

@@ -5,8 +5,12 @@ import os
 from os.path import exists, join, basename
 from .diagnostics import format_version_info, report_errors
 from .spatial.conversion_options import (
+    BROWSER_PRESET_CHOICES,
+    DEFAULT_BROWSER_PRESET,
     DEFAULT_POINT_TRANSFORM,
     DEFAULT_TABLE_HANDLING,
+    IMAGE_CODEC_CHOICES,
+    IMAGE_PRESET_CHOICES,
     POINT_TRANSFORM_CHOICES,
     TABLE_HANDLING_CHOICES,
 )
@@ -242,11 +246,40 @@ def patch_spatial_annotations(project_dir, annotation_csv, datasource, spatialda
     show_default=True,
     help='Strategy for transforming table point coordinates to image coordinates.',
 )
+@click.option(
+    '--browser-preset',
+    type=click.Choice(BROWSER_PRESET_CHOICES),
+    default=DEFAULT_BROWSER_PRESET,
+    show_default=True,
+    help='Rewrite the copied store for SpatialData.js. "standard": HTJ2K images (balanced), CSC tables, '
+    'Morton-sorted points. "experimental": standard plus points-zarr copies. The options below override '
+    'the preset. Not compatible with --link.',
+)
+@click.option('--image-codec', type=click.Choice(IMAGE_CODEC_CHOICES), default=None, help='Recompress images with this codec ("none" to keep them as written). Single-level images also get a pyramid.')
+@click.option('--image-preset', type=click.Choice(IMAGE_PRESET_CHOICES), default=None, help='Quality preset for --image-codec.')
+@click.option('--csc-tables/--no-csc-tables', 'csc_tables', default=None, help='Store table matrices in CSC layout for per-gene reads.')
+@click.option('--morton-points/--no-morton-points', 'morton_points', default=None, help='Morton-sort points for viewport reads.')
+@click.option('--points-zarr/--no-points-zarr', 'points_zarr', default=None, help='Add an experimental points-zarr copy beside each points element.')
 @click.option('--verbose', is_flag=True, help='Show detailed per-dataset conversion output, transform decisions, and merged summaries.')
-def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, output_geojson, density, serve, obs_datasource_name, var_datasource_name, link_name_column, compute_x_umap, leiden_resolution, table_handling, point_transform, verbose):
+def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, output_geojson, density, serve, obs_datasource_name, var_datasource_name, link_name_column, compute_x_umap, leiden_resolution, table_handling, point_transform, browser_preset, image_codec, image_preset, csc_tables, morton_points, points_zarr, verbose):
     """Convert one SpatialData store to MDV format, or use --batch for a directory of stores."""
     import tempfile
+    from .spatial.browser_store import resolve_browser_store_options
     from .spatial.conversion import convert_spatialdata_to_mdv, SpatialDataConversionArgs
+
+    browser_store = resolve_browser_store_options(
+        browser_preset,
+        image_codec=image_codec,
+        image_preset=image_preset,
+        csc_tables=csc_tables,
+        morton_points=morton_points,
+        points_zarr=points_zarr,
+    )
+    if link and browser_store.enabled:
+        raise click.UsageError(
+            f"Browser store rewrites ({browser_store.describe()}) apply to the project's copy of the "
+            "store and cannot be combined with --link."
+        )
 
     with tempfile.TemporaryDirectory() as temp_folder:
         args = SpatialDataConversionArgs(
@@ -267,6 +300,7 @@ def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, l
             leiden_resolution=leiden_resolution,
             table_handling=table_handling,
             point_transform=point_transform,
+            browser_store=browser_store,
         )
         convert_spatialdata_to_mdv(args)
 
