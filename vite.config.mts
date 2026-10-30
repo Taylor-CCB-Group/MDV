@@ -217,8 +217,9 @@ function flaskAssetFileNames(assetInfo: { name?: string }): string {
     if (ext === "wasm") return "assets/[name]-[hash][extname]";
     if (["woff", "woff2", "ttf", "eot"].includes(ext)) return "assets/[name][extname]";
     if (ext === "svg" && /^fa-(brands|regular|solid)-/.test(name)) return "assets/[name][extname]";
-    // CSS of lazily loaded chunks (BaseChart, ChartManager) goes stale the same way as entries.
-    if (ext === "css") return `img/[name]${entryHash}[extname]`;
+    // CSS of lazily loaded chunks (BaseChart, ChartManager) goes stale the same way as entries,
+    // and so does a worker emitted as an asset (zarrextra's codec-worker.js).
+    if (ext === "css" || ext === "js") return `img/[name]${entryHash}[extname]`;
     return "img/[name][extname]";
 }
 

@@ -6,7 +6,7 @@ import re
 
 from flask import Flask, render_template
 
-from mdvtools.entry_assets import entry_assets, register_entry_assets
+from mdvtools.entry_assets import check_static_folder, entry_assets, register_entry_assets
 
 TEMPLATES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 
@@ -117,3 +117,46 @@ def test_templates_link_the_hashed_files(tmp_path):
         "../../flask/assets/mdv-CVOPvuaJ.css",
         "../../flask/js/mdv-B4coGEvZ.js",
     ]
+
+
+def test_check_static_folder_accepts_a_consistent_build(tmp_path):
+    write_manifest(tmp_path)
+    for manifest_entry in MANIFEST.values():
+        for file in [manifest_entry["file"], *manifest_entry.get("css", [])]:
+            (tmp_path / file).parent.mkdir(parents=True, exist_ok=True)
+            (tmp_path / file).write_text("")
+
+    assert check_static_folder(str(tmp_path)) == []
+
+
+def test_check_static_folder_ignores_folders_that_are_not_built(tmp_path):
+    assert check_static_folder(str(tmp_path / "missing")) == []
+    assert check_static_folder(str(tmp_path)) == []
+
+
+def test_check_static_folder_flags_hashed_entries_without_a_manifest(tmp_path):
+    (tmp_path / "js").mkdir()
+    (tmp_path / "js" / "mdv-B4coGEvZ.js").write_text("")
+
+    [problem] = check_static_folder(str(tmp_path))
+
+    assert "no manifest.json" in problem
+
+
+def test_check_static_folder_flags_manifest_files_that_are_missing(tmp_path):
+    write_manifest(tmp_path)
+
+    problems = check_static_folder(str(tmp_path))
+
+    assert any("js/mdv-B4coGEvZ.js" in p for p in problems)
+
+
+def test_registering_logs_an_inconsistent_build(tmp_path, caplog):
+    (tmp_path / "js").mkdir()
+    (tmp_path / "js" / "mdv-B4coGEvZ.js").write_text("")
+    app = Flask(__name__, static_folder=str(tmp_path))
+
+    with caplog.at_level("ERROR"):
+        register_entry_assets(app)
+
+    assert "no manifest.json" in caplog.text
