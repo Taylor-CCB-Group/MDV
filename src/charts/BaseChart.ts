@@ -1352,7 +1352,7 @@ class BaseChart<T extends BaseConfig> {
 }
 
 
-function copyStylesInline(
+export function copyStylesInline(
     destinationNode: HTMLElement,
     sourceNode: HTMLElement
 ): void {

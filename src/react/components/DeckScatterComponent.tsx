@@ -309,6 +309,18 @@ const DeckScatter = observer(function DeckScatterComponent({
 
     const deckContainerRef = useRef<HTMLDivElement | null>(null);
     const deckRef = useRef<DeckGLRef | null>(null);
+    const chart = useChart<DeckScatterConfig, DeckScatterReact>();
+    useEffect(() => {
+        chart.getPlotCanvas = () => {
+            const deck = deckRef.current?.deck;
+            // drawing now lets the canvas be read before the browser clears it
+            deck?.redraw("image export");
+            return deck?.getCanvas() ?? null;
+        };
+        return () => {
+            chart.getPlotCanvas = undefined;
+        };
+    }, [chart]);
     const getTooltipContent = useCallback(
         (info: PickingInfo) => {
             const richInfo = getPickingInfoWithAlternates(info, pickAlternates ? deckRef.current?.deck : null);

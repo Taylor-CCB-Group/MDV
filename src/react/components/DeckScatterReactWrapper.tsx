@@ -1,4 +1,4 @@
-import BaseChart from "../../charts/BaseChart";
+import BaseChart, { copyStylesInline } from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
 import type { ColumnName } from "../../charts/charts";
@@ -115,6 +115,85 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             setActiveBackend: action,
         });
     }
+    /** Set by the component: draws the deck canvas again and returns it, for exporting an image. */
+    getPlotCanvas?: () => HTMLCanvasElement | null;
+    /**
+     * The plot is a raster image in both formats; only the axes are vector in an SVG. Vectorising the
+     * points (and the density layers, which are drawn on the GPU) would be a larger piece of work.
+     */
+    getImage(callback: (resp: any) => void, type: "png" | "svg") {
+        const plot = this.getPlotCanvas?.();
+        if (!plot) {
+            console.warn("No plot canvas to export");
+            return;
+        }
+        const axes = this.contentDiv.querySelector<SVGSVGElement>("svg[data-scatter-axes]");
+        const base = this.contentDiv.getBoundingClientRect();
+        const plotRect = plot.getBoundingClientRect();
+        const offsetX = plotRect.left - base.left;
+        const offsetY = plotRect.top - base.top;
+        // the x axis label can extend below the SVG it is drawn in
+        const labelRoom = axes ? 20 : 0;
+        const width = Math.round(base.width);
+        const height = Math.round(base.height) + labelRoom;
+        // the panel colour behind the chart, which the canvas itself leaves transparent
+        const background = getComputedStyle(this.contentDiv).backgroundColor;
+
+        if (type === "svg") {
+            let axesMarkup = "";
+            if (axes) {
+                const copy = axes.cloneNode(true) as SVGSVGElement;
+                copyStylesInline(copy as unknown as HTMLElement, axes as unknown as HTMLElement);
+                copy.setAttribute("height", `${height}`);
+                copy.setAttribute("viewBox", `0 0 ${width} ${height}`);
+                axesMarkup = new XMLSerializer().serializeToString(copy);
+            }
+            callback(
+                `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+                    `<rect width="${width}" height="${height}" fill="${background}"/>` +
+                    `<image x="${offsetX}" y="${offsetY}" width="${plotRect.width}" height="${plotRect.height}" xlink:href="${plot.toDataURL("image/png")}"/>` +
+                    axesMarkup +
+                    "</svg>",
+            );
+            window.mdv.chartManager.createInfoAlert(
+                "In this SVG the points and density are an embedded image; only the axes are vector.",
+                { duration: 6000 },
+            );
+            return;
+        }
+
+        const pixelRatio = plotRect.width > 0 ? plot.width / plotRect.width : 1;
+        const out = document.createElement("canvas");
+        out.width = Math.round(width * pixelRatio);
+        out.height = Math.round(height * pixelRatio);
+        const ctx = out.getContext("2d");
+        if (!ctx) throw new Error("Could not get 2d context from canvas");
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, out.width, out.height);
+        ctx.drawImage(plot, offsetX * pixelRatio, offsetY * pixelRatio, plot.width, plot.height);
+        if (!axes) {
+            callback(out);
+            return;
+        }
+        // rasterised from the live element, which is what carries the computed styles, so it is
+        // made taller for the moment to keep the label
+        const originalHeight = axes.getAttribute("height");
+        const originalViewBox = axes.getAttribute("viewBox");
+        axes.setAttribute("height", `${height}`);
+        axes.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        const restore = () => {
+            if (originalHeight === null) axes.removeAttribute("height");
+            else axes.setAttribute("height", originalHeight);
+            if (originalViewBox === null) axes.removeAttribute("viewBox");
+            else axes.setAttribute("viewBox", originalViewBox);
+        };
+        this.getImageFromSVG(axes, (axesCanvas) => {
+            restore();
+            ctx.drawImage(axesCanvas, 0, 0, out.width, out.height);
+            callback(out);
+        });
+    }
+
     /** The backend the canvas is drawing with, after any fallback to WebGL; null until the device is chosen. */
     activeBackend: DeckBackend | null = null;
     /** Why WebGPU was requested but not used, when it wasn't. */
