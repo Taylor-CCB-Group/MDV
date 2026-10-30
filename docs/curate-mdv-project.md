@@ -13,6 +13,7 @@ The default is a dry run. It writes one JSON report beside the intended output d
 - `--xlsx` — workbook path
 - `--output` — directory for the curated project; must be a different directory from the input
 - `--write` — apply the plan; omit it for a dry run
+- `--markers` — optional comma-separated marker genes for the question views, such as the project's row in the `Title_Abstract_Markers` sheet. The output lists any that are not in the gene table. Without it a general immune and stromal list is used.
 
 ## What the dry run prints
 

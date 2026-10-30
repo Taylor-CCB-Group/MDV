@@ -900,6 +900,7 @@ def curate(
     output: Path,
     *,
     write: bool,
+    marker_genes: list[str] | None = None,
 ) -> dict[str, Any]:
     project = project.expanduser().resolve()
     output = output.expanduser().resolve()
@@ -945,7 +946,7 @@ def curate(
     replacements = name_replacements(rename_outcomes)
     retitle_input = copy.deepcopy(views)
     retitled = retitle_views(retitle_input, replacements)
-    question_plan = plan_question_views(project, planned_datasources, retitle_input)
+    question_plan = plan_question_views(project, planned_datasources, retitle_input, marker_genes)
     views_for_delete = copy.deepcopy(retitle_input)
     views_for_delete.update(question_plan["views"])
 
@@ -989,6 +990,12 @@ def curate(
     for item in question_plan["skipped"]:
         print(f"  skip: {item['question']}: {item['reason']}")
     print(f"  retitle stored titles/labels: {retitled}")
+    if marker_genes is not None:
+        found = set(question_plan.get("markers", []))
+        missing = [name for name in marker_genes if name not in found]
+        print(f"  markers found: {len(found)} of {len(marker_genes)}")
+        if missing:
+            print(f"  markers not in the gene table: {', '.join(missing)}")
 
     if dry_run:
         path = report_path_for(project, output, dry_run=True)
@@ -1044,12 +1051,31 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--xlsx", type=Path, required=True, help="Workbook containing the Data Cleaning sheet.")
     parser.add_argument("--output", type=Path, required=True, help="Directory for the curated project.")
     parser.add_argument("--write", action="store_true", help="Copy the project to --output and apply the plan.")
+    parser.add_argument(
+        "--markers",
+        help='Comma-separated marker genes for the question views, e.g. "PTPRC, CD3E, CD4". '
+        "Defaults to a general immune and stromal list.",
+    )
     return parser.parse_args()
+
+
+def parse_markers(text: str | None) -> list[str] | None:
+    if text is None:
+        return None
+    names = [name.strip() for name in text.split(",") if name.strip()]
+    return list(dict.fromkeys(names))
 
 
 def main() -> int:
     args = parse_args()
-    curate(args.project, args.project_id, args.xlsx, args.output, write=args.write)
+    curate(
+        args.project,
+        args.project_id,
+        args.xlsx,
+        args.output,
+        write=args.write,
+        marker_genes=parse_markers(args.markers),
+    )
     return 0
 
 
