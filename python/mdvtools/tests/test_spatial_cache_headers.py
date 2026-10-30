@@ -28,12 +28,19 @@ def client_and_project(tmp_path):
     ProjectBlueprint.blueprints.pop(project.id, None)
 
 
+def _get_chunk(client, project, etag=None):
+    headers = {"If-None-Match": etag} if etag else {}
+    return client.get(
+        f"/project/{project.id}/spatial/sample.zarr/images/img/0/c/0/0/0",
+        headers=headers,
+        follow_redirects=True,
+    )
+
+
 def test_spatial_files_are_cached_privately_for_an_hour(client_and_project):
     client, project = client_and_project
 
-    response = client.get(
-        f"/project/{project.id}/spatial/sample.zarr/images/img/0/c/0/0/0", follow_redirects=True
-    )
+    response = _get_chunk(client, project)
 
     assert response.status_code == 200
     assert response.data == b"chunk bytes"
@@ -41,7 +48,21 @@ def test_spatial_files_are_cached_privately_for_an_hour(client_and_project):
     assert response.cache_control.private is True
     assert response.cache_control.public is False
     assert response.cache_control.no_cache is None
-    assert response.headers["ETag"]
+    assert _get_chunk(client, project, response.headers["ETag"]).status_code == 304
+
+
+def test_spatial_files_revalidate_every_request_when_auth_is_on(client_and_project):
+    client, project = client_and_project
+    client.application.config["ENABLE_AUTH"] = True
+
+    response = _get_chunk(client, project)
+
+    assert response.status_code == 200
+    assert response.cache_control.max_age is None
+    assert response.cache_control.private is True
+    assert response.cache_control.public is False
+    assert response.cache_control.no_cache is True
+    assert _get_chunk(client, project, response.headers["ETag"]).status_code == 304
 
 
 def test_missing_spatial_files_are_not_cached(client_and_project):
