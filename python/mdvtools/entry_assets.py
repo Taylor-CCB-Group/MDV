@@ -6,12 +6,17 @@ the hashed names in `manifest.json` at the root of the static folder. Builds wit
 manifest still use the old unhashed names.
 """
 
+import glob
 import json
 import os
 from dataclasses import dataclass
 from functools import lru_cache
 
 from flask import Flask
+
+from mdvtools.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 MANIFEST = "manifest.json"
 
@@ -75,8 +80,49 @@ def _css(manifest: dict, key: str) -> tuple[str, ...]:
     return tuple(css)
 
 
+def check_static_folder(static_folder: str) -> list[str]:
+    """Problems that would make the pages link files that aren't there.
+
+    A hashed build without its manifest falls back to `js/mdv.js`, which doesn't exist (or,
+    behind a caching proxy, is an old copy). Empty for a folder that hasn't been built.
+    """
+    if not os.path.isdir(static_folder):
+        return []
+    path = os.path.join(static_folder, MANIFEST)
+    if not os.path.exists(path):
+        hashed = [
+            file
+            for name in UNHASHED
+            for file in glob.glob(os.path.join(static_folder, "js", f"{name}-*.js"))
+        ]
+        if hashed:
+            return [f"{static_folder} has hashed entries ({os.path.basename(hashed[0])}) but no {MANIFEST}"]
+        return []
+    problems = []
+    for name in UNHASHED:
+        try:
+            entry_assets(static_folder, name)
+        except (LookupError, ValueError) as e:
+            problems.append(str(e))
+    # Every file the manifest lists, including the chunks entries import: one missing from a
+    # partial copy fails at runtime as "Failed to fetch dynamically imported module".
+    try:
+        with open(path) as f:
+            manifest = json.load(f)
+    except ValueError as e:
+        return [*problems, f"{path} is not valid JSON: {e}"]
+    for chunk in manifest.values():
+        for file in (chunk.get("file"), *chunk.get("css", [])):
+            if file and not os.path.isfile(os.path.join(static_folder, file)):
+                problems.append(f"{MANIFEST} lists {file} but it is not in {static_folder}")
+    return problems
+
+
 def register_entry_assets(app: Flask):
     """Expose `entry_assets(name)` to this app's templates."""
+    if app.static_folder is not None:
+        for problem in check_static_folder(app.static_folder):
+            logger.error("Frontend build is inconsistent: %s", problem)
 
     def template_entry_assets(name: str) -> EntryAssets:
         if app.static_folder is None:
