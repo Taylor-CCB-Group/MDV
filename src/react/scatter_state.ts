@@ -267,6 +267,13 @@ function useZoomOnFilter(modelMatrix: Matrix4, data: Uint32Array) {
 }
 
 /**
+ * A radius, so 0.5 keeps the smallest point about 1px across; antialiasing fades it below that.
+ * Suspect we could get away with reducing it further - on dense plots subpixel sizes can look much better.
+ * This is a conservatively high value for the time being.
+ */
+export const SCATTER_RADIUS_MIN_PIXELS = 0.5;
+
+/**
  * If we are in a 'region' then we might have some notion of physical size.
  * If we are rendering abstract data, then we should probably have a normalised size
  * with respect to the domain of the data.
@@ -281,8 +288,6 @@ function useZoomOnFilter(modelMatrix: Matrix4, data: Uint32Array) {
  * it scales with chart size and zoom: in a small chart even the largest slider value can be
  * sub-pixel. Layers using it should also set `radiusMinPixels: SCATTER_RADIUS_MIN_PIXELS`.
  */
-export const SCATTER_RADIUS_MIN_PIXELS = 1;
-
 export function useScatterRadius() {
     const { radius, course_radius, axis_scaling, dimension } = useConfig<ScatterPlotConfig>();
     const [width, height] = useChartSize();
