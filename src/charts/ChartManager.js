@@ -38,7 +38,7 @@ import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
-import { convertLegacyChartConfig } from "./legacyCharts";
+import { convertLegacyChartConfig, convertLegacyChartConfigNow } from "./legacyCharts";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -1407,6 +1407,42 @@ export class ChartManager {
             this.updateInfoAlert(alert.id, msg);
             alert.count = count;
         }
+    }
+
+    /**
+     * Replaces a legacy chart with its current equivalent, in the same place and with the same
+     * settings that both understand. If the new chart cannot be created, the original is restored.
+     * @param {BaseChart<any>} chart
+     */
+    async convertLegacyChart(chart) {
+        const original = JSON.parse(JSON.stringify(chart.getConfig()));
+        const config = JSON.parse(JSON.stringify(original));
+        if (!convertLegacyChartConfigNow(config)) return;
+        const dataSource = chart.dataStore.name;
+        this._removeChart(chart);
+        await this.addChart(dataSource, config);
+        const converted = this.charts[config.id]?.chart;
+        if (!converted) {
+            await this.addChart(dataSource, original);
+            this.createInfoAlert(`Could not convert '${original.title}'; it has been left as it was`, {
+                type: "danger",
+                duration: 4000,
+            });
+            return;
+        }
+        this.createInfoAlert(
+            `Converted '${config.title}' from ${BaseChart.types[original.type]?.name ?? original.type} to ${BaseChart.types[config.type]?.name ?? config.type}`,
+            { duration: 4000 },
+        );
+    }
+
+    /** Removes a chart and everything the manager holds for it, as its remove button does. */
+    _removeChart(chart) {
+        chart.remove();
+        chart.getDiv().remove();
+        delete this.charts[chart.config.id];
+        this._removeLinks(chart);
+        this._callListeners("chart_removed", chart);
     }
 
     updateInfoAlert(id, msg, config = {}) {

@@ -4,7 +4,12 @@ import "@/charts/TableChart";
 import "@/charts/WGLScatterPlot";
 import "@/react/components/DeckScatterReactWrapper";
 import "@/react/components/VivMDVReact";
-import { convertLegacyChartConfig, isLegacyChartType } from "@/charts/legacyCharts";
+import {
+    convertLegacyChartConfig,
+    convertLegacyChartConfigNow,
+    getLegacyConversionTarget,
+    isLegacyChartType,
+} from "@/charts/legacyCharts";
 import { convertLegacyChartsSetting } from "@/lib/browserSettings";
 import type DataStore from "@/datastore/DataStore";
 import { afterEach, describe, expect, test } from "vitest";
@@ -114,3 +119,26 @@ describe("the Spatial Image Viewer", () => {
         expect(isLegacyChartType(viewer, ds)).toBe(false);
     });
 });
+
+describe("converting a chart on request", () => {
+    test("names the replacement for a convertible chart, whatever the setting", () => {
+        convertLegacyChartsSetting.set("off");
+        expect(getLegacyConversionTarget({ type: "wgl_scatter_plot" })).toBe("DeckContourScatter");
+        expect(getLegacyConversionTarget({ type: "table_chart" })).toBe("table_chart_react");
+    });
+
+    test("has no replacement for current charts or ones that cannot be converted", () => {
+        expect(getLegacyConversionTarget({ type: "DeckContourScatter" })).toBeUndefined();
+        expect(getLegacyConversionTarget({ type: "VivMdvRegionReact" })).toBeUndefined();
+        expect(getLegacyConversionTarget({ type: "density_scatter_plot", viv: {} } as never)).toBeUndefined();
+    });
+
+    test("converts the config even when the load-time setting is off", () => {
+        convertLegacyChartsSetting.set("off");
+        const config = { type: "table_chart", sort: { columnId: "x", sortAsc: true } };
+        expect(convertLegacyChartConfig({ ...config })).toBeUndefined();
+        expect(convertLegacyChartConfigNow(config)).toBe("table_chart");
+        expect(config).toEqual({ type: "table_chart_react", sort: { columnId: "x", ascending: true } });
+    });
+});
+

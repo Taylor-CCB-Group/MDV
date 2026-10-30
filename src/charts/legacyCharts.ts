@@ -56,16 +56,33 @@ const legacyConversions: Record<string, LegacyConversion> = {
 };
 
 /**
- * If the "Convert legacy charts" browser setting is on and `config` is of a legacy type with a
- * current equivalent, changes its `type` in place so it loads as the equivalent.
+ * Changes `config`'s `type` in place to its current equivalent, if there is one that works for it.
  * @returns the type the chart was converted from, or undefined if it was left alone.
  */
-export function convertLegacyChartConfig(config: { type: string }): string | undefined {
-    if (convertLegacyChartsSetting.get() !== "on") return undefined;
+export function convertLegacyChartConfigNow(config: { type: string }): string | undefined {
+    const conversion = findLegacyConversion(config);
+    if (!conversion) return undefined;
+const findLegacyConversion = (config: { type: string }) => {
     const conversion = legacyConversions[config.type];
-    if (!conversion || conversion.canConvert?.(config) === false) return undefined;
+    return conversion && conversion.canConvert?.(config) !== false ? conversion : undefined;
+};
+
+/** The chart type that `config` could be converted to, if its type is legacy and that would work. */
+export function getLegacyConversionTarget(config: { type: string }): string | undefined {
+    return findLegacyConversion(config)?.to;
+}
+
     const from = config.type;
     config.type = conversion.to;
     conversion.adapt?.(config);
     return from;
+}
+
+/**
+ * Like {@link convertLegacyChartConfigNow}, but only if the "Convert legacy charts" browser setting is on:
+ * used when charts are loaded.
+ */
+export function convertLegacyChartConfig(config: { type: string }): string | undefined {
+    if (convertLegacyChartsSetting.get() !== "on") return undefined;
+    return convertLegacyChartConfigNow(config);
 }

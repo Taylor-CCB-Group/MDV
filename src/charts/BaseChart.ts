@@ -34,6 +34,8 @@ import {
     type ColorLegendFilter,
 } from "@/react/legend/color_legend/colorLegendFilter";
 import { createElement, type ReactNode } from "react";
+import { getLegacyConversionTarget } from "./legacyCharts";
+import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 export type ChartEventType = string;
 /** A dot on a chart's "more" menu icon, for a problem described in its debug dialog. */
 export type MenuPip = { level: "error" | "notice"; tooltip: string };
@@ -228,9 +230,21 @@ class BaseChart<T extends BaseConfig> {
             }
         });
 
+        // so that the menu item offering to convert this chart can name what it converts to
+        const legacyTarget = getLegacyConversionTarget(config);
+        if (legacyTarget) ensureLazyChartTypeRegistered(legacyTarget);
+
         //set up context menu and icon which opens it
         this.contextMenu = new ContextMenu((data) => {
             const menu = this.getContextMenu(data);
+            const convertTo = getLegacyConversionTarget(this.config);
+            if (convertTo) {
+                menu.push({
+                    text: `convert to ${BaseChart.types[convertTo]?.name ?? convertTo}`,
+                    icon: "fas fa-exchange-alt",
+                    func: () => window.mdv.chartManager.convertLegacyChart(this),
+                });
+            }
             menu.push({
                 text: "debug / report chart",
                 icon: "fas fa-bug",
