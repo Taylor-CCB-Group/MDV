@@ -12,7 +12,7 @@ type LegacyConversion = {
     /** The chart type that replaces it. */
     to: string;
     /** False where the replacement would not show what the saved chart does. */
-    canConvert?: (config: any) => boolean;
+    canConvert?: (config: any, dataStore?: DataStore) => boolean;
     /** Rewrites config keys that the replacement reads differently. */
     adapt?: (config: any) => void;
 };
@@ -57,6 +57,15 @@ const legacyConversions: Record<string, LegacyConversion> = {
         },
     },
     // `param[2]` (the category column) becomes `contourParameter` when the deck chart loads
+    // the Viv image viewer that is not a React chart; one whose region is SpatialData would want the
+    // SpatialData.js viewer instead, which is not something this converts to
+    viv_scatter_plot: {
+        to: "VivMdvRegionReact",
+        canConvert: (config, dataStore) => {
+            const region = dataStore?.regions?.all_regions?.[config.region];
+            return !!region?.viv_image && !region.spatial;
+        },
+    },
     density_scatter_plot: {
         to: "DeckContourScatter",
         canConvert: (config) => !config.viv,
@@ -64,22 +73,22 @@ const legacyConversions: Record<string, LegacyConversion> = {
     },
 };
 
-const findLegacyConversion = (config: { type: string }) => {
+const findLegacyConversion = (config: { type: string }, dataStore?: DataStore) => {
     const conversion = legacyConversions[config.type];
-    return conversion && conversion.canConvert?.(config) !== false ? conversion : undefined;
+    return conversion && conversion.canConvert?.(config, dataStore) !== false ? conversion : undefined;
 };
 
 /** The chart type that `config` could be converted to, if its type is legacy and that would work. */
-export function getLegacyConversionTarget(config: { type: string }): string | undefined {
-    return findLegacyConversion(config)?.to;
+export function getLegacyConversionTarget(config: { type: string }, dataStore?: DataStore): string | undefined {
+    return findLegacyConversion(config, dataStore)?.to;
 }
 
 /**
  * Changes `config`'s `type` in place to its current equivalent, if there is one that works for it.
  * @returns the type the chart was converted from, or undefined if it was left alone.
  */
-export function convertLegacyChartConfigNow(config: { type: string }): string | undefined {
-    const conversion = findLegacyConversion(config);
+export function convertLegacyChartConfigNow(config: { type: string }, dataStore?: DataStore): string | undefined {
+    const conversion = findLegacyConversion(config, dataStore);
     if (!conversion) return undefined;
     const from = config.type;
     config.type = conversion.to;
@@ -91,7 +100,7 @@ export function convertLegacyChartConfigNow(config: { type: string }): string | 
  * Like {@link convertLegacyChartConfigNow}, but only if the "Convert legacy charts" browser setting is on:
  * used when charts are loaded.
  */
-export function convertLegacyChartConfig(config: { type: string }): string | undefined {
+export function convertLegacyChartConfig(config: { type: string }, dataStore?: DataStore): string | undefined {
     if (convertLegacyChartsSetting.get() !== "on") return undefined;
-    return convertLegacyChartConfigNow(config);
+    return convertLegacyChartConfigNow(config, dataStore);
 }

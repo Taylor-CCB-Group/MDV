@@ -231,18 +231,18 @@ class BaseChart<T extends BaseConfig> {
         });
 
         // so that the menu item offering to convert this chart can name what it converts to
-        const legacyTarget = getLegacyConversionTarget(config);
+        const legacyTarget = getLegacyConversionTarget(config, dataStore);
         if (legacyTarget) ensureLazyChartTypeRegistered(legacyTarget);
 
         //set up context menu and icon which opens it
         this.contextMenu = new ContextMenu((data) => {
             const menu = this.getContextMenu(data);
-            const convertTo = getLegacyConversionTarget(this.config);
+            const convertTo = getLegacyConversionTarget(this.config, this.dataStore);
             if (convertTo) {
                 menu.push({
                     text: `convert to ${BaseChart.types[convertTo]?.name ?? convertTo}`,
                     icon: "fas fa-exchange-alt",
-                    func: () => window.mdv.chartManager.convertLegacyChart(this),
+                    func: () => window.mdv.chartManager.viewManager.convertLegacyChart(this),
                 });
             }
             menu.push({

@@ -157,3 +157,28 @@ test("converting a deck scatter does not touch its point size", () => {
     convertLegacyChartConfigNow(config);
     expect(config).toEqual({ type: "DeckContourScatter", radius: 7, size: [493, 462] });
 });
+
+describe("the Viv scatter plot that is not a React chart", () => {
+    const withRegions = (regions: Record<string, { viv_image?: unknown; spatial?: unknown }>) =>
+        ({ regions: { all_regions: regions } }) as unknown as DataStore;
+
+    test("converts for a region with a Viv image that is not SpatialData", () => {
+        const dataStore = withRegions({ r1: { viv_image: {} } });
+        expect(getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never, dataStore)).toBe(
+            "VivMdvRegionReact",
+        );
+        const config = { type: "viv_scatter_plot", region: "r1", viv: { channels: [] } };
+        expect(convertLegacyChartConfigNow(config, dataStore)).toBe("viv_scatter_plot");
+        expect(config).toEqual({ type: "VivMdvRegionReact", region: "r1", viv: { channels: [] } });
+    });
+
+    test("leaves a SpatialData region, which would want the SpatialData.js viewer", () => {
+        const dataStore = withRegions({ r1: { viv_image: {}, spatial: {} } });
+        expect(getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never, dataStore)).toBeUndefined();
+    });
+
+    test("leaves a chart whose region has no Viv image, or that cannot be checked", () => {
+        expect(getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never, withRegions({ r1: {} }))).toBeUndefined();
+        expect(getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never)).toBeUndefined();
+    });
+});
