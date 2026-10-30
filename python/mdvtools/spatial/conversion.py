@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Optional
 import numpy as np
 from ..serverlite import serve_project
 from .conversion_options import (
+    DEFAULT_IMAGE_CHUNK_SIZE,
     DEFAULT_POINT_TRANSFORM,
     DEFAULT_TABLE_HANDLING,
     POINT_TRANSFORM_CHOICES,
@@ -45,6 +46,7 @@ class SpatialDataConversionArgs:
     compute_x_umap: bool = False
     leiden_resolution: float = 1.0
     table_handling: str = DEFAULT_TABLE_HANDLING
+    image_chunk_size: int = DEFAULT_IMAGE_CHUNK_SIZE
 
 
 REGION_FIELD = "spatial_region"
@@ -207,6 +209,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += f"- **Compute X UMAP/Leiden**: {conversion_args.compute_x_umap}\n"
         markdown += f"- **Leiden resolution**: {conversion_args.leiden_resolution}\n"
         markdown += f"- **Table handling**: `{conversion_args.table_handling}`\n"
+        markdown += f"- **Image chunk size**: {conversion_args.image_chunk_size}\n"
         markdown += "\n"
         if conversion_args.compute_x_umap:
             markdown += (
@@ -967,6 +970,38 @@ def _try_read_zarr(
             _emit(f"WARNING: Failed to read SpatialData object from {path}: '{e}'")
         return None
 
+
+def _capped_chunks(element, max_edge: int) -> dict[str, int] | None:
+    """
+    Chunk shape for an image or labels element with x and y capped at max_edge pixels,
+    or None if the element's chunks already fit.
+
+    Viv takes its tile size from the chunk shape and fetches one channel and one z plane per tile,
+    so every other dimension gets a chunk of 1.
+    """
+    from xarray import DataTree
+
+    level = element.children["scale0"].dataset if isinstance(element, DataTree) else element
+    current = {str(dim): max(sizes) for dim, sizes in level.chunksizes.items()}
+    capped = {
+        dim: min(size, max_edge) if dim in ("y", "x") else 1
+        for dim, size in current.items()
+    }
+    return None if capped == current else capped
+
+
+def _cap_raster_chunks(sdata: "SpatialData", max_edge: int) -> list[str]:
+    """Rechunk images and labels in place so they are written with capped chunks. Returns the names rechunked."""
+    rechunked = []
+    for elements in (sdata.images, sdata.labels):
+        for name, element in list(elements.items()):
+            chunks = _capped_chunks(element, max_edge)
+            if chunks is not None:
+                elements[name] = element.chunk(chunks)
+                rechunked.append(name)
+    return rechunked
+
+
 def _ensure_unique_var_names(adata: "AnnData", table_name: str, sdata_name: str) -> None:
     if adata.var_names.is_unique:
         return
@@ -1598,6 +1633,21 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             raise FileExistsError(
                 f"Cannot create symlink at '{link_target}' because the path already exists."
             )
+        if args.image_chunk_size > 0:
+            oversized = [
+                f"{os.path.basename(sdata_path)}/{name}"
+                for sdata_path, sdata in sdata_objects.items()
+                for elements in (sdata.images, sdata.labels)
+                for name, element in elements.items()
+                if _capped_chunks(element, args.image_chunk_size) is not None
+            ]
+            if oversized:
+                _progress(
+                    f"WARNING: --link keeps the source chunks, and these are larger than "
+                    f"{args.image_chunk_size} x {args.image_chunk_size} pixels of one channel, "
+                    f"which makes panning slow: {', '.join(oversized)}. "
+                    "Convert without --link to rechunk them."
+                )
         _progress(f"Linking spatial inputs into '{link_target}'")
         _emit(
             "NOTE: Original SpatialData files are not modified. Table modifications exist only in the merged MDV project.",
@@ -1621,6 +1671,13 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         )  # pretty sure sdata.write will do this anyway
         for sdata_path, sdata in sdata_objects.items():
             sdata_name = os.path.basename(sdata_path)
+            if args.image_chunk_size > 0:
+                rechunked = _cap_raster_chunks(sdata, args.image_chunk_size)
+                if rechunked:
+                    _progress(
+                        f"Rechunking {', '.join(rechunked)} in {sdata_name} to at most "
+                        f"{args.image_chunk_size} x {args.image_chunk_size} pixels of one channel"
+                    )
             # pay attention to format specifier here?
             sdata.write(os.path.join(mdv.dir, "spatial", sdata_name))
     # move contents of temp_folder to output_folder/spatial
@@ -1697,6 +1754,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         compute_x_umap=args.compute_x_umap,
         leiden_resolution=args.leiden_resolution,
         table_handling=args.table_handling,
+        image_chunk_size=args.image_chunk_size,
     )
     add_readme_to_project(mdv, primary_adata, readme_args)
     if args.serve:
@@ -1750,6 +1808,12 @@ if __name__ == "__main__":
             "'by-region' merges compatible tables by annotated region/keys, "
             "and 'per-table' writes one datasource pair per source table."
         ),
+    )
+    parser.add_argument(
+        "--image-chunk-size",
+        type=int,
+        default=DEFAULT_IMAGE_CHUNK_SIZE,
+        help="Largest chunk edge in pixels for copied images and labels, one channel per chunk. 0 keeps the source chunks.",
     )
     parser.add_argument("--verbose", action="store_true", help="Show detailed per-dataset conversion output, transform decisions, and merged summaries")
     parser.add_argument(

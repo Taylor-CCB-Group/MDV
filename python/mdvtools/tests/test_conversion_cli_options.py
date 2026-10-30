@@ -72,6 +72,8 @@ def test_convert_spatial_cli_forwards_x_umap_options(monkeypatch):
             "per-table",
             "--point-transform",
             "identity",
+            "--image-chunk-size",
+            "512",
         ],
     )
 
@@ -83,6 +85,7 @@ def test_convert_spatial_cli_forwards_x_umap_options(monkeypatch):
     assert captured["args"].leiden_resolution == 1.25
     assert captured["args"].table_handling == "per-table"
     assert captured["args"].point_transform == "identity"
+    assert captured["args"].image_chunk_size == 512
 
 
 def test_convert_spatial_cli_defaults_to_by_region_table_handling(monkeypatch):
