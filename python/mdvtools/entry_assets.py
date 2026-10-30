@@ -90,20 +90,31 @@ def check_static_folder(static_folder: str) -> list[str]:
         return []
     path = os.path.join(static_folder, MANIFEST)
     if not os.path.exists(path):
-        hashed = glob.glob(os.path.join(static_folder, "js", "mdv-*.js"))
+        hashed = [
+            file
+            for name in UNHASHED
+            for file in glob.glob(os.path.join(static_folder, "js", f"{name}-*.js"))
+        ]
         if hashed:
             return [f"{static_folder} has hashed entries ({os.path.basename(hashed[0])}) but no {MANIFEST}"]
         return []
     problems = []
     for name in UNHASHED:
         try:
-            assets = entry_assets(static_folder, name)
+            entry_assets(static_folder, name)
         except (LookupError, ValueError) as e:
             problems.append(str(e))
-            continue
-        for file in (assets.js, *assets.css):
-            if not os.path.exists(os.path.join(static_folder, file)):
-                problems.append(f"{MANIFEST} lists {file} for '{name}' but it is not in {static_folder}")
+    # Every file the manifest lists, including the chunks entries import: one missing from a
+    # partial copy fails at runtime as "Failed to fetch dynamically imported module".
+    try:
+        with open(path) as f:
+            manifest = json.load(f)
+    except ValueError as e:
+        return [*problems, f"{path} is not valid JSON: {e}"]
+    for chunk in manifest.values():
+        for file in (chunk.get("file"), *chunk.get("css", [])):
+            if file and not os.path.isfile(os.path.join(static_folder, file)):
+                problems.append(f"{MANIFEST} lists {file} but it is not in {static_folder}")
     return problems
 
 

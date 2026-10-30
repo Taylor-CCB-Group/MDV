@@ -151,6 +151,35 @@ def test_check_static_folder_flags_manifest_files_that_are_missing(tmp_path):
     assert any("js/mdv-B4coGEvZ.js" in p for p in problems)
 
 
+def test_check_static_folder_flags_a_missing_imported_chunk(tmp_path):
+    write_manifest(tmp_path)
+    for manifest_entry in MANIFEST.values():
+        for file in [manifest_entry["file"], *manifest_entry.get("css", [])]:
+            (tmp_path / file).parent.mkdir(parents=True, exist_ok=True)
+            (tmp_path / file).write_text("")
+    (tmp_path / "assets" / "ChartManager-BndN7OT2.js").unlink()
+
+    [problem] = check_static_folder(str(tmp_path))
+
+    assert "assets/ChartManager-BndN7OT2.js" in problem
+
+
+def test_check_static_folder_treats_a_directory_as_missing(tmp_path):
+    write_manifest(tmp_path)
+    (tmp_path / "js" / "mdv-B4coGEvZ.js").mkdir(parents=True)
+
+    assert any("js/mdv-B4coGEvZ.js" in p for p in check_static_folder(str(tmp_path)))
+
+
+def test_check_static_folder_flags_any_hashed_entry_without_a_manifest(tmp_path):
+    (tmp_path / "js").mkdir()
+    (tmp_path / "js" / "login-EahKsMqf.js").write_text("")
+
+    [problem] = check_static_folder(str(tmp_path))
+
+    assert "login-EahKsMqf.js" in problem
+
+
 def test_registering_logs_an_inconsistent_build(tmp_path, caplog):
     (tmp_path / "js").mkdir()
     (tmp_path / "js" / "mdv-B4coGEvZ.js").write_text("")
