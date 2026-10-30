@@ -84,7 +84,7 @@ If `--output` already exists, `--write` stops and leaves it alone.
 
 ## Add the overview view
 
-`python/mdvtools/template_views/create_overview_view.py` adds a `Cell atlas` view with the same layout as the one in `myeloid_v2_testing_latest`: the project title and abstract across the top, UMAPs coloured by cell type, cell group, tissue and disease, and composition charts below. It then orders the views: `Cell atlas` first, the question views in question order, then every other listed view in its current order. `initial_view` is set to `Cell atlas`. Only `views.json` and `state.json` change. `datafile.h5` is not opened.
+`python/mdvtools/template_views/create_overview_view.py` adds a `Cell atlas` view with the same charts and chart sizes as the one in `myeloid_v2_testing_latest`: the project title and abstract across the top, UMAPs coloured by cell type, cell group, tissue and disease, and composition charts below. It then orders the views: `Cell atlas` first, the question views in question order, then every other listed view in its current order. `initial_view` is set to `Cell atlas`. Only `views.json` and `state.json` change. `datafile.h5` is not opened.
 
 Columns are chosen from the cells datasource by display name, after curation:
 
@@ -131,3 +131,9 @@ For a project that already has the separate plots, `python/mdvtools/scripts/conv
 ```
 
 `--write` copies `views.json` to `views.json.bak.<timestamp>` first. Text that was edited by hand is left alone; the summary lists any text box that still describes separate dot plots. A second run finds nothing to merge.
+
+## Layout and thumbnails
+
+The question views and `Cell atlas` use fixed pixel positions with about 25 px between charts, so the page can be scrolled from the gaps without the mouse wheel zooming a chart. Each view keeps its width; it gets a little taller.
+
+The scripts don't write thumbnails (`viewImage`). Open each new view with edit permission and save it (Ctrl+S) before copying `views.json` to a server where users only have view permission. A viewer who opens a project whose first view has no thumbnail gets a "Forbidden" save error.

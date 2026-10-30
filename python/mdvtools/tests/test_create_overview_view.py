@@ -82,8 +82,13 @@ def test_write_adds_view_sets_order_and_keeps_other_state(tmp_path: Path):
 
     view = read(project, "views")[VIEW_NAME]
     charts = view["initialCharts"]["cells"]
-    assert view["dataSources"] == {"cells": {"layout": "gridstack", "panelWidth": 100}}
+    assert view["dataSources"] == {"cells": {"panelWidth": 100}}
     assert len(charts) == 8
+    assert max(chart["position"][0] + chart["size"][0] for chart in charts) == 1837
+    umap_row = [chart for chart in charts if chart["position"][1] == charts[1]["position"][1]]
+    gaps = [b["position"][0] - (a["position"][0] + a["size"][0]) for a, b in zip(umap_row, umap_row[1:])]
+    assert len(gaps) == 2 and all(23 <= gap <= 25 for gap in gaps)
+    assert charts[1]["position"][1] - charts[0]["size"][1] == 25
     assert len({chart["id"] for chart in charts}) == 8
     assert charts[0]["text"] == "# Synovial atlas\nAbout the cells."
     used = {field for chart in charts for field in chart["param"]}

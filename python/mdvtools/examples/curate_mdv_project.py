@@ -60,6 +60,7 @@ from mdvtools.template_views.create_question_views import (
     placed,
     resolve_feature_fields,
     scatter,
+    spread_layout,
     text_box,
 )
 from mdvtools.template_views.create_synovial_question_views import MARKER_GENES
@@ -462,7 +463,7 @@ def plan_question_views(
         if name in views:
             skipped.append({"question": name, "reason": "already in the project"})
             return
-        built[name] = view
+        built[name] = spread_layout(view)
 
     if umap_x and umap_y and group_field:
         maps = [

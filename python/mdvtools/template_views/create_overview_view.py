@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Add a project overview view and put the project's views in a fixed order.
 
-The overview copies the layout of the "Cell atlas" view in myeloid_v2_testing_latest:
+The overview copies the charts and chart sizes of the "Cell atlas" view in myeloid_v2_testing_latest:
 the project title and abstract across the top, UMAPs coloured by cell type, cell
 group and tissue, a UMAP coloured by disease, and composition charts below. Charts
 use columns that already exist in the cells datasource. datafile.h5 is not opened.
@@ -67,10 +67,12 @@ ROLE_NAMES: dict[str, tuple[str, ...]] = {
 UMAP_FIELD_SUFFIXES = ("X_umap_mindist_0.25_1", "X_umap_mindist_0.25_2")
 UMAP_DISPLAY_NAMES = ("UMAP 1", "UMAP 2")
 
-# Grid placement and pixel size copied from the myeloid Cell atlas view (12 columns).
-WIDE = {"gssize": [12, 2], "size": [1839, 274]}
-THIRD = {"gssize": [4, 5], "size": [609, 694]}
-HALF = {"gssize": [6, 4], "size": [917, 554]}
+# Pixel layout matching the sizes in the myeloid Cell atlas view; spread_layout then widens
+# the gaps. Charts are [x, y], [width, height].
+WIDTH = 1837
+TEXT_BOX = ([0, 0], [WIDTH, 270])
+UMAP_ROW = [([x, 275], [609, 690]) for x in (0, 614, 1228)]
+LOWER_ROWS = [([x, y], [916, 550]) for y in (970, 1525) for x in (0, 921)]
 
 
 @dataclass(frozen=True)
@@ -191,68 +193,55 @@ def bar_axes(stacked: bool) -> dict[str, Any]:
     return {"ry": dict(axis), "x": dict(axis), "y": {**axis, "size": 40}}
 
 
-def umap_chart(roles: Roles, color_by: Column, grid: dict[str, Any], position: list[int]) -> dict[str, Any]:
+def umap_chart(roles: Roles, color_by: Column) -> dict[str, Any]:
     chart = questions.scatter(
         color_by.name, [roles.umap_x.field, roles.umap_y.field], color_by.field, color_by.field
     )
-    chart.update({
-        "on_filter": "hide",
-        "opacity": 0.8,
-        "position": [0, 0],
-        "gsposition": position,
-        **grid,
-    })
+    chart.update({"on_filter": "hide", "opacity": 0.8})
     return chart
 
 
-def stacked_chart(rows: Column, stacks: Column, position: list[int]) -> dict[str, Any]:
+def stacked_chart(rows: Column, stacks: Column) -> dict[str, Any]:
     return {
         "type": "stacked_row_chart",
         "title": f"{stacks.name} by {rows.name}",
         "param": [rows.field, stacks.field],
         "axis": bar_axes(stacked=True),
         "color_legend": {"display": True, "pos": [8, 8]},
-        "position": [0, 0],
-        "gsposition": position,
-        **HALF,
     }
 
 
 def build_overview_view(roles: Roles, title: str, abstract: str, datasource: str = CELLS) -> dict[str, Any]:
-    """Return a view with the same chart set and grid as the myeloid Cell atlas."""
-    charts: list[dict[str, Any]] = [
-        {
-            "type": "text_box_chart",
-            "title": "",
-            "legend": "",
-            "param": [],
-            "text": overview_text(title, abstract),
-            "gsposition": [0, 0],
-            **WIDE,
-        },
-        umap_chart(roles, roles.cell_type, THIRD, [0, 2]),
-        umap_chart(roles, roles.cell_group, THIRD, [4, 2]),
-        umap_chart(roles, roles.tissue, THIRD, [8, 2]),
-        umap_chart(roles, roles.disease, HALF, [0, 7]),
-        stacked_chart(roles.disease, roles.cell_group, [6, 7]),
-        stacked_chart(roles.tissue, roles.cell_type, [0, 11]),
+    """Return a view with the same chart set and sizes as the myeloid Cell atlas."""
+    text = {
+        "type": "text_box_chart",
+        "title": "",
+        "legend": "",
+        "param": [],
+        "text": overview_text(title, abstract),
+    }
+    lower = [
+        umap_chart(roles, roles.disease),
+        stacked_chart(roles.disease, roles.cell_group),
+        stacked_chart(roles.tissue, roles.cell_type),
         {
             "type": "row_chart",
             "title": roles.cell_type.name,
             "param": [roles.cell_type.field],
             "axis": bar_axes(stacked=False),
-            "position": [0, 0],
-            "gsposition": [6, 11],
-            **HALF,
         },
     ]
+    umaps = [umap_chart(roles, column) for column in (roles.cell_type, roles.cell_group, roles.tissue)]
+    layout = [(text, TEXT_BOX), *zip(umaps, UMAP_ROW), *zip(lower, LOWER_ROWS)]
     used: set[str] = set()
-    for chart in charts:
-        chart["id"] = chart_id(used)
-    return {
-        "dataSources": {datasource: {"layout": "gridstack", "panelWidth": 100}},
+    charts = [
+        {**chart, "position": list(position), "size": list(size), "id": chart_id(used)}
+        for chart, (position, size) in layout
+    ]
+    return questions.spread_layout({
+        "dataSources": {datasource: {"panelWidth": 100}},
         "initialCharts": {datasource: charts},
-    }
+    })
 
 
 def order_views(all_views: list[str], overview: str) -> list[str]:

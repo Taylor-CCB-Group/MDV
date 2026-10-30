@@ -82,6 +82,11 @@ WIDE_LAYOUT_WIDTH = 1590
 PROTEIN_VIEW_PANEL_WIDTHS = {CELLS: 70, GENES.datasource: 15, PROTEINS.datasource: 15}
 PROTEIN_VIEW_LAYOUT_WIDTH = 1310
 
+# Builders tile charts with BUILDER_GAP pixels between them; spread_layout widens that to
+# CHART_GAP so there is room to scroll the page without the wheel zooming a chart.
+BUILDER_GAP = 5
+CHART_GAP = 25
+
 Q1_VIEW_NAME = "Where is my gene of interest expressed across cell populations?"
 Q1_FEATURE_GENES = GENES.names[:3]
 
@@ -314,6 +319,44 @@ def feature_query(features: LinkedFeatures, max_items: int) -> dict[str, Any]:
 
 def placed(chart: dict[str, Any], position: list[int], size: list[int]) -> dict[str, Any]:
     return {**chart, "position": position, "size": size, "id": chart_id()}
+
+
+def spread_layout(view: dict[str, Any], gap: int = CHART_GAP) -> dict[str, Any]:
+    """Widen the gaps between placed charts to ``gap`` pixels, in place.
+
+    Each chart edge moves by the extra gap times the number of chart starts before it, so
+    charts that lined up still line up. Each panel then keeps its original width (charts get
+    slightly narrower) and grows taller.
+    """
+    extra = gap - BUILDER_GAP
+    for charts in view.get("initialCharts", {}).values():
+        boxes = [chart for chart in charts if "position" in chart and "size" in chart]
+        if not boxes:
+            continue
+        for axis in (0, 1):
+            starts = sorted({chart["position"][axis] for chart in boxes})
+
+            def shifted(edge: int, end: bool) -> int:
+                before = sum(start < edge for start in starts)
+                return edge + extra * (before - 1 if end else before)
+
+            spans = [
+                (
+                    shifted(chart["position"][axis], False),
+                    shifted(chart["position"][axis] + chart["size"][axis], True),
+                )
+                for chart in boxes
+            ]
+            scale = 1.0
+            if axis == 0:
+                old_width = max(chart["position"][0] + chart["size"][0] for chart in boxes)
+                scale = old_width / max(end for _, end in spans)
+            for chart, (start, end) in zip(boxes, spans):
+                chart["position"] = list(chart["position"])
+                chart["size"] = list(chart["size"])
+                chart["position"][axis] = round(start * scale)
+                chart["size"][axis] = round(end * scale) - chart["position"][axis]
+    return view
 
 
 def text_box(title: str, text: str) -> dict[str, Any]:
@@ -1224,7 +1267,7 @@ def add_question_views(project_path: Path, *, dry_run: bool = False) -> dict[str
 
     all_views = list(state.get("all_views") or [])
     for name, build in VIEW_BUILDERS.items():
-        views[name] = build(fields)
+        views[name] = spread_layout(build(fields))
         if name not in all_views:
             all_views.append(name)
     state["all_views"] = all_views

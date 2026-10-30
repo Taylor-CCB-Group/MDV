@@ -31,6 +31,7 @@ from mdvtools.template_views.create_question_views import (
     placed,
     resolve_feature_fields,
     scatter,
+    spread_layout,
     text_box,
 )
 
@@ -596,7 +597,7 @@ def add_synovial_question_views(project_path: Path, *, dry_run: bool = False) ->
     retitled = retitle_existing_views(views)
     all_views = list(state.get("all_views") or [])
     for name, build in VIEW_BUILDERS.items():
-        views[name] = build(fields)
+        views[name] = spread_layout(build(fields))
         if name not in all_views:
             all_views.append(name)
     state["all_views"] = all_views
