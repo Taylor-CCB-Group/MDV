@@ -62,7 +62,7 @@ describe("convertLegacyChartConfig", () => {
                 background_filter: { column: "cell_type", categories: ["T", "B"], category: "T" },
             };
             expect(convertLegacyChartConfig(config)).toBe("wgl_scatter_plot");
-            expect(config).toEqual({
+            expect(config).toMatchObject({
                 type: "DeckContourScatter",
                 background_filter: { column: "cell_type", category: ["T", "B"] },
             });
@@ -72,7 +72,7 @@ describe("convertLegacyChartConfig", () => {
             convertLegacyChartsSetting.set("on");
             const config = { type: "wgl_scatter_plot", background_filter: { column: "cell_type", category: "T" } };
             convertLegacyChartConfig(config);
-            expect(config).toEqual({
+            expect(config).toMatchObject({
                 type: "DeckContourScatter",
                 background_filter: { column: "cell_type", category: ["T"] },
             });
@@ -142,3 +142,18 @@ describe("converting a chart on request", () => {
     });
 });
 
+test("converting a classic scatter keeps its point size on screen", () => {
+    const config: { type: string; radius: number; size: number[]; course_radius?: number } = {
+        type: "wgl_scatter_plot",
+        radius: 2,
+        size: [493, 462],
+    };
+    convertLegacyChartConfigNow(config);
+    expect(config).toMatchObject({ type: "DeckContourScatter", radius: 3.3, course_radius: 10 });
+});
+
+test("converting a deck scatter does not touch its point size", () => {
+    const config = { type: "wgl_scatter_plot_dev", radius: 7, size: [493, 462] };
+    convertLegacyChartConfigNow(config);
+    expect(config).toEqual({ type: "DeckContourScatter", radius: 7, size: [493, 462] });
+});

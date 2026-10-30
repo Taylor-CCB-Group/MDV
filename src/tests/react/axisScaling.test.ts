@@ -1,4 +1,4 @@
-import { fitOrthographicView, radiusReferenceRange, serialisableZoom } from "@/react/axisScaling";
+import { deckRadiusForClassicRadius, fitOrthographicView, radiusReferenceRange, serialisableZoom } from "@/react/axisScaling";
 import { describe, expect, test } from "vitest";
 
 describe("fitOrthographicView", () => {
@@ -81,5 +81,28 @@ describe("serialisableZoom", () => {
 
     test("fit without axis zooms is a plain zoom", () => {
         expect(serialisableZoom({ zoom: 3 }, "fit")).toEqual({ zoom: 3 });
+    });
+});
+
+describe("deckRadiusForClassicRadius", () => {
+    test("draws a point as large on screen as the classic chart did", () => {
+        const size: [number, number] = [493, 462];
+        const sizing = deckRadiusForClassicRadius(2, size);
+        expect(sizing).toBeDefined();
+        const { radius, course_radius } = sizing!;
+        // the fitted view of data as wide as it is tall, in a square the chart's shorter side
+        const view = fitOrthographicView({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, size[1], size[1], "equal");
+        const radiusPx = ((radius * course_radius) / 10000) * 10 * 2 ** view.zoom;
+        expect(radiusPx * 2).toBeCloseTo(2, 1);
+    });
+
+    test("keeps the slider's range by moving large values into course_radius", () => {
+        expect(deckRadiusForClassicRadius(2, [493, 462])).toEqual({ radius: 3.3, course_radius: 10 });
+        expect(deckRadiusForClassicRadius(2, [8000, 8000])?.course_radius).toBe(1);
+    });
+
+    test("leaves the setting alone for a radius it cannot map", () => {
+        expect(deckRadiusForClassicRadius(0, [300, 300])).toBeUndefined();
+        expect(deckRadiusForClassicRadius(Number.NaN, [300, 300])).toBeUndefined();
     });
 });

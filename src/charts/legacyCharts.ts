@@ -1,6 +1,7 @@
 import { convertLegacyChartsSetting } from "@/lib/browserSettings";
 import type DataStore from "@/datastore/DataStore";
 import type { ChartType } from "./ChartTypes";
+import { deckRadiusForClassicRadius } from "@/react/axisScaling";
 
 /** Whether a chart type is hidden from the Add Chart dialog as superseded, for this data store. */
 export function isLegacyChartType(type: Pick<ChartType<any>, "legacy">, dataStore: DataStore) {
@@ -32,12 +33,20 @@ const adaptScatterBackgroundFilter = (config: any) => {
     }
 };
 
+/** The classic scatter's point size is in pixels, and the deck chart's is relative to the chart. */
+const adaptClassicScatter = (config: any) => {
+    adaptScatterBackgroundFilter(config);
+    const size = Array.isArray(config.size) && config.size.length === 2 ? config.size : [300, 300];
+    const sizing = deckRadiusForClassicRadius(config.radius ?? 2, size);
+    if (sizing) Object.assign(config, sizing);
+};
+
 /**
  * Where a legacy chart type has a current equivalent that reads the same config keys.
  * Only these are converted: the Viv image viewer's config has no direct SpatialData.js equivalent.
  */
 const legacyConversions: Record<string, LegacyConversion> = {
-    wgl_scatter_plot: { to: "DeckContourScatter", adapt: adaptScatterBackgroundFilter },
+    wgl_scatter_plot: { to: "DeckContourScatter", adapt: adaptClassicScatter },
     // same chart class; `DeckContourScatter` only adds density settings, which are off by default
     wgl_scatter_plot_dev: { to: "DeckContourScatter", adapt: adaptScatterBackgroundFilter },
     // the sort direction is stored as `ascending` rather than `sortAsc`; the rest is shared
@@ -51,17 +60,10 @@ const legacyConversions: Record<string, LegacyConversion> = {
     density_scatter_plot: {
         to: "DeckContourScatter",
         canConvert: (config) => !config.viv,
-        adapt: adaptScatterBackgroundFilter,
+        adapt: adaptClassicScatter,
     },
 };
 
-/**
- * Changes `config`'s `type` in place to its current equivalent, if there is one that works for it.
- * @returns the type the chart was converted from, or undefined if it was left alone.
- */
-export function convertLegacyChartConfigNow(config: { type: string }): string | undefined {
-    const conversion = findLegacyConversion(config);
-    if (!conversion) return undefined;
 const findLegacyConversion = (config: { type: string }) => {
     const conversion = legacyConversions[config.type];
     return conversion && conversion.canConvert?.(config) !== false ? conversion : undefined;
@@ -72,6 +74,13 @@ export function getLegacyConversionTarget(config: { type: string }): string | un
     return findLegacyConversion(config)?.to;
 }
 
+/**
+ * Changes `config`'s `type` in place to its current equivalent, if there is one that works for it.
+ * @returns the type the chart was converted from, or undefined if it was left alone.
+ */
+export function convertLegacyChartConfigNow(config: { type: string }): string | undefined {
+    const conversion = findLegacyConversion(config);
+    if (!conversion) return undefined;
     const from = config.type;
     config.type = conversion.to;
     conversion.adapt?.(config);

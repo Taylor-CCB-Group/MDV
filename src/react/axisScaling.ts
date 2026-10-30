@@ -69,3 +69,19 @@ export function serialisableZoom(viewState: ZoomState, scaling: AxisScaling) {
     if (scaling !== "fit" || zoomX === undefined || zoomY === undefined) return { zoom: scalar };
     return { zoom: Math.min(scalar, zoomX, zoomY), zoomX, zoomY };
 }
+
+/**
+ * The classic scatter's `radius` is a point's diameter in pixels at the initial view; the deck chart's
+ * `radius * course_radius` is a fraction (1/10000) of the data range, so the pixels depend on the chart.
+ * This is the deck setting that draws the same points in a chart of `size`, assuming the data is about
+ * as wide as it is tall (which is not known when a config is converted). The slider tops out at 20, so
+ * larger values use `course_radius` instead.
+ */
+export function deckRadiusForClassicRadius(classicRadius: number, size: [number, number]) {
+    const plotSide = Math.min(...size);
+    // at the fitted view a deck radius of r is about r / 10000 * 2^-FIT_PADDING_ZOOM * plotSide pixels
+    const total = ((classicRadius / 2) * 10000) / (2 ** -FIT_PADDING_ZOOM * plotSide);
+    if (!(total > 0) || !Number.isFinite(total)) return undefined;
+    if (total <= 20) return { radius: Math.round(total * 10) / 10, course_radius: 1 };
+    return { radius: Math.round(total) / 10, course_radius: 10 };
+}
