@@ -5,6 +5,7 @@ import os
 from os.path import exists, join, basename
 from .diagnostics import format_version_info, report_errors
 from .spatial.conversion_options import (
+    DEFAULT_IMAGE_CHUNK_SIZE,
     DEFAULT_POINT_TRANSFORM,
     DEFAULT_TABLE_HANDLING,
     POINT_TRANSFORM_CHOICES,
@@ -242,8 +243,15 @@ def patch_spatial_annotations(project_dir, annotation_csv, datasource, spatialda
     show_default=True,
     help='Strategy for transforming table point coordinates to image coordinates.',
 )
+@click.option(
+    '--image-chunk-size',
+    default=DEFAULT_IMAGE_CHUNK_SIZE,
+    type=click.IntRange(min=0),
+    show_default=True,
+    help='Largest chunk edge in pixels for copied images and labels, one channel per chunk. 0 keeps the source chunks.',
+)
 @click.option('--verbose', is_flag=True, help='Show detailed per-dataset conversion output, transform decisions, and merged summaries.')
-def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, output_geojson, density, serve, obs_datasource_name, var_datasource_name, link_name_column, compute_x_umap, leiden_resolution, table_handling, point_transform, verbose):
+def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, output_geojson, density, serve, obs_datasource_name, var_datasource_name, link_name_column, compute_x_umap, leiden_resolution, table_handling, point_transform, image_chunk_size, verbose):
     """Convert one SpatialData store to MDV format, or use --batch for a directory of stores."""
     import tempfile
     from .spatial.conversion import convert_spatialdata_to_mdv, SpatialDataConversionArgs
@@ -267,6 +275,7 @@ def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, l
             leiden_resolution=leiden_resolution,
             table_handling=table_handling,
             point_transform=point_transform,
+            image_chunk_size=image_chunk_size,
         )
         convert_spatialdata_to_mdv(args)
 
