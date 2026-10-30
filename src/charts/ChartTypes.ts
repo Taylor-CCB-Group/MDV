@@ -54,6 +54,13 @@ export type ChartType<T extends BaseConfig> = {
     /** @deprecated in favour of {@link loadColumnData} decorator */
     methodsUsingColumns?: string[];
     allow_user_add?: boolean;
+    /**
+     * Superseded by another chart type. Hidden from the 'add chart' dialog unless the
+     * "Legacy charts" browser setting is on; existing charts of this type still load.
+     * A function says whether it is superseded for a given data store, for types that
+     * are still needed by some data (see `isLegacyChartType`).
+     */
+    legacy?: boolean | ((dataStore: DataStore) => boolean);
 };
 
 export type ChartTypeMap = Record<string, ChartType<any>>;

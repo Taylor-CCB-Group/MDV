@@ -166,6 +166,8 @@ const ScatterAxis2DSchema = z.object({
 const OrthographicViewStateSchema = z.object({
     target: z.tuple([z.number(), z.number(), z.number()]).describe("Orthographic view target in world coordinates"),
     zoom: z.number().describe("Current zoom level"),
+    zoomX: z.number().optional().describe("Zoom along x, where the axes are scaled separately"),
+    zoomY: z.number().optional().describe("Zoom along y, where the axes are scaled separately"),
     minZoom: z.number().optional().describe("Minimum allowed zoom"),
     maxZoom: z.number().optional().describe("Maximum allowed zoom"),
 }).passthrough().describe("Serializable orthographic deck.gl view state");
@@ -183,9 +185,14 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
     radius: z.number().positive().optional().describe("Scatter point radius"),
     opacity: z.number().min(0).max(1).optional().describe("Scatter point opacity"),
     category_filters: z.array(CategoryFilterSchema).optional().describe("Categorical filters applied before rendering"),
+    background_filter: z.object({
+        column: z.string().nullable().describe("Categorical column used for filtering; null when unset"),
+        category: CategorySelectionSchema.optional().describe("Values of the column to keep; rows outside them are hidden from this chart"),
+    }).nullable().optional().describe("Hides rows outside the selected categories from this chart only"),
     on_filter: z.enum(["hide", "grey"]).optional().describe("How filtered-out points should be rendered"),
     zoom_on_filter: z.boolean().optional().describe("Whether filtering should auto-fit the current view"),
     point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
+    axis_scaling: z.enum(["equal", "fit"]).optional().describe("2D only: `equal` keeps one scale for both axes (the default), `fit` scales each axis to the chart"),
     selectionFeatureCollection: z.unknown().optional().describe("Serialized selection overlay geometry"),
     region: z.string().optional().describe("Associated region identifier when rendering spatial scatter plots"),
     hideMissing: z.boolean().optional().describe("Whether to hide points with missing numeric color values"),

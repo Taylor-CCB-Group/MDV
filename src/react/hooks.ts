@@ -46,7 +46,8 @@ export function getActiveChartScopeFilters(config: ChartScopeConfig) {
     const filters: ChartScopeCategoryFilter[] = [];
     const backgroundFilter = config.background_filter;
     if (
-        backgroundFilter &&
+        backgroundFilter?.column &&
+        backgroundFilter.column !== "__none__" &&
         !isAllCategoryFilter(backgroundFilter.category)
     ) {
         filters.push(backgroundFilter);

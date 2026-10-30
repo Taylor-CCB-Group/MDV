@@ -4,6 +4,9 @@ import type { DataSource } from "./charts";
 import _ from "lodash";
 import screenshot from "@/utilities/Screenshot";
 import { getPostData, getProjectRoot } from "@/dataloaders/DataLoaderUtil";
+import BaseChart from "./BaseChart";
+import { convertLegacyChartConfig, convertLegacyChartConfigNow } from "./legacyCharts";
+import { restoreChartLinks, snapshotChartLinks } from "./chartLinks";
 
 /** Per–data-source view config (panel layout and optional highlight state). */
 export type ViewDataDataSource = {
@@ -53,6 +56,8 @@ class ViewManager {
     @observable accessor lastSavedState: State;
     @observable accessor showGallery = false;
     private cm: ChartManager;
+    /** The alert that the charts converted as a view loads share, and how many it has counted. */
+    private legacyConversionAlert?: { id: string; count: number };
 
     constructor(current_view = "", all_views: string[] = []) {
         this.cm = window.mdv.chartManager;
@@ -71,6 +76,90 @@ class ViewManager {
     getCleanCurrState() {
         const currState = this.cm.getState();
         return removeImageProp(toJS(currState));
+    }
+
+    /**
+     * Tells the user that a chart was loaded as its current equivalent. A view loads its charts
+     * together, so they share one alert whose count is updated as each is converted.
+     */
+    reportLegacyConversion() {
+        const alert = this.legacyConversionAlert;
+        const count = alert && alert.id in this.cm.infoAlerts ? alert.count + 1 : 1;
+        const msg =
+            count === 1
+                ? "A legacy chart was converted to its current equivalent (see Convert legacy charts in Browser settings)"
+                : `${count} legacy charts were converted to their current equivalents (see Convert legacy charts in Browser settings)`;
+        if (alert && count > 1) {
+            this.cm.updateInfoAlert(alert.id, msg);
+            alert.count = count;
+        } else {
+            const id = this.cm.createInfoAlert(msg, { duration: 6000 });
+            this.legacyConversionAlert = { id, count };
+        }
+    }
+
+    /**
+     * Converts the config of a chart that a view is loading, if the browser setting for that is on.
+     * Charts the user adds themselves are not passed through here.
+     */
+    convertLegacyChartOnLoad(dataSource: string, config: { type: string; title?: string }) {
+        const convertedFrom = convertLegacyChartConfig(config, this.cm.dsIndex[dataSource]?.dataStore);
+        if (!convertedFrom) return;
+        console.log(`Loading legacy chart '${config.title}' (${convertedFrom}) as ${config.type}`);
+        this.reportLegacyConversion();
+    }
+
+    /**
+     * Replaces a legacy chart with its current equivalent, in the same place and with the same
+     * settings that both understand. If the new chart cannot be created, the original is restored.
+     */
+    async convertLegacyChart(chart: BaseChart<any>) {
+        let current: unknown;
+        try {
+            current = chart.getConfig();
+        } catch (error) {
+            // a chart that has not finished loading (e.g. a Viv image) can fail to describe itself
+            console.warn("Using the config a chart was created with, as it could not be read", error);
+            current = chart.config;
+        }
+        const original = JSON.parse(JSON.stringify(current));
+        const config = JSON.parse(JSON.stringify(original));
+        if (!convertLegacyChartConfigNow(config, chart.dataStore)) return;
+        const dataSource = chart.dataStore.name;
+        const links = snapshotChartLinks(this.cm.viewData.links, config.id);
+        this.removeChart(chart);
+        let converted = false;
+        try {
+            await this.cm.addChart(dataSource, config);
+            converted = !!this.cm.charts[config.id]?.chart;
+        } catch (error) {
+            console.error(`Could not convert chart '${original.title}'`, error);
+        }
+        if (!converted) {
+            // `addChart` does not convert, so this puts back what was there
+            await this.cm.addChart(dataSource, original);
+            this.cm.createInfoAlert(`Could not convert '${original.title}'; it has been left as it was`, {
+                type: "danger",
+                duration: 4000,
+            });
+        }
+        restoreChartLinks(this.cm.viewData.links ?? [], links, config.id, (link) => this.cm._setUpLink(link));
+        if (!converted) return;
+        const typeName = (type: string) => BaseChart.types[type]?.name ?? type;
+        this.cm.createInfoAlert(
+            `Converted '${config.title}' from ${typeName(original.type)} to ${typeName(config.type)}`,
+            { duration: 4000 },
+        );
+    }
+
+    /** Removes a chart and everything the manager holds for it, as its remove button does. */
+    private removeChart(chart: BaseChart<any>) {
+        chart.remove();
+        chart.getDiv().remove();
+        // links are looked up through the chart, so it is removed from them first
+        this.cm._removeLinks(chart);
+        delete this.cm.charts[chart.config.id];
+        this.cm._callListeners("chart_removed", chart);
     }
 
     // Setters
@@ -130,6 +219,8 @@ class ViewManager {
             }
             this.cm.removeAllCharts();
             contentDiv.innerHTML = "";
+            // the next view's conversions are counted afresh
+            this.legacyConversionAlert = undefined;
             this.setView(view);
             this.cm.viewLoader(view).then(async (data: object) => {
                 await this.cm._init(data);

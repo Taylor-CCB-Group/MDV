@@ -332,6 +332,7 @@ class DensityScatterPlot extends WGLScatterPlot {
 BaseChart.types["density_scatter_plot"] = {
     name: "Density Scatter Plot",
     class: DensityScatterPlot,
+    legacy: true,
     params: [
         {
             type: "number",
