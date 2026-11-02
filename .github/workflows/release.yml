@@ -1,0 +1,183 @@
+name: Release
+
+# Runs when a version bump in python/pyproject.toml reaches main, usually by merging the PR
+# that release-prepare.yml opens. A version that already has a tag is skipped.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - python/pyproject.toml
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: version
+        run: |
+          version=$(python3 .github/scripts/release.py current)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then
+            echo "v$version is already tagged, so there is nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            python3 .github/scripts/release.py notes "$version" > /dev/null
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      # the wheel ships the frontend from python/mdvtools/static, which git ignores
+      - run: pnpm run build-flask-vite
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          working-directory: python
+
+      - name: Build the sdist and wheel
+        working-directory: python
+        run: |
+          uv build --out-dir dist
+          ls -lh dist
+          # TestPyPI rejects files over 100 MB
+          if [ -n "$(find dist -size +95M)" ]; then
+            echo "A dist file is over 95 MB. Check wheel-exclude in pyproject.toml."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: python/dist/
+          if-no-files-found: error
+
+  testpypi:
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/mdvtools/${{ needs.check.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+
+      # --check-url skips files TestPyPI already has, so re-running failed jobs works
+      - run: >-
+          uv publish --trusted-publishing always --publish-url https://test.pypi.org/legacy/
+          --check-url https://test.pypi.org/simple/ dist/*
+
+  smoke-test:
+    needs: [check, testpypi]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+
+      # Fetch only mdvtools from TestPyPI, so its dependencies still come from PyPI
+      - name: Download the wheel from TestPyPI
+        run: |
+          uv venv --python 3.12 fetch
+          uv pip install --python fetch pip
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            fetch/bin/pip download --no-deps --only-binary :all: -d testpypi \
+              --index-url https://test.pypi.org/simple/ "mdvtools==$VERSION" && break
+            echo "TestPyPI has not listed $VERSION yet, retrying in 30 seconds"
+            sleep 30
+          done
+          ls testpypi/*.whl
+          # the upload must be the wheel this run built
+          cmp testpypi/*.whl dist/*.whl
+
+      - name: Install the TestPyPI wheel and smoke-test it
+        run: |
+          wheel=$(ls testpypi/*.whl)
+          uv venv --python 3.12 slim
+          uv pip install --python slim "$wheel"
+          slim/bin/python .github/scripts/smoke_test.py "$VERSION"
+          uv venv --python 3.12 app
+          uv pip install --python app "${wheel}[app]"
+          app/bin/python .github/scripts/smoke_test.py "$VERSION" --app
+
+  pypi:
+    needs: [check, smoke-test]
+    runs-on: ubuntu-latest
+    # add required reviewers to this environment so a person approves each PyPI upload
+    environment:
+      name: pypi
+      url: https://pypi.org/project/mdvtools/${{ needs.check.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+
+      - run: uv publish --trusted-publishing always dist/*
+
+  github-release:
+    needs: [check, pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Tag the release and publish its notes
+        run: |
+          python3 .github/scripts/release.py notes "$VERSION" > "$RUNNER_TEMP/notes.md"
+          gh release create "v$VERSION" dist/* --target "$GITHUB_SHA" \
+            --title "MDV $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
