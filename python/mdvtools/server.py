@@ -286,8 +286,20 @@ def create_app(
         if path is None or not os.path.exists(path):
             return "File not found", 404
         # consider allowing directory listing here if it's not a file?
-        return send_file(path)
-    
+        response = send_file(path)
+        # Private because these files are only for the signed-in user.
+        response.cache_control.private = True
+        if current_app.config.get("ENABLE_AUTH", False):
+            # Every request has to reach the project access check, so the browser
+            # revalidates with the ETag and gets a 304 when the file has not changed.
+            response.cache_control.no_cache = True
+        else:
+            # Lets the browser reuse zarr chunks when panning back without asking the server.
+            # Chunk URLs stay the same when a store is reconverted, so the age is kept short.
+            response.cache_control.no_cache = None
+            response.cache_control.max_age = 3600
+        return response
+
     @project_bp.route("/<file>.b")
     def get_binary_file(file):
         # should this now b '.gz'?
