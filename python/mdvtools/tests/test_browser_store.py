@@ -31,6 +31,7 @@ def test_default_preset_rewrites_nothing():
 def test_standard_and_experimental_presets():
     standard = resolve_browser_store_options("standard")
     assert standard == BrowserStoreOptions(
+        pyramids=True,
         image_codec="htj2k",
         image_preset="balanced",
         csc_tables=True,
@@ -75,11 +76,15 @@ def test_cli_forwards_browser_store_options(monkeypatch):
 
     result = CliRunner().invoke(
         cli_module.cli,
-        ["convert-spatial", "out", "spatial", "--browser-preset", "standard", "--no-morton-points", "--points-zarr"],
+        [
+            "convert-spatial", "out", "spatial", "--browser-preset", "standard",
+            "--no-pyramids", "--no-morton-points", "--points-zarr",
+        ],
     )
 
     assert result.exit_code == 0, result.output
     assert captured["args"].browser_store == BrowserStoreOptions(
+        pyramids=False,
         image_codec="htj2k",
         image_preset="balanced",
         csc_tables=True,
@@ -149,9 +154,16 @@ def _zarr_json(path: Path) -> dict:
     return json.loads((path / "zarr.json").read_text())
 
 
-def _first_level_codecs(raster_group: Path) -> list[str]:
-    level = _zarr_json(raster_group)["attributes"]["ome"]["multiscales"][0]["datasets"][0]["path"]
+def _level_paths(raster_group: Path) -> list[str]:
+    return [dataset["path"] for dataset in _zarr_json(raster_group)["attributes"]["ome"]["multiscales"][0]["datasets"]]
+
+
+def _level_codecs(raster_group: Path, level: str) -> list[str]:
     return [codec["name"] for codec in _zarr_json(raster_group / level)["codecs"]]
+
+
+def _first_level_codecs(raster_group: Path) -> list[str]:
+    return _level_codecs(raster_group, _level_paths(raster_group)[0])
 
 
 @pytest.fixture
@@ -280,3 +292,54 @@ def test_write_keeps_points_that_are_already_morton_indexed(small_sdata, tmp_pat
     assert "Keeping points/blobs_points: already Morton-indexed" in messages
     resorted = pq.read_table(second / "points" / "blobs_points" / "points.parquet")
     assert resorted.column("morton_code_2d").equals(sorted_once.column("morton_code_2d"))
+
+
+def test_pyramids_extend_large_rasters_and_leave_small_ones(small_sdata, tmp_path):
+    import dask.array as da
+    import numpy as np
+    from spatialdata.models import Image2DModel, Labels2DModel
+
+    # Larger than ensure_pyramids' default 1024-pixel min_size, so they need levels.
+    small_sdata.images["large_float"] = Image2DModel.parse(
+        da.zeros((1, 2100, 2100), dtype=np.float32), dims=("c", "y", "x")
+    )
+    small_sdata.labels["large_labels"] = Labels2DModel.parse(
+        da.zeros((2100, 2100), dtype=np.uint32), dims=("y", "x")
+    )
+    dest = tmp_path / "pyramids.zarr"
+    messages: list[str] = []
+    write_spatialdata_store(small_sdata, dest, BrowserStoreOptions(pyramids=True), progress=messages.append)
+
+    assert len(_level_paths(dest / "images" / "large_float")) > 1
+    assert len(_level_paths(dest / "labels" / "large_labels")) > 1
+    assert _level_paths(dest / "images" / "blobs_uint8") == ["s0"]
+    assert any(message.startswith("Adding overview levels to images/large_float") for message in messages)
+    # Pyramids alone never apply an image codec.
+    assert "experimental.openjph_htj2k" not in _first_level_codecs(dest / "images" / "large_float")
+
+
+def test_pyramid_levels_are_recompressed_with_the_image_codec(small_sdata, tmp_path):
+    import dask.array as da
+    import numpy as np
+    from spatialdata.models import Image2DModel
+    from spatialdata_js_util import htj2k_available
+
+    if not htj2k_available():
+        pytest.skip("no HTJ2K encoder backend available")
+
+    small_sdata.images["large_uint8"] = Image2DModel.parse(
+        da.zeros((1, 2100, 2100), dtype=np.uint8), dims=("c", "y", "x")
+    )
+    dest = tmp_path / "pyramids_htj2k.zarr"
+    write_spatialdata_store(
+        small_sdata,
+        dest,
+        BrowserStoreOptions(pyramids=True, image_codec="htj2k"),
+        progress=lambda message: None,
+    )
+
+    raster = dest / "images" / "large_uint8"
+    levels = _level_paths(raster)
+    assert len(levels) > 1
+    for level in levels:
+        assert "experimental.openjph_htj2k" in _level_codecs(raster, level)

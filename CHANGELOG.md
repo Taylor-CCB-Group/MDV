@@ -12,18 +12,19 @@ All notable changes to `mdvtools` are documented here. The format is based on
   traceback, and mdvtools/dependency versions, ready to paste into an issue, and exits with
   status 1.
 - `mdvtools convert-spatial --browser-preset standard|experimental` rewrites the project's copy
-  of each store for SpatialData.js: `standard` recompresses images as HTJ2K (adding a
-  pyramid to single-level images), stores table matrices as CSC and Morton-sorts points;
-  `experimental` also adds a points-zarr copy beside each points element. `--image-codec`,
-  `--image-preset`, `--csc-tables`, `--morton-points` and `--points-zarr` override the
-  preset. Images that browser codecs can't encode, points without a `feature_key` (for
+  of each store for SpatialData.js: `standard` adds overview levels to images and labels
+  whose coarsest level is too large to load whole, recompresses images as HTJ2K, stores
+  table matrices as CSC and Morton-sorts points; `experimental` also adds a points-zarr copy
+  beside each points element. `--pyramids`, `--image-codec`, `--image-preset`,
+  `--csc-tables`, `--morton-points` and `--points-zarr` override the preset;
+  `--pyramids` on its own adds levels with plain zarr codecs and recompresses nothing. Images that browser codecs can't encode, points without a `feature_key` (for
   points-zarr) and points that are already Morton-indexed are left as they are. The
   presets will change as the formats do, and none of this works with `--link`.
 
 ### Changed
 - Supported Python is now `>=3.12,<3.13`; Python 3.11 is no longer supported.
-- `mdvtools` now depends on `spatialdata-js-util` (with its `write` extra), which needs
-  `zarr` 3.3 or later.
+- `mdvtools` now depends on `spatialdata-js-util` 0.2 (with its `write` extra), which needs
+  `zarr` 3.3 or later and `imagecodecs` 2026.6.26 or later.
 - Upgraded `spatialdata` to 0.8 and `spatialdata-io` to 0.7.1 (from 0.7.2 and 0.6.0).
   `spatialdata-io` 0.7.1 indexes Xenium shapes by `cell_id`.
 - `mdvtools convert-spatial` default views now use the SpatialData.js viewer instead of the

@@ -2,9 +2,9 @@
 
 `convert-spatial` copies each source store into ``<project>/spatial``. These options
 have spatialdata-js-util rewrite that copy so SpatialData.js can read it cheaply over
-HTTP: images recompressed as HTJ2K or JPEG 2000 (with a pyramid for single-level
-images), table matrices in CSC, points Morton-sorted, and an experimental points-zarr
-copy beside each points element.
+HTTP: overview levels added to images and labels whose pyramids are missing or too
+shallow, images recompressed as HTJ2K or JPEG 2000, table matrices in CSC, points
+Morton-sorted, and an experimental points-zarr copy beside each points element.
 
 Presets bundle a recommended set and are expected to change as the formats and the
 frontend evolve; the per-item options override whatever the preset chose. The
@@ -26,6 +26,8 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class BrowserStoreOptions:
+    # Add overview levels (plain zarr codecs) where a raster's coarsest level is too large.
+    pyramids: bool = False
     # "htj2k" or "jp2k"; None leaves images as spatialdata writes them.
     image_codec: str | None = None
     image_preset: str = "balanced"
@@ -47,7 +49,8 @@ class BrowserStoreOptions:
     @property
     def enabled(self) -> bool:
         return (
-            self.image_codec is not None
+            self.pyramids
+            or self.image_codec is not None
             or self.csc_tables
             or self.morton_points
             or self.points_zarr
@@ -55,6 +58,8 @@ class BrowserStoreOptions:
 
     def describe(self) -> str:
         parts = []
+        if self.pyramids:
+            parts.append("pyramids")
         if self.image_codec is not None:
             parts.append(f"{self.image_codec} images ({self.image_preset})")
         if self.csc_tables:
@@ -72,6 +77,7 @@ _CODEC_NAMES = {
 }
 
 _STANDARD = BrowserStoreOptions(
+    pyramids=True,
     image_codec="htj2k",
     image_preset="balanced",
     csc_tables=True,
@@ -89,6 +95,7 @@ BROWSER_PRESETS: dict[str, BrowserStoreOptions] = {
 def resolve_browser_store_options(
     preset: str = DEFAULT_BROWSER_PRESET,
     *,
+    pyramids: bool | None = None,
     image_codec: str | None = None,
     image_preset: str | None = None,
     csc_tables: bool | None = None,
@@ -104,6 +111,8 @@ def resolve_browser_store_options(
             f"Unknown browser preset '{preset}'. Expected one of: {', '.join(BROWSER_PRESETS)}"
         )
     overrides: dict[str, Any] = {}
+    if pyramids is not None:
+        overrides["pyramids"] = pyramids
     if image_codec is not None:
         overrides["image_codec"] = None if image_codec == "none" else image_codec
     if image_preset is not None:
@@ -165,6 +174,14 @@ def _write_and_rewrite(
     *,
     name: str,
 ) -> None:
+    if options.pyramids:
+        from spatialdata_js_util import ensure_pyramids
+
+        # Lazy: the new levels are computed as the store is written below.
+        for report in ensure_pyramids(sdata, include_labels=True):
+            if report["action"] == "extended":
+                progress(f"Adding overview levels to {report['path']} ({report['level_count']} levels)")
+
     image_keys = _recompressible_image_keys(sdata) if options.image_codec is not None else []
     if options.image_codec is not None:
         for key in sdata.images:
@@ -178,15 +195,13 @@ def _write_and_rewrite(
         from spatialdata_js_util import recompress_spatialdata
 
         progress(f"Writing '{name}' with {options.image_codec} images ({options.image_preset})")
-        # Writes the store, then recompresses the listed rasters; single-level images
-        # get a pyramid first, existing pyramids are kept.
+        # Writes the store, then recompresses every level of the listed rasters.
         recompress_spatialdata(
             sdata,
             store,
             config={"images": {key: {} for key in image_keys}},
             codec=_CODEC_NAMES[options.image_codec],
             preset=_image_preset(options.image_preset),
-            pyramid=True,
             manifest=False,
         )
 

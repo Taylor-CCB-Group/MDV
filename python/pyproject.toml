@@ -42,7 +42,7 @@ dependencies = [
     "spatialdata>=0.8.0,<0.9",
     "spatialdata-io>=0.7.1,<0.8",
     "generate-tiff-offsets>=0.1.7,<0.2",
-    "spatialdata-js-util[write]>=0.1.0,<0.2",
+    "spatialdata-js-util[write]>=0.2.0,<0.3",
     # genomic operations
     "pysam==0.24.0",
     "pyranges>=0.1.4,<0.2",
