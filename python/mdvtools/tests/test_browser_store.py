@@ -360,6 +360,36 @@ def test_pyramid_levels_are_recompressed_with_the_image_codec(small_sdata, tmp_p
         assert "experimental.openjph_htj2k" in _level_codecs(raster, level)
 
 
+@pytest.mark.parametrize(
+    ("codec", "stored_codec"),
+    [("htj2k", "experimental.openjph_htj2k"), ("jp2k", "imagecodecs_jpeg2k")],
+)
+def test_recompressed_images_read_back_with_spatialdata(small_sdata, tmp_path, codec, stored_codec):
+    # spatialdata-js-util registers its codecs through zarr entry points, so a plain
+    # read_zarr decodes them with no import or registration step.
+    import numpy as np
+    import spatialdata as sd
+    from spatialdata_js_util import htj2k_available
+    from xarray import DataArray
+
+    if codec == "htj2k" and not htj2k_available():
+        pytest.skip("no HTJ2K encoder backend available")
+
+    dest = tmp_path / f"{codec}.zarr"
+    write_spatialdata_store(
+        small_sdata,
+        dest,
+        BrowserStoreOptions(image_codec=codec, image_preset="lossless"),
+        progress=lambda message: None,
+    )
+
+    assert stored_codec in _first_level_codecs(dest / "images" / "blobs_uint8")
+    original = small_sdata.images["blobs_uint8"]
+    read_back = sd.read_zarr(dest).images["blobs_uint8"]
+    assert isinstance(original, DataArray) and isinstance(read_back, DataArray)
+    assert np.array_equal(read_back.values, original.values)
+
+
 def test_csc_tables_is_skipped_for_a_store_without_tables(small_sdata, tmp_path):
     import spatialdata as sd
     from spatialdata import SpatialData

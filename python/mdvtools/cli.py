@@ -252,12 +252,12 @@ def patch_spatial_annotations(project_dir, annotation_csv, datasource, spatialda
     default=DEFAULT_BROWSER_PRESET,
     show_default=True,
     help='Rewrite the copied store for SpatialData.js. "standard": pyramids, CSC tables, Morton-sorted points, '
-    'all readable by any SpatialData reader. "compact": standard plus HTJ2K images (balanced), which only '
-    'spatialdata-js-util and SpatialData.js decode. "experimental": compact plus points-zarr copies. '
+    'all readable by any SpatialData reader. "compact": standard plus HTJ2K images (balanced), which '
+    'Python readers can only decode with spatialdata-js-util installed. "experimental": compact plus points-zarr copies. '
     'The options below override the preset. Not compatible with --link.',
 )
 @click.option('--pyramids/--no-pyramids', 'pyramids', default=None, help='Add overview levels to images and labels whose coarsest level is too large to load whole.')
-@click.option('--image-codec', type=click.Choice(IMAGE_CODEC_CHOICES), default=None, help='Recompress images with this codec ("none" to keep them as written).')
+@click.option('--image-codec', type=click.Choice(IMAGE_CODEC_CHOICES), default=None, help='Recompress images with this codec ("none" to keep them as written). Either needs spatialdata-js-util to read back in Python.')
 @click.option('--image-preset', type=click.Choice(IMAGE_PRESET_CHOICES), default=None, help='Quality preset for --image-codec.')
 @click.option('--csc-tables/--no-csc-tables', 'csc_tables', default=None, help='Store table matrices in CSC layout for per-gene reads.')
 @click.option('--morton-points/--no-morton-points', 'morton_points', default=None, help='Morton-sort points for viewport reads.')

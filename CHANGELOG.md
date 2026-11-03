@@ -15,12 +15,15 @@ All notable changes to `mdvtools` are documented here. The format is based on
   project's copy of each store for SpatialData.js: `standard` adds overview levels to images
   and labels whose coarsest level is too large to load whole, stores table matrices as CSC
   and Morton-sorts points, leaving a store any SpatialData reader can open; `compact` also
-  recompresses images as HTJ2K, which only spatialdata-js-util and SpatialData.js decode;
-  `experimental` also adds a points-zarr copy beside each points element. `--pyramids`, `--image-codec`, `--image-preset`,
-  `--csc-tables`, `--morton-points` and `--points-zarr` override the preset;
-  `--pyramids` on its own adds levels with plain zarr codecs and recompresses nothing. Images that browser codecs can't encode, points without a `feature_key` (for
-  points-zarr) and points that are already Morton-indexed are left as they are. The
-  presets will change as the formats do, and none of this works with `--link`.
+  recompresses images as HTJ2K, which SpatialData.js reads and Python reads wherever
+  `spatialdata-js-util` is installed (as it is with mdvtools), but other readers can't;
+  `experimental` also adds a points-zarr copy beside each points element. `--pyramids`,
+  `--image-codec`, `--image-preset`, `--csc-tables`, `--morton-points` and `--points-zarr`
+  override the preset; `--pyramids` on its own adds levels with plain zarr codecs and
+  recompresses nothing. Images that browser codecs can't encode, stores without tables (for
+  CSC), points without a `feature_key` (for points-zarr) and points that are already
+  Morton-indexed are left as they are. The presets will change as the formats do, and none
+  of this works with `--link`.
 
 ### Changed
 - Supported Python is now `>=3.12,<3.13`; Python 3.11 is no longer supported.

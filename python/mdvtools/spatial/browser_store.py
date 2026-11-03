@@ -6,6 +6,10 @@ HTTP: overview levels added to images and labels whose pyramids are missing or t
 shallow, images recompressed as HTJ2K or JPEG 2000, table matrices in CSC, points
 Morton-sorted, and an experimental points-zarr copy beside each points element.
 
+Image codecs other than spatialdata's own are zarr extensions: SpatialData.js decodes
+them, and Python can read them wherever spatialdata-js-util is installed (mdvtools depends
+on it), but readers without it cannot.
+
 Presets bundle a recommended set and are expected to change as the formats and the
 frontend evolve; the per-item options override whatever the preset chose. The
 rewrites only ever touch the project's copy, so they cannot be combined with linking.
@@ -78,7 +82,8 @@ _CODEC_NAMES = {
 
 # Every rewrite here leaves a store that any SpatialData reader can open.
 _STANDARD = BrowserStoreOptions(pyramids=True, csc_tables=True, morton_points=True)
-# The HTJ2K codec is only decoded by spatialdata-js-util and SpatialData.js.
+# HTJ2K images need spatialdata-js-util to read in Python (its zarr entry points
+# register the codec, so a plain spatialdata.read_zarr works once it is installed).
 _COMPACT = replace(_STANDARD, image_codec="htj2k", image_preset="balanced")
 
 BROWSER_PRESETS: dict[str, BrowserStoreOptions] = {
