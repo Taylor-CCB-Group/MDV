@@ -101,6 +101,8 @@ datatype_mappings = {
     "float32": "double",
     "object": "text",
     "str":"text",
+    # pandas' nullable StringDtype, e.g. an anndata `nullable-string-array`
+    "string": "text",
     "category": "text",
     "bool": "text",
     "int32": "double",
@@ -2970,8 +2972,9 @@ def add_column_to_group(
             # unique: ensure string (e.g. CSV-inferred int cell_id)
             if pandas.api.types.is_numeric_dtype(data):
                 data = data.astype(str)
-            max_len = max(data.str.len())
-            utf8_type = h5py.string_dtype("utf-8", int(max_len))
+            # int(): a StringDtype column measures its lengths as numpy ints, which json can't write.
+            max_len = int(data.str.len().max())
+            utf8_type = h5py.string_dtype("utf-8", max_len)
             col["datatype"] = "unique"
             col["stringLength"] = max_len
             group.create_dataset(col["field"], length, data=data, dtype=utf8_type)
