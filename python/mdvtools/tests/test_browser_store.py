@@ -358,3 +358,14 @@ def test_pyramid_levels_are_recompressed_with_the_image_codec(small_sdata, tmp_p
     assert len(levels) > 1
     for level in levels:
         assert "experimental.openjph_htj2k" in _level_codecs(raster, level)
+
+
+def test_csc_tables_is_skipped_for_a_store_without_tables(small_sdata, tmp_path):
+    import spatialdata as sd
+    from spatialdata import SpatialData
+
+    sdata = SpatialData(images={"blobs_uint8": small_sdata.images["blobs_uint8"]})
+    dest = tmp_path / "no_tables.zarr"
+    write_spatialdata_store(sdata, dest, BROWSER_PRESETS["standard"], progress=lambda message: None)
+
+    assert set(sd.read_zarr(dest).images) == {"blobs_uint8"}

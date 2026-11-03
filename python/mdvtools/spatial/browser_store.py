@@ -203,7 +203,8 @@ def _write_and_rewrite(
             manifest=False,
         )
 
-    if options.csc_tables:
+    # convert_store_tables_to_csc raises on a store with no tables.
+    if options.csc_tables and sdata.tables:
         from spatialdata_js_util import convert_store_tables_to_csc
 
         progress(f"Converting tables in '{name}' to CSC")
