@@ -163,10 +163,10 @@ def write_spatialdata_store(
         shutil.rmtree(staging)
     try:
         _write_and_rewrite(sdata, staging, options, progress, name=dest.name)
+        staging.rename(dest)
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise
-    staging.rename(dest)
 
 
 def _write_and_rewrite(

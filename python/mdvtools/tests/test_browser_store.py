@@ -309,6 +309,38 @@ def test_write_keeps_points_that_are_already_morton_indexed(small_sdata, tmp_pat
     assert resorted.column("morton_code_2d").equals(sorted_once.column("morton_code_2d"))
 
 
+def test_write_keeps_a_deliberate_order_of_morton_indexed_points(small_sdata, tmp_path):
+    import spatialdata as sd
+    from spatialdata.models import PointsModel
+
+    first = tmp_path / "first.zarr"
+    write_spatialdata_store(small_sdata, first, BrowserStoreOptions(morton_points=True), progress=lambda message: None)
+    points = sd.read_zarr(first).points["blobs_points"].compute()
+    # Feature-then-Morton, which a plain Morton re-sort would undo.
+    by_feature = points.sort_values(["genes", "morton_code_2d"], ignore_index=True)
+    assert not by_feature["morton_code_2d"].is_monotonic_increasing
+    small_sdata.points["blobs_points"] = PointsModel.parse(by_feature, feature_key="genes")
+
+    second = tmp_path / "second.zarr"
+    write_spatialdata_store(small_sdata, second, BrowserStoreOptions(morton_points=True), progress=lambda message: None)
+
+    written = pq.read_table(second / "points" / "blobs_points" / "points.parquet").to_pandas()
+    for column in ["x", "y", "genes"]:
+        assert written[column].astype(str).tolist() == by_feature[column].astype(str).tolist()
+
+
+def test_failed_final_rename_leaves_no_staging_store(small_sdata, tmp_path, monkeypatch):
+    def fail_rename(self, target):
+        raise OSError("rename failed")
+
+    monkeypatch.setattr(Path, "rename", fail_rename)
+    dest = tmp_path / "store.zarr"
+    with pytest.raises(OSError, match="rename failed"):
+        write_spatialdata_store(small_sdata, dest, BrowserStoreOptions(csc_tables=True), progress=lambda message: None)
+
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_pyramids_extend_large_rasters_and_leave_small_ones(small_sdata, tmp_path):
     import dask.array as da
     import numpy as np
