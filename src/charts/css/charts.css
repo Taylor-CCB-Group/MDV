@@ -709,7 +709,9 @@ reflowed every chart. Handles are still painted and still receive pointer events
     scrollbar-gutter: stable;
 }
 
-.mdv-textbox-markdown {
+/* children too: ContextMenu.css sets `* { user-select: none }` on every element */
+.mdv-textbox-markdown,
+.mdv-textbox-markdown * {
     user-select: text;
     -webkit-user-select: text;
     -moz-user-select: text;

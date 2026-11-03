@@ -19,6 +19,38 @@ type RescanResponse = {
     unwritable_projects: RescannedProject[];
 };
 
+/** One `/projects` entry (or `/projects/<id>` response) as the catalog stores it. */
+function formatProject(item: any): Project {
+    return {
+        id: item.id === undefined || item.id === null ? "" : String(item.id),
+        name: item.name || "",
+        type: item.type === "Read-Only" ? "Read-Only" : "Editable",
+        lastModified: item.lastModified || "",
+        createdAt: item.createdAt || "",
+        owner: item.owner || [],
+        collaborators: Array.isArray(item.collaborators)
+            ? item.collaborators
+            : [],
+        numberOfStructures: item.numberOfStructures || "0",
+        numberOfImages: item.numberOfImages || "0",
+        writable: item.writable !== false,
+        // Assigning all permissions as true if auth is not enabled
+        permissions: item?.permissions
+            ? {
+                  read: item.permissions["can_read"],
+                  edit: item.permissions["can_write"],
+                  owner: item.permissions["is_owner"],
+              }
+            : {
+                  read: true,
+                  edit: true,
+                  owner: true,
+              },
+        thumbnail: item?.thumbnail,
+        readme: item?.readme,
+    };
+}
+
 const useProjects = () => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -62,32 +94,7 @@ const useProjects = () => {
                     throw new Error("Invalid response format");
                 }
 
-                const formattedProjects: Project[] = data.map((item: any) => ({
-                    id: item.id === undefined || item.id === null ? "" : String(item.id),
-                    name: item.name || "",
-                    type: item.type === "Read-Only" ? "Read-Only" : "Editable",
-                    lastModified: item.lastModified || "",
-                    createdAt: item.createdAt || "",
-                    owner: item.owner || [],
-                    collaborators: Array.isArray(item.collaborators)
-                        ? item.collaborators
-                        : [],
-                    numberOfStructures: item.numberOfStructures || "0",
-                    numberOfImages: item.numberOfImages || "0",
-                    writable: item.writable !== false,
-                    // Assigning all permissions as true if auth is not enabled
-                    permissions: item?.permissions ? {
-                                read: item.permissions["can_read"],
-                                edit: item.permissions["can_write"],
-                                owner: item.permissions["is_owner"],
-                            } : {
-                                read: true,
-                                edit: true,
-                                owner: true,
-                            },
-                    thumbnail: item?.thumbnail,
-                    readme: item?.readme,
-                }));
+                const formattedProjects: Project[] = data.map(formatProject);
 
                 setProjects(formattedProjects);
                 return;
@@ -537,8 +544,21 @@ const useProjects = () => {
                         fallbackText: "Error restoring recycled project.",
                     });
                 }
-                await fetchProjects();
-                return restoreRecycledProjectResponseSchema.parse(await response.json());
+                const restored = restoreRecycledProjectResponseSchema.parse(await response.json());
+                // fetch just the restored project rather than the whole list
+                const projectResponse = await apiFetch(`projects/${projectId}`, {
+                    headers: { Accept: "application/json" },
+                });
+                if (projectResponse.ok) {
+                    const project = formatProject(await projectResponse.json());
+                    setProjects((previousProjects) => [
+                        ...previousProjects.filter((p) => p.id !== project.id),
+                        project,
+                    ]);
+                } else {
+                    await fetchProjects();
+                }
+                return restored;
             } catch (error) {
                 const errorMessage = error instanceof Error
                     ? error.message

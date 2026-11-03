@@ -1,4 +1,4 @@
-import { AppBar, Box, Chip, Toolbar } from "@mui/material";
+import { AppBar, Box, Chip, Divider, Toolbar, Typography } from "@mui/material";
 import {
     Home as HomeIcon,
     Save as SaveIcon,
@@ -11,7 +11,7 @@ import ToggleThemeWrapper from "@/charts/dialogs/ToggleTheme";
 import IconWithTooltip from "./IconWithTooltip";
 import ViewSelectorWrapper from "./ViewSelectorComponent";
 import ViewThumbnailComponent from "./ViewThumbnailComponent";
-import { useProject } from "@/modules/ProjectContext";
+import { useCurrentProject, useProject } from "@/modules/ProjectContext";
 import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
 import ChatButtons from "./ChatButtons";
 import CustomTooltip from "./CustomTooltip";
@@ -24,6 +24,7 @@ import { buildDashboardUrl, getApiRootFromDir } from "@/utils/mdvRouting";
 const MenuBarComponent = observer(() => {
     const { viewManager, config } = useChartManager();
     const { mainApiRoute, root } = useProject();
+    const projectDisplayName = useCurrentProject()?.name;
 
     const isEditable = config.permission === "edit";
     const ariaLabel = isEditable ? "editable" : "view only";
@@ -95,9 +96,35 @@ const MenuBarComponent = observer(() => {
                                 <CloudUploadIcon />
                             </IconWithTooltip>
                         )}
+
+                        {projectDisplayName && (
+                            <>
+                                <Divider orientation="vertical" flexItem sx={{ mx: 1.5, my: 1 }} />
+                                <CustomTooltip tooltipText={projectDisplayName}>
+                                    <Typography
+                                        variant="subtitle1"
+                                        component="span"
+                                        noWrap
+                                        aria-label={`Project: ${projectDisplayName}`}
+                                        sx={{
+                                            fontSize: "0.9rem",
+                                            fontWeight: 500,
+                                            maxWidth: "24rem",
+                                            px: 1.25,
+                                            py: 0.25,
+                                            border: 1,
+                                            borderColor: "divider",
+                                            borderRadius: 1,
+                                        }}
+                                    >
+                                        {projectDisplayName}
+                                    </Typography>
+                                </CustomTooltip>
+                            </>
+                        )}
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <CustomTooltip 
+                        <CustomTooltip
                             tooltipText={
                                 isEditable ? 
                                 "You can edit views and add data." : 

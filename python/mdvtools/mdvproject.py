@@ -59,6 +59,46 @@ def get_unwritable_project_paths(project_dir: str) -> list[str]:
     return unwritable
 
 
+def pick_thumbnail(state: dict, views: dict) -> Optional[str]:
+    """The image of the first view, in the order the project lists its views.
+
+    Views without an image are skipped. Views missing from ``all_views`` come last.
+    """
+    listed = [v for v in state.get("all_views") or [] if v in views]
+    unlisted = [v for v in views if v not in listed]
+    for name in listed + unlisted:
+        view = views.get(name)
+        image = view.get("viewImage") if isinstance(view, dict) else None
+        if image:
+            return image
+    return None
+
+
+# project_dir -> ((state mtime, views mtime), thumbnail)
+_thumbnail_cache: dict[str, tuple[tuple[float, float], Optional[str]]] = {}
+
+
+def get_project_thumbnail(project_dir: str) -> Optional[str]:
+    """Thumbnail for the project catalog, re-read whenever state.json or views.json changes."""
+    statefile = join(project_dir, "state.json")
+    viewsfile = join(project_dir, "views.json")
+    try:
+        key = (os.path.getmtime(statefile), os.path.getmtime(viewsfile))
+        cached = _thumbnail_cache.get(project_dir)
+        if cached and cached[0] == key:
+            return cached[1]
+        with open(statefile) as f:
+            state = json.load(f)
+        with open(viewsfile) as f:
+            views = json.load(f)
+        thumbnail = pick_thumbnail(state, views)
+        _thumbnail_cache[project_dir] = (key, thumbnail)
+        return thumbnail
+    except Exception as e:
+        logger.exception(f"Error extracting thumbnail for project at {project_dir}: {e}")
+        return None
+
+
 def _agent_debug_log(
     run_id: str,
     hypothesis_id: str,

@@ -3,7 +3,7 @@ import "./wdyr";
 import "./all_css";
 import { createElement, type TransitionEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { getProjectName } from "./ProjectContext";
+import { getProject } from "./ProjectContext";
 import { getProjectBootstrapContext, loadProjectRuntime, type LoadedProjectRuntime } from "./projectRuntime";
 import type { DataSource } from "@/charts/charts";
 import type ChartManager from "@/charts/ChartManager";
@@ -158,8 +158,8 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
             onComplete();
             return;
         }
-        void getProjectName(Number(context.projectId), context.apiRoot).then((projectName) => {
-            document.title = `MDV - ${projectName}`;
+        void getProject(Number(context.projectId), context.apiRoot).then((project) => {
+            document.title = `MDV - ${project?.name || "unnamed_project"}`;
         });
     }, [context, onComplete]);
 
