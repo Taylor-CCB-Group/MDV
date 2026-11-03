@@ -11,11 +11,12 @@ All notable changes to `mdvtools` are documented here. The format is based on
 - When a CLI command fails unexpectedly it now prints an error report with the command line,
   traceback, and mdvtools/dependency versions, ready to paste into an issue, and exits with
   status 1.
-- `mdvtools convert-spatial --browser-preset standard|experimental` rewrites the project's copy
-  of each store for SpatialData.js: `standard` adds overview levels to images and labels
-  whose coarsest level is too large to load whole, recompresses images as HTJ2K, stores
-  table matrices as CSC and Morton-sorts points; `experimental` also adds a points-zarr copy
-  beside each points element. `--pyramids`, `--image-codec`, `--image-preset`,
+- `mdvtools convert-spatial --browser-preset standard|compact|experimental` rewrites the
+  project's copy of each store for SpatialData.js: `standard` adds overview levels to images
+  and labels whose coarsest level is too large to load whole, stores table matrices as CSC
+  and Morton-sorts points, leaving a store any SpatialData reader can open; `compact` also
+  recompresses images as HTJ2K, which only spatialdata-js-util and SpatialData.js decode;
+  `experimental` also adds a points-zarr copy beside each points element. `--pyramids`, `--image-codec`, `--image-preset`,
   `--csc-tables`, `--morton-points` and `--points-zarr` override the preset;
   `--pyramids` on its own adds levels with plain zarr codecs and recompresses nothing. Images that browser codecs can't encode, points without a `feature_key` (for
   points-zarr) and points that are already Morton-indexed are left as they are. The

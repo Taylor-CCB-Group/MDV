@@ -5,7 +5,7 @@ POINT_TRANSFORM_CHOICES = ("image", "auto", "xenium", "identity", "annotated-ele
 DEFAULT_POINT_TRANSFORM = "auto"
 
 # Browser-oriented rewrites of the copied store; see browser_store.py.
-BROWSER_PRESET_CHOICES = ("none", "standard", "experimental")
+BROWSER_PRESET_CHOICES = ("none", "standard", "compact", "experimental")
 DEFAULT_BROWSER_PRESET = "none"
 IMAGE_CODEC_CHOICES = ("none", "htj2k", "jp2k")
 IMAGE_PRESET_CHOICES = ("lossless", "balanced", "small")

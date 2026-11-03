@@ -28,9 +28,17 @@ def test_default_preset_rewrites_nothing():
     assert options.describe() == "none"
 
 
-def test_standard_and_experimental_presets():
+def test_standard_compact_and_experimental_presets():
     standard = resolve_browser_store_options("standard")
     assert standard == BrowserStoreOptions(
+        pyramids=True,
+        image_codec=None,
+        csc_tables=True,
+        morton_points=True,
+        points_zarr=False,
+    )
+    compact = resolve_browser_store_options("compact")
+    assert compact == BrowserStoreOptions(
         pyramids=True,
         image_codec="htj2k",
         image_preset="balanced",
@@ -38,7 +46,14 @@ def test_standard_and_experimental_presets():
         morton_points=True,
         points_zarr=False,
     )
-    assert resolve_browser_store_options("experimental").points_zarr is True
+    assert resolve_browser_store_options("experimental") == BrowserStoreOptions(
+        pyramids=True,
+        image_codec="htj2k",
+        image_preset="balanced",
+        csc_tables=True,
+        morton_points=True,
+        points_zarr=True,
+    )
 
 
 def test_overrides_apply_on_top_of_preset():
@@ -77,7 +92,7 @@ def test_cli_forwards_browser_store_options(monkeypatch):
     result = CliRunner().invoke(
         cli_module.cli,
         [
-            "convert-spatial", "out", "spatial", "--browser-preset", "standard",
+            "convert-spatial", "out", "spatial", "--browser-preset", "compact",
             "--no-pyramids", "--no-morton-points", "--points-zarr",
         ],
     )
@@ -143,7 +158,7 @@ def test_conversion_fails_early_without_an_htj2k_encoder(tmp_path, monkeypatch):
         spatialdata_path=str(tmp_path / "missing.zarr"),
         output_folder=str(tmp_path / "out"),
         temp_folder=str(tmp_path),
-        browser_store=BROWSER_PRESETS["standard"],
+        browser_store=BROWSER_PRESETS["compact"],
     )
     # Raised before the (missing) source is read, rather than after the whole conversion.
     with pytest.raises(RuntimeError, match="--image-codec none"):

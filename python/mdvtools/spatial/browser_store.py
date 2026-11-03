@@ -76,19 +76,17 @@ _CODEC_NAMES = {
     "jp2k": "imagecodecs_jpeg2k",
 }
 
-_STANDARD = BrowserStoreOptions(
-    pyramids=True,
-    image_codec="htj2k",
-    image_preset="balanced",
-    csc_tables=True,
-    morton_points=True,
-)
+# Every rewrite here leaves a store that any SpatialData reader can open.
+_STANDARD = BrowserStoreOptions(pyramids=True, csc_tables=True, morton_points=True)
+# The HTJ2K codec is only decoded by spatialdata-js-util and SpatialData.js.
+_COMPACT = replace(_STANDARD, image_codec="htj2k", image_preset="balanced")
 
 BROWSER_PRESETS: dict[str, BrowserStoreOptions] = {
     "none": BrowserStoreOptions(),
     "standard": _STANDARD,
+    "compact": _COMPACT,
     # points-zarr is a draft spec that published SpatialData.js does not read yet.
-    "experimental": replace(_STANDARD, points_zarr=True),
+    "experimental": replace(_COMPACT, points_zarr=True),
 }
 
 

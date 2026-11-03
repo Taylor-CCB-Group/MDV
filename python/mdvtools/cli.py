@@ -251,9 +251,10 @@ def patch_spatial_annotations(project_dir, annotation_csv, datasource, spatialda
     type=click.Choice(BROWSER_PRESET_CHOICES),
     default=DEFAULT_BROWSER_PRESET,
     show_default=True,
-    help='Rewrite the copied store for SpatialData.js. "standard": pyramids, HTJ2K images (balanced), CSC tables, '
-    'Morton-sorted points. "experimental": standard plus points-zarr copies. The options below override '
-    'the preset. Not compatible with --link.',
+    help='Rewrite the copied store for SpatialData.js. "standard": pyramids, CSC tables, Morton-sorted points, '
+    'all readable by any SpatialData reader. "compact": standard plus HTJ2K images (balanced), which only '
+    'spatialdata-js-util and SpatialData.js decode. "experimental": compact plus points-zarr copies. '
+    'The options below override the preset. Not compatible with --link.',
 )
 @click.option('--pyramids/--no-pyramids', 'pyramids', default=None, help='Add overview levels to images and labels whose coarsest level is too large to load whole.')
 @click.option('--image-codec', type=click.Choice(IMAGE_CODEC_CHOICES), default=None, help='Recompress images with this codec ("none" to keep them as written).')
