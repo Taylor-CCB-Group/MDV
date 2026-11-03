@@ -2969,15 +2969,16 @@ def add_column_to_group(
             col["values"] = [str(x) for x in col["values"]]
 
         else:
-            # unique: ensure string (e.g. CSV-inferred int cell_id)
-            if pandas.api.types.is_numeric_dtype(data):
-                data = data.astype(str)
-            # int(): a StringDtype column measures its lengths as numpy ints, which json can't write.
-            max_len = int(data.str.len().max())
+            # unique: astype(str) covers non-string input (e.g. CSV-inferred int cell_id).
+            # Encoded here because h5py writes str to a fixed-length dataset as ASCII, and
+            # because stringLength is bytes per value for the frontend, not characters.
+            encoded = data.astype(str).str.encode("utf-8")
+            # int(): pandas measures lengths as numpy ints, which json can't write.
+            max_len = int(encoded.str.len().max())
             utf8_type = h5py.string_dtype("utf-8", max_len)
             col["datatype"] = "unique"
             col["stringLength"] = max_len
-            group.create_dataset(col["field"], length, data=data, dtype=utf8_type)
+            group.create_dataset(col["field"], length, data=encoded.to_numpy(dtype=f"S{max_len}").astype(utf8_type))
 
     elif col["datatype"] == "multitext":
         delim = col.get("delimiter", ",")

@@ -45,6 +45,9 @@ All notable changes to `mdvtools` are documented here. The format is based on
   `mdvtools` is installed inside one (for example a virtualenv within your own project).
 - In the gridstack layout, hovering a chart no longer adds a scrollbar and resizes every chart
   (#594).
+- `add_datasource` accepts pandas `string` columns, such as the obs index of Atera stores
+  from `spatialdata-io`, which failed with `KeyError: 'string'`. `unique` columns with
+  non-ASCII values are now written instead of being dropped with a warning.
 
 ## [1.3.0] - 2026-06-04
 
