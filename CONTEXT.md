@@ -84,6 +84,38 @@ attribute it to. Startup and rescan give every administrator ownership of one, s
 project list only shows a user the projects they hold a permission row for.
 _Avoid_: orphan, public project, shared project
 
+## Access terms
+
+**User**:
+A person who can sign in to one Independent MDV deployment, tied to the Auth0 account they
+first signed in with. A User on one deployment means nothing to another.
+_Avoid_: account, member, Auth0 user
+
+**Admin**:
+A User who can invite people and manage every User's access on their deployment. A deployment
+always keeps at least one active Admin.
+_Avoid_: administrator, superuser, Auth0 admin
+
+**Invitation**:
+An Admin's offer of access to one email address, naming the Sign-in method the person must use
+and a Project role on each chosen project. An Invitation sent to an existing User moves them to a
+new Sign-in method. It lasts 14 days, and a resend starts a new 14 days.
+_Avoid_: pending user, invite request, access request
+
+**Sign-in method**:
+The Auth0 connection a person signs in through: the deployment's password connection, or a
+Microsoft connection for an organisation whose staff sign in with their own work accounts.
+_Avoid_: provider, login type, Oxford login, Oxford user
+
+**Project role**:
+What a User may do in one project: Viewer, Editor or Owner.
+_Avoid_: permission level, access level
+
+**Deactivated user**:
+A User whose access an Admin removed. The deployment keeps them for history, and an Admin can
+reactivate them.
+_Avoid_: deleted user, blocked user, pending user
+
 ## Deployment terms
 
 **Deployable image**:
