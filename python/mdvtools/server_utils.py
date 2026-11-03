@@ -8,7 +8,10 @@ file serving helpers, and HTTP range request handling.
 import re
 import os
 import mimetypes
+from typing import BinaryIO
 from flask import request, send_file as sf, Response
+from werkzeug.exceptions import RequestedRangeNotSatisfiable
+from werkzeug.wrappers import Response as WerkzeugResponse
 
 
 # Entry files of builds that don't hash them (see entry_assets.py). Matched by suffix
@@ -75,6 +78,68 @@ def send_file(f):
     if not os.path.isabs(f):
         f = os.path.join(os.getcwd(), f)
     return sf(f)
+
+
+class _SeekableBlocks:
+    """A file that yields fixed-size blocks and can be seeked.
+
+    Werkzeug only seeks to the start of a range when the iterable reports `seekable()`.
+    The `wsgi.file_wrapper` that gunicorn supplies does not, so werkzeug reads and
+    discards everything before the range instead, which makes a request near the end
+    of a multi-GB zip take hundreds of milliseconds.
+    """
+
+    def __init__(self, file: BinaryIO, block_size: int = 64 * 1024) -> None:
+        self._file = file
+        self._block_size = block_size
+
+    def seekable(self) -> bool:
+        return True
+
+    def seek(self, offset: int) -> int:
+        return self._file.seek(offset)
+
+    def tell(self) -> int:
+        return self._file.tell()
+
+    def __iter__(self) -> "_SeekableBlocks":
+        return self
+
+    def __next__(self) -> bytes:
+        block = self._file.read(self._block_size)
+        if not block:
+            raise StopIteration
+        return block
+
+    def close(self) -> None:
+        self._file.close()
+
+
+def send_file_ranged(f: str) -> WerkzeugResponse:
+    """
+    Like send_file, but a Range request seeks straight to the requested bytes
+    under any WSGI server. Conditional (ETag / If-Range) handling is unchanged.
+    """
+    if "Range" not in request.headers:
+        return send_file(f)
+    if not os.path.isabs(f):
+        f = os.path.join(os.getcwd(), f)
+    response = sf(f, conditional=False)
+    response.close()
+    blocks = _SeekableBlocks(open(f, "rb"))
+    response.response = blocks
+    try:
+        response.make_conditional(
+            request.environ, accept_ranges=True, complete_length=response.content_length
+        )
+    except RequestedRangeNotSatisfiable:
+        # returned rather than raised so the 416 survives the project router's catch-all
+        blocks.close()
+        return Response(status=416, headers={"Content-Range": f"bytes */{response.content_length}"})
+    except Exception:
+        blocks.close()
+        raise
+    return response
 
 
 def get_range(file_name, range_header):

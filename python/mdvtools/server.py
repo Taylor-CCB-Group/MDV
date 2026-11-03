@@ -10,6 +10,7 @@ from flask import (
 )
 from mdvtools.server_utils import (
     send_file,
+    send_file_ranged,
     get_range,
     add_safe_headers,
 )
@@ -286,7 +287,9 @@ def create_app(
         if path is None or not os.path.exists(path):
             return "File not found", 404
         # consider allowing directory listing here if it's not a file?
-        response = send_file(path)
+        response = send_file_ranged(path)
+        if response.status_code >= 400:
+            return response
         # Private because these files are only for the signed-in user.
         response.cache_control.private = True
         if current_app.config.get("ENABLE_AUTH", False):
