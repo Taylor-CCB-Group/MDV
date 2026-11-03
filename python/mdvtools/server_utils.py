@@ -8,6 +8,7 @@ file serving helpers, and HTTP range request handling.
 import re
 import os
 import mimetypes
+from zlib import adler32
 from typing import BinaryIO
 from flask import request, send_file as sf, Response
 from werkzeug.exceptions import RequestedRangeNotSatisfiable
@@ -122,22 +123,31 @@ def send_file_ranged(f: str) -> WerkzeugResponse:
     """
     if "Range" not in request.headers:
         return send_file(f)
-    if not os.path.isabs(f):
-        f = os.path.join(os.getcwd(), f)
-    response = sf(f, conditional=False)
-    response.close()
-    blocks = _SeekableBlocks(open(f, "rb"))
-    response.response = blocks
+    path = os.path.abspath(f)
+    # One handle supplies the validators and the body, so a file replaced mid-request
+    # can't pair its old ETag and length with new bytes.
+    file = open(path, "rb")
     try:
-        response.make_conditional(
-            request.environ, accept_ranges=True, complete_length=response.content_length
+        stat = os.fstat(file.fileno())
+        response = sf(
+            file,
+            download_name=os.path.basename(path),
+            # same value werkzeug derives from a path, so ETags agree with non-range responses
+            etag=f"{stat.st_mtime}-{stat.st_size}-{adler32(path.encode()) & 0xFFFFFFFF}",
+            last_modified=stat.st_mtime,
+            conditional=False,
         )
-    except RequestedRangeNotSatisfiable:
+        response.content_length = stat.st_size
+        response.response = _SeekableBlocks(file)
+        response.make_conditional(
+            request.environ, accept_ranges=True, complete_length=stat.st_size
+        )
+    except RequestedRangeNotSatisfiable as e:
         # returned rather than raised so the 416 survives the project router's catch-all
-        blocks.close()
-        return Response(status=416, headers={"Content-Range": f"bytes */{response.content_length}"})
+        file.close()
+        return Response(status=416, headers={"Content-Range": f"bytes */{e.length}"})
     except Exception:
-        blocks.close()
+        file.close()
         raise
     return response
 
