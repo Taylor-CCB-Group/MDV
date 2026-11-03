@@ -39,8 +39,11 @@ the email and Sign-in method they used, and the contact configured for the site.
 
 For password Invitations, MDV asks Auth0 to email the person a link to set their password. If
 they already have an account on that connection, MDV reuses it and sends no email. For those
-people and for Microsoft Invitations, the admin page shows a message with the sign-in link
+people and for Microsoft Invitations, the users page shows a message with the sign-in link
 for the Admin to send.
+
+An admin extension provides the users page, and MDV core keeps the sign-in checks (see
+ADR 0022).
 
 ## How an Admin adds a new User
 
@@ -84,7 +87,7 @@ sequenceDiagram
     autonumber
     actor A as Admin
     box rgb(232, 245, 233) MDV
-        participant M as Admin users page and callback
+        participant M as Users page (admin extension) and callback
     end
     box rgb(255, 243, 224) Auth0
         participant Z as Auth0 and post-login Action
