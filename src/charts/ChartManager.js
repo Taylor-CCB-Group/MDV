@@ -884,6 +884,7 @@ export class ChartManager {
         const chartPromises = [];
         for (const ds in charts) {
             for (const ch of charts[ds]) {
+                this.viewManager.convertLegacyChartOnLoad(ds, ch);
                 chartPromises.push(this.addChart(ds, ch));
             }
         }

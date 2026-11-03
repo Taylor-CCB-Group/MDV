@@ -114,7 +114,7 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     return (
         <>
             <div style={deckStyle}>{children}</div>
-            {is2d && <svg width={width} height={height}>
+            {is2d && <svg width={width} height={height} data-scatter-axes>
                 <Axis.AxisBottom
                     top={chartHeight + margin.top}
                     scale={scaleX}

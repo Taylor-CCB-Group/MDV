@@ -34,6 +34,8 @@ import {
     type ColorLegendFilter,
 } from "@/react/legend/color_legend/colorLegendFilter";
 import { createElement, type ReactNode } from "react";
+import { getLegacyConversionTarget } from "./legacyCharts";
+import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 export type ChartEventType = string;
 /** A dot on a chart's "more" menu icon, for a problem described in its debug dialog. */
 export type MenuPip = { level: "error" | "notice"; tooltip: string };
@@ -228,9 +230,25 @@ class BaseChart<T extends BaseConfig> {
             }
         });
 
+        // so that the menu item offering to convert this chart can name what it converts to
+        const legacyTarget = getLegacyConversionTarget(config, dataStore);
+        if (legacyTarget) {
+            ensureLazyChartTypeRegistered(legacyTarget)?.catch((error) =>
+                console.warn(`Failed to load chart type '${legacyTarget}'`, error),
+            );
+        }
+
         //set up context menu and icon which opens it
         this.contextMenu = new ContextMenu((data) => {
             const menu = this.getContextMenu(data);
+            const convertTo = getLegacyConversionTarget(this.config, this.dataStore);
+            if (convertTo) {
+                menu.push({
+                    text: `convert to ${BaseChart.types[convertTo]?.name ?? convertTo}`,
+                    icon: "fas fa-exchange-alt",
+                    func: () => window.mdv.chartManager.viewManager.convertLegacyChart(this),
+                });
+            }
             menu.push({
                 text: "debug / report chart",
                 icon: "fas fa-bug",
@@ -1307,7 +1325,11 @@ class BaseChart<T extends BaseConfig> {
         }
     }
 
-    getImageFromSVG(svg: any|SVGElement, callback: (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => void) {
+    getImageFromSVG(
+        svg: any | SVGElement,
+        callback: (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => void,
+        onError?: (error: unknown) => void,
+    ) {
         const copy = svg.cloneNode(true);
         copyStylesInline(copy, svg);
         const canvas = document.createElement("canvas");
@@ -1330,6 +1352,11 @@ class BaseChart<T extends BaseConfig> {
             ctx.drawImage(img, 0, 0);
             callback(canvas, ctx);
         };
+        img.onerror = (error) => {
+            DOMURL.revokeObjectURL(url);
+            if (onError) onError(error);
+            else console.error("Could not draw the SVG as an image", error);
+        };
     }
     /**
      * A dictionary of all the chart types
@@ -1338,7 +1365,7 @@ class BaseChart<T extends BaseConfig> {
 }
 
 
-function copyStylesInline(
+export function copyStylesInline(
     destinationNode: HTMLElement,
     sourceNode: HTMLElement
 ): void {

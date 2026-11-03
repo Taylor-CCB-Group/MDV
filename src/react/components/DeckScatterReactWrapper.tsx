@@ -1,4 +1,4 @@
-import BaseChart from "../../charts/BaseChart";
+import BaseChart, { copyStylesInline } from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
 import type { ColumnName } from "../../charts/charts";
@@ -17,6 +17,7 @@ import type DataStore from "@/datastore/DataStore";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 import type { DeckBackend } from "@/react/spatialdata/deck_backend";
+import { serialisableZoom } from "../axisScaling";
 
 const MainChart = observer(() => {
     return <DeckScatterComponent />;
@@ -29,6 +30,9 @@ export type DeckScatterConfig = (ScatterPlotConfig2D | ScatterPlotConfig3D) & {
 export type DeckScatterConfigWithRegion = DeckScatterConfig & { region?: string };
 export const DECK_CONTOUR_SCATTER_TYPE = "DeckContourScatter";
 const deckContourScatterTypes = new Set([DECK_CONTOUR_SCATTER_TYPE, "DeckDensity"]);
+
+/** The "None" choice of a column dropdown, as the classic scatter plot spells it. */
+const NO_COLUMN = "__none__";
 
 const defaultViewState = {
     viewState: {
@@ -62,6 +66,10 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     // Must exist before the config is made observable for later changes to be observed, and
     // survive initialiseChartConfig's JSON copy, so null rather than undefined.
     config.render_backend = config.render_backend ?? null;
+    // same for the background filter, which is replaced as a whole by its settings
+    config.background_filter = config.background_filter ?? null;
+    // charts saved before this setting kept both axes at one scale
+    if (config.dimension !== "3d") config.axis_scaling = config.axis_scaling ?? "equal";
     const legacyContourParameter = originalConfig.param?.[2];
     if (
         !config.contourParameter &&
@@ -107,6 +115,98 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             setActiveBackend: action,
         });
     }
+    /** Set by the component: draws the deck canvas again and returns it, for exporting an image. */
+    getPlotCanvas?: () => HTMLCanvasElement | null;
+    /**
+     * The plot is a raster image in both formats; only the axes are vector in an SVG. Vectorising the
+     * points (and the density layers, which are drawn on the GPU) would be a larger piece of work.
+     */
+    getImage(callback: (resp: any) => void, type: "png" | "svg") {
+        const plot = this.getPlotCanvas?.();
+        if (!plot) {
+            console.warn("No plot canvas to export");
+            return;
+        }
+        const axes = this.contentDiv.querySelector<SVGSVGElement>("svg[data-scatter-axes]");
+        const base = this.contentDiv.getBoundingClientRect();
+        const plotRect = plot.getBoundingClientRect();
+        const offsetX = plotRect.left - base.left;
+        const offsetY = plotRect.top - base.top;
+        // the x axis label can extend below the SVG it is drawn in
+        const labelRoom = axes ? 20 : 0;
+        const width = Math.round(base.width);
+        const height = Math.round(base.height) + labelRoom;
+        // the panel colour behind the chart, which the canvas itself leaves transparent
+        const background = getComputedStyle(this.contentDiv).backgroundColor;
+
+        if (type === "svg") {
+            let axesMarkup = "";
+            if (axes) {
+                const copy = axes.cloneNode(true) as SVGSVGElement;
+                copyStylesInline(copy as unknown as HTMLElement, axes as unknown as HTMLElement);
+                copy.setAttribute("height", `${height}`);
+                copy.setAttribute("viewBox", `0 0 ${width} ${height}`);
+                axesMarkup = new XMLSerializer().serializeToString(copy);
+            }
+            callback(
+                `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+                    `<rect width="${width}" height="${height}" fill="${background}"/>` +
+                    `<image x="${offsetX}" y="${offsetY}" width="${plotRect.width}" height="${plotRect.height}" xlink:href="${plot.toDataURL("image/png")}"/>` +
+                    axesMarkup +
+                    "</svg>",
+            );
+            window.mdv.chartManager.createInfoAlert(
+                "In this SVG the points and density are an embedded image; only the axes are vector.",
+                { duration: 6000 },
+            );
+            return;
+        }
+
+        const pixelRatio = plotRect.width > 0 ? plot.width / plotRect.width : 1;
+        const out = document.createElement("canvas");
+        out.width = Math.round(width * pixelRatio);
+        out.height = Math.round(height * pixelRatio);
+        const ctx = out.getContext("2d");
+        if (!ctx) throw new Error("Could not get 2d context from canvas");
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, out.width, out.height);
+        ctx.drawImage(plot, offsetX * pixelRatio, offsetY * pixelRatio, plot.width, plot.height);
+        if (!axes) {
+            callback(out);
+            return;
+        }
+        // rasterised from the live element, which is what carries the computed styles, so it is
+        // made taller for the moment to keep the label
+        const originalHeight = axes.getAttribute("height");
+        const originalViewBox = axes.getAttribute("viewBox");
+        axes.setAttribute("height", `${height}`);
+        axes.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        const restore = () => {
+            if (originalHeight === null) axes.removeAttribute("height");
+            else axes.setAttribute("height", originalHeight);
+            if (originalViewBox === null) axes.removeAttribute("viewBox");
+            else axes.setAttribute("viewBox", originalViewBox);
+        };
+        try {
+            this.getImageFromSVG(
+                axes,
+                (axesCanvas) => {
+                    restore();
+                    ctx.drawImage(axesCanvas, 0, 0, out.width, out.height);
+                    callback(out);
+                },
+                (error) => {
+                    restore();
+                    console.error("Could not draw the axes for the image", error);
+                    callback(out);
+                },
+            );
+        } catch (error) {
+            restore();
+            throw error;
+        }
+    }
+
     /** The backend the canvas is drawing with, after any fallback to WebGL; null until the device is chosen. */
     activeBackend: DeckBackend | null = null;
     /** Why WebGPU was requested but not used, when it wasn't. */
@@ -142,7 +242,7 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         // that don't de-serialize properly, so we explicity extract the properties we want
         const viewState = {
             target: c.viewState.target,
-            zoom: c.viewState.zoom,
+            ...serialisableZoom(c.viewState, c.dimension === "2d" ? (c.axis_scaling ?? "equal") : "equal"),
         };
         if (c.dimension === "3d") {
             const v = c.viewState;
@@ -152,7 +252,36 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         }
         // null only exists to keep the key observable; leave it out of saved views
         const render_backend = c.render_backend ?? undefined;
-        return { ...c, viewState, render_backend };
+        const background_filter = c.background_filter ?? undefined;
+        return { ...c, viewState, render_backend, background_filter };
+    }
+
+    /** Choose a column and the categories of it to keep; other rows are hidden from this chart only. */
+    getBackgroundFilterSettings() {
+        const c = this.config;
+        const textColumns = this.dataStore.getColumnList("string");
+        return [
+            g({
+                type: "dropdown",
+                label: "Background Filter Column",
+                current_value: c.background_filter?.column ?? NO_COLUMN,
+                values: [[...textColumns, { name: "None", field: NO_COLUMN }], "name", "field"],
+                func: (column) => {
+                    c.background_filter = column === NO_COLUMN ? null : { column, category: [] };
+                },
+            }),
+            g({
+                type: "category_selection",
+                label: "Background Filter Categories",
+                current_value: [],
+                sourceColumn: () => c.background_filter?.column ?? undefined,
+                getCurrentValue: () => [c.background_filter?.category ?? []].flat(),
+                func: (category: string[]) => {
+                    const column = c.background_filter?.column;
+                    if (column) c.background_filter = { column, category };
+                },
+            }),
+        ];
     }
 
     getSettings() {
@@ -162,8 +291,26 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         if (c.dimension === "2d") {
             const axisSettings = getAxisGuiSpec(c);
             settings.push(axisSettings);
+            settings.push(
+                g({
+                    type: "radiobuttons",
+                    label: "Axis scaling",
+                    choices: [
+                        ["Equal (same scale on both axes)", "equal"],
+                        ["Fit (each axis to the chart)", "fit"],
+                    ],
+                    current_value: c.axis_scaling ?? "equal",
+                    func: (value) => {
+                        //@ts-expect-error value is a string, but we have a narrow "equal" | "fit" type
+                        c.axis_scaling = value;
+                        // the current view is for the other scaling
+                        this.pendingRecenter = true;
+                    },
+                }),
+            );
         }
         return settings.concat([
+            ...this.getBackgroundFilterSettings(),
             ...getSharedScatterSettings(c, {
                 chart: this,
                 includeDensitySettings: deckContourScatterTypes.has(c.type),
@@ -220,9 +367,15 @@ BaseChart.types["DeckDensity"] = {
         },
     ],
 };
+// The 2D scatter plot offered in the Add Chart dialog; density is an option that is off by default.
 BaseChart.types[DECK_CONTOUR_SCATTER_TYPE] = {
     ...BaseChart.types["DeckDensity"],
+    name: "2D Scatter Plot",
     allow_user_add: true,
+    init: (config: ScatterPlotConfig) => {
+        // new charts show columns with very different ranges properly; see `AxisScaling`
+        config.axis_scaling = "fit";
+    },
 };
 BaseChart.types["DeckScatter3D"] = {
     name: "3D Scatter Plot (new)",
@@ -248,9 +401,9 @@ BaseChart.types["DeckScatter3D"] = {
     },
 };
 BaseChart.types["wgl_scatter_plot_dev"] = {
-    name: "2D Scatter Plot",
+    name: "2D Scatter Plot (no density)",
     class: DeckScatterReact,
-    allow_user_add: true,
+    legacy: true,
     params: [
         {
             type: "number",
