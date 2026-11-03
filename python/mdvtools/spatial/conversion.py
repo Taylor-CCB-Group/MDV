@@ -5,10 +5,15 @@ import logging
 import os
 import re
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 import numpy as np
 from ..serverlite import serve_project
+from .browser_store import (
+    BrowserStoreOptions,
+    check_browser_store_encoders,
+    write_spatialdata_store,
+)
 from .conversion_options import (
     DEFAULT_POINT_TRANSFORM,
     DEFAULT_TABLE_HANDLING,
@@ -45,6 +50,7 @@ class SpatialDataConversionArgs:
     compute_x_umap: bool = False
     leiden_resolution: float = 1.0
     table_handling: str = DEFAULT_TABLE_HANDLING
+    browser_store: BrowserStoreOptions = field(default_factory=BrowserStoreOptions)
 
 
 REGION_FIELD = "spatial_region"
@@ -207,6 +213,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += f"- **Compute X UMAP/Leiden**: {conversion_args.compute_x_umap}\n"
         markdown += f"- **Leiden resolution**: {conversion_args.leiden_resolution}\n"
         markdown += f"- **Table handling**: `{conversion_args.table_handling}`\n"
+        markdown += f"- **Browser store rewrites**: {conversion_args.browser_store.describe()}\n"
         markdown += "\n"
         if conversion_args.compute_x_umap:
             markdown += (
@@ -1425,6 +1432,13 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         date_str = build_info["git_commit_date"] or build_info["build_date"] or "unknown"
         _progress(f"MDV conversion (commit: {commit_short}, date: {date_str})")
     
+    if args.link and args.browser_store.enabled:
+        # Rewriting a linked store would modify the user's source data.
+        raise ValueError(
+            f"Browser store rewrites ({args.browser_store.describe()}) apply to the project's "
+            "copy of the store and cannot be combined with --link."
+        )
+    check_browser_store_encoders(args.browser_store)
     sdata_paths = _discover_spatialdata_paths(args.spatialdata_path, batch=args.batch)
     single_source_input = _is_single_spatialdata_source(args.spatialdata_path, sdata_paths)
     _validate_table_handling(args.table_handling)
@@ -1622,7 +1636,12 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         for sdata_path, sdata in sdata_objects.items():
             sdata_name = os.path.basename(sdata_path)
             # pay attention to format specifier here?
-            sdata.write(os.path.join(mdv.dir, "spatial", sdata_name))
+            write_spatialdata_store(
+                sdata,
+                os.path.join(mdv.dir, "spatial", sdata_name),
+                args.browser_store,
+                _progress,
+            )
     # move contents of temp_folder to output_folder/spatial
     # nb would probably rather avoid non spatialdata in spatial folder, 
     # especially if linking (should avoid side-effects in linked folder)
@@ -1697,6 +1716,7 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         compute_x_umap=args.compute_x_umap,
         leiden_resolution=args.leiden_resolution,
         table_handling=args.table_handling,
+        browser_store=args.browser_store,
     )
     add_readme_to_project(mdv, primary_adata, readme_args)
     if args.serve:
