@@ -93,8 +93,8 @@ Homepage = "https://github.com/Taylor-CCB-Group/MDV"
 mdvtools = "mdvtools.cli:cli"
 
 [tool.uv]
-# Pin uv for CI and local dev. Docker pins the same version via pip (see Dockerfile).
-required-version = "0.11.14"
+# Minimum uv only; newer releases are fine. CI and Docker install the latest uv.
+required-version = ">=0.11.14"
 
 [tool.uv.build-backend]
 module-root = ""
