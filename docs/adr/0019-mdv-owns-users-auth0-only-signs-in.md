@@ -35,7 +35,8 @@ projects with existing Users through the share dialog. A deployment cannot lose 
 active Admin, and an Admin cannot deactivate themselves.
 
 Someone who signs in with no User and no matching Invitation sees a no-access page. It shows
-the email and Sign-in method they used, and the contact configured for the site.
+the email and Sign-in method they used, the contact configured for the site and a link to sign
+out, so they can try another account.
 
 For password Invitations, MDV asks Auth0 to email the person a link to set their password. If
 they already have an account on that connection, MDV reuses it and sends no email. For those
@@ -122,7 +123,8 @@ connection and copies the Auth0 `admin` role into MDV. After that, the startup s
 `admin` role lookup and `manage_project_permissions.py` are removed.
 `MDV_BOOTSTRAP_ADMIN_EMAIL` still creates the first Admin on a new site.
 
-Sites on the Shibboleth provider and the dummy provider keep their current user creation.
+Sites on the dummy provider keep their current user creation. No site uses the Shibboleth
+provider to give people access, so this decision and the users page leave it out.
 
 ## Considered options
 
