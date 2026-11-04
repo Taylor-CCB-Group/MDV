@@ -1,4 +1,4 @@
-import { AppBar, Box, Chip, Toolbar } from "@mui/material";
+import { AppBar, Box, Chip, Divider, Toolbar, Typography } from "@mui/material";
 import {
     Home as HomeIcon,
     Save as SaveIcon,
@@ -11,7 +11,7 @@ import ToggleThemeWrapper from "@/charts/dialogs/ToggleTheme";
 import IconWithTooltip from "./IconWithTooltip";
 import ViewSelectorWrapper from "./ViewSelectorComponent";
 import ViewThumbnailComponent from "./ViewThumbnailComponent";
-import { useProject } from "@/modules/ProjectContext";
+import { useCurrentProject, useProject } from "@/modules/ProjectContext";
 import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
 import ChatButtons from "./ChatButtons";
 import CustomTooltip from "./CustomTooltip";
@@ -24,6 +24,7 @@ import { buildDashboardUrl, getApiRootFromDir } from "@/utils/mdvRouting";
 const MenuBarComponent = observer(() => {
     const { viewManager, config } = useChartManager();
     const { mainApiRoute, root } = useProject();
+    const projectDisplayName = useCurrentProject()?.name;
 
     const isEditable = config.permission === "edit";
     const ariaLabel = isEditable ? "editable" : "view only";
@@ -56,7 +57,8 @@ const MenuBarComponent = observer(() => {
         <>
             <AppBar position="static" color="default" sx={{ boxShadow: "none" }}>
                 <Toolbar className="ciview-main-menu-bar" sx={{ padding: 2 }} disableGutters>
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
+                    {/* the left group gives way first, so the right-hand actions stay on screen */}
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", minWidth: 0 }}>
                         <IconWithTooltip
                             tooltipText="Back to Catalog"
                             href={homeHref}
@@ -95,9 +97,41 @@ const MenuBarComponent = observer(() => {
                                 <CloudUploadIcon />
                             </IconWithTooltip>
                         )}
+
+                        {projectDisplayName && (
+                            <>
+                                <Divider
+                                    orientation="vertical"
+                                    flexItem
+                                    sx={{ mx: 1.5, my: 1, display: { xs: "none", md: "block" } }}
+                                />
+                                <CustomTooltip tooltipText={projectDisplayName}>
+                                    <Typography
+                                        variant="subtitle1"
+                                        component="span"
+                                        noWrap
+                                        aria-label={`Project: ${projectDisplayName}`}
+                                        sx={{
+                                            display: { xs: "none", md: "block" },
+                                            fontSize: "0.9rem",
+                                            fontWeight: 500,
+                                            minWidth: 0,
+                                            maxWidth: { md: "14rem", lg: "24rem" },
+                                            px: 1.25,
+                                            py: 0.25,
+                                            border: 1,
+                                            borderColor: "divider",
+                                            borderRadius: 1,
+                                        }}
+                                    >
+                                        {projectDisplayName}
+                                    </Typography>
+                                </CustomTooltip>
+                            </>
+                        )}
                     </Box>
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <CustomTooltip 
+                    <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                        <CustomTooltip
                             tooltipText={
                                 isEditable ? 
                                 "You can edit views and add data." : 

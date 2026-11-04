@@ -1,5 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { getProjectInfoBase } from "@/modules/ProjectContext";
+import { renderHook, waitFor } from "@testing-library/react";
+import axios from "axios";
+import { createElement, type PropsWithChildren } from "react";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { ProjectProvider, getProject, getProjectInfoBase, useCurrentProject } from "@/modules/ProjectContext";
 
 describe("ProjectContext", () => {
     let originalMdv: unknown;
@@ -32,5 +35,41 @@ describe("ProjectContext", () => {
         expect(info.root).toBe(`${window.location.origin}/mdv/project/174`);
         expect(info.mainApiRoute).toBe("/mdv/");
         expect(info.projectApiRoute).toBe("/mdv/project/174/");
+    });
+
+    test("getProject fetches just that project", async () => {
+        const project = { id: 7, name: "Lung atlas", lastModified: "", owner: [], writable: true, permissions: null };
+        const get = vi.spyOn(axios, "get").mockResolvedValue({ data: project });
+        try {
+            expect(await getProject(7, "/mdv/")).toEqual(project);
+            expect(get).toHaveBeenCalledWith("/mdv/projects/7");
+        } finally {
+            get.mockRestore();
+        }
+    });
+
+    test("getProject returns null when the request fails", async () => {
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+        const get = vi.spyOn(axios, "get").mockRejectedValue(new Error("Not found"));
+        try {
+            expect(await getProject(99, "/mdv/")).toBeNull();
+        } finally {
+            get.mockRestore();
+            error.mockRestore();
+        }
+    });
+
+    test("useCurrentProject asks the configured API root, not one derived from the URL", async () => {
+        (window as any).mdv.chartManager.config.mdv_api_root = "/proxied/mdv/";
+        const project = { id: 174, name: "Lung atlas", lastModified: "", owner: [], writable: true, permissions: null };
+        const get = vi.spyOn(axios, "get").mockResolvedValue({ data: project });
+        const wrapper = ({ children }: PropsWithChildren) => createElement(ProjectProvider, null, children);
+        try {
+            const { result } = renderHook(() => useCurrentProject(), { wrapper });
+            await waitFor(() => expect(result.current).toEqual(project));
+            expect(get).toHaveBeenCalledWith("/proxied/mdv/projects/174");
+        } finally {
+            get.mockRestore();
+        }
     });
 });

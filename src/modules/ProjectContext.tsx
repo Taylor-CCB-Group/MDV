@@ -6,6 +6,8 @@ import {
     type PropsWithChildren,
     createContext,
     useContext,
+    useEffect,
+    useState,
 } from "react";
 
 export type ProjectInfoBase = {
@@ -21,10 +23,17 @@ export type ProjectInfo = ProjectInfoBase & {
     buildInfo: BuildInfo;
 };
 
+/** One project, as `GET /projects/<id>` returns it. */
 export type Project = {
     id: number;
-    lastModified: string;
     name: string;
+    lastModified: string;
+    thumbnail?: string | null;
+    readme?: string | null;
+    owner: string[];
+    writable: boolean;
+    /** Null when auth is off. */
+    permissions: { can_read: boolean; can_write: boolean; is_owner: boolean } | null;
 };
 
 /** 
@@ -82,17 +91,32 @@ export function useProjectInfo(): ProjectInfo {
     };
 }
 
-export async function getProjectName(projectId: number, apiRoot?: string) {
+/** Fetch one project from `GET /projects/<id>`, or null if the server doesn't have it. */
+export async function getProject(projectId: number, apiRoot?: string): Promise<Project | null> {
     try {
-        const res = await axios.get(buildApiUrl("projects", apiRoot));
-        const projectData: Project[] = res.data;
-    
-        const projectName = projectData?.find((project) => project.id === projectId)?.name || "unnamed_project";
-        return projectName;
+        const res = await axios.get<Project>(buildApiUrl(`projects/${projectId}`, apiRoot));
+        return res.data;
     } catch (error) {
-        console.error("Failed to fetch project name:", error);
-        return "unnamed_project";
+        console.error("Failed to fetch project:", error);
+        return null;
     }
+}
+
+/** The project this page is showing, or null until it loads or if it can't be found. */
+export function useCurrentProject(): Project | null {
+    const { projectName: projectId, root, mainApiRoute } = useProject();
+    const apiRoot = mainApiRoute === "/" ? getApiRootFromDir(root) : mainApiRoute;
+    const [project, setProject] = useState<Project | null>(null);
+    useEffect(() => {
+        let cancelled = false;
+        void getProject(Number(projectId), apiRoot).then((result) => {
+            if (!cancelled) setProject(result);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [projectId, apiRoot]);
+    return project;
 }
 
 const ProjectContext = createContext<ProjectInfo>(null as any);
