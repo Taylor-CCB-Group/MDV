@@ -63,6 +63,8 @@ import { VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/st
 type SpatialRegionMetadata = {
     spatial?: {
         file?: string;
+        /** Where the store is served from, when not the project's `spatial/<file>`. */
+        url?: string;
         coordinate_system?: string;
     };
 };

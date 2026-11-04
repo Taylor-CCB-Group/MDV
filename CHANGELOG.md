@@ -7,6 +7,13 @@ All notable changes to `mdvtools` are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- A region's `spatial.url` in `datasources.json` tells the SpatialData.js viewer to load the
+  store from that URL instead of the project's `spatial/<file>`. `spatial.file` still names
+  the object, which is how its tables are matched.
+- `mdvtools convert-spatial --spatial-url URL` sets each region's `spatial.url` to `URL` and
+  neither copies nor links the store into the project, for a store served from elsewhere.
+  It takes a single store, so it can't be combined with `--batch`, `--link` or browser store
+  rewrites.
 - `mdvtools --version` (`-V`) prints the mdvtools version, git commit, Python and platform.
 - When a CLI command fails unexpectedly it now prints an error report with the command line,
   traceback, and mdvtools/dependency versions, ready to paste into an issue, and exits with
