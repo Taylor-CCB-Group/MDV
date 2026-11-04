@@ -7,7 +7,7 @@ import zipfile
 import io
 import tempfile
 from mdvtools.server_extension import MDVProjectServerExtension
-from mdvtools.mdvproject import MDVProject, get_json, get_project_thumbnail
+from mdvtools.mdvproject import MDVProject, forget_project_thumbnail, get_json, get_project_thumbnail
 from mdvtools.project_router import ProjectBlueprintProtocol
 from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
 from mdvtools.dbutils.dbmodels import User, db
@@ -190,6 +190,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 # Rollback: Clean up the projects filesystem directory if it was created
                 if project_path and os.path.exists(project_path):
                     try:
+                        forget_project_thumbnail(project_path)
                         shutil.rmtree(project_path)
                         logger.info("In register_routes -/create_project : Rolled back project directory creation as db entry is not added")
                     except Exception as cleanup_error:
@@ -343,6 +344,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 # Clean up project directory if it was created
                 if project_path and os.path.exists(project_path):
                     try:
+                        forget_project_thumbnail(project_path)
                         shutil.rmtree(project_path)
                         logger.info("In register_routes -/import_project : Rolled back project directory creation as db entry is not added")
                     except Exception as cleanup_error:
