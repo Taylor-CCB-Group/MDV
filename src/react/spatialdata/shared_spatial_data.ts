@@ -11,6 +11,9 @@ export function spatialDataUrlForRegion(region: unknown): string | null {
     if (!spatial || typeof spatial !== "object" || !("file" in spatial)) return null;
     const file = spatial.file;
     if (typeof file !== "string" || !file) return null;
+    // `file` names the object (table association matches on it); `url`, when set, is where
+    // the store is served from instead of the project's spatial folder.
+    if ("url" in spatial && typeof spatial.url === "string" && spatial.url) return spatial.url;
     return getProjectURL(`spatial/${file}`);
 }
 
