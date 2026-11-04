@@ -117,4 +117,4 @@ def test_project_route_with_auth_checks_permissions(auth_app):
 
 
 def test_project_route_with_auth_needs_a_session_user(auth_app):
-    assert auth_app.test_client().get("/projects/1").status_code == 500
+    assert auth_app.test_client().get("/projects/1").status_code == 401

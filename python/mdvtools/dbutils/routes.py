@@ -274,6 +274,8 @@ def register_routes(app, ENABLE_AUTH):
             One active project, in the same shape as an entry of /projects. 404 when it
             doesn't exist, is deleted, or the user can't see it.
             """
+            if ENABLE_AUTH and not session.get('user'):
+                return jsonify({"error": "Authentication required"}), 401
             try:
                 if ENABLE_AUTH:
                     perms = session_user_projects().get(project_id)

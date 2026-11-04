@@ -104,17 +104,18 @@ export async function getProject(projectId: number, apiRoot?: string): Promise<P
 
 /** The project this page is showing, or null until it loads or if it can't be found. */
 export function useCurrentProject(): Project | null {
-    const { projectName: projectId, root } = useProject();
+    const { projectName: projectId, root, mainApiRoute } = useProject();
+    const apiRoot = mainApiRoute === "/" ? getApiRootFromDir(root) : mainApiRoute;
     const [project, setProject] = useState<Project | null>(null);
     useEffect(() => {
         let cancelled = false;
-        void getProject(Number(projectId), getApiRootFromDir(root)).then((result) => {
+        void getProject(Number(projectId), apiRoot).then((result) => {
             if (!cancelled) setProject(result);
         });
         return () => {
             cancelled = true;
         };
-    }, [projectId, root]);
+    }, [projectId, apiRoot]);
     return project;
 }
 

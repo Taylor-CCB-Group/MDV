@@ -74,16 +74,27 @@ def pick_thumbnail(state: dict, views: dict) -> Optional[str]:
     return None
 
 
-# project_dir -> ((state mtime, views mtime), thumbnail)
-_thumbnail_cache: dict[str, tuple[tuple[float, float], Optional[str]]] = {}
+# project_dir -> ((state mtime_ns, state size, views mtime_ns, views size), thumbnail)
+_thumbnail_cache: dict[str, tuple[tuple[int, int, int, int], Optional[str]]] = {}
+
+
+def _file_signature(path: str) -> tuple[int, int]:
+    # Size as well as mtime, so two writes inside one mtime tick (coarse on some
+    # mounted filesystems) still miss the cache unless they are the same length.
+    st = os.stat(path)
+    return st.st_mtime_ns, st.st_size
 
 
 def get_project_thumbnail(project_dir: str) -> Optional[str]:
-    """Thumbnail for the project catalog, re-read whenever state.json or views.json changes."""
+    """Thumbnail for the project catalog, re-read whenever state.json or views.json changes.
+
+    The cache is keyed on file metadata rather than contents: comparing contents
+    would mean reading views.json, which holds every view's image, on each request.
+    """
     statefile = join(project_dir, "state.json")
     viewsfile = join(project_dir, "views.json")
     try:
-        key = (os.path.getmtime(statefile), os.path.getmtime(viewsfile))
+        key = _file_signature(statefile) + _file_signature(viewsfile)
         cached = _thumbnail_cache.get(project_dir)
         if cached and cached[0] == key:
             return cached[1]
@@ -97,6 +108,11 @@ def get_project_thumbnail(project_dir: str) -> Optional[str]:
     except Exception as e:
         logger.exception(f"Error extracting thumbnail for project at {project_dir}: {e}")
         return None
+
+
+def forget_project_thumbnail(project_dir: str) -> None:
+    """Drop a project's cached thumbnail, e.g. once it has been purged."""
+    _thumbnail_cache.pop(project_dir, None)
 
 
 def _agent_debug_log(

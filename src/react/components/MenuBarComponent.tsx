@@ -57,7 +57,8 @@ const MenuBarComponent = observer(() => {
         <>
             <AppBar position="static" color="default" sx={{ boxShadow: "none" }}>
                 <Toolbar className="ciview-main-menu-bar" sx={{ padding: 2 }} disableGutters>
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
+                    {/* the left group gives way first, so the right-hand actions stay on screen */}
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", minWidth: 0 }}>
                         <IconWithTooltip
                             tooltipText="Back to Catalog"
                             href={homeHref}
@@ -99,7 +100,11 @@ const MenuBarComponent = observer(() => {
 
                         {projectDisplayName && (
                             <>
-                                <Divider orientation="vertical" flexItem sx={{ mx: 1.5, my: 1 }} />
+                                <Divider
+                                    orientation="vertical"
+                                    flexItem
+                                    sx={{ mx: 1.5, my: 1, display: { xs: "none", md: "block" } }}
+                                />
                                 <CustomTooltip tooltipText={projectDisplayName}>
                                     <Typography
                                         variant="subtitle1"
@@ -107,9 +112,11 @@ const MenuBarComponent = observer(() => {
                                         noWrap
                                         aria-label={`Project: ${projectDisplayName}`}
                                         sx={{
+                                            display: { xs: "none", md: "block" },
                                             fontSize: "0.9rem",
                                             fontWeight: 500,
-                                            maxWidth: "24rem",
+                                            minWidth: 0,
+                                            maxWidth: { md: "14rem", lg: "24rem" },
                                             px: 1.25,
                                             py: 0.25,
                                             border: 1,
@@ -123,7 +130,7 @@ const MenuBarComponent = observer(() => {
                             </>
                         )}
                     </Box>
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                         <CustomTooltip
                             tooltipText={
                                 isEditable ? 

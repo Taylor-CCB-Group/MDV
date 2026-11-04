@@ -108,4 +108,24 @@ describe("useProjects restore", () => {
         ]);
         expect(result.current.projects.map((p) => p.name)).toEqual(["restored"]);
     });
+
+    test("falls back to the whole list if fetching the restored project throws", async () => {
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        apiFetchMock
+            .mockResolvedValueOnce(jsonResponse({ restoredProjectId: 5 }))
+            .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+            .mockResolvedValueOnce(jsonResponse([{ id: 5, name: "restored" }]));
+        const { result } = renderHook(() => useProjects());
+
+        try {
+            await act(async () => {
+                await result.current.restoreRecycledProject("5");
+            });
+        } finally {
+            consoleError.mockRestore();
+        }
+
+        expect(result.current.isErrorModalOpen).toBe(false);
+        expect(result.current.projects.map((p) => p.name)).toEqual(["restored"]);
+    });
 });

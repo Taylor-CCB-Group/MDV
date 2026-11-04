@@ -51,6 +51,19 @@ function formatProject(item: any): Project {
     };
 }
 
+/** Just the restored project, or null if that fetch fails in any way. */
+async function fetchRestoredProject(projectId: string): Promise<Project | null> {
+    try {
+        const response = await apiFetch(`projects/${projectId}`, {
+            headers: { Accept: "application/json" },
+        });
+        return response.ok ? formatProject(await response.json()) : null;
+    } catch (error) {
+        console.error("Error fetching the restored project:", error);
+        return null;
+    }
+}
+
 const useProjects = () => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -545,12 +558,10 @@ const useProjects = () => {
                     });
                 }
                 const restored = restoreRecycledProjectResponseSchema.parse(await response.json());
-                // fetch just the restored project rather than the whole list
-                const projectResponse = await apiFetch(`projects/${projectId}`, {
-                    headers: { Accept: "application/json" },
-                });
-                if (projectResponse.ok) {
-                    const project = formatProject(await projectResponse.json());
+                // Fetch just the restored project rather than the whole list. The restore
+                // has already succeeded, so if that fails, reload the list instead.
+                const project = await fetchRestoredProject(projectId);
+                if (project) {
                     setProjects((previousProjects) => [
                         ...previousProjects.filter((p) => p.id !== project.id),
                         project,

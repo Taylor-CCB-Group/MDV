@@ -25,7 +25,7 @@ Example:
 
 from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject, UsageEvent
 from datetime import datetime
-from mdvtools.mdvproject import MDVProject, get_project_thumbnail
+from mdvtools.mdvproject import MDVProject, forget_project_thumbnail, get_project_thumbnail
 from typing import Optional
 import os
 import shutil
@@ -307,6 +307,8 @@ class ProjectService:
             if not project.path:
                 return False, "Project path is missing."
 
+            # read before the delete: the row's attributes may expire on commit
+            cached_path = project.path
             project_path = os.path.abspath(project.path)
             if project_path == os.path.abspath(os.sep):
                 return False, "Refusing to delete filesystem root."
@@ -366,6 +368,7 @@ class ProjectService:
             if filesystem_delete is not None:
                 filesystem_delete()
             db.session.commit()
+            forget_project_thumbnail(cached_path)
             return True, None
         except Exception as e:
             db.session.rollback()

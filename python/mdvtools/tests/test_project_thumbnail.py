@@ -42,5 +42,18 @@ def test_get_project_thumbnail_rereads_after_views_change(tmp_path):
     assert mp.get_project_thumbnail(project_dir) == "img-a"
 
 
+def test_get_project_thumbnail_rereads_when_size_changes_within_one_mtime(tmp_path):
+    project_dir = str(tmp_path)
+    statefile = os.path.join(project_dir, "state.json")
+    viewsfile = os.path.join(project_dir, "views.json")
+    _write(statefile, {"all_views": ["a"]}, 1000)
+    _write(viewsfile, {"a": {}}, 1000)
+    assert mp.get_project_thumbnail(project_dir) is None
+
+    # same mtime, as on a filesystem with coarse timestamps
+    _write(viewsfile, {"a": {"viewImage": "img-a"}}, 1000)
+    assert mp.get_project_thumbnail(project_dir) == "img-a"
+
+
 def test_get_project_thumbnail_returns_none_for_missing_project(tmp_path):
     assert mp.get_project_thumbnail(str(tmp_path / "missing")) is None
