@@ -21,8 +21,11 @@ removing Admin rights. Every deployment with `ENABLE_AUTH` on installs and enabl
 deployments with auth off leave it out.
 
 MDV core keeps everything that runs when a person signs in or makes a request. That covers the
-Invitation table, matching an Invitation at the callback, refusing a Deactivated user on every
-request, and the no-access page.
+Invitation table with its expiry and email helpers, matching an Invitation at the callback,
+refusing a Deactivated user on every request, and the no-access page.
+
+The admin extension makes its changes by writing MDV's models directly, as it already does for
+Users and Project roles. Core offers no separate service for them.
 
 ## Consequences
 
@@ -34,3 +37,6 @@ but once the sync is removed nobody on it can invite anyone.
 
 - **Build the users page into MDV core.** Rejected so that admin features stay an add-on that
   each deployment chooses to install.
+- **Give core a service that the extension calls for every change.** Rejected because most of
+  its functions would have no caller in core, and every auth-enabled deployment installs the
+  extension alongside core.

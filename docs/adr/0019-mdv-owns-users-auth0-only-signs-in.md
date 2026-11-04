@@ -26,13 +26,14 @@ address, the Sign-in method the person must use, and a Project role on each chos
 It lasts 14 days, and a resend starts a new 14 days. The person's first sign-in accepts it,
 creates their User and grants the projects, so they see their projects straight away. An
 Invitation sent to an existing User moves them to a new Sign-in method and can carry a new
-email. Inviting the email of an active User grants the projects directly, and inviting a
-Deactivated user reactivates them with the chosen projects. Invitations are kept after they
-are accepted, revoked or expired, so a User's history shows who invited them.
+email. Inviting the email of an active User grants the projects directly. Inviting a
+Deactivated user reactivates them with their earlier Project roles, and a role chosen in the
+Invitation replaces the earlier role on that project. Invitations are kept after they are
+accepted, revoked or expired, so a User's history shows who invited them.
 
 Admin rights live only in MDV. Only Admins can invite people. Owners keep sharing their
 projects with existing Users through the share dialog. A deployment cannot lose its last
-active Admin, and an Admin cannot deactivate themselves.
+active Admin.
 
 Someone who signs in with no User and no matching Invitation sees a no-access page. It shows
 the email and Sign-in method they used, the contact configured for the site and a link to sign

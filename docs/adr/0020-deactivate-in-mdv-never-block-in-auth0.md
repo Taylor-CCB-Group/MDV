@@ -21,11 +21,16 @@ The callback also activated any inactive User who signed in
 
 ## Decision
 
-Removing access makes a Deactivated user in MDV and removes their Project roles. MDV refuses
+Removing access makes a Deactivated user in MDV and keeps their Project roles. MDV refuses
 a Deactivated user at sign-in and on every later request, so a session that was open when
 the Admin removed them stops working too. At sign-in they see the same no-access page as a
 person with no User (ADR 0019), so the page does not show that MDV still holds their User.
 MDV never blocks, unblocks or deletes the Auth0 account. The User row stays, so usage history
-still names them. An Admin can reactivate them.
+still names them. An Admin can reactivate them, which restores their projects.
 
 Signing in never reactivates a User. Only an Admin's action does.
+
+## Consequences
+
+A Deactivated user still holds Project roles, so the share dialog and project member lists
+leave them out.
