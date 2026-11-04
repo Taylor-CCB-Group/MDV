@@ -412,7 +412,10 @@ def load_config(app, config_name=None, enable_auth=False):
                     # identity matching this email may bootstrap as the first administrator.
                     # Leave unset once bootstrap is no longer needed for this deployment.
                     app.config["MDV_BOOTSTRAP_ADMIN_EMAIL"] = os.getenv('MDV_BOOTSTRAP_ADMIN_EMAIL') or config.get('MDV_BOOTSTRAP_ADMIN_EMAIL')
-                
+                    # Optional: who the no-access page tells people to contact, such as
+                    # an email address or a team name. The page leaves it out when unset.
+                    app.config["MDV_ACCESS_CONTACT"] = os.getenv('MDV_ACCESS_CONTACT') or config.get('MDV_ACCESS_CONTACT')
+
                 app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
                 app.config["SHIBBOLETH_LOGIN_URL"] = os.getenv('SHIBBOLETH_LOGIN_URL') or config.get('SHIBBOLETH_LOGIN_URL')
                 app.config["SHIBBOLETH_LOGOUT_URL"] = os.getenv('SHIBBOLETH_LOGOUT_URL') or config.get('SHIBBOLETH_LOGOUT_URL')

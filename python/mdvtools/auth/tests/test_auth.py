@@ -6,6 +6,7 @@ from mdvtools.auth.authutils import get_auth_provider
 from mdvtools.auth.dummy_provider import DummyAuthProvider
 from mdvtools.auth.shibboleth_provider import ShibbolethProvider
 from mdvtools.auth.auth0_provider import Auth0Provider
+from mdvtools.auth.auth_provider import NoAccess
 from auth0.exceptions import RateLimitError
 
 @pytest.fixture
@@ -378,9 +379,9 @@ class TestAuth0ProviderSync:
         assert mock_db.session.rollback.called
 
 
-class TestValidateUserBootstrapAndActivation:
+class TestValidateUserBootstrapAndRefusal:
     """Tests for Auth0Provider.validate_user's first-admin bootstrap and
-    pending-user activation behavior."""
+    refusal of people with no active User."""
 
     @pytest.fixture
     def bootstrap_app(self):
@@ -502,7 +503,7 @@ class TestValidateUserBootstrapAndActivation:
         )
 
         assert result is None
-        assert error[1] == 404
+        assert error == NoAccess(email="someone@else.com")
         mock_db.session.add.assert_not_called()
 
     def test_bootstrap_rejects_unverified_email(self, bootstrap_app, provider):
@@ -513,7 +514,7 @@ class TestValidateUserBootstrapAndActivation:
         )
 
         assert result is None
-        assert error[1] == 404
+        assert error == NoAccess(email="admin@example.com")
         mock_db.session.add.assert_not_called()
 
     def test_bootstrap_noop_when_users_already_exist(self, bootstrap_app, provider):
@@ -535,7 +536,7 @@ class TestValidateUserBootstrapAndActivation:
                 result, error = provider.validate_user()
 
         assert result is None
-        assert error[1] == 404
+        assert error == NoAccess(email="admin@example.com")
         mock_db.session.add.assert_not_called()
 
     def test_bootstrap_discards_the_admin_when_role_assignment_fails(self, bootstrap_app, provider):
@@ -631,31 +632,6 @@ class TestValidateUserBootstrapAndActivation:
         assert error is None
         assert result == {"id": 1, "auth_id": "auth0|new-admin", "email": "admin@example.com", "is_admin": True}
         mock_db.session.rollback.assert_called_once()
-
-    def test_pending_user_activated_on_first_login(self, bootstrap_app, provider):
-        user_info = {"sub": "auth0|invited-user", "email": "invited@example.com", "email_verified": True}
-        pending_user = MagicMock(id=7, auth_id="auth0|invited-user", email="invited@example.com", is_admin=False)
-        pending_user.is_active = False
-
-        with patch.object(provider, 'get_token', return_value='dummy-token'), \
-             patch.object(provider, 'is_token_valid', return_value=True), \
-             patch.object(provider, 'get_user', return_value=user_info), \
-             patch('mdvtools.dbutils.dbmodels.User') as mock_user_class, \
-             patch('mdvtools.dbutils.dbmodels.db') as mock_db:
-
-            mock_db.session = MagicMock()
-            filter_by_mock = MagicMock()
-            filter_by_mock.first.return_value = pending_user
-            mock_user_class.query.filter_by.return_value = filter_by_mock
-
-            with bootstrap_app.test_request_context('/'):
-                result, error = provider.validate_user()
-
-        assert error is None
-        assert pending_user.is_active is True
-        assert pending_user.confirmed_at is not None
-        mock_db.session.commit.assert_called_once()
-        assert result == {"id": 7, "auth_id": "auth0|invited-user", "email": "invited@example.com", "is_admin": False}
 
     def test_active_user_login_does_not_touch_db(self, bootstrap_app, provider):
         user_info = {"sub": "auth0|active-user", "email": "active@example.com", "email_verified": True}

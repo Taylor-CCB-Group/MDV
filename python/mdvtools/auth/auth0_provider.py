@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from mdvtools.dbutils.dbmodels import Project
 # from flask import Response
 from flask.typing import ResponseReturnValue
-from mdvtools.auth.auth_provider import AuthProvider
+from mdvtools.auth.auth_provider import AuthProvider, NoAccess
 from mdvtools.logging_config import get_logger
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
@@ -361,7 +361,7 @@ class Auth0Provider(AuthProvider):
     def validate_user(self):
         """Validate the user using Auth0."""
 
-        from mdvtools.dbutils.dbmodels import User, db
+        from mdvtools.dbutils.dbmodels import User
 
         try:
             # Check if user information is already cached in session
@@ -396,12 +396,11 @@ class Auth0Provider(AuthProvider):
                     logger.exception(f"Bootstrap administrator creation failed: {e}")
                     return None, (jsonify({"error": "Administrator bootstrap failed"}), 500)
                 if user is None:
-                    return None, (jsonify({"error": "User not found"}), 404)
+                    return None, NoAccess(email=email)
             elif not user.is_active:
-                # First successful login for a pending (admin-invited) user: activate them.
-                user.is_active = True
-                user.confirmed_at = datetime.now()
-                db.session.commit()
+                # A Deactivated user. Signing in never reactivates them; only an
+                # Admin can (ADR 0020).
+                return None, NoAccess(email=email)
 
             # Add the user to the in-memory cache
             user_data = {"id": user.id, "auth_id": user.auth_id, "email": user.email, "is_admin": user.is_admin}
