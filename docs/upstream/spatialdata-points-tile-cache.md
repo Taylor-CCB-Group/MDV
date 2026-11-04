@@ -48,3 +48,17 @@ columnar tile content could report its byte size and the grid pass a byte budget
 from `DEFAULT_POINTS_MEMORY_CAP`. That keeps the stated worst case ADR 0005 asks for while
 letting sparse tiles stay. A smaller change: count rows per resident tile and evict against
 the row budget, keeping `maxCacheSize` as a backstop at 512.
+
+## Fix
+
+The byte-bounded version is on SpatialData.ts branch `points-tile-cache-bytes` (33fc8dd,
+not pushed): tiles report their batch `byteLength`, `maxCacheByteSize` is the row budget
+at 16 bytes a row (64 MB), and `maxCacheSize` is a 128-tile backstop, kept low because
+deck diffs a sublayer per cached tile every frame. MDV linked to that build, same
+60-step sweeps on the dataset above, with the old bounds forced in the page for the
+baseline:
+
+| Bounds | Tiles rebuilt per warm sweep | Frame p90 | Frames over 33ms |
+|---|---|---|---|
+| 16 tiles, no byte bound | 55–61 | 45.6–46.9ms | 9–13 of 60 |
+| 64 MB, 128-tile backstop | 0 | 17.3–17.7ms | 0 of 60 |
