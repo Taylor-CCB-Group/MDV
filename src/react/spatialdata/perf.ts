@@ -30,6 +30,8 @@
  * | `association.rows` | **absent** during a cosmetic edit or filter; once per geometry or key-column load | Feature ids are being re-resolved to DataStore rows (`table_rows.ts`). It depends only on geometry, table association and key-column loads — never on layer props. |
  * | `adapter.*` | one per viewer render | These are cheap; the `count` is the signal, and it tracks how often the adapter re-ran. |
  * | `render:spatial.viewer` / `.canvas` | one per interaction step, under ~16ms | More than one per step means something downstream is setting state during the render that follows an edit. |
+ * | `webgpu.assembleWGSL` | **absent** during a zoom or pan over layers already drawn; once per distinct shader per device otherwise | A WGSL shader was assembled from scratch (~6ms each). Every new deck layer builds a `Model`; `wgsl_assembly_cache.ts` makes repeats `.cached`. A steady stream here means the inputs differ per call — usually a module or define created per layer instance. |
+ * | `webgpu.assembleWGSL.cached` | `count` tracks new tile sublayers, `avgMs` well under 0.1 | Each is a layer being created. A high `count` on a zoom over tiles already seen means the tile layer evicted and rebuilt them (the points layer's tile cache holds 16). |
  */
 
 type Stat = { count: number; total: number; max: number };

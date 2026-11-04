@@ -3,6 +3,8 @@ import type { CreateDeviceProps, Device } from "@luma.gl/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // Side effect: when "WebGPU call tracing" is on, wrap the WebGPU API before any device exists.
 import "./webgpu_trace";
+// Side effect: memoise WGSL shader assembly, which luma otherwise repeats for every layer's Model.
+import "./wgsl_assembly_cache";
 
 /**
  * Which deck.gl device backend the SpatialData chart and the deck scatter plot render with. WebGPU is the
