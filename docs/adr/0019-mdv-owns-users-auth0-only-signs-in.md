@@ -129,6 +129,14 @@ provider to give people access, so this decision and the users page leave it out
 ## Considered options
 
 - **Keep the sync and add the Microsoft connection.** Rejected because of the double sign-in.
+- **Use Auth0 Organizations for Invitations.** Rejected because MDV would still keep the same
+  records. [Organization invitations](https://auth0.com/docs/manage-users/organizations/configure-organizations/invite-members)
+  carry roles for the whole Organization, so MDV would still store each Invitation's Project
+  roles until the person signs in. Removing an Organization member in Auth0 cannot end MDV's
+  own session, so MDV would still need Deactivated users and its check on every request, and
+  membership would live in both places. Auth0 accepts a Microsoft invitation when the identity
+  provider returns the invited email, which ADR 0021 says is not enough on its own. Each site
+  would also need its own Organization and an extra parameter on every sign-in.
 - **Store pending Users in the users table.** Rejected because a User's Auth0 account ID
   cannot be empty (`dbutils/dbmodels.py:20`), and a pending User would share the inactive
   state with a Deactivated user (see ADR 0020).
