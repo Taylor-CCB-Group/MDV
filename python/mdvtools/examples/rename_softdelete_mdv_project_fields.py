@@ -9,6 +9,7 @@ import os
 import shutil
 import tempfile
 from collections import Counter
+from collections.abc import Collection
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,8 @@ CELL_RENAME_OVERRIDES = {
     "annotation_caf": "Cell State",
 }
 CELL_RENAME_EXCLUSIONS = {"bucket", "sub_bucket", "annotation"}
+# Columns the app manages itself; never soft-deleted.
+APP_FIELDS = {"__gates__"}
 
 
 def normalize_text(value: Any) -> str:
@@ -395,7 +398,7 @@ def build_soft_delete_plan(
     for column in metadata.get("columns", []):
         field = normalize_text(column.get("field"))
         display_name = normalize_text(column.get("name"))
-        if not field or field in kept_fields or column.get("deleted"):
+        if not field or field in kept_fields or field in APP_FIELDS or column.get("deleted"):
             continue
         item: dict[str, Any] = {
             "row": None,
@@ -422,9 +425,19 @@ def build_soft_delete_plan(
     return plan
 
 
+def planned_soft_deletes(plan: list[dict[str, Any]]) -> set[str]:
+    return {item["field"] for item in plan if item.get("status") == "planned"}
+
+
 def apply_plan(
-    project_dir: Path, datasource: str, plan: list[dict[str, Any]], dry_run: bool
+    project_dir: Path,
+    datasource: str,
+    plan: list[dict[str, Any]],
+    dry_run: bool,
+    hidden_fields: Collection[str] = (),
 ) -> tuple[Counter, list[dict[str, Any]], list[str]]:
+    """Rename columns. Columns already soft-deleted, or in ``hidden_fields``
+    (about to be soft-deleted), don't count as name clashes."""
     summary: Counter = Counter()
     results: list[dict[str, Any]] = []
     log_lines: list[str] = []
@@ -439,6 +452,8 @@ def apply_plan(
 
     final_names: dict[str, str] = {}
     for field, column in columns_by_field.items():
+        if field not in plans_by_field and (field in hidden_fields or column.get("deleted")):
+            continue
         item = plans_by_field.get(field)
         final_names[field] = item["target_name"] if item else normalize_text(column.get("name"))
     duplicate_fields: dict[str, list[str]] = {}
@@ -731,7 +746,9 @@ def main() -> int:
             print(f"Target pre-write JSON backup created at: {target_backup}")
 
     for datasource, plan in plans.items():
-        summary, results, actions = apply_plan(project_dir, datasource, plan, dry_run)
+        summary, results, actions = apply_plan(
+            project_dir, datasource, plan, dry_run, planned_soft_deletes(soft_delete_plans[datasource])
+        )
         delete_summary, delete_results, delete_actions = apply_soft_delete_plan(
             project_dir, datasource, soft_delete_plans[datasource], dry_run
         )

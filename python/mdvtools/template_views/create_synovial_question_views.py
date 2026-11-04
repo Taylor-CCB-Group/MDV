@@ -23,10 +23,9 @@ from mdvtools.template_views.create_question_views import (
     cell_filter,
     composition_bar,
     compound_dot_plot,
-    dot_plot,
     feature_list,
     feature_query,
-    feature_table,
+    gene_info,
     heat_map,
     placed,
     resolve_feature_fields,
@@ -155,8 +154,8 @@ darker dot means a higher average level.
 
 **To compare groups:** pick one or more diagnoses, biopsy sites or cell types in **Choose groups \
 to compare**, and every chart uses only those cells. **To change patients:** the **Patient** chart \
-shows {len(Q2_PATIENTS)} example patients. Click its settings icon (⚙) and pick patients under \
-**Background Filter Categories**. **To change genes:** click genes in the list on the right \
+shows {len(Q2_PATIENTS)} example patients, a panel each, by cell group. Click its settings icon (⚙) \
+and pick patients under **Split values**. **To change genes:** click genes in the list on the right \
 (Ctrl/Cmd-click to pick several).
 """
 
@@ -225,7 +224,7 @@ def umap(title: str, color_by: str, only: tuple[str, str] | None = None) -> dict
 def marker_panel(names: list[str]) -> list[dict[str, Any]]:
     return [
         placed(feature_list("Marker genes", names), [0, 0], [270, 400]),
-        placed(feature_table("Click a gene to plot it"), [0, 405], [270, 455]),
+        placed(gene_info("Click a gene to plot it"), [0, 405], [270, 455]),
     ]
 
 
@@ -251,7 +250,7 @@ def build_q1_view(fields: dict[str, str]) -> dict[str, Any]:
         placed(umap("Cell Group", CELL_GROUP), [0, 125], [385, 340]),
         *maps,
         placed(
-            dot_plot("Selected genes by Cell Type", CELL_TYPE, feature_query(RNA, DOT_PLOT_FEATURES)),
+            compound_dot_plot("Selected genes by Cell Type", CELL_TYPE, feature_query(RNA, DOT_PLOT_FEATURES)),
             [0, 475],
             [700, 390],
         ),
@@ -277,23 +276,26 @@ def build_q2_view(fields: dict[str, str]) -> dict[str, Any]:
             [1105, 0],
             [485, 200],
         ),
-        placed(dot_plot("Selected genes by Diagnosis", DIAGNOSIS, selected), [0, 205], [500, 655]),
-        placed(dot_plot("Selected genes by Biopsy Site", SITE, selected), [505, 205], [540, 325]),
+        placed(compound_dot_plot("Selected genes by Diagnosis", DIAGNOSIS, selected), [0, 205], [500, 655]),
+        # Dot plots are sized to leave room for their legends above the plot.
+        placed(compound_dot_plot("Selected genes by Biopsy Site", SITE, selected), [505, 205], [540, 655]),
         placed(
-            dot_plot("Selected genes by Inflammation Status", INFLAMMATION, selected),
-            [505, 535],
-            [540, 325],
-        ),
-        placed(
-            dot_plot(
-                "Selected genes by Patient",
-                PATIENT,
-                selected,
-                y_label_size=110,
-                only=(PATIENT, Q2_PATIENTS),
-            ),
+            compound_dot_plot("Selected genes by Inflammation Status", INFLAMMATION, selected),
             [1050, 205],
-            [540, 655],
+            [592, 435],
+        ),
+        # The React dot plot can't limit its rows to a few patients, so it has a panel per
+        # example patient instead.
+        placed(
+            compound_dot_plot(
+                "Selected genes by Patient",
+                CELL_GROUP,
+                selected,
+                split=(PATIENT, Q2_PATIENTS),
+                y_label_size=110,
+            ),
+            [0, 865],
+            [1030, 385],
         ),
     ])
 
@@ -428,7 +430,7 @@ def build_q9_view(fields: dict[str, str]) -> dict[str, Any]:
             y_label_size=110,
         ),
         [0, 565],
-        [1590, 295],
+        [1590, 423],
     )
     return rna_view([
         placed(text_box("About this page", Q9_TEXT), [0, 0], [1100, 175]),

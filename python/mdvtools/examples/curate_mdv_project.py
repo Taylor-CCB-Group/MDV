@@ -32,6 +32,7 @@ from mdvtools.examples.rename_softdelete_mdv_project_fields import (
     build_plan,
     build_report,
     build_soft_delete_plan,
+    planned_soft_deletes,
     load_views,
     print_report,
     resolve_datasources,
@@ -52,10 +53,10 @@ from mdvtools.template_views.create_question_views import (
     cell_filter,
     composition_bar,
     compound_dot_plot,
-    dot_plot,
     feature_list,
     feature_query,
     feature_table,
+    gene_info,
     heat_map,
     placed,
     resolve_feature_fields,
@@ -93,6 +94,8 @@ ROLE_BY_NAME = {
     "prior tnf inhibitor": "prior_tnf",
     "umap 1": "umap_x",
     "umap 2": "umap_y",
+    "umap dimension 1": "umap_x",
+    "umap dimension 2": "umap_y",
 }
 UMAP_FIELD_PAIRS = (
     ("rna:X_umap_mindist_0.25_1", "rna:X_umap_mindist_0.25_2"),
@@ -380,7 +383,7 @@ def gene_panel(datasource: str, names: list[str]) -> list[dict[str, Any]]:
     del datasource
     return [
         placed(feature_list("Marker genes", names), [0, 0], [270, 400]),
-        placed(feature_table("Click a gene to plot it"), [0, 405], [270, 455]),
+        placed(gene_info("Click a gene to plot it"), [0, 405], [270, 455]),
     ]
 
 
@@ -498,7 +501,7 @@ def plan_question_views(
                     placed(umap_chart(group_label, umap_x, umap_y, group_field, dot_field or group_field), [0, 125], [385, 340]),
                     *maps,
                     placed(
-                        dot_plot(f"Selected genes by {dot_label}", dot_field, selected),
+                        compound_dot_plot(f"Selected genes by {dot_label}", dot_field, selected),
                         [0, 475],
                         [700, 390],
                     ),
@@ -543,18 +546,21 @@ def plan_question_views(
         for index, column in enumerate(comparisons[:4]):
             field = str(column["field"])
             label = column_label(column, field)
-            only = None
+            chart = compound_dot_plot(f"Selected genes by {label}", field, selected, y_label_size=110)
             if roles.get("patient") is column:
+                # The React dot plot can't limit its rows to a few patients, so it has a panel
+                # per example patient instead, by cell group.
                 chosen = preferred_values(text_column_values(column), [], 5)
                 if chosen:
-                    only = (field, chosen)
-            charts.append(
-                placed(
-                    dot_plot(f"Selected genes by {label}", field, selected, y_label_size=110, only=only),
-                    [(index % 2) * 795, 170 + (index // 2) * 340],
-                    [790, 330],
-                )
-            )
+                    chart = compound_dot_plot(
+                        f"Selected genes by {label}",
+                        group_field or dot_field,
+                        selected,
+                        split=(field, chosen),
+                        y_label_size=110,
+                    )
+            # Tall enough to leave room for the legends above the plot.
+            charts.append(placed(chart, [(index % 2) * 795, 170 + (index // 2) * 440], [790, 435]))
         accept(Q2_VIEW_NAME, question_view(cells_name, gene_name, charts, gene_panel(gene_name, markers)))
     else:
         skipped.append({"question": Q2_VIEW_NAME, "reason": "needs a grouping column and marker genes"})
@@ -599,7 +605,7 @@ def plan_question_views(
                                 [LAYOUT_WIDTH, 120],
                             ),
                             placed(
-                                dot_plot(
+                                compound_dot_plot(
                                     f"RNA by {dot_label}",
                                     dot_field,
                                     feature_query(
@@ -611,7 +617,7 @@ def plan_question_views(
                                 [790, 500],
                             ),
                             placed(
-                                dot_plot(
+                                compound_dot_plot(
                                     f"Protein by {dot_label}",
                                     dot_field,
                                     feature_query(protein_features, DOT_PLOT_FEATURES),
@@ -938,7 +944,12 @@ def curate(
         ambiguous_fields[datasource] = ambiguous
         warnings[datasource] = datasource_warnings
         errors[datasource] = datasource_errors
-        _summary, results, _actions = apply_plan(project, datasource, plan, True)
+        # Question views aren't planned yet, so this soft-delete list can be a
+        # little too long; the final check below uses the real one.
+        first_soft_deletes = build_soft_delete_plan(project, datasource, kept, ambiguous, views)
+        _summary, results, _actions = apply_plan(
+            project, datasource, plan, True, planned_soft_deletes(first_soft_deletes)
+        )
         rename_outcomes[datasource] = results
 
     source_datasources = json.loads((project / "datasources.json").read_text(encoding="utf-8"))
@@ -960,12 +971,25 @@ def curate(
             ambiguous_fields[datasource],
             views_for_delete,
         )
-        summary, _results, _actions = apply_plan(project, datasource, plans[datasource], True)
+        summary, results, _actions = apply_plan(
+            project,
+            datasource,
+            plans[datasource],
+            True,
+            planned_soft_deletes(soft_delete_plans[datasource]),
+        )
+        if [item["status"] for item in results] != [
+            item["status"] for item in rename_outcomes[datasource]
+        ]:
+            print(
+                f"Warning: {datasource}: a rename is blocked because a question view "
+                "keeps a column with the same name visible."
+            )
         delete_summary, delete_results, _delete_actions = apply_soft_delete_plan(
             project, datasource, soft_delete_plans[datasource], True
         )
         summary.update(delete_summary)
-        outcomes[datasource] = rename_outcomes[datasource] + delete_results
+        outcomes[datasource] = results + delete_results
         print(
             f"\nDatasource: {datasource}; dry_run=True; "
             f"renames={len(plans[datasource])}; "
@@ -1014,7 +1038,13 @@ def curate(
     backup_project_jsons(output, json_backup)
     views_backup = backup_views(output)
     for datasource in datasources:
-        apply_plan(output, datasource, plans[datasource], False)
+        apply_plan(
+            output,
+            datasource,
+            plans[datasource],
+            False,
+            planned_soft_deletes(soft_delete_plans[datasource]),
+        )
         apply_soft_delete_plan(output, datasource, soft_delete_plans[datasource], False)
 
     output_views = load_views(output)
@@ -1025,7 +1055,8 @@ def curate(
     state_path = output / "state.json"
     state = json.loads(state_path.read_text(encoding="utf-8"))
     all_views = list(state.get("all_views") or [])
-    for name in output_views:
+    # Only add the new views; views left out of all_views stay hidden.
+    for name in question_plan["views"]:
         if name not in all_views:
             all_views.append(name)
     state["all_views"] = all_views

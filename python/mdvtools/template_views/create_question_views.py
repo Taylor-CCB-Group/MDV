@@ -113,8 +113,8 @@ darker dot means a higher average level.
 
 **To compare groups:** pick one or more diagnoses, diseases or cell states in **Choose groups to \
 compare**, and every chart uses only those cells. **To change patients:** the **Patient** chart \
-shows {len(Q2_PATIENTS)} example patients. Click its settings icon (⚙) and pick patients under \
-**Background Filter Categories**. **To change genes:** click genes in the list on the right \
+shows {len(Q2_PATIENTS)} example patients, a panel each, by cell subgroup. Click its settings icon (⚙) \
+and pick patients under **Split values**. **To change genes:** click genes in the list on the right \
 (Ctrl/Cmd-click to pick several).
 """
 
@@ -130,8 +130,8 @@ Q3_MATCHING = [
 Q3_TEXT = f"""\
 **Is the expression concordant with protein expression?** Protein was measured (CITE-seq) for \
 most cells. The left dot plot shows **RNA** for the selected genes and the right one shows \
-**protein** for the selected proteins, in each cell state. Both use only batches with protein \
-data. The maps below compare {" and ".join(f"{g} RNA with {p}" for g, p in Q3_PAIRS)} protein: \
+**protein** for the selected proteins, in each cell state. The page starts on the batches with \
+protein data (**Cells with protein data**, top right), so every chart uses only those cells. The maps below compare {" and ".join(f"{g} RNA with {p}" for g, p in Q3_PAIRS)} protein: \
 similar colour patterns mean RNA and protein agree.
 
 **To compare a gene with its protein:** click the gene in the genes list and its protein in the \
@@ -288,8 +288,9 @@ with a panel for baseline and one for post-treatment.
 sample with their own baseline sample, in {DEG_COMPARISON_LABEL} (the starting selection). In \
 the **volcano plot**, genes to the right go up after treatment, genes to the left go down, and \
 higher means stronger evidence. The page starts on the top {DEG_TOP} candidates in each \
-direction. **To explore other genes:** clear **Show genes**, then draw round genes in the volcano \
-plot or click them in the table (Ctrl/Cmd-click to pick several).
+direction. Hover over a gene in the volcano plot to see its change and p value. **To explore other \
+genes:** clear **Show genes**, then draw round genes in the volcano plot or click them in the gene list \
+(Ctrl/Cmd-click to pick several).
 
 **Good to know:** in this comparison no gene changes clearly once all genes tested are taken \
 into account, so the "candidate" genes (p < {DEG_MAX_P} and at least {2 ** DEG_MIN_LOG2_FOLD:.1f}-fold, \
@@ -431,10 +432,11 @@ def compound_dot_plot(
     title: str,
     category: str,
     features: str | list[str] | dict[str, Any],
-    split: tuple[str, list[str]],
+    split: tuple[str, list[str]] | None = None,
     y_label_size: int = 175,
 ) -> dict[str, Any]:
-    """One dot plot with a panel per value in `split=(column, values)`, all on one colour and size scale.
+    """The React dot plot. With `split=(column, values)` it has a panel per value, all on one colour
+    and size scale; without it, one panel.
 
     Use it in place of several `dot_plot`s that differ only in the value they are restricted to.
     """
@@ -444,8 +446,8 @@ def compound_dot_plot(
         "title": title,
         "legend": "",
         "param": [category, *feature_params],
-        "split_by": split[0],
-        "split_values": list(split[1]),
+        "split_by": split[0] if split else None,
+        "split_values": list(split[1]) if split else [],
         "axis": {
             "x": {
                 "label": "",
@@ -577,10 +579,22 @@ def feature_table(title: str, extra_columns: tuple[str, ...] = ()) -> dict[str, 
     }
 
 
+def gene_info(title: str) -> dict[str, Any]:
+    """The Gene Info chart: the gene list with details from genenetwork.nl. Clicking a gene
+    highlights it, as clicking a row in `feature_table` does."""
+    return {
+        "type": "geneNetwork",
+        "title": title,
+        "legend": "",
+        "param": [NAME_FIELD],
+        "autoScroll": True,
+    }
+
+
 def genes_panel() -> list[dict[str, Any]]:
     return [
         placed(feature_list("Marker genes", GENES.names), [0, 0], [270, 400]),
-        placed(feature_table("Click a gene to plot it"), [0, 405], [270, 455]),
+        placed(gene_info("Click a gene to plot it"), [0, 405], [270, 455]),
     ]
 
 
@@ -598,9 +612,7 @@ def collections_panel() -> list[dict[str, Any]]:
             [0, 0],
             [270, 300],
         ),
-        placed(
-            feature_table("Genes in the collection", (GENE_COLLECTION_FIELD,)), [0, 305], [270, 555]
-        ),
+        placed(gene_info("Genes in the collection"), [0, 305], [270, 555]),
     ]
 
 
@@ -632,7 +644,7 @@ def build_q1_view(fields: ProjectFields) -> dict[str, Any]:
         placed(umap("Cell Subgroup", CELL_SUBGROUP), [0, 125], [430, 350]),
         *features,
         placed(
-            dot_plot(
+            compound_dot_plot(
                 "Selected genes by Cell State", CELL_STATE, feature_query(GENES, DOT_PLOT_FEATURES)
             ),
             [0, 480],
@@ -659,30 +671,32 @@ def build_q2_view(fields: ProjectFields) -> dict[str, Any]:
             [1105, 0],
             [485, 200],
         ),
-        placed(dot_plot("Selected genes by Diagnosis", DIAGNOSIS, selected), [0, 205], [470, 655]),
-        placed(dot_plot("Selected genes by Disease", DISEASE, selected), [475, 205], [555, 325]),
-        placed(dot_plot("Selected genes by Tissue", TISSUE, selected), [475, 535], [555, 325]),
+        placed(compound_dot_plot("Selected genes by Diagnosis", DIAGNOSIS, selected), [0, 205], [470, 655]),
+        placed(compound_dot_plot("Selected genes by Disease", DISEASE, selected), [475, 205], [555, 325]),
+        placed(compound_dot_plot("Selected genes by Tissue", TISSUE, selected), [475, 535], [555, 325]),
+        # Dot plots are sized to leave room for their legends above the plot.
         placed(
-            dot_plot("Selected genes by Inflammation Status", INFLAMMATION, selected),
+            compound_dot_plot("Selected genes by Inflammation Status", INFLAMMATION, selected),
             [1035, 205],
-            [555, 325],
+            [592, 415],
         ),
+        # The React dot plot can't limit its rows to a few patients, so it has a panel per
+        # example patient instead.
         placed(
-            dot_plot(
+            compound_dot_plot(
                 "Selected genes by Patient",
-                PATIENT,
+                CELL_SUBGROUP,
                 selected,
+                split=(PATIENT, Q2_PATIENTS),
                 y_label_size=90,
-                only=(PATIENT, Q2_PATIENTS),
             ),
-            [1035, 535],
-            [555, 325],
+            [0, 865],
+            [1030, 385],
         ),
     ])
 
 
 def build_q3_view(fields: ProjectFields) -> dict[str, Any]:
-    with_protein = (BATCH, fields.protein_batches)
     half = PROTEIN_VIEW_LAYOUT_WIDTH // 2
     quarter = PROTEIN_VIEW_LAYOUT_WIDTH // 4
     pair_maps = []
@@ -696,23 +710,27 @@ def build_q3_view(fields: ProjectFields) -> dict[str, Any]:
                 )
             )
     cells = [
-        placed(text_box("About this page", Q3_TEXT), [0, 0], [PROTEIN_VIEW_LAYOUT_WIDTH, 150]),
+        placed(text_box("About this page", Q3_TEXT), [0, 0], [900, 150]),
+        # The React dot plot can't limit its cells, so the page filter does it for every chart.
         placed(
-            dot_plot(
+            cell_filter("Cells with protein data", [BATCH], {BATCH: fields.protein_batches}),
+            [905, 0],
+            [PROTEIN_VIEW_LAYOUT_WIDTH - 905, 150],
+        ),
+        placed(
+            compound_dot_plot(
                 "RNA: selected genes by Cell State",
                 CELL_STATE,
                 feature_query(GENES, DOT_PLOT_FEATURES),
-                only=with_protein,
             ),
             [0, 155],
             [half - 5, 345],
         ),
         placed(
-            dot_plot(
+            compound_dot_plot(
                 "Protein: selected proteins by Cell State",
                 CELL_STATE,
                 feature_query(PROTEINS, DOT_PLOT_FEATURES),
-                only=with_protein,
             ),
             [half, 155],
             [half, 345],
@@ -850,23 +868,22 @@ def build_q8_view(fields: ProjectFields) -> dict[str, Any]:
     ])
 
 
+def volcano_plot() -> dict[str, Any]:
+    """Volcano plot whose tooltip shows each gene's DEG results."""
+    chart = scatter(
+        "Volcano plot: change after treatment", [DEG_LOG2_FOLD, DEG_EVIDENCE], DEG_CHANGE, NAME_FIELD
+    )
+    chart["tooltip"]["column"] = [NAME_FIELD, DEG_CHANGE, DEG_LOG2_FOLD, DEG_ADJUSTED_P]
+    return chart
+
+
 def deg_panel() -> list[dict[str, Any]]:
     return [
         placed(
             category_list("Show genes", DEG_TOP_FIELD, [DEG_TOP_UP, DEG_TOP_DOWN]), [0, 0], [465, 150]
         ),
-        placed(
-            scatter(
-                "Volcano plot: change after treatment", [DEG_LOG2_FOLD, DEG_EVIDENCE], DEG_CHANGE, NAME_FIELD
-            ),
-            [0, 155],
-            [465, 400],
-        ),
-        placed(
-            feature_table("Genes (click to plot)", (DEG_CHANGE, DEG_LOG2_FOLD, DEG_ADJUSTED_P)),
-            [0, 560],
-            [465, 300],
-        ),
+        placed(volcano_plot(), [0, 155], [465, 400]),
+        placed(gene_info("Genes (click to plot)"), [0, 560], [465, 300]),
     ]
 
 
@@ -889,7 +906,7 @@ def build_q9_view(fields: ProjectFields) -> dict[str, Any]:
             y_label_size=90,
         ),
         [0, 610],
-        [1400, 250],
+        [1400, 423],
     )
     return {
         "dataSources": {ds: {"panelWidth": width} for ds, width in Q9_PANEL_WIDTHS.items()},

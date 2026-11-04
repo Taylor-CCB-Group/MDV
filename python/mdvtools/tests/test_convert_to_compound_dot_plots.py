@@ -80,11 +80,25 @@ def test_synovial_comparison_views_use_one_compound_dot_plot(view_name, split_by
     assert filtered_dot_plots(view) == []
 
 
-def test_patient_plot_keeps_its_background_filter():
+def test_patient_plot_has_a_panel_per_example_patient():
     view = myeloid.VIEW_BUILDERS[myeloid.Q2_VIEW_NAME](MYELOID_FIELDS)
-    [patients] = filtered_dot_plots(view)
-    assert patients["background_filter"]["categories"] == myeloid.Q2_PATIENTS
-    assert compound_plots(view) == []
+    plots = compound_plots(view)
+    assert all(chart["type"] != "dot_plot" for chart in charts_of(view))
+    assert [plot["split_by"] for plot in plots] == [None] * 4 + [myeloid.PATIENT]
+    assert plots[-1]["split_values"] == myeloid.Q2_PATIENTS
+
+
+@pytest.mark.parametrize("module", [myeloid, synovial])
+def test_question_views_have_no_legacy_dot_plots(module):
+    fields = MYELOID_FIELDS if module is myeloid else FieldIds()
+    for build in module.VIEW_BUILDERS.values():
+        assert all(chart["type"] != "dot_plot" for chart in charts_of(build(fields)))
+
+
+def test_protein_view_filters_to_cells_with_protein():
+    view = myeloid.VIEW_BUILDERS[myeloid.Q3_VIEW_NAME](MYELOID_FIELDS)
+    [protein_filter] = [c for c in charts_of(view) if c["title"] == "Cells with protein data"]
+    assert protein_filter["filters"][myeloid.BATCH] == {"category": ["batch1"]}
 
 
 # --- converter -------------------------------------------------------------------------------
