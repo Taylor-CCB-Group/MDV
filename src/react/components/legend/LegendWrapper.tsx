@@ -9,6 +9,8 @@ import { makeDraggable, makeResizable } from "@/utilities/Elements.js";
 export type LegendWrapperPosition = {
     left: string | number;
     top: string | number;
+    /** Size the user last resized the legend to, as [width, height]. */
+    size?: [number, number];
 };
 
 export type LegendWrapperComponentProps<TSpec> = {
@@ -45,6 +47,7 @@ export default class LegendWrapper<
     private currentSpec: TSpec | null = null;
     private interactionsAttached = false;
     private interactions: LegendWrapperInteractions = {};
+    private userSize: [number, number] | null = null;
 
     constructor(chart: BaseChart<T>) {
         this.chart = chart;
@@ -52,6 +55,11 @@ export default class LegendWrapper<
 
     getWrapperElement(): HTMLDivElement | null {
         return this.wrapper;
+    }
+
+    /** The size the user resized the legend to, or null if they haven't. */
+    getUserSize(): [number, number] | null {
+        return this.userSize;
     }
 
     render(
@@ -81,6 +89,7 @@ export default class LegendWrapper<
         this.currentSpec = spec;
         this.interactions = interactions;
         this.interactionsAttached = false;
+        this.userSize = position.size ?? null;
 
         const wrapper = this.wrapper;
         this.root = createMdvPortal(
@@ -96,7 +105,18 @@ export default class LegendWrapper<
     private attachInteractions(): void {
         const wrapper = this.wrapper;
         const spec = this.currentSpec;
-        if (!wrapper || !spec || this.interactionsAttached) {
+        if (!wrapper || !spec) {
+            return;
+        }
+        // The legend component sets its default size in a layout effect, which can
+        // run more than once (StrictMode), so the saved size and the fit-inside step
+        // are reapplied every time; only the drag/resize wiring happens once.
+        if (this.userSize && this.interactions.resizable) {
+            wrapper.style.width = `${this.userSize[0]}px`;
+            wrapper.style.height = `${this.userSize[1]}px`;
+        }
+        this.keepInsideChart(wrapper);
+        if (this.interactionsAttached) {
             return;
         }
         const doc = this.chart.__doc__;
@@ -106,9 +126,28 @@ export default class LegendWrapper<
             doc,
         });
         if (this.interactions.resizable) {
-            makeResizable(wrapper, { doc });
+            makeResizable(wrapper, {
+                doc,
+                onresizeend: (width: number, height: number) => {
+                    this.userSize = [width, height];
+                },
+            });
         }
         this.interactionsAttached = true;
+    }
+
+    /** Moves the legend back inside the chart if it would hang over an edge. */
+    private keepInsideChart(wrapper: HTMLDivElement): void {
+        const content = this.chart.contentDiv;
+        if (!content.clientWidth || !content.clientHeight) {
+            return;
+        }
+        const maxLeft = Math.max(0, content.clientWidth - wrapper.offsetWidth);
+        const maxTop = Math.max(0, content.clientHeight - wrapper.offsetHeight);
+        const left = Math.min(Math.max(0, wrapper.offsetLeft), maxLeft);
+        const top = Math.min(Math.max(0, wrapper.offsetTop), maxTop);
+        if (left !== wrapper.offsetLeft) wrapper.style.left = `${left}px`;
+        if (top !== wrapper.offsetTop) wrapper.style.top = `${top}px`;
     }
 
     unmount(): void {

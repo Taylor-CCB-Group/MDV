@@ -76,6 +76,7 @@ export const ChartColorConfigSchema = z.object({
             // configs where `color_legend` exists but `display` may be missing/misspelled.
             display: z.boolean().optional().describe("Whether the color legend is visible"),
             pos: z.tuple([z.number(), z.number()]).optional().describe("Legend position in pixels [left, top]"),
+            size: z.tuple([z.number(), z.number()]).optional().describe("Legend size in pixels [width, height], set when the user resizes it"),
             filter: z
                 .discriminatedUnion("kind", [
                     z.object({

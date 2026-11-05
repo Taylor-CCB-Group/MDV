@@ -18,6 +18,15 @@ import tippy, {type Instance as TippyInstance} from "tippy.js";
 import 'tippy.js/dist/tippy.css';
 import { isDateColumn } from "@/lib/dateFormat";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+
+/** A saved legend size from a view's config: [width, height] in pixels. */
+function isLegendSize(value: unknown): value is [number, number] {
+    return (
+        Array.isArray(value) &&
+        value.length === 2 &&
+        value.every((n) => typeof n === "number" && n > 0)
+    );
+}
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import ColorLegend from "@/react/components/legend/ColorLegend";
 import LegendWrapper, {
@@ -616,9 +625,12 @@ class BaseChart<T extends BaseConfig> {
         return true;
     }
 
-    /** Whether a continuous color legend can be resized (categorical legends always can). */
+    /**
+     * Whether a continuous color legend can be resized (categorical legends always can).
+     * The continuous bar follows the legend's width, so this is on unless a chart opts out.
+     */
     isColorLegendResizable(): boolean {
-        return false;
+        return true;
     }
 
     getColorLegendSpec(): ColorLegendSpec | null {
@@ -674,6 +686,10 @@ class BaseChart<T extends BaseConfig> {
                     this.legend.offsetLeft,
                     this.legend.offsetTop,
                 ];
+                const userSize = this.colorLegendWrapper.getUserSize();
+                if (userSize) {
+                    this.config.color_legend.size = userSize;
+                }
             }
             this.colorLegendWrapper.unmount();
             this.legend = undefined;
@@ -682,9 +698,11 @@ class BaseChart<T extends BaseConfig> {
         const box = this._getContentDimensions();
         let lt: string | number = 0;
         let ll: string | number = 0;
+        let size: [number, number] | undefined;
         if (this.legend) {
             ll = this.legend.style.left;
             lt = this.legend.style.top;
+            size = this.colorLegendWrapper.getUserSize() ?? undefined;
             this.colorLegendWrapper.unmount();
         } else {
             const cl = this.config.color_legend;
@@ -693,6 +711,7 @@ class BaseChart<T extends BaseConfig> {
             }
             ll = `${cl.pos[0]}px`;
             lt = `${cl.pos[1]}px`;
+            size = isLegendSize(cl.size) ? cl.size : undefined;
         }
         const spec = this.getColorLegendSpec();
         if (!spec) {
@@ -701,7 +720,11 @@ class BaseChart<T extends BaseConfig> {
             this.legend = undefined;
             return;
         }
-        const filterable = this.isColorLegendFilterable();
+        // Only categorical legends filter. Brushing a continuous legend was confusing
+        // (in heat maps and dot plots it doesn't map to what the colours show), so it
+        // is off for now, and a range filter saved in an older view isn't restored.
+        const filterable =
+            this.isColorLegendFilterable() && spec.kind === "categorical";
         if (filterable) {
             restoreColorLegendFilter(this, spec);
         }
@@ -727,7 +750,7 @@ class BaseChart<T extends BaseConfig> {
             });
         this.colorLegendWrapper.render(
             spec,
-            { left: ll, top: lt },
+            { left: ll, top: lt, size },
             ColorLegendWithInteractions,
             spec.kind === "categorical"
                 ? {
@@ -1215,10 +1238,12 @@ class BaseChart<T extends BaseConfig> {
      */
     getConfig() {
         if (this.legend) {
+            const userSize = this.colorLegendWrapper.getUserSize();
             this.config.color_legend = {
                 ...this.config.color_legend,
                 display: true,
                 pos: [this.legend.offsetLeft, this.legend.offsetTop],
+                ...(userSize && { size: userSize }),
             };
         }
         // there is a general issue with config.size/position when not using "absolute" layout
