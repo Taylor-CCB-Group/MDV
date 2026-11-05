@@ -28,9 +28,7 @@ const MenuBarComponent = observer(() => {
 
     const isEditable = config.permission === "edit";
     const ariaLabel = isEditable ? "editable" : "view only";
-    const homeHref = buildDashboardUrl(
-        mainApiRoute === "/" ? getApiRootFromDir(root) : mainApiRoute,
-    );
+    const homeHref = buildDashboardUrl(mainApiRoute === "/" ? getApiRootFromDir(root) : mainApiRoute);
 
     const handleSaveButtonClick = async () => {
         await viewManager.saveView();
@@ -133,9 +131,9 @@ const MenuBarComponent = observer(() => {
                     <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                         <CustomTooltip
                             tooltipText={
-                                isEditable ? 
-                                "You can edit views and add data." : 
-                                "You can only view, editing is disabled."
+                                isEditable
+                                    ? "You can edit views and add data."
+                                    : "You can only view, editing is disabled."
                             }
                         >
                             <Box
@@ -144,11 +142,11 @@ const MenuBarComponent = observer(() => {
                                 tabIndex={0}
                                 sx={{ marginRight: "10px", marginBottom: "2px" }}
                             >
-                                {
-                                    isEditable ? 
-                                        <LockOpenIcon height={18} aria-hidden="true" focusable="false" /> :
-                                        <LockIcon height={18} aria-hidden="true" focusable="false" /> 
-                                }
+                                {isEditable ? (
+                                    <LockOpenIcon height={18} aria-hidden="true" focusable="false" />
+                                ) : (
+                                    <LockIcon height={18} aria-hidden="true" focusable="false" />
+                                )}
                             </Box>
                         </CustomTooltip>
                         <ChatButtons />

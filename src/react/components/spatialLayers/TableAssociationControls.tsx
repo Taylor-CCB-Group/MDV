@@ -45,13 +45,7 @@ function ControlLabel({ children }: { children: string }) {
     );
 }
 
-function LabeledControl({
-    label,
-    children,
-}: {
-    label: string;
-    children: ReactNode;
-}) {
+function LabeledControl({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-2">
             <ControlLabel>{label}</ControlLabel>
@@ -156,10 +150,7 @@ export function FillColorByColumnControl({
                             // initialising — the spec is still stored, and the projection
                             // fills the colour column in when it resolves.
                             const columnName = flattenFields(selection)[0];
-                            onChange(
-                                columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined,
-                                selection,
-                            );
+                            onChange(columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined, selection);
                         }}
                     />
                 ) : (

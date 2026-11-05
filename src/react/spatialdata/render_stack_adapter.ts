@@ -1,15 +1,6 @@
 import type { Layer } from "@deck.gl/core";
-import type {
-    RenderStack,
-    RenderStackEntry,
-    RenderStackHostEntry,
-} from "@spatialdata/layers";
-import {
-    layerConfig,
-    renderStackOrder,
-    type LayerConfig,
-    type RenderStackLayerInputs,
-} from "@spatialdata/vis";
+import type { RenderStack, RenderStackEntry, RenderStackHostEntry } from "@spatialdata/layers";
+import { layerConfig, renderStackOrder, type LayerConfig, type RenderStackLayerInputs } from "@spatialdata/vis";
 import { useMemo, useRef } from "react";
 
 import { withoutMdvFieldSpecs } from "./field_spec_projection";
@@ -37,9 +28,7 @@ export function createMdvHostLayerResolver(overlays: MdvDeckOverlayLayers) {
     };
 }
 
-export function spatialEntryAsLayerConfig(
-    entry: Extract<RenderStackEntry, { kind: "spatial" }>,
-): LayerConfig {
+export function spatialEntryAsLayerConfig(entry: Extract<RenderStackEntry, { kind: "spatial" }>): LayerConfig {
     return layerConfig(
         entry.source.elementType,
         {
@@ -65,8 +54,7 @@ function stableSignatureValue(value: unknown): unknown {
 }
 
 function layerConfigReplacementSignature(config: LayerConfig): string {
-    const fillColorByColumn =
-        "fillColorByColumn" in config ? config.fillColorByColumn : undefined;
+    const fillColorByColumn = "fillColorByColumn" in config ? config.fillColorByColumn : undefined;
     const tooltipFields = "tooltipFields" in config ? config.tooltipFields : undefined;
     return JSON.stringify({
         type: config.type,
@@ -177,8 +165,9 @@ export function useRenderStackAdapter({
     // see `perf.ts` for the labels, what a healthy capture looks like, and the
     // warning about leaving that flag set.
     measureSpatial("adapter.observe", () => observeRenderStack(stack));
-    const spatialRevision = measureSpatial("adapter.revision", () =>
-        `${propsGeneration}:${renderStackSpatialRevision(stack)}`,
+    const spatialRevision = measureSpatial(
+        "adapter.revision",
+        () => `${propsGeneration}:${renderStackSpatialRevision(stack)}`,
     );
 
     const synced = measureSpatial("adapter.sync", () =>

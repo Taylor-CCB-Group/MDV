@@ -6,7 +6,7 @@ class CategoryChart extends SVGChart {
         if (!Array.isArray(config.param)) {
             // as much as it's nice to have a simple single value, we are now more formally consistently
             // making config.param an array, so we need to make sure it is one here.
-            // Currently, the amount of extra faff using config.param[0] here 
+            // Currently, the amount of extra faff using config.param[0] here
             // is much less than would be needed elsewhere with more generic code.
             config.param = [config.param];
         }
@@ -23,15 +23,18 @@ class CategoryChart extends SVGChart {
         this.mobxAutorun(() => {
             // we need to react to config.param changes and updateData() or similar...
             console.log("config.param changed", this.config.param);
-            setTimeout(action(() => {
-                // colors could probably be `@computed` from dataStore.getColumnColors(this.config.param[0])...
-                this.colors = this.dataStore.getColumnColors(this.config.param[0]);
-                this.onDataFiltered();
-                // this.updateData();
-                if (hadDefaultTitle && this.config.title === originalTitle) {
-                    this.config.title = dataStore.getColumnName(this.config.param[0]);
-                }
-            }), 0);
+            setTimeout(
+                action(() => {
+                    // colors could probably be `@computed` from dataStore.getColumnColors(this.config.param[0])...
+                    this.colors = this.dataStore.getColumnColors(this.config.param[0]);
+                    this.onDataFiltered();
+                    // this.updateData();
+                    if (hadDefaultTitle && this.config.title === originalTitle) {
+                        this.config.title = dataStore.getColumnName(this.config.param[0]);
+                    }
+                }),
+                0,
+            );
         });
     }
 
@@ -105,8 +108,7 @@ class CategoryChart extends SVGChart {
             c.show_limit = 40;
         }
         if (c.show_limit) {
-            if (c.show_limit < this.rowData.length)
-                this.rowData.splice(c.show_limit);
+            if (c.show_limit < this.rowData.length) this.rowData.splice(c.show_limit);
         }
     }
 

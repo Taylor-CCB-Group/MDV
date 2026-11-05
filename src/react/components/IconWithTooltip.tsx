@@ -20,10 +20,7 @@ const IconWithTooltip = ({
     iconButtonProps,
 }: IconWithTooltipProps) => {
     return (
-        <CustomTooltip
-            tooltipText={tooltipText}
-            {...tooltipProps}
-        >
+        <CustomTooltip tooltipText={tooltipText} {...tooltipProps}>
             {href ? (
                 <IconButton
                     color="inherit"

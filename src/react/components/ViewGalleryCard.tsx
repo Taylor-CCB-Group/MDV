@@ -50,14 +50,7 @@ export function ViewGalleryCard({
     onCommitRename,
     onCancelRename,
 }: ViewGalleryCardProps) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: view.name,
         // Disabled when filter is on or not in edit mode.
         disabled: !canReorder,

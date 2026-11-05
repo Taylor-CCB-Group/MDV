@@ -1,21 +1,8 @@
 import useProjects from "@/catalog/hooks/useProjects";
 import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
-import {
-    Container,
-    DropzoneContainer,
-    DynamicText,
-    FileInputLabel,
-} from "@/charts/dialogs/FileUploadDialog";
-import {
-    Box,
-    Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-} from "@mui/material";
+import { Container, DropzoneContainer, DynamicText, FileInputLabel } from "@/charts/dialogs/FileUploadDialog";
+import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
 import { CloudUpload as CloudUploadIcon } from "@mui/icons-material";
 import axios, { AxiosError, type AxiosProgressEvent } from "axios";
 import type React from "react";
@@ -34,20 +21,16 @@ const REQUIRED_FILES = new Set(["views.json", "state.json", "datasources.json"])
 // Helper function moved outside component for better organization
 const findRootPrefix = (names: string[]): string | null => {
     // Check if all required files are in the root of archive
-    const rootFiles = new Set(names.filter(n => !n.includes("/")).map(n => n.split("/").pop() || ""));
-    if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => rootFiles.has(file)).length) {
+    const rootFiles = new Set(names.filter((n) => !n.includes("/")).map((n) => n.split("/").pop() || ""));
+    if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter((file) => rootFiles.has(file)).length) {
         return "";
     }
-    
+
     // Check one level below if required files exist
-    const dirs = new Set(names.filter(n => n.includes("/")).map(n => n.split("/")[0]));
+    const dirs = new Set(names.filter((n) => n.includes("/")).map((n) => n.split("/")[0]));
     for (const dir of dirs) {
-        const filesInDir = new Set(
-            names
-                .filter(n => n.startsWith(`${dir}/`))
-                .map(n => n.split("/").pop() || "")
-        );
-        if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter(file => filesInDir.has(file)).length) {
+        const filesInDir = new Set(names.filter((n) => n.startsWith(`${dir}/`)).map((n) => n.split("/").pop() || ""));
+        if (REQUIRED_FILES.size === [...REQUIRED_FILES].filter((file) => filesInDir.has(file)).length) {
             return `${dir}/`;
         }
     }
@@ -95,69 +78,73 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const [errorOpen, setErrorOpen] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
     const { fetchProjects } = useProjects();
-    
+
     // State to hold the chosen upload method and the client instance for cancellation
-    const [uploadMethod] = useState<'http' | 'socketio'>(
-        USE_SOCKETIO_UPLOAD ? 'socketio' : 'http'
-    );
+    const [uploadMethod] = useState<"http" | "socketio">(USE_SOCKETIO_UPLOAD ? "socketio" : "http");
     const [uploadClient, setUploadClient] = useState<SocketIOUploadClient | null>(null);
 
     // Get the mdvApiRoot from the hook
     const mdvApiRoot = useApiRoot();
-    
+
     const validateMDVProject = useCallback(async (file: File): Promise<{ isValid: boolean; error?: string }> => {
         let zipReader: ZipReader<Blob> | null = null;
-        
+
         try {
             zipReader = new ZipReader<Blob>(new BlobReader(file));
             const entries = await zipReader.getEntries();
-            
+
             // Get just the filenames without loading file contents
-            const fileNames = entries.map(entry => entry.filename);
-            
+            const fileNames = entries.map((entry) => entry.filename);
+
             // Reject entries with absolute paths or ".."
-            const badEntries = fileNames.filter(n => n.startsWith("/") || n.startsWith("\\") || n.includes(".."));
+            const badEntries = fileNames.filter((n) => n.startsWith("/") || n.startsWith("\\") || n.includes(".."));
             if (badEntries.length > 0) {
                 return { isValid: false, error: "Invalid ZIP file: unsafe paths detected" };
             }
 
             const root = findRootPrefix(fileNames);
-            
+
             if (root === null) {
-                return { isValid: false, error: "Not a valid MDV project: missing required files (views.json, state.json, datasources.json)" };
+                return {
+                    isValid: false,
+                    error: "Not a valid MDV project: missing required files (views.json, state.json, datasources.json)",
+                };
             }
 
             return { isValid: true };
         } catch (error) {
-            console.error('ZIP validation error:', error);
+            console.error("ZIP validation error:", error);
             return { isValid: false, error: "Failed to read ZIP file contents" };
         } finally {
             if (zipReader) {
                 try {
                     await zipReader.close();
                 } catch (closeError) {
-                    console.warn('Failed to close ZIP reader:', closeError);
+                    console.warn("Failed to close ZIP reader:", closeError);
                 }
             }
         }
     }, []);
 
-    const onDrop = useCallback(async (acceptedFiles: File[]) => {
-        if (acceptedFiles[0]) {
-            setValidationError(null);
-            const file = acceptedFiles[0];
-            
-            const validation = await validateMDVProject(file);
-            if (!validation.isValid) {
-                setValidationError(validation.error || "Invalid MDV project file");
-                return;
+    const onDrop = useCallback(
+        async (acceptedFiles: File[]) => {
+            if (acceptedFiles[0]) {
+                setValidationError(null);
+                const file = acceptedFiles[0];
+
+                const validation = await validateMDVProject(file);
+                if (!validation.isValid) {
+                    setValidationError(validation.error || "Invalid MDV project file");
+                    return;
+                }
+
+                setFile(file);
+                const name = file.name.match(/^(.+?)(?:\.mdv)?\.zip$/)?.[1];
+                setProjectName(name ?? "");
             }
-            
-            setFile(file);
-            const name = file.name.match(/^(.+?)(?:\.mdv)?\.zip$/)?.[1];
-            setProjectName(name ?? "");
-        }
-    }, [validateMDVProject]);
+        },
+        [validateMDVProject],
+    );
 
     const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
         onDrop,
@@ -170,8 +157,8 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         fileRejections.length > 0
             ? "Only ZIP files are allowed under 20 GB. Please try again."
             : validationError
-            ? validationError
-            : "Drag and drop a file here or click the button below (only MDV project archive *.zip files are allowed)";
+              ? validationError
+              : "Drag and drop a file here or click the button below (only MDV project archive *.zip files are allowed)";
 
     const rejectionMessageStyle = fileRejections.length > 0 || validationError ? "text-red-500" : "";
 
@@ -205,9 +192,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
             const res = await axios.post("import_project", form, {
                 onUploadProgress: (progressEvent: AxiosProgressEvent) => {
                     if (progressEvent.total) {
-                        const percentCompleted = Math.round(
-                            (progressEvent.loaded * 100) / progressEvent.total
-                        );
+                        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
                         setProgress(percentCompleted);
                     }
                 },
@@ -225,7 +210,10 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         } catch (error) {
             let err;
             if (error instanceof AxiosError) {
-                err = { message: error.response?.data?.error, stack: error.response?.status === 500 ? error?.stack : undefined };
+                err = {
+                    message: error.response?.data?.error,
+                    stack: error.response?.status === 500 ? error?.stack : undefined,
+                };
             } else if (error instanceof Error) {
                 err = { message: error.message, stack: error?.stack };
             } else {
@@ -281,7 +269,6 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
             });
             setUploadClient(client);
             await client.upload();
-
         } catch (error) {
             setIsLoading(false);
             setUploadClient(null);
@@ -299,7 +286,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     // Main handler to delegate to the correct upload function
     const handleUpload = useCallback(() => {
         console.log(`Using ${uploadMethod} upload method for project import.`);
-        if (uploadMethod === 'socketio') {
+        if (uploadMethod === "socketio") {
             handleSocketIOUpload();
         } else {
             handleHttpUpload();
@@ -336,7 +323,9 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                                         <DynamicText text={"Drop files here..."} className="text-sm" />
                                     ) : (
                                         <DynamicText
-                                            text={file ? `Selected file: ${file.name} (${projectName})` : rejectionMessage}
+                                            text={
+                                                file ? `Selected file: ${file.name} (${projectName})` : rejectionMessage
+                                            }
                                             className={`${rejectionMessageStyle} text-sm`}
                                         />
                                     )}

@@ -28,28 +28,16 @@ const TextBoxMarkdownRenderer = ({ markdown }: { markdown: string }) => {
 
     useEffect(() => {
         let cancelled = false;
-        Promise.all([
-            import("react-markdown"),
-            import("remark-gfm"),
-            import("rehype-raw"),
-            import("rehype-sanitize"),
-        ])
-            .then(
-                ([
-                    reactMarkdownModule,
-                    remarkGfmModule,
-                    rehypeRawModule,
-                    rehypeSanitizeModule,
-                ]) => {
-                    if (cancelled) return;
-                    setRuntime({
-                        ReactMarkdown: reactMarkdownModule.default,
-                        remarkGfm: remarkGfmModule.default,
-                        rehypeRaw: rehypeRawModule.default,
-                        rehypeSanitize: rehypeSanitizeModule.default,
-                    });
-                },
-            )
+        Promise.all([import("react-markdown"), import("remark-gfm"), import("rehype-raw"), import("rehype-sanitize")])
+            .then(([reactMarkdownModule, remarkGfmModule, rehypeRawModule, rehypeSanitizeModule]) => {
+                if (cancelled) return;
+                setRuntime({
+                    ReactMarkdown: reactMarkdownModule.default,
+                    remarkGfm: remarkGfmModule.default,
+                    rehypeRaw: rehypeRawModule.default,
+                    rehypeSanitize: rehypeSanitizeModule.default,
+                });
+            })
             .catch((error) => {
                 if (cancelled) return;
                 console.error("failed to load markdown runtime", error);
@@ -62,21 +50,9 @@ const TextBoxMarkdownRenderer = ({ markdown }: { markdown: string }) => {
 
     const markdownComponents = useMemo(
         () => ({
-            pre({
-                children,
-                className,
-            }: {
-                children?: ReactNode;
-                className?: string;
-            }) {
+            pre({ children, className }: { children?: ReactNode; className?: string }) {
                 return (
-                    <div
-                        className={
-                            className
-                                ? `mdv-textbox-fenced ${className}`
-                                : "mdv-textbox-fenced"
-                        }
-                    >
+                    <div className={className ? `mdv-textbox-fenced ${className}` : "mdv-textbox-fenced"}>
                         {children}
                     </div>
                 );
@@ -92,9 +68,7 @@ const TextBoxMarkdownRenderer = ({ markdown }: { markdown: string }) => {
                 node?: unknown;
             }) {
                 const language = getCodeBlockLanguage(className);
-                const renderer = language
-                    ? getTextBoxFencedRenderer(language)
-                    : undefined;
+                const renderer = language ? getTextBoxFencedRenderer(language) : undefined;
                 if (!renderer) {
                     const blockLang = getCodeBlockLanguage(className);
                     const text = toCodeString(children).replace(/\n$/, "");

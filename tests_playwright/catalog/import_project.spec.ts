@@ -1,11 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { isWorktreeFrontendForPlaywright } from "../utils/helpers";
-import {
-    gotoPath,
-    mockApiRoot,
-    mockExtensionConfig,
-    mockProjects,
-} from "../utils/routes";
+import { gotoPath, mockApiRoot, mockExtensionConfig, mockProjects } from "../utils/routes";
 
 test("import dialog opens when import permissions are enabled", async ({ page }) => {
     test.skip(

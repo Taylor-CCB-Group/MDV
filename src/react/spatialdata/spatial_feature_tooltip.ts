@@ -12,15 +12,11 @@ export function formatSpatialFeatureTooltipHtml(tooltip: SpatialFeatureTooltipDa
             lines.push(`<div style="margin-top:6px;font-weight:600">${escapeHtml(section.title)}</div>`);
         }
         for (const item of section.items ?? []) {
-            lines.push(
-                `<div>${escapeHtml(item.label)}: ${escapeHtml(String(item.value ?? ""))}</div>`,
-            );
+            lines.push(`<div>${escapeHtml(item.label)}: ${escapeHtml(String(item.value ?? ""))}</div>`);
         }
     }
     for (const item of tooltip.items ?? []) {
-        lines.push(
-            `<div>${escapeHtml(item.label)}: ${escapeHtml(String(item.value ?? ""))}</div>`,
-        );
+        lines.push(`<div>${escapeHtml(item.label)}: ${escapeHtml(String(item.value ?? ""))}</div>`);
     }
     // Central sanitization of the assembled markup is the actual XSS guard for the
     // `innerHTML`-bound tooltip; `escapeHtml` below stays as defence in depth on each field.
@@ -28,9 +24,5 @@ export function formatSpatialFeatureTooltipHtml(tooltip: SpatialFeatureTooltipDa
 }
 
 function escapeHtml(value: string): string {
-    return value
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;");
+    return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }

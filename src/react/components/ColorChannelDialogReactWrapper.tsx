@@ -9,7 +9,9 @@ import type { VivContextType } from "./avivatorish/state";
 
 const ColorChannelDialogReact = observer(function ColorChannelDialogReact({
     vivStores,
-}: { vivStores: VivContextType }) {
+}: {
+    vivStores: VivContextType;
+}) {
     return <Gui vivStores={vivStores} />;
 });
 
@@ -24,10 +26,7 @@ class ColorDialogReactWrapper extends BaseDialog {
         this._root = v;
     }
     constructor(parent: VivMDVReact) {
-        if (parent.__doc__ !== document)
-            console.warn(
-                "ColorDialogReactWrapper may have styling issues in popouts...",
-            );
+        if (parent.__doc__ !== document) console.warn("ColorDialogReactWrapper may have styling issues in popouts...");
         const config = {
             width: 500,
             title: `Color Channels (${parent.config.title})`,
@@ -56,10 +55,7 @@ class ColorDialogReactWrapper extends BaseDialog {
         // I don't think there's any 'this' weirdness going on here...
         // some kind of react voodoo?
         if (this.root) this.root.unmount();
-        else
-            console.warn(
-                "not unmounting react root for dialog because of weirdness",
-            );
+        else console.warn("not unmounting react root for dialog because of weirdness");
     }
 }
 

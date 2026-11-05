@@ -1,9 +1,5 @@
 import { Typography } from "@mui/material";
-import {
-    pickDefaultSelectionForAdd,
-    serializeChannelConfig,
-    type LayerChannelConfig,
-} from "@spatialdata/avivatorish";
+import { pickDefaultSelectionForAdd, serializeChannelConfig, type LayerChannelConfig } from "@spatialdata/avivatorish";
 import {
     ImageLayerContextProvider,
     useImageLayerContext,
@@ -11,30 +7,14 @@ import {
     type LayerConfig,
 } from "@spatialdata/vis";
 import { observer } from "mobx-react-lite";
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useMemo,
-    useRef,
-    useState,
-} from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 
 import { useChart } from "@/react/context";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "@/react/components/SpatialDataMDVReact";
-import {
-    toneFromArrays,
-    toneFromVivLayerProps,
-    useImageLayerRuntime,
-} from "@/react/spatialdata/image_layer_runtime";
+import { toneFromArrays, toneFromVivLayerProps, useImageLayerRuntime } from "@/react/spatialdata/image_layer_runtime";
 import { useRenderStackEntry } from "@/react/spatialdata/render_stack_control";
 import { VivChannelList } from "../ColorChannelComponents";
-import {
-    createVivStores,
-    VivProvider,
-    useChannelsStoreApi,
-    useViewerStoreApi,
-} from "../avivatorish/state";
+import { createVivStores, VivProvider, useChannelsStoreApi, useViewerStoreApi } from "../avivatorish/state";
 
 type ImageLayerConfig = Extract<LayerConfig, { type: "image" }>;
 
@@ -97,13 +77,7 @@ const ImageLayerPanelLoaded = observer(function ImageLayerPanelLoaded({
         );
     }
 
-    return (
-        <ImageLayerPanelReady
-            layer={layer}
-            layerContext={layerContext}
-            patchLayer={patchLayer}
-        />
-    );
+    return <ImageLayerPanelReady layer={layer} layerContext={layerContext} patchLayer={patchLayer} />;
 });
 
 const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
@@ -163,16 +137,8 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
     // on a real channel edit, so they are honest useMemo/useCallback deps (and the
     // hooks linter accepts the locals, where `hookState.x` member access would make
     // it demand the whole — freshly-allocated — `hookState` object).
-    const {
-        channelIds,
-        colors,
-        contrastLimits,
-        channelsVisible,
-        selections,
-        setChannels,
-        addChannel,
-        removeChannel,
-    } = hookState;
+    const { channelIds, colors, contrastLimits, channelsVisible, selections, setChannels, addChannel, removeChannel } =
+        hookState;
 
     const channelCount = channelIds.length;
     // `vivLayerProps` is patched in place (stable object ref); `brightnessRaw` /
@@ -212,17 +178,12 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
 
     const addChannelWithSelection = useCallback(() => {
         const current = hookStateRef.current;
-        const nextC = pickDefaultSelectionForAdd(
-            current.selections,
-            layerContext.channelNames,
-        );
+        const nextC = pickDefaultSelectionForAdd(current.selections, layerContext.channelNames);
         const base = current.selections[0] ?? {};
         addChannel();
         setChannels({
             selections: [
-                ...current.selections.map(
-                    (selection: (typeof current.selections)[number]) => ({ ...selection }),
-                ),
+                ...current.selections.map((selection: (typeof current.selections)[number]) => ({ ...selection })),
                 { ...base, c: nextC },
             ],
         });
@@ -244,13 +205,11 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
             brightness: tone.brightness,
             contrast: tone.contrast,
             toneUnavailable,
-            selections: selections.map(
-                (selection: (typeof selections)[number]) => ({
-                    z: selection.z ?? 0,
-                    c: selection.c ?? 0,
-                    t: selection.t ?? 0,
-                }),
-            ),
+            selections: selections.map((selection: (typeof selections)[number]) => ({
+                z: selection.z ?? 0,
+                c: selection.c ?? 0,
+                t: selection.t ?? 0,
+            })),
             setChannels,
             addChannel,
             addChannelWithSelection,
@@ -291,11 +250,7 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
     );
 });
 
-const ImageLayerPanelBridge = observer(function ImageLayerPanelBridge({
-    entryId,
-}: {
-    entryId: string;
-}) {
+const ImageLayerPanelBridge = observer(function ImageLayerPanelBridge({ entryId }: { entryId: string }) {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const { entry } = useRenderStackEntry(entryId);
     const registry = chart.imageLayerRegistry;

@@ -89,7 +89,9 @@ const SpatialStatusPanel = observer(function SpatialStatusPanel({ chart }: { cha
                             Dismiss errors
                         </Button>
                     )}
-                    {copyState === "failed" && <span className="opacity-70">Could not copy; logged to the console.</span>}
+                    {copyState === "failed" && (
+                        <span className="opacity-70">Could not copy; logged to the console.</span>
+                    )}
                 </div>
             )}
             {rasterIssues.length > 0 && (

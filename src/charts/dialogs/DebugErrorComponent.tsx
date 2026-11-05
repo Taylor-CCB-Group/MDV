@@ -1,12 +1,6 @@
 import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 import { DEBUG_ERROR_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
-import {
-    Check,
-    ContentCopy,
-    Error as ErrorIcon,
-    ExpandLess,
-    ExpandMore,
-} from "@mui/icons-material";
+import { Check, ContentCopy, Error as ErrorIcon, ExpandLess, ExpandMore } from "@mui/icons-material";
 import {
     Alert,
     AlertTitle,
@@ -41,11 +35,7 @@ export interface DebugErrorComponentProps {
     extraMetadata?: ErrorMetadata;
 }
 
-const DebugErrorComponent = ({
-    error,
-    title = "Error Occurred",
-    extraMetadata,
-}: DebugErrorComponentProps) => {
+const DebugErrorComponent = ({ error, title = "Error Occurred", extraMetadata }: DebugErrorComponentProps) => {
     const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
     const [userComments, setUserComments] = useState<string>();
@@ -152,9 +142,8 @@ const DebugErrorComponent = ({
                             justifyContent: "center",
                         }}
                     >
-                        <Typography sx={{color: "text.primary"}}>
-                            Thank you for your feedback, we will do our best to
-                            fix this issue as soon as possible.
+                        <Typography sx={{ color: "text.primary" }}>
+                            Thank you for your feedback, we will do our best to fix this issue as soon as possible.
                         </Typography>
                     </Box>
                 ) : (
@@ -200,16 +189,11 @@ const DebugErrorComponent = ({
                                             ml: 1,
                                             color: "var(--text_color_error)",
                                             "&:hover": {
-                                                backgroundColor:
-                                                    "var(--background_color)",
+                                                backgroundColor: "var(--background_color)",
                                             },
                                         }}
                                     >
-                                        {copied ? (
-                                            <Check />
-                                        ) : (
-                                            <ContentCopy />
-                                        )}
+                                        {copied ? <Check /> : <ContentCopy />}
                                     </IconButton>
                                 </Tooltip>
                             </AlertTitle>
@@ -233,9 +217,7 @@ const DebugErrorComponent = ({
                                     <div>
                                         <IconButton
                                             size="medium"
-                                            onClick={() =>
-                                                setExpanded(!expanded)
-                                            }
+                                            onClick={() => setExpanded(!expanded)}
                                             sx={{
                                                 mb: 1,
                                                 fontSize: "0.875rem",
@@ -246,20 +228,13 @@ const DebugErrorComponent = ({
                                                 borderRadius: "6px",
                                                 color: "var(--icon_color_error)",
                                                 "&:hover": {
-                                                    backgroundColor:
-                                                        "var(--background_color_hover)",
+                                                    backgroundColor: "var(--background_color_hover)",
                                                 },
                                             }}
                                         >
-                                            {expanded ? (
-                                                <ExpandLess />
-                                            ) : (
-                                                <ExpandMore />
-                                            )}
+                                            {expanded ? <ExpandLess /> : <ExpandMore />}
                                             <span style={{ marginLeft: "6px" }}>
-                                                {expanded
-                                                    ? "Hide Details"
-                                                    : "Show Details"}
+                                                {expanded ? "Hide Details" : "Show Details"}
                                             </span>
                                         </IconButton>
 
@@ -269,21 +244,15 @@ const DebugErrorComponent = ({
                                                 style={{
                                                     whiteSpace: "pre-wrap",
                                                     wordBreak: "break-word",
-                                                    padding: "10px"
+                                                    padding: "10px",
                                                 }}
                                                 src={{
-                                                    ...metaData, 
+                                                    ...metaData,
                                                     // buildInfo: buildInfo
                                                 }}
-                                                onAdd={(params) =>
-                                                    setMetaData(params.src)
-                                                }
-                                                onDelete={(params) =>
-                                                    setMetaData(params.src)
-                                                }
-                                                onEdit={(params) =>
-                                                    setMetaData(params.src)
-                                                }
+                                                onAdd={(params) => setMetaData(params.src)}
+                                                onDelete={(params) => setMetaData(params.src)}
+                                                onEdit={(params) => setMetaData(params.src)}
                                                 collapsed={1}
                                                 customizeNode={(_params) => {
                                                     return { add: false };
@@ -302,23 +271,18 @@ const DebugErrorComponent = ({
                             }}
                         >
                             <Typography sx={{ mb: 2 }}>
-                                {DEBUG_ERROR_REPORT_MESSAGE[0]}
-                                {' '}
-                                <Link 
-                                    href={`mailto:${MDV_EMAIL}?subject=MDV%20Error%20Report`} 
-                                    sx={{ 
-                                        textDecoration: "none", 
-                                        "&.MuiLink-root": { color: "info.main" } 
+                                {DEBUG_ERROR_REPORT_MESSAGE[0]}{" "}
+                                <Link
+                                    href={`mailto:${MDV_EMAIL}?subject=MDV%20Error%20Report`}
+                                    sx={{
+                                        textDecoration: "none",
+                                        "&.MuiLink-root": { color: "info.main" },
                                     }}
                                 >
                                     {MDV_EMAIL}
                                 </Link>
                             </Typography>
-                            {metaData && (
-                                <Typography sx={{ mb: 2 }}>
-                                    {DEBUG_ERROR_REPORT_MESSAGE[1]}
-                                </Typography>
-                            )}
+                            {metaData && <Typography sx={{ mb: 2 }}>{DEBUG_ERROR_REPORT_MESSAGE[1]}</Typography>}
                             {/* <TextareaAutosize
                                 minRows={3}
                                 style={{

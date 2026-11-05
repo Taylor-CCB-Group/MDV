@@ -7,15 +7,8 @@ type ChartManagerProviderProps = PropsWithChildren<{
     chartManager?: ChartManager | null;
 }>;
 
-export function ChartManagerProvider({
-    chartManager,
-    children,
-}: ChartManagerProviderProps) {
-    return (
-        <ChartManagerContext.Provider value={chartManager ?? null}>
-            {children}
-        </ChartManagerContext.Provider>
-    );
+export function ChartManagerProvider({ chartManager, children }: ChartManagerProviderProps) {
+    return <ChartManagerContext.Provider value={chartManager ?? null}>{children}</ChartManagerContext.Provider>;
 }
 
 export function useChartManagerContext() {

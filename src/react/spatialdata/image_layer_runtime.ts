@@ -1,8 +1,5 @@
 import { useChannelSelectionStats } from "@spatialdata/avivatorish";
-import type {
-    LayerChannelSelection,
-    UseLayerChannelStateResult,
-} from "@spatialdata/avivatorish";
+import type { LayerChannelSelection, UseLayerChannelStateResult } from "@spatialdata/avivatorish";
 import { useLayoutEffect } from "react";
 
 import type { StoreApi } from "zustand";
@@ -47,10 +44,7 @@ export function toneFromVivLayerProps(
     return toneFromArrays(vivLayerProps?.brightness, vivLayerProps?.contrast, count);
 }
 
-function channelOptionsForSelections(
-    selections: LayerChannelSelection[],
-    channelNames: string[],
-): string[] {
+function channelOptionsForSelections(selections: LayerChannelSelection[], channelNames: string[]): string[] {
     return selections.map((selection, index) => {
         const channelIndex = selection.c ?? index;
         return channelNames[channelIndex] ?? `Channel ${channelIndex + 1}`;
@@ -76,13 +70,7 @@ type RuntimeInput = {
  * live in the canonical render-stack entry and the UI reads them through the
  * panel context. Never writes MobX; never subscribes zustand → persistence.
  */
-export function useImageLayerRuntime({
-    hookState,
-    loader,
-    channelNames,
-    channelsStore,
-    viewerStore,
-}: RuntimeInput) {
+export function useImageLayerRuntime({ hookState, loader, channelNames, channelsStore, viewerStore }: RuntimeInput) {
     const { statsByIndex, loadingByChannelId } = useChannelSelectionStats({
         loader,
         channelIds: hookState.channelIds,
@@ -100,26 +88,17 @@ export function useImageLayerRuntime({
     useLayoutEffect(() => {
         channelsStore.setState({
             domains: hookState.channelIds.map(
-                (_, index) =>
-                    statsByIndex[index]?.domain ??
-                    hookState.contrastLimits[index] ??
-                    ([0, 255] as Range),
+                (_, index) => statsByIndex[index]?.domain ?? hookState.contrastLimits[index] ?? ([0, 255] as Range),
             ),
-            raster: hookState.channelIds.map(
-                (_, index) => statsByIndex[index]?.raster ?? EMPTY_RASTER,
-            ),
+            raster: hookState.channelIds.map((_, index) => statsByIndex[index]?.raster ?? EMPTY_RASTER),
             loader,
         });
 
         const viewer = viewerStore.getState();
         viewerStore.setState({
             channelOptions: channelOptionsForSelections(hookState.selections, channelNames),
-            pixelValues: hookState.channelIds.map(
-                (_, index) => viewer.pixelValues[index] ?? Number.NaN,
-            ),
-            isChannelLoading: hookState.channelIds.map(
-                (id) => loadingByChannelId.get(id) ?? false,
-            ),
+            pixelValues: hookState.channelIds.map((_, index) => viewer.pixelValues[index] ?? Number.NaN),
+            isChannelLoading: hookState.channelIds.map((id) => loadingByChannelId.get(id) ?? false),
             isViewerLoading: false,
         });
     }, [

@@ -13,7 +13,14 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import type { ChatMessage, ChatModelOption, ChatDatasourceOption, DatasourceMode, ChatProgress, ConversationMap } from "./ChatAPI";
+import type {
+    ChatMessage,
+    ChatModelOption,
+    ChatDatasourceOption,
+    DatasourceMode,
+    ChatProgress,
+    ConversationMap,
+} from "./ChatAPI";
 import {
     Close as CloseIcon,
     Launch as LaunchIcon,
@@ -86,17 +93,9 @@ const ChatDialog = ({
     const minDrawerWidth = 180;
     const maxDrawerWidth = fullscreen ? 1000 : 600;
     const [drawerOpen, setDrawerOpen] = useState(true);
-    const [search, setSearch] = useState("")
+    const [search, setSearch] = useState("");
     const dialogRef = useRef<HTMLDivElement>(null);
-    const { 
-        drawerWidth,
-        onMouseDown,
-    } = useResizeDrawer(
-        dialogRef, 
-        defaultDrawerWidth, 
-        minDrawerWidth, 
-        maxDrawerWidth
-    );
+    const { drawerWidth, onMouseDown } = useResizeDrawer(dialogRef, defaultDrawerWidth, minDrawerWidth, maxDrawerWidth);
 
     const filteredLog = useMemo(() => {
         const filteredConversations: ConversationMap = {};
@@ -173,92 +172,92 @@ const ChatDialog = ({
                 <Box sx={{ display: "flex", height: "100%" }}>
                     {drawerOpen && (
                         <>
-                        <Drawer
-                            open={drawerOpen}
-                            variant="persistent"
-                            anchor="left"
-                            PaperProps={{
-                                sx: {
-                                    position: "relative",
-                                    bgcolor: "unset",
+                            <Drawer
+                                open={drawerOpen}
+                                variant="persistent"
+                                anchor="left"
+                                PaperProps={{
+                                    sx: {
+                                        position: "relative",
+                                        bgcolor: "unset",
+                                        width: drawerWidth,
+                                        minWidth: minDrawerWidth,
+                                        maxWidth: maxDrawerWidth,
+                                    },
+                                }}
+                                sx={{
                                     width: drawerWidth,
-                                    minWidth: minDrawerWidth,
-                                    maxWidth: maxDrawerWidth,
-                                },
-                            }}
-                            sx={{
-                                width: drawerWidth,
-                                height: "100%",
-                            }}
-                        >
-                            <Box sx={{ position: 'relative', height: '100%' }}>
-                                <Box sx={{ mt: 2, px: 1 }}>
-                                    <Button variant="contained" fullWidth onClick={startNewConversation}>
-                                        New Chat
-                                    </Button>
-                                </Box>
-                                <TextField
-                                    fullWidth
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Search History...."
-                                    sx={{
-                                        mt: 2,
-                                        mb: 2,
-                                        px: 1,
-                                    }}
-                                    slotProps={{
-                                        input: {
-                                            startAdornment: (
-                                                <InputAdornment position="start">
-                                                    <SearchIcon fontSize="small" />
-                                                </InputAdornment>
-                                            ),
-                                        },
-                                    }}
-                                />
-                                <Divider />
-                                <List>
-                                    {isLoading || isLoadingInit ? (
-                                        <ListItemButton>
-                                            <ListItemText primary="Loading chat history..." />
-                                        </ListItemButton>
-                                    ) : (
-                                        Object.entries(filteredLog).map(([convId, conv], index) => (
-                                            <ListItemButton
-                                                key={convId}
-                                                onClick={() => switchConversation(convId)}
-                                                selected={conversationId === convId}
-                                            >
-                                                <ListItemText
-                                                    primary={conv.logText}
-                                                    secondary={`${conv.logLength} messages`}
-                                                    primaryTypographyProps={{
-                                                        noWrap: true,
-                                                        variant: "body1",
-                                                        fontWeight: "bold",
-                                                    }}
-                                                />
+                                    height: "100%",
+                                }}
+                            >
+                                <Box sx={{ position: "relative", height: "100%" }}>
+                                    <Box sx={{ mt: 2, px: 1 }}>
+                                        <Button variant="contained" fullWidth onClick={startNewConversation}>
+                                            New Chat
+                                        </Button>
+                                    </Box>
+                                    <TextField
+                                        fullWidth
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder="Search History...."
+                                        sx={{
+                                            mt: 2,
+                                            mb: 2,
+                                            px: 1,
+                                        }}
+                                        slotProps={{
+                                            input: {
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <SearchIcon fontSize="small" />
+                                                    </InputAdornment>
+                                                ),
+                                            },
+                                        }}
+                                    />
+                                    <Divider />
+                                    <List>
+                                        {isLoading || isLoadingInit ? (
+                                            <ListItemButton>
+                                                <ListItemText primary="Loading chat history..." />
                                             </ListItemButton>
-                                        ))
-                                    )}
-                                </List>
-                            </Box>
-                        </Drawer>
-                        <Box
-                            sx={{
-                                // position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: 8,
-                                height: '100%',
-                                cursor: 'ew-resize',
-                                zIndex: 10,
-                                backgroundColor: 'rgba(0,0,0,0.05)',
-                                '&:hover': { background: 'rgba(0,0,0,0.15)' },
-                            }}
-                            onMouseDown={onMouseDown}
-                        />
+                                        ) : (
+                                            Object.entries(filteredLog).map(([convId, conv], index) => (
+                                                <ListItemButton
+                                                    key={convId}
+                                                    onClick={() => switchConversation(convId)}
+                                                    selected={conversationId === convId}
+                                                >
+                                                    <ListItemText
+                                                        primary={conv.logText}
+                                                        secondary={`${conv.logLength} messages`}
+                                                        primaryTypographyProps={{
+                                                            noWrap: true,
+                                                            variant: "body1",
+                                                            fontWeight: "bold",
+                                                        }}
+                                                    />
+                                                </ListItemButton>
+                                            ))
+                                        )}
+                                    </List>
+                                </Box>
+                            </Drawer>
+                            <Box
+                                sx={{
+                                    // position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: 8,
+                                    height: "100%",
+                                    cursor: "ew-resize",
+                                    zIndex: 10,
+                                    backgroundColor: "rgba(0,0,0,0.05)",
+                                    "&:hover": { background: "rgba(0,0,0,0.15)" },
+                                }}
+                                onMouseDown={onMouseDown}
+                            />
                         </>
                     )}
                     <Box sx={{ flexGrow: 1, overflow: "hidden", pb: 2 }}>

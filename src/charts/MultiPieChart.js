@@ -39,9 +39,7 @@ class MultiPieChart extends SVGChart {
                 index: n,
             };
         }
-        const cat = this.dataStore.columnIndex[p[3]].values.indexOf(
-            this.config.category,
-        );
+        const cat = this.dataStore.columnIndex[p[3]].values.indexOf(this.config.category);
         for (let i = 0; i < len; i++) {
             if (fc[i] === cat) {
                 const d = data[c1d[i]].data;
@@ -102,10 +100,7 @@ class MultiPieChart extends SVGChart {
 
     drawChart(tTime = 1000) {
         //can't get transitions to work properly
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(tTime)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
         const dim = this._getContentDimensions();
         const ratio = dim.width / dim.height;
         const rc = Math.ceil(Math.sqrt(this.data.length));
@@ -173,9 +168,7 @@ class MultiPieChart extends SVGChart {
             })
             .join("path")
             .attr("class", "pie-outer")
-            .attr("stroke", (d) =>
-                d.data[3] === this.highlight ? "black" : "white",
-            )
+            .attr("stroke", (d) => (d.data[3] === this.highlight ? "black" : "white"))
             .attr("d", this.arc)
             .on("click", (e, d) => {
                 this.dataStore.dataHighlighted([d.data[3]], this);
@@ -184,17 +177,12 @@ class MultiPieChart extends SVGChart {
                 const c1 = v1[d.data[0]];
                 const c2 = v2[d.data[1]];
                 const p = ((d.data[2] / d.sum) * 100).toFixed(2);
-                this.showToolTip(
-                    e,
-                    `${c1}<br>${c2}<br>${d.data[2].toFixed(2)}<br>${p}%`,
-                );
+                this.showToolTip(e, `${c1}<br>${c2}<br>${d.data[2].toFixed(2)}<br>${p}%`);
             })
             .on("mouseleave", () => {
                 this.hideToolTip();
             })
-            .style("stroke-width", (d) =>
-                d.data[3] === this.highlight ? "4px" : "2px",
-            )
+            .style("stroke-width", (d) => (d.data[3] === this.highlight ? "4px" : "2px"))
             .style("fill", (d, i) => {
                 return c2[d.data[1]];
             });

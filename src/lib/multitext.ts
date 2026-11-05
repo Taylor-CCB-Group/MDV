@@ -26,9 +26,7 @@ function filterSemanticItems(items: string[], options?: MultiTextItemOptions) {
     return items.filter((item) => item !== options.emptyItem);
 }
 
-export function getMultitextDelimiter(
-    column: Pick<MultiTextColumnLike, "delimiter" | "values">,
-) {
+export function getMultitextDelimiter(column: Pick<MultiTextColumnLike, "delimiter" | "values">) {
     if (column.delimiter) {
         return column.delimiter;
     }
@@ -51,20 +49,14 @@ export function joinMultitextItems(items: Iterable<string>, delimiter = ",") {
 }
 
 export function normalizeMultitextItems(items: Iterable<string>) {
-    return Array.from(new Set(trimNonEmpty(items))).sort((left, right) =>
-        left.localeCompare(right),
-    );
+    return Array.from(new Set(trimNonEmpty(items))).sort((left, right) => left.localeCompare(right));
 }
 
-export function getMultitextCapacity(
-    column: Pick<MultiTextColumnLike, "stringLength">,
-) {
+export function getMultitextCapacity(column: Pick<MultiTextColumnLike, "stringLength">) {
     return Math.max(column.stringLength || 1, 1);
 }
 
-export function isPackedMultitextColumn(
-    column: Pick<MultiTextColumnLike, "stringLength">,
-) {
+export function isPackedMultitextColumn(column: Pick<MultiTextColumnLike, "stringLength">) {
     return getMultitextCapacity(column) > 1;
 }
 
@@ -84,9 +76,7 @@ export function getMultitextValueItems(
     if (value == null) {
         return [];
     }
-    const items = isPackedMultitextColumn(column)
-        ? [value]
-        : splitMultitextItems(value, getMultitextDelimiter(column));
+    const items = isPackedMultitextColumn(column) ? [value] : splitMultitextItems(value, getMultitextDelimiter(column));
     return filterSemanticItems(items, options);
 }
 
@@ -95,15 +85,10 @@ export function getMultitextItemValues(
     options?: MultiTextItemOptions,
 ) {
     if (isPackedMultitextColumn(column)) {
-        return filterSemanticItems(
-            trimNonEmpty(column.values),
-            options,
-        );
+        return filterSemanticItems(trimNonEmpty(column.values), options);
     }
     const delimiter = getMultitextDelimiter(column);
-    const values = column.values.flatMap((value) =>
-        splitMultitextItems(value, delimiter),
-    );
+    const values = column.values.flatMap((value) => splitMultitextItems(value, delimiter));
     return Array.from(new Set(filterSemanticItems(values, options)));
 }
 
@@ -119,10 +104,7 @@ export function getRowMultitextValueIndices(
     const indices: number[] = [];
     for (let offset = 0; offset < capacity; offset += 1) {
         const valueIndex = column.data[start + offset];
-        if (
-            valueIndex == null ||
-            valueIndex === MULTITEXT_EMPTY_INDEX
-        ) {
+        if (valueIndex == null || valueIndex === MULTITEXT_EMPTY_INDEX) {
             break;
         }
         indices.push(valueIndex);
@@ -136,8 +118,6 @@ export function getRowMultitextItems(
     options?: MultiTextItemOptions,
 ) {
     const indices = getRowMultitextValueIndices(column, rowIndex);
-    const items = indices.flatMap((valueIndex) =>
-        getMultitextValueItems(column, valueIndex, options),
-    );
+    const items = indices.flatMap((valueIndex) => getMultitextValueItems(column, valueIndex, options));
     return filterSemanticItems(items, options);
 }

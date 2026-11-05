@@ -1,8 +1,5 @@
 import test, { expect } from "@playwright/test";
-import {
-    createSharedSyntheticAnndataSuite,
-    type SharedSyntheticAnndataSuiteHandle,
-} from "../../utils/projectFixtures";
+import { createSharedSyntheticAnndataSuite, type SharedSyntheticAnndataSuiteHandle } from "../../utils/projectFixtures";
 import {
     addChartViaUi,
     getAvailableAddableChartTypes,
@@ -56,9 +53,7 @@ test.describe("Chart Creation", () => {
 
                 const chartsAfter = await getChartSummaries(page);
                 const createdChart = chartsAfter.find(
-                    (chart) =>
-                        chart.title === title &&
-                        !chartsBefore.some((before) => before.id === chart.id),
+                    (chart) => chart.title === title && !chartsBefore.some((before) => before.id === chart.id),
                 );
 
                 expect(createdChart).toBeTruthy();

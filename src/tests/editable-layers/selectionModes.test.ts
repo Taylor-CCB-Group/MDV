@@ -29,7 +29,15 @@ function squareCollection(size = 10): FeatureCollection {
                 properties: {},
                 geometry: {
                     type: "Polygon",
-                    coordinates: [[[0, 0], [size, 0], [size, size], [0, size], [0, 0]]],
+                    coordinates: [
+                        [
+                            [0, 0],
+                            [size, 0],
+                            [size, size],
+                            [0, size],
+                            [0, 0],
+                        ],
+                    ],
                 },
             },
         ],
@@ -100,7 +108,12 @@ function tentativeHandlePick(position: Position, positionIndex: number): Pick {
         isGuide: true,
         object: {
             type: "Feature",
-            properties: { guideType: "editHandle", editHandleType: "existing", featureIndex: -1, positionIndexes: [positionIndex] },
+            properties: {
+                guideType: "editHandle",
+                editHandleType: "existing",
+                featureIndex: -1,
+                positionIndexes: [positionIndex],
+            },
             geometry: { type: "Point", coordinates: position },
         },
     };
@@ -115,39 +128,66 @@ describe("selection edit modes", () => {
     it("Polygon tool adds the double-clicked point as the last vertex and completes the polygon", () => {
         const mode: GeoJsonEditMode = new PolygonMode();
         const { props, onEdit } = modeProps(emptyCollection());
-        for (const p of [[0, 0], [10, 0], [10, 10]] satisfies XY[]) {
+        for (const p of [
+            [0, 0],
+            [10, 0],
+            [10, 10],
+        ] satisfies XY[]) {
             mode.handleClick(pointerEvent(p), props);
         }
         mode.handleDoubleClick(pointerEvent([0, 10]), props);
 
         const added = onEdit.mock.calls.find(([a]) => a.editType === "addFeature")?.[0];
         expect(added?.updatedData.features).toHaveLength(1);
-        expect(outerRing(added?.updatedData)).toEqual([[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]);
+        expect(outerRing(added?.updatedData)).toEqual([
+            [0, 0],
+            [10, 0],
+            [10, 10],
+            [0, 10],
+            [0, 0],
+        ]);
     });
 
     it("Polygon tool completes a triangle when the third vertex is double-clicked", () => {
         const mode: GeoJsonEditMode = new PolygonMode();
         const { props, onEdit } = modeProps(emptyCollection());
-        for (const p of [[0, 0], [10, 0]] satisfies XY[]) {
+        for (const p of [
+            [0, 0],
+            [10, 0],
+        ] satisfies XY[]) {
             mode.handleClick(pointerEvent(p), props);
         }
         mode.handleDoubleClick(pointerEvent([10, 10]), props);
 
         const added = onEdit.mock.calls.find(([a]) => a.editType === "addFeature")?.[0];
-        expect(outerRing(added?.updatedData)).toEqual([[0, 0], [10, 0], [10, 10], [0, 0]]);
+        expect(outerRing(added?.updatedData)).toEqual([
+            [0, 0],
+            [10, 0],
+            [10, 10],
+            [0, 0],
+        ]);
     });
 
     it("Polygon tool doesn't duplicate the last vertex when its handle is double-clicked", () => {
         const mode: GeoJsonEditMode = new PolygonMode();
         const { props, onEdit } = modeProps(emptyCollection());
-        for (const p of [[0, 0], [10, 0], [10, 10]] satisfies XY[]) {
+        for (const p of [
+            [0, 0],
+            [10, 0],
+            [10, 10],
+        ] satisfies XY[]) {
             mode.handleClick(pointerEvent(p), props);
         }
         // nearby rather than exact: the handle is picked within a pixel radius
         mode.handleDoubleClick(pointerEvent([10.01, 10], [tentativeHandlePick([10, 10], 2)]), props);
 
         const added = onEdit.mock.calls.find(([a]) => a.editType === "addFeature")?.[0];
-        expect(outerRing(added?.updatedData)).toEqual([[0, 0], [10, 0], [10, 10], [0, 0]]);
+        expect(outerRing(added?.updatedData)).toEqual([
+            [0, 0],
+            [10, 0],
+            [10, 10],
+            [0, 0],
+        ]);
     });
 
     it("Polygon tool keeps drawing if a double-click would leave fewer than three vertices", () => {
@@ -159,7 +199,12 @@ describe("selection edit modes", () => {
 
         mode.handleDoubleClick(pointerEvent([10, 10]), props);
         const added = onEdit.mock.calls.find(([a]) => a.editType === "addFeature")?.[0];
-        expect(outerRing(added?.updatedData)).toEqual([[0, 0], [10, 0], [10, 10], [0, 0]]);
+        expect(outerRing(added?.updatedData)).toEqual([
+            [0, 0],
+            [10, 0],
+            [10, 10],
+            [0, 0],
+        ]);
     });
 
     it("Modify tool removes a vertex on double-click", () => {
@@ -195,7 +240,13 @@ describe("selection edit modes", () => {
         const last = onEdit.mock.calls.at(-1)?.[0];
         expect(last?.editType).toBe("translated");
         const ring = outerRing(last?.updatedData);
-        const expected = [[30, 10], [130, 10], [130, 110], [30, 110], [30, 10]];
+        const expected = [
+            [30, 10],
+            [130, 10],
+            [130, 110],
+            [30, 110],
+            [30, 10],
+        ];
         ring.forEach((p, i) => {
             expect(p[0]).toBeCloseTo(expected[i][0], 6);
             expect(p[1]).toBeCloseTo(expected[i][1], 6);

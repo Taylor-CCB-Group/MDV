@@ -53,10 +53,7 @@ export type SyntheticSpatialTemporaryProjectHandle = {
 /** @deprecated Use {@link SyntheticSpatialTemporaryProjectHandle}. */
 export type RescanTemporaryProjectHandle = SyntheticSpatialTemporaryProjectHandle;
 
-async function runSyntheticSpatialProjectCli(
-    projectPath: string,
-    synthetic: SyntheticSpatialGeneratorCliArgs,
-) {
+async function runSyntheticSpatialProjectCli(projectPath: string, synthetic: SyntheticSpatialGeneratorCliArgs) {
     const pythonProjectDir = path.join(REPO_ROOT, "python");
     const profile = synthetic.profile ?? "scatter-table";
     const nCells = synthetic.nCells ?? "200";
@@ -97,9 +94,7 @@ async function runSyntheticSpatialProjectCli(
         }
     }
 
-    throw new Error(
-        `Unable to run mdvtools.tests.generate_synthetic_spatial_project.\n${errors.join("\n")}`,
-    );
+    throw new Error(`Unable to run mdvtools.tests.generate_synthetic_spatial_project.\n${errors.join("\n")}`);
 }
 
 export async function createTemporaryProjectViaSyntheticSpatial(
@@ -109,9 +104,7 @@ export async function createTemporaryProjectViaSyntheticSpatial(
     const deleteOnCleanup = shouldDeleteProjectOnCleanup(options.deleteOnCleanup);
     const mdvRoot = options.mdvRoot ?? (await ensurePlaywrightMdvRoot());
 
-    const nameSegment =
-        options.nameSegment ??
-        `synth-spatial--playwright-rescan--scatter-table--${Date.now()}`;
+    const nameSegment = options.nameSegment ?? `synth-spatial--playwright-rescan--scatter-table--${Date.now()}`;
     const projectPath = options.projectPath ?? path.join(mdvRoot, nameSegment);
 
     let projectId: string | undefined;
@@ -129,9 +122,7 @@ export async function createTemporaryProjectViaSyntheticSpatial(
             projectsAfter.find((project) => !projectIdsBefore.has(String(project.id)));
         expect(createdProject).toBeTruthy();
         if (!createdProject) {
-            throw new Error(
-                "Synthetic project was generated but was not registered by /rescan_projects.",
-            );
+            throw new Error("Synthetic project was generated but was not registered by /rescan_projects.");
         }
         projectId = String(createdProject.id);
 

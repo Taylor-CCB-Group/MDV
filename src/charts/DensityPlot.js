@@ -103,10 +103,7 @@ class DensityPlot extends SVGChart {
         const nyp = nsy(yr[0]) - nsy(this.orig_y_scale[0]) * ll;
         const x = this.margins.left;
         const y = this.margins.top;
-        this.graph_area.attr(
-            "transform",
-            `translate(${x - nxp},${y - nyp}) scale(${nxs},${nys})  `,
-        );
+        this.graph_area.attr("transform", `translate(${x - nxp},${y - nyp}) scale(${nxs},${nys})  `);
     }
 
     onDataFiltered(dim) {
@@ -122,9 +119,7 @@ class DensityPlot extends SVGChart {
         this.or_x_scale = [0, 400]; //this.x_scale.range();
 
         const config = {
-            category: this.dataStore
-                .getColumnValues(this.config.param[2])
-                .indexOf(this.config.category),
+            category: this.dataStore.getColumnValues(this.config.param[2]).indexOf(this.config.category),
             yscale: [this.orig_y_scale, this.or_y_scale],
             xscale: [this.orig_x_scale, this.or_x_scale],
         };
@@ -153,10 +148,7 @@ class DensityPlot extends SVGChart {
 
     drawChart(tTime = 400) {
         const color = scaleSequential(interpolateYlGnBu).domain([0, 0.5]);
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(tTime)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
 
         this.graph_area
             .selectAll(".dp-polygon")

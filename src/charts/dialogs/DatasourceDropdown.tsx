@@ -6,10 +6,7 @@ export interface DropdownProps {
     onSelect: (value: string) => void;
 }
 
-export const DatasourceDropdown: React.FC<DropdownProps> = ({
-    options,
-    onSelect,
-}) => {
+export const DatasourceDropdown: React.FC<DropdownProps> = ({ options, onSelect }) => {
     // Initialize selectedOption with the first option in the array (if it exists)
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
 

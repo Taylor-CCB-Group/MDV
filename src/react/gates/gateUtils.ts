@@ -110,12 +110,7 @@ type RelevantGatesArgs = {
     region?: string;
 };
 
-export function getRelevantGates({
-    gates,
-    xField,
-    yField,
-    region,
-}: RelevantGatesArgs): Gate[] {
+export function getRelevantGates({ gates, xField, yField, region }: RelevantGatesArgs): Gate[] {
     if (!xField || !yField) return [];
 
     return gates.filter((gate) => {

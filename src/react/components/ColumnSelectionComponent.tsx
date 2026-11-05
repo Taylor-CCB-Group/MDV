@@ -17,7 +17,6 @@ import TabHeader from "./TabHeader";
 
 type ColumnMode = "column" | "link" | "active link";
 
-
 /**
  * Currently, the only type of 'link' that we are referring to is a `RowsAsCols` link.
  * That is only compatible with numeric types.
@@ -39,7 +38,7 @@ function getActiveMode<T extends CTypes, M extends boolean>(props: ColumnSelecti
             console.error("Multiple type mismatch");
         }
         const v = isArray(current_value) ? current_value[0] : current_value;
-        if (typeof v === 'string') {
+        if (typeof v === "string") {
             if (v.includes("|")) return "link";
             else return "column";
         } else {
@@ -51,13 +50,13 @@ function getActiveMode<T extends CTypes, M extends boolean>(props: ColumnSelecti
 /**
  * A component for selecting a column from the data store - which can entail quite complex UI
  * and state for things like synthesising columns from linked data etc.
- * 
- * When 'linked' data is available, an interface is shown allowing for switching between different 
+ *
+ * When 'linked' data is available, an interface is shown allowing for switching between different
  * modes of column selection, each of which has it's own UI as well as hooks for adapting the complex generic
  * props and narrowing them to simpler types related specifically to the corresponding mode.
- * 
+ *
  * As of this writing, this more complex functionality is specifically related to `RowsAsCols` links.
- * 
+ *
  * Must either be used in a context where a `DataStoreContext` is available, or provided with a `dataStore` prop.
  * (e.g. if we're in a more global dialog etc rather than a chart context, this would be ambiguous).
  */
@@ -75,7 +74,6 @@ const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(
         setActiveTab(initialActiveTab);
     }, [initialActiveTab]);
 
-
     const chartModeFromValue = useMemo(() => getActiveMode(props), [props]);
 
     const iIsLinkCompatible = useIsLinkCompatible(props);
@@ -85,23 +83,21 @@ const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(
         <>
             {iIsLinkCompatible ? (
                 <Paper className="mx-auto w-full" variant="outlined" sx={{ backgroundColor: "transparent" }}>
-                <TabHeader
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    tabs={["column", "link", "active link"]}
-                    indicatorTab={chartModeFromValue}
-                />
-                    <ErrorBoundary FallbackComponent={({error}) => <ErrorComponentReactWrapper error={error} title={error.toString()} />}>
+                    <TabHeader
+                        activeTab={activeTab}
+                        setActiveTab={setActiveTab}
+                        tabs={["column", "link", "active link"]}
+                        indicatorTab={chartModeFromValue}
+                    />
+                    <ErrorBoundary
+                        FallbackComponent={({ error }) => (
+                            <ErrorComponentReactWrapper error={error} title={error.toString()} />
+                        )}
+                    >
                         <div className="p-4">
-                            {activeTab === "column" && (
-                                <ColumnDropdownComponent {...props} />
-                            )}
-                            {activeTab === "link" && (
-                                <LinkToColumnComponent {...props} />
-                            )}
-                            {activeTab === "active link" && (
-                                <ActiveLinkComponent {...props} />
-                            )}
+                            {activeTab === "column" && <ColumnDropdownComponent {...props} />}
+                            {activeTab === "link" && <LinkToColumnComponent {...props} />}
+                            {activeTab === "active link" && <ActiveLinkComponent {...props} />}
                         </div>
                     </ErrorBoundary>
                 </Paper>

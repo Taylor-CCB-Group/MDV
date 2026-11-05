@@ -70,9 +70,8 @@ async function setupReactTableProject(page: Page): Promise<ProjectSetupInfo> {
         }
 
         const cloneSource =
-            visibleColumns.find((column: any) =>
-                ["text", "text16", "unique", "multitext"].includes(column.datatype),
-            ) ?? visibleColumns[0];
+            visibleColumns.find((column: any) => ["text", "text16", "unique", "multitext"].includes(column.datatype)) ??
+            visibleColumns[0];
         const tableFields = visibleColumns.slice(0, 3).map((column: any) => column.field);
         const tableChartId = `rename-col-table-${Date.now()}`;
 
@@ -124,11 +123,7 @@ async function addClonedEditableColumn(
     const cloneInput = dialog.getByRole("combobox", { name: "Column to clone" });
     await cloneInput.click();
     await cloneInput.fill(cloneSourceName);
-    await page
-        .locator('[role="option"]')
-        .filter({ hasText: cloneSourceName })
-        .first()
-        .click();
+    await page.locator('[role="option"]').filter({ hasText: cloneSourceName }).first().click();
 
     await dialog.getByRole("button", { name: "Add", exact: true }).click();
     await expect(dialog).not.toBeVisible();
@@ -159,28 +154,30 @@ async function requestRenameColumnDialog(page: Page, chartId: string, columnFiel
         return Boolean(chart?.gridRef?.current?.slickGrid);
     }, chartId);
 
-    await page.evaluate(({ targetChartId, targetColumnField }) => {
-        const chart = Object.values((window as any).mdv.chartManager.charts)
-            .map((entry: any) => entry.chart)
-            .find((entry: any) => entry.config.id === targetChartId);
-        if (!chart?.gridRef?.current?.slickGrid) {
-            throw new Error(`Grid not ready for chart ${targetChartId}`);
-        }
-        const slickGrid = chart.gridRef.current.slickGrid;
-        const pubSub = slickGrid.getPubSubService?.();
-        if (!pubSub?.publish) {
-            throw new Error("SlickGrid PubSub service is unavailable");
-        }
-        const column =
-            slickGrid.getColumns().find((entry: any) => entry.field === targetColumnField) ?? {
+    await page.evaluate(
+        ({ targetChartId, targetColumnField }) => {
+            const chart = Object.values((window as any).mdv.chartManager.charts)
+                .map((entry: any) => entry.chart)
+                .find((entry: any) => entry.config.id === targetChartId);
+            if (!chart?.gridRef?.current?.slickGrid) {
+                throw new Error(`Grid not ready for chart ${targetChartId}`);
+            }
+            const slickGrid = chart.gridRef.current.slickGrid;
+            const pubSub = slickGrid.getPubSubService?.();
+            if (!pubSub?.publish) {
+                throw new Error("SlickGrid PubSub service is unavailable");
+            }
+            const column = slickGrid.getColumns().find((entry: any) => entry.field === targetColumnField) ?? {
                 field: targetColumnField,
                 id: targetColumnField,
             };
-        pubSub.publish("onHeaderMenuCommand", {
-            column,
-            command: "rename-column",
-        });
-    }, { targetChartId: chartId, targetColumnField: columnField });
+            pubSub.publish("onHeaderMenuCommand", {
+                column,
+                command: "rename-column",
+            });
+        },
+        { targetChartId: chartId, targetColumnField: columnField },
+    );
 }
 
 async function submitRenameColumnDialog(page: Page, initialColumnName: string, newDisplayName: string) {
@@ -237,17 +234,15 @@ test.describe("Rename table column", () => {
 
             await saveCurrentView(page);
             await expect
-                .poll(async () =>
-                    getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField),
-                )
+                .poll(async () => getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField))
                 .toBe(newDisplayName);
 
             await page.reload();
             await waitForProjectReady(page);
 
-            expect(
-                await getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField),
-            ).toBe(newDisplayName);
+            expect(await getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField)).toBe(
+                newDisplayName,
+            );
         } finally {
             await projectHandle.cleanup();
         }
@@ -268,31 +263,29 @@ test.describe("Rename table column", () => {
             );
             await saveCurrentView(page);
             await expect
-                .poll(async () =>
-                    getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField),
-                )
+                .poll(async () => getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField))
                 .toBe(columnField);
 
             await page.reload();
             await waitForProjectReady(page);
 
-            expect(
-                await getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField),
-            ).toBe(columnField);
+            expect(await getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField)).toBe(
+                columnField,
+            );
 
             await requestRenameColumnDialog(page, setupInfo.tableChartId, columnField);
             await submitRenameColumnDialog(page, columnField, unsavedRename);
             expect(await getColumnDisplayName(page, columnField)).toBe(unsavedRename);
-            expect(
-                await getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField),
-            ).toBe(columnField);
+            expect(await getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField)).toBe(
+                columnField,
+            );
 
             await page.reload();
             await waitForProjectReady(page);
 
-            expect(
-                await getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField),
-            ).toBe(columnField);
+            expect(await getColumnNameFromDatasourcesJson(page, setupInfo.dataSourceName, columnField)).toBe(
+                columnField,
+            );
         } finally {
             await projectHandle.cleanup();
         }

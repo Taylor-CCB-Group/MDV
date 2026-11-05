@@ -100,7 +100,7 @@ function adaptConfig(originalConfig: VivMdvReactConfig, dataStore: DataStore) {
     const config = { ...scatterDefaults, ...originalConfig };
     // in future we might have something like an array of layers with potentially ways of describing parameters...
     if (!dataStore.regions) {
-        throw new Error("unexpected attempt to load spatial chart with no regions in datasource")
+        throw new Error("unexpected attempt to load spatial chart with no regions in datasource");
     }
     // we now only use param for spatial coordinates, but charts could be saved with param[2] being contourParameter
     config.param = [...dataStore.regions.position_fields];
@@ -141,15 +141,12 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             colorByColumn: action,
             colorByDefault: action,
         });
-        this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener(
-            "click",
-            () => {
-                if (!this.colorDialog) {
-                    this.colorDialog = new ColorChannelDialogReactWrapper(this);
-                    this.dialogs.push(this.colorDialog);
-                }
-            },
-        );
+        this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", () => {
+            if (!this.colorDialog) {
+                this.colorDialog = new ColorChannelDialogReactWrapper(this);
+                this.dialogs.push(this.colorDialog);
+            }
+        });
         this.vivStores = createVivStores();
     }
     colorBy?: (i: number) => [r: number, g: number, b: number];
@@ -171,7 +168,6 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     getSettings() {
         const c = this.config;
         const settings = super.getSettings();
-
 
         // What I would like is ability to
         // - change selected image at runtime.
@@ -255,8 +251,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const config = super.getConfig();
         // todo this is an experimental version of serialisation, WIP / subject to change.
         if (this.vivStores) {
-            const { viewerStore, channelsStore, imageSettingsStore } =
-                this.vivStores;
+            const { viewerStore, channelsStore, imageSettingsStore } = this.vivStores;
             const channels = channelsStore.getState();
             const viewer = viewerStore.getState();
             // const imageSettings = imageSettingsStore.getState();

@@ -1,9 +1,4 @@
-import {
-    createEl,
-    createSVGEl,
-    makeResizable,
-    makeDraggable,
-} from "./Elements.js";
+import { createEl, createSVGEl, makeResizable, makeDraggable } from "./Elements.js";
 import { select } from "d3-selection";
 import { scaleLinear } from "d3-scale";
 import { axisBottom } from "d3-axis";
@@ -23,7 +18,7 @@ function getColorLegendCustom(scale, config = {}) {
 function getColorLegend(colors, names, config = {}) {
     const len = colors.length;
     const type = config.type || "color";
-    const h_fac = type === "circle" ? (config.itemGap || 24) : 12;
+    const h_fac = type === "circle" ? config.itemGap || 24 : 12;
     const itemTop = config.itemTop || 0;
     const dynamicCircleSpacing = type === "circle" && config.dynamicCircleSpacing;
     const circleGap = config.circleGap ?? 4;
@@ -177,10 +172,7 @@ function getColorLegend(colors, names, config = {}) {
 function getColorBar(colors, config = {}) {
     const c = config;
     const len = colors.length;
-    const colorPct = colors.map((c, i) => [
-        `${Math.floor((i / len) * 100)}%`,
-        c,
-    ]);
+    const colorPct = colors.map((c, i) => [`${Math.floor((i / len) * 100)}%`, c]);
     const width = c.width || 120;
     const height = c.height || 45;
     const svg = createSVGEl("svg", {
@@ -227,10 +219,7 @@ function getColorBar(colors, config = {}) {
         .style("fill", `url(#${id})`);
 
     colorPct.forEach((d) => {
-        grad.append("stop")
-            .attr("offset", d[0])
-            .attr("stop-color", d[1])
-            .attr("stop-opacity", 1);
+        grad.append("stop").attr("offset", d[0]).attr("stop-color", d[1]).attr("stop-opacity", 1);
     });
 
     //add bottom axis

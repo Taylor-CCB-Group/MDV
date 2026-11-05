@@ -15,11 +15,11 @@ function generateAndSaveSchema(schema: z.ZodTypeAny, filename: string, outputDir
         // Generate JSON schema
         // nb, built-in zod method has less nice internal names for $defs (__schemaN), but I think we prefer not needing to use zod-to-json-schema
         const jsonSchema = z.toJSONSchema(schema, { reused: "ref" });
-        
+
         // Save to file
         const outputPath = path.join(outputDir, filename);
         fs.writeFileSync(outputPath, JSON.stringify(jsonSchema, null, 2));
-        
+
         console.log(`✅ Generated schema: ${outputPath}`);
         return jsonSchema;
     } catch (error) {
@@ -30,26 +30,26 @@ function generateAndSaveSchema(schema: z.ZodTypeAny, filename: string, outputDir
 // Function to extract enums from JSON schema
 function extractEnums(jsonSchema: any): Record<string, string[]> {
     const enums: Record<string, string[]> = {};
-    
+
     function traverse(obj: any, path: string[] = []) {
-        if (obj && typeof obj === 'object') {
+        if (obj && typeof obj === "object") {
             if (obj.enum && Array.isArray(obj.enum)) {
-                const enumName = path[path.length - 1] || 'UnknownEnum';
+                const enumName = path[path.length - 1] || "UnknownEnum";
                 enums[enumName] = obj.enum;
             }
-            
+
             for (const [key, value] of Object.entries(obj)) {
-                if (key === 'properties' && typeof value === 'object') {
+                if (key === "properties" && typeof value === "object") {
                     for (const [propName, propSchema] of Object.entries(value as any)) {
                         traverse(propSchema, [...path, propName]);
                     }
-                } else if (key === 'items' || key === 'anyOf' || key === 'allOf' || key === 'oneOf') {
+                } else if (key === "items" || key === "anyOf" || key === "allOf" || key === "oneOf") {
                     traverse(value, path);
                 }
             }
         }
     }
-    
+
     traverse(jsonSchema);
     return enums;
 }
@@ -58,7 +58,7 @@ function extractEnums(jsonSchema: any): Record<string, string[]> {
 function generateEnum(enumName: string, values: string[]): string {
     let enumCode = `class ${enumName}(str, Enum):\n`;
     for (const value of values) {
-        const constName = value.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+        const constName = value.toUpperCase().replace(/[^A-Z0-9]/g, "_");
         enumCode += `    ${constName} = "${value}"\n`;
     }
     return enumCode;
@@ -67,17 +67,17 @@ function generateEnum(enumName: string, values: string[]): string {
 // Function to generate Python class from JSON schema
 function generateClassFromSchema(jsonSchema: any, className: string): string {
     let classCode = `class ${className}(BaseModel):\n`;
-    
+
     if (jsonSchema.description) {
         classCode += `    """${jsonSchema.description}"""\n`;
     }
-    
+
     if (jsonSchema.properties) {
         for (const [propName, propSchema] of Object.entries(jsonSchema.properties)) {
             const fieldType = getPythonType(propSchema as any, propName);
-            const fieldDescription = (propSchema as any).description || '';
+            const fieldDescription = (propSchema as any).description || "";
             const isRequired = jsonSchema.required?.includes(propName) || false;
-            
+
             if (isRequired) {
                 classCode += `    ${propName}: ${fieldType} = Field(description="${fieldDescription}")\n`;
             } else {
@@ -85,36 +85,36 @@ function generateClassFromSchema(jsonSchema: any, className: string): string {
             }
         }
     }
-    
+
     return classCode;
 }
 
 // Function to get Python type from JSON schema
 function getPythonType(schema: any, fieldName: string): string {
-    if (!schema) return 'Any';
-    if (schema.type === 'string') {
+    if (!schema) return "Any";
+    if (schema.type === "string") {
         if (schema.enum) {
-            return 'str';
+            return "str";
         }
-        return 'str';
-    } else if (schema.type === 'number' || schema.type === 'integer') {
-        return 'float';
-    } else if (schema.type === 'boolean') {
-        return 'bool';
-    } else if (schema.type === 'array') {
+        return "str";
+    } else if (schema.type === "number" || schema.type === "integer") {
+        return "float";
+    } else if (schema.type === "boolean") {
+        return "bool";
+    } else if (schema.type === "array") {
         const itemType = getPythonType(schema.items, `${fieldName}_item`);
         return `List[${itemType}]`;
-    } else if (schema.type === 'object') {
-        return 'Dict[str, Any]';
+    } else if (schema.type === "object") {
+        return "Dict[str, Any]";
     } else if (schema.anyOf || schema.oneOf) {
         const types = (schema.anyOf || schema.oneOf).map((s: any) => getPythonType(s, fieldName));
-        return `Union[${types.join(', ')}]`;
+        return `Union[${types.join(", ")}]`;
     } else if (schema.$ref) {
         // Handle references - for now return Any
-        return 'Any';
+        return "Any";
     }
     // Defensive: if schema.type is missing or unknown
-    return 'Any';
+    return "Any";
 }
 
 // Function to generate Python Pydantic models file
@@ -122,7 +122,7 @@ async function generatePythonModels(): Promise<string> {
     // Import the schemas we need to process
     const { ChartConfigSchema } = await import("../src/charts/schemas/ChartConfigSchema.ts");
     const { DataSourceSchema, DataSourcesArraySchema } = await import("../src/charts/schemas/DataSourceSchema.ts");
-    
+
     // Convert schemas to JSON Schema format using Zod's toJSONSchema method
     const chartConfigJsonSchema = z.toJSONSchema(ChartConfigSchema);
     const datasourceJsonSchema = z.toJSONSchema(DataSourceSchema);
@@ -157,28 +157,34 @@ from enum import Enum
     if (chartConfigAny.anyOf) {
         const chartClasses: string[] = [];
         const chartTypeNames: string[] = [];
-        
+
         for (const schema of chartConfigAny.anyOf) {
             // Only generate a class if this schema has properties (is an object type)
-            if ((schema as any).properties && typeof (schema as any).properties === 'object' && (schema as any).properties.type?.const) {
+            if (
+                (schema as any).properties &&
+                typeof (schema as any).properties === "object" &&
+                (schema as any).properties.type?.const
+            ) {
                 const chartType = (schema as any).properties.type.const;
                 // biome-ignore lint/style/useTemplate: wrapping complex expression would be harder to read.
-                const className = chartType.split('_').map((word: string) => 
-                    word.charAt(0).toUpperCase() + word.slice(1)
-                ).join('') + 'Config';
-                
+                const className =
+                    chartType
+                        .split("_")
+                        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join("") + "Config";
+
                 chartClasses.push(generateClassFromSchema(schema, className));
                 chartTypeNames.push(className);
             }
             // else: skip schemas that are not object types (no properties)
         }
-        
+
         // Add all chart classes
-        pythonCode += chartClasses.join('\n\n');
-        pythonCode += '\n\n';
-        
+        pythonCode += chartClasses.join("\n\n");
+        pythonCode += "\n\n";
+
         // Add the union type
-        pythonCode += `# Union of all chart configuration types\nChartConfig = Union[\n    ${chartTypeNames.join(',\n    ')}\n]\n\n`;
+        pythonCode += `# Union of all chart configuration types\nChartConfig = Union[\n    ${chartTypeNames.join(",\n    ")}\n]\n\n`;
     }
 
     // Generate datasource classes
@@ -278,7 +284,7 @@ async function savePythonModels(outputDir: string) {
         const pythonCode = await generatePythonModels();
         const outputPath = path.join(outputDir, "structured_schemas.py");
         fs.writeFileSync(outputPath, pythonCode);
-        
+
         console.log(`✅ Generated Python models: ${outputPath}`);
     } catch (error) {
         console.error(`❌ Error generating Python models: ${error}`);
@@ -289,46 +295,36 @@ async function savePythonModels(outputDir: string) {
 // Main execution
 async function main() {
     console.log("🚀 Starting schema generation...");
-    
+
     try {
         // Generate main chart config schema
-        const chartConfigSchema = generateAndSaveSchema(
-            ChartConfigSchema, 
-            "chart-config-schema.json"
-        );
-        
+        const chartConfigSchema = generateAndSaveSchema(ChartConfigSchema, "chart-config-schema.json");
+
         console.log("📊 Chart config schema generated successfully!");
 
         // Generate datasource schema
-        const datasourceSchema = generateAndSaveSchema(
-            DataSourceSchema,
-            "datasource-schema.json"
-        );
+        const datasourceSchema = generateAndSaveSchema(DataSourceSchema, "datasource-schema.json");
 
         console.log("📊 Datasource schema generated successfully!");
         console.log("📋 Schema includes validation for datasource configuration");
 
         // Generate datasources array schema
-        const datasourcesArraySchema = generateAndSaveSchema(
-            DataSourcesArraySchema,
-            "datasources-array-schema.json"
-        );
+        const datasourcesArraySchema = generateAndSaveSchema(DataSourcesArraySchema, "datasources-array-schema.json");
 
         console.log("📊 Datasources array schema generated successfully!");
         console.log("📋 Schema includes validation for arrays of datasources");
-        
+
         // Generate Python Pydantic models
         await savePythonModels("./python/mdvtools/llm");
-        
+
         console.log("🐍 Python Pydantic models generated successfully!");
         console.log("📋 Models include all chart types and structured output classes");
-        
+
         console.log("\n✨ Schema generation complete!");
         console.log("🔒 Security note: Structured output approach enables secure server-side execution");
         console.log("   - No arbitrary code execution via PythonAstREPLTool");
         console.log("   - Type-safe schema validation");
         console.log("   - Controlled output generation");
-        
     } catch (error) {
         console.error("💥 Schema generation failed:", error);
         process.exit(1);

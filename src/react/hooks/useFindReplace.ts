@@ -15,7 +15,7 @@ export type FoundMatch = {
 
 /**
  * Hook for handling find and replace functionality
- * 
+ *
  * Search runs over the currently selected column and uses sortedFilteredIndices (visible rows).
  * Replace uses valueReplacementUtil and notifies the data store so changes persist.
  */
@@ -26,7 +26,7 @@ const useFindReplace = (
     searchColumn: string | null,
     config: { include_index?: boolean },
     gridRef: React.MutableRefObject<SlickgridReactInstance | null>,
-    selectionSourceRef: React.MutableRefObject<'user' | 'programmatic' | null>,
+    selectionSourceRef: React.MutableRefObject<"user" | "programmatic" | null>,
     setFeedbackAlert: (alert: FeedbackAlert) => void,
     isEditMode: boolean,
 ) => {
@@ -81,7 +81,7 @@ const useFindReplace = (
 
                     const displayedValue = String(value);
                     const lowerDisplayedValue = displayedValue.toLowerCase();
-                    
+
                     if (lowerDisplayedValue.includes(findText.toLowerCase())) {
                         matches.push({
                             rowIndex: row,
@@ -103,7 +103,7 @@ const useFindReplace = (
                     const grid = gridRef.current?.slickGrid;
                     if (grid) {
                         const match = matches[0];
-                        selectionSourceRef.current = 'programmatic';
+                        selectionSourceRef.current = "programmatic";
                         grid.gotoCell(match.rowIndex, match.columnIndex, false);
                         requestAnimationFrame(() => {
                             selectionSourceRef.current = null;
@@ -153,7 +153,7 @@ const useFindReplace = (
 
         // Go to the cell in grid's display
         if (grid && match) {
-            selectionSourceRef.current = 'programmatic';
+            selectionSourceRef.current = "programmatic";
             grid.gotoCell(match.rowIndex, match.columnIndex, false);
             requestAnimationFrame(() => {
                 selectionSourceRef.current = null;
@@ -177,7 +177,7 @@ const useFindReplace = (
 
         // Go to the cell in grid's display
         if (grid && match) {
-            selectionSourceRef.current = 'programmatic';
+            selectionSourceRef.current = "programmatic";
             grid.gotoCell(match.rowIndex, match.columnIndex, false);
             requestAnimationFrame(() => {
                 selectionSourceRef.current = null;

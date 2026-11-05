@@ -6,10 +6,7 @@
  *   TEST_BASE_URL=http://127.0.0.1:5173 pnpm run playwright-test-project tests_playwright/project/column_selection/link_subgroup_selection.spec.ts --project=chromium
  */
 import test, { expect } from "@playwright/test";
-import {
-    createTemporaryProjectViaSyntheticAnndata,
-    waitForProjectReady,
-} from "../../utils/projectFixtures";
+import { createTemporaryProjectViaSyntheticAnndata, waitForProjectReady } from "../../utils/projectFixtures";
 import {
     addDotPlotChartViaApi,
     closeTopDialog,
@@ -57,9 +54,7 @@ test.describe("Link subgroup column selection", () => {
         }
     });
 
-    test("shows subgroup layer tabs in the link column picker when the worktree UI is served", async ({
-        page,
-    }) => {
+    test("shows subgroup layer tabs in the link column picker when the worktree UI is served", async ({ page }) => {
         const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
             synthetic: MULTILAYER_SYNTHETIC,
         });

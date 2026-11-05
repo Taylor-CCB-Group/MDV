@@ -9,13 +9,29 @@ import Autocomplete from "@mui/material/Autocomplete";
 import BaseChart from "../BaseChart";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Paper, Typography } from "@mui/material";
+import {
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    Divider,
+    IconButton,
+    Paper,
+    Typography,
+} from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
 import { action, observable, reaction, toJS } from "mobx";
 import type { ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
-import { columnMatchesType, flattenFields, isMultiColumn, type FieldSpec, type FieldSpecs } from "@/lib/columnTypeHelpers";
+import {
+    columnMatchesType,
+    flattenFields,
+    isMultiColumn,
+    type FieldSpec,
+    type FieldSpecs,
+} from "@/lib/columnTypeHelpers";
 import type { Param } from "@/lib/columnTypeHelpers.js";
 import { g, isArray } from "@/lib/utils.js";
 import { serialiseConfig } from "../chartConfigUtils.js";
@@ -69,16 +85,15 @@ function buildChartPropsFromDialogState(
     for (const c of chartType?.extra_controls?.(dataStore) ?? []) {
         if (!(c.name in mergedExtra) && c.defaultVal !== undefined) mergedExtra[c.name] = c.defaultVal;
     }
-    const flatParam =
-        chartType?.params?.length ?
-            chartType.params.flatMap((p, i) => {
-                const slot = liveSlots[i];
-                if (slot === undefined) return [];
-                const n = normaliseParamSlot(slot, isMultiColumn(p.type));
-                if (n === undefined) return [];
-                return isArray(n) ? n : [n];
-            })
-        :   [];
+    const flatParam = chartType?.params?.length
+        ? chartType.params.flatMap((p, i) => {
+              const slot = liveSlots[i];
+              if (slot === undefined) return [];
+              const n = normaliseParamSlot(slot, isMultiColumn(p.type));
+              if (n === undefined) return [];
+              return isArray(n) ? n : [n];
+          })
+        : [];
     const chartProps: Record<string, unknown> = { ...props, param: flatParam };
     Object.assign(chartProps, mergedExtra);
     const typeKey = Object.entries(BaseChart.types).find(([, t]) => t.name === draft.type)?.[0];
@@ -114,12 +129,9 @@ function getDefaultParamSlot(type: Param | Param[], dataStore: DataStore): AddCh
     return isMultiColumn(type) ? [matchingColumn.field] : matchingColumn.field;
 }
 
-const ChartPreview = observer(({config}: {config: ChartConfig}) => {
+const ChartPreview = observer(({ config }: { config: ChartConfig }) => {
     const dataStore = useDataStore();
-    const chartType = useMemo(
-        () => Object.values(BaseChart.types).find((t) => t.name === config.type),
-        [config.type],
-    );
+    const chartType = useMemo(() => Object.values(BaseChart.types).find((t) => t.name === config.type), [config.type]);
     const scratchProps = useMemo(() => {
         const draft = toJS(config);
         const { chartProps, extra } = buildChartPropsFromDialogState(draft, config.param, dataStore, chartType);
@@ -136,29 +148,44 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
     return (
         <div className="grid grid-cols-2 px-3 py-5">
             {/* <h2>Chart Preview</h2> */}
-            <JsonView style={{
-                    backgroundColor: 'transparent',
-                    fontSize: '0.875rem',
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                }} src={configWithoutUpdated} collapseStringsAfterLength={10} collapsed={1} />
-            <JsonView style={{
-                    backgroundColor: 'transparent',
-                    fontSize: '0.875rem',
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                }} src={scratchProps} collapsed={1} />
+            <JsonView
+                style={{
+                    backgroundColor: "transparent",
+                    fontSize: "0.875rem",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                }}
+                src={configWithoutUpdated}
+                collapseStringsAfterLength={10}
+                collapsed={1}
+            />
+            <JsonView
+                style={{
+                    backgroundColor: "transparent",
+                    fontSize: "0.875rem",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                }}
+                src={scratchProps}
+                collapsed={1}
+            />
         </div>
     );
 });
 
 const ParamSelection = observer(
-    ({ config, index, param }: { config: ChartConfig, index: number, param: { type: Param | Param[]; name: string } }) => {
+    ({
+        config,
+        index,
+        param,
+    }: {
+        config: ChartConfig;
+        index: number;
+        param: { type: Param | Param[]; name: string };
+    }) => {
         const currentSlot = config.param[index];
 
         return (
             <>
-                <Typography fontSize="small">
-                    {param.name}:
-                </Typography>
+                <Typography fontSize="small">{param.name}:</Typography>
                 {isMultiColumn(param.type) ? (
                     <ColumnSelectionComponent
                         placeholder={param.name}
@@ -190,7 +217,7 @@ const ParamSelection = observer(
 /** given an (observable) ExtraControl, return an (observable) GuiSpec
  * adapted so we can use SettingsDialogComponent widgets
  * When the returned GuiSpec is updated, the property of config corresponding to the control is updated
-*/
+ */
 /** The column chosen in another extra control, or undefined while it has none (or "None"). */
 function getChosenColumn(extra: Record<string, unknown>, columnControl: string): string | undefined {
     const value = extra[columnControl];
@@ -213,7 +240,8 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(
         // >the props.values may be a tuple of [valueObjectArray, textKey, valueKey],
         // or an array of length 1 - [string[]]
         //const useObjectKeys = Array.isArray(control.values) && control.values.length === 3;
-        if (!control.values || control.values.length === 0) throw new Error(`Dropdown control '${control.label}' has no values`);
+        if (!control.values || control.values.length === 0)
+            throw new Error(`Dropdown control '${control.label}' has no values`);
         const values = control.values;
         // if (!control.defaultVal) draftSpec.current_value = useObjectKeys ? values[0][0][values[0][2]] : values[0][0];
         // todo - add some type predicate so we know we're assigning the right type
@@ -222,7 +250,8 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(
         //(draftSpec as any).values = control.values; //doesn't give runtime error, doesn't work
         (draftSpec as any).values = [values, "name", "value"];
     }
-    if (draftSpec.type === "radiobuttons") {}//todo test
+    if (draftSpec.type === "radiobuttons") {
+    } //todo test
     //bad bad bad <<< how did we end up needing "as string", "as any"???
     //if (draftSpec.type === "check" && !control.defaultVal) (draftSpec as any).current_value = false;
     // if ((draftSpec as any).type === "checkbox" && !control.defaultVal) (draftSpec as any).current_value = false;
@@ -249,25 +278,32 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(
 }
 function useGuiSpecControl<T extends keyof GuiValueTypes>(control: ExtraControl<T>, config: ChartConfig): GuiSpec<T> {
     const spec = useMemo(() => {
-        const val = controlToGuiSpec(control, (v) => {config.extra[control.name] = v}, config.extra);
+        const val = controlToGuiSpec(
+            control,
+            (v) => {
+                config.extra[control.name] = v;
+            },
+            config.extra,
+        );
         config.extra[control.name] = val.current_value;
         return val;
     }, [control, config]);
     return spec;
 }
 
-const ExtraControlComponent = observer(({ control, config }: { control: ExtraControl<keyof GuiValueTypes>, config: ChartConfig }) => {
-    const spec = useGuiSpecControl(control, config);
-    if (control.columnControl && !getChosenColumn(config.extra, control.columnControl)) return null;
-    return (
-        <Paper elevation={6}>
-            <AbstractComponent props={spec} />
-        </Paper>
-    );
-});
+const ExtraControlComponent = observer(
+    ({ control, config }: { control: ExtraControl<keyof GuiValueTypes>; config: ChartConfig }) => {
+        const spec = useGuiSpecControl(control, config);
+        if (control.columnControl && !getChosenColumn(config.extra, control.columnControl)) return null;
+        return (
+            <Paper elevation={6}>
+                <AbstractComponent props={spec} />
+            </Paper>
+        );
+    },
+);
 
-
-const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone: () => void}) => {
+const ConfigureChart = observer(({ config, onDone }: { config: ChartConfig; onDone: () => void }) => {
     const dataStore = useDataStore();
     const [lazyTypesReady, setLazyTypesReady] = useState(false);
 
@@ -287,7 +323,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
     const showLegacy = legacyChartsSetting.get() === "show";
     const chartTypes = useMemo(() => {
         lazyTypesReady;
-        return Object.values(BaseChart.types).filter(t => {
+        return Object.values(BaseChart.types).filter((t) => {
             if (t.allow_user_add === false) return false;
             if (!showLegacy && isLegacyChartType(t, dataStore)) return false;
             if (t.required) {
@@ -299,54 +335,55 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                 // but since we're in glorious JS land, we have things like `dataStore['interactions'] = undefined`
                 // which means that `'interactions' in dataStore` is true, but `!!dataStore['interactions']` is false.
                 //@ts-ignore DataStore string index on things 'required' for chart types
-                return t.required.every(r => !!dataStore[r]);
+                return t.required.every((r) => !!dataStore[r]);
             }
             return true;
         });
     }, [dataStore, lazyTypesReady, showLegacy]);
-    const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
+    const chartNames = chartTypes.map((t) => t.name).sort((a, b) => a.localeCompare(b));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
     // biome-ignore lint/correctness/useExhaustiveDependencies: need to figure out mobx/biome linting...
-    const setChartTypeName = useCallback(action((chartTypeName: string) => {
-        config.type = chartTypeName;
-        const chartType = chartTypes.find(t => t.name === config.type);
-        if (!chartType) throw new Error(`Chart type ${config.type} not found`);
-        const slotStr = (s: AddChartParamSlot | undefined) =>
-            s === undefined ? "undefined" : JSON.stringify(s);
-        if (chartType.params) {
-            // we could have some metadata on the column like `{intendedFor: "X axis"}` etc
-            const previousParams = toJS(config.param);
-            config.param = Array.from({ length: chartType.params.length }, () => undefined);
-            for (const [i, p] of chartType.params.entries()) {
-                const previousParam = previousParams[i];
-                if (slotMatchesParamType(previousParam, p.type, dataStore)) {
-                    const normalisedSlot = normaliseParamSlot(previousParam, isMultiColumn(p.type));
-                    console.log(`[${config.type}, ${p.name}] using previous selection: ${slotStr(normalisedSlot)}`);
-                    config.param[i] = normalisedSlot;
-                } else {
-                    // we could try to be a bit clever about finding a suitable column, like "x"...
-                    const defaultSlot = getDefaultParamSlot(p.type, dataStore);
-                    if (defaultSlot === undefined) {
-                        // we should let the user know - highlight the dropdown or something
-                        console.warn(`[${config.type}, ${p.name}] No column found for type '${p.type}'`);
-                        continue;
+    const setChartTypeName = useCallback(
+        action((chartTypeName: string) => {
+            config.type = chartTypeName;
+            const chartType = chartTypes.find((t) => t.name === config.type);
+            if (!chartType) throw new Error(`Chart type ${config.type} not found`);
+            const slotStr = (s: AddChartParamSlot | undefined) => (s === undefined ? "undefined" : JSON.stringify(s));
+            if (chartType.params) {
+                // we could have some metadata on the column like `{intendedFor: "X axis"}` etc
+                const previousParams = toJS(config.param);
+                config.param = Array.from({ length: chartType.params.length }, () => undefined);
+                for (const [i, p] of chartType.params.entries()) {
+                    const previousParam = previousParams[i];
+                    if (slotMatchesParamType(previousParam, p.type, dataStore)) {
+                        const normalisedSlot = normaliseParamSlot(previousParam, isMultiColumn(p.type));
+                        console.log(`[${config.type}, ${p.name}] using previous selection: ${slotStr(normalisedSlot)}`);
+                        config.param[i] = normalisedSlot;
+                    } else {
+                        // we could try to be a bit clever about finding a suitable column, like "x"...
+                        const defaultSlot = getDefaultParamSlot(p.type, dataStore);
+                        if (defaultSlot === undefined) {
+                            // we should let the user know - highlight the dropdown or something
+                            console.warn(`[${config.type}, ${p.name}] No column found for type '${p.type}'`);
+                            continue;
+                        }
+                        console.log(`[${config.type}, ${p.name}] using default selection: ${slotStr(defaultSlot)}`);
+                        config.param[i] = defaultSlot;
                     }
-                    console.log(`[${config.type}, ${p.name}] using default selection: ${slotStr(defaultSlot)}`);
-                    config.param[i] = defaultSlot;
                 }
+            } else {
+                config.param = [];
             }
-        } else {
-            config.param = [];
-        }
-        config._updated = new Date();
-    }), [config, chartTypes, dataStore]);
-    const chartType = chartTypes.find(t => t.name === config.type);
+            config._updated = new Date();
+        }),
+        [config, chartTypes, dataStore],
+    );
+    const chartType = chartTypes.find((t) => t.name === config.type);
     const extraControls = useMemo(() => {
-        return chartType?.extra_controls?.(dataStore).map((control, i) => (
-            <ExtraControlComponent key={control.name} control={control} config={config} />
-        ));
+        return chartType
+            ?.extra_controls?.(dataStore)
+            .map((control, i) => <ExtraControlComponent key={control.name} control={control} config={config} />);
     }, [chartType, dataStore, config]);
-
 
     const addChart = useCallback(() => {
         if (!chartType) throw new Error("No chart type selected");
@@ -362,69 +399,69 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
         onDone();
     }, [config, dataStore, onDone, chartType]);
     return (
-        <ErrorBoundary FallbackComponent={({error}) =>
-            (
-            <div className="flex items-center" style={{width: 600, height: 420}}> 
-                <ErrorComponentReactWrapper 
-                    error={{message: error.message, stack: error.stack}} 
-                    extraMetaData={config} 
-                    title={chartType?.name 
-                        ? `Error creating '${chartType?.name}'. Click to view details`
-                        : 'Something went wrong. Click to view details'}
-                />
-            </div>
-            )
-        }>
+        <ErrorBoundary
+            FallbackComponent={({ error }) => (
+                <div className="flex items-center" style={{ width: 600, height: 420 }}>
+                    <ErrorComponentReactWrapper
+                        error={{ message: error.message, stack: error.stack }}
+                        extraMetaData={config}
+                        title={
+                            chartType?.name
+                                ? `Error creating '${chartType?.name}'. Click to view details`
+                                : "Something went wrong. Click to view details"
+                        }
+                    />
+                </div>
+            )}
+        >
             <DialogContent dividers>
-            <Grid container spacing={2} sx={{paddingBottom: 2, width: "100%"}}>
-                <Grid size={6}>
-                    <Grid container direction={"column"} spacing={1}
-                    >
-                        <Typography variant="h6">Chart Type</Typography>
-                        <Autocomplete
-                            options={chartNames}
-                            value={config.type}
-                            onChange={(_, value) => value && setChartTypeName(value)}
-                            renderInput={(params) => (
-                                <TextField {...params} label="Chart Type" />
-                            )}
-                            sx={{pt: 1}}
-                        />
-                        <TextField label="Title" size="small" onChange={action((e) => config.title = e.target.value)} />
-                        <TextField label="Description" size="small"
-                        multiline aria-multiline
-                        rows={6}
-                        onChange={action((e) => config.legend = e.target.value)}
-                        />
+                <Grid container spacing={2} sx={{ paddingBottom: 2, width: "100%" }}>
+                    <Grid size={6}>
+                        <Grid container direction={"column"} spacing={1}>
+                            <Typography variant="h6">Chart Type</Typography>
+                            <Autocomplete
+                                options={chartNames}
+                                value={config.type}
+                                onChange={(_, value) => value && setChartTypeName(value)}
+                                renderInput={(params) => <TextField {...params} label="Chart Type" />}
+                                sx={{ pt: 1 }}
+                            />
+                            <TextField
+                                label="Title"
+                                size="small"
+                                onChange={action((e) => (config.title = e.target.value))}
+                            />
+                            <TextField
+                                label="Description"
+                                size="small"
+                                multiline
+                                aria-multiline
+                                rows={6}
+                                onChange={action((e) => (config.legend = e.target.value))}
+                            />
+                        </Grid>
                     </Grid>
-                </Grid>
-                <Grid size={6}>
-                    <Grid container direction={"column"} spacing={1}
-                    sx={{gap: 1}}
-                    >
-                        {chartType?.params && <Typography variant="h6">Columns</Typography>}
-                        {chartType?.params?.map((p, i) => (
-                            <ParamSelection key={p.name} config={config} index={i} param={p} />
-                        ))}
-                        {extraControls && <h2>Extra Controls</h2>}
-                        {extraControls}
-                        {/* <Dialog open={false}>
+                    <Grid size={6}>
+                        <Grid container direction={"column"} spacing={1} sx={{ gap: 1 }}>
+                            {chartType?.params && <Typography variant="h6">Columns</Typography>}
+                            {chartType?.params?.map((p, i) => (
+                                <ParamSelection key={p.name} config={config} index={i} param={p} />
+                            ))}
+                            {extraControls && <h2>Extra Controls</h2>}
+                            {extraControls}
+                            {/* <Dialog open={false}>
                             <JsonView src={chartType} collapsed/>
                         </Dialog> */}
+                        </Grid>
                     </Grid>
                 </Grid>
-            </Grid>
-            <Divider />
-            {/* NOTE - before config._updated was added, this causes update when config.legend chages,
+                <Divider />
+                {/* NOTE - before config._updated was added, this causes update when config.legend chages,
                 otherwise not unless we spread config... and then nested `config.params[i] = c` updates didn't work */}
-            {/* <ChartPreview config={{...config}} /> */}
+                {/* <ChartPreview config={{...config}} /> */}
             </DialogContent>
-            <DialogActions sx={{justifyContent: "center"}}>
-                <Button
-                    variant="contained"
-                    onClick={addChart}
-                    disabled={!chartType}
-                >
+            <DialogActions sx={{ justifyContent: "center" }}>
+                <Button variant="contained" onClick={addChart} disabled={!chartType}>
                     Add Chart
                 </Button>
             </DialogActions>
@@ -433,7 +470,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
 });
 
 const AddChartDialogComponent = observer(
-    ({ dataStore, config, onDone }: { dataStore: DataStore, config: ChartConfig, onDone: () => void }) => {
+    ({ dataStore, config, onDone }: { dataStore: DataStore; config: ChartConfig; onDone: () => void }) => {
         // prompt, e.g.: "dot-plot of gene expression"
         return (
             <>
@@ -450,11 +487,11 @@ const AddChartDialogComponent = observer(
                     {/* <ChartPreview config={{...config}} /> */}
                 </DataStoreContext.Provider>
             </>
-        )
+        );
     },
 );
 /** we could standardise this more for reuse... but not sure we want this to be modal, actually */
-const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => void }) => {
+const Wrapper = (props: { dataStore: DataStore; modal: boolean; onDone: () => void }) => {
     // how to manage this state?
     // it is currently possible for multiple dialogs to be open at once, with different states
     // this should not be allowed.
@@ -490,41 +527,44 @@ const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => vo
         return <AddChartDialogComponent {...props} config={config} />;
     }
     return (
-        <Dialog open={open} disableEscapeKeyDown={true}
+        <Dialog
+            open={open}
+            disableEscapeKeyDown={true}
             PaperProps={{
-                style: { //copied from FileUploadDialog, should maybe be part of theme.
-                //     backgroundColor: "var(--fade_background_color)",
-                //     backdropFilter: "blur(1px)",
-                border: "1px solid var(--border_menu_bar_color)"
+                style: {
+                    //copied from FileUploadDialog, should maybe be part of theme.
+                    //     backgroundColor: "var(--fade_background_color)",
+                    //     backdropFilter: "blur(1px)",
+                    border: "1px solid var(--border_menu_bar_color)",
                 },
             }}
             fullWidth
             onClose={() => {
                 setOpen(false);
                 props.onDone();
-            }} 
+            }}
         >
             <DialogTitle>
                 Add Chart in "{props.dataStore.name}"
-                        <IconButton
-                            aria-label="close"
-                                            onClick={() => {
-                                                setOpen(false);
-                                                props.onDone();
-                                            }}
-                                            sx={{
-                                                position: "absolute",
-                                                right: 8,
-                                                top: 8,
-                                            }}
-                            >
-                            <CloseIcon />
-                        </IconButton>
-                    </DialogTitle>
-                    <AddChartDialogComponent {...props} config={config} />
+                <IconButton
+                    aria-label="close"
+                    onClick={() => {
+                        setOpen(false);
+                        props.onDone();
+                    }}
+                    sx={{
+                        position: "absolute",
+                        right: 8,
+                        top: 8,
+                    }}
+                >
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
+            <AddChartDialogComponent {...props} config={config} />
         </Dialog>
     );
-}
+};
 class AddChartDialogReact extends BaseDialog {
     root: ReturnType<typeof createMdvPortal>;
     constructor(dataStore: DataStore) {
@@ -538,7 +578,7 @@ class AddChartDialogReact extends BaseDialog {
         );
         const modal = true; //doesn't work on fullscreen panel as of writing, also needs some redesign of "add chart" button in particular
         this.root = createMdvPortal(
-            <Wrapper dataStore={dataStore} modal={modal} onDone={() => this.close()}/>,
+            <Wrapper dataStore={dataStore} modal={modal} onDone={() => this.close()} />,
             this.dialog,
             this,
         );

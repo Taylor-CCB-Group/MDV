@@ -83,8 +83,7 @@ export function getAppMountPath(pathname = window.location.pathname) {
 export function getApiRootFromDir(dir: string) {
     const url = asUrl(dir);
     const projectMarker = url.pathname.lastIndexOf("/project/");
-    const apiPath =
-        projectMarker >= 0 ? url.pathname.slice(0, projectMarker) : url.pathname;
+    const apiPath = projectMarker >= 0 ? url.pathname.slice(0, projectMarker) : url.pathname;
 
     if (url.origin === window.location.origin) {
         return normalizeSameOriginPath(apiPath);

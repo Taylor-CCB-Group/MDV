@@ -374,11 +374,7 @@ export function useScatterplotLayer(
     const { opacity } = config;
     const radiusScale = useScatterRadius();
 
-    const {
-        aggregateFilteredRows,
-        ownerVisibleRows,
-        isExternallyFiltered,
-    } = useOwnedFilteredIndices(filterOwner);
+    const { aggregateFilteredRows, ownerVisibleRows, isExternallyFiltered } = useOwnedFilteredIndices(filterOwner);
     const data = ownerVisibleRows;
     const params = useParamColumns();
     const [cx, cy, cz] = params;
@@ -485,10 +481,10 @@ export function useScatterplotLayer(
             if (!tooltipCols) return null;
             // return tooltipCols.getValue(data[i]);
             return tooltipCols.map((col) => {
-                    // Sanitise the strings before passing
-                    const value = col.data ? col.getValue(rowIndex) : "loading...";
-                    const strValue = value === undefined || value === null ? "" : String(value);
-                    return `<strong>${escapeHtml(col.name)}:</strong> ${escapeHtml(strValue)}`;
+                // Sanitise the strings before passing
+                const value = col.data ? col.getValue(rowIndex) : "loading...";
+                const strValue = value === undefined || value === null ? "" : String(value);
+                return `<strong>${escapeHtml(col.name)}:</strong> ${escapeHtml(strValue)}`;
             });
         },
         [tooltipCols],
@@ -672,7 +668,13 @@ export function useScatterplotLayer(
                 updateTriggers: {
                     // a full pass over every row; only worth redoing while the layer is shown
                     getFilterValue: greyOnFilter
-                        ? [aggregateFilteredRows, isExternallyFiltered, colorColumn, shouldFilterMissing, fallbackOnZero]
+                        ? [
+                              aggregateFilteredRows,
+                              isExternallyFiltered,
+                              colorColumn,
+                              shouldFilterMissing,
+                              fallbackOnZero,
+                          ]
                         : false,
                     getPosition: [cx.data, cy.data, cz?.data],
                 },

@@ -14,12 +14,12 @@ import RenameTableColumnDialog from "./RenameTableColumnDialog";
 
 /**
  * Main component for the react table chart
- * 
+ *
  * Uses:
  * - useSlickGridReact: Core grid states, refs and events
  * - useFindReplace: Find and replace logic
  * - useEditCell: Cell editing logic
- * 
+ *
  * Wrapped in an observer to react to Mobx changes
  */
 // todo: add integration tests using playwright to test the working of this component
@@ -64,9 +64,12 @@ const TableChartReactComponent = observer(() => {
         openColumnRemovalView,
     } = useSlickGridReact();
 
-    const handleFeedbackAlert = useCallback((alert: FeedbackAlert) => {
-        setFeedbackAlert(alert);
-    }, [setFeedbackAlert]);
+    const handleFeedbackAlert = useCallback(
+        (alert: FeedbackAlert) => {
+            setFeedbackAlert(alert);
+        },
+        [setFeedbackAlert],
+    );
 
     useEffect(() => {
         setAlertDialogOpen(Boolean(feedbackAlert));
@@ -183,9 +186,7 @@ const TableChartReactComponent = observer(() => {
                         open={alertDialogOpen}
                         handleClose={onFeedbackDialogClose}
                         component={<FeedbackAlertComponent feedbackAlert={feedbackAlert} />}
-                        isAlertErrorComponent={
-                            !isDebugError(feedbackAlert)
-                        }
+                        isAlertErrorComponent={!isDebugError(feedbackAlert)}
                     />
                 </div>
             )}

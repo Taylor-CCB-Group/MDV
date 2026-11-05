@@ -17,14 +17,7 @@ import {
 import { Clear as ClearIcon, Close as CloseIcon } from "@mui/icons-material";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import {
-    DndContext,
-    closestCenter,
-    PointerSensor,
-    useSensor,
-    useSensors,
-    type DragEndEvent,
-} from "@dnd-kit/core";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { stringContainsAll } from "@/lib/utils";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
@@ -61,9 +54,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     const [savingOrder, setSavingOrder] = useState(false);
 
     // Gallery default checkbox
-    const [galleryDefault, setGalleryDefault] = useState<boolean>(
-        Boolean(config.show_gallery_on_open),
-    );
+    const [galleryDefault, setGalleryDefault] = useState<boolean>(Boolean(config.show_gallery_on_open));
     // keep track of saving galleryDefault request and avoid overlapping requests
     const [savingGalleryDefault, setSavingGalleryDefault] = useState(false);
 
@@ -157,8 +148,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         try {
             await viewManager.renameView(oldName, trimmed);
             // Update the local states
-            const updateEntry = (v: ViewEntry) =>
-                v.name === oldName ? { ...v, name: trimmed } : v;
+            const updateEntry = (v: ViewEntry) => (v.name === oldName ? { ...v, name: trimmed } : v);
             setViewList((prev) => prev.map(updateEntry));
             setFilteredViewList((prev) => prev.map(updateEntry));
             // Reset the rename states
@@ -172,9 +162,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     };
 
     // Only start a drag after the pointer moves 8px; avoids triggering drag on image click.
-    const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    );
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
     // On drop: resolve indices by view name (id), reorder with arrayMove, update both lists and mark order changed.
     const handleDragEnd = useCallback(
@@ -233,10 +221,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
             <DialogContent dividers sx={{ height: "95vh" }}>
                 <ErrorBoundary
                     FallbackComponent={({ error }: { error: Error }) => (
-                        <DebugErrorComponent
-                            error={error}
-                            title="Error displaying view gallery"
-                        />
+                        <DebugErrorComponent error={error} title="Error displaying view gallery" />
                     )}
                 >
                     {loading ? (

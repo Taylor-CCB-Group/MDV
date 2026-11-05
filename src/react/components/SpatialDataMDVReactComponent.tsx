@@ -340,11 +340,7 @@ function summariseLayersForError(layers: RenderStackLayerInputs["layers"]) {
 }
 
 const SpatialDataViewer = observer(
-    ({
-        setHoveredContour,
-    }: {
-        setHoveredContour: (contour: HoveredContour | null) => void;
-    }) => {
+    ({ setHoveredContour }: { setHoveredContour: (contour: HoveredContour | null) => void }) => {
         const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
         const config = useConfig<SpatialDataMdvReactConfig>();
         const rawRegion = useRegion();
@@ -365,7 +361,9 @@ const SpatialDataViewer = observer(
         const legendCategories = useCategoryContourLegend(contourConfig);
         const showLegend = contourConfig.field_legend.display;
         const legendPosition = { x: 10, y: 10 };
-        const { device: deckDevice, fallBack: fallBackToWebGL } = useDeckDevice(resolveDeckBackend(config.render_backend));
+        const { device: deckDevice, fallBack: fallBackToWebGL } = useDeckDevice(
+            resolveDeckBackend(config.render_backend),
+        );
         const activeBackend = deckDevice.status === "ready" ? deckDevice.backend : null;
         const fallbackReason = deckDevice.status === "ready" ? deckDevice.fallbackReason : undefined;
         useEffect(() => {

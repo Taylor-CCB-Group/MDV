@@ -7,7 +7,7 @@ import useChat from "@/charts/dialogs/ChatAPI";
 import ChatDialog from "@/charts/dialogs/ChatDialog";
 import PopoutWindow from "./PopoutWindow";
 import { ProjectProvider } from "@/modules/ProjectContext";
-import type React from 'react';
+import type React from "react";
 
 interface ChatProviderProps {
     open: boolean;
@@ -18,14 +18,7 @@ interface ChatProviderProps {
     theme: any;
 }
 
-const ChatProvider: React.FC<ChatProviderProps> = ({
-    open,
-    popout,
-    onClose,
-    onPopout,
-    onPopoutClose,
-    theme
-}) => {
+const ChatProvider: React.FC<ChatProviderProps> = ({ open, popout, onClose, onPopout, onPopoutClose, theme }) => {
     // useChat is only called when this component is mounted (after first button click)
     const {
         messages,
@@ -95,8 +88,9 @@ const ChatProvider: React.FC<ChatProviderProps> = ({
                         </ThemeProvider>
                     </ProjectProvider>
                 </PopoutWindow>
-                ) : dialog
-            }
+            ) : (
+                dialog
+            )}
         </>
     );
 };

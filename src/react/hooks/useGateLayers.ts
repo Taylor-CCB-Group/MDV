@@ -130,7 +130,7 @@ const useGateLayers = () => {
                 // Set teh dragging id and drag position state
                 draggingIdRef.current = pickingInfo.object.gateId;
                 setDraggingId(pickingInfo.object.gateId);
-                const startPos: [number, number] = [pickingInfo.coordinate[0], pickingInfo.coordinate[1]]
+                const startPos: [number, number] = [pickingInfo.coordinate[0], pickingInfo.coordinate[1]];
                 dragPosRef.current = startPos;
                 setDragPos(startPos);
                 return true;

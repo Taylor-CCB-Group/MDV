@@ -23,7 +23,7 @@ const useGateActions = () => {
         setSelectionFeatureCollection,
         setSelectionMode,
     } = selectionProps;
-    const chart = useChart<DeckScatterConfig & {region?: string}>();
+    const chart = useChart<DeckScatterConfig & { region?: string }>();
 
     const clearSelection = useCallback(() => {
         action(() => {

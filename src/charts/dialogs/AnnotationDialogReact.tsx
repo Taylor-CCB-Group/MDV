@@ -21,11 +21,7 @@ class AnnotationDialogReact extends BaseDialog {
             },
             null,
         );
-        this.root = createMdvPortal(
-            <AnnotationDialogComponent dataStore={dataStore} />,
-            this.dialog,
-            this,
-        );
+        this.root = createMdvPortal(<AnnotationDialogComponent dataStore={dataStore} />, this.dialog, this);
     }
 
     close(): void {

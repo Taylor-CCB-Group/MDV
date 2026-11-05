@@ -28,9 +28,7 @@ function formatProject(item: any): Project {
         lastModified: item.lastModified || "",
         createdAt: item.createdAt || "",
         owner: item.owner || [],
-        collaborators: Array.isArray(item.collaborators)
-            ? item.collaborators
-            : [],
+        collaborators: Array.isArray(item.collaborators) ? item.collaborators : [],
         numberOfStructures: item.numberOfStructures || "0",
         numberOfImages: item.numberOfImages || "0",
         writable: item.writable !== false,
@@ -71,9 +69,7 @@ const useProjects = () => {
     const [rescanWarning, setRescanWarning] = useState<string | null>(null);
     const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
     const [filter, setFilter] = useState("");
-    const [sortBy, setSortBy] = useState<"lastModified" | "name">(
-        "lastModified",
-    );
+    const [sortBy, setSortBy] = useState<"lastModified" | "name">("lastModified");
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
     const closeErrorModal = useCallback(() => {
@@ -113,16 +109,14 @@ const useProjects = () => {
                 return;
             } else {
                 const errorResponse = await parseErrorResponse({
-                    response, 
+                    response,
                     fallbackText: "Error fetching projects. Please try again later.",
                 });
                 throw errorResponse;
             }
         } catch (error) {
             const errorMessage =
-                error instanceof Error
-                    ? error.message
-                    : "Error fetching projects. Please try again later.";
+                error instanceof Error ? error.message : "Error fetching projects. Please try again later.";
 
             handleError(errorMessage);
             console.error("Error fetching projects:", error);
@@ -144,7 +138,6 @@ const useProjects = () => {
                 },
             });
 
-            
             if (response.ok) {
                 const data = await response.json();
                 // Add the new project to the local state with default values
@@ -171,17 +164,14 @@ const useProjects = () => {
                 return newProject;
             } else {
                 const errorResponse = await parseErrorResponse({
-                    response, 
-                    fallbackText: "Error creating project. Please try again later."
+                    response,
+                    fallbackText: "Error creating project. Please try again later.",
                 });
                 throw errorResponse;
             }
-
         } catch (error) {
             const errorMessage =
-                error instanceof Error
-                    ? error.message
-                    : "Error creating project. Please try again later.";
+                error instanceof Error ? error.message : "Error creating project. Please try again later.";
 
             handleError(errorMessage);
             // todo: revisit this soon for better error handling
@@ -205,22 +195,18 @@ const useProjects = () => {
                 });
 
                 if (response.ok) {
-                    setProjects((prevProjects) =>
-                        prevProjects.filter((p) => String(p.id) !== String(id)),
-                    );
+                    setProjects((prevProjects) => prevProjects.filter((p) => String(p.id) !== String(id)));
                     return;
                 } else {
                     const errorResponse = await parseErrorResponse({
-                        response, 
-                        fallbackText: "Error deleting project. Please try again later."
+                        response,
+                        fallbackText: "Error deleting project. Please try again later.",
                     });
                     throw errorResponse;
                 }
             } catch (error) {
                 const errorMessage =
-                    error instanceof Error
-                        ? error.message
-                        : "Error deleting project. Please try again later.";
+                    error instanceof Error ? error.message : "Error deleting project. Please try again later.";
 
                 handleError(errorMessage);
                 console.error("Error deleting project:", error);
@@ -232,21 +218,15 @@ const useProjects = () => {
     );
 
     const filteredAndSortedProjects = useMemo(() => {
-        const result = projects.filter((p) =>
-            p.name.toLowerCase().includes(filter.toLowerCase()),
-        );
+        const result = projects.filter((p) => p.name.toLowerCase().includes(filter.toLowerCase()));
 
         result.sort((a, b) => {
             if (sortBy === "name") {
-                return sortOrder === "asc"
-                    ? a.name.localeCompare(b.name)
-                    : b.name.localeCompare(a.name);
+                return sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
             }
             return sortOrder === "asc"
-                ? new Date(a.lastModified).getTime() -
-                      new Date(b.lastModified).getTime()
-                : new Date(b.lastModified).getTime() -
-                      new Date(a.lastModified).getTime();
+                ? new Date(a.lastModified).getTime() - new Date(b.lastModified).getTime()
+                : new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime();
         });
 
         return result;
@@ -257,7 +237,6 @@ const useProjects = () => {
             setIsLoading(true);
             setError(null);
 
-            
             try {
                 if (!newName || newName.trim() === "") {
                     const errorMessage = "New name not provided";
@@ -279,24 +258,20 @@ const useProjects = () => {
                 if (response.ok) {
                     setProjects((prevProjects) =>
                         prevProjects.map((project) =>
-                            project.id === id
-                                ? { ...project, name: newName.trim() }
-                                : project,
+                            project.id === id ? { ...project, name: newName.trim() } : project,
                         ),
                     );
                     return;
                 } else {
                     const errorResponse = await parseErrorResponse({
-                        response, 
-                        fallbackText: "Error renaming project. Please try again later."
+                        response,
+                        fallbackText: "Error renaming project. Please try again later.",
                     });
                     throw errorResponse;
                 }
             } catch (error) {
                 const errorMessage =
-                    error instanceof Error
-                        ? error.message
-                        : "Error renaming project. Please try again later.";
+                    error instanceof Error ? error.message : "Error renaming project. Please try again later.";
 
                 handleError(errorMessage);
                 console.error("Error renaming project:", error);
@@ -339,16 +314,14 @@ const useProjects = () => {
                     return;
                 } else {
                     const errorResponse = await parseErrorResponse({
-                        response, 
-                        fallbackText: "Error changing project type. Please try again later."
+                        response,
+                        fallbackText: "Error changing project type. Please try again later.",
                     });
                     throw errorResponse;
                 }
             } catch (error) {
                 const errorMessage =
-                    error instanceof Error
-                        ? error.message
-                        : "Error changing project type. Please try again later.";
+                    error instanceof Error ? error.message : "Error changing project type. Please try again later.";
 
                 handleError(errorMessage);
                 console.error("Error changing project type:", error);
@@ -381,64 +354,58 @@ const useProjects = () => {
                     window.URL.revokeObjectURL(url);
                 } else {
                     const errorResponse = await parseErrorResponse({
-                        response, 
-                        fallbackText: "Error exporting the project. Please try again later."
+                        response,
+                        fallbackText: "Error exporting the project. Please try again later.",
                     });
                     throw errorResponse;
                 }
             } catch (error) {
                 const errorMessage =
-                    error instanceof Error
-                        ? error.message
-                        : "Error exporting the project. Please try again later.";
+                    error instanceof Error ? error.message : "Error exporting the project. Please try again later.";
 
                 handleError(errorMessage);
                 console.error("Error exporting the project:", error);
             } finally {
                 setIsLoading(false);
             }
-    }, [handleError])
-
-    const rescanProjects = useCallback(
-        async () => {
-            setIsLoading(true);
-            setError(null);
-            setRescanWarning(null);
-
-            try {
-                const response = await apiFetch("rescan_projects");
-                if (response.ok) {
-                   const result: RescanResponse = await response.json();
-                   if (result.unwritable_projects.length > 0) {
-                       const projectNames = result.unwritable_projects
-                           .map((project) => project.name)
-                           .join(", ");
-                       setRescanWarning(
-                           `Registered ${projectNames}, but the server cannot write the project files. These projects will open read-only.`,
-                       );
-                   }
-                   // Refresh the project list so newly discovered projects appear (works with or without auth)
-                   await fetchProjects();
-                } else {
-                    const errorResponse = await parseErrorResponse({
-                        response, 
-                        fallbackText: "Error rescanning projects. Please try again later."
-                    });
-                    throw errorResponse;
-                }
-            } catch (error) {
-                const errorMessage =
-                    error instanceof Error
-                        ? error.message
-                        : "Error rescanning projects. Please try again later.";
-
-                handleError(errorMessage);
-                console.error("Error rescanning projects:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        }, [handleError, fetchProjects]
+        },
+        [handleError],
     );
+
+    const rescanProjects = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        setRescanWarning(null);
+
+        try {
+            const response = await apiFetch("rescan_projects");
+            if (response.ok) {
+                const result: RescanResponse = await response.json();
+                if (result.unwritable_projects.length > 0) {
+                    const projectNames = result.unwritable_projects.map((project) => project.name).join(", ");
+                    setRescanWarning(
+                        `Registered ${projectNames}, but the server cannot write the project files. These projects will open read-only.`,
+                    );
+                }
+                // Refresh the project list so newly discovered projects appear (works with or without auth)
+                await fetchProjects();
+            } else {
+                const errorResponse = await parseErrorResponse({
+                    response,
+                    fallbackText: "Error rescanning projects. Please try again later.",
+                });
+                throw errorResponse;
+            }
+        } catch (error) {
+            const errorMessage =
+                error instanceof Error ? error.message : "Error rescanning projects. Please try again later.";
+
+            handleError(errorMessage);
+            console.error("Error rescanning projects:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [handleError, fetchProjects]);
 
     const softDeleteProjects = useCallback(
         async (projectIds: string[]) => {
@@ -471,9 +438,8 @@ const useProjects = () => {
                 );
                 return [...deletedIds];
             } catch (error) {
-                const errorMessage = error instanceof Error
-                    ? error.message
-                    : "Error moving projects to the recycle bin.";
+                const errorMessage =
+                    error instanceof Error ? error.message : "Error moving projects to the recycle bin.";
                 handleError(errorMessage);
                 throw new Error(errorMessage);
             } finally {
@@ -498,9 +464,7 @@ const useProjects = () => {
             }
             return recycleBinResponseSchema.parse(await response.json());
         } catch (error) {
-            const errorMessage = error instanceof Error
-                ? error.message
-                : "Error fetching the recycle bin.";
+            const errorMessage = error instanceof Error ? error.message : "Error fetching the recycle bin.";
             handleError(errorMessage);
             return [];
         } finally {
@@ -532,9 +496,8 @@ const useProjects = () => {
             }
             return data;
         } catch (error) {
-            const errorMessage = error instanceof Error
-                ? error.message
-                : "Error permanently deleting recycled projects.";
+            const errorMessage =
+                error instanceof Error ? error.message : "Error permanently deleting recycled projects.";
             handleError(errorMessage);
             throw new Error(errorMessage);
         } finally {
@@ -571,9 +534,7 @@ const useProjects = () => {
                 }
                 return restored;
             } catch (error) {
-                const errorMessage = error instanceof Error
-                    ? error.message
-                    : "Error restoring recycled project.";
+                const errorMessage = error instanceof Error ? error.message : "Error restoring recycled project.";
                 handleError(errorMessage);
                 throw new Error(errorMessage);
             } finally {

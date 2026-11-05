@@ -67,10 +67,7 @@ export type SharedSyntheticAnndataSuiteHandle = SyntheticAnndataTemporaryProject
 /** @deprecated Use {@link SyntheticAnndataTemporaryProjectHandle}. */
 export type AnndataRescanTemporaryProjectHandle = SyntheticAnndataTemporaryProjectHandle;
 
-async function runSyntheticAnndataProjectCli(
-    projectPath: string,
-    synthetic: SyntheticAnndataGeneratorCliArgs,
-) {
+async function runSyntheticAnndataProjectCli(projectPath: string, synthetic: SyntheticAnndataGeneratorCliArgs) {
     const pythonProjectDir = path.join(REPO_ROOT, "python");
     const profile = synthetic.profile ?? "minimal";
     const nCells = synthetic.nCells ?? 1000;
@@ -129,9 +126,7 @@ async function runSyntheticAnndataProjectCli(
         }
     }
 
-    throw new Error(
-        `Unable to run mdvtools.tests.generate_synthetic_anndata_project.\n${errors.join("\n")}`,
-    );
+    throw new Error(`Unable to run mdvtools.tests.generate_synthetic_anndata_project.\n${errors.join("\n")}`);
 }
 
 export async function createTemporaryProjectViaSyntheticAnndata(
@@ -141,9 +136,7 @@ export async function createTemporaryProjectViaSyntheticAnndata(
     const deleteOnCleanup = shouldDeleteProjectOnCleanup(options.deleteOnCleanup);
     const mdvRoot = options.mdvRoot ?? (await ensurePlaywrightMdvRoot());
 
-    const nameSegment =
-        options.nameSegment ??
-        `synth-anndata--playwright-rescan--minimal--${Date.now()}`;
+    const nameSegment = options.nameSegment ?? `synth-anndata--playwright-rescan--minimal--${Date.now()}`;
     const projectPath = options.projectPath ?? path.join(mdvRoot, nameSegment);
 
     let projectId: string | undefined;
@@ -162,9 +155,7 @@ export async function createTemporaryProjectViaSyntheticAnndata(
             projectsAfter.find((project) => !projectIdsBefore.has(String(project.id)));
         expect(createdProject).toBeTruthy();
         if (!createdProject) {
-            throw new Error(
-                "Synthetic AnnData project was generated but was not registered by /rescan_projects.",
-            );
+            throw new Error("Synthetic AnnData project was generated but was not registered by /rescan_projects.");
         }
         projectId = String(createdProject.id);
 

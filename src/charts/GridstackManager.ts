@@ -64,7 +64,7 @@ export default class GridStackManager {
                         handles: "e,se,s,sw,w,n,ne,nw",
                     },
                     // now working - as a have inner and outer containers
-                     margin: "3px"
+                    margin: "3px",
                     // column
                 },
                 div,
@@ -76,11 +76,8 @@ export default class GridStackManager {
                 el.style.filter = "blur(1px) opacity(0.5)";
             });
 
-            const i = this.chartManager.addMenuIcon(
-                ds.name,
-                "fas fa-compress-arrows-alt",
-                "compact layout",
-                () => this.compact(ds),
+            const i = this.chartManager.addMenuIcon(ds.name, "fas fa-compress-arrows-alt", "compact layout", () =>
+                this.compact(ds),
             );
             this.grids.set(ds, { grid: grid, charts: new Set(), icon: i });
         }
@@ -101,12 +98,11 @@ export default class GridStackManager {
         for (const chart of gi.charts) {
             const div = chart.getDiv();
             const d = div.parentElement?.parentElement;
-            if (d){
+            if (d) {
                 const { x, y, w, h } = d.gridstackNode;
                 chart.config.gssize = [w, h];
                 chart.config.gsposition = [x, y];
             }
-
         }
     }
 
@@ -121,27 +117,27 @@ export default class GridStackManager {
             return;
         }
         const div = ds.contentDiv;
-        //get an array - don't want to loop through set as removeLayout 
+        //get an array - don't want to loop through set as removeLayout
         //will remove the chart from the set
         const charts = Array.from(gi.charts);
-        for (const chart of charts){
+        for (const chart of charts) {
             const cdiv = chart.getDiv();
             //bit of a hack to get the outer gridstack container
             const d = cdiv.parentElement?.parentElement;
-            if (d){
+            if (d) {
                 //get the size and position of the chart in gridstack
-                const w =  d.offsetWidth;
+                const w = d.offsetWidth;
                 const h = d.offsetHeight;
                 const l = d.offsetLeft;
-                const t= d .offsetTop;
+                const t = d.offsetTop;
                 //apply these to the chart's div for absolute positioning
                 cdiv.style.position = "absolute";
                 cdiv.style.width = `${w - 6}px`;
                 cdiv.style.height = `${h - 12}px`;
                 cdiv.style.left = `${l}px`;
                 cdiv.style.top = `${t}px`;
-                chart.config.size = [w- 6, h - 12];
-                chart.config.position = [l,t]
+                chart.config.size = [w - 6, h - 12];
+                chart.config.position = [l, t];
             }
             //remove the gridstack data from the chart's config
             chart.config.gssize = undefined;
@@ -180,8 +176,8 @@ export default class GridStackManager {
             //work out the size location of the chart in gridstack
             //doesn't work that well with complex layouts
             const rect = div.getBoundingClientRect();
-            let w = Math.round((rect.width+6) / grid.cellWidth());
-            let h = Math.round((rect.height+6) / this.cellHeight);
+            let w = Math.round((rect.width + 6) / grid.cellWidth());
+            let h = Math.round((rect.height + 6) / this.cellHeight);
             let x = Math.round(div.offsetLeft / grid.cellWidth()); //relative location
             //cases where the old container was wider than the current one
             x = x > 11 ? 11 : x;
@@ -198,14 +194,13 @@ export default class GridStackManager {
             clearPosition(div);
             div.style.transition = "filter 0.5s ease";
 
-
             // Add the "move" cursor
             const handle = div.querySelector(this.dragHandle) as HTMLElement;
             if (handle) {
                 handle.style.cursor = "move"; // Add the "move" cursor
             }
 
-            // a bit long-winded but for gridstack to work correctly we 
+            // a bit long-winded but for gridstack to work correctly we
             // the chart wrapped in an outer and inner container
             //! check the handling these variables if any issues occur
             let outer: HTMLElement;
@@ -232,23 +227,23 @@ export default class GridStackManager {
                 grid.el.appendChild(outer);
             }
             const origHeight = div.style.height;
-            div.style.height="100%";
+            div.style.height = "100%";
 
             //saves thr chart's position and size to the chart's config
-            const saveChartPosition = () => { 
+            const saveChartPosition = () => {
                 const { x, y, w, h } = outer.gridstackNode;
                 chart.config.gssize = [w, h];
                 chart.config.gsposition = [x, y];
-            }
+            };
 
             // Disconnect existing observers
             //! If any problems occur try deleting the observers
             if (remanageChart) {
                 if (chart._gsResizeObserver) {
-                chart._gsResizeObserver.disconnect();
+                    chart._gsResizeObserver.disconnect();
                 }
                 if (chart._gsMutationObserver) {
-                chart._gsMutationObserver.disconnect();
+                    chart._gsMutationObserver.disconnect();
                 }
             }
             // using ResizeObserver rather than gridstack callbacks
@@ -261,16 +256,15 @@ export default class GridStackManager {
                         //when loading as saved view
                         //it redraws chart before the data is processed
                         //^ perhaps we could use something related to chart.deferredInit if this is a problem
-                        //would possibly need to improve the design of that mechanism, 
+                        //would possibly need to improve the design of that mechanism,
                         //we could possibly move `ro` creation to after that promise resolves.
 
                         // also leads to a condition in which initial chart.config.size is not stable
-                        // immediately after adding it... and also if the window is resized, 
+                        // immediately after adding it... and also if the window is resized,
                         // or the view is opened on a different screen... we need to think about how
                         // we serialize the layout information.
                         chart.setSize();
                         saveChartPosition();
-
                     } catch {}
                 }, 20),
             );
@@ -301,8 +295,7 @@ export default class GridStackManager {
             }
 
             // Create widget only during creation
-            if (!remanageChart)
-                grid.makeWidget(outer);
+            if (!remanageChart) grid.makeWidget(outer);
 
             //nb, autoPosition property doesn't apply in update()?
             //passing options to makeWidget() or addWidget() does not evoke joy.
@@ -312,7 +305,6 @@ export default class GridStackManager {
             } else {
                 grid.update(outer, { w, h });
             }
-        
 
             let lockButton: HTMLElement;
             // Create lock button only the first time during creation
@@ -324,10 +316,7 @@ export default class GridStackManager {
             }
             function addPositionLock() {
                 let locked = false;
-                const lockButton = chart.addMenuIcon(
-                    "fas fa-unlock",
-                    "lock position",
-                );
+                const lockButton = chart.addMenuIcon("fas fa-unlock", "lock position");
                 const lockIcon = lockButton.children[0];
                 lockButton.addEventListener("click", () => {
                     locked = !locked;
@@ -438,17 +427,14 @@ export default class GridStackManager {
 export type P = [number, number];
 export type Config = Partial<{ size: P; position: P; gssize: P; gsposition: P }>;
 function getVisibleChartBounds(dataSource: DataSource) {
-    const charts = Object.entries(
-        window.mdv.chartManager.charts,
-    ) as unknown as [[string, { dataSource: DataSource; chart: Chart }]];
-    return charts
-        .filter((c) => c[1].dataSource === dataSource)
-        .map((c) => c[1].chart.getDiv().getBoundingClientRect());
+    const charts = Object.entries(window.mdv.chartManager.charts) as unknown as [
+        [string, { dataSource: DataSource; chart: Chart }],
+    ];
+    return charts.filter((c) => c[1].dataSource === dataSource).map((c) => c[1].chart.getDiv().getBoundingClientRect());
 }
 
 function getGridInfo(dataSource: DataSource) {
-    const [cellW, cellH] =
-        window.mdv.chartManager.gridStack.getCellDimensions(dataSource);
+    const [cellW, cellH] = window.mdv.chartManager.gridStack.getCellDimensions(dataSource);
     const rect = dataSource.contentDiv.getBoundingClientRect();
     const rows = Math.floor(rect.height / cellH) * 2; //hack for more rows in layout
     const cols = Math.floor(rect.width / cellW);
@@ -473,14 +459,8 @@ function findFreeSpace(dataSource: DataSource) {
         // get outer-bounds in terms of nominal grid... with appropriate offset relative to mainRect...
         const left = Math.floor((rect.left - mainRect.left) / cellW);
         const top = Math.floor((rect.top - mainRect.top) / cellH);
-        const right = Math.min(
-            cols,
-            Math.ceil((rect.right - mainRect.left) / cellW),
-        );
-        const bottom = Math.min(
-            rows,
-            Math.ceil((rect.bottom - mainRect.top) / cellH),
-        );
+        const right = Math.min(cols, Math.ceil((rect.right - mainRect.left) / cellW));
+        const bottom = Math.min(rows, Math.ceil((rect.bottom - mainRect.top) / cellH));
         for (let row = top; row < bottom; row++) {
             for (let col = left; col < right; col++) {
                 grid[row][col] = true;
@@ -534,11 +514,7 @@ export function positionChart(dataSource: DataSource, config: Config) {
     }
     //hack approx position of grid stack elements
 
-    if (
-        chartManager.viewData.dataSources[dataSource.name]?.layout ===
-            "gridstack" &&
-        config.gssize
-    ) {
+    if (chartManager.viewData.dataSources[dataSource.name]?.layout === "gridstack" && config.gssize) {
         const cellDim = chartManager.gridStack.getCellDimensions(dataSource);
         width = Math.round(config.gssize[0] * cellDim[0]);
         height = Math.round(config.gssize[1] * cellDim[1]);

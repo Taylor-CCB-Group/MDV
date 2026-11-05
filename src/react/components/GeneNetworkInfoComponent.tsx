@@ -5,59 +5,81 @@ import z from "zod";
 import clsx from "clsx";
 
 // Zod schema for GeneNetwork API response
-const geneNetworkApiResponseSchema = z.object({
-    comment: z.string().optional(),
-    version: z.string().optional(),
-    gene: z.object({
-        id: z.string(),
-        index_: z.number().optional(),
-        name: z.string(),
-        biotype: z.string().optional(),
-        chr: z.string().optional(),
-        start: z.number().optional(),
-        stop: z.number().optional(),
-        strand: z.number().optional(),
-        description: z.string(),
-        biomartRelease: z.string().optional(),
-        assemblyRelease: z.string().optional(),
-        transcripts: z.array(z.string()).optional(),
-        genePredScore: z.string().optional(),
-    }),
-    databases: z.array(z.object({
-        id: z.string(),
-        name: z.string(),
-        fullName: z.string(),
-        description: z.string(),
-        url: z.string(),
-        inMemory: z.boolean(),
-    })).optional(),
-    pathways: z.object({
-        annotated: z.array(z.object({
-            href: z.string(),
-            zScore: z.number(),
-            pValue: z.number(),
-        })).optional(),
-        predicted: z.array(z.object({
-            href: z.string(),
-            zScore: z.number(),
-            pValue: z.number(),
-        })).optional(),
-    }).optional(),
-    // actually I think the celltype info is more interesting than currently expressed here.
-    celltypes: z.object({
-        fixed: z.object({
-            header: z.array(z.any()).optional(),
-            indices: z.record(z.string(), z.number()).optional(),
-        }).optional(),
-        values: z.object({
-            avg: z.array(z.number()).optional(),
-            stdev: z.array(z.number()).optional(),
-            z: z.array(z.number()).optional(),
-            auc: z.array(z.number()).optional(),
-        }).optional(),
-        transcriptBars: z.record(z.string(), z.array(z.number().nullable())).optional(),
-    }).optional(),
-}).passthrough();
+const geneNetworkApiResponseSchema = z
+    .object({
+        comment: z.string().optional(),
+        version: z.string().optional(),
+        gene: z.object({
+            id: z.string(),
+            index_: z.number().optional(),
+            name: z.string(),
+            biotype: z.string().optional(),
+            chr: z.string().optional(),
+            start: z.number().optional(),
+            stop: z.number().optional(),
+            strand: z.number().optional(),
+            description: z.string(),
+            biomartRelease: z.string().optional(),
+            assemblyRelease: z.string().optional(),
+            transcripts: z.array(z.string()).optional(),
+            genePredScore: z.string().optional(),
+        }),
+        databases: z
+            .array(
+                z.object({
+                    id: z.string(),
+                    name: z.string(),
+                    fullName: z.string(),
+                    description: z.string(),
+                    url: z.string(),
+                    inMemory: z.boolean(),
+                }),
+            )
+            .optional(),
+        pathways: z
+            .object({
+                annotated: z
+                    .array(
+                        z.object({
+                            href: z.string(),
+                            zScore: z.number(),
+                            pValue: z.number(),
+                        }),
+                    )
+                    .optional(),
+                predicted: z
+                    .array(
+                        z.object({
+                            href: z.string(),
+                            zScore: z.number(),
+                            pValue: z.number(),
+                        }),
+                    )
+                    .optional(),
+            })
+            .optional(),
+        // actually I think the celltype info is more interesting than currently expressed here.
+        celltypes: z
+            .object({
+                fixed: z
+                    .object({
+                        header: z.array(z.any()).optional(),
+                        indices: z.record(z.string(), z.number()).optional(),
+                    })
+                    .optional(),
+                values: z
+                    .object({
+                        avg: z.array(z.number()).optional(),
+                        stdev: z.array(z.number()).optional(),
+                        z: z.array(z.number()).optional(),
+                        auc: z.array(z.number()).optional(),
+                    })
+                    .optional(),
+                transcriptBars: z.record(z.string(), z.array(z.number().nullable())).optional(),
+            })
+            .optional(),
+    })
+    .passthrough();
 
 export type GeneNetworkApiResponse = z.infer<typeof geneNetworkApiResponseSchema>;
 
@@ -110,19 +132,18 @@ export function GeneNetworkInfoComponent({
     }, [isVisible]);
 
     // Only query when visible and geneId is provided
-    const { data: geneInfo, isLoading, error } = useQuery<GeneInfo>({
+    const {
+        data: geneInfo,
+        isLoading,
+        error,
+    } = useQuery<GeneInfo>({
         queryKey: ["geneInfo", geneId],
         queryFn: async () => {
             if (!geneId) throw new Error("No gene ID provided");
-            const response = await fetch(
-                `https://www.genenetwork.nl/api/v1/gene/${geneId}`,
-            );
+            const response = await fetch(`https://www.genenetwork.nl/api/v1/gene/${geneId}`);
             if (!response.ok) {
                 const errorData = await response.json().catch(() => null);
-                throw new Error(
-                    errorData?.message ||
-                        `HTTP error! status: ${response.status}`,
-                );
+                throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
             }
             const jsonData = await response.json();
             // Parse and validate with Zod
@@ -176,8 +197,8 @@ export function GeneNetworkInfoComponent({
                     borderColor: "rgb(59, 130, 246)", // blue-500
                 }),
                 "&:focus": {
-                    borderWidth: "2px"
-                }
+                    borderWidth: "2px",
+                },
             }}
             onClick={handleCardClick}
             onKeyDown={handleKeyDown}
@@ -187,25 +208,20 @@ export function GeneNetworkInfoComponent({
                     Scroll to load gene info...
                 </Typography>
             )}
-            {isVisible && isLoading && (
-                <Typography variant="body2">
-                    Loading gene info for {geneId}...
-                </Typography>
-            )}
+            {isVisible && isLoading && <Typography variant="body2">Loading gene info for {geneId}...</Typography>}
             {isVisible && error && (
                 <>
-                <Typography variant="body2" color="error">
-                    Error fetching gene info:{" "}
-                    {error instanceof Error ? error.message : "Unknown error"}
-                </Typography>
-                <Link
-                    href={`https://www.genecards.org/cgi-bin/carddisp.pl?gene=${geneId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    tabIndex={-1}
-                >
-                    Try opening on genecards.org
-                </Link>
+                    <Typography variant="body2" color="error">
+                        Error fetching gene info: {error instanceof Error ? error.message : "Unknown error"}
+                    </Typography>
+                    <Link
+                        href={`https://www.genecards.org/cgi-bin/carddisp.pl?gene=${geneId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        tabIndex={-1}
+                    >
+                        Try opening on genecards.org
+                    </Link>
                 </>
             )}
             {isVisible && geneInfo && (
@@ -218,10 +234,10 @@ export function GeneNetworkInfoComponent({
                     <Typography variant="body2" sx={{ mb: 0.5, lineHeight: 1.3 }}>
                         <strong>Gene ID:</strong> {geneInfo.geneId}
                     </Typography>
-                    <Typography 
-                        variant="body2" 
-                        sx={{ 
-                            mb: 0.5, 
+                    <Typography
+                        variant="body2"
+                        sx={{
+                            mb: 0.5,
                             lineHeight: 1.3,
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -266,4 +282,3 @@ export function GeneNetworkInfoComponent({
         </Paper>
     );
 }
-

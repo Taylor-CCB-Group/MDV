@@ -79,37 +79,22 @@ export const ALLOWED_FILE_TYPES: Record<string, FileTypeConfig> = IS_PRODUCTION
       }
     : FILE_TYPES;
 
-export const DEFAULT_UPLOAD_METHOD: UploadMethod = USE_SOCKETIO_UPLOAD
-    ? "socketio"
-    : "http";
+export const DEFAULT_UPLOAD_METHOD: UploadMethod = USE_SOCKETIO_UPLOAD ? "socketio" : "http";
 
 export function getFileTypeFromExtension(fileName: string): FileTypeConfig | null {
     const extension = `.${fileName.split(".").pop()?.toLowerCase()}`;
-    return (
-        Object.values(ALLOWED_FILE_TYPES).find((config) =>
-            config.extensions.includes(extension),
-        ) || null
-    );
+    return Object.values(ALLOWED_FILE_TYPES).find((config) => config.extensions.includes(extension)) || null;
 }
 
 export function generateDropzoneAccept(): Record<string, string[]> {
-    return Object.values(ALLOWED_FILE_TYPES).reduce<Record<string, string[]>>(
-        (acc, config) => {
-            config.mimeTypes.forEach((mimeType) => {
-                acc[mimeType] = config.extensions;
-            });
-            return acc;
-        },
-        {},
-    );
+    return Object.values(ALLOWED_FILE_TYPES).reduce<Record<string, string[]>>((acc, config) => {
+        config.mimeTypes.forEach((mimeType) => {
+            acc[mimeType] = config.extensions;
+        });
+        return acc;
+    }, {});
 }
 
 export function getSupportedFileExtensions(): string[] {
-    return Array.from(
-        new Set(
-            Object.values(ALLOWED_FILE_TYPES).flatMap(
-                (config) => config.extensions,
-            ),
-        ),
-    );
+    return Array.from(new Set(Object.values(ALLOWED_FILE_TYPES).flatMap((config) => config.extensions)));
 }

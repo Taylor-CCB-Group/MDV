@@ -58,17 +58,10 @@ const useSavedVivConfig = () => {
     return applyConfig;
 };
 
-export const useImage = (
-    source?: { description: string; urlOrFile: string },
-    history?: any,
-) => {
+export const useImage = (source?: { description: string; urlOrFile: string }, history?: any) => {
     const applyConfig = useSavedVivConfig();
     const [use3d, toggleUse3d, toggleIsOffsetsSnackbarOn] = useViewerStore(
-        (store) => [
-            store.use3d,
-            store.toggleUse3d,
-            store.toggleIsOffsetsSnackbarOn,
-        ],
+        (store) => [store.use3d, store.toggleUse3d, store.toggleIsOffsetsSnackbarOn],
         shallow,
     );
     const [lensEnabled, toggleLensEnabled] = useImageSettingsStore(
@@ -90,18 +83,15 @@ export const useImage = (
             if (use3d) toggleUse3d();
             if (!source) throw "this should never happen - this is a type-guard";
             const { urlOrFile } = source;
-            const newLoader = await createLoader(
-                urlOrFile,
-                toggleIsOffsetsSnackbarOn,
-                (message) =>
-                    viewerStore.setState({
-                        loaderErrorSnackbar: { on: true, message },
-                    }),
+            const newLoader = await createLoader(urlOrFile, toggleIsOffsetsSnackbarOn, (message) =>
+                viewerStore.setState({
+                    loaderErrorSnackbar: { on: true, message },
+                }),
             );
             //@ts-ignore flagging so we can get back to this
             let nextMeta: any;
             //@ts-ignore flagging so we can get back to this
-            let nextLoader: any;//PixelSource | PixelSource[] | null = null;
+            let nextLoader: any; //PixelSource | PixelSource[] | null = null;
             if (Array.isArray(newLoader)) {
                 if (newLoader.length > 1) {
                     nextMeta = newLoader.map((l) => l.metadata);
@@ -115,10 +105,7 @@ export const useImage = (
                 nextLoader = newLoader.data;
             }
             if (nextLoader) {
-                console.info(
-                    "Metadata (in JSON-like form) for current file being viewed: ",
-                    nextMeta,
-                );
+                console.info("Metadata (in JSON-like form) for current file being viewed: ", nextMeta);
                 unstable_batchedUpdates(() => {
                     channelsStore.setState({ loader: nextLoader });
                     viewerStore.setState({
@@ -127,11 +114,7 @@ export const useImage = (
                 });
                 if (use3d) toggleUse3d();
                 // eslint-disable-next-line no-unused-expressions
-                history?.push(
-                    typeof urlOrFile === "string"
-                        ? `?image_url=${urlOrFile}`
-                        : "",
-                );
+                history?.push(typeof urlOrFile === "string" ? `?image_url=${urlOrFile}` : "");
             }
         }
         if (source) changeLoader().then(applyConfig);
@@ -146,16 +129,14 @@ export const useImage = (
             if (use3d) toggleUse3d();
             const newSelections = buildDefaultSelection(loader[0]);
             const { Channels } = metadata.Pixels;
-            const channelOptions = Channels.map(
-                (c, i) => c.Name ?? `Channel ${i}`,
-            );
+            const channelOptions = Channels.map((c, i) => c.Name ?? `Channel ${i}`);
             // Default RGB.
             type Limits = [number, number][];
             type Colors = [number, number, number][];
             let newContrastLimits: Limits = [];
             let newDomains: Limits = [];
             let newColors: Colors = [];
-            let newRaster = [] as typeof EMPTY_RASTER[];
+            let newRaster = [] as (typeof EMPTY_RASTER)[];
             const isRgb = guessRgb(metadata);
             if (isRgb) {
                 if (isInterleaved(loader[0].shape)) {
@@ -198,11 +179,9 @@ export const useImage = (
                 // If there is only one channel, use white.
                 newColors =
                     newDomains.length === 1
-                        ? [[255, 255, 255]] as Colors
+                        ? ([[255, 255, 255]] as Colors)
                         : newDomains.map(
-                              (_, i) =>
-                                  (Channels[i]?.Color?.slice(0, -1) ??
-                                  COLOR_PALLETE[i]) as Colors[number],
+                              (_, i) => (Channels[i]?.Color?.slice(0, -1) ?? COLOR_PALLETE[i]) as Colors[number],
                           );
                 viewerStore.setState({
                     useLens: channelOptions.length !== 1,
@@ -221,9 +200,7 @@ export const useImage = (
             viewerStore.setState({
                 isChannelLoading: newSelections.map((i) => !i),
                 isViewerLoading: false,
-                pixelValues: new Array(newSelections.length).fill(
-                    FILL_PIXEL_VALUE,
-                ),
+                pixelValues: new Array(newSelections.length).fill(FILL_PIXEL_VALUE),
                 // Set the global selections (needed for the UI). All selections have the same global selection.
                 globalSelection: newSelections[0],
                 channelOptions,

@@ -94,7 +94,7 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
         else if (Object.keys(matrices.varm).length > 0) newKey = "varm";
         else if (Object.keys(matrices.obsp).length > 0) newKey = "obsp";
         else if (Object.keys(matrices.varp).length > 0) newKey = "varp";
-        
+
         if (newKey !== matrixKey) {
             setMatrixKey(newKey);
             setActiveMatrixTab(0);
@@ -154,56 +154,33 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
         } as const;
     }, [currentMatrix]);
 
-    const getCellColor = useCallback(
-        (value: number, min: number, max: number): string => {
-            const normalizedValue = (value - min) / (max - min);
-            return `rgba(0, 0, 255, ${normalizedValue * 0.2})` as const;
-        },
-        [],
-    );
+    const getCellColor = useCallback((value: number, min: number, max: number): string => {
+        const normalizedValue = (value - min) / (max - min);
+        return `rgba(0, 0, 255, ${normalizedValue * 0.2})` as const;
+    }, []);
 
-    const getEllipsisKey = useCallback(
-        (
-            name: string,
-            type: string,
-            position: string,
-            matrix: Matrix,
-        ): string => {
-            return `${name}-${type}-ellipsis-${position}-${matrix.length}-${matrix[0].length}` as const;
-        },
-        [],
-    );
+    const getEllipsisKey = useCallback((name: string, type: string, position: string, matrix: Matrix): string => {
+        return `${name}-${type}-ellipsis-${position}-${matrix.length}-${matrix[0].length}` as const;
+    }, []);
 
     const renderMatrix = useCallback(
         (matrixData: MatrixEntry) => {
             const [name, matrix] = matrixData;
-            if (!matrix || matrix.length === 0 || !visibleMatrixData)
-                return null;
+            if (!matrix || matrix.length === 0 || !visibleMatrixData) return null;
 
             const stats = calculateStats(matrix);
-            const { rows, hasMoreRows, hasMoreCols, colIndices, rowIndices } =
-                visibleMatrixData;
+            const { rows, hasMoreRows, hasMoreCols, colIndices, rowIndices } = visibleMatrixData;
 
-            const formatNumber = (value: number) =>
-                Number.isNaN(value) ? " - " : value.toFixed(4);
+            const formatNumber = (value: number) => (Number.isNaN(value) ? " - " : value.toFixed(4));
 
             return (
                 <Box sx={{ width: "100%" }}>
-                    <Stack
-                        direction="row"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        sx={{ mb: 2 }}
-                    >
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                         <Stack spacing={0.5}>
-                            <Typography variant="subtitle1">
-                                Matrix Statistics
-                            </Typography>
+                            <Typography variant="subtitle1">Matrix Statistics</Typography>
                             <Typography variant="body2" color="text.secondary">
-                                Dimensions: {stats.dimensions} | Range: [
-                                {formatNumber(stats.min)},{" "}
-                                {formatNumber(stats.max)}] | Mean:{" "}
-                                {formatNumber(stats.mean)}
+                                Dimensions: {stats.dimensions} | Range: [{formatNumber(stats.min)},{" "}
+                                {formatNumber(stats.max)}] | Mean: {formatNumber(stats.mean)}
                             </Typography>
                         </Stack>
                     </Stack>
@@ -237,29 +214,14 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
                         <Table size="small" stickyHeader>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell
-                                        sx={{ bgcolor: "grey.100", width: 60 }}
-                                    >
-                                        #
-                                    </TableCell>
+                                    <TableCell sx={{ bgcolor: "grey.100", width: 60 }}>#</TableCell>
                                     {colIndices.map((colIndex) => (
-                                        <TableCell
-                                            key={`${name}-col-${colIndex}-${matrix[0].length}`}
-                                        >
+                                        <TableCell key={`${name}-col-${colIndex}-${matrix[0].length}`}>
                                             {colIndex}
                                         </TableCell>
                                     ))}
                                     {hasMoreCols && (
-                                        <TableCell
-                                            key={getEllipsisKey(
-                                                name,
-                                                "header",
-                                                "right",
-                                                matrix,
-                                            )}
-                                        >
-                                            ...
-                                        </TableCell>
+                                        <TableCell key={getEllipsisKey(name, "header", "right", matrix)}>...</TableCell>
                                     )}
                                 </TableRow>
                             </TableHead>
@@ -267,62 +229,38 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
                                 {rows.map((row, rowIdx) => {
                                     const actualRowIndex = rowIndices[rowIdx];
                                     return (
-                                        <TableRow
-                                            key={`${name}-row-${actualRowIndex}-${matrix.length}`}
-                                        >
-                                            <TableCell
-                                                sx={{ bgcolor: "grey.100" }}
-                                            >
-                                                {actualRowIndex}
-                                            </TableCell>
-                                            {row
-                                                .slice(0, DEFAULT_VISIBLE_ITEMS)
-                                                .map((cell, colIdx) => {
-                                                    const actualColIndex =
-                                                        colIndices[colIdx];
-                                                    return (
-                                                        <TableCell
-                                                            key={`${name}-cell-${actualRowIndex}-${actualColIndex}-${matrix.length}-${matrix[0].length}`}
-                                                            sx={{
-                                                                bgcolor:
-                                                                    getCellColor(
-                                                                        cell,
-                                                                        stats.min,
-                                                                        stats.max,
-                                                                    ),
-                                                                cursor: "pointer",
-                                                                outline:
-                                                                    selectedCell?.row ===
-                                                                        actualRowIndex &&
-                                                                    selectedCell?.col ===
-                                                                        actualColIndex
-                                                                        ? "2px solid #1976d2"
-                                                                        : "none",
-                                                                transition:
-                                                                    "background-color 0.2s",
-                                                            }}
-                                                            onClick={() =>
-                                                                setSelectedCell(
-                                                                    {
-                                                                        row: actualRowIndex,
-                                                                        col: actualColIndex,
-                                                                        value: cell,
-                                                                    },
-                                                                )
-                                                            }
-                                                        >
-                                                            {cell.toFixed(4)}
-                                                        </TableCell>
-                                                    );
-                                                })}
+                                        <TableRow key={`${name}-row-${actualRowIndex}-${matrix.length}`}>
+                                            <TableCell sx={{ bgcolor: "grey.100" }}>{actualRowIndex}</TableCell>
+                                            {row.slice(0, DEFAULT_VISIBLE_ITEMS).map((cell, colIdx) => {
+                                                const actualColIndex = colIndices[colIdx];
+                                                return (
+                                                    <TableCell
+                                                        key={`${name}-cell-${actualRowIndex}-${actualColIndex}-${matrix.length}-${matrix[0].length}`}
+                                                        sx={{
+                                                            bgcolor: getCellColor(cell, stats.min, stats.max),
+                                                            cursor: "pointer",
+                                                            outline:
+                                                                selectedCell?.row === actualRowIndex &&
+                                                                selectedCell?.col === actualColIndex
+                                                                    ? "2px solid #1976d2"
+                                                                    : "none",
+                                                            transition: "background-color 0.2s",
+                                                        }}
+                                                        onClick={() =>
+                                                            setSelectedCell({
+                                                                row: actualRowIndex,
+                                                                col: actualColIndex,
+                                                                value: cell,
+                                                            })
+                                                        }
+                                                    >
+                                                        {cell.toFixed(4)}
+                                                    </TableCell>
+                                                );
+                                            })}
                                             {hasMoreCols && (
                                                 <TableCell
-                                                    key={getEllipsisKey(
-                                                        name,
-                                                        "row",
-                                                        `${actualRowIndex}-right`,
-                                                        matrix,
-                                                    )}
+                                                    key={getEllipsisKey(name, "row", `${actualRowIndex}-right`, matrix)}
                                                 >
                                                     ...
                                                 </TableCell>
@@ -331,28 +269,10 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
                                     );
                                 })}
                                 {hasMoreRows && (
-                                    <TableRow
-                                        key={getEllipsisKey(
-                                            name,
-                                            "footer",
-                                            "row",
-                                            matrix,
-                                        )}
-                                    >
-                                        <TableCell
-                                            key={getEllipsisKey(
-                                                name,
-                                                "footer",
-                                                "index",
-                                                matrix,
-                                            )}
-                                        >
-                                            ...
-                                        </TableCell>
+                                    <TableRow key={getEllipsisKey(name, "footer", "row", matrix)}>
+                                        <TableCell key={getEllipsisKey(name, "footer", "index", matrix)}>...</TableCell>
                                         {Array.from({
-                                            length: hasMoreCols
-                                                ? DEFAULT_VISIBLE_ITEMS + 1
-                                                : DEFAULT_VISIBLE_ITEMS,
+                                            length: hasMoreCols ? DEFAULT_VISIBLE_ITEMS + 1 : DEFAULT_VISIBLE_ITEMS,
                                         }).map((_, colIdx) => (
                                             <TableCell
                                                 key={getEllipsisKey(
@@ -373,13 +293,7 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
                 </Box>
             );
         },
-        [
-            visibleMatrixData,
-            calculateStats,
-            getCellColor,
-            selectedCell,
-            getEllipsisKey,
-        ],
+        [visibleMatrixData, calculateStats, getCellColor, selectedCell, getEllipsisKey],
     );
 
     return (
@@ -390,9 +304,7 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
                         <>
                             <Tabs
                                 value={activeMatrixTab}
-                                onChange={(_, newValue) =>
-                                    setActiveMatrixTab(newValue)
-                                }
+                                onChange={(_, newValue) => setActiveMatrixTab(newValue)}
                                 variant="scrollable"
                                 scrollButtons="auto"
                                 sx={{

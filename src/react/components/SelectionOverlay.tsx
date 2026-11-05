@@ -1,19 +1,15 @@
 import { ButtonGroup, Divider } from "@mui/material"; //check tree-shaking...
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
 import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
-import PhotoSizeSelectSmallIcon from '@mui/icons-material/PhotoSizeSelectSmall';
-import DoneOutlinedIcon from '@mui/icons-material/DoneOutlined';
-import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
-import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
+import PhotoSizeSelectSmallIcon from "@mui/icons-material/PhotoSizeSelectSmall";
+import DoneOutlinedIcon from "@mui/icons-material/DoneOutlined";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import AddCircleOutlinedIcon from "@mui/icons-material/AddCircleOutlined";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSpatialLayers } from "../spatial_context";
 import { observer } from "mobx-react-lite";
 import GateNameDialog from "./GateNameDialog";
-import {
-    DrawPolygonByDraggingMode,
-    TranslateMode,
-    type GeoJsonEditMode,
-} from '@deck.gl-community/editable-layers';
+import { DrawPolygonByDraggingMode, TranslateMode, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import { EditMode, PolygonMode, RectangleMode } from "@/editable-layers/selectionModes";
 import useGateActions from "../hooks/useGateActions";
 import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
@@ -30,28 +26,28 @@ export const Tools = {
     pan: {
         name: "Pan",
         ToolIcon: PanToolOutlinedIcon,
-        mode: TranslateMode
+        mode: TranslateMode,
     },
     rectangle: {
         name: "Rectangle",
         ToolIcon: PhotoSizeSelectSmallIcon,
-        mode: RectangleMode
+        mode: RectangleMode,
     },
     // todo: add these back in once we have deck EditableGeoJsonLayer etc in place...
     polygon: {
         name: "Polygon",
         ToolIcon: PolylineOutlinedIcon,
-        mode: PolygonMode
+        mode: PolygonMode,
     },
     freehand: {
         name: "Freehand",
         ToolIcon: LassoIcon,
-        mode: DrawPolygonByDraggingMode
+        mode: DrawPolygonByDraggingMode,
     },
     transform: {
         name: "Modify",
         ToolIcon: SplineIcon,
-        mode: EditMode
+        mode: EditMode,
     },
     // measure: {
     //     name: "Measure",
@@ -59,7 +55,7 @@ export const Tools = {
     //     mode: DrawLineStringMode
     // },
 } as const;
-type ToolIcon = typeof Tools[keyof typeof Tools]["ToolIcon"];
+type ToolIcon = (typeof Tools)[keyof typeof Tools]["ToolIcon"];
 export type Tool = (typeof Tools)[keyof typeof Tools]["name"];
 const ToolArray = Object.values(Tools);
 const EDIT_MODE_TOOL_NAMES: Tool[] = ["Pan", "Modify"];
@@ -76,8 +72,7 @@ const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: 
     const selectedBackgroundColor = theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(48, 46, 46, 0.18)";
     const style = useMemo(
         () => ({
-            backgroundColor:
-                selectedTool === name ? selectedBackgroundColor : "transparent",
+            backgroundColor: selectedTool === name ? selectedBackgroundColor : "transparent",
             color: "var(--text_color)",
             borderRadius: 10,
             zIndex: 2,
@@ -103,16 +98,16 @@ export default observer(function SelectionOverlay() {
     const chart = useChart<DeckScatterConfigWithRegion>();
     const chartId = useChartID();
     const config = useConfig<DeckScatterConfigWithRegion>();
-    const { 
-        setSelectionMode, 
+    const {
+        setSelectionMode,
         selectionFeatureCollection,
-        editingGateId, 
+        editingGateId,
         setSelectionFeatureCollection,
         selectedTool,
-        setSelectedTool: setSelectedToolX
+        setSelectedTool: setSelectedToolX,
     } = selectionProps;
     const [cx, cy] = useParamColumns();
-    
+
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
     const manageGateByChartRef = useRef<Map<string, ManageGateDialogWrapper<DeckScatterConfigWithRegion>>>(new Map());
     const theme = useTheme();
@@ -131,35 +126,35 @@ export default observer(function SelectionOverlay() {
     useEffect(() => {
         // close the open dialog when unmounting the component
         return () => {
-          const dlg = manageGateByChartRef.current.get(chartId);
-          if (dlg) {
-            setTimeout(() => dlg?.close(), 0);
-          }
-          manageGateByChartRef.current.delete(chartId);
+            const dlg = manageGateByChartRef.current.get(chartId);
+            if (dlg) {
+                setTimeout(() => dlg?.close(), 0);
+            }
+            manageGateByChartRef.current.delete(chartId);
         };
-      }, [chartId]);
+    }, [chartId]);
 
     const toolsToShow = useMemo(
-        () =>
-            editingGateId
-                ? ToolArray.filter((t) => EDIT_MODE_TOOL_NAMES.includes(t.name))
-                : ToolArray,
+        () => (editingGateId ? ToolArray.filter((t) => EDIT_MODE_TOOL_NAMES.includes(t.name)) : ToolArray),
         [editingGateId],
     );
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: need to check that gate id is correct here?
-    const setSelectedTool = useCallback((tool: Tool) => {
-        // pending refactor
-        const mode = Object.values(Tools).find((t) => t.name === tool)?.mode;
-        if (!mode) {
-            console.error("no mode found for tool", tool);
-            return;
-        }
+    const setSelectedTool = useCallback(
+        (tool: Tool) => {
+            // pending refactor
+            const mode = Object.values(Tools).find((t) => t.name === tool)?.mode;
+            if (!mode) {
+                console.error("no mode found for tool", tool);
+                return;
+            }
 
-        //same composite mode order doesn't work for all tools, so making `mode()` be more explicit for each
-        setSelectionMode(new mode() as GeoJsonEditMode);
-        setSelectedToolX(tool);
-    }, [setSelectionMode, editingGateId, setSelectionFeatureCollection, setSelectedToolX]);
+            //same composite mode order doesn't work for all tools, so making `mode()` be more explicit for each
+            setSelectionMode(new mode() as GeoJsonEditMode);
+            setSelectedToolX(tool);
+        },
+        [setSelectionMode, editingGateId, setSelectionFeatureCollection, setSelectedToolX],
+    );
     // add a row of buttons to the top of the chart
     // rectangle, circle, polygon, lasso, magic wand, etc.
     // (thanks copilot, that may be over-ambitious)
@@ -182,7 +177,7 @@ export default observer(function SelectionOverlay() {
             // a dialog already exists
             return;
         }
-        
+
         // Create a new manage gates dialog for a chart
         const dialog = new ManageGateDialogWrapper({
             chart,
@@ -205,18 +200,21 @@ export default observer(function SelectionOverlay() {
     }, [
         cx?.field,
         cy?.field,
-        onDeleteGate, 
-        onEditGate, 
-        onColorChange, 
-        onRenameGate, 
-        onExportClick, 
+        onDeleteGate,
+        onEditGate,
+        onColorChange,
+        onRenameGate,
+        onExportClick,
         chart,
         chartId,
         config?.region,
     ]);
 
-    const hasSelection = useMemo(() => selectionFeatureCollection.features.length > 0, [selectionFeatureCollection.features.length]);
-    
+    const hasSelection = useMemo(
+        () => selectionFeatureCollection.features.length > 0,
+        [selectionFeatureCollection.features.length],
+    );
+
     return (
         <>
             <ButtonGroup
@@ -231,14 +229,14 @@ export default observer(function SelectionOverlay() {
                 }}
             >
                 {toolButtons}
-                <Divider 
-                    orientation="vertical" 
+                <Divider
+                    orientation="vertical"
                     sx={{
                         color: "inherit",
                         width: "5px",
                         height: "35px",
                         padding: "2px",
-                    }} 
+                    }}
                 />
                 <IconWithTooltip
                     tooltipText={"Manage Gates"}
@@ -270,9 +268,9 @@ export default observer(function SelectionOverlay() {
                     <>
                         <IconWithTooltip
                             tooltipText={"Confirm"}
-                            onClick={() => 
-                                { onConfirmEditGate().catch(console.error) }
-                            }
+                            onClick={() => {
+                                onConfirmEditGate().catch(console.error);
+                            }}
                             iconButtonProps={{
                                 sx: {
                                     color: "green",
@@ -301,12 +299,8 @@ export default observer(function SelectionOverlay() {
                     </>
                 )}
             </ButtonGroup>
-            
-            <GateNameDialog
-                open={gateDialogOpen}
-                onClose={() => setGateDialogOpen(false)}
-                onSaveGate={onSaveGate}
-            />
+
+            <GateNameDialog open={gateDialogOpen} onClose={() => setGateDialogOpen(false)} onSaveGate={onSaveGate} />
         </>
     );
 });

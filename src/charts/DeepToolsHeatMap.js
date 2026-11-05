@@ -2,7 +2,7 @@ import { createEl } from "../utilities/Elements";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart";
 import { WGL2DI } from "../webgl/WGL2DI";
-import {debounce} from "../utilities/Utilities"
+import { debounce } from "../utilities/Utilities";
 const color_scheme = [
     "#313695",
     "#4575B4",
@@ -78,29 +78,13 @@ class DeepToolsHeatMap extends SVGChart {
 
             this.data = new SharedArrayBuffer(this.dataLength * 7);
             this.rowPositions = new Uint32Array(this.data, 0, this.dataLength);
-            this.colPositions = new Uint16Array(
-                this.data,
-                this.dataLength * 4,
-                this.dataLength,
-            );
-            this.values = new Uint8Array(
-                this.data,
-                this.dataLength * 6,
-                this.dataLength,
-            );
+            this.colPositions = new Uint16Array(this.data, this.dataLength * 4, this.dataLength);
+            this.values = new Uint8Array(this.data, this.dataLength * 6, this.dataLength);
 
             this.displayData = new SharedArrayBuffer(this.dataLength * 11);
             this.x = new Float32Array(this.displayData, 0, this.dataLength);
-            this.y = new Float32Array(
-                this.displayData,
-                this.dataLength * 4,
-                this.dataLength,
-            );
-            this.colors = new Uint8Array(
-                this.displayData,
-                this.dataLength * 8,
-                this.dataLength * 3,
-            );
+            this.y = new Float32Array(this.displayData, this.dataLength * 4, this.dataLength);
+            this.colors = new Uint8Array(this.displayData, this.dataLength * 8, this.dataLength * 3);
 
             this._debouncedColor = debounce((range) => {
                 this.config.color_scale.range = [...range];
@@ -147,9 +131,7 @@ class DeepToolsHeatMap extends SVGChart {
             const r = this.dataStore.filterSize;
             const dim = this._getContentDimensions();
             if (!colorOnly) {
-                this.app.x_scale =
-                    dim.width /
-                    (c * 20 + (this.hm_config.groups.length - 1) * 200);
+                this.app.x_scale = dim.width / (c * 20 + (this.hm_config.groups.length - 1) * 200);
                 this.app.y_scale = dim.height / (r * 20);
                 this.app.offset = [0, 0];
             }
@@ -197,16 +179,8 @@ class DeepToolsHeatMap extends SVGChart {
         const r = this.currentRows[data.indexes[0]];
         const cols = this.hm_config.cols;
         if (r) {
-            this.app.addLine(
-                [0, r * 20],
-                [cols * 20 + 600, r * 20],
-                [255, 255, 0],
-            );
-            this.app.addLine(
-                [0, r * 20 + 20],
-                [cols * 20 + 600, r * 20 + 20],
-                [255, 255, 0],
-            );
+            this.app.addLine([0, r * 20], [cols * 20 + 600, r * 20], [255, 255, 0]);
+            this.app.addLine([0, r * 20 + 20], [cols * 20 + 600, r * 20 + 20], [255, 255, 0]);
         }
 
         /* if (data.source!==this && r){
@@ -230,10 +204,7 @@ class DeepToolsHeatMap extends SVGChart {
             },
         };
         return {
-            colors: this.dataStore.getColumnColors(
-                { datatype: "integer" },
-                conf,
-            ),
+            colors: this.dataStore.getColumnColors({ datatype: "integer" }, conf),
             bins: 200,
             min: r[0],
             max: r[1],
@@ -246,7 +217,6 @@ class DeepToolsHeatMap extends SVGChart {
     }
 
     getSettings() {
-      
         let settings = super.getSettings();
         const c = this.config;
         const cs = c.color_scale;
@@ -260,7 +230,7 @@ class DeepToolsHeatMap extends SVGChart {
                 doc: this.__doc__,
                 current_value: cs.range,
                 label: "Color Scale",
-                func: (x) => this._debouncedColor(x)
+                func: (x) => this._debouncedColor(x),
             },
             {
                 type: "dropdown",

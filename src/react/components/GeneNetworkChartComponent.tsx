@@ -17,7 +17,7 @@ function getTextValue(column: any, index: number): string {
     if (!isColumnLoaded(column)) {
         throw new Error("Column not loaded");
     }
-    
+
     // getValue handles all column types correctly
     const value = column.getValue(index);
     return String(value);
@@ -153,11 +153,8 @@ export const GeneNetworkChartComponent = observer(() => {
 
         // Check if user is actively interacting with the component
         // If so, don't auto-scroll to avoid feedback loops
-        const hasComponentFocus =
-            scrollContainerRef.current?.contains(document.activeElement) ?? false;
-        const isUserInteracting =
-            hasComponentFocus &&
-            (focusedGeneIndex !== null || rangeAnchorGeneIndex !== null);
+        const hasComponentFocus = scrollContainerRef.current?.contains(document.activeElement) ?? false;
+        const isUserInteracting = hasComponentFocus && (focusedGeneIndex !== null || rangeAnchorGeneIndex !== null);
 
         if (isUserInteracting) {
             return; // Don't auto-scroll while user is interacting with this component
@@ -178,8 +175,7 @@ export const GeneNetworkChartComponent = observer(() => {
         const targetRowTop = targetVisibleIndex * ROW_TOTAL_HEIGHT;
         const targetRowBottom = targetRowTop + ROW_TOTAL_HEIGHT;
         const viewportBottom = scrollTop + containerHeight;
-        const isFullyVisible =
-            targetRowTop >= scrollTop && targetRowBottom <= viewportBottom;
+        const isFullyVisible = targetRowTop >= scrollTop && targetRowBottom <= viewportBottom;
 
         // Only scroll if the target row is not fully visible in the viewport
         if (!isFullyVisible) {
@@ -201,7 +197,7 @@ export const GeneNetworkChartComponent = observer(() => {
         focusedGeneIndex,
         rangeAnchorGeneIndex,
         rowVirtualizer,
-        ROW_TOTAL_HEIGHT
+        ROW_TOTAL_HEIGHT,
     ]);
 
     const setRowRef = (rowIndex: number, element: HTMLDivElement | null) => {
@@ -212,123 +208,128 @@ export const GeneNetworkChartComponent = observer(() => {
         }
     };
 
-    const handleGeneSelection = useCallback((
-        rowIndex: number,
-        isToggle: boolean,
-        isRange: boolean,
-        currentVisibleIndex?: number,
-    ) => {
-        if (isRange && currentVisibleIndex !== undefined) {
-            const maxVisibleIndex = visibleRowIndices.length - 1;
-            if (maxVisibleIndex < 0) return;
+    const handleGeneSelection = useCallback(
+        (rowIndex: number, isToggle: boolean, isRange: boolean, currentVisibleIndex?: number) => {
+            if (isRange && currentVisibleIndex !== undefined) {
+                const maxVisibleIndex = visibleRowIndices.length - 1;
+                if (maxVisibleIndex < 0) return;
 
-            let anchorVisibleIndex: number;
-            if (rangeAnchorGeneIndex !== null) {
-                anchorVisibleIndex = Math.min(
-                    Math.max(rangeAnchorGeneIndex, 0),
-                    maxVisibleIndex,
-                );
-            } else {
-                if (lastClickedIndex !== null) {
-                    const anchorFromMap = rowIndexToVisibleIndex.get(lastClickedIndex);
-                    anchorVisibleIndex = anchorFromMap ?? currentVisibleIndex;
+                let anchorVisibleIndex: number;
+                if (rangeAnchorGeneIndex !== null) {
+                    anchorVisibleIndex = Math.min(Math.max(rangeAnchorGeneIndex, 0), maxVisibleIndex);
                 } else {
-                    anchorVisibleIndex = currentVisibleIndex;
+                    if (lastClickedIndex !== null) {
+                        const anchorFromMap = rowIndexToVisibleIndex.get(lastClickedIndex);
+                        anchorVisibleIndex = anchorFromMap ?? currentVisibleIndex;
+                    } else {
+                        anchorVisibleIndex = currentVisibleIndex;
+                    }
+                    setRangeAnchorGeneIndex(anchorVisibleIndex);
                 }
-                setRangeAnchorGeneIndex(anchorVisibleIndex);
+                const safeCurrentVisibleIndex = Math.min(Math.max(currentVisibleIndex, 0), maxVisibleIndex);
+                const start = Math.min(anchorVisibleIndex, safeCurrentVisibleIndex);
+                const end = Math.max(anchorVisibleIndex, safeCurrentVisibleIndex);
+                const allRangeIndices: number[] = [];
+                for (let i = start; i <= end; i++) {
+                    const nextRowIndex = visibleRowIndices[i];
+                    if (nextRowIndex !== undefined) allRangeIndices.push(nextRowIndex);
+                }
+                highlightRows(allRangeIndices);
+                setLastClickedIndex(rowIndex);
+                return;
             }
-            const safeCurrentVisibleIndex = Math.min(
-                Math.max(currentVisibleIndex, 0),
-                maxVisibleIndex,
-            );
-            const start = Math.min(anchorVisibleIndex, safeCurrentVisibleIndex);
-            const end = Math.max(anchorVisibleIndex, safeCurrentVisibleIndex);
-            const allRangeIndices: number[] = [];
-            for (let i = start; i <= end; i++) {
-                const nextRowIndex = visibleRowIndices[i];
-                if (nextRowIndex !== undefined) allRangeIndices.push(nextRowIndex);
+
+            if (isToggle) {
+                const currentSet = new Set(highlightedIndices);
+                if (currentSet.has(rowIndex)) {
+                    currentSet.delete(rowIndex);
+                } else {
+                    currentSet.add(rowIndex);
+                }
+                const newIndices = Array.from(currentSet).sort((a, b) => a - b);
+                highlightRows(newIndices);
+                setLastClickedIndex(rowIndex);
+                return;
             }
-            highlightRows(allRangeIndices);
+
+            highlightRows([rowIndex]);
             setLastClickedIndex(rowIndex);
-            return;
-        }
+            setRangeAnchorGeneIndex(null);
+        },
+        [
+            highlightedIndices,
+            lastClickedIndex,
+            highlightRows,
+            visibleRowIndices,
+            rowIndexToVisibleIndex,
+            rangeAnchorGeneIndex,
+        ],
+    );
 
-        if (isToggle) {
-            const currentSet = new Set(highlightedIndices);
-            if (currentSet.has(rowIndex)) {
-                currentSet.delete(rowIndex);
-            } else {
-                currentSet.add(rowIndex);
+    const focusGeneAtIndex = useCallback(
+        (visibleIndex: number, shouldSelect: boolean, isRange: boolean, isToggle: boolean) => {
+            if (visibleIndex < 0 || visibleIndex >= visibleRowIndices.length) return;
+            const rowIndex = visibleRowIndices[visibleIndex];
+            setFocusedGeneIndex(visibleIndex);
+
+            rowVirtualizer.scrollToIndex(visibleIndex, {
+                align: "center",
+                behavior: "auto",
+            });
+
+            const rowElement = rowRefs.current.get(rowIndex);
+            if (rowElement) {
+                const paperElement = rowElement.querySelector('[tabindex="0"]') as HTMLElement;
+                if (paperElement) paperElement.focus();
             }
-            const newIndices = Array.from(currentSet).sort((a, b) => a - b);
-            highlightRows(newIndices);
-            setLastClickedIndex(rowIndex);
-            return;
-        }
 
-        highlightRows([rowIndex]);
-        setLastClickedIndex(rowIndex);
-        setRangeAnchorGeneIndex(null);
-    }, [highlightedIndices, lastClickedIndex, highlightRows, visibleRowIndices, rowIndexToVisibleIndex, rangeAnchorGeneIndex]);
-
-    const focusGeneAtIndex = useCallback((visibleIndex: number, shouldSelect: boolean, isRange: boolean, isToggle: boolean) => {
-        if (visibleIndex < 0 || visibleIndex >= visibleRowIndices.length) return;
-        const rowIndex = visibleRowIndices[visibleIndex];
-        setFocusedGeneIndex(visibleIndex);
-
-        rowVirtualizer.scrollToIndex(visibleIndex, {
-            align: "center",
-            behavior: "auto",
-        });
-
-        const rowElement = rowRefs.current.get(rowIndex);
-        if (rowElement) {
-            const paperElement = rowElement.querySelector('[tabindex="0"]') as HTMLElement;
-            if (paperElement) paperElement.focus();
-        }
-
-        if (shouldSelect) {
-            handleGeneSelection(rowIndex, isToggle, isRange, visibleIndex);
-        }
-    }, [visibleRowIndices, rowVirtualizer, handleGeneSelection]);
+            if (shouldSelect) {
+                handleGeneSelection(rowIndex, isToggle, isRange, visibleIndex);
+            }
+        },
+        [visibleRowIndices, rowVirtualizer, handleGeneSelection],
+    );
 
     // Container-level keyboard handler for arrow key navigation
-    const handleContainerKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
-        // Only handle arrow keys
-        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
-            return;
-        }
-
-        // Don't handle if user is typing in an input/textarea
-        const target = event.target as HTMLElement;
-        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
-            return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        const isRange = event.shiftKey;
-        const isToggle = event.ctrlKey || event.metaKey;
-        const shouldSelect = !isToggle; // Ctrl/Cmd+Arrow just navigates without selecting
-
-        let newIndex: number;
-        if (event.key === "ArrowDown") {
-            if (focusedGeneIndex === null) {
-                newIndex = 0;
-            } else {
-                newIndex = Math.min(focusedGeneIndex + 1, visibleRowIndices.length - 1);
+    const handleContainerKeyDown = useCallback(
+        (event: KeyboardEvent<HTMLDivElement>) => {
+            // Only handle arrow keys
+            if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+                return;
             }
-        } else {
-            if (focusedGeneIndex === null) {
-                newIndex = visibleRowIndices.length - 1;
-            } else {
-                newIndex = Math.max(focusedGeneIndex - 1, 0);
-            }
-        }
 
-        focusGeneAtIndex(newIndex, shouldSelect, isRange, isToggle);
-    }, [focusedGeneIndex, visibleRowIndices.length, focusGeneAtIndex]);
+            // Don't handle if user is typing in an input/textarea
+            const target = event.target as HTMLElement;
+            if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            const isRange = event.shiftKey;
+            const isToggle = event.ctrlKey || event.metaKey;
+            const shouldSelect = !isToggle; // Ctrl/Cmd+Arrow just navigates without selecting
+
+            let newIndex: number;
+            if (event.key === "ArrowDown") {
+                if (focusedGeneIndex === null) {
+                    newIndex = 0;
+                } else {
+                    newIndex = Math.min(focusedGeneIndex + 1, visibleRowIndices.length - 1);
+                }
+            } else {
+                if (focusedGeneIndex === null) {
+                    newIndex = visibleRowIndices.length - 1;
+                } else {
+                    newIndex = Math.max(focusedGeneIndex - 1, 0);
+                }
+            }
+
+            focusGeneAtIndex(newIndex, shouldSelect, isRange, isToggle);
+        },
+        [focusedGeneIndex, visibleRowIndices.length, focusGeneAtIndex],
+    );
 
     const handleGeneClick = (rowIndex: number, event: MouseEvent<HTMLDivElement>) => {
         event.preventDefault();
@@ -368,10 +369,7 @@ export const GeneNetworkChartComponent = observer(() => {
                         className="flex-1 min-h-0 overflow-y-auto"
                         onKeyDown={handleContainerKeyDown}
                     >
-                        <div
-                            className="relative w-full"
-                            style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
-                        >
+                        <div className="relative w-full" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
                             {rowVirtualizer.getVirtualItems().map((virtualItem: { index: number; start: number }) => {
                                 const rowIndex = visibleRowIndices[virtualItem.index];
                                 let geneId: string;
@@ -413,4 +411,3 @@ export const GeneNetworkChartComponent = observer(() => {
         </div>
     );
 });
-

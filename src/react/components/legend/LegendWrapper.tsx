@@ -35,10 +35,7 @@ export type LegendWrapperInteractions = {
  * - drag/resize wiring after React commit
  * - offsetLeft/offsetTop persistence for config + SVG export
  */
-export default class LegendWrapper<
-    TSpec,
-    T extends BaseConfig = BaseConfig,
-> {
+export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
     private chart: BaseChart<T>;
     private wrapper: HTMLDivElement | null = null;
     private root: Root | null = null;
@@ -70,8 +67,7 @@ export default class LegendWrapper<
                     position: "absolute",
                     padding: "0.4em",
                     border: "1px solid rgba(128, 128, 128, 0.65)",
-                    boxShadow:
-                        "0 1px 4px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.16)",
+                    boxShadow: "0 1px 4px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.16)",
                 },
             },
             this.chart.contentDiv,
@@ -129,13 +125,7 @@ export default class LegendWrapper<
         if (!this.wrapper) {
             return;
         }
-        this.wrapper.style.left =
-            typeof position.left === "number"
-                ? `${position.left}px`
-                : String(position.left);
-        this.wrapper.style.top =
-            typeof position.top === "number"
-                ? `${position.top}px`
-                : String(position.top);
+        this.wrapper.style.left = typeof position.left === "number" ? `${position.left}px` : String(position.left);
+        this.wrapper.style.top = typeof position.top === "number" ? `${position.top}px` : String(position.top);
     }
 }

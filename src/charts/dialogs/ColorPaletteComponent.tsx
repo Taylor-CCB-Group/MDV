@@ -84,10 +84,7 @@ function buildEntries(dataSource: DataSourceLike, column: string): ColorEntry[] 
 
     return values
         .map((value, index) => ({
-            color:
-                typeof colors[index] === "string"
-                    ? normalizeHexColor(colors[index]) ?? "#808080"
-                    : "#808080",
+            color: typeof colors[index] === "string" ? (normalizeHexColor(colors[index]) ?? "#808080") : "#808080",
             index,
             label: String(value ?? ""),
         }))
@@ -444,7 +441,10 @@ function ColorPaletteComponent({ dataSource, dataSourceLabel, onApply }: ColorPa
                                             component="input"
                                             aria-label={`Pick color for ${entry.label || "(empty value)"}`}
                                             onChange={(event) => {
-                                                handleEntryColorChange(entry.index, (event.target as HTMLInputElement).value.toUpperCase());
+                                                handleEntryColorChange(
+                                                    entry.index,
+                                                    (event.target as HTMLInputElement).value.toUpperCase(),
+                                                );
                                             }}
                                             sx={{
                                                 backgroundColor: "transparent",

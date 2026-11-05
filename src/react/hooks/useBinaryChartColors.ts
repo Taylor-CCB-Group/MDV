@@ -3,18 +3,14 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import { useRef, useMemo } from "react";
 import { useChartColors } from "./useResolvedChartColor";
 
-export function useBinaryChartColors<T extends BaseConfig>(
-    chart: BaseChart<T>
-): [Uint8Array, number]{
+export function useBinaryChartColors<T extends BaseConfig>(chart: BaseChart<T>): [Uint8Array, number] {
     const colorFunction = useChartColors(chart);
-    const stamp  = useRef<number>(1);
+    const stamp = useRef<number>(1);
 
-    const colorBuffer= useMemo(()=>new Uint8Array(chart.dataStore.size*3), [chart.dataStore.size]
-    )
+    const colorBuffer = useMemo(() => new Uint8Array(chart.dataStore.size * 3), [chart.dataStore.size]);
 
     return useMemo(() => {
-        if (colorFunction){
-
+        if (colorFunction) {
             const size = chart.dataStore.size;
 
             for (let i = 0; i < size; i++) {
@@ -25,7 +21,6 @@ export function useBinaryChartColors<T extends BaseConfig>(
                 colorBuffer[idx + 2] = color[2];
             }
             stamp.current++;
-
         }
         return [colorBuffer, stamp.current];
     }, [colorFunction, colorBuffer]);

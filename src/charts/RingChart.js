@@ -18,10 +18,7 @@ class RingChart extends CategoryChart {
 
     drawChart(tTime = 1000) {
         //can't get transitions to work properly
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(tTime)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
 
         const dim = this._getContentDimensions();
         //calculate the radius and center of the plot based on the

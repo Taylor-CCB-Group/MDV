@@ -132,7 +132,10 @@ describe("CategoryDimension", () => {
     test.each([
         ["a", [0, 2, 5]],
         [["a"], [0, 2, 5]],
-        [["a", "c"], [0, 2, 3, 5, 6]],
+        [
+            ["a", "c"],
+            [0, 2, 3, 5, 6],
+        ],
         [["a", "b", "c"], ALL],
     ])("filterCategoriesPredicate(%j) matches filterCategories", (cats, expected) => {
         const dim = ds.getDimension("category_dimension");
@@ -515,7 +518,7 @@ describe.each([
     type Model = { include: ((i: number) => boolean) | null; bg: Set<string> | null };
     type Op = (rand: () => number) => void;
 
-    const pick = <T,>(rand: () => number, xs: readonly T[]) => xs[Math.floor(rand() * xs.length)];
+    const pick = <T>(rand: () => number, xs: readonly T[]) => xs[Math.floor(rand() * xs.length)];
     const subset = (rand: () => number, xs: readonly string[]) => {
         const s = xs.filter(() => rand() < 0.5);
         return s.length ? s : [xs[0]];

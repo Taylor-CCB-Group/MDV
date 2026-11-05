@@ -8,7 +8,7 @@ const Login: React.FC = () => {
     useEffect(() => {
         // Check if this is a callback from Auth0
         const params = new URLSearchParams(window.location.search);
-        if (params.get('callback')) {
+        if (params.get("callback")) {
             window.location.href = buildDashboardUrl();
         }
     }, []);

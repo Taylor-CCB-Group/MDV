@@ -1,9 +1,4 @@
-import {
-    Box,
-    Dialog,
-    DialogContent,
-    DialogTitle,
-} from "@mui/material";
+import { Box, Dialog, DialogContent, DialogTitle } from "@mui/material";
 import type React from "react";
 import { DialogCloseIconButton } from "./ProjectRenameModal";
 import ReactMarkdown from "react-markdown";
@@ -18,19 +13,9 @@ export interface ProjectInfoModalProps {
     readme?: string;
 }
 
-const ProjectInfoModal: React.FC<ProjectInfoModalProps> = ({
-    open,
-    onClose,
-    readme,
-}) => {
+const ProjectInfoModal: React.FC<ProjectInfoModalProps> = ({ open, onClose, readme }) => {
     return (
-        <Dialog
-            open={open}
-            onClose={onClose}
-            aria-labelledby="project_info_dialog-title"
-            maxWidth="sm"
-            fullWidth
-        >
+        <Dialog open={open} onClose={onClose} aria-labelledby="project_info_dialog-title" maxWidth="sm" fullWidth>
             <DialogTitle id="project_info_dialog-title">
                 Project Information
                 <DialogCloseIconButton onClose={onClose} />
@@ -39,13 +24,11 @@ const ProjectInfoModal: React.FC<ProjectInfoModalProps> = ({
                 {readme ? (
                     <Box className="readme-markdown">
                         <ReactMarkdown
-                            remarkPlugins={[remarkGfm, remarkBreaks]} 
+                            remarkPlugins={[remarkGfm, remarkBreaks]}
                             rehypePlugins={[rehypeRaw, rehypeSanitize]}
                             components={{
                                 // Open the links in new tab
-                                a: ({node, ...props}) => (
-                                    <a {...props} target="_blank" rel="noopener noreferrer" />
-                                )
+                                a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
                             }}
                         >
                             {readme}

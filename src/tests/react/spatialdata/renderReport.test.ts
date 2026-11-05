@@ -26,13 +26,20 @@ describe("formatRenderReport", () => {
                 },
             ],
             canvasErrors: [
-                { message: "boom", stack: "Error: boom\n    at a (x.ts:1)\n    at b (y.ts:2)", count: 2, dismissed: false },
+                {
+                    message: "boom",
+                    stack: "Error: boom\n    at a (x.ts:1)\n    at b (y.ts:2)",
+                    count: 2,
+                    dismissed: false,
+                },
             ],
         });
         expect(report).toContain("Renderer: WebGPU");
         expect(report).toContain("Layer turned off: image: morphology_focus (webgpu, ×3)\n    Texture size exceeded");
         expect(report).toContain("  Reported as:\n    Model(image).draw failed");
-        expect(report).toContain("Rendering error (×2):\n    boom\n  Stack:\n    Error: boom\n        at a (x.ts:1)\n        at b (y.ts:2)");
+        expect(report).toContain(
+            "Rendering error (×2):\n    boom\n  Stack:\n    Error: boom\n        at a (x.ts:1)\n        at b (y.ts:2)",
+        );
         expect(report).not.toContain("\\n");
     });
 

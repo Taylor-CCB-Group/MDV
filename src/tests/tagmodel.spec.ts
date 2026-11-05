@@ -19,11 +19,7 @@ function createMockDataModel(selection: number[]) {
     } as any;
 }
 
-function createMockDataStore(
-    columnIndex: Record<string, any>,
-    size: number,
-    options?: { isFiltered?: () => boolean },
-) {
+function createMockDataStore(columnIndex: Record<string, any>, size: number, options?: { isFiltered?: () => boolean }) {
     const listeners: Record<string, (type: string, data?: any) => void> = {};
     const store = {
         size,
@@ -83,9 +79,7 @@ describe("TagModel", () => {
             }),
             expect.any(SharedArrayBuffer),
         );
-        expect(Array.from(columnIndex.__tags.data)).toEqual([
-            65535, 65535, 65535, 65535,
-        ]);
+        expect(Array.from(columnIndex.__tags.data)).toEqual([65535, 65535, 65535, 65535]);
     });
 
     test("getTags ignores undefined legacy values", async () => {
@@ -120,11 +114,7 @@ describe("TagModel", () => {
             values: ["N/A", "a", "b"],
             delimiter: ",",
             stringLength: 3,
-            data: new Uint16Array([
-                0, 65535, 65535,
-                2, 65535, 65535,
-                1, 2, 65535,
-            ]),
+            data: new Uint16Array([0, 65535, 65535, 2, 65535, 65535, 1, 2, 65535]),
             buffer: new SharedArrayBuffer(18),
         };
         const dataStore = createMockDataStore({ __gates__: gateColumn }, 3);
@@ -149,11 +139,7 @@ describe("TagModel", () => {
             values: ["N/A", "a", "b"],
             delimiter: ",",
             stringLength: 3,
-            data: new Uint16Array([
-                0, 65535, 65535,
-                2, 65535, 65535,
-                1, 2, 65535,
-            ]),
+            data: new Uint16Array([0, 65535, 65535, 2, 65535, 65535, 1, 2, 65535]),
             buffer: new SharedArrayBuffer(18),
         };
         const dataStore = createMockDataStore({ __gates__: gateColumn }, 3);
@@ -167,11 +153,7 @@ describe("TagModel", () => {
         const tagModel = await TagModel.create(dataStore as never, "__gates__");
         tagModel.setTag("a", true);
 
-        expect(Array.from(gateColumn.data)).toEqual([
-            1, 65535, 65535,
-            1, 2, 65535,
-            1, 2, 65535,
-        ]);
+        expect(Array.from(gateColumn.data)).toEqual([1, 65535, 65535, 1, 2, 65535, 1, 2, 65535]);
         expect(dataStore.dataChanged).toHaveBeenCalledWith(["__gates__"]);
     });
 
@@ -195,11 +177,7 @@ describe("TagModel", () => {
         });
         vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
 
-        const tagModel = await TagModel.create(
-            dataStore as never,
-            "__tags",
-            "highlighted",
-        );
+        const tagModel = await TagModel.create(dataStore as never, "__tags", "highlighted");
 
         expect(tagModel.getSelectionLength()).toBe(2);
         expect(tagModel.getTagsInSelection()).toEqual(new Set(["b"]));
@@ -231,11 +209,7 @@ describe("TagModel", () => {
         });
         vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
 
-        const tagModel = await TagModel.create(
-            dataStore as never,
-            "__tags",
-            "highlighted",
-        );
+        const tagModel = await TagModel.create(dataStore as never, "__tags", "highlighted");
         const listener = vi.fn();
         tagModel.addListener(listener);
 
@@ -301,11 +275,7 @@ describe("TagModel", () => {
         vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
 
         const filteredTagModel = await TagModel.create(dataStore as never, "__tags");
-        const highlightedTagModel = await TagModel.create(
-            dataStore as never,
-            "__tags",
-            "highlighted",
-        );
+        const highlightedTagModel = await TagModel.create(dataStore as never, "__tags", "highlighted");
         dataStore.highightedData = [1, 3];
 
         expect(filteredTagModel.getMatchingRowIndices("b")).toEqual([1, 2]);
@@ -414,11 +384,7 @@ describe("TagModel", () => {
         });
         vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
 
-        const tagModel = await TagModel.create(
-            dataStore as never,
-            "__tags",
-            "highlighted",
-        );
+        const tagModel = await TagModel.create(dataStore as never, "__tags", "highlighted");
         dataStore.highightedData = [0];
 
         const flags = tagModel.getAnnotationWarningFlags();
@@ -447,8 +413,6 @@ describe("TagModel", () => {
         });
         vi.mocked(loadColumn).mockResolvedValue(tagColumn as never);
 
-        await expect(TagModel.create(dataStore as never)).rejects.toThrow(
-            "column '__tags' is not editable",
-        );
+        await expect(TagModel.create(dataStore as never)).rejects.toThrow("column '__tags' is not editable");
     });
 });

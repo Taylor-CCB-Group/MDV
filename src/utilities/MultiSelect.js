@@ -73,21 +73,11 @@ class MultiSelectDropdown {
     }
 
     refresh() {
-        this.div
-            .querySelectorAll("span.optext, span.placeholder")
-            .forEach((t) => this.div.removeChild(t));
-        const sels = Array.from(this.options.values()).filter(
-            (x) => x.selected,
-        );
+        this.div.querySelectorAll("span.optext, span.placeholder").forEach((t) => this.div.removeChild(t));
+        const sels = Array.from(this.options.values()).filter((x) => x.selected);
         const nex = this.options.size - sels.length;
-        if (
-            nex < this.config.maxShow &&
-            nex !== 0 &&
-            this.options.size > this.config.maxShow
-        ) {
-            const ex = Array.from(this.options.values()).filter(
-                (x) => !x.selected,
-            );
+        if (nex < this.config.maxShow && nex !== 0 && this.options.size > this.config.maxShow) {
+            const ex = Array.from(this.options.values()).filter((x) => !x.selected);
             const msg = ex.map((x) => x.text).join(",");
             this.div.appendChild(
                 createEl("span", {
@@ -143,29 +133,19 @@ class MultiSelectDropdown {
         this.config.doc.removeEventListener("click", this.docListener);
     }
     _handleSearch() {
-        this.list
-            .querySelectorAll(
-                ":scope div:not(.multiselect-dropdown-all-selector)",
-            )
-            .forEach((d) => {
-                const txt = d.querySelector("label").innerText.toUpperCase();
-                const v = this.search.value.toUpperCase();
-                const does = txt.includes(v) || v === "";
-                if (does) {
-                    console.log(txt);
-                }
-                d.style.display = does ? "block" : "none";
-            });
+        this.list.querySelectorAll(":scope div:not(.multiselect-dropdown-all-selector)").forEach((d) => {
+            const txt = d.querySelector("label").innerText.toUpperCase();
+            const v = this.search.value.toUpperCase();
+            const does = txt.includes(v) || v === "";
+            if (does) {
+                console.log(txt);
+            }
+            d.style.display = does ? "block" : "none";
+        });
     }
     _bulkChange(type) {
         Array.from(this.options.values()).forEach(
-            (x) =>
-                (x.selected =
-                    type === "All"
-                        ? true
-                        : type === "None"
-                          ? false
-                          : !x.selected),
+            (x) => (x.selected = type === "All" ? true : type === "None" ? false : !x.selected),
         );
         this.refresh();
     }
@@ -245,9 +225,7 @@ class MultiSelectDropdown {
         this.search = createEl(
             "input",
             {
-                class: ["multiselect-dropdown-search"].concat([
-                    this.config.searchInput?.class ?? "form-control",
-                ]),
+                class: ["multiselect-dropdown-search"].concat([this.config.searchInput?.class ?? "form-control"]),
                 style: {
                     width: "95%",
                     display: this.config.search ? "block" : "none",
@@ -258,15 +236,9 @@ class MultiSelectDropdown {
         );
         createEl("button", { text: "All", classes: ["ciview-button"] }, menu);
         createEl("button", { text: "None", classes: ["ciview-button"] }, menu);
-        createEl(
-            "button",
-            { text: "Toggle", classes: ["ciview-button"] },
-            menu,
-        );
+        createEl("button", { text: "Toggle", classes: ["ciview-button"] }, menu);
         createEl("button", { text: "OK", classes: ["ciview-button"] }, menu);
-        this.listWrap.addEventListener("click", (e) =>
-            this._handleListClick(e),
-        );
+        this.listWrap.addEventListener("click", (e) => this._handleListClick(e));
         this.search.addEventListener("keyup", (e) => this._handleSearch(e));
         //does list go off bottom of screen
         const ddim = getElDim(this.listWrap);
@@ -294,9 +266,7 @@ class MultiSelectDropdown {
 
     removeOption(value) {
         this.options.delete(value);
-        const el = Array.from(this.list.childNodes).find(
-            (x) => x.__value__ === value,
-        );
+        const el = Array.from(this.list.childNodes).find((x) => x.__value__ === value);
         if (el) {
             el.remove();
             return true;

@@ -22,9 +22,7 @@ const filterOptions = createFilterOptions<any>({ limit: AUTOCOMPLETE_OPTIONS_LIM
  * which should ensure that tooltips / dropdowns etc work correctly without needing to manually
  * `useOuterContainer`.
  */
-const MaterialWrapper = observer(function MaterialWrapper({
-    children,
-}: PropsWithChildren) {
+const MaterialWrapper = observer(function MaterialWrapper({ children }: PropsWithChildren) {
     const chartManager = useChartManagerContext();
     const prefersDarkMode = chartManager?.theme === "dark";
     const container = useOuterContainer();
@@ -43,24 +41,19 @@ const MaterialWrapper = observer(function MaterialWrapper({
                     MuiAutocomplete: { defaultProps: { filterOptions } },
                     // There is a bit of a general issue with material-ui favouring less dense layouts
                     // than we would tend to want - it is aiming for a more mobile-friendly UX...
-                    MuiTextField: { defaultProps: { size: "small" }},
+                    MuiTextField: { defaultProps: { size: "small" } },
                     MuiRadio: {
                         styleOverrides: {
                             root: {
-                                padding: '5px',
+                                padding: "5px",
                             },
-                        }
-                    }
+                        },
+                    },
                 },
                 typography: {
-                    fontFamily: [
-                        "Roboto",
-                        '"Helvetica Neue"',
-                        "Arial",
-                        "sans-serif",
-                    ].join(","),
+                    fontFamily: ["Roboto", '"Helvetica Neue"', "Arial", "sans-serif"].join(","),
                     fontSize: 12,
-                }
+                },
             }),
         [prefersDarkMode, defaultProps],
     );
@@ -79,8 +72,8 @@ const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
             refetchOnWindowFocus: false,
-        }
-    }
+        },
+    },
 });
 
 /**
@@ -109,9 +102,7 @@ const createMdvPortal = (
                 <ChartManagerProvider chartManager={resolvedChartManager}>
                     <OuterContainerProvider parent={parent}>
                         <MaterialWrapper>
-                            <ProjectProvider chartManager={resolvedChartManager}>
-                                {component}
-                            </ProjectProvider>
+                            <ProjectProvider chartManager={resolvedChartManager}>{component}</ProjectProvider>
                         </MaterialWrapper>
                     </OuterContainerProvider>
                 </ChartManagerProvider>

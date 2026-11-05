@@ -40,64 +40,42 @@ function getVerticalLayout(items: FractionLegendSpec["items"]) {
     return {
         layout,
         bodyWidth: FRACTION_LEGEND_WIDTH,
-        bodyHeight: Math.max(
-            items.length * 24 + (items.length + 2) * 2 + FRACTION_LEGEND_ITEM_TOP,
-            contentBottom + 8,
-        ),
+        bodyHeight: Math.max(items.length * 24 + (items.length + 2) * 2 + FRACTION_LEGEND_ITEM_TOP, contentBottom + 8),
     };
 }
 
 /** Circles in one row, each followed by its label, sharing a centre line. */
 function getHorizontalLayout(items: FractionLegendSpec["items"]) {
-    const maxRadius = Math.max(
-        0,
-        ...items.map((item) => Number(item.radius) || 0),
-    );
+    const maxRadius = Math.max(0, ...items.map((item) => Number(item.radius) || 0));
     const cy = FRACTION_LEGEND_ITEM_TOP + maxRadius;
     let x = FRACTION_LEGEND_LEFT_PADDING;
     const layout = items.map((item) => {
         const radius = Number(item.radius) || 0;
         const cx = x + radius;
         const textX = cx + radius + FRACTION_LEGEND_LABEL_GAP;
-        x =
-            textX +
-            item.label.length * FRACTION_LEGEND_CHAR_WIDTH +
-            FRACTION_LEGEND_ITEM_GAP;
+        x = textX + item.label.length * FRACTION_LEGEND_CHAR_WIDTH + FRACTION_LEGEND_ITEM_GAP;
         return { cx, cy, textX };
     });
     return { layout, bodyWidth: x, bodyHeight: cy + maxRadius + 6 };
 }
 
 function getItemLayout(spec: FractionLegendSpec) {
-    return spec.orientation === "horizontal"
-        ? getHorizontalLayout(spec.items)
-        : getVerticalLayout(spec.items);
+    return spec.orientation === "horizontal" ? getHorizontalLayout(spec.items) : getVerticalLayout(spec.items);
 }
 
 /** Size the legend sets on its wrapper, so charts can lay out around it before it renders. */
 export function getFractionLegendSize(spec: FractionLegendSpec) {
     const { bodyWidth, bodyHeight } = getItemLayout(spec);
-    const titleWidth =
-        spec.label.length * FRACTION_LEGEND_CHAR_WIDTH +
-        FRACTION_LEGEND_LEFT_PADDING * 2;
-    const autoWidth =
-        spec.orientation === "horizontal"
-            ? Math.max(bodyWidth, titleWidth)
-            : FRACTION_LEGEND_WIDTH;
-    const autoHeight =
-        bodyHeight +
-        FRACTION_LEGEND_TITLE_HEIGHT +
-        FRACTION_LEGEND_VERTICAL_PADDING;
+    const titleWidth = spec.label.length * FRACTION_LEGEND_CHAR_WIDTH + FRACTION_LEGEND_LEFT_PADDING * 2;
+    const autoWidth = spec.orientation === "horizontal" ? Math.max(bodyWidth, titleWidth) : FRACTION_LEGEND_WIDTH;
+    const autoHeight = bodyHeight + FRACTION_LEGEND_TITLE_HEIGHT + FRACTION_LEGEND_VERTICAL_PADDING;
     return {
         width: spec.width ?? autoWidth,
         height: Math.min(autoHeight, spec.maxHeight ?? autoHeight),
     };
 }
 
-export default function FractionLegend({
-    spec,
-    onLayoutReady,
-}: LegendWrapperComponentProps<FractionLegendSpec>) {
+export default function FractionLegend({ spec, onLayoutReady }: LegendWrapperComponentProps<FractionLegendSpec>) {
     const containerRef = useRef<HTMLDivElement>(null);
     const { layout, bodyHeight } = getItemLayout(spec);
     const { width, height } = getFractionLegendSize(spec);
@@ -139,12 +117,7 @@ export default function FractionLegend({
                             const { cx, cy, textX } = layout[i];
                             return (
                                 <g key={item.key}>
-                                    <circle
-                                        cy={cy}
-                                        cx={cx}
-                                        r={item.radius}
-                                        fill="gray"
-                                    />
+                                    <circle cy={cy} cx={cx} r={item.radius} fill="gray" />
                                     <text
                                         y={cy + 5}
                                         x={textX}

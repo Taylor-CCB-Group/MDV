@@ -25,19 +25,14 @@ function getIncludedRows(dimension: CategoryDimension, size: number) {
 
 describe("CategoryDimension multitext filtering", () => {
     beforeEach(() => {
-        const WorkerMock = vi
-            .fn()
-            .mockImplementation(function MockWorker() {
-                return {
-                    addEventListener: vi.fn(),
-                    postMessage: vi.fn(),
-                    terminate: vi.fn(),
-                };
-            });
-        vi.stubGlobal(
-            "Worker",
-            WorkerMock,
-        );
+        const WorkerMock = vi.fn().mockImplementation(function MockWorker() {
+            return {
+                addEventListener: vi.fn(),
+                postMessage: vi.fn(),
+                terminate: vi.fn(),
+            };
+        });
+        vi.stubGlobal("Worker", WorkerMock);
     });
 
     afterEach(() => {
@@ -92,11 +87,7 @@ describe("CategoryDimension multitext filtering", () => {
             delimiter: ",",
             stringLength: 3,
             values: ["N/A", "a", "b"],
-            data: new Uint16Array([
-                0, 65535, 65535,
-                2, 65535, 65535,
-                1, 2, 65535,
-            ]),
+            data: new Uint16Array([0, 65535, 65535, 2, 65535, 65535, 1, 2, 65535]),
         };
         const parent = createParent(column, 3);
         const dimension = new CategoryDimension(parent as never);

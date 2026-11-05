@@ -173,7 +173,7 @@ const FindAndReplaceDialog = ({
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter" && replaceText.trim()) {
                                             e.preventDefault();
-                                            handleReplace(findText, replaceText)
+                                            handleReplace(findText, replaceText);
                                         }
                                     }}
                                     sx={{ flexGrow: 1 }}

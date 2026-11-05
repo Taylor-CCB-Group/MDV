@@ -1,13 +1,20 @@
-import { BotMessageSquare, SquareTerminal } from 'lucide-react';
-import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from 'lucide-react';
-import { type ChatProgress, type ChatMessage, type ChatModelOption, type ChatDatasourceOption, type DatasourceMode, navigateToView } from './ChatAPI';
-import { forwardRef, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import JsonView from 'react18-json-view';
-import ReactMarkdown from 'react-markdown';
-import SyntaxHighlighter from 'react-syntax-highlighter';
-import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import { BotMessageSquare, SquareTerminal } from "lucide-react";
+import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from "lucide-react";
+import {
+    type ChatProgress,
+    type ChatMessage,
+    type ChatModelOption,
+    type ChatDatasourceOption,
+    type DatasourceMode,
+    navigateToView,
+} from "./ChatAPI";
+import { forwardRef, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import JsonView from "react18-json-view";
+import ReactMarkdown from "react-markdown";
+import SyntaxHighlighter from "react-syntax-highlighter";
+import { dracula } from "react-syntax-highlighter/dist/esm/styles/hljs";
 // import RobotPandaSVG from './PandaSVG';
-import LinearProgress from '@mui/material/LinearProgress';
+import LinearProgress from "@mui/material/LinearProgress";
 import {
     Accordion,
     AccordionDetails,
@@ -29,27 +36,26 @@ import {
     Typography,
     ToggleButton,
     ToggleButtonGroup,
-} from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import _ from 'lodash';
-import { Check, ContentCopy, Clear as ClearIcon } from '@mui/icons-material';
-import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
-
+} from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import _ from "lodash";
+import { Check, ContentCopy, Clear as ClearIcon } from "@mui/icons-material";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 
 export type MessageType = {
     onClose: () => void;
     updateInput: (text: string) => void;
     suggestedQuestions: string[];
-}
+};
 
 /**
  * prototype for new ways of handling project state...
  */
 // function useCheckDataStore() {
 //     const cm = useChartManager();
-    
+
 //     const { root } = useProject();
 //     useEffect(() => {
 //         // we want something that will respond via socket.io to changes in dataStore etc...
@@ -86,20 +92,27 @@ export type MessageType = {
 //     }, [cm, root]);
 // }
 
-const SuggestedQuestions = ({ onSelect, suggestedQuestions }: { onSelect: (q: string) => void, suggestedQuestions: string[] }) => (
+const SuggestedQuestions = ({
+    onSelect,
+    suggestedQuestions,
+}: {
+    onSelect: (q: string) => void;
+    suggestedQuestions: string[];
+}) => (
     <div className="flex flex-wrap gap-2 mt-4 mb-4 flex-col">
-        <div className='font-bold'>Suggested Questions:</div>
-        <div className='flex flex-wrap gap-2 mt-2'>{suggestedQuestions.map((q) => (
-            <Button
-                key={q}
-                variant="outlined"
-                onClick={() => onSelect(q)}
-                size='large'
-                sx={{ textTransform: 'none', borderRadius: 2, color: "inherit" }}
-            >
-                {q}
-            </Button>
-        ))}
+        <div className="font-bold">Suggested Questions:</div>
+        <div className="flex flex-wrap gap-2 mt-2">
+            {suggestedQuestions.map((q) => (
+                <Button
+                    key={q}
+                    variant="outlined"
+                    onClick={() => onSelect(q)}
+                    size="large"
+                    sx={{ textTransform: "none", borderRadius: 2, color: "inherit" }}
+                >
+                    {q}
+                </Button>
+            ))}
         </div>
     </div>
 );
@@ -113,23 +126,17 @@ const DATA_PREVIEW_COLLAPSE_LINES = 120;
 const DATA_PREVIEW_COLLAPSE_CHARS = 80_000;
 
 function previewShouldCollapse(content: string): boolean {
-    return (
-        content.length > PREVIEW_COLLAPSE_CHARS ||
-        content.split('\n').length > PREVIEW_COLLAPSE_LINES
-    );
+    return content.length > PREVIEW_COLLAPSE_CHARS || content.split("\n").length > PREVIEW_COLLAPSE_LINES;
 }
 
 function previewShouldCollapseData(content: string): boolean {
-    return (
-        content.length > DATA_PREVIEW_COLLAPSE_CHARS ||
-        content.split('\n').length > DATA_PREVIEW_COLLAPSE_LINES
-    );
+    return content.length > DATA_PREVIEW_COLLAPSE_CHARS || content.split("\n").length > DATA_PREVIEW_COLLAPSE_LINES;
 }
 
 /** Pipe-style markdown table vs monospace tabular stdout (e.g. pandas to_string). */
 function dataPreviewLooksLikeMarkdownTable(content: string): boolean {
     const t = content.trim();
-    return t.startsWith('|') || /^[^\n]*\|[^\n]*\n[-|\s:]{3,}/m.test(content);
+    return t.startsWith("|") || /^[^\n]*\|[^\n]*\n[-|\s:]{3,}/m.test(content);
 }
 
 function DataPreviewBody({ content }: { content: string }) {
@@ -145,220 +152,227 @@ function DataPreviewBody({ content }: { content: string }) {
 
 type MessageProps = ChatMessage & MessageType;
 
-const Message = memo(forwardRef<HTMLDivElement, MessageProps>(function Message(
-    {
-    text,
-    sender,
-    view,
-    verification,
-    data_preview,
-    guidance,
-    needs_refresh,
-    datasource_names,
-    datasource_mode,
-    resolved_datasource_names,
-    onClose,
-    error,
-    updateInput,
-    suggestedQuestions,
-    },
-    ref,
-) {
-    const isUser = sender === 'user';
-    const [copied, setCopied] = useState(false);
-    const pythonSections = extractPythonSections(typeof text === 'string' ? text : '');
-    try {
-        if (typeof text === 'string') {
-            text = JSON.parse(text);
-        }
-    } catch (e) {
-    }
-    const markdownContent =
-        typeof text === 'string' ? text : JSON.stringify(text, null, 2);
-
-    const messageStyle = isUser ? 
-        'bg-teal-200 self-end dark:bg-teal-900' :
-        (error ?
-            'bg-slate-200 dark:bg-slate-800 self-start border border-red-900':
-            'bg-slate-200 dark:bg-slate-800 self-start'
-        )
-    
-    const messageIcon = error ?
-            <CircleAlert color='red' /> :
-            isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />;
-    const handleCopy = async () => {
+const Message = memo(
+    forwardRef<HTMLDivElement, MessageProps>(function Message(
+        {
+            text,
+            sender,
+            view,
+            verification,
+            data_preview,
+            guidance,
+            needs_refresh,
+            datasource_names,
+            datasource_mode,
+            resolved_datasource_names,
+            onClose,
+            error,
+            updateInput,
+            suggestedQuestions,
+        },
+        ref,
+    ) {
+        const isUser = sender === "user";
+        const [copied, setCopied] = useState(false);
+        const pythonSections = extractPythonSections(typeof text === "string" ? text : "");
         try {
-            const parts: string[] = [];
-            if (guidance?.trim()) parts.push(guidance.trim());
-            if (data_preview?.trim()) parts.push(data_preview.trim());
-            if (verification?.trim()) parts.push(verification.trim());
-            if (markdownContent) parts.push(markdownContent);
-            await navigator.clipboard.writeText(parts.join('\n\n---\n\n'));
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        } catch (err) {
-            console.error("Failed to copy error details:", err);
-        }
-    };
+            if (typeof text === "string") {
+                text = JSON.parse(text);
+            }
+        } catch (e) {}
+        const markdownContent = typeof text === "string" ? text : JSON.stringify(text, null, 2);
 
-    return (//setting `select-all` here doesn't help because * selector applies it to children, so we have custom class in tailwind theme
-        <div ref={ref} className='selectable mt-4'>
-            <div>{messageIcon}</div>
-            <div className={`mb-2 p-4 rounded-lg ${messageStyle} relative markdown-body`}>
-                {/* <JsonView src={text} /> */}
-                {(sender === "bot" || error) && (
-                    <IconButton
-                        size="small"
-                        aria-label="Copy button"
-                        onClick={handleCopy}
-                        sx={{ position: 'absolute', top: 2, right: 2 }}
-                    >
-                        {copied ? (
-                            <Check fontSize='small' />
-                        ) : (
-                            <ContentCopy fontSize='small' />
-                        )}
-                    </IconButton>
-                )}
-                {isUser && datasource_mode === 'manual' && datasource_names && datasource_names.length > 0 && (
-                    <Typography variant="caption" color="text.secondary" className="block mb-2">
-                        Datasources: {datasource_names.join(', ')}
-                    </Typography>
-                )}
-                {isUser && datasource_mode === 'auto' && (
-                    <Typography variant="caption" color="text.secondary" className="block mb-2">
-                        Datasources: Auto
-                    </Typography>
-                )}
-                {sender === 'bot' && !error && resolved_datasource_names && resolved_datasource_names.length > 0 && (
-                    <Typography variant="caption" color="text.secondary" className="block mb-2">
-                        Resolved datasources: {resolved_datasource_names.join(', ')}
-                    </Typography>
-                )}
-                {sender === 'bot' && !error && guidance?.trim() && (
-                    <ChatPreviewBlock
-                        title="Analysis summary"
-                        content={guidance.trim()}
-                        defaultExpandedWhenLong
-                    />
-                )}
-                {sender === 'bot' && !error && data_preview?.trim() && (
-                    <ChatPreviewBlock
-                        variant="data"
-                        title="Data preview (script output)"
-                        content={data_preview.trim()}
-                    />
-                )}
-                {sender === 'bot' && !error && verification?.trim() && (
-                    <ChatPreviewBlock
-                        title="What you can verify"
-                        content={verification.trim()}
-                        defaultExpandedWhenLong
-                    />
-                )}
-                {sender === 'bot' && !error && (guidance?.trim() || data_preview?.trim() || verification?.trim()) ? (
-                    <Accordion
-                        defaultExpanded={false}
-                        disableGutters
-                        className="mt-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-slate-50/80 dark:bg-slate-900/40 before:hidden"
-                    >
-                        <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
-                            <Typography component="span" variant="body2" className="font-semibold">
-                                Explanation and generated code
-                            </Typography>
-                        </AccordionSummary>
-                        <AccordionDetails className="pt-0">
-                            <MessageMarkdown text={markdownContent} />
-                        </AccordionDetails>
-                    </Accordion>
-                ) : (
-                    <MessageMarkdown text={markdownContent} />
-                )}
-                {view && sender === 'bot' && !error && (
-                    <Box sx={{ mt: 2 }}>
-                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                            Review the analysis summary and data preview above, then open the view.
-                        </Typography>
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => navigateToView(view, Boolean(needs_refresh), onClose)}
+        const messageStyle = isUser
+            ? "bg-teal-200 self-end dark:bg-teal-900"
+            : error
+              ? "bg-slate-200 dark:bg-slate-800 self-start border border-red-900"
+              : "bg-slate-200 dark:bg-slate-800 self-start";
+
+        const messageIcon = error ? (
+            <CircleAlert color="red" />
+        ) : isUser ? (
+            <MessageCircleQuestion className="" />
+        ) : (
+            <BotMessageSquare className="scale-x-[-1]" />
+        );
+        const handleCopy = async () => {
+            try {
+                const parts: string[] = [];
+                if (guidance?.trim()) parts.push(guidance.trim());
+                if (data_preview?.trim()) parts.push(data_preview.trim());
+                if (verification?.trim()) parts.push(verification.trim());
+                if (markdownContent) parts.push(markdownContent);
+                await navigator.clipboard.writeText(parts.join("\n\n---\n\n"));
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            } catch (err) {
+                console.error("Failed to copy error details:", err);
+            }
+        };
+
+        return (
+            //setting `select-all` here doesn't help because * selector applies it to children, so we have custom class in tailwind theme
+            <div ref={ref} className="selectable mt-4">
+                <div>{messageIcon}</div>
+                <div className={`mb-2 p-4 rounded-lg ${messageStyle} relative markdown-body`}>
+                    {/* <JsonView src={text} /> */}
+                    {(sender === "bot" || error) && (
+                        <IconButton
+                            size="small"
+                            aria-label="Copy button"
+                            onClick={handleCopy}
+                            sx={{ position: "absolute", top: 2, right: 2 }}
                         >
-                            Load view &apos;{view}&apos;...
-                        </Button>
-                    </Box>
-                )}
-            </div>
-            {/* {pythonSections.map((section, index) => (
+                            {copied ? <Check fontSize="small" /> : <ContentCopy fontSize="small" />}
+                        </IconButton>
+                    )}
+                    {isUser && datasource_mode === "manual" && datasource_names && datasource_names.length > 0 && (
+                        <Typography variant="caption" color="text.secondary" className="block mb-2">
+                            Datasources: {datasource_names.join(", ")}
+                        </Typography>
+                    )}
+                    {isUser && datasource_mode === "auto" && (
+                        <Typography variant="caption" color="text.secondary" className="block mb-2">
+                            Datasources: Auto
+                        </Typography>
+                    )}
+                    {sender === "bot" &&
+                        !error &&
+                        resolved_datasource_names &&
+                        resolved_datasource_names.length > 0 && (
+                            <Typography variant="caption" color="text.secondary" className="block mb-2">
+                                Resolved datasources: {resolved_datasource_names.join(", ")}
+                            </Typography>
+                        )}
+                    {sender === "bot" && !error && guidance?.trim() && (
+                        <ChatPreviewBlock title="Analysis summary" content={guidance.trim()} defaultExpandedWhenLong />
+                    )}
+                    {sender === "bot" && !error && data_preview?.trim() && (
+                        <ChatPreviewBlock
+                            variant="data"
+                            title="Data preview (script output)"
+                            content={data_preview.trim()}
+                        />
+                    )}
+                    {sender === "bot" && !error && verification?.trim() && (
+                        <ChatPreviewBlock
+                            title="What you can verify"
+                            content={verification.trim()}
+                            defaultExpandedWhenLong
+                        />
+                    )}
+                    {sender === "bot" &&
+                    !error &&
+                    (guidance?.trim() || data_preview?.trim() || verification?.trim()) ? (
+                        <Accordion
+                            defaultExpanded={false}
+                            disableGutters
+                            className="mt-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-slate-50/80 dark:bg-slate-900/40 before:hidden"
+                        >
+                            <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
+                                <Typography component="span" variant="body2" className="font-semibold">
+                                    Explanation and generated code
+                                </Typography>
+                            </AccordionSummary>
+                            <AccordionDetails className="pt-0">
+                                <MessageMarkdown text={markdownContent} />
+                            </AccordionDetails>
+                        </Accordion>
+                    ) : (
+                        <MessageMarkdown text={markdownContent} />
+                    )}
+                    {view && sender === "bot" && !error && (
+                        <Box sx={{ mt: 2 }}>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                                Review the analysis summary and data preview above, then open the view.
+                            </Typography>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={() => navigateToView(view, Boolean(needs_refresh), onClose)}
+                            >
+                                Load view &apos;{view}&apos;...
+                            </Button>
+                        </Box>
+                    )}
+                </div>
+                {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
             ))} */}
 
-            {/* Show suggested questions only for the welcome message (sender: 'system') */}
-            {sender === 'system' && suggestedQuestions.length > 0 && (
-                <SuggestedQuestions suggestedQuestions={suggestedQuestions} onSelect={updateInput} />
-            )}
-            
-            {/* Uncomment later and add logic for feedback buttons */}
-            {/* {(sender === 'bot') && <MessageFeedback />} */}
-        </div>
-    );
-}));
-Message.displayName = 'Message';
+                {/* Show suggested questions only for the welcome message (sender: 'system') */}
+                {sender === "system" && suggestedQuestions.length > 0 && (
+                    <SuggestedQuestions suggestedQuestions={suggestedQuestions} onSelect={updateInput} />
+                )}
+
+                {/* Uncomment later and add logic for feedback buttons */}
+                {/* {(sender === 'bot') && <MessageFeedback />} */}
+            </div>
+        );
+    }),
+);
+Message.displayName = "Message";
 
 const MessageFeedback = () => {
     const [isStarred, setIsStarred] = useState<boolean>(false);
     const [isLiked, setIsLiked] = useState<boolean>(false);
     const [isDisliked, setIsDisliked] = useState<boolean>(false);
     const [showNotes, setShowNotes] = useState<boolean>(false);
-    const [notes, setNotes] = useState<string>('');
+    const [notes, setNotes] = useState<string>("");
     return (
-        <div className='flex justify-end'>
-            <Star className='self-end scale-75' fill={isStarred ? 'var(--text_color)' : undefined}
-            onClick={() => setIsStarred(!isStarred)}
+        <div className="flex justify-end">
+            <Star
+                className="self-end scale-75"
+                fill={isStarred ? "var(--text_color)" : undefined}
+                onClick={() => setIsStarred(!isStarred)}
             />
-            <ThumbsUp className='self-end scale-75' fill={isLiked ? 'var(--text_color)' : undefined}
-            onClick={() => {
-                setIsLiked(!isLiked);
-                setIsDisliked(false);
-            }}
+            <ThumbsUp
+                className="self-end scale-75"
+                fill={isLiked ? "var(--text_color)" : undefined}
+                onClick={() => {
+                    setIsLiked(!isLiked);
+                    setIsDisliked(false);
+                }}
             />
-            <ThumbsDown className='self-end scale-75' fill={isDisliked ? 'var(--text_color)' : undefined}
-            onClick={() => {
-                setIsDisliked(!isDisliked);
-                setIsLiked(false);
-            }}
+            <ThumbsDown
+                className="self-end scale-75"
+                fill={isDisliked ? "var(--text_color)" : undefined}
+                onClick={() => {
+                    setIsDisliked(!isDisliked);
+                    setIsLiked(false);
+                }}
             />
-            <NotebookPen className='self-end scale-75' fill={showNotes ? 'var(--text_color)' : undefined} 
-            onClick={() => setShowNotes(!showNotes)}
+            <NotebookPen
+                className="self-end scale-75"
+                fill={showNotes ? "var(--text_color)" : undefined}
+                onClick={() => setShowNotes(!showNotes)}
             />
             {showNotes && (
                 <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder='Add notes...'
-                    className='p-2 m-2 border border-gray-300 rounded-lg'
+                    placeholder="Add notes..."
+                    className="p-2 m-2 border border-gray-300 rounded-lg"
                 />
             )}
         </div>
     );
-}
+};
 
 const MessageJson = ({ text }: { text: string }) => {
     try {
         text = JSON.parse(text);
-    } catch (e) {
-    }
-    return (
-        <JsonView src={text} />
-    );
-}
+    } catch (e) {}
+    return <JsonView src={text} />;
+};
 function extractPythonSections(responseText: string) {
-    // Regular expression to match Python code blocks 
+    // Regular expression to match Python code blocks
     const pythonCodeRegex = /```python([\s\S]*?)```/g;
-    let matches; const pythonSections = [];
-    // Find all matches 
+    let matches;
+    const pythonSections = [];
+    // Find all matches
     while ((matches = pythonCodeRegex.exec(responseText)) !== null) {
-        // Extract the code block without the backticks and "python" keyword 
+        // Extract the code block without the backticks and "python" keyword
         pythonSections.push(matches[1].trim());
     }
     return pythonSections;
@@ -374,7 +388,7 @@ const PythonCode = ({ code }: { code: string }) => {
             </SyntaxHighlighter>
         </div>
     );
-}
+};
 
 const MessageMarkdown = ({ text }: { text: string }) => {
     const markdown = text;
@@ -389,47 +403,47 @@ const MessageMarkdown = ({ text }: { text: string }) => {
             rehypePlugins={[rehypeRaw, rehypeSanitize]}
             components={{
                 code({ node, className, children, ...props }) {
-                    const match = /language-(\w+)/.exec(className || '')
+                    const match = /language-(\w+)/.exec(className || "");
                     return match ? (
                         <>
-                        <SquareTerminal onClick={() => alert(children)} /> {match[1]}:
-                        <SyntaxHighlighter
-                            className="rounded-lg border dark:border-gray-800 p-4 overflow-x-auto"
-                            // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-syntax-highlighter, not our code
-                            children={String(children).replace(/\n$/, '')}
-                            // TODO: follow-up: tree-shake syntax-highlighter languages to keep this chunk minimal.
-                            //@ts-ignore - not sure what's wrong here - maybe @types/react-syntax-highlighter needs updating?
-                            style={dracula}
-                            language={match[1]}
-                            PreTag="div"
-                            {...props}
-                        />
+                            <SquareTerminal onClick={() => alert(children)} /> {match[1]}:
+                            <SyntaxHighlighter
+                                className="rounded-lg border dark:border-gray-800 p-4 overflow-x-auto"
+                                // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-syntax-highlighter, not our code
+                                children={String(children).replace(/\n$/, "")}
+                                // TODO: follow-up: tree-shake syntax-highlighter languages to keep this chunk minimal.
+                                //@ts-ignore - not sure what's wrong here - maybe @types/react-syntax-highlighter needs updating?
+                                style={dracula}
+                                language={match[1]}
+                                PreTag="div"
+                                {...props}
+                            />
                         </>
                     ) : (
                         <code className={className} {...props}>
                             {children}
                         </code>
-                    )
-                }
+                    );
+                },
             }}
         />
     );
-}
+};
 
 const ChatPreviewBlock = ({
     title,
     content,
     defaultExpandedWhenLong,
-    variant = 'default',
+    variant = "default",
 }: {
     title: string;
     content: string;
     /** When content is long, start expanded so users see verification before scrolling to the button. */
     defaultExpandedWhenLong?: boolean;
     /** Script stdout: prefer expanded, monospace tabular unless extremely large. */
-    variant?: 'default' | 'data';
+    variant?: "default" | "data";
 }) => {
-    const isData = variant === 'data';
+    const isData = variant === "data";
     const collapse = isData ? previewShouldCollapseData(content) : previewShouldCollapse(content);
     const body = isData ? <DataPreviewBody content={content} /> : <MessageMarkdown text={content} />;
     if (!collapse) {
@@ -456,15 +470,16 @@ const ChatPreviewBlock = ({
     );
 };
 
-const Progress = (props: ChatProgress & {verboseProgress: string[]}) => {
-    const verbose = useMemo(() => 
-        props.verboseProgress.map(s => s.substring(s.length-100)).join('\n'), 
-    [props.verboseProgress]);
+const Progress = (props: ChatProgress & { verboseProgress: string[] }) => {
+    const verbose = useMemo(
+        () => props.verboseProgress.map((s) => s.substring(s.length - 100)).join("\n"),
+        [props.verboseProgress],
+    );
 
     if (props.progress >= 100) return null;
     return (
         <div className="p-4">
-            <LinearProgress 
+            <LinearProgress
                 variant="buffer"
                 // consider some custom styling of the buffer
                 value={props.progress}
@@ -474,12 +489,12 @@ const Progress = (props: ChatProgress & {verboseProgress: string[]}) => {
             <pre className="">{verbose}</pre>
         </div>
     );
-}
+};
 
-function datasourceRoleLabel(role: ChatDatasourceOption['role']): string {
-    if (role === 'obs') return 'obs';
-    if (role === 'expression') return 'expr';
-    return 'table';
+function datasourceRoleLabel(role: ChatDatasourceOption["role"]): string {
+    if (role === "obs") return "obs";
+    if (role === "expression") return "expr";
+    return "table";
 }
 
 export type ChatBotProps = {
@@ -500,7 +515,6 @@ export type ChatBotProps = {
     onDatasourceModeChange: (mode: DatasourceMode) => void;
 };
 
-
 const Chatbot = ({
     messages,
     isSending,
@@ -518,14 +532,14 @@ const Chatbot = ({
     datasourceMode,
     onDatasourceModeChange,
 }: ChatBotProps) => {
-    const [input, setInput] = useState<string>('');
+    const [input, setInput] = useState<string>("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const lastMessageRef = useRef<HTMLDivElement>(null);
     // useCheckDataStore();
 
     const handleSend = useCallback(async () => {
         if (!input.trim()) return;
-        setInput('');
+        setInput("");
         await sendAPI(input);
     }, [input, sendAPI]);
 
@@ -537,11 +551,14 @@ const Chatbot = ({
         setInput(text);
     }, []);
 
-    const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            handleSend();
-        }
-    }, [handleSend]);
+    const handleKeyPress = useCallback(
+        (e: React.KeyboardEvent<HTMLInputElement>) => {
+            if (e.key === "Enter") {
+                handleSend();
+            }
+        },
+        [handleSend],
+    );
 
     const handleClearInput = useCallback(() => {
         setInput("");
@@ -549,14 +566,13 @@ const Chatbot = ({
 
     const scrollToBottom = useCallback(() => {
         //! block: 'nearest' seems to solve issue with dialog header disappearing from top
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }, []);
 
     useLayoutEffect(() => {
         if (!messages?.length) return;
 
-        const inProgress =
-            requestProgress !== null && requestProgress.progress < 100;
+        const inProgress = requestProgress !== null && requestProgress.progress < 100;
         if (isSending && inProgress) {
             scrollToBottom();
             return;
@@ -564,21 +580,23 @@ const Chatbot = ({
 
         const last = messages[messages.length - 1];
         const hasPreview =
-            last?.sender === 'bot' &&
+            last?.sender === "bot" &&
             !last?.error &&
-            (Boolean(last.guidance?.trim()) || Boolean(last.verification?.trim()) || Boolean(last.data_preview?.trim()));
+            (Boolean(last.guidance?.trim()) ||
+                Boolean(last.verification?.trim()) ||
+                Boolean(last.data_preview?.trim()));
 
         if (!isSending && hasPreview && lastMessageRef.current) {
-            lastMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            lastMessageRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
             return;
         }
 
         scrollToBottom();
     }, [messages, requestProgress, isSending, scrollToBottom]);
-    
+
     return (
         <Box className="flex flex-col h-full mx-auto overflow-hidden">
-            <Box className="flex-1 p-4 w-full overflow-y-auto" sx={{ bgcolor: "var(--background_color)"}}>
+            <Box className="flex-1 p-4 w-full overflow-y-auto" sx={{ bgcolor: "var(--background_color)" }}>
                 {messages.map((message, index) => (
                     <Message
                         key={`${message.id}-${message.sender}`}
@@ -589,20 +607,21 @@ const Chatbot = ({
                         suggestedQuestions={suggestedQuestions}
                     />
                 ))}
-                {isSending ?  
-                    (requestProgress ? 
-                        <Progress {...requestProgress} verboseProgress={verboseProgress} /> : 
-                        <Skeleton variant='rectangular' sx={{ fontSize: "1.2rem", marginBottom: 2, marginTop: 2}} />
+                {isSending ? (
+                    requestProgress ? (
+                        <Progress {...requestProgress} verboseProgress={verboseProgress} />
                     ) : (
-                        <></>
+                        <Skeleton variant="rectangular" sx={{ fontSize: "1.2rem", marginBottom: 2, marginTop: 2 }} />
                     )
-                }
+                ) : (
+                    <></>
+                )}
                 {/* {
                 isSending && 
                 (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}
                 <Box ref={messagesEndRef} />
             </Box>
-             {/*<Box className='absolute opacity-10 pointer-events-none right-0'>
+            {/*<Box className='absolute opacity-10 pointer-events-none right-0'>
                 <RobotPandaSVG />
             </Box> */}
             <Divider />
@@ -644,14 +663,14 @@ const Chatbot = ({
                             disabled={isSending}
                             sx={{ mb: 1 }}
                         >
-                            <ToggleButton value="auto" sx={{ textTransform: 'none' }}>
+                            <ToggleButton value="auto" sx={{ textTransform: "none" }}>
                                 Auto
                             </ToggleButton>
-                            <ToggleButton value="manual" sx={{ textTransform: 'none' }}>
+                            <ToggleButton value="manual" sx={{ textTransform: "none" }}>
                                 Manual
                             </ToggleButton>
                         </ToggleButtonGroup>
-                        {datasourceMode === 'auto' ? (
+                        {datasourceMode === "auto" ? (
                             <Typography variant="caption" color="text.secondary" className="block">
                                 Datasources inferred from your question (table names and column fields).
                             </Typography>
@@ -660,7 +679,7 @@ const Chatbot = ({
                                 <Typography variant="caption" color="text.secondary" className="block mb-1">
                                     Datasources (first selected is the primary chart target)
                                 </Typography>
-                                <FormGroup row sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                                <FormGroup row sx={{ flexWrap: "wrap", gap: 0.5 }}>
                                     {availableDatasources.map((ds) => {
                                         const checked = selectedDatasourceNames.includes(ds.name);
                                         return (
@@ -674,7 +693,9 @@ const Chatbot = ({
                                                         onChange={() => {
                                                             const nameSet = new Set(
                                                                 checked
-                                                                    ? selectedDatasourceNames.filter((n) => n !== ds.name)
+                                                                    ? selectedDatasourceNames.filter(
+                                                                          (n) => n !== ds.name,
+                                                                      )
                                                                     : [...selectedDatasourceNames, ds.name],
                                                             );
                                                             const next = availableDatasources
@@ -700,35 +721,39 @@ const Chatbot = ({
                         Datasource: {availableDatasources[0].name}
                     </Typography>
                 ) : null}
-            <Box className="flex w-full">
-                <TextField
-                    type="text"
-                    // disabled={isSending} //we can still type while it's processing
-                    value={input}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyPress}
-                    placeholder="Type a message..."
-                    fullWidth
-                    sx={{
-                        mr: 2,
-                    }}
-                    slotProps={{
-                        input: {
-                            endAdornment: (
-                                <InputAdornment position="end">
-                                    <IconButton onClick={handleClearInput}>
-                                        <ClearIcon fontSize="small" />
-                                    </IconButton>
-                                </InputAdornment>
-                            )
-                        }
-                    }}
-                />
-                <Button onClick={handleSend} disabled={isSending || !input} 
-                className="p-2 bg-blue-500 text-white rounded-lg" variant='contained'>
-                    Send
-                </Button>
-            </Box>
+                <Box className="flex w-full">
+                    <TextField
+                        type="text"
+                        // disabled={isSending} //we can still type while it's processing
+                        value={input}
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyPress}
+                        placeholder="Type a message..."
+                        fullWidth
+                        sx={{
+                            mr: 2,
+                        }}
+                        slotProps={{
+                            input: {
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton onClick={handleClearInput}>
+                                            <ClearIcon fontSize="small" />
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            },
+                        }}
+                    />
+                    <Button
+                        onClick={handleSend}
+                        disabled={isSending || !input}
+                        className="p-2 bg-blue-500 text-white rounded-lg"
+                        variant="contained"
+                    >
+                        Send
+                    </Button>
+                </Box>
             </Box>
         </Box>
     );

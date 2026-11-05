@@ -42,7 +42,7 @@ export class ChooseColumnDialog extends BaseDialog {
                         marginRight: "5px",
                     },
                 },
-                gd
+                gd,
             );
             createEl("span", { text: group }, d);
             createEl(
@@ -52,7 +52,7 @@ export class ChooseColumnDialog extends BaseDialog {
                     value: group,
                     name: rName,
                 },
-                d
+                d,
             ).addEventListener("click", (e) => {
                 this.checkAllInGroup(e.target.value);
             });
@@ -70,7 +70,7 @@ export class ChooseColumnDialog extends BaseDialog {
                 placeholder: "Search columns",
                 type: "text",
             },
-            cd
+            cd,
         );
         filter.addEventListener("input", (e) => {
             const val = e.target.value.toLowerCase().split(" ");
@@ -89,7 +89,7 @@ export class ChooseColumnDialog extends BaseDialog {
                         // marginRight:"5px"
                     },
                 },
-                cd
+                cd,
             );
             //createEl("span",{text:col.name},d);
             const cb = createEl(
@@ -97,7 +97,7 @@ export class ChooseColumnDialog extends BaseDialog {
                 {
                     type: "checkbox",
                 },
-                d
+                d,
             );
             this.checks.push([cb, col.field]);
             createEl("span", { text: col.name }, d);

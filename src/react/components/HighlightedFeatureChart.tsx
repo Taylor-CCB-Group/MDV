@@ -10,11 +10,7 @@ export type HighlightedFeatureConfig = {
 } & BaseConfig;
 
 class HighlightedFeatureChartWrapper extends BaseReactChart<HighlightedFeatureConfig> {
-    constructor(
-        dataStore: DataStore,
-        div: string | HTMLDivElement,
-        config: HighlightedFeatureConfig & BaseConfig,
-    ) {
+    constructor(dataStore: DataStore, div: string | HTMLDivElement, config: HighlightedFeatureConfig & BaseConfig) {
         if (!config.text) config.text = "";
         super(dataStore, div, config, HighlightedFeatureComponent);
     }

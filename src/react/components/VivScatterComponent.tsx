@@ -92,11 +92,7 @@ const Main = observer(
         // passing showJson from here to make use of this being `observer`
         const jsonLayer = useJsonLayer(showJson);
 
-        const {
-            gateLabelLayer,
-            gateDisplayLayer,
-            controllerOptions,
-        } = useGateLayers();
+        const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
 
         // Get field contour legend data
         const config = useConfig<DualContourLegacyConfig>();
@@ -169,28 +165,16 @@ const Main = observer(
                 brightness,
                 contrast,
             }),
-                [
-                ome,
-                selections,
-                contrastLimits,
-                extensions,
-                colors,
-                channelsVisible,
-                brightness,
-                contrast,
-            ],
+            [ome, selections, contrastLimits, extensions, colors, channelsVisible, brightness, contrast],
         );
 
         const getTooltipContent = useCallback(
             (info: PickingInfo) => {
-                return getCombinedScatterTooltip(
-                    info,
-                    {
-                        gateDisplayLayerId: gateDisplayLayer?.id,
-                        gateLabelLayerId: gateLabelLayer?.id,
-                        getPointTooltip: getTooltip,
-                    },
-                );
+                return getCombinedScatterTooltip(info, {
+                    gateDisplayLayerId: gateDisplayLayer?.id,
+                    gateLabelLayerId: gateLabelLayer?.id,
+                    getPointTooltip: getTooltip,
+                });
             },
             [gateDisplayLayer?.id, gateLabelLayer?.id, getTooltip],
         );
@@ -211,10 +195,10 @@ const Main = observer(
                     gateDisplayLayer,
                     selectionLayer,
                     gateLabelLayer,
-                ].filter(l => l !== null),
+                ].filter((l) => l !== null),
                 id: `${id}deck`,
                 // deviceProps: {
-                //     webgl: {                    
+                //     webgl: {
                 //         depth: true,
                 //         preserveDrawingBuffer: true,
                 //         antialias: true,
@@ -247,8 +231,8 @@ const Main = observer(
             <>
                 <SelectionOverlay />
                 {showLegend && (
-                    <FieldContourLegend 
-                        fields={legendFields} 
+                    <FieldContourLegend
+                        fields={legendFields}
                         categories={legendCategories.items}
                         categoryLabel={legendCategories.label}
                         position={legendPosition}
@@ -275,16 +259,12 @@ const Main = observer(
                         layerProps={[layerConfig]}
                         viewStates={[{ ...viewState, id: detailId }]}
                         // not really expecting OrbitViewState... yet... but we will for 3D.
-                        onViewStateChange={(e: {viewState: OrthographicViewState | OrbitViewState}) => {
+                        onViewStateChange={(e: { viewState: OrthographicViewState | OrbitViewState }) => {
                             viewerStore.setState({
                                 viewState: { ...e.viewState, id: detailId },
                             });
                             if (vsDebugDivRef.current)
-                                vsDebugDivRef.current.innerText = JSON.stringify(
-                                    e.viewState,
-                                    null,
-                                    2,
-                                );
+                                vsDebugDivRef.current.innerText = JSON.stringify(e.viewState, null, 2);
                         }}
                         deckProps={deckProps}
                     />
@@ -292,4 +272,5 @@ const Main = observer(
                 {tooltipPortal}
             </>
         );
-});
+    },
+);

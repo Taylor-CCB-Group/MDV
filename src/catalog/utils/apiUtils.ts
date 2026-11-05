@@ -3,9 +3,9 @@ import type { AxiosResponse } from "axios";
 export type ParseErrorProps = {
     response: Response | AxiosResponse;
     fallbackText: string;
-}
+};
 
-export const parseErrorResponse = async ({response, fallbackText}: ParseErrorProps) => {
+export const parseErrorResponse = async ({ response, fallbackText }: ParseErrorProps) => {
     let errorData;
     if (response instanceof Response) {
         errorData = await response.json().catch(() => ({

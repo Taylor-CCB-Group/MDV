@@ -111,9 +111,7 @@ function getDoubleCategory(lFilter, gFilter, data, data2, config) {
         }
     }
 
-    const reducedMatrix = rowIndexes.map((i1) =>
-        colIndexes.map((i2) => matrix[i1][i2]),
-    );
+    const reducedMatrix = rowIndexes.map((i1) => colIndexes.map((i2) => matrix[i1][i2]));
 
     return {
         matrix: reducedMatrix,

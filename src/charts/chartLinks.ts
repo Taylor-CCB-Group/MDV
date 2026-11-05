@@ -17,7 +17,9 @@ export function snapshotChartLinks(links: ChartLink[] | undefined, chartId: stri
 }
 
 const isSameLink = (a: ChartLink, b: ChartLink) =>
-    a.type === b.type && a.source_chart === b.source_chart && (a.id === undefined || b.id === undefined || a.id === b.id);
+    a.type === b.type &&
+    a.source_chart === b.source_chart &&
+    (a.id === undefined || b.id === undefined || a.id === b.id);
 
 /**
  * Puts back links that were dropped while a chart was replaced by one with the same id: a link that is

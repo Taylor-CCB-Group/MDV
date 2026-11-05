@@ -12,11 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { getProjectUrl } from "../projectUrl";
-import {
-    deleteProjectViaApi,
-    shouldDeleteProjectOnCleanup,
-    waitForProjectReady,
-} from "./core";
+import { deleteProjectViaApi, shouldDeleteProjectOnCleanup, waitForProjectReady } from "./core";
 import { buildPythonPath, getPythonCandidates, REPO_ROOT } from "./pythonEnv";
 
 const execFileAsync = promisify(execFile);
@@ -88,11 +84,7 @@ async function generateMockProjectArchive(mockConfig: MockProjectConfig = {}) {
     );
 }
 
-async function importProjectArchive(
-    request: APIRequestContext,
-    archivePath: string,
-    projectName: string,
-) {
+async function importProjectArchive(request: APIRequestContext, archivePath: string, projectName: string) {
     const fixtureBuffer = await fs.readFile(archivePath);
     const response = await request.post("/import_project", {
         multipart: {
@@ -129,10 +121,7 @@ async function setProjectEditable(request: APIRequestContext, projectId: string)
 }
 
 async function createFallbackCsvFile(csvContent: string) {
-    const csvPath = path.join(
-        os.tmpdir(),
-        `mdv-playwright-${Date.now()}-${Math.random().toString(36).slice(2)}.csv`,
-    );
+    const csvPath = path.join(os.tmpdir(), `mdv-playwright-${Date.now()}-${Math.random().toString(36).slice(2)}.csv`);
     await fs.writeFile(csvPath, csvContent, "utf8");
     return csvPath;
 }
@@ -150,9 +139,7 @@ async function uploadCsvToProject(page: Page, projectId: string, csvPath: string
         timeout: 30_000,
     });
     await page.getByRole("button", { name: "Upload", exact: true }).click();
-    await page
-        .getByRole("button", { name: /refresh page/i })
-        .waitFor({ state: "visible", timeout: 120_000 });
+    await page.getByRole("button", { name: /refresh page/i }).waitFor({ state: "visible", timeout: 120_000 });
     await page.getByRole("button", { name: /refresh page/i }).click();
 }
 

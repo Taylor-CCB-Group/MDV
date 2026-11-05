@@ -30,14 +30,8 @@ export type BrushXOptions = {
     updateOn?: "brush" | "end";
 };
 
-export const createBrushScale = (
-    scaleType: BrushXScaleType,
-    domain: Range,
-    range: Range,
-) =>
-    scaleType === "log"
-        ? d3.scaleSymlog().domain(domain).range(range)
-        : d3.scaleLinear().domain(domain).range(range);
+export const createBrushScale = (scaleType: BrushXScaleType, domain: Range, range: Range) =>
+    scaleType === "log" ? d3.scaleSymlog().domain(domain).range(range) : d3.scaleLinear().domain(domain).range(range);
 
 export function useBrushX(
     ref: RefObject<SVGSVGElement | null>,
@@ -49,13 +43,7 @@ export function useBrushX(
     const isUserBrushingRef = useRef(false);
     const minMax = brushConfig?.minMax;
     const setValue = brushConfig?.setValue;
-    const {
-        x = 0,
-        y = -2,
-        width,
-        height,
-        handleSize = 1.25,
-    } = options.layout;
+    const { x = 0, y = -2, width, height, handleSize = 1.25 } = options.layout;
     const {
         selectionFill = "rgba(15, 23, 42, 0.08)",
         selectionStroke = "rgba(15, 23, 42, 0.7)",
@@ -68,9 +56,13 @@ export function useBrushX(
 
         const svg = d3.select(ref.current);
         const xScale = createBrushScale(xScaleType, minMax, [x, x + width]);
-        const brush = d3.brushX()
+        const brush = d3
+            .brushX()
             .handleSize(handleSize)
-            .extent([[x, y], [x + width, y + height]])
+            .extent([
+                [x, y],
+                [x + width, y + height],
+            ])
             .on("brush end", (event) => {
                 if (!event.sourceEvent) return;
                 if (event.type === "brush") {
@@ -82,9 +74,7 @@ export function useBrushX(
                 }
                 if (updateOn === "end" && event.type !== "end") return;
                 if (event.selection) {
-                    const [start, end] = event.selection.map((position: number) =>
-                        xScale.invert(position),
-                    );
+                    const [start, end] = event.selection.map((position: number) => xScale.invert(position));
                     setValue([start, end]);
                 } else {
                     setValue(null);

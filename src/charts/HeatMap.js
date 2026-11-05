@@ -55,7 +55,7 @@ class HeatMap extends SVGChart {
     // @loadColumnData
     setFields(p) {
         this.fieldNames = p;
-        const yLabels = this.fieldNames.map(f => this.dataStore.getColumnName(f));
+        const yLabels = this.fieldNames.map((f) => this.dataStore.getColumnName(f));
         this.y_scale.domain(yLabels);
         // this.config.param = [this.config.param[0]].concat(p);
         this.onDataFiltered();
@@ -72,9 +72,7 @@ class HeatMap extends SVGChart {
         const arr = new Array(d.length + 1);
         const c_name = this.dataStore.getColumnName(this.config.param[0]);
         //the order is the same as in params
-        const colnames = this.config.param
-            .slice(1)
-            .map((x) => this.dataStore.getColumnName(x));
+        const colnames = this.config.param.slice(1).map((x) => this.dataStore.getColumnName(x));
         arr[0] = [c_name].concat(colnames).join("\t");
         const vals = this.dataStore.getColumnValues(this.config.param[0]);
         for (let n = 0; n < d.length; n++) {
@@ -88,11 +86,7 @@ class HeatMap extends SVGChart {
      * Matches DataStore.getColumnInfo / addColumnFromField behaviour used elsewhere in ChartManager.
      */
     _ensureExpressionColumn(field) {
-        if (
-            typeof field === "string" &&
-            !this.dataStore.columnIndex[field] &&
-            field.includes("|")
-        ) {
+        if (typeof field === "string" && !this.dataStore.columnIndex[field] && field.includes("|")) {
             this.dataStore.getColumnInfo(field);
         }
     }
@@ -167,19 +161,13 @@ class HeatMap extends SVGChart {
         const config = { method: this.config.method, scaleVals: [] };
         // const p = this.config.param;
         const p = [this.config.param[0], ...this.fieldNames];
-        const q =
-            this.config.color_scale.trim === "none"
-                ? null
-                : this.config.color_scale.trim;
+        const q = this.config.color_scale.trim === "none" ? null : this.config.color_scale.trim;
         for (let x = 1; x < p.length; x++) {
             this._ensureExpressionColumn(p[x]);
             const col = this.dataStore.columnIndex[p[x]];
             const [min, max] = this.dataStore.getMinMaxForColumn(p[x]);
             const quantile = q && col.quantiles && col.quantiles !== "NA" && col.quantiles[q];
-            config.scaleVals.push([
-                quantile ? quantile[0] : min,
-                quantile ? quantile[1] : max,
-            ]);
+            config.scaleVals.push([quantile ? quantile[0] : min, quantile ? quantile[1] : max]);
         }
 
         this.dim.getAverages(
@@ -204,16 +192,11 @@ class HeatMap extends SVGChart {
             this.data.averages.sort((x, y) => x._order - y._order);
             this.margins.right = 70;
             this.y_scale.domain(
-                this.rowClusterNodes.order.map((x) =>
-                    this.dataStore.getColumnName(this.fieldNames[x]),
-                ),
+                this.rowClusterNodes.order.map((x) => this.dataStore.getColumnName(this.fieldNames[x])),
             );
         } else {
             this.rowClusterNodes = undefined;
-            this.y_scale.domain(
-                this.fieldNames
-                    .map((x) => this.dataStore.getColumnName(x)),
-            );
+            this.y_scale.domain(this.fieldNames.map((x) => this.dataStore.getColumnName(x)));
             this.margins.right = 10;
             this.data.averages.sort((x, y) => x._id - y._id);
             this.ry_axis_svg.selectAll("*").remove();
@@ -226,9 +209,7 @@ class HeatMap extends SVGChart {
             this.columnClusterNodes = getHierarchicalNodes(this.data.transpose);
 
             this.data.transpose.sort((x, y) => x._order - y._order);
-            this.x_scale.domain(
-                this.columnClusterNodes.order.map((x) => vals[x]),
-            );
+            this.x_scale.domain(this.columnClusterNodes.order.map((x) => vals[x]));
             this.setAxisSize("tx", 85);
         } else {
             this.columnClusterNodes = undefined;
@@ -241,10 +222,7 @@ class HeatMap extends SVGChart {
     }
 
     drawChart(tTime = 400) {
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(tTime)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
         const vals = this.dataStore.getColumnValues(this.config.param[0]);
         const colors = this.dataStore.getColumnColors(this.config.param[0]);
         const dim = this._getContentDimensions();
@@ -254,11 +232,8 @@ class HeatMap extends SVGChart {
         const ytHeight = 40;
         this.cat_scale.domain([cMax, 0]);
         const cUnits = cMax === 0 ? 0 : 40 / cMax;
-        const cTotals = this.data.transpose.map((x) => [
-            this.data.catTotals[x._id],
-            x._id,
-        ]);
-        const recHeight = dim.height / (this.fieldNames.length);
+        const cTotals = this.data.transpose.map((x) => [this.data.catTotals[x._id], x._id]);
+        const recHeight = dim.height / this.fieldNames.length;
         this.graph_area
             .selectAll(".heatmap-row")
             .data(this.data.averages)
@@ -292,14 +267,9 @@ class HeatMap extends SVGChart {
                 });
             })
             .on("mouseover pointermove", (e, d) => {
-                const row =
-                    this.dataStore.columnIndex[this.fieldNames[d.row_id]]
-                        .name;
+                const row = this.dataStore.columnIndex[this.fieldNames[d.row_id]].name;
 
-                this.showToolTip(
-                    e,
-                    `${vals[d.col_id]}<br>${row}<br>${d.av.toPrecision(2)}`,
-                );
+                this.showToolTip(e, `${vals[d.col_id]}<br>${row}<br>${d.av.toPrecision(2)}`);
             })
             .on("mouseleave", () => {
                 this.hideToolTip();
@@ -312,10 +282,7 @@ class HeatMap extends SVGChart {
                 return this.colorFunction(d.av);
             });
 
-        const trans2 = select(this.contentDiv)
-            .transition()
-            .duration(tTime)
-            .ease(easeLinear);
+        const trans2 = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
 
         this.tx_axis_svg
             .selectAll(".heatmap-catsize")
@@ -332,14 +299,7 @@ class HeatMap extends SVGChart {
                         .attr("x", (d, i) => catRecWidth / 2 + i * recWidth)
                         .attr("width", catRecWidth),
                 (update) => update,
-                (exit) =>
-                    exit.call((exit) =>
-                        exit
-                            .transition(trans2)
-                            .attr("height", 0)
-                            .attr("y", 45)
-                            .remove(),
-                    ),
+                (exit) => exit.call((exit) => exit.transition(trans2).attr("height", 0).attr("y", 45).remove()),
             )
 
             .transition(trans2)
@@ -357,18 +317,10 @@ class HeatMap extends SVGChart {
         this.cat_axis_svg.transition().call(this.cat_axis_call);
         this.updateAxis();
         if (this.rowClusterNodes) {
-            this.drawYTree(
-                this.rowClusterNodes.nodes,
-                this.fieldNames.length,
-            );
+            this.drawYTree(this.rowClusterNodes.nodes, this.fieldNames.length);
         }
         if (this.columnClusterNodes) {
-            this.drawXTree(
-                this.columnClusterNodes.nodes,
-                this.data.transpose.length,
-                40,
-                45,
-            );
+            this.drawXTree(this.columnClusterNodes.nodes, this.data.transpose.length, 40, 45);
         }
     }
 

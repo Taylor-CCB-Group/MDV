@@ -49,7 +49,16 @@ export type ProjectListViewProps = {
     onSelectionChange: (id: string, selected: boolean) => void;
 };
 export type MouseEv = React.MouseEvent<HTMLElement>;
-const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType, selectionMode, selectedProjectIds, onSelectionChange }: ProjectListViewProps) => {
+const ProjectListView = ({
+    projects,
+    onDelete,
+    onRename,
+    onExport,
+    onChangeType,
+    selectionMode,
+    selectedProjectIds,
+    onSelectionChange,
+}: ProjectListViewProps) => {
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>();
     const [selectedProject, setSelectedProject] = useState<Project>();
 
@@ -70,23 +79,29 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
         setAnchorEl(null);
     }, []);
 
-    const handleRowClick = useCallback((projectId: Project['id']) => {
+    const handleRowClick = useCallback((projectId: Project["id"]) => {
         window.location.href = buildProjectUrl(projectId);
     }, []);
 
-    const handleModalOpen = useCallback((modalSetter: React.Dispatch<React.SetStateAction<boolean>>) => {
-        handleMenuClose();
-        modalSetter(true);
-    }, [handleMenuClose]);
+    const handleModalOpen = useCallback(
+        (modalSetter: React.Dispatch<React.SetStateAction<boolean>>) => {
+            handleMenuClose();
+            modalSetter(true);
+        },
+        [handleMenuClose],
+    );
 
     const hasReadme = useCallback((proj: Project) => !!proj.readme, []);
 
-    const hasPermissions = useCallback((proj: Project) => 
-        proj.permissions.edit && (operationPermissions.renameProject ||
-        operationPermissions.deleteProject ||
-        // operationPermissions.exportProject ||
-        operationPermissions.shareProject)
-        , [operationPermissions]);
+    const hasPermissions = useCallback(
+        (proj: Project) =>
+            proj.permissions.edit &&
+            (operationPermissions.renameProject ||
+                operationPermissions.deleteProject ||
+                // operationPermissions.exportProject ||
+                operationPermissions.shareProject),
+        [operationPermissions],
+    );
 
     // todo: Update this component for more cleaner code
     return (
@@ -117,25 +132,27 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                             >
                                 {selectionMode && (
                                     <TableCell padding="checkbox">
-                                        {operationPermissions.deleteProject && project.permissions.edit && project.permissions.owner && (
-                                            <Checkbox
-                                                checked={selectedProjectIds.has(project.id)}
-                                                onChange={(event) => onSelectionChange(project.id, event.target.checked)}
-                                                onClick={(event) => event.stopPropagation()}
-                                                inputProps={{ "aria-label": `select project ${project.name}` }}
-                                            />
-                                        )}
+                                        {operationPermissions.deleteProject &&
+                                            project.permissions.edit &&
+                                            project.permissions.owner && (
+                                                <Checkbox
+                                                    checked={selectedProjectIds.has(project.id)}
+                                                    onChange={(event) =>
+                                                        onSelectionChange(project.id, event.target.checked)
+                                                    }
+                                                    onClick={(event) => event.stopPropagation()}
+                                                    inputProps={{ "aria-label": `select project ${project.name}` }}
+                                                />
+                                            )}
                                     </TableCell>
                                 )}
                                 <TableCell>
                                     <div className="flex items-center gap-3">
-                                        <ImageIcon
-                                            sx={{ color: "text.secondary" }}
-                                        />
+                                        <ImageIcon sx={{ color: "text.secondary" }} />
                                         <Typography>{project.name}</Typography>
                                     </div>
                                 </TableCell>
-                                <TableCell>{project.owner ? project.owner.join(', ') : ''}</TableCell>
+                                <TableCell>{project.owner ? project.owner.join(", ") : ""}</TableCell>
                                 {!isPublicPage && <TableCell>{project.lastModified}</TableCell>}
                                 <TableCell>{project.type}</TableCell>
                                 {!isPublicPage && (
@@ -157,18 +174,15 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                                     </TableCell>
                                 )}
                                 <TableCell align="right">
-                                {(hasReadme(project) || hasPermissions(project)) && 
-                                    (
+                                    {(hasReadme(project) || hasPermissions(project)) && (
                                         <IconButton
-                                            onClick={(e) =>
-                                                handleMenuClick(e, project)
-                                            }
+                                            onClick={(e) => handleMenuClick(e, project)}
                                             size="small"
                                             data-testid={`project_menu_${project.id}`}
                                         >
                                             <MoreVert />
                                         </IconButton>
-                                )}
+                                    )}
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -178,11 +192,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
 
             {selectedProject && (
                 <>
-                    <Menu
-                        anchorEl={anchorEl}
-                        open={Boolean(anchorEl)}
-                        onClose={handleMenuClose}
-                    >
+                    <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
                         {hasReadme(selectedProject) && (
                             <MenuItem onClick={() => handleModalOpen(setIsInfoModalOpen)}>
                                 <ListItemIcon>
@@ -192,7 +202,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                             </MenuItem>
                         )}
                         {operationPermissions.renameProject && (
-                            <MenuItem 
+                            <MenuItem
                                 onClick={() => handleModalOpen(setIsRenameModalOpen)}
                                 disabled={!selectedProject?.permissions.edit}
                             >
@@ -219,8 +229,8 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                             </MenuItem>
                         )} */}
                         {operationPermissions.shareProject && (
-                            <MenuItem 
-                                onClick={() => handleModalOpen(setIsShareModalOpen)} 
+                            <MenuItem
+                                onClick={() => handleModalOpen(setIsShareModalOpen)}
                                 disabled={!selectedProject?.permissions.edit}
                             >
                                 <ListItemIcon>
@@ -230,9 +240,9 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                             </MenuItem>
                         )}
                         {operationPermissions.deleteProject && (
-                            <MenuItem 
-                                onClick={() => handleModalOpen(setIsDeleteModalOpen)} 
-                                sx={{color: theme.palette.error.main}}
+                            <MenuItem
+                                onClick={() => handleModalOpen(setIsDeleteModalOpen)}
+                                sx={{ color: theme.palette.error.main }}
                                 disabled={!selectedProject?.permissions.edit}
                             >
                                 <ListItemIcon>
@@ -245,34 +255,40 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
 
                     {hasReadme(selectedProject) && (
                         <ProjectInfoModal
-                        open={isInfoModalOpen}
-                        onClose={() => setIsInfoModalOpen(false)}
-                        readme={selectedProject.readme}
-                    />
+                            open={isInfoModalOpen}
+                            onClose={() => setIsInfoModalOpen(false)}
+                            readme={selectedProject.readme}
+                        />
                     )}
 
                     {selectedProject.permissions.edit && (
                         <>
-                            {operationPermissions.renameProject && <ProjectRenameModal
-                                id={selectedProject.id}
-                                name={selectedProject.name}
-                                open={isRenameModalOpen}
-                                onRename={onRename}
-                                onClose={() => setIsRenameModalOpen(false)}
-                            />}
+                            {operationPermissions.renameProject && (
+                                <ProjectRenameModal
+                                    id={selectedProject.id}
+                                    name={selectedProject.name}
+                                    open={isRenameModalOpen}
+                                    onRename={onRename}
+                                    onClose={() => setIsRenameModalOpen(false)}
+                                />
+                            )}
 
-                            {operationPermissions.shareProject && <ProjectShareModal
-                                open={isShareModalOpen}
-                                onClose={() => setIsShareModalOpen(false)}
-                                projectId={selectedProject.id}
-                            />}
+                            {operationPermissions.shareProject && (
+                                <ProjectShareModal
+                                    open={isShareModalOpen}
+                                    onClose={() => setIsShareModalOpen(false)}
+                                    projectId={selectedProject.id}
+                                />
+                            )}
 
-                            {operationPermissions.deleteProject && <ProjectDeleteModal
-                                id={selectedProject.id}
-                                open={isDeleteModalOpen}
-                                onDelete={onDelete}
-                                onClose={() => setIsDeleteModalOpen(false)}
-                            />}
+                            {operationPermissions.deleteProject && (
+                                <ProjectDeleteModal
+                                    id={selectedProject.id}
+                                    open={isDeleteModalOpen}
+                                    onDelete={onDelete}
+                                    onClose={() => setIsDeleteModalOpen(false)}
+                                />
+                            )}
                         </>
                     )}
                 </>
