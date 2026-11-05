@@ -73,7 +73,40 @@ function renderLegend(
     return { wrapper, el, contentDiv };
 }
 
+/** jsdom has no ResizeObserver; this one lets a test say when the chart has resized. */
+class FakeResizeObserver {
+    static instances: FakeResizeObserver[] = [];
+    targets: Element[] = [];
+    disconnected = false;
+    callback: ResizeObserverCallback;
+    constructor(callback: ResizeObserverCallback) {
+        this.callback = callback;
+        FakeResizeObserver.instances.push(this);
+    }
+    observe(target: Element) {
+        this.targets.push(target);
+    }
+    unobserve() {}
+    disconnect() {
+        this.disconnected = true;
+    }
+    trigger() {
+        this.callback([], this);
+    }
+}
+
+/** Changes the chart's size and tells the legend's observer about it. */
+function resizeChart(contentDiv: HTMLElement, width: number, height: number) {
+    contentDiv.dataset.testWidth = String(width);
+    contentDiv.dataset.testHeight = String(height);
+    for (const observer of FakeResizeObserver.instances) {
+        if (!observer.disconnected && observer.targets.includes(contentDiv)) observer.trigger();
+    }
+}
+
 beforeEach(() => {
+    FakeResizeObserver.instances = [];
+    vi.stubGlobal("ResizeObserver", FakeResizeObserver);
     vi.spyOn(HTMLElement.prototype, "offsetLeft", "get").mockImplementation(function (this: HTMLElement) {
         return px(this.style.left);
     });
@@ -101,6 +134,7 @@ afterEach(() => {
     wrappers = [];
     document.body.innerHTML = "";
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
 });
 
 describe("LegendWrapper saved size", () => {
@@ -155,5 +189,26 @@ describe("LegendWrapper keeps the legend inside the chart", () => {
     test("leaves the position alone while the chart has no size yet", () => {
         const { el } = renderLegend({ width: 0, height: 0 }, { left: 350, top: 280 });
         expect([el.style.left, el.style.top]).toEqual(["350px", "280px"]);
+    });
+
+    test("fits the legend once the chart gets a size", () => {
+        const { el, contentDiv } = renderLegend({ width: 0, height: 0 }, { left: 350, top: 280 });
+        resizeChart(contentDiv, 400, 300);
+        expect([el.style.left, el.style.top]).toEqual(["220px", "50px"]);
+    });
+
+    test("moves the legend back inside when the chart shrinks", () => {
+        // fits at first: 350 + 180 <= 600 and 280 + 250 <= 600
+        const { el, contentDiv } = renderLegend({ width: 600, height: 600 }, { left: 350, top: 280 });
+        expect([el.style.left, el.style.top]).toEqual(["350px", "280px"]);
+        resizeChart(contentDiv, 400, 300);
+        expect([el.style.left, el.style.top]).toEqual(["220px", "50px"]);
+    });
+
+    test("stops watching the chart when the legend is removed", () => {
+        const { wrapper } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 });
+        expect(FakeResizeObserver.instances).toHaveLength(1);
+        act(() => wrapper.unmount());
+        expect(FakeResizeObserver.instances[0].disconnected).toBe(true);
     });
 });

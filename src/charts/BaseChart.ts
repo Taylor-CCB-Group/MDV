@@ -688,6 +688,10 @@ class BaseChart<T extends BaseConfig> {
         const spec = this.getColorLegendSpec();
         if (!spec) {
             console.warn("no color legend");
+            // keep the user's resize for when a colour is chosen again
+            if (size) {
+                this.config.color_legend.size = size;
+            }
             this.colorLegendWrapper.unmount();
             this.legend = undefined;
             return;

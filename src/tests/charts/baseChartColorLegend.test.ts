@@ -23,7 +23,8 @@ const continuous: ColorLegendContinuousSpec = {
 };
 
 type FakeOptions = {
-    spec: ColorLegendSpec;
+    /** null when there's nothing to show, e.g. the colour was cleared. */
+    spec: ColorLegendSpec | null;
     colorLegend?: Record<string, unknown>;
     /** A legend already on the chart, as when the legend is redrawn. */
     existingLegend?: HTMLDivElement;
@@ -132,6 +133,28 @@ describe("BaseChart color legend size", () => {
         });
         chart.setColorLegend();
         expect(chart.config.color_legend).toEqual({ display: false, pos: [5, 6], size: [100, 60] });
+    });
+
+    test("keeps the user's size when there is no legend to show, e.g. the colour was cleared", () => {
+        const legend = document.createElement("div");
+        const { chart, wrapper } = fakeChart({
+            spec: null,
+            colorLegend: { display: true, pos: [10, 20], size: [200, 100] },
+            existingLegend: legend,
+            userSize: [130, 70],
+        });
+        chart.setColorLegend();
+        expect(wrapper.render).not.toHaveBeenCalled();
+        expect(chart.config.color_legend.size).toEqual([130, 70]);
+    });
+
+    test("leaves the saved size alone when there is no legend and no resize", () => {
+        const { chart } = fakeChart({
+            spec: null,
+            colorLegend: { display: true, pos: [10, 20], size: [200, 100] },
+        });
+        chart.setColorLegend();
+        expect(chart.config.color_legend.size).toEqual([200, 100]);
     });
 });
 

@@ -45,6 +45,7 @@ export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
     private interactionsAttached = false;
     private interactions: LegendWrapperInteractions = {};
     private userSize: [number, number] | null = null;
+    private contentObserver: ResizeObserver | null = null;
 
     constructor(chart: BaseChart<T>) {
         this.chart = chart;
@@ -129,6 +130,13 @@ export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
                 },
             });
         }
+        // Refit when the chart changes size, including when it had no size yet above.
+        if (typeof ResizeObserver !== "undefined") {
+            this.contentObserver = new ResizeObserver(() => {
+                if (this.wrapper) this.keepInsideChart(this.wrapper);
+            });
+            this.contentObserver.observe(this.chart.contentDiv);
+        }
         this.interactionsAttached = true;
     }
 
@@ -150,6 +158,8 @@ export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
         this.currentSpec = null;
         this.interactionsAttached = false;
         this.interactions = {};
+        this.contentObserver?.disconnect();
+        this.contentObserver = null;
         if (this.root) {
             this.root.unmount();
             this.root = null;
