@@ -14,7 +14,7 @@ from mdvtools.server import add_safe_headers
 from mdvtools.entry_assets import register_entry_assets
 from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprint
-from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent
+from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent, Invitation, InvitationProject
 from mdvtools.dbutils.routes import register_routes
 from mdvtools.auth.register_auth_routes import register_auth_routes
 from mdvtools.auth.authutils import register_before_request_auth, get_auth_provider, cache_user_projects
@@ -113,6 +113,7 @@ def create_flask_app(config_name=None):
                 ensure_usage_events_table()
             except Exception as e:
                 logger.warning(f"Skipping usage_events table setup: {e}")
+            ensure_invitation_tables()
 
             if ENABLE_AUTH:
                 try:
@@ -458,6 +459,15 @@ def ensure_usage_events_table():
         # checkfirst=True is check-then-act, so two workers racing can both pass
         # the check. Gunicorn runs -w 1 today but will not forever.
         logger.warning(f"Could not ensure the usage_events table exists: {e}")
+
+def ensure_invitation_tables():
+    """Create the Invitation tables on an existing database, where create_all() never runs.
+
+    Unlike usage_events, these hold access data, so a failure here is raised and
+    stops startup rather than leaving Admins unable to invite anyone.
+    """
+    Invitation.__table__.create(bind=db.engine, checkfirst=True)
+    InvitationProject.__table__.create(bind=db.engine, checkfirst=True)
 
 def warn_if_project_ids_can_be_reused():
     """Log a warning when a SQLite projects table can give a purged project's ID to

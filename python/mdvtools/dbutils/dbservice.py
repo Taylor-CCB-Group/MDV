@@ -23,7 +23,7 @@ Example:
     >>> new_project = ProjectService.add_new_project('/path/to/project', 'My Project')
 """
 
-from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject, UsageEvent
+from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject, UsageEvent, InvitationProject
 from datetime import datetime
 from mdvtools.mdvproject import MDVProject
 from typing import Optional
@@ -317,6 +317,7 @@ class ProjectService:
 
             File.query.filter_by(project_id=project_id).delete(synchronize_session=False)
             UserProject.query.filter_by(project_id=project_id).delete(synchronize_session=False)
+            InvitationProject.query.filter_by(project_id=project_id).delete(synchronize_session=False)
             # Detach the usage history rather than deleting it. The foreign key
             # would block this delete otherwise, and dropping the rows would make
             # last month's access numbers silently change when somebody empties
