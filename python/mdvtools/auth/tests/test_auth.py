@@ -394,6 +394,15 @@ class TestValidateUserBootstrapAndRefusal:
         app.secret_key = "test_secret_key"
         return app
 
+    @pytest.fixture(autouse=True)
+    def no_open_invitation(self):
+        # These tests mock User and db, so there is no table to look in.
+        # test_accept_invitation.py covers accepting an Invitation.
+        with patch(
+            'mdvtools.dbutils.dbservice.InvitationService.accept_for_sign_in', return_value=None
+        ):
+            yield
+
     @pytest.fixture
     def provider(self, bootstrap_app):
         with patch('mdvtools.auth.auth0_provider.requests.get') as mock_get:

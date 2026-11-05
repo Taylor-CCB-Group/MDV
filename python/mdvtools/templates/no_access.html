@@ -13,7 +13,11 @@
   </head>
   <body>
     <h1>No access to this MDV site</h1>
+    {% if sign_in_method %}
+    <p>You signed in as <strong>{{ email }}</strong> through <strong>{{ sign_in_method }}</strong>, but this site has not given that account access.</p>
+    {% else %}
     <p>You signed in as <strong>{{ email }}</strong>, but this site has not given that account access.</p>
+    {% endif %}
     {% if contact %}
     <p>If you think you should have access, contact {{ contact }}.</p>
     {% endif %}

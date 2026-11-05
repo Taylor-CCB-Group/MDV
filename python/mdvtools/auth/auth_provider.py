@@ -15,6 +15,8 @@ class NoAccess:
     """
 
     email: str
+    # The Auth0 connection they signed in through, when the provider knows it.
+    sign_in_method: Optional[str] = None
 
 
 class AuthProvider(ABC):

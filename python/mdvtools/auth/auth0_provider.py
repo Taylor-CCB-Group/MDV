@@ -29,6 +29,9 @@ _jwks_cache_expiry = None
 _jwks_cache_lock = threading.Lock()  # Lock to protect cache access
 JWKS_CACHE_DURATION = 3600  # Cache for 1 hour
 
+# Prefix of the claims the post-login Action adds (docs/auth0/add-sign-in-claims.js).
+CLAIM_NAMESPACE = "https://mdv/"
+
 class Auth0Provider(AuthProvider):
     def __init__(self, app, oauth: OAuth, client_id: str, client_secret: str, domain: str):
         """
@@ -179,6 +182,10 @@ class Auth0Provider(AuthProvider):
                     "last_name": user_metadata.get("last_name", "Unknown"),
                     "email": raw_data.get("email", ""),
                     "email_verified": bool(raw_data.get("email_verified", False)),
+                    # Added by the post-login Action, for accepting an Invitation (ADR 0021).
+                    "connection": raw_data.get(f"{CLAIM_NAMESPACE}connection"),
+                    "connection_strategy": raw_data.get(f"{CLAIM_NAMESPACE}connection_strategy"),
+                    "xms_edov": raw_data.get(f"{CLAIM_NAMESPACE}xms_edov") is True,
                     "association": user_metadata.get("association", "Unknown Organization"),
                     "avatarUrl": raw_data.get("picture", ""),
                 }
@@ -396,11 +403,15 @@ class Auth0Provider(AuthProvider):
                     logger.exception(f"Bootstrap administrator creation failed: {e}")
                     return None, (jsonify({"error": "Administrator bootstrap failed"}), 500)
                 if user is None:
-                    return None, NoAccess(email=email)
+                    user = self._accept_invitation(user_info)
+                if user is None:
+                    return None, NoAccess(email=email, sign_in_method=user_info.get("connection"))
             elif not user.is_active:
-                # A Deactivated user. Signing in never reactivates them; only an
-                # Admin can (ADR 0020).
-                return None, NoAccess(email=email)
+                # A Deactivated user. Signing in reactivates them only by
+                # accepting an Invitation an Admin sent them (ADRs 0020, 0021).
+                user = self._accept_invitation(user_info)
+                if user is None:
+                    return None, NoAccess(email=email, sign_in_method=user_info.get("connection"))
 
             # Add the user to the in-memory cache
             user_data = {"id": user.id, "auth_id": user.auth_id, "email": user.email, "is_admin": user.is_admin}
@@ -414,6 +425,18 @@ class Auth0Provider(AuthProvider):
         except Exception as e:
             logger.exception(f"Error in validate_user: {e}")
             return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
+
+    def _accept_invitation(self, user_info: Dict[str, Any]):
+        """The User made or moved by accepting an open Invitation, or None."""
+        from mdvtools.dbutils.dbservice import InvitationService
+        from mdvtools.auth.authutils import cache_user_projects
+
+        user = InvitationService.accept_for_sign_in(user_info)
+        if user is not None:
+            # Project routes read grants from the cache, so the new User would
+            # otherwise see no projects until something else refreshed it.
+            cache_user_projects()
+        return user
 
     def _try_bootstrap_first_admin(self, user_info: Dict[str, Any], auth0_id: Optional[str], email: str):
         """

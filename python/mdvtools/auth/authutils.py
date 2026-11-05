@@ -218,6 +218,7 @@ def register_before_request_auth(app):
             page = render_template(
                 "no_access.html",
                 email=reason.email,
+                sign_in_method=reason.sign_in_method,
                 contact=app.config.get("MDV_ACCESS_CONTACT"),
             )
             return page, 403

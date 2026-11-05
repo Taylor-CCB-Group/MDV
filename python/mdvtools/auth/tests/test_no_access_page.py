@@ -67,18 +67,25 @@ def provider(app):
         )
 
 
-def signed_in_to_auth0(provider, *, sub, email):
+def signed_in_to_auth0(provider, *, sub, email, connection="Username-Password-Authentication"):
     """Make Auth0 report a valid sign-in for this account."""
+    sign_in = {
+        "sub": sub,
+        "email": email,
+        "email_verified": True,
+        "connection": connection,
+        "connection_strategy": "auth0",
+    }
     return patch.multiple(
         provider,
         get_token=MagicMock(return_value="token"),
         is_token_valid=MagicMock(return_value=True),
-        get_user=MagicMock(return_value={"sub": sub, "email": email, "email_verified": True}),
+        get_user=MagicMock(return_value=sign_in),
     )
 
 
-def get_as(app, provider, path, *, sub, email):
-    with signed_in_to_auth0(provider, sub=sub, email=email), patch(
+def get_as(app, provider, path, *, sub, email, **sign_in):
+    with signed_in_to_auth0(provider, sub=sub, email=email, **sign_in), patch(
         "mdvtools.auth.authutils.get_auth_provider", return_value=provider
     ):
         return app.test_client().get(path)
@@ -92,6 +99,16 @@ def test_person_with_no_user_sees_the_no_access_page(app, provider):
     assert "stranger@example.org" in page
     assert CONTACT in page
     assert sign_out_target(page, "/whoami") == "/logout"
+
+
+def test_no_access_page_shows_the_sign_in_method_used(app, provider):
+    # ADR 0019: someone who used the wrong Sign-in method can see that they did.
+    response = get_as(
+        app, provider, "/whoami", sub="waad|stranger", email="stranger@acme.example", connection="acme-entra"
+    )
+
+    assert response.status_code == 403
+    assert "acme-entra" in response.get_data(as_text=True)
 
 
 def sign_out_target(page, requested_path):
