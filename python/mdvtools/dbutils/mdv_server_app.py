@@ -409,6 +409,9 @@ def load_config(app, config_name=None, enable_auth=False):
                     app.config["AUTH0_PUBLIC_KEY_URI"] = os.getenv('AUTH0_PUBLIC_KEY_URI') or config.get('AUTH0_PUBLIC_KEY_URI')
                     app.config["AUTH0_AUDIENCE"] = os.getenv('AUTH0_AUDIENCE') or config.get('AUTH0_AUDIENCE')
                     app.config["AUTH0_DB_CONNECTION"] = os.getenv('AUTH0_DB_CONNECTION') or config.get('AUTH0_DB_CONNECTION')
+                    # Optional: comma-separated names of the site's Microsoft connections,
+                    # which the admin extension offers as Sign-in methods for Invitations.
+                    app.config["AUTH0_MICROSOFT_CONNECTIONS"] = os.getenv('AUTH0_MICROSOFT_CONNECTIONS') or config.get('AUTH0_MICROSOFT_CONNECTIONS')
                     # Optional: while the local database has zero users, a verified Auth0
                     # identity matching this email may bootstrap as the first administrator.
                     # Leave unset once bootstrap is no longer needed for this deployment.
