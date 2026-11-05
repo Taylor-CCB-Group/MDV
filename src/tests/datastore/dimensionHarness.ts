@@ -112,9 +112,7 @@ export function assertConsistent(ds: DataStore) {
             if (s === 1 || s === 3) excluding++;
         }
         if (ds.filterArray[i] !== excluding) {
-            throw new Error(
-                `row ${i}: parent count ${ds.filterArray[i]} but ${excluding} dimension(s) exclude it`,
-            );
+            throw new Error(`row ${i}: parent count ${ds.filterArray[i]} but ${excluding} dimension(s) exclude it`);
         }
         if (excluding === 0) passing++;
     }

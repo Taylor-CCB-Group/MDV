@@ -16,16 +16,11 @@ export function ChartProvider<T extends BaseConfig>({
     //DataStoreContext.Provider would be applied at a wider scope if we had a global root & portals.
     return (
         <ChartContext.Provider value={chart}>
-            <DataStoreContext.Provider value={chart.dataStore}>
-                {children}
-            </DataStoreContext.Provider>
+            <DataStoreContext.Provider value={chart.dataStore}>{children}</DataStoreContext.Provider>
         </ChartContext.Provider>
     );
 }
-export function useChart<
-    T extends BaseConfig,
-    C extends BaseChart<T> = BaseChart<T>,
->(): C {
+export function useChart<T extends BaseConfig, C extends BaseChart<T> = BaseChart<T>>(): C {
     const chart = useContext(ChartContext);
     if (!chart) throw new Error("no chart context");
     return chart as C;

@@ -71,9 +71,7 @@ export type XAxisColumn = {
  */
 export function stripSharedSubgroupSuffix(columns: XAxisColumn[]): string[] {
     const names = columns.map((c) => c.name);
-    const keys = new Set(
-        columns.map((c) => (c.inSubgroup ? c.field.split("|")[0] : null)),
-    );
+    const keys = new Set(columns.map((c) => (c.inSubgroup ? c.field.split("|")[0] : null)));
     if (keys.size !== 1) {
         return names;
     }
@@ -83,9 +81,7 @@ export function stripSharedSubgroupSuffix(columns: XAxisColumn[]): string[] {
     }
     const suffix = `(${key})`;
     return names.map((name) =>
-        name.endsWith(suffix) && name.length > suffix.length
-            ? name.slice(0, -suffix.length).trimEnd()
-            : name,
+        name.endsWith(suffix) && name.length > suffix.length ? name.slice(0, -suffix.length).trimEnd() : name,
     );
 }
 
@@ -94,12 +90,7 @@ export function stripSharedSubgroupSuffix(columns: XAxisColumn[]): string[] {
  * share a prefix (e.g. Ensembl ids) stay distinguishable. Binary-searches the
  * number of characters kept, since width grows with each character added.
  */
-export function truncateMiddle(
-    text: string,
-    maxWidth: number,
-    fontSize: number,
-    measure: MeasureText,
-): string {
+export function truncateMiddle(text: string, maxWidth: number, fontSize: number, measure: MeasureText): string {
     if (measure(text, fontSize) <= maxWidth) {
         return text;
     }
@@ -126,10 +117,7 @@ export function truncateMiddle(
  * the chart, are shortened from the middle; otherwise the margin grows to fit
  * the full labels.
  */
-export function layoutXLabels(
-    input: XLabelLayoutInput,
-    measure: MeasureText,
-): XLabelLayout {
+export function layoutXLabels(input: XLabelLayoutInput, measure: MeasureText): XLabelLayout {
     const { labels, plotLeft, chartHeight, titleSize, truncate } = input;
     const bandWidth = input.plotWidth / labels.length;
 
@@ -150,15 +138,10 @@ export function layoutXLabels(
         Math.min(X_MIN_FONT_SIZE, input.fontSize),
         Math.min(input.fontSize, spacing / X_LABEL_SPACING),
     );
-    const step = input.thin
-        ? Math.ceil((fontSize * X_LABEL_SPACING) / spacing)
-        : 1;
+    const step = input.thin ? Math.ceil((fontSize * X_LABEL_SPACING) / spacing) : 1;
 
     const fixed = X_TICK_OFFSET + fontSize * Math.SQRT1_2 + titleSize + X_LABEL_GAP;
-    const cap = Math.max(
-        fixed + fontSize,
-        Math.min(X_MARGIN_MAX_PX, Math.floor(chartHeight * X_MARGIN_MAX_FRACTION)),
-    );
+    const cap = Math.max(fixed + fontSize, Math.min(X_MARGIN_MAX_PX, Math.floor(chartHeight * X_MARGIN_MAX_FRACTION)));
     const capWidth = (cap - fixed) / Math.SQRT1_2;
     let longest = 0;
     const display = labels.map((label, i) => {
@@ -175,10 +158,7 @@ export function layoutXLabels(
         return text;
     });
     // without truncation, still leave room for the dots
-    const margin = Math.min(
-        fixed + longest * Math.SQRT1_2,
-        chartHeight * X_MARGIN_UNTRUNCATED_MAX_FRACTION,
-    );
+    const margin = Math.min(fixed + longest * Math.SQRT1_2, chartHeight * X_MARGIN_UNTRUNCATED_MAX_FRACTION);
     return { angle: 45, fontSize, margin: Math.ceil(margin), labels: display };
 }
 
@@ -196,10 +176,7 @@ export type FixedXLabelLayoutInput = XLabelLayoutInput & {
  * the left edge of the chart) at 45°. With `thin`, only every nth column is
  * labelled when labels would still overlap.
  */
-export function layoutFixedXLabels(
-    input: FixedXLabelLayoutInput,
-    measure: MeasureText,
-): XLabelLayout {
+export function layoutFixedXLabels(input: FixedXLabelLayoutInput, measure: MeasureText): XLabelLayout {
     const { labels, plotLeft, fontSize, titleSize, truncate, thin, angle, margin } = input;
     const bandWidth = input.plotWidth / labels.length;
 

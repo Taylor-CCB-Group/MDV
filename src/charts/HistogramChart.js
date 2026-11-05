@@ -37,10 +37,7 @@ class HistogramChart extends SVGChart {
                 return;
             }
             const offset = this.margins.left;
-            this.setRange(
-                this.x_scale.invert(s[0] - offset),
-                this.x_scale.invert(s[1] - offset),
-            );
+            this.setRange(this.x_scale.invert(s[0] - offset), this.x_scale.invert(s[1] - offset));
         });
 
         this._setBrushExtent();
@@ -57,18 +54,15 @@ class HistogramChart extends SVGChart {
         const oldPName = this.dataStore.getColumnName(this.config.param[0]);
         this.config.title = oldTitle === oldPName ? pname : oldTitle;
         this.config.axis.x.label = pname;
-        
-        this.config.param = params;        
+
+        this.config.param = params;
         this.onDataFiltered(); //the arguments! they do nothing!
     }
 
     _setBrushExtent() {
         this.brush.extent([
             [this.margins.left, 0],
-            [
-                this.width - this.margins.right,
-                this.height - this.margins.bottom,
-            ],
+            [this.width - this.margins.right, this.height - this.margins.bottom],
         ]);
         this.svg.call(this.brush);
     }
@@ -162,10 +156,7 @@ class HistogramChart extends SVGChart {
     }
 
     drawChart() {
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(400)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(400).ease(easeLinear);
         const cdim = this._getContentDimensions();
         const nBins = this.config.bin_number;
         const barWidth = (cdim.width - (nBins + 1) * 3) / nBins;

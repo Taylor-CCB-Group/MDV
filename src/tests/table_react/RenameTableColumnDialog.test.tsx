@@ -12,26 +12,12 @@ vi.mock("@/catalog/ProjectRenameModal", () => ({
 }));
 
 vi.mock("@mui/material", () => ({
-    Button: ({
-        children,
-        onClick,
-        color,
-    }: {
-        children: ReactNode;
-        onClick?: () => void;
-        color?: string;
-    }) => (
+    Button: ({ children, onClick, color }: { children: ReactNode; onClick?: () => void; color?: string }) => (
         <button type="button" data-color={color} onClick={onClick}>
             {children}
         </button>
     ),
-    Dialog: ({
-        children,
-        open,
-    }: {
-        children: ReactNode;
-        open: boolean;
-    }) => (open ? <div>{children}</div> : null),
+    Dialog: ({ children, open }: { children: ReactNode; open: boolean }) => (open ? <div>{children}</div> : null),
     DialogActions: ({ children }: { children: ReactNode }) => <div>{children}</div>,
     DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
     DialogTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -59,7 +45,8 @@ vi.mock("@mui/material", () => ({
                     onKeyDown?.({
                         key: event.key,
                         preventDefault: () => event.preventDefault(),
-                    })}
+                    })
+                }
             />
             {helperText ? <span>{helperText}</span> : null}
         </label>
@@ -70,13 +57,7 @@ vi.mock("@mui/material", () => ({
 describe("RenameTableColumnDialog", () => {
     test("prefills the current column name", () => {
         render(
-            <RenameTableColumnDialog
-                open
-                columnField="age"
-                initialName="Age"
-                onClose={vi.fn()}
-                onSubmit={vi.fn()}
-            />,
+            <RenameTableColumnDialog open columnField="age" initialName="Age" onClose={vi.fn()} onSubmit={vi.fn()} />,
         );
 
         expect(screen.getByDisplayValue("Age")).toBeDefined();
@@ -85,13 +66,7 @@ describe("RenameTableColumnDialog", () => {
     test("submits a valid rename", () => {
         const onSubmit = vi.fn();
         render(
-            <RenameTableColumnDialog
-                open
-                columnField="age"
-                initialName="Age"
-                onClose={vi.fn()}
-                onSubmit={onSubmit}
-            />,
+            <RenameTableColumnDialog open columnField="age" initialName="Age" onClose={vi.fn()} onSubmit={onSubmit} />,
         );
 
         fireEvent.change(screen.getByLabelText("Column Name"), {
@@ -109,13 +84,7 @@ describe("RenameTableColumnDialog", () => {
         const onClose = vi.fn();
         const onSubmit = vi.fn();
         render(
-            <RenameTableColumnDialog
-                open
-                columnField="age"
-                initialName="Age"
-                onClose={onClose}
-                onSubmit={onSubmit}
-            />,
+            <RenameTableColumnDialog open columnField="age" initialName="Age" onClose={onClose} onSubmit={onSubmit} />,
         );
 
         fireEvent.click(screen.getByRole("button", { name: "Rename" }));

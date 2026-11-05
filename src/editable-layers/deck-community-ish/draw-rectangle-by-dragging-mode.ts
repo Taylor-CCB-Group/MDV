@@ -3,72 +3,70 @@
 // Copyright (c) vis.gl contributors / Peter Todd
 
 import {
-  DrawPolygonByDraggingMode,
-  type DraggingEvent,
-  type Feature,
-  type ModeProps,
-  type Polygon,
-  type SimpleFeatureCollection,
-  type StopDraggingEvent,
+    DrawPolygonByDraggingMode,
+    type DraggingEvent,
+    type Feature,
+    type ModeProps,
+    type Polygon,
+    type SimpleFeatureCollection,
+    type StopDraggingEvent,
 } from "@deck.gl-community/editable-layers";
 
 /**
  * Draw a rectangle by dragging
- * 
+ *
  * !this is already a feature, we just needed to pass in `dragToDraw` in props...
  * leaving this for now, for review later, as the other version isn't an immediate drop-in replacement.
  */
 export class DrawRectangleByDraggingMode extends DrawPolygonByDraggingMode {
-  handleStopDragging(event: StopDraggingEvent, props: ModeProps<SimpleFeatureCollection>) {
-    // I don't think we want the clickSequence stuff from DrawPolygonByDraggingMode
-    // we should be safe to assume here that the last feature is the one we're working on
-    props.data.features[props.data.features.length - 1].properties = {};
-    props.onEdit({
-      updatedData: props.data,
-      editType: 'finishDrawingRectangle',
-      editContext: {
-        position: event.mapCoords
-      }
-    });
-  }
-
-  handleDraggingAux(event: DraggingEvent, props: ModeProps<SimpleFeatureCollection>) {
-    const p1 = event.pointerDownMapCoords;
-    const p2 = event.mapCoords;
-    const minX = Math.min(p1[0], p2[0]);
-    const minY = Math.min(p1[1], p2[1]);
-    const maxX = Math.max(p1[0], p2[0]);
-    const maxY = Math.max(p1[1], p2[1]);
-    const start = [minX, minY];
-    const end = [maxX, maxY];
-    const feature: Feature<Polygon> = {
-      type: "Feature",
-      properties: {
-        tentativeRectangle: true
-      },
-      geometry: {
-        type: "Polygon",
-        coordinates: [
-          [start, [end[0], start[1]], end, [start[0], end[1]], start]
-        ]
-      }
-    };
-    const features = [...props.data.features];
-    if (features.length > 0 && features[features.length - 1].properties?.tentativeRectangle) {
-      features[features.length - 1] = feature;
-    } else {
-      features.push(feature);
+    handleStopDragging(event: StopDraggingEvent, props: ModeProps<SimpleFeatureCollection>) {
+        // I don't think we want the clickSequence stuff from DrawPolygonByDraggingMode
+        // we should be safe to assume here that the last feature is the one we're working on
+        props.data.features[props.data.features.length - 1].properties = {};
+        props.onEdit({
+            updatedData: props.data,
+            editType: "finishDrawingRectangle",
+            editContext: {
+                position: event.mapCoords,
+            },
+        });
     }
-    const updatedData = {
-      ...props.data,
-      features
-    };
-    props.onEdit({
-      updatedData,
-      editType: 'setTentativeRectangle',
-      editContext: {
-        position: event.mapCoords
-      }
-    });
-  }
+
+    handleDraggingAux(event: DraggingEvent, props: ModeProps<SimpleFeatureCollection>) {
+        const p1 = event.pointerDownMapCoords;
+        const p2 = event.mapCoords;
+        const minX = Math.min(p1[0], p2[0]);
+        const minY = Math.min(p1[1], p2[1]);
+        const maxX = Math.max(p1[0], p2[0]);
+        const maxY = Math.max(p1[1], p2[1]);
+        const start = [minX, minY];
+        const end = [maxX, maxY];
+        const feature: Feature<Polygon> = {
+            type: "Feature",
+            properties: {
+                tentativeRectangle: true,
+            },
+            geometry: {
+                type: "Polygon",
+                coordinates: [[start, [end[0], start[1]], end, [start[0], end[1]], start]],
+            },
+        };
+        const features = [...props.data.features];
+        if (features.length > 0 && features[features.length - 1].properties?.tentativeRectangle) {
+            features[features.length - 1] = feature;
+        } else {
+            features.push(feature);
+        }
+        const updatedData = {
+            ...props.data,
+            features,
+        };
+        props.onEdit({
+            updatedData,
+            editType: "setTentativeRectangle",
+            editContext: {
+                position: event.mapCoords,
+            },
+        });
+    }
 }

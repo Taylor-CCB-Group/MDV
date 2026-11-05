@@ -50,10 +50,7 @@ class ContextMenu {
         }
         this.menus = [];
         if (this.removeFunc) {
-            this._getDocument().removeEventListener(
-                "click",
-                this.removeFunc,
-            );
+            this._getDocument().removeEventListener("click", this.removeFunc);
         }
     }
 
@@ -128,11 +125,7 @@ class ContextMenu {
         }
         if (item.subitems) {
             const caret = document.createElement("i");
-            caret.classList.add(
-                "fas",
-                "fa-caret-right",
-                "ciview-ctm-right-icon",
-            );
+            caret.classList.add("fas", "fa-caret-right", "ciview-ctm-right-icon");
             el.appendChild(caret);
         }
         el.addEventListener("click", (e) => {

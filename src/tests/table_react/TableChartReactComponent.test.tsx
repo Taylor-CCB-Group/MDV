@@ -26,8 +26,7 @@ vi.mock("@/react/components/BulkEditColumnDialog", () => ({
 }));
 
 vi.mock("@/react/components/RenameTableColumnDialog", () => ({
-    default: ({ open }: { open: boolean }) =>
-        open ? <div data-testid="mock-rename-column-dialog" /> : null,
+    default: ({ open }: { open: boolean }) => (open ? <div data-testid="mock-rename-column-dialog" /> : null),
 }));
 
 vi.mock("@/react/components/ColumnRemovalImpactDialog", () => ({

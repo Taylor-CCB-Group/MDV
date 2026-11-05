@@ -134,8 +134,7 @@ export function getSharedSplatterViewState(
 
     const dx = maxX - minX;
     const dy = maxY - minY;
-    const epsilon =
-        Math.max(1e-9, Math.min(Math.abs(minX), Math.abs(maxX), Math.abs(minY), Math.abs(maxY), 1) * 1e-6);
+    const epsilon = Math.max(1e-9, Math.min(Math.abs(minX), Math.abs(maxX), Math.abs(minY), Math.abs(maxY), 1) * 1e-6);
     const safeDx = Math.max(dx, epsilon);
     const safeDy = Math.max(dy, epsilon);
     const paddedWidth = Math.max(cellWidth * 0.82, 1);

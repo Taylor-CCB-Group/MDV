@@ -10,11 +10,7 @@ import {
 
 import { hexToRGB, RGBToHex } from "../datastore/DataStore.js";
 import { Deck } from "@deck.gl/core";
-import {
-    getMultiSelectionStats,
-    getDefaultSelectionStats,
-    getBoundingCube,
-} from "../utilities/VivUtils.js";
+import { getMultiSelectionStats, getDefaultSelectionStats, getBoundingCube } from "../utilities/VivUtils.js";
 import { ScatterplotLayer } from "deck.gl";
 import { getRandomString } from "../utilities/Utilities";
 
@@ -58,9 +54,7 @@ class VivViewerMDV {
                 console.log(e);
                 const ctx = this.canvas.getContext("2d");
                 ctx.font = "20px Arial";
-                this.canvas
-                    .getContext("2d")
-                    .fillText("Error loading data", 10, 20);
+                this.canvas.getContext("2d").fillText("Error loading data", 10, 20);
             });
     }
 
@@ -217,12 +211,7 @@ class VivViewerMDV {
     _createLayers3D() {
         const tiff = this.tiff;
         //most of this can move into createLayers()
-        const {
-            SizeX,
-            SizeY,
-            SizeZ,
-            Channels: channels,
-        } = tiff.metadata.Pixels;
+        const { SizeX, SizeY, SizeZ, Channels: channels } = tiff.metadata.Pixels;
         const target = [SizeX / 2, SizeY / 2, SizeZ / 2];
         const id = `3d_${DETAIL_VIEW_ID}`;
         const loader = tiff.data;
@@ -231,10 +220,7 @@ class VivViewerMDV {
         // const selections = channels.map((_, i) => {return {c: i, t: 0, z: 0}});
         const dtype = tiff.data[0].dtype;
         const { domains, contrastLimits, selections, colors, channelsVisible } =
-            this.newVivProps ??
-            (this.mainVivLayer
-                ? this.mainVivLayer.props
-                : getDefaultSelectionStats(n));
+            this.newVivProps ?? (this.mainVivLayer ? this.mainVivLayer.props : getDefaultSelectionStats(n));
         this.newVivProps = null;
         if (!this.hasRequestedDefaultChannelStats) {
             this.hasRequestedDefaultChannelStats = true;
@@ -353,26 +339,18 @@ class VivViewerMDV {
         for (const item of conf) {
             const chan = this.channels.findIndex((x) => x.Name === item.name);
             if (chan === -1) {
-                console.warn(
-                    `channel '${item.name}' not found, uniforms housekeeping will be a bit messed up`,
-                );
+                console.warn(`channel '${item.name}' not found, uniforms housekeeping will be a bit messed up`);
                 continue;
             }
             nconf.selections.push({ z: 0, t: 0, c: chan });
             let c = item.color;
-            c = c
-                ? typeof item.color === "string"
-                    ? hexToRGB(c)
-                    : c
-                : def_colors[c_index];
+            c = c ? (typeof item.color === "string" ? hexToRGB(c) : c) : def_colors[c_index];
             c_index++;
             if (c_index >= def_colors.length) {
                 c_index = 0;
             }
             nconf.colors.push(c);
-            nconf.channelsVisible.push(
-                item.visible === undefined ? true : item.visible,
-            );
+            nconf.channelsVisible.push(item.visible === undefined ? true : item.visible);
             nconf.contrastLimits.push(item.contrastLimits || null);
             nconf.domains.push(item.domains || null);
         }
@@ -402,11 +380,7 @@ class VivViewerMDV {
         this.channels = loader.metadata.Pixels.Channels;
         this.loader = loader.data;
         this.transparentColor = [255, 255, 255, 0];
-        const baseViewState = this.getViewState(
-            iv.x_scale,
-            iv.y_scale,
-            iv.offset,
-        );
+        const baseViewState = this.getViewState(iv.x_scale, iv.y_scale, iv.offset);
 
         if (use3d) {
             // this._setUpVolumeView(loader);
@@ -420,15 +394,12 @@ class VivViewerMDV {
                 id: DETAIL_VIEW_ID,
                 useFixedAxis: false,
                 target,
-                extensions: [
-                    new ColorPalette3DExtensions.AdditiveBlendExtension(),
-                ],
+                extensions: [new ColorPalette3DExtensions.AdditiveBlendExtension()],
             });
         } else {
             this.detailView = new DetailView({
                 id: DETAIL_VIEW_ID,
-                height:
-                    this.native_y > this.height ? this.native_y : this.height,
+                height: this.native_y > this.height ? this.native_y : this.height,
                 width: this.native_x > this.width ? this.native_x : this.width,
             });
         }
@@ -447,10 +418,7 @@ class VivViewerMDV {
         //check if there are any channels without contrast limits and get default values
         const contrastLimitsToGet = [];
         for (let n = 0; n < image_properties.contrastLimits.length; n++) {
-            if (
-                image_properties.contrastLimits[n] &&
-                image_properties.domains[n]
-            ) {
+            if (image_properties.contrastLimits[n] && image_properties.domains[n]) {
                 continue;
             }
             contrastLimitsToGet.push({
@@ -461,8 +429,7 @@ class VivViewerMDV {
         //get the default values and continue the set up
         this.getDefaultChannelValues(contrastLimitsToGet).then((data) => {
             for (const d of data) {
-                image_properties.contrastLimits[d.index] =
-                    d.stats.contrastLimits;
+                image_properties.contrastLimits[d.index] = d.stats.contrastLimits;
                 image_properties.domains[d.index] = d.stats.domain;
             }
             this.createLayers(image_properties);
@@ -486,9 +453,7 @@ class VivViewerMDV {
     async getDefaultChannelValues(selections) {
         return await Promise.all(
             selections.map(async (s) => {
-                const data = await this.loader[
-                    this.loader.length - 1
-                ].getRaster({ selection: s.sel });
+                const data = await this.loader[this.loader.length - 1].getRaster({ selection: s.sel });
                 return { index: s.index, stats: getChannelStats(data.data) };
             }),
         );
@@ -513,10 +478,8 @@ class VivViewerMDV {
             extensions: this.extensions,
             transparentColor: this.transparentColor,
         };
-        if (!this.defaultDomains)
-            this.defaultDomains = layerConfig.contrastLimits; //PJT somewhat tested
-        if (!this.defaultContrastLimits)
-            this.defaultContrastLimits = this.defaultDomains.slice(0);
+        if (!this.defaultDomains) this.defaultDomains = layerConfig.contrastLimits; //PJT somewhat tested
+        if (!this.defaultContrastLimits) this.defaultContrastLimits = this.defaultDomains.slice(0);
         this.layers = this.detailView.getLayers({
             viewStates,
             props: layerConfig,

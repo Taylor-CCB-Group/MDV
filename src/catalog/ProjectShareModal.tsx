@@ -186,36 +186,44 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell>Shared Users</TableCell>
-                                                {operationPermissions.editUserPermissions && <TableCell>Permission</TableCell>}
-                                                {operationPermissions.removeUserFromProject && <TableCell align="right">Remove</TableCell>}
+                                                {operationPermissions.editUserPermissions && (
+                                                    <TableCell>Permission</TableCell>
+                                                )}
+                                                {operationPermissions.removeUserFromProject && (
+                                                    <TableCell align="right">Remove</TableCell>
+                                                )}
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {sharedUsers.map((user) => (
                                                 <TableRow key={user.id}>
                                                     <TableCell>{user.email}</TableCell>
-                                                    {operationPermissions.editUserPermissions && <TableCell>
-                                                        <Select
-                                                            value={user.permission}
-                                                            size="small"
-                                                            fullWidth
-                                                            onChange={(e) =>
-                                                                handlePermissionChange(
-                                                                    e.target.value as UserPermission,
-                                                                    user.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            <MenuItem value="View">View</MenuItem>
-                                                            <MenuItem value="Edit">Edit</MenuItem>
-                                                            <MenuItem value="Owner">Owner</MenuItem>
-                                                        </Select>
-                                                    </TableCell>}
-                                                    {operationPermissions.removeUserFromProject && <TableCell align="right">
-                                                        <IconButton onClick={() => handleDeleteUser(user.id)}>
-                                                            <DeleteIcon />
-                                                        </IconButton>
-                                                    </TableCell>}
+                                                    {operationPermissions.editUserPermissions && (
+                                                        <TableCell>
+                                                            <Select
+                                                                value={user.permission}
+                                                                size="small"
+                                                                fullWidth
+                                                                onChange={(e) =>
+                                                                    handlePermissionChange(
+                                                                        e.target.value as UserPermission,
+                                                                        user.id,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <MenuItem value="View">View</MenuItem>
+                                                                <MenuItem value="Edit">Edit</MenuItem>
+                                                                <MenuItem value="Owner">Owner</MenuItem>
+                                                            </Select>
+                                                        </TableCell>
+                                                    )}
+                                                    {operationPermissions.removeUserFromProject && (
+                                                        <TableCell align="right">
+                                                            <IconButton onClick={() => handleDeleteUser(user.id)}>
+                                                                <DeleteIcon />
+                                                            </IconButton>
+                                                        </TableCell>
+                                                    )}
                                                 </TableRow>
                                             ))}
                                         </TableBody>

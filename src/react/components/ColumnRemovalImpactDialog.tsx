@@ -1,8 +1,4 @@
-import type {
-    ChartColumnImpact,
-    ColumnRemovalImpact,
-    SavedViewColumnImpact,
-} from "@/charts/types/columnRemoval";
+import type { ChartColumnImpact, ColumnRemovalImpact, SavedViewColumnImpact } from "@/charts/types/columnRemoval";
 import {
     Accordion,
     AccordionDetails,
@@ -83,9 +79,7 @@ function getUsageBadgeLabel(chart: ChartColumnImpact) {
 function SectionHeader({ count, title }: { count: number; title: string }) {
     return (
         <Stack alignItems="center" direction="row" spacing={1.25}>
-            <Typography fontWeight={700}>
-                {title}
-            </Typography>
+            <Typography fontWeight={700}>{title}</Typography>
             <Box
                 sx={{
                     minWidth: 20,
@@ -126,8 +120,7 @@ function ChartImpactCard({
                 borderRadius: 1.25,
                 px: 2,
                 py: 1.75,
-                bgcolor: (theme) =>
-                    theme.palette.mode === "dark" ? theme.palette.grey[800] : theme.palette.grey[50],
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? theme.palette.grey[800] : theme.palette.grey[50]),
             }}
         >
             <Stack
@@ -138,12 +131,7 @@ function ChartImpactCard({
             >
                 <Stack minWidth={0} spacing={0.35} sx={{ flex: 1 }}>
                     <Stack alignItems="center" direction="row" minWidth={0} spacing={1}>
-                        <Typography
-                            fontWeight={700}
-                            noWrap
-                            title={fullPrimaryLabel}
-                            sx={{ minWidth: 0 }}
-                        >
+                        <Typography fontWeight={700} noWrap title={fullPrimaryLabel} sx={{ minWidth: 0 }}>
                             {primaryLabel}
                         </Typography>
                         {secondaryLabel ? (
@@ -273,13 +261,7 @@ function ChartImpactCard({
     );
 }
 
-function ChartImpactList({
-    charts,
-    title,
-}: {
-    charts: ChartColumnImpact[];
-    title: string;
-}) {
+function ChartImpactList({ charts, title }: { charts: ChartColumnImpact[]; title: string }) {
     if (charts.length === 0) {
         return null;
     }
@@ -288,10 +270,7 @@ function ChartImpactList({
         <Stack spacing={1}>
             <SectionHeader count={charts.length} title={title} />
             {charts.map((chart) => (
-                <ChartImpactCard
-                    key={`${chart.chartId ?? chart.chartTitle}-${chart.chartType}`}
-                    chart={chart}
-                />
+                <ChartImpactCard key={`${chart.chartId ?? chart.chartTitle}-${chart.chartType}`} chart={chart} />
             ))}
         </Stack>
     );
@@ -424,16 +403,12 @@ export default function ColumnRemovalImpactDialog({
                 },
             }}
         >
-            <DialogTitle>
-                {impact ? `Delete Column "${impact.columnName}"` : "Delete Column"}
-            </DialogTitle>
+            <DialogTitle>{impact ? `Delete Column "${impact.columnName}"` : "Delete Column"}</DialogTitle>
             <DialogContent dividers>
                 <Stack spacing={2}>
                     <Alert severity={"error"}>
                         <Typography fontWeight={700} variant="body1">
-                            {isBlocked
-                                ? "Deletion is blocked."
-                                : "Are you sure you want to delete this column?"}
+                            {isBlocked ? "Deletion is blocked." : "Are you sure you want to delete this column?"}
                         </Typography>
                         <Typography sx={{ mt: 0.75 }} variant="body1">
                             {isBlocked
@@ -444,11 +419,7 @@ export default function ColumnRemovalImpactDialog({
 
                     <ChartImpactList charts={currentViewCharts} title="Current View" />
 
-                    <SavedViewImpactGroup
-                        onOpenView={onOpenView}
-                        savedViews={savedViews}
-                        title="Other Views"
-                    />
+                    <SavedViewImpactGroup onOpenView={onOpenView} savedViews={savedViews} title="Other Views" />
                 </Stack>
             </DialogContent>
             <DialogActions>

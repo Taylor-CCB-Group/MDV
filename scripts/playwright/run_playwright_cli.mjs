@@ -50,10 +50,6 @@ await new Promise((resolve, reject) => {
         );
     });
     child.on("error", (error) => {
-        reject(
-            new Error(
-                `Unable to launch Playwright CLI: ${error instanceof Error ? error.message : String(error)}`,
-            ),
-        );
+        reject(new Error(`Unable to launch Playwright CLI: ${error instanceof Error ? error.message : String(error)}`));
     });
 });

@@ -105,7 +105,8 @@ export function contourToDensityProps(
         modelMatrix?: Matrix4 | null;
     },
 ): DensityLayerProps {
-    const { id, x, y, data, getWeight, weightKey, bandwidth, fillOpacity, contourOpacity, contourFill, colorRange } = props;
+    const { id, x, y, data, getWeight, weightKey, bandwidth, fillOpacity, contourOpacity, contourFill, colorRange } =
+        props;
     // radiusPixels / 6 screen pixels, and `radiusPixels = 30 · bandwidth · 2^zoom`: 5 · bandwidth world units.
     const sigma = (5 * bandwidth) / modelMatrixScale(props.modelMatrix);
     const perDensity = HEATMAP_WEIGHT_PER_DENSITY * sigma * sigma;

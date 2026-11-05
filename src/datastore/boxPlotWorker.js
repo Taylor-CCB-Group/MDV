@@ -90,18 +90,9 @@ onmessage = function (e) {
         for (let n = 0; n < catLen; n++) {
             let k = null;
             if (config.scaletrim) {
-                k = stKernelDensityEstimator(
-                    arrs[n],
-                    config.ticks,
-                    config.scaletrim,
-                    config.bandwidth || 7,
-                );
+                k = stKernelDensityEstimator(arrs[n], config.ticks, config.scaletrim, config.bandwidth || 7);
             } else {
-                k = kernelDensityEstimator(
-                    arrs[n],
-                    config.ticks,
-                    config.bandwidth || 7,
-                );
+                k = kernelDensityEstimator(arrs[n], config.ticks, config.bandwidth || 7);
             }
 
             const max = Math.max(...k);
@@ -169,11 +160,7 @@ function kernelDensityEstimator(V, X, k = 2) {
 function multiBoxPlot(e) {
     const data = [];
     for (const item of e.data[2]) {
-        data.push(
-            item[1] === "int32"
-                ? new Int32Array(item[0])
-                : new Float32Array(item[0]),
-        );
+        data.push(item[1] === "int32" ? new Int32Array(item[0]) : new Float32Array(item[0]));
     }
     const dLen = data.length;
     const config = e.data[4];

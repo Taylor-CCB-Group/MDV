@@ -1,10 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-    dateTickFormat,
-    formatDateDays,
-    isDateColumn,
-    parseDateDays,
-} from "@/lib/dateFormat";
+import { dateTickFormat, formatDateDays, isDateColumn, parseDateDays } from "@/lib/dateFormat";
 
 describe("dateFormat", () => {
     test("formatDateDays formats UTC epoch days as YYYY-MM-DD", () => {

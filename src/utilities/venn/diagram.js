@@ -1,11 +1,5 @@
 import { select } from "d3";
-import {
-    venn,
-    lossFunction,
-    normalizeSolution,
-    scaleSolution,
-    nelderMead,
-} from "./layout.js";
+import { venn, lossFunction, normalizeSolution, scaleSolution, nelderMead } from "./layout.js";
 import { intersectionArea, distance, getCenter } from "./circleintersection.js";
 
 /*global console:true*/
@@ -64,9 +58,7 @@ export function VennDiagram() {
                 toremove[datum.sets[0]] = 1;
             }
         });
-        data = data.filter(
-            (datum) => !datum.sets.some((set) => set in toremove),
-        );
+        data = data.filter((datum) => !datum.sets.some((set) => set in toremove));
 
         let circles = {};
         let textCentres = {};
@@ -75,11 +67,7 @@ export function VennDiagram() {
             let solution = layoutFunction(data, { lossFunction: loss });
 
             if (normalize) {
-                solution = normalizeSolution(
-                    solution,
-                    orientation,
-                    orientationOrder,
-                );
+                solution = normalizeSolution(solution, orientation, orientationOrder);
             }
 
             circles = scaleSolution(solution, width, height, padding);
@@ -107,10 +95,7 @@ export function VennDiagram() {
         // create svg if not already existing
         selection.selectAll("svg").data([circles]).enter().append("svg");
 
-        const svg = selection
-            .select("svg")
-            .attr("width", width)
-            .attr("height", height);
+        const svg = selection.select("svg").attr("width", width).attr("height", height);
 
         // to properly transition intersection areas, we need the
         // previous circles locations. load from elements
@@ -152,11 +137,7 @@ export function VennDiagram() {
         const enter = nodes
             .enter()
             .append("g")
-            .attr(
-                "class",
-                (d) =>
-                    `venn-area venn-${d.sets.length === 1 ? "circle" : "intersection"}`,
-            )
+            .attr("class", (d) => `venn-area venn-${d.sets.length === 1 ? "circle" : "intersection"}`)
             .attr("data-venn-sets", (d) => d.sets.join("_"));
 
         const enterPath = enter.append("path");
@@ -177,9 +158,7 @@ export function VennDiagram() {
                 .style("fill", (d) => colours(d.sets))
                 .style("fill-opacity", ".25");
 
-            enterText.style("fill", (d) =>
-                d.sets.length === 1 ? colours(d.sets) : "#444",
-            );
+            enterText.style("fill", (d) => (d.sets.length === 1 ? colours(d.sets) : "#444"));
         }
 
         // update existing, using pathTween if necessary
@@ -188,11 +167,7 @@ export function VennDiagram() {
             update = selection.transition("venn").duration(duration);
             update.selectAll("path").attrTween("d", pathTween);
         } else {
-            update
-                .selectAll("path")
-                .attr("d", (d) =>
-                    intersectionAreaPath(d.sets.map((set) => circles[set])),
-                );
+            update.selectAll("path").attr("d", (d) => intersectionAreaPath(d.sets.map((set) => circles[set])));
         }
 
         const updateText = update
@@ -217,11 +192,7 @@ export function VennDiagram() {
         }
 
         // remove old
-        const exit = nodes
-            .exit()
-            .transition("venn")
-            .duration(duration)
-            .remove();
+        const exit = nodes.exit().transition("venn").duration(duration).remove();
         exit.selectAll("path").attrTween("d", pathTween);
 
         const exitText = exit
@@ -357,10 +328,7 @@ export function wrapText(circles, labeller) {
             line.push(word);
             joined = line.join(" ");
             tspan.text(joined);
-            if (
-                joined.length > minChars &&
-                tspan.node().getComputedTextLength() > width
-            ) {
+            if (joined.length > minChars && tspan.node().getComputedTextLength() > width) {
                 line.pop();
                 tspan.text(line.join(" "));
                 line = [word];

@@ -33,10 +33,7 @@ class BoxPlot extends ViolinPlot {
     }
 
     drawChart() {
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(400)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(400).ease(easeLinear);
         const catLen = this.data.length;
         const yscale = this.y_scale;
         const values = [];

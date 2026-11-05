@@ -74,12 +74,12 @@ export function useFilteredGroupedSettings(rawSettings: AnyGuiSpec[], searchTerm
         const wrappedTopLevelSettings: StableGuiSpec[] =
             groupedSettings.topLevelSettings.length > 0
                 ? [
-                    {
-                        type: "folder",
-                        label: "General",
-                        current_value: groupedSettings.topLevelSettings,
-                    },
-                ]
+                      {
+                          type: "folder",
+                          label: "General",
+                          current_value: groupedSettings.topLevelSettings,
+                      },
+                  ]
                 : [];
 
         const settings = [...wrappedTopLevelSettings, ...groupedSettings.folderSettings] as StableGuiSpec[];
@@ -93,17 +93,14 @@ export function useFilteredGroupedSettings(rawSettings: AnyGuiSpec[], searchTerm
     }, [topLevelSettings, searchTerm]);
 
     return useMemo(() => {
-        const settings = filteredSettings.map(
-            (setting) => ({
-                setting,
-                // Stable across filtering/search transitions.
-                id: setting._stableId || `${setting.type}:${setting.label}`,
-            }),
-        );
+        const settings = filteredSettings.map((setting) => ({
+            setting,
+            // Stable across filtering/search transitions.
+            id: setting._stableId || `${setting.type}:${setting.label}`,
+        }));
 
         const wrap = { settings };
         makeAutoObservable(wrap);
         return wrap.settings;
     }, [filteredSettings]);
 }
-

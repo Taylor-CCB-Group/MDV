@@ -118,9 +118,7 @@ describe("DataStore soft delete", () => {
 
     test("persists soft-delete metadata even when the column metadata entry is missing", () => {
         const store = createStore();
-        store.config.columns = store.config.columns.filter(
-            (column: { field: string }) => column.field !== "temp",
-        );
+        store.config.columns = store.config.columns.filter((column: { field: string }) => column.field !== "temp");
 
         store.softDeleteColumn("temp", true, true);
 
@@ -147,9 +145,7 @@ describe("DataStore soft delete", () => {
         delete store.columnIndex.temp;
         store.columns = [];
         store.columnsWithData = [];
-        store.config.columns = store.config.columns.filter(
-            (column: { field: string }) => column.field !== "temp",
-        );
+        store.config.columns = store.config.columns.filter((column: { field: string }) => column.field !== "temp");
 
         store.softDeleteColumn("temp", true, true);
 

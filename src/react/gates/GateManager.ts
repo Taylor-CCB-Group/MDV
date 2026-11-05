@@ -324,9 +324,7 @@ export class GateManager {
 
         const gateRegion = gate.region;
         const regionField = this.dataStore.regions?.region_field;
-        const regionCol = gateRegion !== undefined && regionField
-            ? this.dataStore.columnIndex[regionField]
-            : null;
+        const regionCol = gateRegion !== undefined && regionField ? this.dataStore.columnIndex[regionField] : null;
 
         // If region column isn't loaded, skip
         if (gateRegion !== undefined && !regionCol?.data) return;

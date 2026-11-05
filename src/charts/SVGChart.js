@@ -10,12 +10,9 @@ import { dateTickFormat } from "@/lib/dateFormat";
 class SVGChart extends BaseChart {
     constructor(dataStore, div, config, axisTypes = {}) {
         super(dataStore, div, config);
-        this.svg = select(this.contentDiv)
-            .append("svg")
-            .attr("width", this.width)
-            .attr("height", this.height);
+        this.svg = select(this.contentDiv).append("svg").attr("width", this.width).attr("height", this.height);
 
-        // axis stuff for ref... could be handled differently, 
+        // axis stuff for ref... could be handled differently,
         // - outside constructor to respond to config changes etc.
         // - in a react component.
         //  ^ could we change this base to use react here? risky, interesting to try.
@@ -45,12 +42,7 @@ class SVGChart extends BaseChart {
             }
         }
         this._setMargins();
-        this.graph_area = this.svg
-            .append("g")
-            .attr(
-                "transform",
-                `translate(${this.margins.left},${this.margins.top})`,
-            );
+        this.graph_area = this.svg.append("g").attr("transform", `translate(${this.margins.left},${this.margins.top})`);
         this.ry_axis_svg = this.svg.append("g");
         this.tx_axis_svg = this.svg.append("g");
         this.x_axis_svg = this.svg.append("g");
@@ -119,9 +111,7 @@ class SVGChart extends BaseChart {
         if (!field || typeof field !== "string") {
             return null;
         }
-        const col =
-            this.dataStore.columnIndex[field] ??
-            this.dataStore.config?.columns?.find((c) => c.field === field);
+        const col = this.dataStore.columnIndex[field] ?? this.dataStore.config?.columns?.find((c) => c.field === field);
         if (!col) {
             return null;
         }
@@ -167,7 +157,7 @@ class SVGChart extends BaseChart {
 
     /**
      * Set the size of an axis
-     * @param {"tx" | "ry" | "x" | "y"} axis - the axis to set the size of. 
+     * @param {"tx" | "ry" | "x" | "y"} axis - the axis to set the size of.
      * `'tx'` is the top x-axis, `'ry'` is the right y-axis (in Sankey chart), `'x'` is the bottom x-axis, `'y'` is the left y-axis.
      * Top and right axes apply to specific chart types.
      * @param {number} size - the size in px to set the axis to
@@ -192,25 +182,16 @@ class SVGChart extends BaseChart {
                 this.config.axis.x.size = size;
                 this.margins.bottom = size;
         }
-        this.graph_area.attr(
-            "transform",
-            `translate(${this.margins.left},${this.margins.top})`,
-        );
+        this.graph_area.attr("transform", `translate(${this.margins.left},${this.margins.top})`);
     }
 
     updateAxis() {
         const dim = this._getContentDimensions();
         const ax = this.config.axis;
 
-        this.ry_axis_svg.attr(
-            "transform",
-            `translate(${dim.left + dim.width},${dim.top})`,
-        );
+        this.ry_axis_svg.attr("transform", `translate(${dim.left + dim.width},${dim.top})`);
         this.tx_axis_svg.attr("transform", `translate(${dim.left},0)`);
-        this.x_axis_svg.attr(
-            "transform",
-            `translate(${dim.left},${this.height - this.margins.bottom})`,
-        );
+        this.x_axis_svg.attr("transform", `translate(${dim.left},${this.height - this.margins.bottom})`);
         this.y_axis_svg.attr("transform", `translate(${dim.left},${dim.top})`);
         if (ax.x) {
             if (this.x_scale) {
@@ -219,9 +200,7 @@ class SVGChart extends BaseChart {
                 if (this._isLinearScale(this.x_scale) && this.x_axis_call) {
                     this._applyDateTickFormat("x", this.x_axis_call);
                 }
-                this.x_axis_svg
-                    .selectAll(".tick text")
-                    .attr("font-family", "Helvetica");
+                this.x_axis_svg.selectAll(".tick text").attr("font-family", "Helvetica");
                 this.x_axis_svg.transition().call(this.x_axis_call);
                 if (ax.x.rotate_labels) {
                     this.x_axis_svg
@@ -238,9 +217,7 @@ class SVGChart extends BaseChart {
                         .attr("dy", ".71em")
                         .attr("transform", null);
                 }
-                this.x_axis_svg
-                    .selectAll(".tick text")
-                    .attr("font-size", ax.x.tickfont);
+                this.x_axis_svg.selectAll(".tick text").attr("font-size", ax.x.tickfont);
             }
             this.x_axis_label
                 .attr("x", dim.width / 2)
@@ -255,9 +232,7 @@ class SVGChart extends BaseChart {
                 this.y_scale.range([0, dim.height]);
                 const tinterval = dim.height / this.y_scale.domain().length;
                 if (tinterval < 8) {
-                    const ii = Math.round(
-                        this.y_scale.domain().length / (dim.height / 10),
-                    );
+                    const ii = Math.round(this.y_scale.domain().length / (dim.height / 10));
                     this.y_axis_call.tickFormat((d, i) => {
                         return i % ii === 0 ? d : "";
                     });
@@ -315,10 +290,7 @@ class SVGChart extends BaseChart {
     }
 
     drawXTree(nodeData, number, height, offset) {
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(400)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(400).ease(easeLinear);
         const b = this._getContentDimensions();
         const treeMap = cluster().size([b.width, height]);
         const nodes = treeMap(nodeData);
@@ -333,9 +305,7 @@ class SVGChart extends BaseChart {
             if (!n.children) {
                 let i = n.parent;
                 while (i) {
-                    i.x =
-                        i.children[0].x +
-                        (i.children[1].x - i.children[0].x) / 2;
+                    i.x = i.children[0].x + (i.children[1].x - i.children[0].x) / 2;
                     i = i.parent;
                 }
             }
@@ -361,10 +331,7 @@ class SVGChart extends BaseChart {
 
     drawYTree(nodeData, number) {
         // trans
-        select(this.contentDiv)
-            .transition()
-            .duration(400)
-            .ease(easeLinear);
+        select(this.contentDiv).transition().duration(400).ease(easeLinear);
         const b = this._getContentDimensions();
         const width = this.margins.right;
         const treeMap = cluster().size([b.height, width]);
@@ -380,9 +347,7 @@ class SVGChart extends BaseChart {
             if (!n.children) {
                 let i = n.parent;
                 while (i) {
-                    i.x =
-                        i.children[0].x +
-                        (i.children[1].x - i.children[0].x) / 2;
+                    i.x = i.children[0].x + (i.children[1].x - i.children[0].x) / 2;
                     i = i.parent;
                 }
             }
@@ -508,12 +473,14 @@ class SVGChart extends BaseChart {
                 ]);
             }
         }
-        return settings.concat([{
-            type: "folder",
-            label: "Axis controls",
-            current_value: arr,
-            func: (x) => {},
-        }]);
+        return settings.concat([
+            {
+                type: "folder",
+                label: "Axis controls",
+                current_value: arr,
+                func: (x) => {},
+            },
+        ]);
     }
 
     _addLegendToSVG(param) {
@@ -523,10 +490,7 @@ class SVGChart extends BaseChart {
         }
         const cl = [legend.offsetLeft, legend.offsetTop];
         legend._leg = legend.querySelector("g");
-        legend._leg_g = select(legend._leg).attr(
-            "transform",
-            `translate(${cl[0]},${cl[1]})`,
-        );
+        legend._leg_g = select(legend._leg).attr("transform", `translate(${cl[0]},${cl[1]})`);
         this.svg.node().append(legend._leg_g.node());
     }
 
@@ -562,9 +526,7 @@ class SVGChart extends BaseChart {
                 }
                 this._removeLegendFromSVG("legend");
                 if (this.extra_legends) {
-                    this.extra_legends.forEach((x) =>
-                        this._removeLegendFromSVG(x),
-                    );
+                    this.extra_legends.forEach((x) => this._removeLegendFromSVG(x));
                 }
             });
         } else {

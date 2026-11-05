@@ -87,7 +87,11 @@ describe("LayerFailureTracker", () => {
     it("attributes deck layer errors by layer id, or to the canvas, keeping their stacks", () => {
         const shaderError = new Error("shader failed");
         tracker.layer(shaderError, `${POINTS}-#spatial-detail-x#-scatter`);
-        expect(fail).toHaveBeenCalledWith(POINTS, { reason: "shader failed", source: "deck", stack: shaderError.stack });
+        expect(fail).toHaveBeenCalledWith(POINTS, {
+            reason: "shader failed",
+            source: "deck",
+            stack: shaderError.stack,
+        });
         const unattributed = new Error("no layer");
         tracker.layer(unattributed, undefined);
         expect(canvas).toHaveBeenCalledWith("no layer", unattributed.stack);

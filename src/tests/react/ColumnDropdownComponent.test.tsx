@@ -21,11 +21,10 @@ describe("getSelectableColumns", () => {
             },
         ] as any;
 
-        expect(
-            getSelectableColumns(columns, ["text", "text16", "multitext"]).map(
-                (column) => column.field,
-            ),
-        ).toEqual(["cell_type", "__tags"]);
+        expect(getSelectableColumns(columns, ["text", "text16", "multitext"]).map((column) => column.field)).toEqual([
+            "cell_type",
+            "__tags",
+        ]);
     });
 
     test("re-evaluates against the current columns array contents", () => {
@@ -37,11 +36,9 @@ describe("getSelectableColumns", () => {
             },
         ] as any[];
 
-        expect(
-            getSelectableColumns(columns, ["text", "text16", "multitext"]).map(
-                (column) => column.field,
-            ),
-        ).toEqual(["cell_type"]);
+        expect(getSelectableColumns(columns, ["text", "text16", "multitext"]).map((column) => column.field)).toEqual([
+            "cell_type",
+        ]);
 
         columns.push({
             datatype: "multitext",
@@ -49,10 +46,9 @@ describe("getSelectableColumns", () => {
             name: "__tags",
         });
 
-        expect(
-            getSelectableColumns(columns, ["text", "text16", "multitext"]).map(
-                (column) => column.field,
-            ),
-        ).toEqual(["cell_type", "__tags"]);
+        expect(getSelectableColumns(columns, ["text", "text16", "multitext"]).map((column) => column.field)).toEqual([
+            "cell_type",
+            "__tags",
+        ]);
     });
 });

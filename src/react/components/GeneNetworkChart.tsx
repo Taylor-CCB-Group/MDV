@@ -10,11 +10,7 @@ export type GeneNetworkConfig = {
 } & BaseConfig;
 
 class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
-    constructor(
-        dataStore: DataStore,
-        div: string | HTMLDivElement,
-        config: GeneNetworkConfig & BaseConfig,
-    ) {
+    constructor(dataStore: DataStore, div: string | HTMLDivElement, config: GeneNetworkConfig & BaseConfig) {
         if (config.autoScroll === undefined) config.autoScroll = true;
         super(dataStore, div, config, GeneNetworkChartComponent);
     }
@@ -60,5 +56,5 @@ BaseChart.types["geneNetwork"] = {
             type: ["text", "text16"],
             name: "Gene ID Column (text column containing gene identifiers)",
         },
-    ]
+    ],
 };

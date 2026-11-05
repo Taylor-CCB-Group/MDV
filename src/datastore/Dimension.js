@@ -186,11 +186,11 @@ class Dimension {
         return this.commitFilter(args.predicate);
     }
     /**
-     * 
-     * @param {*} noClear - if true, then the filter will not be cleared 
+     *
+     * @param {*} noClear - if true, then the filter will not be cleared
      * when a removeAllFilters is called on the parent DataStore. Default is false.
      */
-    setNoClear(noClear){
+    setNoClear(noClear) {
         this.noClear = noClear;
     }
 
@@ -212,7 +212,7 @@ class Dimension {
                 this._applyStateTransition(i, 2);
             }
         }
-   
+
         if (notify) {
             this.parent._callListeners("filtered", this);
         }
@@ -321,12 +321,7 @@ class Dimension {
         if (this.filterMethod && this.filterColumns) {
             for (const c of this.filterColumns) {
                 if (typeof c === "string" && columns.indexOf(c) !== -1) {
-                    this.filter(
-                        this.filterMethod,
-                        this.filterColumns,
-                        this.filterArguments,
-                        false,
-                    );
+                    this.filter(this.filterMethod, this.filterColumns, this.filterArguments, false);
                     return true;
                 }
             }
@@ -348,18 +343,10 @@ class Dimension {
         this.filterArray = newArr;
         if (this.bgfData) {
             const bd = this.bgfData;
-            this.setBackgroundFilter(
-                bd.column,
-                bd.cats?.length ? bd.cats : bd.cat,
-            );
+            this.setBackgroundFilter(bd.column, bd.cats?.length ? bd.cats : bd.cat);
         }
         if (this.filterMethod) {
-            this.filter(
-                this.filterMethod,
-                this.filterColumns,
-                this.filterArguments,
-                false,
-            );
+            this.filter(this.filterMethod, this.filterColumns, this.filterArguments, false);
             if (this.pendingFilter) {
                 this._notifyWhenCommitted(this.pendingFilter).catch((e) =>
                     console.error("async refilter after resize failed", e),
@@ -378,9 +365,7 @@ class Dimension {
         if (!col?.values) {
             return;
         }
-        const cats = (Array.isArray(cat) ? cat.slice(0) : [cat]).filter(
-            (x) => x !== undefined && x !== null,
-        );
+        const cats = (Array.isArray(cat) ? cat.slice(0) : [cat]).filter((x) => x !== undefined && x !== null);
         if (cats.length === 0) {
             this.clearBackgroundFilter();
             return;
@@ -414,11 +399,7 @@ class Dimension {
                 const start = i * multitextCapacity;
                 for (let offset = 0; offset < multitextCapacity; offset += 1) {
                     const valueIndex = data[start + offset];
-                    if (
-                        valueIndex === undefined ||
-                        valueIndex === null ||
-                        valueIndex === 65535
-                    ) {
+                    if (valueIndex === undefined || valueIndex === null || valueIndex === 65535) {
                         break;
                     }
                     if (indices.has(valueIndex)) {

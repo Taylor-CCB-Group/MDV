@@ -1,8 +1,4 @@
-import {
-    type ChangeEventHandler,
-    type PropsWithChildren,
-    forwardRef,
-} from "react";
+import { type ChangeEventHandler, type PropsWithChildren, forwardRef } from "react";
 
 const colorStyles = {
     blue: {
@@ -40,19 +36,11 @@ type ButtonProps = {
 } & PropsWithChildren;
 
 export const Container = ({ children }: PropsWithChildren) => {
-    return (
-        <div className="flex flex-col content-center items-center h-max dark:text-white">
-            {children}
-        </div>
-    );
+    return <div className="flex flex-col content-center items-center h-max dark:text-white">{children}</div>;
 };
 
 export const StatusContainer = ({ children }: PropsWithChildren) => {
-    return (
-        <div className="flex flex-col justify-center items-center w-full h-[150px]">
-            {children}
-        </div>
-    );
+    return <div className="flex flex-col justify-center items-center w-full h-[150px]">{children}</div>;
 };
 
 export const SuccessContainer = ({ children }: PropsWithChildren) => (
@@ -66,22 +54,18 @@ export const SuccessHeading = ({ children }: PropsWithChildren) => (
 );
 
 export const SuccessText = ({ children }: PropsWithChildren) => (
-    <p className="text-2xl text-[#555] mb-3 text-center dark:text-gray-300">
-        {children}
-    </p>
+    <p className="text-2xl text-[#555] mb-3 text-center dark:text-gray-300">{children}</p>
 );
 
-export const DropzoneContainer = forwardRef(
-    ({ isDragOver, children, ...props }: any, ref) => (
-        <div
-            {...props}
-            ref={ref}
-            className={`p-4 mt-2 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]`}
-        >
-            {children}
-        </div>
-    ),
-);
+export const DropzoneContainer = forwardRef(({ isDragOver, children, ...props }: any, ref) => (
+    <div
+        {...props}
+        ref={ref}
+        className={`p-4 mt-2 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]`}
+    >
+        {children}
+    </div>
+));
 
 //! warning: className isn't being merged etc, I think it just gets overriden.
 // not sure if there's a better type for `htmlFor`.
@@ -119,8 +103,7 @@ export const Button = ({
     marginTop = "mt-2.5",
     children,
 }: ButtonProps) => {
-    const { bgColor, hoverColor, darkBgColor, darkHoverColor } =
-        colorStyles[color] || colorStyles.blue;
+    const { bgColor, hoverColor, darkBgColor, darkHoverColor } = colorStyles[color] || colorStyles.blue;
 
     return (
         <button
@@ -148,9 +131,7 @@ export const ProgressBar = ({ value, max }: ProgressBarProps) => (
 );
 
 export const Message = ({ children }: PropsWithChildren) => (
-    <p className="text-lg font-bold text-[#333] dark:text-white text-center">
-        {children}
-    </p>
+    <p className="text-lg font-bold text-[#333] dark:text-white text-center">{children}</p>
 );
 
 export const FileSummary = ({ children }: PropsWithChildren) => (
@@ -164,13 +145,9 @@ export const FileSummaryHeading = ({ children }: PropsWithChildren) => (
 export const FileSummaryText = ({ children }: PropsWithChildren) => (
     <>
         {typeof children === "string" ? (
-            <p className="text-lg text-gray-700 dark:text-white my-1">
-                {children}
-            </p>
+            <p className="text-lg text-gray-700 dark:text-white my-1">{children}</p>
         ) : (
-            <div className="text-lg text-gray-700 dark:text-white my-1">
-                {children}
-            </div>
+            <div className="text-lg text-gray-700 dark:text-white my-1">{children}</div>
         )}
     </>
 );
@@ -181,10 +158,7 @@ export const ErrorContainer = ({ children }: PropsWithChildren) => (
     </div>
 );
 
-export const DynamicText = ({
-    text,
-    className = "",
-}: { text: string; className: string }) => (
+export const DynamicText = ({ text, className = "" }: { text: string; className: string }) => (
     <div className="w-96 h-20 overflow-hidden flex items-center justify-center">
         <p
             //consider using `cn()` from lib/utils
@@ -195,9 +169,7 @@ export const DynamicText = ({
     </div>
 );
 
-export const ErrorHeading = ({ children }: PropsWithChildren) => (
-    <h4 className="mt-0 text-lg font-bold">{children}</h4>
-);
+export const ErrorHeading = ({ children }: PropsWithChildren) => <h4 className="mt-0 text-lg font-bold">{children}</h4>;
 
 type DatasourceNameInputProps = {
     value: string;
@@ -205,11 +177,7 @@ type DatasourceNameInputProps = {
     isDisabled: boolean;
 };
 
-export const DatasourceNameInput = ({
-    value,
-    onChange,
-    isDisabled,
-}: DatasourceNameInputProps) => (
+export const DatasourceNameInput = ({ value, onChange, isDisabled }: DatasourceNameInputProps) => (
     <div className="flex items-center justify-start space-x-2 pr-4">
         <label className="text-lg text-gray-700 dark:text-white my-1" htmlFor="datasourceName">
             <strong>Datasource Name:</strong>

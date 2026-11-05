@@ -4,13 +4,8 @@ import { g } from "@/lib/utils";
 import type { AnyGuiSpec, GuiSpec } from "@/charts/charts";
 import { useFilteredGroupedSettings } from "../../react/hooks/useFilteredGroupedSettings";
 
-function getFolder(
-    settings: Array<{ setting: AnyGuiSpec; id: string }>,
-    label: string,
-): GuiSpec<"folder"> | undefined {
-    const match = settings.find(
-        (entry) => entry.setting.type === "folder" && entry.setting.label === label,
-    )?.setting;
+function getFolder(settings: Array<{ setting: AnyGuiSpec; id: string }>, label: string): GuiSpec<"folder"> | undefined {
+    const match = settings.find((entry) => entry.setting.type === "folder" && entry.setting.label === label)?.setting;
     if (!match || match.type !== "folder") return undefined;
     return match;
 }
@@ -27,18 +22,13 @@ describe("useFilteredGroupedSettings", () => {
             g({ type: "check", label: "Show legend", current_value: true }),
         ];
 
-        const { result } = renderHook(() =>
-            useFilteredGroupedSettings(rawSettings, ""),
-        );
+        const { result } = renderHook(() => useFilteredGroupedSettings(rawSettings, ""));
 
         const general = getFolder(result.current, "General");
         const axes = getFolder(result.current, "Axes");
 
         expect(general).toBeDefined();
-        expect(general?.current_value.map((item) => item.label)).toEqual([
-            "Opacity",
-            "Show legend",
-        ]);
+        expect(general?.current_value.map((item) => item.label)).toEqual(["Opacity", "Show legend"]);
         expect(axes).toBeDefined();
     });
 
@@ -48,17 +38,12 @@ describe("useFilteredGroupedSettings", () => {
             g({ type: "check", label: "Show legend", current_value: true }),
         ];
 
-        const { result } = renderHook(() =>
-            useFilteredGroupedSettings(rawSettings, "general"),
-        );
+        const { result } = renderHook(() => useFilteredGroupedSettings(rawSettings, "general"));
 
         const general = getFolder(result.current, "General");
         expect(result.current).toHaveLength(1);
         expect(general).toBeDefined();
-        expect(general?.current_value.map((item) => item.label)).toEqual([
-            "Opacity",
-            "Show legend",
-        ]);
+        expect(general?.current_value.map((item) => item.label)).toEqual(["Opacity", "Show legend"]);
     });
 
     test("keeps full folder content when folder label matches search", () => {
@@ -73,16 +58,11 @@ describe("useFilteredGroupedSettings", () => {
             }),
         ];
 
-        const { result } = renderHook(() =>
-            useFilteredGroupedSettings(rawSettings, "axes"),
-        );
+        const { result } = renderHook(() => useFilteredGroupedSettings(rawSettings, "axes"));
 
         const axes = getFolder(result.current, "Axes");
         expect(axes).toBeDefined();
-        expect(axes?.current_value.map((item) => item.label)).toEqual([
-            "X min",
-            "Y min",
-        ]);
+        expect(axes?.current_value.map((item) => item.label)).toEqual(["X min", "Y min"]);
     });
 
     test("keeps only matching descendants when folder does not match", () => {
@@ -97,9 +77,7 @@ describe("useFilteredGroupedSettings", () => {
             }),
         ];
 
-        const { result } = renderHook(() =>
-            useFilteredGroupedSettings(rawSettings, "x min"),
-        );
+        const { result } = renderHook(() => useFilteredGroupedSettings(rawSettings, "x min"));
 
         const axes = getFolder(result.current, "Axes");
         expect(axes).toBeDefined();
@@ -116,10 +94,9 @@ describe("useFilteredGroupedSettings", () => {
             }),
         ];
 
-        const { result, rerender } = renderHook(
-            ({ term }) => useFilteredGroupedSettings(rawSettings, term),
-            { initialProps: { term: "" } },
-        );
+        const { result, rerender } = renderHook(({ term }) => useFilteredGroupedSettings(rawSettings, term), {
+            initialProps: { term: "" },
+        });
 
         const axesBefore = result.current.find((entry) => entry.setting.label === "Axes");
         expect(axesBefore).toBeDefined();
@@ -131,4 +108,3 @@ describe("useFilteredGroupedSettings", () => {
         expect(axesAfter?.id).toBe(axesBefore?.id);
     });
 });
-

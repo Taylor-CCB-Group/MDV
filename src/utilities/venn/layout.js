@@ -1,9 +1,4 @@
-import {
-    intersectionArea,
-    circleOverlap,
-    circleCircleIntersection,
-    distance,
-} from "./circleintersection.js";
+import { intersectionArea, circleOverlap, circleCircleIntersection, distance } from "./circleintersection.js";
 
 function zeros(x) {
     const r = new Array(x);
@@ -272,16 +267,10 @@ function nelderMead(f, x0, parameters) {
 
         maxDiff = 0;
         for (let i = 0; i < N; ++i) {
-            maxDiff = Math.max(
-                maxDiff,
-                Math.abs(simplex[0][i] - simplex[1][i]),
-            );
+            maxDiff = Math.max(maxDiff, Math.abs(simplex[0][i] - simplex[1][i]));
         }
 
-        if (
-            Math.abs(simplex[0].fx - simplex[N].fx) < minErrorDelta &&
-            maxDiff < minTolerance
-        ) {
+        if (Math.abs(simplex[0].fx - simplex[N].fx) < minErrorDelta && maxDiff < minTolerance) {
             break;
         }
 
@@ -327,13 +316,7 @@ function nelderMead(f, x0, parameters) {
                 }
             } else {
                 // do an outside contraction
-                weightedSum(
-                    contracted,
-                    1 - psi * rho,
-                    centroid,
-                    psi * rho,
-                    worst,
-                );
+                weightedSum(contracted, 1 - psi * rho, centroid, psi * rho, worst);
                 contracted.fx = f(contracted);
                 if (contracted.fx < reflected.fx) {
                     updateSimplex(contracted);
@@ -348,13 +331,7 @@ function nelderMead(f, x0, parameters) {
 
                 // do a reduction
                 for (i = 1; i < simplex.length; ++i) {
-                    weightedSum(
-                        simplex[i],
-                        1 - sigma,
-                        simplex[0],
-                        sigma,
-                        simplex[i],
-                    );
+                    weightedSum(simplex[i], 1 - sigma, simplex[0], sigma, simplex[i]);
                     simplex[i].fx = f(simplex[i]);
                 }
             }
@@ -436,11 +413,7 @@ function distanceFromIntersectArea(r1, r2, overlap) {
         return Math.abs(r1 - r2);
     }
 
-    return bisect(
-        (distance) => circleOverlap(r1, r2, distance) - overlap,
-        0,
-        r1 + r2,
-    );
+    return bisect((distance) => circleOverlap(r1, r2, distance) - overlap, 0, r1 + r2);
 }
 
 /** Missing pair-wise intersection area data can cause problems:
@@ -505,10 +478,7 @@ function getDistanceMatrices(areas, sets, setids) {
             // also update constraints to indicate if its a subset or disjoint
             // relationship
             let c = 0;
-            if (
-                current.size + 1e-10 >=
-                Math.min(sets[left].size, sets[right].size)
-            ) {
+            if (current.size + 1e-10 >= Math.min(sets[left].size, sets[right].size)) {
                 c = 1;
             } else if (current.size <= 1e-10) {
                 c = -1;
@@ -536,15 +506,11 @@ function constrainedMDSGradient(x, fxprime, distances, constraints) {
             const dij = distances[i][j];
             const constraint = constraints[i][j];
 
-            const squaredDistance =
-                (xj - xi) * (xj - xi) + (yj - yi) * (yj - yi);
+            const squaredDistance = (xj - xi) * (xj - xi) + (yj - yi) * (yj - yi);
             const distance = Math.sqrt(squaredDistance);
             const delta = squaredDistance - dij * dij;
 
-            if (
-                (constraint > 0 && distance <= dij) ||
-                (constraint < 0 && distance >= dij)
-            ) {
+            if ((constraint > 0 && distance <= dij) || (constraint < 0 && distance >= dij)) {
                 continue;
             }
 
@@ -607,8 +573,7 @@ function constrainedMDSLayout(areas, params) {
     const norm = norm2(distances.map(norm2)) / distances.length;
     distances = distances.map((row) => row.map((value) => value / norm));
 
-    const obj = (x, fxprime) =>
-        constrainedMDSGradient(x, fxprime, distances, constraints);
+    const obj = (x, fxprime) => constrainedMDSGradient(x, fxprime, distances, constraints);
 
     let best;
     let current;
@@ -674,10 +639,7 @@ function greedyLayout(areas, params) {
         const right = current.sets[1];
 
         // completely overlapped circles shouldn't be positioned early here
-        if (
-            current.size + SMALL >=
-            Math.min(circles[left].size, circles[right].size)
-        ) {
+        if (current.size + SMALL >= Math.min(circles[left].size, circles[right].size)) {
             weight = 0;
         }
 
@@ -746,11 +708,7 @@ function greedyLayout(areas, params) {
         for (let j = 0; j < overlap.length; ++j) {
             // get appropriate distance from most overlapped already added set
             const p1 = circles[overlap[j].set];
-            const d1 = distanceFromIntersectArea(
-                set.radius,
-                p1.radius,
-                overlap[j].size,
-            );
+            const d1 = distanceFromIntersectArea(set.radius, p1.radius, overlap[j].size);
 
             // sample positions at 90 degrees for maximum aesthetics
             points.push({ x: p1.x + d1, y: p1.y });
@@ -762,11 +720,7 @@ function greedyLayout(areas, params) {
             // set should be positioned analytically and try those too
             for (let k = j + 1; k < overlap.length; ++k) {
                 const p2 = circles[overlap[k].set];
-                const d2 = distanceFromIntersectArea(
-                    set.radius,
-                    p2.radius,
-                    overlap[k].size,
-                );
+                const d2 = distanceFromIntersectArea(set.radius, p2.radius, overlap[k].size);
 
                 const extraPoints = circleCircleIntersection(
                     { x: p1.x, y: p1.y, radius: d1 },
@@ -818,11 +772,7 @@ function lossFunction(sets, overlaps) {
         if (area.sets.length === 2) {
             const left = sets[area.sets[0]];
             const right = sets[area.sets[1]];
-            overlap = circleOverlap(
-                left.radius,
-                right.radius,
-                distance(left, right),
-            );
+            overlap = circleOverlap(left.radius, right.radius, distance(left, right));
         } else {
             overlap = intersectionArea(getCircles(area.sets));
         }
@@ -859,8 +809,7 @@ function orientateCircles(circles, orientation, orientationOrder) {
         // it is off to one side. hack for https://github.com/benfred/venn.js/issues/120
         const dist = distance(circles[0], circles[1]);
         if (dist < Math.abs(circles[1].radius - circles[0].radius)) {
-            circles[1].x =
-                circles[0].x + circles[0].radius - circles[1].radius - 1e-10;
+            circles[1].x = circles[0].x + circles[0].radius - circles[1].radius - 1e-10;
             circles[1].y = circles[0].y;
         }
     }
@@ -895,8 +844,7 @@ function orientateCircles(circles, orientation, orientationOrder) {
         if (angle > Math.PI) {
             const slope = circles[1].y / (1e-10 + circles[1].x);
             for (i = 0; i < circles.length; ++i) {
-                const d =
-                    (circles[i].x + slope * circles[i].y) / (1 + slope * slope);
+                const d = (circles[i].x + slope * circles[i].y) / (1 + slope * slope);
                 circles[i].x = 2 * d - circles[i].x;
                 circles[i].y = 2 * d * slope - circles[i].y;
             }
@@ -1005,9 +953,7 @@ function normalizeSolution(solution, orientation, orientationOrder) {
     for (i = 0; i < clusters.length; ++i) {
         orientateCircles(clusters[i], orientation, orientationOrder);
         const bounds = getBoundingBox(clusters[i]);
-        clusters[i].size =
-            (bounds.xRange.max - bounds.xRange.min) *
-            (bounds.yRange.max - bounds.yRange.min);
+        clusters[i].size = (bounds.xRange.max - bounds.xRange.min) * (bounds.yRange.max - bounds.yRange.min);
         clusters[i].bounds = bounds;
     }
     clusters.sort((a, b) => b.size - a.size);
@@ -1031,8 +977,7 @@ function normalizeSolution(solution, orientation, orientationOrder) {
         } else {
             xOffset = returnBounds.xRange.max - bounds.xRange.max;
             centreing =
-                (bounds.xRange.max - bounds.xRange.min) / 2 -
-                (returnBounds.xRange.max - returnBounds.xRange.min) / 2;
+                (bounds.xRange.max - bounds.xRange.min) / 2 - (returnBounds.xRange.max - returnBounds.xRange.min) / 2;
             if (centreing < 0) xOffset += centreing;
         }
 
@@ -1041,8 +986,7 @@ function normalizeSolution(solution, orientation, orientationOrder) {
         } else {
             yOffset = returnBounds.yRange.max - bounds.yRange.max;
             centreing =
-                (bounds.yRange.max - bounds.yRange.min) / 2 -
-                (returnBounds.yRange.max - returnBounds.yRange.min) / 2;
+                (bounds.yRange.max - bounds.yRange.min) / 2 - (returnBounds.yRange.max - returnBounds.yRange.min) / 2;
             if (centreing < 0) yOffset += centreing;
         }
 

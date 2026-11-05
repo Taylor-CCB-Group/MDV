@@ -101,7 +101,7 @@ describe("useSlickGridReact", () => {
                 data: new Uint32Array([65, 66, 65, 0]),
                 stringLength: 2,
                 editable: true,
-            }
+            },
         ] as any;
 
         mockSortedIndices = new Uint32Array([0, 1, 2]);
@@ -162,9 +162,7 @@ describe("useSlickGridReact", () => {
             columns: mockOrderedParamColumns,
             size: 3,
             name: "test-ds",
-            columnIndex: Object.fromEntries(
-                mockOrderedParamColumns.map((column) => [column.field, column]),
-            ),
+            columnIndex: Object.fromEntries(mockOrderedParamColumns.map((column) => [column.field, column])),
         };
 
         mockChart = {
@@ -537,9 +535,7 @@ describe("useSlickGridReact", () => {
                 "age",
                 expect.stringContaining("&lt;img src=x onerror=alert(&#39;xss&#39;)&gt;"),
             );
-            expect(liveColumns[0].name).toContain(
-                "&lt;img src=x onerror=alert(&#39;xss&#39;)&gt;",
-            );
+            expect(liveColumns[0].name).toContain("&lt;img src=x onerror=alert(&#39;xss&#39;)&gt;");
         });
 
         test("should reject duplicate display names", () => {
@@ -1005,11 +1001,14 @@ describe("useSlickGridReact", () => {
             const { result } = renderHook(() => useSlickGridReact());
             const { gridInstance } = setupGrid(result);
 
-            gridInstance.slickGrid.getColumns = vi.fn(() => [
-                { field: "id", width: 100 },
-                { field: "age", width: 100 },
-                { field: "name", width: 100 },
-            ] as any);
+            gridInstance.slickGrid.getColumns = vi.fn(
+                () =>
+                    [
+                        { field: "id", width: 100 },
+                        { field: "age", width: 100 },
+                        { field: "name", width: 100 },
+                    ] as any,
+            );
 
             act(() => {
                 result.current.handleAddColumn({
@@ -1273,11 +1272,7 @@ describe("useSlickGridReact", () => {
                 });
             });
 
-            expect(mockChartManager.loadColumnSet).toHaveBeenCalledWith(
-                ["surname"],
-                "test-ds",
-                expect.any(Function),
-            );
+            expect(mockChartManager.loadColumnSet).toHaveBeenCalledWith(["surname"], "test-ds", expect.any(Function));
             expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
         });
 
@@ -1355,9 +1350,7 @@ describe("useSlickGridReact", () => {
 
         test("should reject duplicate column names when the field exists in active metadata", () => {
             mockDataStore.columnIndex = {};
-            mockDataStore.getAllColumnsMetadata.mockReturnValueOnce([
-                { field: "age", name: "Age", datatype: "text" },
-            ]);
+            mockDataStore.getAllColumnsMetadata.mockReturnValueOnce([{ field: "age", name: "Age", datatype: "text" }]);
             const { result } = renderHook(() => useSlickGridReact());
 
             act(() => {
@@ -1421,13 +1414,7 @@ describe("useSlickGridReact", () => {
         test("should drop stale deleted plain-string params before adding a brand-new column", () => {
             mockDataStore.columnIndex = {};
             mockConfig.param = ["age", "column 5", "column 6", "name", "id"] as typeof mockConfig.param;
-            mockChart.activeQueries.activeParams.mockReturnValue([
-                "age",
-                "column 5",
-                "column 6",
-                "name",
-                "id",
-            ]);
+            mockChart.activeQueries.activeParams.mockReturnValue(["age", "column 5", "column 6", "name", "id"]);
 
             const { result } = renderHook(() => useSlickGridReact());
 
@@ -1485,11 +1472,14 @@ describe("useSlickGridReact", () => {
             const { result } = renderHook(() => useSlickGridReact());
             const { columnsResizedHandler, gridInstance } = setupGrid(result);
 
-            gridInstance.slickGrid.getColumns = vi.fn(() => [
-                { field: "age", width: 180 },
-                { field: "name", width: 260 },
-                { field: "id", width: 100 },
-            ] as any);
+            gridInstance.slickGrid.getColumns = vi.fn(
+                () =>
+                    [
+                        { field: "age", width: 180 },
+                        { field: "name", width: 260 },
+                        { field: "id", width: 100 },
+                    ] as any,
+            );
 
             act(() => {
                 columnsResizedHandler?.({}, {});

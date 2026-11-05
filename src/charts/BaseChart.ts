@@ -14,15 +14,13 @@ import { initialiseChartConfig } from "./chartConfigUtils";
 import { ColumnQueryMapper, decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
-import tippy, {type Instance as TippyInstance} from "tippy.js";
-import 'tippy.js/dist/tippy.css';
+import tippy, { type Instance as TippyInstance } from "tippy.js";
+import "tippy.js/dist/tippy.css";
 import { isDateColumn } from "@/lib/dateFormat";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import ColorLegend from "@/react/components/legend/ColorLegend";
-import LegendWrapper, {
-    type LegendWrapperComponentProps,
-} from "@/react/components/legend/LegendWrapper";
+import LegendWrapper, { type LegendWrapperComponentProps } from "@/react/components/legend/LegendWrapper";
 import {
     clearColorLegendFilter,
     destroyColorLegendFilter,
@@ -40,7 +38,7 @@ export type ChartEventType = string;
 /** A dot on a chart's "more" menu icon, for a problem described in its debug dialog. */
 export type MenuPip = { level: "error" | "notice"; tooltip: string };
 export type Listener = (type: ChartEventType, data: any) => void;
-export type LegacyColorBy = { column: DataColumn<any> }
+export type LegacyColorBy = { column: DataColumn<any> };
 export type BaseConfig = {
     id: string;
     size: [x: number, y: number];
@@ -53,8 +51,8 @@ export type BaseConfig = {
 } & ColorConfig;
 /**
  * All chart config types include a color configuration, (although not all charts use it).
- * 
- * It may also be possible to have nested properties of this kind - such as a chart with multiple layers, 
+ *
+ * It may also be possible to have nested properties of this kind - such as a chart with multiple layers,
  * each with its own color config.
  */
 export type ColorConfig = {
@@ -67,9 +65,9 @@ export type ColorConfig = {
     fallbackOnZero?: boolean;
     hideMissing?: boolean;
 };
-export type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
+export type ColumnChangeEvent = { columns: FieldName[]; hasFiltered: boolean };
 export type ColorOptions = any;
-export type ContextMenuItem = { text: string, icon: string, func: () => void, pip?: MenuPip["level"] };
+export type ContextMenuItem = { text: string; icon: string; func: () => void; pip?: MenuPip["level"] };
 export type SettingsDialogFolderState = {
     isOpen: boolean;
     isOpenBeforeSearch: boolean;
@@ -81,7 +79,7 @@ export type SettingsDialogState = {
 };
 /**
  * A JSON string representing a chart configuration.
- * 
+ *
  * The generic parameter `T` is the type of the chart configuration - maybe overkill, or maybe useful at some point.
  */
 export type SerialString<T extends BaseConfig> = string;
@@ -103,7 +101,7 @@ class BaseChart<T extends BaseConfig> {
     observable: { container: HTMLElement };
     width = 0;
     height = 0;
-    menuTooltips:TippyInstance[]=[];
+    menuTooltips: TippyInstance[] = [];
     /** The "more" (hamburger) menu icon, which `setMenuPip` marks. */
     moreIcon: HTMLSpanElement;
     menuPip: MenuPip | null = null;
@@ -137,8 +135,8 @@ class BaseChart<T extends BaseConfig> {
         //**********
         // this needs to be set before we initialise the config
         this.dataStore = dataStore;
-        
-        //copy the config, 
+
+        //copy the config,
         // this.config = JSON.parse(JSON.stringify(config));
         //^^ previously, only react charts had observable config
         //and make it observable etc... may apply some other processing e.g. in case of 'virtual columns'
@@ -255,18 +253,13 @@ class BaseChart<T extends BaseConfig> {
                 pip: this.menuPip?.level,
                 func: () => {
                     window.mdv.debugChart = this;
-                    this.dialogs.push(
-                        new DebugJsonDialogReactWrapper(this.getConfig(), this),
-                    );
+                    this.dialogs.push(new DebugJsonDialogReactWrapper(this.getConfig(), this));
                 },
             });
             menu.push({
                 text: "copy config JSON to clipboard",
                 icon: "fas fa-copy",
-                func: () =>
-                    navigator.clipboard.writeText(
-                        JSON.stringify(this.getConfig(), null, 2),
-                    ),
+                func: () => navigator.clipboard.writeText(JSON.stringify(this.getConfig(), null, 2)),
             });
             return menu;
         });
@@ -274,43 +267,29 @@ class BaseChart<T extends BaseConfig> {
         this.moreIcon = this.addMenuIcon("fas fa-bars", "more");
         this.moreIcon.addEventListener("click", (e) => this.contextMenu.show(e));
 
-        this.addMenuIcon("fas fa-cog", "settings").addEventListener(
-            "click",
-            (e) => this._openSettingsDialog(e),
-        );
+        this.addMenuIcon("fas fa-cog", "settings").addEventListener("click", (e) => this._openSettingsDialog(e));
 
-        this.addMenuIcon("fas fa-copy", "duplicate chart").addEventListener(
-            "click",
-            () => {
-                const newConfig = JSON.parse(JSON.stringify(this.getConfig()));
-                newConfig.id = getRandomString();
-                newConfig.title = `${newConfig.title} copy`;
-                window.mdv.chartManager.addChart(
-                    this.dataStore.name,
-                    newConfig,
-                );
-            },
-        );
+        this.addMenuIcon("fas fa-copy", "duplicate chart").addEventListener("click", () => {
+            const newConfig = JSON.parse(JSON.stringify(this.getConfig()));
+            newConfig.id = getRandomString();
+            newConfig.title = `${newConfig.title} copy`;
+            window.mdv.chartManager.addChart(this.dataStore.name, newConfig);
+        });
 
         //info icon
-        this.legendIcon = this.addMenuIcon(
-            "fas fa-info",
-            config.legend || "No description",
-            { size: "medium" },
-        );
+        this.legendIcon = this.addMenuIcon("fas fa-info", config.legend || "No description", { size: "medium" });
 
         let oldSize = config.size;
         this._fullscreenChangeHandler = action(() => {
             //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
             if (this.__doc__.fullscreenElement) {
-                if (this.div === this.__doc__.fullscreenElement) {               
+                if (this.div === this.__doc__.fullscreenElement) {
                     this.observable.container = this.div;
                     const rect = window.screen;
                     this.setSize(rect.width, rect.height);
                     for (const d of this.dialogs) {
                         d.setParent(this.contentDiv);
                     }
-
 
                     // Updating the icon
                     if (this.fullscreenIcon) {
@@ -329,7 +308,7 @@ class BaseChart<T extends BaseConfig> {
                 this.isFullscreen = true;
             } else {
                 this.observable.container = this.__doc__.body;
-             
+
                 // Reset the size of chart
                 this.setSize(...oldSize);
                 const cm = window.mdv.chartManager;
@@ -385,7 +364,7 @@ class BaseChart<T extends BaseConfig> {
                 //there is an implementation of the method here in BaseChart, but we wrap in a try/catch as it assumes other associated methods are also implemented.
                 //Calling this in a timeout helps ensure that the chart is fully constructed before we try to do this.
                 this.setColorLegend();
-            } catch (e) { }
+            } catch (e) {}
         });
         // provide some observable mobx state for useOuterContainer()
         this.observable = makeAutoObservable({
@@ -428,7 +407,7 @@ class BaseChart<T extends BaseConfig> {
         return Promise.allSettled(this._deferredInits);
     }
     reactionDisposers: IReactionDisposer[] = [];
-    mobxAutorun(fn: ()=>void, opts?: IAutorunOptions) {
+    mobxAutorun(fn: () => void, opts?: IAutorunOptions) {
         const disposer = autorun(fn, opts);
         this.reactionDisposers.push(disposer);
         return disposer;
@@ -498,29 +477,30 @@ class BaseChart<T extends BaseConfig> {
      * @param [config.func] - a function that is called when the icon is clicked
      * @returns - the icon
      */
-    addMenuIcon(icon: string, tooltip: string, config:
-        {size?: string, position?: string, func?: (e: MouseEvent)=>void} = {}
+    addMenuIcon(
+        icon: string,
+        tooltip: string,
+        config: { size?: string; position?: string; func?: (e: MouseEvent) => void } = {},
     ) {
         const sp = createEl(
             "span",
             {
-                
                 styles: {
                     margin: "0px 1px",
                 },
             },
             this.menuSpace,
         );
-        const t= tippy(sp, {
+        const t = tippy(sp, {
             content: tooltip,
-            appendTo: this.div
+            appendTo: this.div,
         });
         //need to store in order to switch document when chart is popped out/in
-        this.menuTooltips.push(t); 
+        this.menuTooltips.push(t);
         // event listener for hiding the tooltip on mouseleave event for popout window
-        sp.addEventListener('mouseleave', () => {
+        sp.addEventListener("mouseleave", () => {
             t.hide();
-          });
+        });
         createEl(
             "i",
             {
@@ -607,7 +587,7 @@ class BaseChart<T extends BaseConfig> {
             this.colorByColumn?.(this.config.color_by);
         }
     }
-    
+
     /**
      * Whether clicking or brushing the color legend filters rows by the legend's column.
      * Charts whose legend doesn't show a column's per-row values should return false.
@@ -630,9 +610,7 @@ class BaseChart<T extends BaseConfig> {
         const conf = {
             overideValues: {
                 // Log color scales are not meaningful for calendar day numbers.
-                colorLogScale: isDateColumn(colorCol)
-                    ? false
-                    : this.config.log_color_scale,
+                colorLogScale: isDateColumn(colorCol) ? false : this.config.log_color_scale,
             },
         };
         this._addTrimmedColor(colorBy, conf);
@@ -647,7 +625,7 @@ class BaseChart<T extends BaseConfig> {
         if (!col) throw `expected color column '${column}' in columnIndex for ${this.dataStore.name}`;
         if (tr && tr !== "none") {
             if (col.quantiles) {
-                if (col.quantiles as any === "NA") return;
+                if ((col.quantiles as any) === "NA") return;
                 conf.overideValues.min = col.quantiles[tr][0];
                 conf.overideValues.max = col.quantiles[tr][1];
             }
@@ -670,10 +648,7 @@ class BaseChart<T extends BaseConfig> {
     setColorLegend() {
         if (!this.config.color_legend?.display) {
             if (this.legend && this.config.color_legend) {
-                this.config.color_legend.pos = [
-                    this.legend.offsetLeft,
-                    this.legend.offsetTop,
-                ];
+                this.config.color_legend.pos = [this.legend.offsetLeft, this.legend.offsetTop];
             }
             this.colorLegendWrapper.unmount();
             this.legend = undefined;
@@ -705,22 +680,13 @@ class BaseChart<T extends BaseConfig> {
         if (filterable) {
             restoreColorLegendFilter(this, spec);
         }
-        const ColorLegendWithInteractions = (
-            props: LegendWrapperComponentProps<ColorLegendSpec>,
-        ) =>
+        const ColorLegendWithInteractions = (props: LegendWrapperComponentProps<ColorLegendSpec>) =>
             createElement(ColorLegend, {
                 ...props,
                 ...(filterable && {
-                    activeCategoricalValue: getActiveCategoricalColorLegendValue(
-                        this,
-                        spec,
-                    ),
-                    onCategoricalItemClick: (value: string) =>
-                        toggleCategoricalColorLegendFilter(this, spec, value),
-                    activeContinuousRange: getActiveContinuousColorLegendRange(
-                        this,
-                        spec,
-                    ),
+                    activeCategoricalValue: getActiveCategoricalColorLegendValue(this, spec),
+                    onCategoricalItemClick: (value: string) => toggleCategoricalColorLegendFilter(this, spec, value),
+                    activeContinuousRange: getActiveContinuousColorLegendRange(this, spec),
                     onContinuousRangeChange: (range: [number, number] | null) =>
                         setContinuousColorLegendFilter(this, spec, range),
                 }),
@@ -743,15 +709,11 @@ class BaseChart<T extends BaseConfig> {
         if (!this.legend) {
             return;
         }
-        (this.legend as HTMLDivElement & { __doc__?: Document }).__doc__ =
-            this.__doc__;
+        (this.legend as HTMLDivElement & { __doc__?: Document }).__doc__ = this.__doc__;
     }
 
     getColorFunction(column: FieldName, asArray?: boolean) {
-        if (
-            this.colorLegendFilter &&
-            this.colorLegendFilter.column !== column
-        ) {
+        if (this.colorLegendFilter && this.colorLegendFilter.column !== column) {
             clearColorLegendFilter(this, false);
         }
         this.config.color_by = column;
@@ -829,7 +791,7 @@ class BaseChart<T extends BaseConfig> {
 
     showToolTip(e: MouseEvent, msg: string) {
         if (!this._tooltip) this.addToolTip();
-        if (!this._tooltip) throw 'expected tooltip to be added by now';
+        if (!this._tooltip) throw "expected tooltip to be added by now";
         this._tooltip.innerHTML = msg;
         this._tooltip.style.display = "inline-block";
         this._tooltip.style.left = `${3 + e.clientX}px`;
@@ -860,7 +822,7 @@ class BaseChart<T extends BaseConfig> {
         for (const disposer of this.reactionDisposers) {
             disposer();
         }
-        this.menuTooltips.forEach(t => t.destroy());
+        this.menuTooltips.forEach((t) => t.destroy());
         this.menuTooltips = [];
         if (this._fullscreenChangeHandler) {
             this.__doc__.removeEventListener("fullscreenchange", this._fullscreenChangeHandler);
@@ -868,10 +830,10 @@ class BaseChart<T extends BaseConfig> {
         // dynamic props?
     }
     removeLayout?(): void;
-    
+
     /**
      * Sets the params array in the config and redraws the chart.
-     * 
+     *
      * Note that if an active query is set, the first argument will have the concrete column names as strings,
      * as processed by `@loadColumnData`,
      * while the second argument will have the FieldSpecs objects, unprocessed by the decorator.
@@ -930,8 +892,8 @@ class BaseChart<T extends BaseConfig> {
                 func: (v) => {
                     c.legend = v;
                     this.legendIcon.setAttribute("aria-label", v);
-                }
-            }
+                },
+            },
         ];
         const paramsSettings = getParamsGuiSpec(this);
         if (paramsSettings) {
@@ -941,47 +903,43 @@ class BaseChart<T extends BaseConfig> {
 
         if (colorOptions.colorby) {
             //cannot color by unique (at the moment)
-            const filter = (
+            const filter =
                 colorOptions.colorby === "all"
-                    ? [
-                          "int32",
-                          "text",
-                          "integer",
-                          "double",
-                          "text16",
-                          "multitext",
-                      ]
-                    : colorOptions.colorby
-            );
+                    ? ["int32", "text", "integer", "double", "text16", "multitext"]
+                    : colorOptions.colorby;
 
             const colorSettings: GuiSpecs = [];
-            settings.push(g({
-                type: "folder",
-                label: "Color Settings",
-                current_value: colorSettings,
-            }));
+            settings.push(
+                g({
+                    type: "folder",
+                    label: "Color Settings",
+                    current_value: colorSettings,
+                }),
+            );
 
             // change this to use setting with type: "column" - so it should understand "filter" in a similar way
-            colorSettings.push(g({
-                label: "Color By",
-                type: "column",
-                // c.color_by degrades active link here #297
-                //@ts-expect-error LegacyColorBy should be gone by here
-                current_value: c.color_by,
-                columnType: filter,
-                func: (x) => {
-                    if (x === "_none") {
-                        clearColorLegendFilter(this, false);
-                        c.color_by = undefined;
-                        this.colorByDefault?.();
-                    } else {
-                        //@ts -expect-error color_by will have been co-erced to string by here as of now, and colorByColumn expects that
-                        c.color_by = x;
-                        //@ts-expect-error color_by will have been co-erced to string by here as of now
-                        this.colorByColumn?.(x);
-                    }
-                },
-            }));
+            colorSettings.push(
+                g({
+                    label: "Color By",
+                    type: "column",
+                    // c.color_by degrades active link here #297
+                    //@ts-expect-error LegacyColorBy should be gone by here
+                    current_value: c.color_by,
+                    columnType: filter,
+                    func: (x) => {
+                        if (x === "_none") {
+                            clearColorLegendFilter(this, false);
+                            c.color_by = undefined;
+                            this.colorByDefault?.();
+                        } else {
+                            //@ts -expect-error color_by will have been co-erced to string by here as of now, and colorByColumn expects that
+                            c.color_by = x;
+                            //@ts-expect-error color_by will have been co-erced to string by here as of now
+                            this.colorByColumn?.(x);
+                        }
+                    },
+                }),
+            );
             if (colorOptions.color_overlay !== undefined) {
                 colorSettings.push({
                     label: "Color Overlay",
@@ -1086,10 +1044,7 @@ class BaseChart<T extends BaseConfig> {
     _openSettingsDialog(e: MouseEvent) {
         if (!this.settingsDialog) {
             // the dialog will set `this.settingsDialog = null` (and remove itself from this.dialogs) when it closes.
-            this.settingsDialog = new SettingsDialogReactWrapper(this, [
-                e.pageX,
-                e.pageY,
-            ]);
+            this.settingsDialog = new SettingsDialogReactWrapper(this, [e.pageX, e.pageY]);
             this.dialogs.push(this.settingsDialog);
         }
     }
@@ -1099,7 +1054,7 @@ class BaseChart<T extends BaseConfig> {
     getChartData?(): any;
     /**
      * @returns an array of `ContextMenuItems`
-    */
+     */
     addToContextMenu?(): any;
     getContextMenu(data?: any) {
         let menu: ContextMenuItem[] = [];
@@ -1160,10 +1115,10 @@ class BaseChart<T extends BaseConfig> {
         // - fullscreen... some permutations of dialog behaviour / mouse events on deck are a bit odd
         //   ^^ that's not a changeBaseDocument() thing, it's a fullscreen thing...
         this.contextMenu.__doc__ = doc;
-        this.menuTooltips.forEach(t=>{
+        this.menuTooltips.forEach((t) => {
             //for some reason the popout tooltip layer shows in the popout window
             //and needs closing
-            setTimeout(()=>t.hide(),20);
+            setTimeout(() => t.hide(), 20);
         });
         action(() => (this.observable.container = doc.body))();
         this.__doc__ = doc;
@@ -1174,8 +1129,7 @@ class BaseChart<T extends BaseConfig> {
             d.setParent(doc.body);
         }
         if (this.legend) {
-            (this.legend as HTMLDivElement & { __doc__?: Document }).__doc__ =
-                doc;
+            (this.legend as HTMLDivElement & { __doc__?: Document }).__doc__ = doc;
         }
         if (this._tooltip) {
             this._tooltip.remove();
@@ -1225,12 +1179,12 @@ class BaseChart<T extends BaseConfig> {
         // what would happen if we just remove it in that case???
         return this.activeQueries.serialiseChartConfig();
     }
-    
+
     /**
      * Note: prefer `toJSON()` for serializing the chart config.
      * Returns a string representation of the chart's config, such that a simple call
      * a simple call to `JSON.stringify(chart)` will return the config.
-     * 
+     *
      * The type alias is hoped to allow for code involved in manipulating the config to be able
      * to know what it is dealing with.
      */
@@ -1289,10 +1243,7 @@ class BaseChart<T extends BaseConfig> {
                 link.href = `data:image/svg+xml,${encodeURIComponent(resp)}`;
             } else {
                 let url = resp.toDataURL("image/png");
-                url = url.replace(
-                    /^data:image\/png/,
-                    "data:application/octet-stream",
-                );
+                url = url.replace(/^data:image\/png/, "data:application/octet-stream");
                 link.href = url;
             }
             link.click();
@@ -1364,11 +1315,7 @@ class BaseChart<T extends BaseConfig> {
     static types = chartTypes;
 }
 
-
-export function copyStylesInline(
-    destinationNode: HTMLElement,
-    sourceNode: HTMLElement
-): void {
+export function copyStylesInline(destinationNode: HTMLElement, sourceNode: HTMLElement): void {
     const containerElements = ["svg", "g"];
     for (let cd = 0; cd < destinationNode.childNodes.length; cd++) {
         const child = destinationNode.childNodes[cd] as HTMLElement;
@@ -1381,21 +1328,15 @@ export function copyStylesInline(
             continue;
         }
 
-        const style =
-            (sourceChild as any).currentStyle ||
-            window.getComputedStyle(sourceChild);
+        const style = (sourceChild as any).currentStyle || window.getComputedStyle(sourceChild);
 
         if (!style) continue;
 
         for (let st = 0; st < style.length; st++) {
             const property = style[st];
-            child.style.setProperty(
-                property,
-                style.getPropertyValue(property)
-            );
+            child.style.setProperty(property, style.getPropertyValue(property));
         }
     }
 }
-
 
 export default BaseChart;

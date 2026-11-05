@@ -73,7 +73,7 @@ const ViewSelectorDropdown = observer(() => {
 
     const options = viewManager.all_views;
     const [dirty, setDirty] = useState(false);
-    const [error, setError] = useState<DebugErrorComponentProps['error']>();
+    const [error, setError] = useState<DebugErrorComponentProps["error"]>();
     const [openError, setOpenError] = useState(false);
 
     // todo: uncomment when we fix state issues

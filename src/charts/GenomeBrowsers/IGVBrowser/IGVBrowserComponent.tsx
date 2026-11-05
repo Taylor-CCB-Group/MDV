@@ -7,21 +7,9 @@ import type { Browser } from "igv";
 import { useFieldSpec } from "@/react/hooks";
 import { useGenomicInfo } from "../genomicLocationUtils";
 
+const IGV_DOCUMENT_EVENTS = new Set(["mousemove", "mouseup", "mouseleave", "mouseexit", "keyup"]);
 
-
-
-const IGV_DOCUMENT_EVENTS = new Set([
-    "mousemove",
-    "mouseup",
-    "mouseleave",
-    "mouseexit",
-    "keyup",
-]);
-
-const IGV_WINDOW_EVENTS = new Set([
-    "resize",
-    "beforeunload",
-]);
+const IGV_WINDOW_EVENTS = new Set(["resize", "beforeunload"]);
 
 let igvEventRerouteCleanup: (() => void) | null = null;
 let igvEventRerouteRefCount = 0;
@@ -124,9 +112,6 @@ function installIgvGlobalEventReroute(targetDoc: Document) {
     };
 }
 
-
-
-
 const IGVBrowserComponent = observer(() => {
     const chart = useChart() as IGVBrowser;
     const rootRef = useRef<HTMLDivElement | null>(null);
@@ -134,23 +119,18 @@ const IGVBrowserComponent = observer(() => {
     const [loading, setLoading] = useState(true);
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const featureLabelColumn = useFieldSpec(chart.config.feature_label==="_none_"?undefined:chart.config.feature_label);
-    const {
-        genomicInfo,
-        areColumnsLoaded,
-        genomicColumns,
-    } = useGenomicInfo();
- 
+    const featureLabelColumn = useFieldSpec(
+        chart.config.feature_label === "_none_" ? undefined : chart.config.feature_label,
+    );
+    const { genomicInfo, areColumnsLoaded, genomicColumns } = useGenomicInfo();
+
     const remountNonce = chart.browserRemountNonce;
-
-
 
     useEffect(() => {
         return installIgvGlobalEventReroute(chart.__doc__);
     }, [chart, remountNonce]);
 
     useEffect(() => {
-        
         if (!areColumnsLoaded) {
             setLoading(true);
             setError(null);
@@ -199,7 +179,7 @@ const IGVBrowserComponent = observer(() => {
                         return undefined;
                     }
                     const id = popupData?.[0]?.id;
-                    if (id ){
+                    if (id) {
                         chart.dataStore.dataHighlighted([Number.parseInt(id)], chart);
                     }
                     return false;
@@ -245,22 +225,54 @@ const IGVBrowserComponent = observer(() => {
 
     useEffect(() => {
         const lf = chart.config.feature_label;
-        if (lf !== "_none_" &&(!featureLabelColumn || featureLabelColumn.field !== lf)) return;
+        if (lf !== "_none_" && (!featureLabelColumn || featureLabelColumn.field !== lf)) return;
         void chart.updateMDVFeatures();
-    }, [chart, chart.config.feature_label, featureLabelColumn, ]);
-
-
+    }, [chart, chart.config.feature_label, featureLabelColumn]);
 
     return (
         <div style={{ width: "100%", height: "100%", position: "relative" }}>
             {loading && !browserRef.current ? (
-                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1, background: "rgba(255,255,255,0.6)", pointerEvents: "none" }}>
+                <div
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 1,
+                        background: "rgba(255,255,255,0.6)",
+                        pointerEvents: "none",
+                    }}
+                >
                     Loading IGV...
                 </div>
             ) : null}
             {searching && browserRef.current ? (
-                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2, background: "rgba(255,255,255,0.35)", pointerEvents: "none" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.9)", border: "1px solid #d1d5db", borderRadius: "9999px", padding: "6px 12px", fontSize: "12px", color: "#1f2937" }}>
+                <div
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 2,
+                        background: "rgba(255,255,255,0.35)",
+                        pointerEvents: "none",
+                    }}
+                >
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            background: "rgba(255,255,255,0.9)",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "9999px",
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            color: "#1f2937",
+                        }}
+                    >
                         <span
                             style={{
                                 width: "12px",
@@ -277,11 +289,19 @@ const IGVBrowserComponent = observer(() => {
                 </div>
             ) : null}
             <style>{`@keyframes mdv-igv-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-            {error ? (
-                <div style={{ color: "#b91c1c", padding: "8px", fontSize: "12px" }}>{error}</div>
-            ) : null}
+            {error ? <div style={{ color: "#b91c1c", padding: "8px", fontSize: "12px" }}>{error}</div> : null}
             {chart.guardrailMessage ? (
-                <div style={{ color: "#92400e", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "4px", margin: "4px", padding: "4px 8px", fontSize: "11px" }}>
+                <div
+                    style={{
+                        color: "#92400e",
+                        background: "#fffbeb",
+                        border: "1px solid #fde68a",
+                        borderRadius: "4px",
+                        margin: "4px",
+                        padding: "4px 8px",
+                        fontSize: "11px",
+                    }}
+                >
                     {chart.guardrailMessage}
                 </div>
             ) : null}

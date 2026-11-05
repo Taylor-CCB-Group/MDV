@@ -1,10 +1,7 @@
 import { createMdvPortal } from "@/react/react_utils";
 import { BaseDialog } from "../../utilities/Dialog";
 import FileUploadDialogComponent from "./FileUploadDialog";
-import {
-    VivProvider,
-    createVivStores,
-} from "../../react/components/avivatorish/state";
+import { VivProvider, createVivStores } from "../../react/components/avivatorish/state";
 // import { Dialog } from "@mui/material";
 
 class FileUploadDialogReact extends BaseDialog {

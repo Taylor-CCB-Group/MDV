@@ -3,16 +3,14 @@ import type { BaseConfig } from "@/charts/BaseChart";
 import { useFieldSpec } from "@/react/hooks";
 import { useEffect, useMemo } from "react";
 
-
-
 export function useChartColors<T extends BaseConfig>(chart: BaseChart<T>) {
-    const colorField = chart.config.color_by != null && chart.config.color_by !== "" ? String(chart.config.color_by) : undefined;
+    const colorField =
+        chart.config.color_by != null && chart.config.color_by !== "" ? String(chart.config.color_by) : undefined;
     const colorColumn = useFieldSpec(colorField);
     const logColorScale = chart.config.log_color_scale;
     const trimColorScale = chart.config.trim_color_scale;
     const fallbackOnZero = chart.config.fallbackOnZero;
     const hideMissing = chart.config.hideMissing;
-  
 
     useEffect(() => {
         if (!colorField || !colorColumn || colorColumn.field !== colorField) {
@@ -27,7 +25,7 @@ export function useChartColors<T extends BaseConfig>(chart: BaseChart<T>) {
         return () => {
             window.clearTimeout(timeoutId);
         };
-    }, [chart, colorColumn, colorField,logColorScale, trimColorScale, fallbackOnZero, hideMissing]);
+    }, [chart, colorColumn, colorField, logColorScale, trimColorScale, fallbackOnZero, hideMissing]);
 
     const colorFunction = useMemo(() => {
         if (!colorField || !colorColumn || colorColumn.field !== colorField) {
@@ -43,15 +41,7 @@ export function useChartColors<T extends BaseConfig>(chart: BaseChart<T>) {
         };
         chart._addTrimmedColor(colorField, conf);
         return chart.dataStore.getColorFunction(colorField, conf);
-    }, [
-        chart,
-        colorColumn,
-        colorField,
-        fallbackOnZero,
-        hideMissing,
-        logColorScale,
-        trimColorScale,
-    ]);
+    }, [chart, colorColumn, colorField, fallbackOnZero, hideMissing, logColorScale, trimColorScale]);
 
     return colorFunction;
 }

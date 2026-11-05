@@ -2,7 +2,7 @@ import { parse, type ParseResult } from "papaparse";
 
 type ColumnType = "float" | "integer" | "boolean" | "date" | "string" | "unknown";
 type DataValue = string | number | boolean | null;
-type FileType = 'csv' | 'tsv';
+type FileType = "csv" | "tsv";
 
 interface FileMessage {
     file: File;
@@ -26,9 +26,9 @@ type WorkerResponse = PreviewData | ErrorResponse;
 type ParsedRow = Record<string | number, DataValue>;
 
 self.onmessage = (event: MessageEvent<File | FileMessage>) => {
-    const file: File = 'file' in event.data ? event.data.file : event.data;
-    const fileType: FileType = ('fileType' in event.data ? event.data.fileType : 'csv') as FileType;
-    const delimiter: string = fileType === 'tsv' ? '\t' : ',';
+    const file: File = "file" in event.data ? event.data.file : event.data;
+    const fileType: FileType = ("fileType" in event.data ? event.data.fileType : "csv") as FileType;
+    const delimiter: string = fileType === "tsv" ? "\t" : ",";
 
     let totalRowCount = 0;
     let previewData: PreviewData = {
@@ -69,23 +69,19 @@ self.onmessage = (event: MessageEvent<File | FileMessage>) => {
                     const columnCount = columnNames.length;
 
                     columnNames.forEach((name: string | number) => {
-                        const columnValues = results.data.map(row => row[name]);
-                        const uniqueTypes = new Set(
-                            columnValues.map(value => typeof value)
-                        );
+                        const columnValues = results.data.map((row) => row[name]);
+                        const uniqueTypes = new Set(columnValues.map((value) => typeof value));
 
                         if (uniqueTypes.has("number")) {
                             const isFloat = columnValues.some(
-                                value => typeof value === 'number' && 
-                                value !== Math.floor(value)
+                                (value) => typeof value === "number" && value !== Math.floor(value),
                             );
                             columnTypes.push(isFloat ? "float" : "integer");
                         } else if (uniqueTypes.has("boolean")) {
                             columnTypes.push("boolean");
                         } else if (uniqueTypes.has("string")) {
                             const isDate = columnValues.every(
-                                value => typeof value === 'string' && 
-                                !Number.isNaN(Date.parse(value))
+                                (value) => typeof value === "string" && !Number.isNaN(Date.parse(value)),
                             );
                             columnTypes.push(isDate ? "date" : "string");
                         } else {
@@ -93,9 +89,7 @@ self.onmessage = (event: MessageEvent<File | FileMessage>) => {
                         }
                     });
 
-                    const secondRowValuesArray = columnNames.map(
-                        name => secondRowValues[name]
-                    );
+                    const secondRowValuesArray = columnNames.map((name) => secondRowValues[name]);
 
                     previewData = {
                         columnNames,

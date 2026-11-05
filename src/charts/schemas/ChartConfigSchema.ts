@@ -2,57 +2,73 @@ import { z } from "zod/v4";
 import { registerChartConfigSchema, getAllChartConfigSchemas } from "./ChartConfigRegistry";
 
 // Basic data types that can be stored in columns
-export const DataTypeSchema = z.enum([
-    "integer",
-    "double", 
-    "text",
-    "text16",
-    "unique",
-    "multitext",
-    "int32"
-]).describe("Data types for chart columns: integer/double for numbers, text/text16 for categorical data with value limits, unique for unlimited text, multitext for multiple values per item, int32 for large integers");
+export const DataTypeSchema = z
+    .enum(["integer", "double", "text", "text16", "unique", "multitext", "int32"])
+    .describe(
+        "Data types for chart columns: integer/double for numbers, text/text16 for categorical data with value limits, unique for unlimited text, multitext for multiple values per item, int32 for large integers",
+    );
 
 // Parameter types for chart configuration
-export const ParamTypeSchema = z.enum([
-    "text",
-    "number", 
-    "multitext",
-    "text16",
-    "_multi_column:number",
-    "_multi_column:all"
-]).describe("Parameter types for chart configuration: basic types plus special multi-column selectors for complex data relationships");
+export const ParamTypeSchema = z
+    .enum(["text", "number", "multitext", "text16", "_multi_column:number", "_multi_column:all"])
+    .describe(
+        "Parameter types for chart configuration: basic types plus special multi-column selectors for complex data relationships",
+    );
 
 // Serialized form of column queries
-export const RowsAsColsQuerySerializedSchema = z.object({
-    type: z.literal("RowsAsColsQuery").describe("Identifies this as a rows-as-columns query"),
-    linkedDsName: z.string().describe("Name of the linked datasource that contains the row data"),
-    subgroupName: z.string().optional().describe(
-        "Canonical rows-as-columns subgroup key (see link `subgroups`). New `RowsAsColsQuery.toJSON` output always includes this; omit = first subgroup. Zod: keep optional until legacy configs are migrated, then make required.",
-    ),
-    maxItems: z.number().int().positive().describe("Maximum number of items to retrieve from the linked datasource"),
-}).describe("Configuration for queries that treat rows from another datasource as columns in the current chart");
+export const RowsAsColsQuerySerializedSchema = z
+    .object({
+        type: z.literal("RowsAsColsQuery").describe("Identifies this as a rows-as-columns query"),
+        linkedDsName: z.string().describe("Name of the linked datasource that contains the row data"),
+        subgroupName: z
+            .string()
+            .optional()
+            .describe(
+                "Canonical rows-as-columns subgroup key (see link `subgroups`). New `RowsAsColsQuery.toJSON` output always includes this; omit = first subgroup. Zod: keep optional until legacy configs are migrated, then make required.",
+            ),
+        maxItems: z
+            .number()
+            .int()
+            .positive()
+            .describe("Maximum number of items to retrieve from the linked datasource"),
+    })
+    .describe("Configuration for queries that treat rows from another datasource as columns in the current chart");
 
 // Field specification can be a string (FieldName) or a serialized query
-export const FieldSpecSchema = z.union([
-    z.string().describe("Direct field name reference"), // FieldName
-    RowsAsColsQuerySerializedSchema
-]).describe("A field specification can be either a direct column name or a complex query to another datasource");
+export const FieldSpecSchema = z
+    .union([
+        z.string().describe("Direct field name reference"), // FieldName
+        RowsAsColsQuerySerializedSchema,
+    ])
+    .describe("A field specification can be either a direct column name or a complex query to another datasource");
 
 // Field specifications (array of field specs)
-export const FieldSpecsSchema = z.array(FieldSpecSchema).describe("Array of field specifications defining which data columns to use in the chart");
+export const FieldSpecsSchema = z
+    .array(FieldSpecSchema)
+    .describe("Array of field specifications defining which data columns to use in the chart");
 
-export const GridStackConfigSchema = z.object({
-    gssize: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional().describe("GridStack size as [width, height] in grid units"),
-    gsposition: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]).optional().describe("GridStack position as [x, y] coordinates"),
-}).describe("GridStack layout configuration for dashboard positioning");
+export const GridStackConfigSchema = z
+    .object({
+        gssize: z
+            .tuple([z.number().int().positive(), z.number().int().positive()])
+            .optional()
+            .describe("GridStack size as [width, height] in grid units"),
+        gsposition: z
+            .tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])
+            .optional()
+            .describe("GridStack position as [x, y] coordinates"),
+    })
+    .describe("GridStack layout configuration for dashboard positioning");
 
 // Allow `title` to be provided as either a string or a single-element string[]
-const TitleSchema = z.preprocess((val) => {
-    if (Array.isArray(val) && val.length === 1 && typeof val[0] === "string") {
-        return val[0];
-    }
-    return val;
-}, z.string()).describe("Display title for the chart");
+const TitleSchema = z
+    .preprocess((val) => {
+        if (Array.isArray(val) && val.length === 1 && typeof val[0] === "string") {
+            return val[0];
+        }
+        return val;
+    }, z.string())
+    .describe("Display title for the chart");
 
 // Base configuration that all charts extend
 export const BaseConfigSchema = GridStackConfigSchema.extend({
@@ -64,118 +80,159 @@ export const BaseConfigSchema = GridStackConfigSchema.extend({
     type: z.string().describe("Chart type identifier (e.g., 'scatter_plot', 'bar_chart')"),
     param: FieldSpecsSchema.describe("Array of field specifications defining the data columns used by this chart"),
     title_color: z.string().optional().describe("CSS color value for the chart title"),
-    version: z.string().optional().describe("Schema version for this chart configuration (used for future migration support)"),
+    version: z
+        .string()
+        .optional()
+        .describe("Schema version for this chart configuration (used for future migration support)"),
 }).describe("Base configuration shared by all chart types, including layout, styling, and data mapping");
 
 // todo - this should be a union of all the color config options, not applied to all charts
-export const ChartColorConfigSchema = z.object({
-    color_by: FieldSpecSchema.optional().describe("Field or column configuration used to determine color mapping"),
-    color_legend: z
-        .object({
-            // Keep optional for backwards compatibility with legacy/partially-serialized
-            // configs where `color_legend` exists but `display` may be missing/misspelled.
-            display: z.boolean().optional().describe("Whether the color legend is visible"),
-            pos: z.tuple([z.number(), z.number()]).optional().describe("Legend position in pixels [left, top]"),
-            filter: z
-                .discriminatedUnion("kind", [
-                    z.object({
-                        kind: z.literal("categorical"),
-                        column: z.string(),
-                        value: z.string(),
-                    }),
-                    z.object({
-                        kind: z.literal("continuous"),
-                        column: z.string(),
-                        range: z.tuple([z.number(), z.number()]),
-                    }),
-                ])
-                .optional()
-                .describe("Active color legend filter"),
-        })
-        .optional()
-        .describe("Color legend display and position"),
-    log_color_scale: z.boolean().optional().describe("Whether to use logarithmic scaling for color values"),
-    trim_color_scale: z.enum(["0.05", "0.01", "0.001", "none"]).optional().describe("Quantile trimming for color scale to handle outliers"),
-    color_overlay: z.number().optional().describe("Opacity value for color overlay effects"),
-    fallbackOnZero: z.boolean().optional().describe("Whether to use fallback colors when values are zero")
-}).describe("Configuration for chart color mapping and scaling");
-
+export const ChartColorConfigSchema = z
+    .object({
+        color_by: FieldSpecSchema.optional().describe("Field or column configuration used to determine color mapping"),
+        color_legend: z
+            .object({
+                // Keep optional for backwards compatibility with legacy/partially-serialized
+                // configs where `color_legend` exists but `display` may be missing/misspelled.
+                display: z.boolean().optional().describe("Whether the color legend is visible"),
+                pos: z.tuple([z.number(), z.number()]).optional().describe("Legend position in pixels [left, top]"),
+                filter: z
+                    .discriminatedUnion("kind", [
+                        z.object({
+                            kind: z.literal("categorical"),
+                            column: z.string(),
+                            value: z.string(),
+                        }),
+                        z.object({
+                            kind: z.literal("continuous"),
+                            column: z.string(),
+                            range: z.tuple([z.number(), z.number()]),
+                        }),
+                    ])
+                    .optional()
+                    .describe("Active color legend filter"),
+            })
+            .optional()
+            .describe("Color legend display and position"),
+        log_color_scale: z.boolean().optional().describe("Whether to use logarithmic scaling for color values"),
+        trim_color_scale: z
+            .enum(["0.05", "0.01", "0.001", "none"])
+            .optional()
+            .describe("Quantile trimming for color scale to handle outliers"),
+        color_overlay: z.number().optional().describe("Opacity value for color overlay effects"),
+        fallbackOnZero: z.boolean().optional().describe("Whether to use fallback colors when values are zero"),
+    })
+    .describe("Configuration for chart color mapping and scaling");
 
 // Tooltip configuration
-export const TooltipConfigSchema = z.object({
-    tooltip: z.object({
-        show: z.boolean().describe("Whether to display tooltips on hover"),
-        column: z.union([FieldSpecSchema, FieldSpecsSchema]).optional().describe("Field(s) to display in tooltip content")
+export const TooltipConfigSchema = z
+    .object({
+        tooltip: z.object({
+            show: z.boolean().describe("Whether to display tooltips on hover"),
+            column: z
+                .union([FieldSpecSchema, FieldSpecsSchema])
+                .optional()
+                .describe("Field(s) to display in tooltip content"),
+        }),
     })
-}).describe("Configuration for chart tooltip behavior and content");
+    .describe("Configuration for chart tooltip behavior and content");
 
-const CategorySelectionSchema = z.union([
-    z.string(),
-    z.array(z.string()),
-]).describe("One or more selected categorical values");
+const CategorySelectionSchema = z
+    .union([z.string(), z.array(z.string())])
+    .describe("One or more selected categorical values");
 
-const CategoryFilterSchema = z.object({
-    column: z.string().describe("Categorical column used for filtering"),
-    category: CategorySelectionSchema.describe("Selected categorical values"),
-}).describe("A categorical filter applied to a scatter plot");
+const CategoryFilterSchema = z
+    .object({
+        column: z.string().describe("Categorical column used for filtering"),
+        category: CategorySelectionSchema.describe("Selected categorical values"),
+    })
+    .describe("A categorical filter applied to a scatter plot");
 
-const FieldLegendConfigSchema = z.object({
-    display: z.boolean().describe("Whether to display the density field legend"),
-}).describe("Configuration for density field legend visibility");
+const FieldLegendConfigSchema = z
+    .object({
+        display: z.boolean().describe("Whether to display the density field legend"),
+    })
+    .describe("Configuration for density field legend visibility");
 
-const ContourVisualConfigSchema = z.object({
-    contour_fill: z.boolean().optional().describe("Whether to render filled contour areas"),
-    contour_fillThreshold: z.number().optional().describe("Threshold controlling how much of the contour is filled"),
-    contour_bandwidth: z.number().positive().optional().describe("Kernel density bandwidth used for contour generation"),
-    contour_intensity: z.number().min(0).max(1).optional().describe("Opacity/intensity applied to contour fills"),
-    contour_opacity: z.number().min(0).max(1).optional().describe("Opacity applied to contour lines"),
-}).describe("Visual contour configuration shared by density-style charts");
+const ContourVisualConfigSchema = z
+    .object({
+        contour_fill: z.boolean().optional().describe("Whether to render filled contour areas"),
+        contour_fillThreshold: z
+            .number()
+            .optional()
+            .describe("Threshold controlling how much of the contour is filled"),
+        contour_bandwidth: z
+            .number()
+            .positive()
+            .optional()
+            .describe("Kernel density bandwidth used for contour generation"),
+        contour_intensity: z.number().min(0).max(1).optional().describe("Opacity/intensity applied to contour fills"),
+        contour_opacity: z.number().min(0).max(1).optional().describe("Opacity applied to contour lines"),
+    })
+    .describe("Visual contour configuration shared by density-style charts");
 
-const DensityFieldsConfigSchema = z.object({
-    densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),
-}).describe("Density field selection shared by contour-based charts");
+const DensityFieldsConfigSchema = z
+    .object({
+        densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),
+    })
+    .describe("Density field selection shared by contour-based charts");
 
-const LegacyContourCategorySelectionConfigSchema = z.object({
-    contourParameter: FieldSpecSchema.optional().describe("Categorical field used to choose contour categories"),
-    category1: CategorySelectionSchema.optional().describe("First contour category selection"),
-    category2: CategorySelectionSchema.optional().describe("Second contour category selection"),
-}).describe("Legacy contour category selection shared by deck scatter density charts");
+const LegacyContourCategorySelectionConfigSchema = z
+    .object({
+        contourParameter: FieldSpecSchema.optional().describe("Categorical field used to choose contour categories"),
+        category1: CategorySelectionSchema.optional().describe("First contour category selection"),
+        category2: CategorySelectionSchema.optional().describe("Second contour category selection"),
+    })
+    .describe("Legacy contour category selection shared by deck scatter density charts");
 
-const DensityFieldLegendConfigSchema = z.object({
-    field_legend: FieldLegendConfigSchema.optional().describe("Legend settings for density field overlays"),
-}).describe("Legend configuration for density field overlays");
+const DensityFieldLegendConfigSchema = z
+    .object({
+        field_legend: FieldLegendConfigSchema.optional().describe("Legend settings for density field overlays"),
+    })
+    .describe("Legend configuration for density field overlays");
 
-const ContourScatterConfigSchema = z.object({
-    ...ContourVisualConfigSchema.shape,
-    ...LegacyContourCategorySelectionConfigSchema.shape,
-    ...DensityFieldsConfigSchema.shape,
-    ...DensityFieldLegendConfigSchema.shape,
-}).describe("Contour-specific configuration shared by deck scatter charts and spatial viewers");
+const ContourScatterConfigSchema = z
+    .object({
+        ...ContourVisualConfigSchema.shape,
+        ...LegacyContourCategorySelectionConfigSchema.shape,
+        ...DensityFieldsConfigSchema.shape,
+        ...DensityFieldLegendConfigSchema.shape,
+    })
+    .describe("Contour-specific configuration shared by deck scatter charts and spatial viewers");
 
-const ScatterAxisSchema = z.object({
-    size: z.number().describe("Reserved size for this axis in pixels"),
-    tickfont: z.number().describe("Axis tick font size"),
-    rotate_labels: z.boolean().describe("Whether to rotate axis tick labels"),
-}).describe("Configuration for a single scatter plot axis");
+const ScatterAxisSchema = z
+    .object({
+        size: z.number().describe("Reserved size for this axis in pixels"),
+        tickfont: z.number().describe("Axis tick font size"),
+        rotate_labels: z.boolean().describe("Whether to rotate axis tick labels"),
+    })
+    .describe("Configuration for a single scatter plot axis");
 
-const ScatterAxis2DSchema = z.object({
-    x: ScatterAxisSchema.describe("X axis settings"),
-    y: ScatterAxisSchema.describe("Y axis settings"),
-}).describe("Configuration for 2D scatter plot axes");
+const ScatterAxis2DSchema = z
+    .object({
+        x: ScatterAxisSchema.describe("X axis settings"),
+        y: ScatterAxisSchema.describe("Y axis settings"),
+    })
+    .describe("Configuration for 2D scatter plot axes");
 
-const OrthographicViewStateSchema = z.object({
-    target: z.tuple([z.number(), z.number(), z.number()]).describe("Orthographic view target in world coordinates"),
-    zoom: z.number().describe("Current zoom level"),
-    zoomX: z.number().optional().describe("Zoom along x, where the axes are scaled separately"),
-    zoomY: z.number().optional().describe("Zoom along y, where the axes are scaled separately"),
-    minZoom: z.number().optional().describe("Minimum allowed zoom"),
-    maxZoom: z.number().optional().describe("Maximum allowed zoom"),
-}).passthrough().describe("Serializable orthographic deck.gl view state");
+const OrthographicViewStateSchema = z
+    .object({
+        target: z.tuple([z.number(), z.number(), z.number()]).describe("Orthographic view target in world coordinates"),
+        zoom: z.number().describe("Current zoom level"),
+        zoomX: z.number().optional().describe("Zoom along x, where the axes are scaled separately"),
+        zoomY: z.number().optional().describe("Zoom along y, where the axes are scaled separately"),
+        minZoom: z.number().optional().describe("Minimum allowed zoom"),
+        maxZoom: z.number().optional().describe("Maximum allowed zoom"),
+    })
+    .passthrough()
+    .describe("Serializable orthographic deck.gl view state");
 
 const OrbitViewStateSchema = OrthographicViewStateSchema.extend({
     rotationOrbit: z.number().optional().describe("Orbit rotation in degrees"),
     rotationX: z.number().optional().describe("X-axis rotation in degrees"),
-}).passthrough().describe("Serializable orbit deck.gl view state");
+})
+    .passthrough()
+    .describe("Serializable orbit deck.gl view state");
 
 const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
     ...ChartColorConfigSchema.shape,
@@ -185,18 +242,31 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
     radius: z.number().positive().optional().describe("Scatter point radius"),
     opacity: z.number().min(0).max(1).optional().describe("Scatter point opacity"),
     category_filters: z.array(CategoryFilterSchema).optional().describe("Categorical filters applied before rendering"),
-    background_filter: z.object({
-        column: z.string().nullable().describe("Categorical column used for filtering; null when unset"),
-        category: CategorySelectionSchema.optional().describe("Values of the column to keep; rows outside them are hidden from this chart"),
-    }).nullable().optional().describe("Hides rows outside the selected categories from this chart only"),
+    background_filter: z
+        .object({
+            column: z.string().nullable().describe("Categorical column used for filtering; null when unset"),
+            category: CategorySelectionSchema.optional().describe(
+                "Values of the column to keep; rows outside them are hidden from this chart",
+            ),
+        })
+        .nullable()
+        .optional()
+        .describe("Hides rows outside the selected categories from this chart only"),
     on_filter: z.enum(["hide", "grey"]).optional().describe("How filtered-out points should be rendered"),
     zoom_on_filter: z.boolean().optional().describe("Whether filtering should auto-fit the current view"),
     point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
-    axis_scaling: z.enum(["equal", "fit"]).optional().describe("2D only: `equal` keeps one scale for both axes (the default), `fit` scales each axis to the chart"),
+    axis_scaling: z
+        .enum(["equal", "fit"])
+        .optional()
+        .describe("2D only: `equal` keeps one scale for both axes (the default), `fit` scales each axis to the chart"),
     selectionFeatureCollection: z.unknown().optional().describe("Serialized selection overlay geometry"),
     region: z.string().optional().describe("Associated region identifier when rendering spatial scatter plots"),
     hideMissing: z.boolean().optional().describe("Whether to hide points with missing numeric color values"),
-    render_backend: z.enum(["webgl", "webgpu"]).nullable().optional().describe("deck.gl rendering backend; absent follows the browser's default"),
+    render_backend: z
+        .enum(["webgl", "webgpu"])
+        .nullable()
+        .optional()
+        .describe("deck.gl rendering backend; absent follows the browser's default"),
 }).describe("Shared configuration for deck.gl scatter charts");
 
 // Chart-specific configuration schemas
@@ -226,8 +296,14 @@ export const HeatmapConfigSchema = BaseConfigSchema.extend({
 
 export const CategoryHeatmapConfigSchema = BaseConfigSchema.extend({
     type: z.literal("category_heatmap").describe("Category heatmap chart type"),
-    x_display_categories: z.array(z.string()).optional().describe("Optional x-axis categories to display in the heatmap"),
-    y_display_categories: z.array(z.string()).optional().describe("Optional y-axis categories to display in the heatmap"),
+    x_display_categories: z
+        .array(z.string())
+        .optional()
+        .describe("Optional x-axis categories to display in the heatmap"),
+    y_display_categories: z
+        .array(z.string())
+        .optional()
+        .describe("Optional y-axis categories to display in the heatmap"),
 }).describe("Configuration for category heatmaps showing categorical co-occurrence counts");
 
 export const DotPlotConfigSchema = BaseConfigSchema.extend({
@@ -239,18 +315,31 @@ export const CompoundDotPlotConfigSchema = BaseConfigSchema.extend({
     type: z.literal("compound_dot_plot").describe("Compound dot plot chart type"),
     y_axis_order: z.enum(["data", "alphabetical"]).optional().describe("Order of the y-axis categories"),
     threshold_value: z.number().optional().describe("A value counts as expressed when it is greater than this"),
-    split_by: z.string().nullable().optional().describe("Category column to split by, one panel per value; null for one panel"),
+    split_by: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Category column to split by, one panel per value; null for one panel"),
     split_values: z.array(z.string()).optional().describe("Values of split_by to show, in panel order"),
-    color_scale: z.object({
-        palette: z.enum(["reds", "blue_white_red"]).optional().describe("Colour palette for mean expression"),
-        log: z.boolean().optional().describe("Use a log colour scale"),
-        mode: z.enum(["auto", "manual"]).optional().describe("auto: from the data, shared by all panels; manual: from min and max"),
-        min: z.number().optional().describe("Colour range minimum when mode is manual"),
-        max: z.number().optional().describe("Colour range maximum when mode is manual"),
-    }).optional().describe("Colour scale for mean expression, shared by all panels"),
+    color_scale: z
+        .object({
+            palette: z.enum(["reds", "blue_white_red"]).optional().describe("Colour palette for mean expression"),
+            log: z.boolean().optional().describe("Use a log colour scale"),
+            mode: z
+                .enum(["auto", "manual"])
+                .optional()
+                .describe("auto: from the data, shared by all panels; manual: from min and max"),
+            min: z.number().optional().describe("Colour range minimum when mode is manual"),
+            max: z.number().optional().describe("Colour range maximum when mode is manual"),
+        })
+        .optional()
+        .describe("Colour scale for mean expression, shared by all panels"),
     color_legend: z.object({ display: z.boolean() }).optional().describe("Show the colour legend"),
     fraction_legend: z.object({ display: z.boolean() }).optional().describe("Show the fraction legend"),
-    reserve_legend_space: z.boolean().optional().describe("Keep space above the plot for the legends; off, the plot fills the height"),
+    reserve_legend_space: z
+        .boolean()
+        .optional()
+        .describe("Keep space above the plot for the legends; off, the plot fills the height"),
 }).describe("Configuration for React dot plots, optionally split into panels that share one colour and size scale");
 
 // earlier type name of the compound dot plot, still accepted
@@ -377,8 +466,10 @@ export const SelectionDialogConfigSchema = BaseConfigSchema.extend({
 
 export const GeneInfoSchema = BaseConfigSchema.extend({
     type: z.literal("geneNetwork").describe("Gene information from genenetwork.nl API"),
-    autoScroll: z.boolean().optional().describe("Automatically scroll to highlighted items")
-}).describe("Configuration for chart allowing for selection of genes with information retrieved from genenetwork.nl API");
+    autoScroll: z.boolean().optional().describe("Automatically scroll to highlighted items"),
+}).describe(
+    "Configuration for chart allowing for selection of genes with information retrieved from genenetwork.nl API",
+);
 
 // Register all chart-specific schemas with the registry
 // This establishes the pattern for future co-location of schemas with chart implementations
@@ -417,33 +508,59 @@ registerChartConfigSchema("geneNetwork", GeneInfoSchema, { version: "1" });
 // This ensures the union is derived from registered schemas, establishing the pattern
 // for future co-location where schemas register themselves as side-effects
 const registeredSchemas = getAllChartConfigSchemas();
-const allSchemas = registeredSchemas.length > 0 
-    ? [...registeredSchemas, BaseConfigSchema]
-    : [BaseConfigSchema];
-export const ChartConfigSchema = z.union(allSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]])
+const allSchemas = registeredSchemas.length > 0 ? [...registeredSchemas, BaseConfigSchema] : [BaseConfigSchema];
+export const ChartConfigSchema = z
+    .union(allSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]])
     .describe("Union of all possible chart configuration types, allowing for type-safe chart creation");
 
 // Schema for view configuration
-export const ViewConfigSchema = z.object({
-    dataSources: z.record(z.string(), z.object({
-        layout: z.enum(["absolute", "gridstack"]).optional().describe("Layout system for positioning charts: absolute for fixed positioning, gridstack for responsive grid"),
-        panelWidth: z.number().min(0).max(100).optional().describe("Panel width as percentage of viewport (0-100)")
-    })).describe("Configuration for each datasource in the view"),
-    initialCharts: z.record(z.string(), z.array(ChartConfigSchema)).describe("Initial charts to display for each datasource")
-}).describe("Configuration for a complete view containing multiple datasources and their charts");
+export const ViewConfigSchema = z
+    .object({
+        dataSources: z
+            .record(
+                z.string(),
+                z.object({
+                    layout: z
+                        .enum(["absolute", "gridstack"])
+                        .optional()
+                        .describe(
+                            "Layout system for positioning charts: absolute for fixed positioning, gridstack for responsive grid",
+                        ),
+                    panelWidth: z
+                        .number()
+                        .min(0)
+                        .max(100)
+                        .optional()
+                        .describe("Panel width as percentage of viewport (0-100)"),
+                }),
+            )
+            .describe("Configuration for each datasource in the view"),
+        initialCharts: z
+            .record(z.string(), z.array(ChartConfigSchema))
+            .describe("Initial charts to display for each datasource"),
+    })
+    .describe("Configuration for a complete view containing multiple datasources and their charts");
 
 // Schema for chart manager configuration
-export const ChartManagerConfigSchema = z.object({
-    initialCharts: z.array(ChartConfigSchema).optional().describe("Initial charts to create when the manager starts"),
-    all_views: z.array(z.string()).optional().describe("List of all available view names"),
-    current_view: z.string().optional().describe("Currently active view name"),
-    permission: z.string().optional().describe("Permission level for chart operations"),
-    gridstack: z.boolean().optional().describe("Whether to use GridStack for chart layout"),
-    chat_enabled: z.boolean().optional().describe("Whether chat functionality is enabled"),
-    mdv_api_root: z.string().optional().describe("Root URL for MDV API endpoints"),
-    onlyView: ViewConfigSchema.optional().describe("Single view configuration when only one view is needed"),
-    show_gallery_on_open: z.boolean().optional().describe("Whether to show the gallery view by default when the project is opened"),
-}).describe("Top-level configuration for the chart manager controlling the entire dashboard");
+export const ChartManagerConfigSchema = z
+    .object({
+        initialCharts: z
+            .array(ChartConfigSchema)
+            .optional()
+            .describe("Initial charts to create when the manager starts"),
+        all_views: z.array(z.string()).optional().describe("List of all available view names"),
+        current_view: z.string().optional().describe("Currently active view name"),
+        permission: z.string().optional().describe("Permission level for chart operations"),
+        gridstack: z.boolean().optional().describe("Whether to use GridStack for chart layout"),
+        chat_enabled: z.boolean().optional().describe("Whether chat functionality is enabled"),
+        mdv_api_root: z.string().optional().describe("Root URL for MDV API endpoints"),
+        onlyView: ViewConfigSchema.optional().describe("Single view configuration when only one view is needed"),
+        show_gallery_on_open: z
+            .boolean()
+            .optional()
+            .describe("Whether to show the gallery view by default when the project is opened"),
+    })
+    .describe("Top-level configuration for the chart manager controlling the entire dashboard");
 
 // Export types
 export type DataType = z.infer<typeof DataTypeSchema>;

@@ -91,9 +91,7 @@ class MultiLineChart extends SVGChart {
 
             this.config.color_legend.display = false;
             this.setColorLegend();
-            this.y_scale.domain(
-                this.dataStore.getColumnValues(this.config.param[1]),
-            );
+            this.y_scale.domain(this.dataStore.getColumnValues(this.config.param[1]));
         } else {
             this.y_scale = scaleLinear();
             this.y_axis_call = axisLeft(this.y_scale);
@@ -158,19 +156,14 @@ class MultiLineChart extends SVGChart {
     drawChart() {
         const c = this.config;
         const vals = this.dataStore.getColumnValues(c.param[1]);
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(400)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(400).ease(easeLinear);
         const cdim = this._getContentDimensions();
         const y_scales = [];
         const display_data = [];
         const rowHeight = cdim.height / this.data.length;
         const axisd = [];
         for (let i = 0; i < this.data.length; i++) {
-            const scale = c.stacked
-                ? rowHeight / this.data[i].max
-                : cdim.height / this.data[i].max;
+            const scale = c.stacked ? rowHeight / this.data[i].max : cdim.height / this.data[i].max;
             const arr = c.stacked
                 ? this.data[i].map((x) => rowHeight * i + rowHeight - x * scale)
                 : this.data[i].map((x) => cdim.height - x * scale);
@@ -234,9 +227,7 @@ class MultiLineChart extends SVGChart {
                         .x((dd, ii) => xpos[ii])
                         .y0((dd) => dd)
                         .y1((d) => {
-                            return c.stacked
-                                ? rowHeight * i + rowHeight
-                                : cdim.height;
+                            return c.stacked ? rowHeight * i + rowHeight : cdim.height;
                         })(d),
                 );
         } else {
@@ -263,7 +254,8 @@ class MultiLineChart extends SVGChart {
         s.splice(
             1,
             0,
-            {   /// todo use generic ParamSettingsGui instead of this, once it's working...
+            {
+                /// todo use generic ParamSettingsGui instead of this, once it's working...
                 type: "dropdown",
                 current_value: c.param[1],
                 label: "Change Cetegories (y axis)",

@@ -2,7 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type RangeDimension from "../datastore/RangeDimension";
 import { type ScatterPlotConfig, useRegionScale, useScatterplotLayer } from "./scatter_state";
 import { Matrix4 } from "@math.gl/core";
-import { CompositeMode, type SimpleFeature, type SimpleFeatureCollection, type SimpleGeometry, type Position, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
+import {
+    CompositeMode,
+    type SimpleFeature,
+    type SimpleFeatureCollection,
+    type SimpleGeometry,
+    type Position,
+    type GeoJsonEditMode,
+} from "@deck.gl-community/editable-layers";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { type FilterPolyRegionOpts, useChartID, useRangeDimension2D } from "./hooks";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
@@ -33,7 +40,7 @@ export type RangeState = {
     editableLayer: MonkeyPatchEditableGeoJsonLayer;
     editingGateId: string | null;
     setEditingGateId: (id: string | null) => void;
-    setSelectionFeatureCollection: (newSelection: SimpleFeatureCollection) => void
+    setSelectionFeatureCollection: (newSelection: SimpleFeatureCollection) => void;
     selectionMode: GeoJsonEditMode;
     setSelectionMode: (mode: GeoJsonEditMode) => void;
     selectedTool: Tool;
@@ -57,7 +64,6 @@ export type SpatialAnnotationState = {
 // Could more usefully be thought of as SpatialContext?
 const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined as any);
 
-
 function useSelectionCoords(selection: SimpleFeatureCollection) {
     // where should we keep this in config for persisting?
     const feature = selection?.features[0];
@@ -76,16 +82,18 @@ function useSelectionCoords(selection: SimpleFeatureCollection) {
 }
 
 function isSimpleFeature(feature: unknown): feature is SimpleFeature {
-    return typeof feature === "object"
-        && feature !== null
-        && "geometry" in feature
-        && typeof feature.geometry === "object"
-        && feature.geometry !== null
-        && "type" in feature.geometry
-        && feature.geometry.type !== "GeometryCollection";
+    return (
+        typeof feature === "object" &&
+        feature !== null &&
+        "geometry" in feature &&
+        typeof feature.geometry === "object" &&
+        feature.geometry !== null &&
+        "type" in feature.geometry &&
+        feature.geometry.type !== "GeometryCollection"
+    );
 }
 
-/** 
+/**
  * for this to be more useful as a hook will depend on state/context...
  * and with proper spatialdata support we should review this so we have proper coordinate system.
  * hopefully we can move some things around for better HMR editing DX as well.
@@ -101,7 +109,6 @@ function useScatterModelMatrix() {
     return { modelMatrix, setModelMatrix };
 }
 
-
 function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const id = useChartID();
     const { modelMatrix } = useScatterModelMatrix();
@@ -113,9 +120,12 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     // config marks this `observable.ref` (chartConfigUtils): deep observability converted the whole
     // collection on every edit and made deck.gl read its coordinates through proxies
     const { selectionFeatureCollection } = chart.config;
-    const setSelectionFeatureCollection = useCallback(action((newSelection: SimpleFeatureCollection) => {
-        chart.config.selectionFeatureCollection = newSelection;
-    }), []);
+    const setSelectionFeatureCollection = useCallback(
+        action((newSelection: SimpleFeatureCollection) => {
+            chart.config.selectionFeatureCollection = newSelection;
+        }),
+        [],
+    );
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
     const [selectedTool, setSelectedTool] = useState<Tool>("Pan");
     const [editingGateId, setEditingGateId] = useState<string | null>(null);
@@ -127,23 +137,17 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
 
         const gate = gateManager.gates.get(editingGateId);
         const [r, g, b] = gate?.color ?? DEFAULT_GATE_COLOR;
-        
+
         return [r, g, b, 45]; // lower opacity of original color
     }, [editingGateId, gateManager]);
-    
+
     const getLineColor = useCallback((): [number, number, number, number] => {
-        
         if (!editingGateId) return SELECTION_LINE_COLOR; // Dark grey selection line
         const gate = gateManager.gates.get(editingGateId);
         const [r, g, b] = gate?.color ?? DEFAULT_GATE_COLOR;
 
         // brighten the color to make it look highlighted
-        return [
-            Math.min(255, r + 60),
-            Math.min(255, g + 60),
-            Math.min(255, b + 60),
-            255,
-        ];
+        return [Math.min(255, r + 60), Math.min(255, g + 60), Math.min(255, b + 60), 255];
     }, [editingGateId, gateManager]);
 
     const clearSelection = useCallback(() => {
@@ -177,9 +181,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         const ds = chart.dataStore;
         const regionField = ds.regions?.region_field;
         // Get the region value of the gate if it exists
-        const regionValue = editingGateId
-            ? gateManager.gates.get(editingGateId)?.region
-            : undefined;
+        const regionValue = editingGateId ? gateManager.gates.get(editingGateId)?.region : undefined;
 
         // Guard async callbacks with cancellation flag so only the latest
         // effect run calls the filterPoly thereby avoiding stale polygon filter if
@@ -208,14 +210,14 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
 
         return () => {
             cancelled = true;
-        }
+        };
     }, [coords, filterPoly, removeFilter, chart, gateManager, editingGateId]);
     // The collection holds at most one shape (see `onEdit`), and it is always the one being
     // edited. Selecting it on hover made translate-vs-draw depend on whether a hover pick had
     // landed before the press, which on WebGPU (async picking) it often had not.
     const hasShape = selectionFeatureCollection.features.length > 0;
     const selectedFeatureIndexes = useMemo(() => (hasShape ? [0] : []), [hasShape]);
-    
+
     // we might be able to pass this to modeConfig, if it knows what to do with it?
     // const outerContainer = useOuterContainer();
 
@@ -235,9 +237,9 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             editHandlePointStrokeWidth: 1,
             editHandleIconSizeScale: 1,
             editHandlePointRadiusMaxPixels: 5,
-            getEditHandlePointColor: h => {
+            getEditHandlePointColor: (h) => {
                 const intermediate = h.properties.editHandleType === "intermediate";
-                return [0, 0, intermediate ? 200 : 0, 255]
+                return [0, 0, intermediate ? 200 : 0, 255];
             },
             selectedFeatureIndexes,
             // adding `action` here gets rid of warnings but doesn't help with performance.
@@ -247,7 +249,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
                 // updatedData.features = [feature];
                 setSelectionFeatureCollection({
                     ...updatedData,
-                    features: isSimpleFeature(feature) ? [feature] : []
+                    features: isSimpleFeature(feature) ? [feature] : [],
                 });
             }),
             modeConfig: {
@@ -256,10 +258,16 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
                 // or maybe it's enough to remake the layer when it changes?
                 // it looks as though editable-layer.js _addEventHandlers() isn't called again when eventManager has been changed.
                 // outerContainer
-            }
-        })
-    }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes,
-        setSelectionFeatureCollection, getFillColor, getLineColor,
+            },
+        });
+    }, [
+        selectionFeatureCollection,
+        selectionMode,
+        id,
+        selectedFeatureIndexes,
+        setSelectionFeatureCollection,
+        getFillColor,
+        getLineColor,
     ]);
 
     return {
@@ -288,11 +296,7 @@ function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredContour?:
     // consider for project-wide annotation stuff as opposed to ephemeral selections
     const rectRange = useCreateRange(chart);
     const measure = useCreateMeasure();
-    const scatterProps = useScatterplotLayer(
-        rectRange.modelMatrix,
-        hoveredContour,
-        rectRange.rangeDimension,
-    );
+    const scatterProps = useScatterplotLayer(rectRange.modelMatrix, hoveredContour, rectRange.rangeDimension);
     return { rectRange, measure, scatterProps };
 }
 
@@ -302,18 +306,14 @@ export const SpatialAnnotationProvider = observer(function SpatialAnnotationProv
     hoveredContour,
     setHoveredContour,
     //add generic that extends SpatialConfig?
-}: { 
+}: {
     chart: BaseChart<any>;
     hoveredContour?: HoveredContour | null;
     setHoveredContour?: (contour: HoveredContour | null) => void;
 } & React.PropsWithChildren) {
     const annotationState = useCreateSpatialAnnotationState(chart, hoveredContour);
     const stateWithHover = { ...annotationState, hoveredContour, setHoveredContour };
-    return (
-        <SpatialAnnotationState.Provider value={stateWithHover}>
-            {children}
-        </SpatialAnnotationState.Provider>
-    );
+    return <SpatialAnnotationState.Provider value={stateWithHover}>{children}</SpatialAnnotationState.Provider>;
 });
 
 export function useRange() {
@@ -328,12 +328,12 @@ export function useMeasure() {
     return measure;
 }
 
-/** 
+/**
  * useSpatialLayers is a hook that provides access to the spatial layers and their properties.
- * 
+ *
  * This includes the selection layer, scatterplot layer (which is actually an instance
  * of a more complex `SpatialLayer` with custom density/contour rendering), etc.
- * 
+ *
  * work in progress... unstable return type etc, and subject to future changes.
  */
 export function useSpatialLayers() {
@@ -344,7 +344,9 @@ export function useSpatialLayers() {
     const { getTooltip } = scatterProps;
     // const layers = [rectRange.polygonLayer, scatterplotLayer]; /// should probably be in a CompositeLayer?
     return {
-        getTooltip, scatterProps, selectionLayer: rectRange.editableLayer,
+        getTooltip,
+        scatterProps,
+        selectionLayer: rectRange.editableLayer,
         selectionProps: rectRange,
     };
 }

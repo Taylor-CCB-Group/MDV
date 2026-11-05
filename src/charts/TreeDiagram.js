@@ -20,18 +20,14 @@ class TreeDiagram extends SVGChart {
 
     setBranchLength(d, y0, k) {
         d.y = (y0 += d.data.length) * k;
-        if (d.children)
-            d.children.forEach((d) => this.setBranchLength(d, y0, k));
+        if (d.children) d.children.forEach((d) => this.setBranchLength(d, y0, k));
     }
 
     drawChart() {
         if (!this.treeData) {
             return;
         }
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(500)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(500).ease(easeLinear);
         const b = this._getContentDimensions();
         const treeMap = cluster()
             .size([b.height, b.width - 50])
@@ -39,20 +35,14 @@ class TreeDiagram extends SVGChart {
 
         const nodes = treeMap(this.treeData);
         function maxLength(d) {
-            return (
-                d.data.length + (d.children ? max(d.children, maxLength) : 0)
-            );
+            return d.data.length + (d.children ? max(d.children, maxLength) : 0);
         }
 
         // todo !!! fix this !!! need a test, and to understand what it's supposed to do
         // this.setBranchLength(this.treeData, this.treeData.data.length = 0,(b.width-50)/maxLength(this.treeData));
         // at least the following must be less wrong...
         console.warn("setBranchLength needs to be reviewed / tested");
-        this.setBranchLength(
-            this.treeData,
-            0,
-            (b.width - 50) / maxLength(this.treeData),
-        );
+        this.setBranchLength(this.treeData, 0, (b.width - 50) / maxLength(this.treeData));
 
         const desc = nodes.descendants();
         const nml = max(desc, (d) => d.data.length);
@@ -65,11 +55,7 @@ class TreeDiagram extends SVGChart {
             .style("fill", "none")
             .style("stroke-width", "1px")
             .transition(trans)
-            .attr(
-                "d",
-                (d) =>
-                    `M ${d.y} ${d.x} L${d.parent.y} ${d.x} L${d.parent.y} ${d.parent.x}`,
-            );
+            .attr("d", (d) => `M ${d.y} ${d.x} L${d.parent.y} ${d.x} L${d.parent.y} ${d.parent.x}`);
         this.graph_area
             .selectAll("text")
             .data(this.treeData.leaves())

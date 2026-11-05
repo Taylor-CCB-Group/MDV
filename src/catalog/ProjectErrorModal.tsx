@@ -1,17 +1,5 @@
-import {
-    Close as CloseIcon,
-    ErrorOutline as ErrorIcon,
-} from "@mui/icons-material";
-import {
-    Box,
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    Typography,
-} from "@mui/material";
+import { Close as CloseIcon, ErrorOutline as ErrorIcon } from "@mui/icons-material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography } from "@mui/material";
 import type React from "react";
 import { DialogCloseIconButton } from "./ProjectRenameModal";
 
@@ -42,11 +30,7 @@ const ErrorModal: React.FC<ErrorModalProps> = ({ open, message, onClose }) => {
                         width: "100%",
                     }}
                 >
-                    <Button
-                        onClick={onClose}
-                        variant="contained"
-                        color="primary"
-                    >
+                    <Button onClick={onClose} variant="contained" color="primary">
                         Close
                     </Button>
                 </Box>

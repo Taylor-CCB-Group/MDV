@@ -33,17 +33,13 @@ describe("useLiveCategorySelectionValues", () => {
         };
         mockUseDataStore.mockReturnValue(dataStore);
 
-        const { result } = renderHook(() =>
-            useLiveCategorySelectionValues(tagColumn.field),
-        );
+        const { result } = renderHook(() => useLiveCategorySelectionValues(tagColumn.field));
 
         expect(result.current).toEqual(["a"]);
 
         act(() => {
             tagColumn.values.push("a, b", "b");
-            Object.values(listeners).forEach((listener) =>
-                listener("data_changed", { columns: ["__tags"] }),
-            );
+            Object.values(listeners).forEach((listener) => listener("data_changed", { columns: ["__tags"] }));
         });
 
         expect(result.current).toEqual(["a", "b"]);

@@ -18,14 +18,7 @@ export type Disposer = () => void;
 /**
  * The are the names used to refer to the types of data can be stored in a column.
  */
-export type DataType = 
-    | "integer"
-    | "double"
-    | "text"
-    | "text16"
-    | "unique"
-    | "multitext"
-    | "int32";
+export type DataType = "integer" | "double" | "text" | "text16" | "unique" | "multitext" | "int32";
 /**
  * To denote cases where any categorical data can be used,
  * this is the union of the {@link DataType}s that share related properties.
@@ -39,7 +32,7 @@ export type NumberDataType = "integer" | "double" | "int32";
 
 /**
  * Associates a {@link DataType} with the corresponding `TypedArray` type that will be used to store the data.
- * 
+ *
  * This should be associated with definitions in `datatypes.ts`.
  */
 type DataStructureTypes = {
@@ -134,8 +127,7 @@ export type DataColumn<T extends DataType> = {
     sgindex?: number;
     sgtype?: "dense" | "sparse"; //?? any other options?
 };
-export type LoadedDataColumn<T extends DataType> = DataColumn<T> &
-    Required<Pick<DataColumn<T>, "data">>;
+export type LoadedDataColumn<T extends DataType> = DataColumn<T> & Required<Pick<DataColumn<T>, "data">>;
 // function test(column: LoadedDataColumn<"text">) {
 //     column.data;
 //     column.values; //why does this degrade to 'any'?
@@ -153,26 +145,20 @@ export type LoadedDataColumn<T extends DataType> = DataColumn<T> &
 export type RowsAsColumnsLink = {
     name: string;
     name_column: FieldName;
-    subgroups: Record<
-        string,
-        { label: string; name: string; type: "dense" | string }
-    >;
+    subgroups: Record<string, { label: string; name: string; type: "dense" | string }>;
 };
 
-export type DataSourceLinks = Record<
-    DataSourceName,
-    { rows_as_columns?: RowsAsColumnsLink }
->;
+export type DataSourceLinks = Record<DataSourceName, { rows_as_columns?: RowsAsColumnsLink }>;
 
 /**
  * This is a very provisional type for a way of specifying a zarr store that can be used to load data.
- * 
+ *
  * I would prefer the definition for this to be in a schema, will need to get back to this later.
  */
 export type ExperimentalZarrStore = {
-    path: string,
-    type: "xe_cells" | "xe_transcripts" | "xe_analysis"
-}
+    path: string;
+    type: "xe_cells" | "xe_transcripts" | "xe_analysis";
+};
 
 /**
  * nb - there should be a type for the entries in `datasources.json`...
@@ -193,7 +179,7 @@ export type DataSource = {
     gates?: Gate[];
     size: number;
     columns: DataColumn<DataType>[];
-};// | ExperimentalZarrStore; ? something something spatialdata.js ...
+}; // | ExperimentalZarrStore; ? something something spatialdata.js ...
 // maybe that the
 
 type DropdownMappedValue<T extends string, V extends string> = {
@@ -209,9 +195,7 @@ export type DropdownMappedValues<TextKey extends string, ValueKey extends string
  * or a tuple of `[{textKey: string, valueKey: string}[], textKey, valueKey]` where `textKey` and `valueKey` are properties of entries in the array that will be used for 'text'
  * and 'value' respectively.
  */
-export type DropDownValues =
-    | DropdownMappedValues<string, string>
-    | [Array<string>];
+export type DropDownValues = DropdownMappedValues<string, string> | [Array<string>];
 export type GuiValueTypes = {
     //is the premise of this correct? technically, could we have a dropdown of numbers?
     dropdown: string;
@@ -259,12 +243,12 @@ type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => void | Promise<void>;
  * The type parameter `T` is used to specify the type of the GUI element (such as `"slider"`, `"dropdown"` etc),
  * from which we can infer `GV<T>` (`GuiValueType[T]`) used to specify the type of the `current_value` property of the object,
  * as well as some other associated properties that might be expected.
- * 
+ *
  * For example, a `GuiSpec<"slider">` has `current_value: number`,
  * in which case (because `GV<T> extends number`) we may also expect to have associated properties like `min` & `max`.
  * The `GuiValueType["doubleslider"]` is `[number, number]`, which also means that there are `min` & `max` properties etc.
  * For other types, `min` & `max` are not expected, so they are `never`.
- * 
+ *
  * There is a type-helper function `g({...})` that can be used when creating these objects, which can help with type inference,
  * and allow for editor feedback to suggest properties etc.
  */
@@ -277,11 +261,11 @@ export type GuiSpec<T extends GuiSpecType> = {
     only_update_on_enter?: boolean;
     //@ts-check !this is for review... it should *not* be optional, but if I make it non-optional then it demands values for 'never'...
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
-    sourceColumn?: T extends "category_selection" | "single_category_selection" ? (() => FieldSpec | undefined) : never;
+    sourceColumn?: T extends "category_selection" | "single_category_selection" ? () => FieldSpec | undefined : never;
     getCurrentValue?: T extends "category_selection"
-        ? (() => string[])
+        ? () => string[]
         : T extends "single_category_selection"
-          ? (() => string)
+          ? () => string
           : never;
     /**
      * Used by `"radiobuttons"` to specify the choices available.
@@ -290,33 +274,17 @@ export type GuiSpec<T extends GuiSpecType> = {
      */
     choices?: T extends "radiobuttons" ? [string, string][] : never;
     //thouht we could make these non-optional and only have it insist for number types, but that's not happening for some reason
-    min?: GV<T> extends number
-        ? number
-        : GV<T> extends [number, number]
-          ? number
-          : never;
-    max?: GV<T> extends number
-        ? number
-        : GV<T> extends [number, number]
-          ? number
-          : never;
-    step?: GV<T> extends number
-        ? number
-        : GV<T> extends [number, number]
-          ? number
-          : never;
-    continuous?: GV<T> extends number
-        ? boolean
-        : GV<T> extends [number, number]
-          ? boolean
-          : never;
+    min?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
+    max?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
+    step?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
+    continuous?: GV<T> extends number ? boolean : GV<T> extends [number, number] ? boolean : never;
     defaultVal?: GV<T>;
     /**
      * Expresses the type of column that can be selected in a column selection dialog.
-     * Can be in the form of {@link DataType} as in {@link DataColumn#datatype}, 
+     * Can be in the form of {@link DataType} as in {@link DataColumn#datatype},
      * or other form like `"_multi_column:number" | "number"`.
      */
-    columnType?: T extends ("column" | "multicolumn") ? CTypes : never;
+    columnType?: T extends "column" | "multicolumn" ? CTypes : never;
     /** Optional array of disposers that should be cleaned up when the settings dialog closes.
      * This allows settings specs to register autoruns or other reactive disposables that are tied
      * to the dialog's lifetime rather than the chart's lifetime. */
@@ -327,11 +295,11 @@ export type GuiSpec<T extends GuiSpecType> = {
  * This creates a discriminated union of `GuiSpec<"folder"> | GuiSpec<"slider"> | ...`, which can be preferable to the more
  * obvious seeming `GuiSpec<GuiSpecType>`, which evaluates to `GuiSpec<"folder" | "slider" | ...>` - causing
  * some obscure co/contra-variance issues, often resulting in irritating and incomprehensible error messages.
- * 
+ *
  * For example, in the Settings Dialog, we have an array of settings - which could be any kind of gui spec - and
  * we want to iterate over them and pass them to `AbstractComponent` - which will then render the appropriate
  * component for each setting, while also inferring that the types are correct.
- * 
+ *
  * If we have `GuiSpec<GuiSpecType>` then we can't pass that to `AbstractComponent` because it will complain,
  * with a lengthy error message that includes something like
  * ```
@@ -412,12 +380,7 @@ export type ChartManager = {
     charts: Record<string, ChartState>;
     dataSources: DataSourceSpec[];
     dsIndex: Record<string, DataSourceSpec>;
-    addMenuIcon: (
-        dataSourceName: DataSourceName,
-        iconClass: string,
-        text: string,
-        func: () => void,
-    ) => HTMLElement;
+    addMenuIcon: (dataSourceName: DataSourceName, iconClass: string, text: string, func: () => void) => HTMLElement;
     /** probably not something we really want to use publicly like this */
     _popOutChart: (chart: BaseChart) => void;
 };

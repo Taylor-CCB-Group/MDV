@@ -43,9 +43,7 @@ async function getContinuousColorLegendFilterRuntimeState(page: Page, chartTitle
             filterSize: chart.dataStore.filterSize,
             resetDisplay: chart.resetButton?.style?.display ?? "",
             hasSelectedRange: (() => {
-                const selection = panel?.querySelector(
-                    ".legend-container .brush .selection",
-                );
+                const selection = panel?.querySelector(".legend-container .brush .selection");
                 if (!(selection instanceof SVGGraphicsElement)) {
                     return false;
                 }
@@ -94,9 +92,7 @@ test.describe("Color legend continuous", () => {
         );
     });
 
-    test("continuous legend visibility, drag, and persistence after save reload", async ({
-        page,
-    }) => {
+    test("continuous legend visibility, drag, and persistence after save reload", async ({ page }) => {
         const scatterTitle = `Scatter Continuous Color Legend ${Date.now()}`;
 
         let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
@@ -125,20 +121,14 @@ test.describe("Color legend continuous", () => {
             expect(initial.width).toBeGreaterThan(40);
             expect(initial.height).toBeGreaterThan(20);
 
-            const unfiltered = await getContinuousColorLegendFilterRuntimeState(
-                page,
-                scatterTitle,
-            );
+            const unfiltered = await getContinuousColorLegendFilterRuntimeState(page, scatterTitle);
             expect(unfiltered.filterSize).toBe(unfiltered.dataStoreSize);
             expect(unfiltered.hasSelectedRange).toBe(false);
 
             await dragContinuousColorLegendRangeOutsideRight(page, scatterTitle);
             await expect
                 .poll(async () => {
-                    const state = await getContinuousColorLegendFilterRuntimeState(
-                        page,
-                        scatterTitle,
-                    );
+                    const state = await getContinuousColorLegendFilterRuntimeState(page, scatterTitle);
                     return (
                         state.chartFilter?.kind === "continuous" &&
                         state.filterSize < state.dataStoreSize &&
@@ -148,19 +138,13 @@ test.describe("Color legend continuous", () => {
                 })
                 .toBe(true);
 
-            const filtered = await getContinuousColorLegendFilterRuntimeState(
-                page,
-                scatterTitle,
-            );
+            const filtered = await getContinuousColorLegendFilterRuntimeState(page, scatterTitle);
             expect(filtered.filterSize).toBeLessThan(filtered.dataStoreSize);
 
             await clearContinuousColorLegendRange(page, scatterTitle);
             await expect
                 .poll(async () => {
-                    const state = await getContinuousColorLegendFilterRuntimeState(
-                        page,
-                        scatterTitle,
-                    );
+                    const state = await getContinuousColorLegendFilterRuntimeState(page, scatterTitle);
                     return (
                         state.chartFilter === null &&
                         state.filterSize === unfiltered.dataStoreSize &&

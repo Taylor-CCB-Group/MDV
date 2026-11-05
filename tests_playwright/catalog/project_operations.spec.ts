@@ -6,9 +6,7 @@ test.describe("Project operations", () => {
     test.beforeEach(async ({ page }) => {
         await mockApiRoot(page);
         await mockExtensionConfig(page);
-        await mockProjects(page, [
-            project({ id: "p1", name: "Alpha" }),
-        ]);
+        await mockProjects(page, [project({ id: "p1", name: "Alpha" })]);
         await gotoPath(page);
     });
 
@@ -40,14 +38,9 @@ test.describe("Project operations", () => {
     });
 
     test("select multiple projects and move them to the recycle bin", async ({ page }) => {
-        await mockProjects(page, [
-            project({ id: 1, name: "Alpha" }),
-            project({ id: 2, name: "Beta" }),
-        ]);
+        await mockProjects(page, [project({ id: 1, name: "Alpha" }), project({ id: 2, name: "Beta" })]);
         await page.reload();
-        await page.route("**/projects/soft-delete", (route) =>
-            route.fulfill({ json: { deletedProjectIds: [1, 2] } }),
-        );
+        await page.route("**/projects/soft-delete", (route) => route.fulfill({ json: { deletedProjectIds: [1, 2] } }));
 
         await page.getByRole("button", { name: "Select" }).click();
         await page.getByLabel("select project Alpha").click();

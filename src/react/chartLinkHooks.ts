@@ -10,7 +10,7 @@ export type ChartID = string;
 export type ViewStateLink = {
     type: "view_state";
     linked_charts: ChartID[];
-}
+};
 
 export const useViewStateLink = () => {
     const viewerStore = useViewerStoreApi();
@@ -50,18 +50,14 @@ export const useViewStateLink = () => {
                     // todo - viewState may not be directly compatible with other chart's viewState
                     // so there should be a utility function to convert between them - current attempt is not yet correct, and clutters this code.
                     // might entail some extra garbage collection, making a new object each time. So it goes I guess.
-                    const otherMeta =
-                        c.vivStores?.viewerStore.getState().metadata;
+                    const otherMeta = c.vivStores?.viewerStore.getState().metadata;
                     const otherPhysicalSize = otherMeta?.Pixels.PhysicalSizeX ?? 1;
                     const otherUnits = otherMeta?.Pixels.PhysicalSizeXUnit ?? undefined;
-                    if (otherUnits !== ourUnits)
-                        throw "physical size units do not match"; //we could probably convert if this is a common case
+                    if (otherUnits !== ourUnits) throw "physical size units do not match"; //we could probably convert if this is a common case
                     const zoomRatio = ourPhysicalSize / otherPhysicalSize;
                     const zoom = originalZoom * zoomRatio;
                     // this is not right - target needs to be adjusted so that the same point in the image is centred
-                    const target = (viewState.target as [number, number]).map(
-                        (v, i) => v * zoomRatio,
-                    );
+                    const target = (viewState.target as [number, number]).map((v, i) => v * zoomRatio);
                     const newViewState = { ...viewState, zoom, target };
                     c.viewerStore?.setState({ viewState: newViewState });
                 });
@@ -71,12 +67,7 @@ export const useViewStateLink = () => {
             });
         });
         return unsubscribe;
-    }, [
-        viewerStore,
-        id,
-        metadata?.Pixels.PhysicalSizeX,
-        metadata?.Pixels.PhysicalSizeXUnit,
-    ]);
+    }, [viewerStore, id, metadata?.Pixels.PhysicalSizeX, metadata?.Pixels.PhysicalSizeXUnit]);
 };
 
 export type RowsAsColslink = {
@@ -87,9 +78,9 @@ export type RowsAsColslink = {
             name: string;
             label: string;
             type: string;
-        } 
-    }
-}
+        };
+    };
+};
 
 /** returns information about any `rows_as_columns_link`s that exist in the context `dataSource` */
 export function useRowsAsColumnsLinks() {
@@ -106,7 +97,7 @@ export function useRowsAsColumnsLinks() {
 }
 
 /** What if the linkIndex might be able to change at runtime?
- * 
+ *
  * We could also consider having distinct hooks for highlighted and filtered rows.
  * @returns the text values and indices of the highlighted/filtered rows in a linked dataSource
  */
@@ -116,26 +107,21 @@ export function useHighlightedForeignRows(linkIndex = 0) {
     return values; //maybe don't useState version of this but return the mobx observable directly
 }
 /** design of this will need to change to account for n-links
- * 
+ *
  * Will return an array of DataColumn objects, with loaded data, updated as the highlighted/filtered rows change
  * in the linked DataSource.
- * 
- * We could also consider 
+ *
+ * We could also consider
  * - having distinct hooks for highlighted and filtered rows (potentially ways of composing custom filter graphs).
  * - controls for pagination.
  * - returning column objects that are not loaded yet, but will be loaded when they are needed.
- * 
- * 
+ *
+ *
  * @param max - maximum number of columns to return
- * @returns an array of DataColumn objects, with loaded data, for virtual columns 
+ * @returns an array of DataColumn objects, with loaded data, for virtual columns
  * corresponding to the highlighted/filtered rows in the linked dataSource.
  */
-export function useHighlightedForeignRowsAsColumns(
-    max = 10,
-    filter = "",
-    linkIndex = 0,
-    subgroupName?: string,
-) {
+export function useHighlightedForeignRowsAsColumns(max = 10, filter = "", linkIndex = 0, subgroupName?: string) {
     const cols = useHighlightedForeignRows(linkIndex); //not actual cols
     //would like not to have this here - might have some more logic in above hook
     //in particular want to redesign the fieldName being what determines the column
@@ -157,10 +143,7 @@ export function useHighlightedForeignRowsAsColumns(
         const cm = window.mdv.chartManager;
         // Resolve virtual columns for the requested rows_as_columns subgroup (defaults to first key).
         const sgKeys = Object.keys(link.subgroups);
-        const sg =
-            subgroupName && link.subgroups[subgroupName]
-                ? subgroupName
-                : (sgKeys[0] ?? "");
+        const sg = subgroupName && link.subgroups[subgroupName] ? subgroupName : (sgKeys[0] ?? "");
         const f = filter.toLowerCase();
         // todo: consider pagination... pass in a page number, return information about total number of columns etc.
         // moving ds.addColumnsFromFields() up the stack...
@@ -172,7 +155,7 @@ export function useHighlightedForeignRowsAsColumns(
         // alternatively, they could be lazy-loaded by consuming components.
         // that could be implemented relatively easily, but would lack some batching of requests,
         // which may or may not be useful.
-        const cFields = c.map(col => col.field);
+        const cFields = c.map((col) => col.field);
         cm.loadColumnSet(cFields, ds.name, () => {
             setColumns(c);
         });

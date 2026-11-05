@@ -15,7 +15,7 @@ export type ManageGateDialogWrapperProps<T extends BaseConfig> = Omit<ManageGate
 
 class ManageGateDialogWrapper<T extends BaseConfig> extends BaseDialog {
     declare root: ReturnType<typeof createMdvPortal>;
-    
+
     constructor(props: ManageGateDialogWrapperProps<T>) {
         const { chart, ...dialogProps } = props;
         const chartType = BaseChart.types?.[chart.config.type];

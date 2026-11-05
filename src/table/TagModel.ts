@@ -77,9 +77,7 @@ function getOrAddValueIndex(value: string, column: TagColumn) {
     return index;
 }
 
-type RowWritePlan =
-    | { kind: "packed"; itemsToWrite: string[] }
-    | { kind: "legacy"; encodedValue: string };
+type RowWritePlan = { kind: "packed"; itemsToWrite: string[] } | { kind: "legacy"; encodedValue: string };
 
 function computeRowWritePlan(column: TagColumn, items: string[]): RowWritePlan {
     const normalizedItems = normalizeMultitextItems(items);
@@ -87,24 +85,17 @@ function computeRowWritePlan(column: TagColumn, items: string[]): RowWritePlan {
 
     if (isPackedMultitextColumn(column)) {
         const emptyItem = getEmptyItem(column);
-        const itemsToWrite =
-            normalizedItems.length === 0 && emptyItem
-                ? [emptyItem]
-                : normalizedItems;
+        const itemsToWrite = normalizedItems.length === 0 && emptyItem ? [emptyItem] : normalizedItems;
 
         if (itemsToWrite.length > capacity) {
-            throw new Error(
-                `multitext column '${column.name}' can only store ${capacity} values per row`,
-            );
+            throw new Error(`multitext column '${column.name}' can only store ${capacity} values per row`);
         }
 
         return { kind: "packed", itemsToWrite };
     }
 
     const encodedValue =
-        normalizedItems.length === 0
-            ? ""
-            : joinMultitextItems(normalizedItems, getMultitextDelimiter(column));
+        normalizedItems.length === 0 ? "" : joinMultitextItems(normalizedItems, getMultitextDelimiter(column));
 
     return { kind: "legacy", encodedValue };
 }
@@ -120,10 +111,7 @@ function valueStringsFromRowWritePlan(plan: RowWritePlan): string[] {
  * Ensures the column dictionary can accept every distinct new string in one shot.
  * Call before mutating row buffers or column.values so failures cannot leave partial writes.
  */
-function assertCanAddNewMultitextValues(
-    column: TagColumn,
-    valueStrings: readonly string[],
-): void {
+function assertCanAddNewMultitextValues(column: TagColumn, valueStrings: readonly string[]): void {
     const distinctNew = new Set<string>();
     for (const v of valueStrings) {
         if (column.values.indexOf(v) === -1) {
@@ -131,9 +119,7 @@ function assertCanAddNewMultitextValues(
         }
     }
     if (column.values.length + distinctNew.size > MAX_MULTITEXT_VALUES) {
-        throw new Error(
-            `multitext column '${column.name}' exceeded ${MAX_MULTITEXT_VALUES} values`,
-        );
+        throw new Error(`multitext column '${column.name}' exceeded ${MAX_MULTITEXT_VALUES} values`);
     }
 }
 
@@ -144,24 +130,13 @@ function collectPreflightValueStringsForUpdate(
     tagValue: boolean,
     rowState?: Map<number, string[]>,
 ): string[] {
-    const tags = splitMultitextItems(
-        tagToChange,
-        getMultitextDelimiter(column),
-    );
+    const tags = splitMultitextItems(tagToChange, getMultitextDelimiter(column));
 
     if (tags.length > 1) {
         const acc: string[] = [];
         const sim = rowState ?? new Map<number, string[]>();
         for (const tag of tags) {
-            acc.push(
-                ...collectPreflightValueStringsForUpdate(
-                    tag,
-                    column,
-                    rowIndices,
-                    tagValue,
-                    sim,
-                ),
-            );
+            acc.push(...collectPreflightValueStringsForUpdate(tag, column, rowIndices, tagValue, sim));
         }
         return acc;
     }
@@ -174,22 +149,15 @@ function collectPreflightValueStringsForUpdate(
     const pending: string[] = [];
     const sim = rowState ?? new Map<number, string[]>();
     for (const rowIndex of rowIndices) {
-        const currentItems =
-            sim.get(rowIndex) ?? getSemanticRowItems(column, rowIndex);
+        const currentItems = sim.get(rowIndex) ?? getSemanticRowItems(column, rowIndex);
         const hasTag = currentItems.includes(tag);
         if (tagValue ? hasTag : !hasTag) {
             continue;
         }
 
-        const nextItems = tagValue
-            ? [...currentItems, tag]
-            : currentItems.filter((item) => item !== tag);
+        const nextItems = tagValue ? [...currentItems, tag] : currentItems.filter((item) => item !== tag);
         sim.set(rowIndex, nextItems);
-        pending.push(
-            ...valueStringsFromRowWritePlan(
-                computeRowWritePlan(column, nextItems),
-            ),
-        );
+        pending.push(...valueStringsFromRowWritePlan(computeRowWritePlan(column, nextItems)));
     }
     return pending;
 }
@@ -229,26 +197,16 @@ function updateSelectedRows(
     notify = true,
     tagValue = true,
 ): boolean {
-    const tags = splitMultitextItems(
-        tagToChange,
-        getMultitextDelimiter(column),
-    );
+    const tags = splitMultitextItems(tagToChange, getMultitextDelimiter(column));
 
     assertCanAddNewMultitextValues(
         column,
-        collectPreflightValueStringsForUpdate(
-            tagToChange,
-            column,
-            rowIndices,
-            tagValue,
-        ),
+        collectPreflightValueStringsForUpdate(tagToChange, column, rowIndices, tagValue),
     );
 
     if (tags.length > 1) {
         const changed = tags
-            .map((tag) =>
-                updateSelectedRows(tag, column, rowIndices, dataStore, false, tagValue),
-            )
+            .map((tag) => updateSelectedRows(tag, column, rowIndices, dataStore, false, tagValue))
             .some(Boolean);
 
         if (notify && changed) {
@@ -270,9 +228,7 @@ function updateSelectedRows(
             continue;
         }
 
-        const nextItems = tagValue
-            ? [...currentItems, tag]
-            : currentItems.filter((item) => item !== tag);
+        const nextItems = tagValue ? [...currentItems, tag] : currentItems.filter((item) => item !== tag);
         writeRowItems(column, rowIndex, nextItems);
         changed = true;
     }
@@ -298,11 +254,7 @@ export default class TagModel {
     private readonly selectionScope: TagSelectionScope;
     private readonly listenerId: string;
 
-    private constructor(
-        dataStore: DataStore,
-        columnName = "__tags",
-        selectionScope: TagSelectionScope = "filtered",
-    ) {
+    private constructor(dataStore: DataStore, columnName = "__tags", selectionScope: TagSelectionScope = "filtered") {
         this.dataStore = dataStore;
         this.selectionScope = selectionScope;
         this.listenerId = `tag-model-${columnName}-${Math.random().toString(36).slice(2)}`;
@@ -318,9 +270,7 @@ export default class TagModel {
                 stringLength: 1,
                 values: [] as string[],
             };
-            const buffer = new SharedArrayBuffer(
-                dataStore.size * Uint16Array.BYTES_PER_ELEMENT,
-            );
+            const buffer = new SharedArrayBuffer(dataStore.size * Uint16Array.BYTES_PER_ELEMENT);
             const data = new Uint16Array(buffer);
             data.fill(MULTITEXT_EMPTY_INDEX);
             dataStore.addColumn(columnSpec, buffer);
@@ -346,11 +296,7 @@ export default class TagModel {
                 return;
             }
 
-            if (
-                type === "data_changed"
-                && Array.isArray(data?.columns)
-                && data.columns.includes(this.tagColumn.name)
-            ) {
+            if (type === "data_changed" && Array.isArray(data?.columns) && data.columns.includes(this.tagColumn.name)) {
                 if (this.selectionScope === "filtered") {
                     this.dataModel.updateModel();
                 }
@@ -367,25 +313,23 @@ export default class TagModel {
         const model = new TagModel(dataStore, columnName, selectionScope);
 
         if (!model.isReady) {
-        try {
-            const column = await loadColumn(dataStore.name, columnName);
-            if (!isColumnOfType(column, COL_TYPE)) {
-                throw new Error(
-                    `column '${columnName}' is not of type '${COL_TYPE}'`,
-                );
-            }
-            if (!isColumnLoaded(column)) {
-                throw new Error("expected column to be loaded");
-            }
-            if (column.editable === false) {
-                throw new Error(`column '${columnName}' is not editable`);
-            }
-            model.tagColumn = column;
-            model.isReady = true;
-            model.callListeners();
-        } catch (error) {
-            model.dispose();
-            throw error;
+            try {
+                const column = await loadColumn(dataStore.name, columnName);
+                if (!isColumnOfType(column, COL_TYPE)) {
+                    throw new Error(`column '${columnName}' is not of type '${COL_TYPE}'`);
+                }
+                if (!isColumnLoaded(column)) {
+                    throw new Error("expected column to be loaded");
+                }
+                if (column.editable === false) {
+                    throw new Error(`column '${columnName}' is not editable`);
+                }
+                model.tagColumn = column;
+                model.isReady = true;
+                model.callListeners();
+            } catch (error) {
+                model.dispose();
+                throw error;
             }
         }
 
@@ -419,8 +363,7 @@ export default class TagModel {
         const selectionCount = this.getSelectionLength();
         return {
             showNoSelectionWarning: selectionCount === 0,
-            showFilteredScopeCoversWholeTableWarning:
-                selectionCount > 0 && this.isFilteredScopeAnnotatingEntireTable(),
+            showFilteredScopeCoversWholeTableWarning: selectionCount > 0 && this.isFilteredScopeAnnotatingEntireTable(),
         };
     }
 
@@ -460,14 +403,7 @@ export default class TagModel {
     }
 
     setTag(tag: string, tagValue = true) {
-        updateSelectedRows(
-            tag,
-            this.tagColumn,
-            this.getSelectedRowIndices(),
-            this.dataStore,
-            true,
-            tagValue,
-        );
+        updateSelectedRows(tag, this.tagColumn, this.getSelectedRowIndices(), this.dataStore, true, tagValue);
         this.dataModel.updateModel();
         this.callListeners();
     }
@@ -498,9 +434,7 @@ export default class TagModel {
     getTagsInSelection(): Set<string> {
         const tags = new Set<string>();
         for (const rowIndex of this.getSelectedRowIndices()) {
-            getSemanticRowItems(this.tagColumn, rowIndex).forEach((tag) =>
-                tags.add(tag),
-            );
+            getSemanticRowItems(this.tagColumn, rowIndex).forEach((tag) => tags.add(tag));
         }
         return tags;
     }

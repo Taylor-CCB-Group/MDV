@@ -1,14 +1,5 @@
 import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
-import {
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Stack,
-    TextField,
-    Typography,
-} from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 
 type RenameTableColumnDialogProps = {

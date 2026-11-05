@@ -1,11 +1,4 @@
-import {
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Typography,
-} from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
 import type React from "react";
 import { DialogCloseIconButton } from "../ProjectRenameModal";
 
@@ -30,8 +23,7 @@ const BulkDeleteProjectsDialog: React.FC<BulkDeleteProjectsDialogProps> = ({
             </DialogTitle>
             <DialogContent dividers>
                 <Typography>
-                    Move {selectedCount} selected project{selectedCount === 1 ? "" : "s"} to the
-                    recycle bin?
+                    Move {selectedCount} selected project{selectedCount === 1 ? "" : "s"} to the recycle bin?
                 </Typography>
             </DialogContent>
             <DialogActions>

@@ -40,15 +40,13 @@ function loadBootstrapDeps(): Promise<BootstrapDeps> {
             import("./desktop_index"),
             import("@/react/react_utils"),
             import("@/react/ProjectStateHandler"),
-        ]).then(
-            ([chartManagerModule, baseChartModule, desktopIndexModule, reactUtilsModule, projectStateModule]) => ({
-                ChartManager: chartManagerModule.default,
-                chartTypes: baseChartModule.default.types,
-                changeURLParam: desktopIndexModule.changeURLParam,
-                createMdvPortal: reactUtilsModule.createMdvPortal,
-                ProjectStateHandlerWrapper: projectStateModule.default,
-            }),
-        );
+        ]).then(([chartManagerModule, baseChartModule, desktopIndexModule, reactUtilsModule, projectStateModule]) => ({
+            ChartManager: chartManagerModule.default,
+            chartTypes: baseChartModule.default.types,
+            changeURLParam: desktopIndexModule.changeURLParam,
+            createMdvPortal: reactUtilsModule.createMdvPortal,
+            ProjectStateHandlerWrapper: projectStateModule.default,
+        }));
     }
     return bootstrapDepsPromise;
 }
@@ -86,7 +84,9 @@ function LoadState({
     ].join(" ");
     const panelClassName = [
         "w-full max-w-[520px] rounded-xl border px-6 py-5 shadow-2xl",
-        isDark ? "border-slate-400/25 bg-slate-800/85 text-slate-200" : "border-slate-900/10 bg-white/90 text-slate-900",
+        isDark
+            ? "border-slate-400/25 bg-slate-800/85 text-slate-200"
+            : "border-slate-900/10 bg-white/90 text-slate-900",
     ].join(" ");
     const bodyTextClassName = isDark ? "mb-3 text-slate-400" : "mb-3 text-slate-600";
     const trackClassName = [
@@ -141,7 +141,7 @@ function LoadState({
 function BootstrapApp({ onComplete }: { onComplete: () => void }) {
     const context = useMemo(() => getProjectBootstrapContext(), []);
     const [status, setStatus] = useState<BootstrapStatus>({ kind: "loading" });
-    // nb no longer separately tracking isInitialViewLoaded, 
+    // nb no longer separately tracking isInitialViewLoaded,
     // we can re-introduce that if e.g. we have more lazy charts (probably not)
     const [initialised, setInitialised] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
@@ -187,59 +187,51 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
         let cancelled = false;
 
         void loadBootstrapDeps()
-            .then(
-                ({
+            .then(({ ChartManager, chartTypes, changeURLParam, createMdvPortal, ProjectStateHandlerWrapper }) => {
+                window.mdv = {
+                    ...(window.mdv ?? {}),
                     ChartManager,
                     chartTypes,
-                    changeURLParam,
-                    createMdvPortal,
-                    ProjectStateHandlerWrapper,
-                }) => {
-                    window.mdv = {
-                        ...(window.mdv ?? {}),
-                        ChartManager,
-                        chartTypes,
-                    };
+                };
 
-                    const listener = (type: string, cm: ChartManager, data: any) => {
-                        if (type === "state_saved") {
-                            if (stateHandlerRoot) {
-                                stateHandlerRoot.unmount();
-                            }
-
-                            if (!stateHandlerContainer) {
-                                stateHandlerContainer = document.createElement("div");
-                                stateHandlerContainer.id = "mdv_state_handler";
-                                document.body.appendChild(stateHandlerContainer);
-                            }
-                            stateHandlerRoot = createMdvPortal(
-                                createElement(ProjectStateHandlerWrapper, {
-                                    root: runtime.root,
-                                    data,
-                                    staticFolder: runtime.staticFolder,
-                                    permission: runtime.permission,
-                                }),
-                                stateHandlerContainer,
-                                undefined,
-                                cm,
-                            );
+                const listener = (type: string, cm: ChartManager, data: any) => {
+                    if (type === "state_saved") {
+                        if (stateHandlerRoot) {
+                            stateHandlerRoot.unmount();
                         }
-                        if (type === "view_loaded") {
-                            changeURLParam("view", cm.viewManager.current_view);
-                        }
-                    };
 
-                    if (cancelled) return;
-                    new ChartManager(
-                        "holder",
-                        runtime.datasources as DataSource[],
-                        runtime.dataLoader,
-                        runtime.config,
-                        listener,
-                    );
-                    setInitialised(true);
-                },
-            )
+                        if (!stateHandlerContainer) {
+                            stateHandlerContainer = document.createElement("div");
+                            stateHandlerContainer.id = "mdv_state_handler";
+                            document.body.appendChild(stateHandlerContainer);
+                        }
+                        stateHandlerRoot = createMdvPortal(
+                            createElement(ProjectStateHandlerWrapper, {
+                                root: runtime.root,
+                                data,
+                                staticFolder: runtime.staticFolder,
+                                permission: runtime.permission,
+                            }),
+                            stateHandlerContainer,
+                            undefined,
+                            cm,
+                        );
+                    }
+                    if (type === "view_loaded") {
+                        changeURLParam("view", cm.viewManager.current_view);
+                    }
+                };
+
+                if (cancelled) return;
+                new ChartManager(
+                    "holder",
+                    runtime.datasources as DataSource[],
+                    runtime.dataLoader,
+                    runtime.config,
+                    listener,
+                );
+                setInitialised(true);
+            })
             .catch((error) => {
                 if (!cancelled) {
                     setStatus({ kind: "error", error });
@@ -280,14 +272,7 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
         }
     };
 
-    return (
-        <LoadState
-            status={status}
-            detail={detail}
-            isClosing={isClosing}
-            onTransitionEnd={handleTransitionEnd}
-        />
-    );
+    return <LoadState status={status} detail={detail} isClosing={isClosing} onTransitionEnd={handleTransitionEnd} />;
 }
 
 const holder = document.getElementById("holder");

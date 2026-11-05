@@ -1,11 +1,11 @@
 import * as z from "zod/v4";
-import { 
-    BaseConfigSchema, 
-    ChartColorConfigSchema, 
+import {
+    BaseConfigSchema,
+    ChartColorConfigSchema,
     FieldSpecSchema,
     TooltipConfigSchema,
     ScatterPlotConfigSchema,
-    ChartConfigSchema 
+    ChartConfigSchema,
 } from "../src/charts/schemas/ChartConfigSchema.ts";
 
 // Test individual schemas to isolate the problem
@@ -35,6 +35,13 @@ const results = [
 
 console.log("\n📊 Results:");
 results.forEach((result, index) => {
-    const schemas = ["FieldSpecSchema", "BaseConfigSchema", "ChartColorConfigSchema", "TooltipConfigSchema", "ScatterPlotConfigSchema", "ChartConfigSchema"];
+    const schemas = [
+        "FieldSpecSchema",
+        "BaseConfigSchema",
+        "ChartColorConfigSchema",
+        "TooltipConfigSchema",
+        "ScatterPlotConfigSchema",
+        "ChartConfigSchema",
+    ];
     console.log(`${result ? "✅" : "❌"} ${schemas[index]}`);
-}); 
+});

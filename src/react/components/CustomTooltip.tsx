@@ -1,6 +1,5 @@
 import { Tooltip, type TooltipProps } from "@mui/material";
 
-
 export type CustomTooltipProps = {
     tooltipText: string;
     children: React.ReactElement;
@@ -15,8 +14,8 @@ const CustomTooltip = ({ tooltipText, tooltipProps, children }: CustomTooltipPro
             slotProps={{
                 arrow: {
                     sx: {
-                        color: "var(--tooltip_background_color)"
-                    }
+                        color: "var(--tooltip_background_color)",
+                    },
                 },
                 tooltip: {
                     sx: {
@@ -24,8 +23,8 @@ const CustomTooltip = ({ tooltipText, tooltipProps, children }: CustomTooltipPro
                         color: "var(--tooltip_text_color)",
                         fontSize: "0.8rem",
                         fontWeight: "normal",
-                    }
-                }
+                    },
+                },
             }}
             {...tooltipProps}
         >

@@ -2,11 +2,7 @@ import type { ReactNode } from "react";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 
 import DebugErrorComponent from "../DebugErrorComponent";
-import type {
-    DatasourceSummary,
-    TiffSummary,
-    UploadErrorPayload,
-} from "@/utils/file_upload/fileUploadTypes";
+import type { DatasourceSummary, TiffSummary, UploadErrorPayload } from "@/utils/file_upload/fileUploadTypes";
 import {
     Button,
     DatasourceNameInput,
@@ -37,9 +33,7 @@ export function RedirectingView() {
 export function UploadingView({ progress }: { progress: number }) {
     return (
         <StatusContainer>
-            <Message>
-                {"Your file is being uploaded, please wait..."}
-            </Message>
+            <Message>{"Your file is being uploaded, please wait..."}</Message>
             <ProgressBar value={progress} max="100" />
         </StatusContainer>
     );
@@ -48,9 +42,7 @@ export function UploadingView({ progress }: { progress: number }) {
 export function ProcessingView() {
     return (
         <StatusContainer>
-            <Message>
-                {"Your file is being processed, please wait..."}
-            </Message>
+            <Message>{"Your file is being processed, please wait..."}</Message>
             <Spinner />
         </StatusContainer>
     );
@@ -61,15 +53,9 @@ export function UploadSuccessView({ onRefresh }: { onRefresh: () => void }) {
         <>
             <SuccessContainer>
                 <SuccessHeading>Success!</SuccessHeading>
-                <SuccessText>
-                    The file was uploaded successfully to the
-                    database.
-                </SuccessText>
+                <SuccessText>The file was uploaded successfully to the database.</SuccessText>
             </SuccessContainer>
-            <Button
-                color="green"
-                onClick={onRefresh}
-            >
+            <Button color="green" onClick={onRefresh}>
                 Refresh Page
             </Button>
         </>
@@ -89,18 +75,10 @@ export function UploadErrorView({
         <>
             <DebugErrorComponent error={error} />
             <div className="flex justify-center items-center gap-6">
-                <Button
-                    marginTop="mt-1"
-                    onClick={onUploadAnother}
-                >
+                <Button marginTop="mt-1" onClick={onUploadAnother}>
                     Upload Another File
                 </Button>
-                <Button
-                    color="red"
-                    size="px-14 py-2.5"
-                    marginTop="mt-1"
-                    onClick={onCancel}
-                >
+                <Button color="red" size="px-14 py-2.5" marginTop="mt-1" onClick={onCancel}>
                     Cancel
                 </Button>
             </div>
@@ -137,9 +115,7 @@ export function TabularReviewView({
     return (
         <>
             <FileSummary>
-                <FileSummaryHeading>
-                    {"Uploaded File Summary"}
-                </FileSummaryHeading>
+                <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
                 <FileSummaryText>
                     <DatasourceNameInput
                         value={datasourceName}
@@ -148,8 +124,7 @@ export function TabularReviewView({
                     />
                 </FileSummaryText>
                 <FileSummaryText>
-                    <strong>{"File name"}</strong>{" "}
-                    {datasourceSummary.fileName}
+                    <strong>{"File name"}</strong> {datasourceSummary.fileName}
                 </FileSummaryText>
                 {/* <FileSummaryText>
                     <strong>{"Number of rows"}</strong>{" "}
@@ -160,24 +135,15 @@ export function TabularReviewView({
                     {datasourceSummary.columnCount}
                 </FileSummaryText> */}
                 <FileSummaryText>
-                    <strong>{"File size"}</strong>{" "}
-                    {datasourceSummary.fileSize} MB
+                    <strong>{"File size"}</strong> {datasourceSummary.fileSize} MB
                 </FileSummaryText>
             </FileSummary>
             {columnPreview}
             <div className="flex justify-center items-center gap-6 mt-4">
-                <Button
-                    marginTop="mt-1"
-                    onClick={onUpload}
-                >
+                <Button marginTop="mt-1" onClick={onUpload}>
                     {"Upload"}
                 </Button>
-                <Button
-                    color="red"
-                    size="px-6 py-2.5"
-                    marginTop="mt-1"
-                    onClick={onCancel}
-                >
+                <Button color="red" size="px-6 py-2.5" marginTop="mt-1" onClick={onCancel}>
                     {"Cancel"}
                 </Button>
             </div>
@@ -210,23 +176,12 @@ export function TiffReviewView({
                 <div className="flex items-center justify-center">
                     <div className="flex items-start justify-start pt-5 pl-4">
                         <FileSummary>
-                            <FileSummaryHeading>
-                                {
-                                    "Uploaded File Summary"
-                                }
-                            </FileSummaryHeading>
+                            <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
                             <FileSummaryText>
-                                <strong>
-                                    {"File name:"}
-                                </strong>{" "}
-                                {tiffSummary.fileName}
+                                <strong>{"File name:"}</strong> {tiffSummary.fileName}
                             </FileSummaryText>
                             <FileSummaryText>
-                                <strong>
-                                    {"File size:"}
-                                </strong>{" "}
-                                {tiffSummary.fileSize}{" "}
-                                MB
+                                <strong>{"File size:"}</strong> {tiffSummary.fileSize} MB
                             </FileSummaryText>
                             {datasourceDropdown}
                         </FileSummary>
@@ -235,9 +190,7 @@ export function TiffReviewView({
                 <div className="flex items-center justify-center">
                     <div className="flex flex-col items-center justify-center ">
                         <FileSummaryText>
-                            <strong>
-                                Image Preview:
-                            </strong>
+                            <strong>Image Preview:</strong>
                         </FileSummaryText>
                         {/* <TiffVisualization
                             metadata={
@@ -267,29 +220,14 @@ export function TiffReviewView({
                     )} */}
                 </div>
                 <div className="flex justify-between items-center ml-4 mr-2 mt-12">
-                    <Button
-                        color="gray"
-                        size="px-6 py-2.5"
-                        marginTop="mt-1"
-                        onClick={onToggleView}
-                    >
-                        {showMetadata
-                            ? "View Metadata as XML"
-                            : "View Metadata as Table"}
+                    <Button color="gray" size="px-6 py-2.5" marginTop="mt-1" onClick={onToggleView}>
+                        {showMetadata ? "View Metadata as XML" : "View Metadata as Table"}
                     </Button>
                     <div className="flex space-x-4 ml-auto">
-                        <Button
-                            marginTop="mt-6"
-                            onClick={onUpload}
-                        >
+                        <Button marginTop="mt-6" onClick={onUpload}>
                             {"Upload"}
                         </Button>
-                        <Button
-                            color="red"
-                            size="px-6 py-2.5"
-                            marginTop="mt-6"
-                            onClick={onCancel}
-                        >
+                        <Button color="red" size="px-6 py-2.5" marginTop="mt-6" onClick={onCancel}>
                             {"Cancel"}
                         </Button>
                     </div>
@@ -317,20 +255,12 @@ export function H5ReviewView({
     return (
         <>
             <FileSummary>
-                <FileSummaryHeading>
-                    H5 File Summary
-                </FileSummaryHeading>
+                <FileSummaryHeading>H5 File Summary</FileSummaryHeading>
                 <FileSummaryText>
-                    <strong>File name:</strong>{" "}
-                    {selectedFile.name}
+                    <strong>File name:</strong> {selectedFile.name}
                 </FileSummaryText>
                 <FileSummaryText>
-                    <strong>File size:</strong>{" "}
-                    {(
-                        selectedFile.size /
-                        (1024 * 1024)
-                    ).toFixed(2)}{" "}
-                    MB
+                    <strong>File size:</strong> {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
                 </FileSummaryText>
             </FileSummary>
 
@@ -339,18 +269,10 @@ export function H5ReviewView({
             /> */}
 
             <div className="flex justify-center items-center gap-6 mt-4">
-                <Button
-                    marginTop="mt-1"
-                    onClick={onUpload}
-                >
+                <Button marginTop="mt-1" onClick={onUpload}>
                     Upload
                 </Button>
-                <Button
-                    color="red"
-                    size="px-6 py-2.5"
-                    marginTop="mt-1"
-                    onClick={onCancel}
-                >
+                <Button color="red" size="px-6 py-2.5" marginTop="mt-1" onClick={onCancel}>
                     Cancel
                 </Button>
             </div>
@@ -376,36 +298,19 @@ export function FileDropzoneView({
     supportedFileTypes: string[];
 }) {
     return (
-        <DropzoneContainer
-            {...rootProps}
-            isDragOver={isDragActive}
-            aria-label={"dropzoneLabel"}
-        >
+        <DropzoneContainer {...rootProps} isDragOver={isDragActive} aria-label={"dropzoneLabel"}>
             <input {...inputProps} />
             <div className="flex flex-col items-center justify-center">
-                <CloudUploadIcon
-                    className="text-gray-400"
-                    style={{ fontSize: "5rem" }}
-                />
+                <CloudUploadIcon className="text-gray-400" style={{ fontSize: "5rem" }} />
                 {isDragActive ? (
-                    <DynamicText
-                        text={"Drop files here..."}
-                        className="text-sm"
-                    />
+                    <DynamicText text={"Drop files here..."} className="text-sm" />
                 ) : (
                     <DynamicText
-                        text={
-                            selectedFileName
-                                ? `Selected file: ${selectedFileName}`
-                                : rejectionMessage
-                        }
+                        text={selectedFileName ? `Selected file: ${selectedFileName}` : rejectionMessage}
                         className={`${rejectionMessageStyle} text-sm`}
                     />
                 )}
-                <FileInputLabel
-                    htmlFor="fileInput"
-                    className="text-sm"
-                >
+                <FileInputLabel htmlFor="fileInput" className="text-sm">
                     {"Choose File"}
                 </FileInputLabel>
                 <div className="mt-6 w-full max-w-md rounded-md bg-gray-50 px-3 py-2 dark:bg-gray-900/50">
@@ -413,14 +318,14 @@ export function FileDropzoneView({
                         Supported file types
                     </p>
                     <div className="flex flex-wrap items-center justify-center gap-2">
-                    {supportedFileTypes.map((extension) => (
-                        <span
-                            key={extension}
-                            className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                        >
-                            {extension}
-                        </span>
-                    ))}
+                        {supportedFileTypes.map((extension) => (
+                            <span
+                                key={extension}
+                                className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                            >
+                                {extension}
+                            </span>
+                        ))}
                     </div>
                 </div>
             </div>

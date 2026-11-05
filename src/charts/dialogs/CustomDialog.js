@@ -58,11 +58,7 @@ class CustomDialog extends BaseDialog {
                 }
                 this[s.type](s, d);
                 if (s.description) {
-                    createEl(
-                        "div",
-                        { text: s.description, styles: { fontSize: "12px" } },
-                        d,
-                    );
+                    createEl("div", { text: s.description, styles: { fontSize: "12px" } }, d);
                 }
             }
         }

@@ -33,21 +33,29 @@ const DebugButton = observer(() => {
                 return [k, props];
             });
 
-            new DebugChartReactWrapper({
-                chartTypes,
-                datasources,
-                views,
-                state,
-                buildInfo,
-            }, undefined, { showValidationSection: true });
+            new DebugChartReactWrapper(
+                {
+                    chartTypes,
+                    datasources,
+                    views,
+                    state,
+                    buildInfo,
+                },
+                undefined,
+                { showValidationSection: true },
+            );
         } catch (err) {
-            setError(err instanceof Error ? {
-                message: err.message,
-                stack: err?.stack,
-            } : {
-                message: "Error occurred while fetching JSON",
-                stack: `${err}`,
-            });
+            setError(
+                err instanceof Error
+                    ? {
+                          message: err.message,
+                          stack: err?.stack,
+                      }
+                    : {
+                          message: "Error occurred while fetching JSON",
+                          stack: `${err}`,
+                      },
+            );
             setOpen(true);
             console.error("Error occurred while fetching JSON: ", err);
         }

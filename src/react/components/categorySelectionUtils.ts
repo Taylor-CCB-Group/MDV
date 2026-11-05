@@ -22,17 +22,12 @@ export function getAvailableCategorySelectionValues(
         }
         return dataStore.getColumnValues(sourceColumn).slice();
     } catch (error) {
-        console.error(
-            `error updating category selection values with '${sourceColumn}' (${error})`,
-        );
+        console.error(`error updating category selection values with '${sourceColumn}' (${error})`);
         return [];
     }
 }
 
-export function getCategorySelectionDropdownKey(
-    sourceColumn: string | undefined,
-    availableValues: string[],
-) {
+export function getCategorySelectionDropdownKey(sourceColumn: string | undefined, availableValues: string[]) {
     return `${sourceColumn || ""}\u0000${availableValues.join("\u0000")}`;
 }
 
@@ -57,8 +52,10 @@ export function shouldRefreshCategorySelectionValues(
         return false;
     }
 
-    return typeof eventData === "object"
-        && eventData !== null
-        && Array.isArray(eventData.columns)
-        && eventData.columns.includes(sourceColumn);
+    return (
+        typeof eventData === "object" &&
+        eventData !== null &&
+        Array.isArray(eventData.columns) &&
+        eventData.columns.includes(sourceColumn)
+    );
 }

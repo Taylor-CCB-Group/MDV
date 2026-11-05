@@ -44,14 +44,7 @@ type AddTableColumnDialogProps = {
 
 //! We currently don't support int32 datatype column creation
 //! int32 cannot truly represent NaN, so empty int32 cells currently coerce during storage and need a real missing-value strategy later.
-const DATATYPE_OPTIONS: DataType[] = [
-    "text",
-    "text16",
-    "integer",
-    "double",
-    "unique",
-    "multitext",
-];
+const DATATYPE_OPTIONS: DataType[] = ["text", "text16", "integer", "double", "unique", "multitext"];
 const COMPOUND_DATATYPE_OPTIONS: Array<"text" | "text16"> = ["text", "text16"];
 const ADD_COLUMN_MODE_OPTIONS: AddColumnMode[] = ["empty", "clone", "compound"];
 
@@ -77,14 +70,14 @@ const AddTableColumnDialog = ({
     const compoundSourceColumns = cloneableColumns.filter(
         (column) => column.datatype === "text" || column.datatype === "text16",
     );
-    const selectedSourceColumns = compoundSourceColumns.filter((column) =>
-        sourceColumns.includes(column.field),
-    );
+    const selectedSourceColumns = compoundSourceColumns.filter((column) => sourceColumns.includes(column.field));
     const selectedDatatype =
         mode === "clone"
-            ? selectedCloneColumn?.datatype ?? "text"
+            ? (selectedCloneColumn?.datatype ?? "text")
             : mode === "compound"
-              ? (datatype === "text16" ? "text16" : "text")
+              ? datatype === "text16"
+                  ? "text16"
+                  : "text"
               : datatype;
 
     // Reset values when the dialog is opened to avoid stale values
@@ -107,7 +100,7 @@ const AddTableColumnDialog = ({
     const handleSubmit = () => {
         const trimmedName = name.trim();
         if (!trimmedName) {
-                setNameError("Column name is required");
+            setNameError("Column name is required");
             return;
         }
         if (mode === "compound" && sourceColumns.length < 2) {
@@ -129,10 +122,7 @@ const AddTableColumnDialog = ({
                         ? null
                         : parsedStringLength
                     : null,
-            delimiter:
-                selectedDatatype === "multitext" || mode === "compound"
-                    ? delimiter
-                    : null,
+            delimiter: selectedDatatype === "multitext" || mode === "compound" ? delimiter : null,
         });
     };
 
@@ -149,17 +139,17 @@ const AddTableColumnDialog = ({
                         label="Column Name"
                         value={name}
                         onChange={(event) => {
-                                setName(event.target.value);
-                                setNameError(null);
-                            }}
+                            setName(event.target.value);
+                            setNameError(null);
+                        }}
                         onKeyDown={(event) => {
                             if (event.key === "Enter") {
                                 event.preventDefault();
                                 handleSubmit();
                             }
                         }}
-                            error={!!nameError}
-                            helperText={nameError}
+                        error={!!nameError}
+                        helperText={nameError}
                         fullWidth
                     />
 
@@ -169,15 +159,9 @@ const AddTableColumnDialog = ({
                         onChange={(_, value) => setMode(value ?? "empty")}
                         disableClearable
                         getOptionLabel={(option) =>
-                            option === "empty"
-                                ? "Empty"
-                                : option === "clone"
-                                  ? "Clone"
-                                  : "Compound"
+                            option === "empty" ? "Empty" : option === "clone" ? "Clone" : "Compound"
                         }
-                        renderInput={(params) => (
-                            <TextField {...params} label="Mode" fullWidth />
-                        )}
+                        renderInput={(params) => <TextField {...params} label="Mode" fullWidth />}
                     />
 
                     {mode === "clone" ? (
@@ -192,24 +176,20 @@ const AddTableColumnDialog = ({
                                 }}
                                 isOptionEqualToValue={(option, value) => option.field === value.field}
                                 disableClearable
-                                getOptionLabel={(option) =>
-                                    typeof option === "string"
-                                        ? option
-                                        : option.name
-                                }
+                                getOptionLabel={(option) => (typeof option === "string" ? option : option.name)}
                                 renderOption={(props, option) => (
                                     <li {...props}>
-                                            <Typography variant="body1">{option.name}</Typography>
-                                            <Typography
-                                                variant="body2"
-                                                color="textDisabled"
-                                                sx={{
-                                                    ml: 1,
-                                                    fontStyle: "italic",
-                                                }}
-                                            >
-                                                ({option.datatype})
-                                            </Typography>
+                                        <Typography variant="body1">{option.name}</Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="textDisabled"
+                                            sx={{
+                                                ml: 1,
+                                                fontStyle: "italic",
+                                            }}
+                                        >
+                                            ({option.datatype})
+                                        </Typography>
                                     </li>
                                 )}
                                 disabled={cloneableColumns.length === 0}
@@ -231,7 +211,7 @@ const AddTableColumnDialog = ({
                                 slotProps={{
                                     input: {
                                         readOnly: true,
-                                    }
+                                    },
                                 }}
                             />
                         </>
@@ -262,9 +242,7 @@ const AddTableColumnDialog = ({
                                 value={selectedDatatype}
                                 onChange={(_, value) => setDatatype(value ?? "text")}
                                 getOptionLabel={(option) => option}
-                                renderInput={(params) => (
-                                    <TextField {...params} label="Datatype" fullWidth />
-                                )}
+                                renderInput={(params) => <TextField {...params} label="Datatype" fullWidth />}
                             />
                             <TextField
                                 label="Separator"
@@ -280,12 +258,7 @@ const AddTableColumnDialog = ({
                             onChange={(_, value) => setDatatype(value ?? "text")}
                             getOptionLabel={(option) => option}
                             renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    label="Datatype"
-                                    placeholder="Search datatype"
-                                    fullWidth
-                                />
+                                <TextField {...params} label="Datatype" placeholder="Search datatype" fullWidth />
                             )}
                         />
                     )}
@@ -299,7 +272,7 @@ const AddTableColumnDialog = ({
                             slotProps={{
                                 htmlInput: {
                                     min: 1,
-                                }
+                                },
                             }}
                             fullWidth
                         />
@@ -315,7 +288,7 @@ const AddTableColumnDialog = ({
                                 slotProps={{
                                     htmlInput: {
                                         min: 1,
-                                    }
+                                    },
                                 }}
                                 fullWidth
                             />
@@ -336,13 +309,14 @@ const AddTableColumnDialog = ({
                         slotProps={{
                             htmlInput: {
                                 min: 1,
-                            }
+                            },
                         }}
                         fullWidth
                     />
 
                     <Typography variant="body2" color="text.secondary">
-                        New columns are editable. Compound source columns are limited to text/text16, and a requested text output auto-upgrades to text16 if distinct values exceed 256.
+                        New columns are editable. Compound source columns are limited to text/text16, and a requested
+                        text output auto-upgrades to text16 if distinct values exceed 256.
                     </Typography>
                 </Stack>
             </DialogContent>
@@ -350,7 +324,9 @@ const AddTableColumnDialog = ({
                 <Button onClick={handleSubmit} variant="contained">
                     Add
                 </Button>
-                <Button onClick={onClose} color="error">Cancel</Button>
+                <Button onClick={onClose} color="error">
+                    Cancel
+                </Button>
             </DialogActions>
         </Dialog>
     );

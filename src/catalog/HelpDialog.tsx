@@ -28,10 +28,10 @@ const HelpDialog = ({ open, onClose }: HelpDialogType) => {
                     </Link>
                     .
                 </Typography>
-                <Typography  variant="body1" sx={{mt: 1}}>
+                <Typography variant="body1" sx={{ mt: 1 }}>
                     {HELP_DIALOG_MESSAGE[1]}
                 </Typography>
-                <Typography sx={{mt: 3, mb: 1 }} variant="body1">
+                <Typography sx={{ mt: 3, mb: 1 }} variant="body1">
                     {HELP_DIALOG_MESSAGE[2]}{" "}
                     <Link
                         href={MDV_DOC_WEBSITE}

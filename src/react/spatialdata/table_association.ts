@@ -815,130 +815,134 @@ export function useAssociatedShapesLayerInputs(
     // `count` here is how many times the association projection ran during a capture;
     // `avgMs` tells you whether the per-feature pass was cached or rebuilt. A cosmetic
     // edit should show a high count and a near-zero average.
-    const layers = useMemo(() => measureSpatial("association.project", () => {
-        let changed = false;
-        const nextLayers = { ...layerInputs.layers };
+    const layers = useMemo(
+        () =>
+            measureSpatial("association.project", () => {
+                let changed = false;
+                const nextLayers = { ...layerInputs.layers };
 
-        for (const layerId of layerInputs.layerOrder) {
-            const layer = layerInputs.layers[layerId];
-            if (!isFillColorAssociableLayer(layer)) continue;
+                for (const layerId of layerInputs.layerOrder) {
+                    const layer = layerInputs.layers[layerId];
+                    if (!isFillColorAssociableLayer(layer)) continue;
 
-            const associationKey = `${layer.type}:${layer.elementKey}`;
-            const table = tableByAssociationKey[associationKey];
-            if (table?.status !== "resolved") continue;
+                    const associationKey = `${layer.type}:${layer.elementKey}`;
+                    const table = tableByAssociationKey[associationKey];
+                    if (table?.status !== "resolved") continue;
 
-            const fillColumnName = layerFillColorColumnName(layer);
-            // Two routes, decided by whether the viewer can read the column at all.
-            // In obs: hand it over with MDV's palette, and let the viewer do the
-            // reading, the encoding and the load-window retention. Not in obs (a
-            // gene score, `mdv_cell_id`, anything computed here): MDV is the only
-            // party that has the values, so it colours each feature itself.
-            const viewerFillColor =
-                fillColumnName && obsColumnNamesByAssociationKey[associationKey]?.has(fillColumnName)
-                    ? fillColorSchemeFromDataStore(table.dataStore, fillColumnName)
-                    : undefined;
-            const colorForRow =
-                fillColumnName && !viewerFillColor
-                    ? colorFunctionByDataSource[table.dataSourceName]?.[fillColumnName]
-                    : undefined;
-            // A selected column whose data has not loaded yet has no colour function.
-            const colorReady = !fillColumnName || !!viewerFillColor || colorForRow !== undefined;
-            const visibleRows =
-                visibleRowsByDataSource[table.dataSourceName] ?? visibleRowsForDataStore(table.dataStore);
+                    const fillColumnName = layerFillColorColumnName(layer);
+                    // Two routes, decided by whether the viewer can read the column at all.
+                    // In obs: hand it over with MDV's palette, and let the viewer do the
+                    // reading, the encoding and the load-window retention. Not in obs (a
+                    // gene score, `mdv_cell_id`, anything computed here): MDV is the only
+                    // party that has the values, so it colours each feature itself.
+                    const viewerFillColor =
+                        fillColumnName && obsColumnNamesByAssociationKey[associationKey]?.has(fillColumnName)
+                            ? fillColorSchemeFromDataStore(table.dataStore, fillColumnName)
+                            : undefined;
+                    const colorForRow =
+                        fillColumnName && !viewerFillColor
+                            ? colorFunctionByDataSource[table.dataSourceName]?.[fillColumnName]
+                            : undefined;
+                    // A selected column whose data has not loaded yet has no colour function.
+                    const colorReady = !fillColumnName || !!viewerFillColor || colorForRow !== undefined;
+                    const visibleRows =
+                        visibleRowsByDataSource[table.dataSourceName] ?? visibleRowsForDataStore(table.dataStore);
 
-            // Filtering rides `featureState` on both routes: cross-filtering is
-            // MDV's, not the table's, and no column in obs can express it.
-            //
-            // This is the expensive step — one pass over every feature in the element
-            // — and it is reached on every render of this memo, which includes the
-            // cosmetic ones. The memo cannot simply skip those: it hands the canvas
-            // COPIES of the layer configs, so it has to re-copy for an in-place
-            // opacity edit to reach the canvas at all. Caching the featureState on
-            // the inputs it actually reads separates the two: the copy stays cheap
-            // and per-render, the per-feature pass runs only when something it
-            // depends on moved.
-            const source = rowIndexByFeatureIdByAssociationKey[associationKey];
-            if (!source) continue;
+                    // Filtering rides `featureState` on both routes: cross-filtering is
+                    // MDV's, not the table's, and no column in obs can express it.
+                    //
+                    // This is the expensive step — one pass over every feature in the element
+                    // — and it is reached on every render of this memo, which includes the
+                    // cosmetic ones. The memo cannot simply skip those: it hands the canvas
+                    // COPIES of the layer configs, so it has to re-copy for an in-place
+                    // opacity edit to reach the canvas at all. Caching the featureState on
+                    // the inputs it actually reads separates the two: the copy stays cheap
+                    // and per-render, the per-feature pass runs only when something it
+                    // depends on moved.
+                    const source = rowIndexByFeatureIdByAssociationKey[associationKey];
+                    if (!source) continue;
 
-            const rowCount = table.dataStore.size;
-            const alpha = layerFillAlpha(layer);
-            const baseFeatureState = layer.featureState;
-            const cached = featureStateCacheRef.current[layerId];
-            let featureState: AssociatedFeatureState | undefined;
-            if (
-                cached &&
-                cached.source === source &&
-                cached.visibleRows === visibleRows &&
-                cached.rowCount === rowCount &&
-                cached.baseFeatureState === baseFeatureState &&
-                cached.colorForRow === colorForRow &&
-                cached.alpha === alpha
-            ) {
-                featureState = cached.featureState;
-            } else {
-                featureState = buildAssociatedFeatureStateFromRowMap({
-                    rowIndexByFeatureId: source,
-                    visibleRows,
-                    rowCount,
-                    baseFeatureState,
-                    colorForRow,
-                    alpha,
-                });
-                featureStateCacheRef.current[layerId] = {
-                    source,
-                    visibleRows,
-                    rowCount,
-                    baseFeatureState,
-                    colorForRow,
-                    alpha,
-                    featureState,
-                };
-            }
+                    const rowCount = table.dataStore.size;
+                    const alpha = layerFillAlpha(layer);
+                    const baseFeatureState = layer.featureState;
+                    const cached = featureStateCacheRef.current[layerId];
+                    let featureState: AssociatedFeatureState | undefined;
+                    if (
+                        cached &&
+                        cached.source === source &&
+                        cached.visibleRows === visibleRows &&
+                        cached.rowCount === rowCount &&
+                        cached.baseFeatureState === baseFeatureState &&
+                        cached.colorForRow === colorForRow &&
+                        cached.alpha === alpha
+                    ) {
+                        featureState = cached.featureState;
+                    } else {
+                        featureState = buildAssociatedFeatureStateFromRowMap({
+                            rowIndexByFeatureId: source,
+                            visibleRows,
+                            rowCount,
+                            baseFeatureState,
+                            colorForRow,
+                            alpha,
+                        });
+                        featureStateCacheRef.current[layerId] = {
+                            source,
+                            visibleRows,
+                            rowCount,
+                            baseFeatureState,
+                            colorForRow,
+                            alpha,
+                            featureState,
+                        };
+                    }
 
-            if (!viewerFillColor) {
-                featureState = withPreservedFillColorsWhileLoading({
-                    featureState,
-                    fillColumnName,
-                    colorReady,
-                    previousFillColorByFeatureId: lastFillColorsRef.current[layerId],
-                });
-            }
+                    if (!viewerFillColor) {
+                        featureState = withPreservedFillColorsWhileLoading({
+                            featureState,
+                            fillColumnName,
+                            colorReady,
+                            previousFillColorByFeatureId: lastFillColorsRef.current[layerId],
+                        });
+                    }
 
-            if (!fillColumnName || viewerFillColor) {
-                // Nothing to preserve: either no column, or the viewer is holding
-                // the last-good colours itself. Dropping the entry also stops a
-                // previous MDV-drawn column bleeding into a later viewer-drawn one.
-                const { [layerId]: _removed, ...remaining } = lastFillColorsRef.current;
-                lastFillColorsRef.current = remaining;
-            } else if (colorReady && featureState?.fillColorByFeatureId) {
-                lastFillColorsRef.current[layerId] = featureState.fillColorByFeatureId;
-            }
+                    if (!fillColumnName || viewerFillColor) {
+                        // Nothing to preserve: either no column, or the viewer is holding
+                        // the last-good colours itself. Dropping the entry also stops a
+                        // previous MDV-drawn column bleeding into a later viewer-drawn one.
+                        const { [layerId]: _removed, ...remaining } = lastFillColorsRef.current;
+                        lastFillColorsRef.current = remaining;
+                    } else if (colorReady && featureState?.fillColorByFeatureId) {
+                        lastFillColorsRef.current[layerId] = featureState.fillColorByFeatureId;
+                    }
 
-            if (!featureState && !viewerFillColor) continue;
+                    if (!featureState && !viewerFillColor) continue;
 
-            const projected = viewerFillColor
-                ? { ...layer, fillColorByColumn: viewerFillColor }
-                : withoutViewerFillColorColumn(layer);
-            nextLayers[layerId] = featureState ? { ...projected, featureState } : projected;
-            changed = true;
-        }
+                    const projected = viewerFillColor
+                        ? { ...layer, fillColorByColumn: viewerFillColor }
+                        : withoutViewerFillColorColumn(layer);
+                    nextLayers[layerId] = featureState ? { ...projected, featureState } : projected;
+                    changed = true;
+                }
 
-        // Both caches are keyed by layer id and nothing else removes their entries, so
-        // a layer deleted from the stack would leave its featureState — one entry per
-        // feature of that element — reachable for the life of the chart.
-        pruneToKeys(featureStateCacheRef.current, layerInputs.layerOrder);
-        pruneToKeys(lastFillColorsRef.current, layerInputs.layerOrder);
+                // Both caches are keyed by layer id and nothing else removes their entries, so
+                // a layer deleted from the stack would leave its featureState — one entry per
+                // feature of that element — reachable for the life of the chart.
+                pruneToKeys(featureStateCacheRef.current, layerInputs.layerOrder);
+                pruneToKeys(lastFillColorsRef.current, layerInputs.layerOrder);
 
-        return changed ? nextLayers : layerInputs.layers;
-    }), [
-        layerInputs.layers,
-        layerInputs.layerOrder,
-        rowIndexByFeatureIdByAssociationKey,
-        tableByAssociationKey,
-        obsColumnNamesByAssociationKey,
-        visibleRowsByDataSource,
-        colorFunctionByDataSource,
-    ]);
+                return changed ? nextLayers : layerInputs.layers;
+            }),
+        [
+            layerInputs.layers,
+            layerInputs.layerOrder,
+            rowIndexByFeatureIdByAssociationKey,
+            tableByAssociationKey,
+            obsColumnNamesByAssociationKey,
+            visibleRowsByDataSource,
+            colorFunctionByDataSource,
+        ],
+    );
 
     return useMemo(
         () => ({

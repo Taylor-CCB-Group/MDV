@@ -3,9 +3,7 @@ import Dimension from "./Dimension.js";
 class CatColDimension extends Dimension {
     constructor(parent) {
         super(parent);
-        this.worker = new Worker(
-            new URL("./catColWorker.js?v=7", import.meta.url),
-        );
+        this.worker = new Worker(new URL("./catColWorker.js?v=7", import.meta.url));
         // The worker answers requests one at a time, in the order they were sent,
         // so each answer belongs to the oldest request still waiting.
         this.pendingAverages = [];
@@ -42,13 +40,10 @@ class CatColDimension extends Dimension {
         const cIndex = this.parent.columnIndex;
         config.values = cIndex[columns[0]].values;
         config.columns = columns.slice(1);
-        config.y_datatype= cIndex[columns[0]].datatype;
+        config.y_datatype = cIndex[columns[0]].datatype;
         const colBuffers = [];
         for (let n = 1; n < columns.length; n++) {
-            colBuffers.push([
-                cIndex[columns[n]].buffer,
-                cIndex[columns[n]].datatype,
-            ]);
+            colBuffers.push([cIndex[columns[n]].buffer, cIndex[columns[n]].datatype]);
         }
         this.worker.postMessage([
             this.filterBuffer,

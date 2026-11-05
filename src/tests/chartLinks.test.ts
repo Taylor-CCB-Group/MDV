@@ -14,7 +14,9 @@ describe("chart links across replacing a chart", () => {
     });
 
     test("adds the chart back to a link that is still there", () => {
-        const links: ChartLink[] = [{ id: "b", type: "color_by_column", source_chart: "c3", target_charts: ["c4", "c1"] }];
+        const links: ChartLink[] = [
+            { id: "b", type: "color_by_column", source_chart: "c3", target_charts: ["c4", "c1"] },
+        ];
         const snapshot = snapshotChartLinks(links, "c1");
         links[0].target_charts?.splice(1, 1);
         const setUp: ChartLink[] = [];

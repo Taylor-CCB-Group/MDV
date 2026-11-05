@@ -1,14 +1,5 @@
 import { Person } from "@mui/icons-material";
-import {
-    Avatar,
-    Box,
-    CircularProgress,
-    Divider,
-    IconButton,
-    Menu,
-    MenuItem,
-    Typography,
-} from "@mui/material";
+import { Avatar, Box, CircularProgress, Divider, IconButton, Menu, MenuItem, Typography } from "@mui/material";
 import type React from "react";
 import { useState } from "react";
 import useUser from "./hooks/useUser";
@@ -90,13 +81,13 @@ const UserProfile: React.FC = () => {
                 )}
                 {error && (
                     <>
-                    <Box sx={{ p: 2, maxWidth: 280 }}>
-                        <Typography color="error" variant="body2">
-                            {error}
-                        </Typography>
-                    </Box>
+                        <Box sx={{ p: 2, maxWidth: 280 }}>
+                            <Typography color="error" variant="body2">
+                                {error}
+                            </Typography>
+                        </Box>
                         <Divider />
-                        </>
+                    </>
                 )}
                 {user && (
                     <Box sx={{ p: 2 }}>
@@ -114,29 +105,16 @@ const UserProfile: React.FC = () => {
                                 src={user.avatarUrl}
                                 alt={user.name}
                             >
-                                {!user.avatarUrl && (
-                                    <Person sx={{ fontSize: 50 }} />
-                                )}
+                                {!user.avatarUrl && <Person sx={{ fontSize: 50 }} />}
                             </Avatar>
                             <Box>
-                                <Typography
-                                    variant="subtitle1"
-                                    sx={{ fontWeight: 600 }}
-                                >
+                                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                                     {user.name}
                                 </Typography>
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{ mt: 0.5 }}
-                                >
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                                     {user.email}
                                 </Typography>
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{ mt: 1 }}
-                                >
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                                     {user.association}
                                 </Typography>
                             </Box>

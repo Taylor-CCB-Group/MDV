@@ -16,9 +16,7 @@ class SpatialLayerDialogReactWrapper extends BaseDialog {
 
     constructor(parent: SpatialDataMdvReact) {
         if (parent.__doc__ !== document) {
-            console.warn(
-                "SpatialLayerDialogReactWrapper may have styling issues in popouts...",
-            );
+            console.warn("SpatialLayerDialogReactWrapper may have styling issues in popouts...");
         }
         const config = {
             width: 560,

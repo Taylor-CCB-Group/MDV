@@ -12,7 +12,10 @@ function readRequiredValue(argv, index, flag) {
 
 function readRequiredList(argv, index, flag) {
     const value = readRequiredValue(argv, index, flag);
-    const values = value.split(",").map((item) => item.trim()).filter(Boolean);
+    const values = value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
     if (values.length === 0) {
         throw new Error(`${flag} requires at least one non-empty value`);
     }
@@ -79,11 +82,9 @@ async function profileView(page, baseUrl, viewName, categories, settleMs) {
     const url = viewUrl(baseUrl, viewName);
     const startedAt = Date.now();
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await page.waitForFunction(
-        () => Boolean(window.mdv?.chartManager?.viewManager?.current_view),
-        null,
-        { timeout: 120_000 },
-    );
+    await page.waitForFunction(() => Boolean(window.mdv?.chartManager?.viewManager?.current_view), null, {
+        timeout: 120_000,
+    });
     await page.waitForSelector(".row-bar", { timeout: 120_000 });
     await page.waitForTimeout(settleMs);
     const readyAt = Date.now();
@@ -133,8 +134,7 @@ async function profileView(page, baseUrl, viewName, categories, settleMs) {
                 .find((chart) => chart.config.type === "row_chart" && !chart.config.wordcloud);
             if (!rowChart) throw new Error("No row chart found");
             const dataStore = rowChart.dataStore;
-            const label = [...document.querySelectorAll(".row-text")]
-                .find((element) => element.textContent === cat);
+            const label = [...document.querySelectorAll(".row-text")].find((element) => element.textContent === cat);
             if (!label) throw new Error(`No row chart label found for ${cat}`);
 
             const before = performance.now();
@@ -151,7 +151,7 @@ async function profileView(page, baseUrl, viewName, categories, settleMs) {
                     resolve({
                         eventAt: performance.now(),
                         filterSize: dataStore.filterSize,
-                        eventData: typeof data === "string" ? data : data?.constructor?.name ?? null,
+                        eventData: typeof data === "string" ? data : (data?.constructor?.name ?? null),
                     });
                 });
             });

@@ -19,17 +19,17 @@ let idCounter = 0;
 function numberToAlpha(n: number): string {
     let result = "";
     while (n > 0) {
-      const remainder = (n - 1) % 26;
-      result = String.fromCharCode(97 + remainder) + result;
-      n = Math.floor((n - 1) / 26);
+        const remainder = (n - 1) % 26;
+        result = String.fromCharCode(97 + remainder) + result;
+        n = Math.floor((n - 1) / 26);
     }
     return result;
 }
 
 // unique key generator
 export function generateCacheKey() {
-  idCounter++;
-  return `mui-${numberToAlpha(idCounter)}`;
+    idCounter++;
+    return `mui-${numberToAlpha(idCounter)}`;
 }
 
 // Cache map for storing EmotionCache for separate windows
@@ -55,9 +55,7 @@ export const OuterContainerProvider = observer(
         const cache = useEmotionCache(container);
         return (
             <OuterContainerContext.Provider value={container}>
-                <CacheProvider value={cache}>
-                    {children}
-                </CacheProvider>
+                <CacheProvider value={cache}>{children}</CacheProvider>
             </OuterContainerContext.Provider>
         );
     },

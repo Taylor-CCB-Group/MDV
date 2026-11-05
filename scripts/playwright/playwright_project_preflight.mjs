@@ -78,16 +78,7 @@ async function ensureBackendReachable() {
 }
 
 async function runDiagnosticPythonImports(pythonBin) {
-    const command = [
-        "-c",
-        [
-            "import h5py",
-            "import numpy",
-            "import polars",
-            "import scanpy",
-            "print('ok')",
-        ].join("\n"),
-    ];
+    const command = ["-c", ["import h5py", "import numpy", "import polars", "import scanpy", "print('ok')"].join("\n")];
 
     try {
         await execFileAsync(pythonBin, command, {
@@ -99,9 +90,7 @@ async function runDiagnosticPythonImports(pythonBin) {
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        fail(
-            `Diagnostic Python import check failed for the synthetic AnnData fixture path. ${message}`,
-        );
+        fail(`Diagnostic Python import check failed for the synthetic AnnData fixture path. ${message}`);
     }
 }
 
@@ -114,6 +103,4 @@ if (DIAGNOSTIC) {
     await runDiagnosticPythonImports(pythonBin);
 }
 
-console.log(
-    `[playwright project preflight] ok (${DIAGNOSTIC ? "diagnostic" : "light"})`,
-);
+console.log(`[playwright project preflight] ok (${DIAGNOSTIC ? "diagnostic" : "light"})`);

@@ -54,29 +54,15 @@ function createMultitextCategoryPredicate(column, category) {
                         return true;
                     }
                 }
-                return rowHasAnyMultitextItem(
-                    data,
-                    start,
-                    capacity,
-                    valueItemsByIndex,
-                    selectedItems,
-                );
+                return rowHasAnyMultitextItem(data, start, capacity, valueItemsByIndex, selectedItems);
             };
         }
 
         return (rowIndex) =>
-            rowHasAnyMultitextItem(
-                data,
-                rowIndex * capacity,
-                capacity,
-                valueItemsByIndex,
-                selectedItems,
-            );
+            rowHasAnyMultitextItem(data, rowIndex * capacity, capacity, valueItemsByIndex, selectedItems);
     }
 
-    const selectedItems = category.filter(
-        (item) => typeof item === "string" && item.length > 0,
-    );
+    const selectedItems = category.filter((item) => typeof item === "string" && item.length > 0);
 
     if (selectedItems.length === 0) {
         return () => false;
@@ -85,43 +71,22 @@ function createMultitextCategoryPredicate(column, category) {
     if (category.operand !== "and") {
         const selectedItemSet = new Set(selectedItems);
         return (rowIndex) =>
-            rowHasAnyMultitextItem(
-                data,
-                rowIndex * capacity,
-                capacity,
-                valueItemsByIndex,
-                selectedItemSet,
-            );
+            rowHasAnyMultitextItem(data, rowIndex * capacity, capacity, valueItemsByIndex, selectedItemSet);
     }
 
     if (new Set(selectedItems).size === 1) {
         const selectedItemSet = new Set([selectedItems[0]]);
         return (rowIndex) =>
-            rowHasAnyMultitextItem(
-                data,
-                rowIndex * capacity,
-                capacity,
-                valueItemsByIndex,
-                selectedItemSet,
-            );
+            rowHasAnyMultitextItem(data, rowIndex * capacity, capacity, valueItemsByIndex, selectedItemSet);
     }
 
-    return (rowIndex) =>
-        rowHasAllMultitextItems(
-            data,
-            rowIndex * capacity,
-            capacity,
-            valueItemsByIndex,
-            selectedItems,
-        );
+    return (rowIndex) => rowHasAllMultitextItems(data, rowIndex * capacity, capacity, valueItemsByIndex, selectedItems);
 }
 
 class CategoryDimension extends Dimension {
     constructor(parent) {
         super(parent);
-        this.worker = new Worker(
-            new URL("./catWorker.js?v=11", import.meta.url),
-        );
+        this.worker = new Worker(new URL("./catWorker.js?v=11", import.meta.url));
     }
 
     /**
@@ -212,29 +177,18 @@ class CategoryDimension extends Dimension {
 
         config.method = config.method || "sankey";
         if (config.method === "proportion") {
-            config.cats =
-                config.category == null
-                    ? null
-                    : this.parent.columnIndex[columns[2]].buffer;
+            config.cats = config.category == null ? null : this.parent.columnIndex[columns[2]].buffer;
         }
         const t = performance.now();
 
         const action = (e) => {
-            console.log(
-                `calc sankey ${col1.name} ${col2.name} : ${performance.now() - t}`,
-            );
+            console.log(`calc sankey ${col1.name} ${col2.name} : ${performance.now() - t}`);
             callback(e.data);
             this.worker.removeEventListener("message", action);
         };
 
         this.worker.addEventListener("message", action);
-        this.worker.postMessage([
-            this.filterBuffer,
-            this.parent.filterBuffer,
-            col1.buffer,
-            config,
-            col2.buffer,
-        ]);
+        this.worker.postMessage([this.filterBuffer, this.parent.filterBuffer, col1.buffer, config, col2.buffer]);
     }
 
     getCategories(callback, column, config = {}) {
@@ -250,12 +204,7 @@ class CategoryDimension extends Dimension {
         };
 
         this.worker.addEventListener("message", action);
-        this.worker.postMessage([
-            this.filterBuffer,
-            this.parent.filterBuffer,
-            col.buffer,
-            config,
-        ]);
+        this.worker.postMessage([this.filterBuffer, this.parent.filterBuffer, col.buffer, config]);
     }
 
     getCategoryHeatmap(callback, columns, config = {}) {
@@ -304,13 +253,7 @@ class CategoryDimension extends Dimension {
         };
 
         this.worker.addEventListener("message", action);
-        this.worker.postMessage([
-            this.filterBuffer,
-            this.parent.filterBuffer,
-            col1.buffer,
-            config,
-            col2.buffer,
-        ]);
+        this.worker.postMessage([this.filterBuffer, this.parent.filterBuffer, col1.buffer, config, col2.buffer]);
     }
 
     filterUnique(args, columns) {
@@ -319,7 +262,7 @@ class CategoryDimension extends Dimension {
         const predicate = (i) => {
             const v = column.getValue(i);
             return searchVals.every((s) => v.indexOf(s) !== -1);
-        }
+        };
         return this.filterPredicate({ predicate });
     }
     destroy() {

@@ -3,9 +3,7 @@ import Dimension from "./Dimension.js";
 export default class DeepToolsDimension extends SortableDimension {
     constructor(parent) {
         super(parent);
-        this.deepToolsWorker = new Worker(
-            new URL("./deepToolsWorker.js?v=1", import.meta.url),
-        );
+        this.deepToolsWorker = new Worker(new URL("./deepToolsWorker.js?v=1", import.meta.url));
     }
 
     setParameters({ groups, columns, rows, length, displayData, data }) {

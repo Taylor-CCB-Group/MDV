@@ -11,7 +11,13 @@ import { useRegionScale } from "./scatter_state";
 import { isArray, notEmpty, parseDelimitedString } from "@/lib/utils";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
-import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
+import {
+    allColumnsLoaded,
+    type FieldSpecs,
+    isColumnLoaded,
+    type FieldSpec,
+    flattenFields,
+} from "@/lib/columnTypeHelpers";
 import type { SelectionDialogConfig } from "./components/SelectionDialogReact";
 import { compileCategoryFilter, getCategoryFilterIndices, type CategoryFilterColumn } from "@/lib/categoryFilterUtils";
 import { shouldRefreshFilteredIndices } from "./filteredIndicesUtils";
@@ -118,18 +124,18 @@ export function useChartSize() {
     return size;
 }
 
-//this method works in popout windows and has debouncing 
+//this method works in popout windows and has debouncing
 // to avoid excessive updates when resizing is expensive
 export function useDebouncedChartSize(delay: number = 300) {
     const chart = useChart();
     const div = chart.contentDiv;
     const [size, setSize] = useState([div.clientWidth, div.clientHeight]);
     const timeoutRef = useRef<number | null>(null);
-    
+
     useLayoutEffect(() => {
         const win = chart.__doc__.defaultView;
         if (!win) return;
-        const resize = () => {   
+        const resize = () => {
             if (timeoutRef.current !== null) {
                 win.clearTimeout(timeoutRef.current);
             }
@@ -140,13 +146,13 @@ export function useDebouncedChartSize(delay: number = 300) {
         };
         const observer = new ResizeObserver(resize);
         observer.observe(div);
-        win.addEventListener('resize', resize);
+        win.addEventListener("resize", resize);
         return () => {
             if (timeoutRef.current !== null) {
                 win.clearTimeout(timeoutRef.current);
             }
             observer.unobserve(div);
-            win.removeEventListener('resize', resize);
+            win.removeEventListener("resize", resize);
         };
     }, [div, chart.observable.container, delay]);
     return size;
@@ -162,10 +168,7 @@ export function useChartID(): string {
     if (!chart.config.id) {
         // we were hitting this because of the way BaseReactChart was still using original config
         // after super constructor had used a copy of it to set up the chart...
-        console.assert(
-            chart.config.id,
-            "chart.config.id should not be undefined",
-        );
+        console.assert(chart.config.id, "chart.config.id should not be undefined");
         action(() => {
             chart.config.id = getRandomString();
         })();
@@ -225,8 +228,7 @@ export function useParamColumns(): LoadedDataColumn<DataType>[] {
     const columns = useMemo(() => {
         const param = chart.config.param;
         if (!param) return [];
-        if (typeof param === "string")
-            return [columnIndex[param]];
+        if (typeof param === "string") return [columnIndex[param]];
         // we could make sure they are loaded as well...
         if (!isArray(param)) {
             //must be a query object...
@@ -242,7 +244,9 @@ export function useParamColumns(): LoadedDataColumn<DataType>[] {
     // - so this isn't an exhaustive check and ts will have limited capacity to help us.
     // but we should be fairly safe to assume that once we get past here, we have `LoadedDataColumn`s
     if (!allColumnsLoaded(columns)) {
-        throw new Error("we always expect that param columns are loaded by the time we try to use them... this shouldn't happen");
+        throw new Error(
+            "we always expect that param columns are loaded by the time we try to use them... this shouldn't happen",
+        );
     }
     return columns;
 }
@@ -284,7 +288,7 @@ export function useFieldSpecs(specs?: FieldSpecs | FieldSpec) {
     return columns;
 }
 export function useFieldSpec(spec?: FieldSpec) {
-    const fieldSpecs = useMemo(() =>spec ? [spec] : [], [spec]);
+    const fieldSpecs = useMemo(() => (spec ? [spec] : []), [spec]);
     const arr = useFieldSpecs(fieldSpecs);
     if (!arr) return undefined;
     if (arr.length === 0) return undefined;
@@ -307,9 +311,9 @@ export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
                 setColumns([]);
                 return;
             }
-            const renderedParam = param.flatMap(p => typeof p === "string" ? p : p.fields)
+            const renderedParam = param.flatMap((p) => (typeof p === "string" ? p : p.fields));
             chartManager.loadColumnSet(renderedParam, dsName, () => {
-                const cols = renderedParam.map(name => columnIndex[name]).filter(notEmpty);
+                const cols = renderedParam.map((name) => columnIndex[name]).filter(notEmpty);
                 if (!allColumnsLoaded(cols)) throw "bad column state";
                 setColumns(cols);
             });
@@ -322,7 +326,9 @@ export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
 /**
  * version of {@link useParamColumns} which returns a sorted column array based on config.order
  */
-export function useOrderedParamColumns<T extends { order?: Record<string, number> } = SelectionDialogConfig>(): LoadedDataColumn<DataType>[] {
+export function useOrderedParamColumns<
+    T extends { order?: Record<string, number> } = SelectionDialogConfig,
+>(): LoadedDataColumn<DataType>[] {
     const chart = useChart();
     const chartManager = useChartManager();
     const { columnIndex } = chart.dataStore;
@@ -338,12 +344,12 @@ export function useOrderedParamColumns<T extends { order?: Record<string, number
                 setOrderedParams([]);
                 return;
             }
-            const renderedParam = param.flatMap(p => typeof p === "string" ? p : p.fields)
+            const renderedParam = param.flatMap((p) => (typeof p === "string" ? p : p.fields));
             chartManager.loadColumnSet(renderedParam, dsName, () => {
                 // Get the loaded columns
-                const cols = renderedParam.map(name => columnIndex[name]).filter(notEmpty);
+                const cols = renderedParam.map((name) => columnIndex[name]).filter(notEmpty);
                 if (!allColumnsLoaded(cols)) throw "bad column state";
-                
+
                 // Sort the columns based on config.order if it exists
                 const orderMap = config.order;
                 if (orderMap) {
@@ -368,7 +374,6 @@ export function useOrderedParamColumns<T extends { order?: Record<string, number
 
     return orderedParams;
 }
-
 
 /** If the chart in current context has an associated region, referred to by the key `config.region`, this should return it
  * such that relevant information (like image URL, associated geojson layers...) can be retrieved.
@@ -434,10 +439,7 @@ export function useChartScopeFilterPredicate() {
 
         let cancelled = false;
         const filterColumns = activeFilters.map(({ column }) => column);
-        const columnPromise = chartManager._getColumnsAsync(
-            dataStore.name,
-            filterColumns,
-        );
+        const columnPromise = chartManager._getColumnsAsync(dataStore.name, filterColumns);
 
         if (!columnPromise) {
             setLoadedFilterKey(filterKey);
@@ -498,10 +500,7 @@ export function useChartScopeFilterPredicate() {
     };
 }
 
-function useScopedFilteredIndices({
-    predicate,
-    ready,
-}: ReturnType<typeof useChartScopeFilterPredicate>) {
+function useScopedFilteredIndices({ predicate, ready }: ReturnType<typeof useChartScopeFilterPredicate>) {
     const simpleFilteredIndices = useSimplerFilteredIndices();
     return useMemo(() => {
         if (!ready) return new Uint32Array(0);
@@ -521,13 +520,13 @@ export function useFilteredIndices() {
     return useScopedFilteredIndices(chartScope);
 }
 
-/** 
+/**
  * The implementation of useFilteredIndices in `scatter_state` presuposes that the config
  * will have a `background_filter`, which is used for filtering to image region... and then we also
  * added `category_filters` as an extra feature... but it adds up to returning zero-length arrays here
  * where we don't have those filters... and actually, now I'm thinking of a more general way of charts having
  * local filters.
- * 
+ *
  * Additionally, I want to change the approach for how we use filtered indices in deck.gl so that rather than
  * only rendering those points, we render all points, but with a filter that makes them invisible and allows for transitions.
  * n.b. I don't really mean that we render all points either, we also need to consider cases where we have a large number of points
@@ -538,7 +537,7 @@ export function useSimplerFilteredIndices() {
     const [filteredIndices, setFilteredIndices] = useState<Uint32Array>(new Uint32Array(0));
     useEffect(() => {
         ds._filteredIndicesPromise; //referencing this so it's a dependency
-        ds.getFilteredIndices().then(i => setFilteredIndices(i));
+        ds.getFilteredIndices().then((i) => setFilteredIndices(i));
     }, [refreshVersion, ds._filteredIndicesPromise, ds.getFilteredIndices]);
     return filteredIndices;
 }
@@ -602,25 +601,10 @@ export function useOwnedFilteredIndices(filterOwner?: FilterOwner | null) {
                 scopePredicate: predicate,
             }),
         );
-    }, [
-        keepIfUnchanged,
-        aggregateFilteredRows,
-        globalFilter,
-        localFilter,
-        localFilterIsActive,
-        predicate,
-        ready,
-    ]);
+    }, [keepIfUnchanged, aggregateFilteredRows, globalFilter, localFilter, localFilterIsActive, predicate, ready]);
 
     const isExternallyFiltered = useCallback(
-        (rowIndex: number) =>
-            ready &&
-            isRowFilteredByOtherOwner(
-                rowIndex,
-                globalFilter,
-                localFilter,
-                predicate,
-            ),
+        (rowIndex: number) => ready && isRowFilteredByOtherOwner(rowIndex, globalFilter, localFilter, predicate),
         [globalFilter, localFilter, predicate, ready],
     );
 
@@ -631,7 +615,6 @@ export function useOwnedFilteredIndices(filterOwner?: FilterOwner | null) {
     };
 }
 
-
 export function useCategoryFilterIndices(
     contourParameter?: DataColumn<CategoricalDataType>,
     category?: string | string[] | null,
@@ -641,15 +624,9 @@ export function useCategoryFilterIndices(
     //because it always passes through all rows, which this doesn't.
     const data = useFilteredIndices();
     const categorySnapshot = isArray(category) ? [...category] : category;
-    const categoryKey = isArray(categorySnapshot)
-        ? categorySnapshot.join("\u0000")
-        : categorySnapshot ?? "";
+    const categoryKey = isArray(categorySnapshot) ? categorySnapshot.join("\u0000") : (categorySnapshot ?? "");
     const filteredIndices = useMemo(() => {
-        return getCategoryFilterIndices(
-            data,
-            contourParameter,
-            categorySnapshot,
-        );
+        return getCategoryFilterIndices(data, contourParameter, categorySnapshot);
     }, [data, contourParameter, categoryKey]);
     return filteredIndices;
 }
@@ -714,14 +691,14 @@ function useOwnedDimension<T extends Dimension = Dimension>(dimensionType: strin
  */
 export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
     // it might be good to have something better for isTextLike, some tests for this...
-    const isTextLike = (column.values !== undefined) || (column.datatype === "unique");
+    const isTextLike = column.values !== undefined || column.datatype === "unique";
     const dimension_type = isTextLike ? "category_dimension" : "range_dimension";
     return useOwnedDimension(dimension_type);
 }
 
 export function useLazyDimensionFilter<K extends DataType>(column: DataColumn<K>) {
     const ds = useDataStore();
-    const isTextLike = (column.values !== undefined) || (column.datatype === "unique");
+    const isTextLike = column.values !== undefined || column.datatype === "unique";
     const dimension_type = isTextLike ? "category_dimension" : "range_dimension";
     const dimRef = useRef<Dimension | null>(null);
     const getDimension = useCallback(() => {
@@ -773,25 +750,26 @@ export function useRangeDimension2D() {
     return { filterPoly, removeFilter, rangeDimension };
 }
 
-
 export const useCloseOnIntersection = (ref: React.RefObject<HTMLElement | null>, onClose: () => void) => {
     useEffect(() => {
         if (!ref.current) return;
         // Observer to observe the an element and close it when it intersects the parent element (most likely while scrolling)
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach((entry) => {
-                // If less than half of the element is intersecting, call onClose
-                if (entry.intersectionRatio < 0.2) {
-                    onClose();
-                }
-              });
-            }, {threshold: 0.2}
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    // If less than half of the element is intersecting, call onClose
+                    if (entry.intersectionRatio < 0.2) {
+                        onClose();
+                    }
+                });
+            },
+            { threshold: 0.2 },
         );
         observer.observe(ref.current);
         return () => {
             if (ref.current) observer.unobserve(ref.current);
             observer.disconnect();
-        }
+        };
     }, [ref.current, onClose]);
 };
 
@@ -816,75 +794,78 @@ export const usePasteHandler = <T, V = T>({
     getLabel,
     getValue,
 }: PasteHandlerType<T, V>) => {
-    return useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
-        const text = e.clipboardData.getData("text");
-        // Parse the string to extract the pasted items
-        const items = parseDelimitedString(text);
-        if (items.length === 0) return;
-        
-        if (!multiple) {
-            const itemLower = items[0]?.toLowerCase();
+    return useCallback(
+        (e: React.ClipboardEvent<HTMLInputElement>) => {
+            const text = e.clipboardData.getData("text");
+            // Parse the string to extract the pasted items
+            const items = parseDelimitedString(text);
+            if (items.length === 0) return;
 
-            // Find the option which matches the pasted text
-            const matched = options.find((option) => {
-                const optionLower = getLabel(option).toLowerCase();
-                return itemLower === optionLower;
-            });
+            if (!multiple) {
+                const itemLower = items[0]?.toLowerCase();
 
-            if (matched) {
-                // Preventing default paste behaviour
-                e.preventDefault();
-                // Set the value with extracted value from matched option
-                setValue(getValue(matched));
-            }
-        } else {
-            const itemLower = items.map((item) => item.toLowerCase());
-            // Filters the options to get the options which match the pasted text
-            const matched = options.filter((option) => 
-                itemLower.some((item) => {
+                // Find the option which matches the pasted text
+                const matched = options.find((option) => {
                     const optionLower = getLabel(option).toLowerCase();
-                    return item === optionLower;
-                })
-            );
+                    return itemLower === optionLower;
+                });
 
-            if (matched.length > 0) {
-                // Preventing default paste behaviour
-                e.preventDefault();
-                const matchedValues = matched.map(getValue);
-                const currentValues = Array.isArray(currentValue) ? currentValue : [];
-                // Create a set for unique values
-                const uniqueMatched = Array.from(
-                    new Set([...matchedValues, ...currentValues])
+                if (matched) {
+                    // Preventing default paste behaviour
+                    e.preventDefault();
+                    // Set the value with extracted value from matched option
+                    setValue(getValue(matched));
+                }
+            } else {
+                const itemLower = items.map((item) => item.toLowerCase());
+                // Filters the options to get the options which match the pasted text
+                const matched = options.filter((option) =>
+                    itemLower.some((item) => {
+                        const optionLower = getLabel(option).toLowerCase();
+                        return item === optionLower;
+                    }),
                 );
-                // Update the value with the unique values
-                setValue(uniqueMatched);
+
+                if (matched.length > 0) {
+                    // Preventing default paste behaviour
+                    e.preventDefault();
+                    const matchedValues = matched.map(getValue);
+                    const currentValues = Array.isArray(currentValue) ? currentValue : [];
+                    // Create a set for unique values
+                    const uniqueMatched = Array.from(new Set([...matchedValues, ...currentValues]));
+                    // Update the value with the unique values
+                    setValue(uniqueMatched);
+                }
+                // Nothing matched, proceed as normal
             }
-            // Nothing matched, proceed as normal
-        }
-    }, [multiple, getLabel, options, setValue, getValue, currentValue]);
+        },
+        [multiple, getLabel, options, setValue, getValue, currentValue],
+    );
 };
 
 /**
  * Hook that provides the resize logic for a drawer
  */
 export const useResizeDrawer = (
-    dialogRef: React.RefObject<HTMLDivElement | null>, 
-    defaultDrawerWidth: number, 
-    minDrawerWidth: number, 
-    maxDrawerWidth: number
+    dialogRef: React.RefObject<HTMLDivElement | null>,
+    defaultDrawerWidth: number,
+    minDrawerWidth: number,
+    maxDrawerWidth: number,
 ) => {
-    
     const [drawerWidth, setDrawerWidth] = useState(defaultDrawerWidth);
     const [resizing, setResizing] = useState(false);
     const initialMouseX = useRef(0);
     const initialDrawerWidth = useRef(defaultDrawerWidth);
 
     // Calculate the new width of the drawer when resizing
-    const handleMouseMove = useCallback((e: MouseEvent) => {
-        const offset = e.clientX - initialMouseX.current;
-        const newWidth = Math.max(minDrawerWidth, Math.min(initialDrawerWidth.current + offset, maxDrawerWidth));
-        setDrawerWidth(newWidth);
-    }, [maxDrawerWidth, minDrawerWidth]);
+    const handleMouseMove = useCallback(
+        (e: MouseEvent) => {
+            const offset = e.clientX - initialMouseX.current;
+            const newWidth = Math.max(minDrawerWidth, Math.min(initialDrawerWidth.current + offset, maxDrawerWidth));
+            setDrawerWidth(newWidth);
+        },
+        [maxDrawerWidth, minDrawerWidth],
+    );
 
     // Setting resize to false after releasing the mouse
     const handleMouseUp = useCallback(() => {
@@ -892,18 +873,21 @@ export const useResizeDrawer = (
     }, []);
 
     // Store the initial width and clientX and setResizing to true
-    const onMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-        setResizing(true);
-        initialMouseX.current = e.clientX;
-        initialDrawerWidth.current = drawerWidth;
-    }, [drawerWidth]);
+    const onMouseDown = useCallback(
+        (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+            setResizing(true);
+            initialMouseX.current = e.clientX;
+            initialDrawerWidth.current = drawerWidth;
+        },
+        [drawerWidth],
+    );
 
     useEffect(() => {
         // Use the owner document if it exists (valid when the dialog is popped out)
         const doc = dialogRef.current?.ownerDocument ?? document;
 
         if (!resizing) return;
-        
+
         doc.addEventListener("mousemove", handleMouseMove);
         doc.addEventListener("mouseup", handleMouseUp);
         return () => {
@@ -913,6 +897,7 @@ export const useResizeDrawer = (
     }, [resizing, dialogRef.current, handleMouseMove, handleMouseUp]);
 
     return {
-        drawerWidth, onMouseDown
-    }
+        drawerWidth,
+        onMouseDown,
+    };
 };

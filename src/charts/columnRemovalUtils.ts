@@ -139,13 +139,7 @@ export async function analyzeColumnRemoval({
     const currentViewCharts = currentCharts
         .filter((chart) => chart.dataSourceName === dataSourceName)
         .filter((chart) => chart.config.id !== sourceChartId)
-        .map((chart) =>
-            analyzeChartColumnImpact(
-                chart.config,
-                chartTypes[chart.config.type],
-                columnName,
-            ),
-        )
+        .map((chart) => analyzeChartColumnImpact(chart.config, chartTypes[chart.config.type], columnName))
         .filter((impact) => impact !== null);
 
     const savedViews: SavedViewColumnImpact[] = [];
@@ -156,13 +150,7 @@ export async function analyzeColumnRemoval({
                 const viewData = await viewLoader(viewName);
                 const chartConfigs = viewData?.initialCharts?.[dataSourceName] ?? [];
                 const charts = chartConfigs
-                    .map((config) =>
-                        analyzeChartColumnImpact(
-                            config,
-                            chartTypes[config.type],
-                            columnName,
-                        ),
-                    )
+                    .map((config) => analyzeChartColumnImpact(config, chartTypes[config.type], columnName))
                     .filter((impact) => impact !== null);
 
                 if (charts.length === 0) {
@@ -185,9 +173,7 @@ export async function analyzeColumnRemoval({
         }
 
         if (failedViews.length > 0) {
-            throw new Error(
-                `Failed to check column usage in saved views: ${failedViews.join(", ")}`,
-            );
+            throw new Error(`Failed to check column usage in saved views: ${failedViews.join(", ")}`);
         }
     }
 

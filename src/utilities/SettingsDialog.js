@@ -9,11 +9,7 @@ class SettingsDialog extends BaseDialog {
         const originalOnClose = config.onclose;
         config.onclose = () => {
             if (originalOnClose) originalOnClose();
-            if (config.chart)
-                config.chart.dialogs.splice(
-                    config.chart.dialogs.indexOf(this),
-                    1,
-                );
+            if (config.chart) config.chart.dialogs.splice(config.chart.dialogs.indexOf(this), 1);
         };
         super(config, content);
     }
@@ -45,9 +41,7 @@ class SettingsDialog extends BaseDialog {
             //'this' no longer available in function call - causing problems
             //const factory = this[s.type];
             if (!this[s.type]) {
-                console.warn(
-                    `SettingsDialog doesn't have a method '${s.type}'`,
-                );
+                console.warn(`SettingsDialog doesn't have a method '${s.type}'`);
                 continue;
             }
             if (this.config.useMobx && s.func) {
@@ -80,19 +74,13 @@ class SettingsDialog extends BaseDialog {
                     gui.add(s, "func").name(s.label);
                     break;
                 case "slider":
-                    gui.add(s, "current_value", s.min, s.max)
-                        .name(s.label)
-                        .onChange(s.func);
+                    gui.add(s, "current_value", s.min, s.max).name(s.label).onChange(s.func);
                     break;
                 case "spinner":
-                    gui.add(s, "current_value", s.min, s.max)
-                        .name(s.label)
-                        .onChange(s.func);
+                    gui.add(s, "current_value", s.min, s.max).name(s.label).onChange(s.func);
                     break;
                 case "radiobuttons":
-                    gui.add(s, "current_value", s.choices)
-                        .name(s.label)
-                        .onChange(s.func);
+                    gui.add(s, "current_value", s.choices).name(s.label).onChange(s.func);
                     break;
                 default:
                     gui.add(s, "current_value").name(s.label).onChange(s.func);

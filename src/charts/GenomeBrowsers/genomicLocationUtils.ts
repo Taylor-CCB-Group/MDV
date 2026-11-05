@@ -3,7 +3,6 @@ import { useDataStore } from "@/react/context";
 import { useFieldSpecs } from "@/react/hooks";
 import { DataColumn } from "../charts";
 
-
 export interface GenomeLocation {
     chr: string;
     start: number;
@@ -22,7 +21,7 @@ type GenomeMetadataBase = {
 };
 
 type IntervalGenomeMetadata = GenomeMetadataBase & {
-  type: "interval";
+    type: "interval";
     columns: {
         chr: string;
         start: string;
@@ -44,11 +43,7 @@ type SvGenomeMetadata = GenomeMetadataBase & {
 
 export type GenomeMetadata = IntervalGenomeMetadata | SvGenomeMetadata;
 
-
-export function applyViewMargins(
-    location: GenomeLocation,
-    vm: GenomeViewMargins,
-): GenomeLocation {
+export function applyViewMargins(location: GenomeLocation, vm: GenomeViewMargins): GenomeLocation {
     const chr = location.chr;
     let start = location.start;
     let end = location.end;
@@ -74,7 +69,7 @@ export function applyViewMargins(
         }
         //always the same length from the middle of the feature
         case "fixed_length": {
-            const center = Math.round((start + end) / 2);   
+            const center = Math.round((start + end) / 2);
             start = center - vm.value;
             end = center + vm.value;
             break;
@@ -84,32 +79,32 @@ export function applyViewMargins(
 }
 
 export function locationFromFieldValues(
-    dataStore:any,
-    index:number,
+    dataStore: any,
+    index: number,
     genomicInfo: GenomeMetadata,
 ): GenomeLocation[] | null {
-  
     const cols = Object.values(genomicInfo.columns);
-    const row = dataStore.getRowAsObject(index,cols);
+    const row = dataStore.getRowAsObject(index, cols);
     if (!row) {
         return null;
-    } 
+    }
     if (genomicInfo.type === "interval") {
-        const map = genomicInfo.columns ;
+        const map = genomicInfo.columns;
         const chr = typeof row[map.chr] === "string" ? (row[map.chr] as string).trim() : "";
         const start = Number(row[map.start]);
         const end = Number(row[map.end]);
         if (!chr || !Number.isFinite(start) || !Number.isFinite(end)) {
             return null;
         }
-        return [{
-            chr,
-            start,
-            end,
-        }];
-    }
-    else if (genomicInfo.type === "sv") {
-        const map = genomicInfo.columns ;
+        return [
+            {
+                chr,
+                start,
+                end,
+            },
+        ];
+    } else if (genomicInfo.type === "sv") {
+        const map = genomicInfo.columns;
         const svtype = typeof row[map.svtype] === "string" ? (row[map.svtype] as string).trim() : "";
         const chr1 = typeof row[map.chr1] === "string" ? (row[map.chr1] as string).trim() : "";
         const chr2 = typeof row[map.chr2] === "string" ? (row[map.chr2] as string).trim() : "";
@@ -118,7 +113,7 @@ export function locationFromFieldValues(
         if (!svtype || !chr1 || !Number.isFinite(pos1)) {
             return null;
         }
-        if ((svtype === "BND" || svtype === "TRA") || pos2-pos1 > 1000000){
+        if (svtype === "BND" || svtype === "TRA" || pos2 - pos1 > 1000000) {
             if (!chr2 || !Number.isFinite(pos2)) {
                 return null;
             }
@@ -132,18 +127,19 @@ export function locationFromFieldValues(
                     chr: chr2,
                     start: pos2,
                     end: pos2,
-                }
-            ]
-        }
-        else {
+                },
+            ];
+        } else {
             if (!Number.isFinite(pos2)) {
                 return null;
             }
-            return [{
-                chr: chr1,
-                start: pos1,
-                end: pos2,
-             }]
+            return [
+                {
+                    chr: chr1,
+                    start: pos1,
+                    end: pos2,
+                },
+            ];
         }
     }
     return null;
@@ -155,31 +151,25 @@ export function useGenomicInfo() {
     if (!genome) {
         throw new Error("No genome metadata found in data store");
     }
-    const locationFields = useMemo(() => (Object.values(genome.columns)), [genome]);
+    const locationFields = useMemo(() => Object.values(genome.columns), [genome]);
     const locationColumns = useFieldSpecs(locationFields);
-    const areColumnsLoaded =
-        locationColumns.length === locationFields.length;
-    const genomicColumns= useMemo(
-        () => {
-            if (areColumnsLoaded) {
-                const names = Object.keys(genome.columns);
-                const columns: Record<string,DataColumn<any>> = {};
-                for (let i=0 ; i < locationFields.length; i++) {
-                   if (locationColumns[i] !== undefined) {
-                       columns[names[i]] = locationColumns[i];
-                   }
+    const areColumnsLoaded = locationColumns.length === locationFields.length;
+    const genomicColumns = useMemo(() => {
+        if (areColumnsLoaded) {
+            const names = Object.keys(genome.columns);
+            const columns: Record<string, DataColumn<any>> = {};
+            for (let i = 0; i < locationFields.length; i++) {
+                if (locationColumns[i] !== undefined) {
+                    columns[names[i]] = locationColumns[i];
                 }
-                return columns;
             }
-            return {};
-        },
-        [areColumnsLoaded, genome, locationFields, locationColumns],
-    );
+            return columns;
+        }
+        return {};
+    }, [areColumnsLoaded, genome, locationFields, locationColumns]);
     return {
-        genomicInfo:dataStore.genome,
+        genomicInfo: dataStore.genome,
         genomicColumns,
         areColumnsLoaded,
     };
 }
-
-

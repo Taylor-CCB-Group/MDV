@@ -9,17 +9,11 @@ import { getFieldName, subgroupKeyFromFieldName, RowsAsColsQuery, type RowsAsCol
 import { useRowsAsColumnsLinks } from "../chartLinkHooks";
 import TabHeader from "./TabHeader";
 
-type LocalProps<T extends CTypes, M extends boolean> = ColumnSelectionProps<
-    T,
-    M
-> & {
+type LocalProps<T extends CTypes, M extends boolean> = ColumnSelectionProps<T, M> & {
     link: ReturnType<typeof useRowsAsColumnsLinks>[0];
 };
 
-function pickInitialSubgroupKey(
-    subgroups: RowsAsColslink["subgroups"],
-    current_value: unknown,
-): string {
+function pickInitialSubgroupKey(subgroups: RowsAsColslink["subgroups"], current_value: unknown): string {
     const keys = Object.keys(subgroups);
     const first = keys[0] ?? "";
     const v = isArray(current_value) ? current_value[0] : current_value;
@@ -75,10 +69,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: LocalProps<T, M
     }
 
     const subgroupKeys = useMemo(() => Object.keys(subgroups), [subgroups]);
-    const subgroupLabels = useMemo(
-        () => subgroupKeys.map((k) => subgroups[k]?.label ?? k),
-        [subgroupKeys, subgroups],
-    );
+    const subgroupLabels = useMemo(() => subgroupKeys.map((k) => subgroups[k]?.label ?? k), [subgroupKeys, subgroups]);
 
     /** Which subgroup's rows populate the dropdown (browse only until a field is chosen). */
     const [browseSubgroupKey, setBrowseSubgroupKey] = useState(() =>
@@ -117,10 +108,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: LocalProps<T, M
             label: value,
             fieldName: getFieldName(sg, value, rowIndex),
         }));
-        return [[...labelValueObjects], "label", "fieldName"] satisfies DropdownMappedValues<
-            "label",
-            "fieldName"
-        >;
+        return [[...labelValueObjects], "label", "fieldName"] satisfies DropdownMappedValues<"label", "fieldName">;
     }, [sg, link.valueToRowIndex, link.initPromise]);
 
     const { setSelectedColumn } = props;
@@ -352,12 +340,8 @@ const LinkMulti = observer(<T extends CTypes, M extends boolean>(props: ColumnSe
 
             {links.map((link) =>
                 link.link.name === activeLinkName ? (
-                    <LinkToColumnComponentInit
-                        key={link.link.name}
-                        {...props}
-                        link={link}
-                    />
-                ) : null
+                    <LinkToColumnComponentInit key={link.link.name} {...props} link={link} />
+                ) : null,
             )}
         </div>
     );

@@ -1,14 +1,5 @@
 import { Close as CloseIcon, Edit as EditIcon } from "@mui/icons-material";
-import {
-    Box,
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    Typography,
-} from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography } from "@mui/material";
 import type React from "react";
 import { DialogCloseIconButton } from "./ProjectRenameModal";
 
@@ -19,12 +10,7 @@ export interface ProjectDeleteModalProps {
     onClose: () => void;
 }
 
-const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
-    id,
-    open,
-    onDelete,
-    onClose,
-}) => {
+const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({ id, open, onDelete, onClose }) => {
     const handleDelete = async () => {
         await onDelete(id);
         onClose();

@@ -190,7 +190,12 @@ export function useDeckDeviceProps(
     );
     const onError = useCallback(
         (error: Error, layer?: { id: string } | null) => {
-            if (!layer && device.status === "ready" && device.backend === "webgpu" && initializedBackend.current !== "webgpu") {
+            if (
+                !layer &&
+                device.status === "ready" &&
+                device.backend === "webgpu" &&
+                initializedBackend.current !== "webgpu"
+            ) {
                 // deck has no device, so nothing will draw: retry this chart on WebGL
                 console.error(error);
                 fallBack(`creating the WebGPU device failed: ${error.message}`);

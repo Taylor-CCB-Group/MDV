@@ -6,17 +6,17 @@ import { useState } from "react";
 
 export type ErrorComponentType = {
     error: {
-        message: string,
-        stack?: string,
-        traceback?: string,
-    },
-    title?: string,
-    height?: number,
-    width?: number,
-    extraMetaData?: ErrorMetadata,
+        message: string;
+        stack?: string;
+        traceback?: string;
+    };
+    title?: string;
+    height?: number;
+    width?: number;
+    extraMetaData?: ErrorMetadata;
 };
 
-const ErrorComponent = ({error, extraMetaData, title}: ErrorComponentType) => {
+const ErrorComponent = ({ error, extraMetaData, title }: ErrorComponentType) => {
     const [open, setOpen] = useState(false);
     const handleClose = () => setOpen(false);
     const handleOpen = () => setOpen(true);
@@ -70,24 +70,15 @@ const ErrorComponent = ({error, extraMetaData, title}: ErrorComponentType) => {
                 <ReusableAlertDialog
                     open={open}
                     handleClose={handleClose}
-                    component={
-                        <DebugErrorComponent
-                            error={error}
-                            extraMetadata={extraMetaData}
-                        />
-                    }
+                    component={<DebugErrorComponent error={error} extraMetadata={extraMetaData} />}
                 />
             </Paper>
         </Container>
     );
 };
 
-
-
-const ErrorComponentReactWrapper = ({error, height, width, extraMetaData, title}: ErrorComponentType) => {
-    return (
-        <ErrorComponent error={error} height={height} width={width} extraMetaData={extraMetaData} title={title} />
-    );
+const ErrorComponentReactWrapper = ({ error, height, width, extraMetaData, title }: ErrorComponentType) => {
+    return <ErrorComponent error={error} height={height} width={width} extraMetaData={extraMetaData} title={title} />;
 };
 
 export default ErrorComponentReactWrapper;

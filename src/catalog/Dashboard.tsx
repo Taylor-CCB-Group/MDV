@@ -43,11 +43,7 @@ import ProjectListView from "./ProjectListView";
 import UserProfile from "./UserProfile";
 import mdvLogo from "./assets/mdv_logo.png";
 import useProjects from "./hooks/useProjects";
-import {
-    type SortBy,
-    type SortOrder,
-    sortProjects,
-} from "./utils/projectUtils";
+import { type SortBy, type SortOrder, sortProjects } from "./utils/projectUtils";
 import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 import ImportProjectDialog from "@/react/components/ImportProjectDialog";
 import usePermissions from "./PermissionsContext";
@@ -66,8 +62,7 @@ import RecycleBinDialog from "./components/RecycleBinDialog";
 const Dashboard: React.FC = () => {
     // Production builds hide project creation and import unless the build sets
     // VITE_SHOW_PROJECT_CREATION=true, as deployments where users make their own projects do.
-    const showProjectCreation =
-        !import.meta.env.PROD || import.meta.env.VITE_SHOW_PROJECT_CREATION === "true";
+    const showProjectCreation = !import.meta.env.PROD || import.meta.env.VITE_SHOW_PROJECT_CREATION === "true";
     const {
         projects,
         isLoading: projectsLoading,
@@ -158,11 +153,9 @@ const Dashboard: React.FC = () => {
         setAnchorEl(event.currentTarget);
     };
 
-    const onRescanClick = useCallback(
-        async () => {
-            await rescanProjects();
-        }, [rescanProjects]
-    );
+    const onRescanClick = useCallback(async () => {
+        await rescanProjects();
+    }, [rescanProjects]);
 
     const handleSelectionChange = useCallback((id: string, selected: boolean) => {
         setSelectedProjectIds((currentIds) => {
@@ -241,11 +234,7 @@ const Dashboard: React.FC = () => {
                                 inputProps={{ "aria-label": "search projects" }}
                                 onChange={(e) => setFilter(e.target.value)}
                             />
-                            <IconButton
-                                type="submit"
-                                sx={{ p: "10px" }}
-                                aria-label="search"
-                            >
+                            <IconButton type="submit" sx={{ p: "10px" }} aria-label="search">
                                 <Search />
                             </IconButton>
                         </Paper>
@@ -258,11 +247,7 @@ const Dashboard: React.FC = () => {
                                 data-testid="theme_toggle_catalog"
                                 aria-label="Toggle theme"
                             >
-                                {mode === "dark" ? (
-                                    <Brightness4Icon />
-                                ) : (
-                                    <Brightness7Icon />
-                                )}
+                                {mode === "dark" ? <Brightness4Icon /> : <Brightness7Icon />}
                             </IconButton>
                         </Tooltip>
                         <Button
@@ -285,24 +270,21 @@ const Dashboard: React.FC = () => {
                 <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
                     {showLocalBackendNotice && (
                         <Alert severity="info" sx={{ mb: 3 }}>
-                            This preview build needs to talk to an MDV app running locally on <code>http://localhost:5055</code>.
-                            If your browser asks whether this site can communicate with local apps or devices, allow it for this preview:
-                            the Netlify page is only the frontend, and project lists plus <code>/project/:id</code> data are loaded from your local MDV container.
-                            No local data is sent to a remote server.
+                            This preview build needs to talk to an MDV app running locally on{" "}
+                            <code>http://localhost:5055</code>. If your browser asks whether this site can communicate
+                            with local apps or devices, allow it for this preview: the Netlify page is only the
+                            frontend, and project lists plus <code>/project/:id</code> data are loaded from your local
+                            MDV container. No local data is sent to a remote server.
                         </Alert>
                     )}
                     {rescanWarning && (
-                        <Alert
-                            severity="warning"
-                            onClose={clearRescanWarning}
-                            sx={{ mb: 3 }}
-                        >
+                        <Alert severity="warning" onClose={clearRescanWarning} sx={{ mb: 3 }}>
                             {rescanWarning}
                         </Alert>
                     )}
                     <Grid container spacing={3} sx={{ mb: 4 }}>
                         {showProjectCreation && permissions.createProject && (
-                            <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
+                            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                                 <ButtonBase
                                     sx={{
                                         width: "100%",
@@ -334,7 +316,7 @@ const Dashboard: React.FC = () => {
                             </Grid>
                         )}
                         {showProjectCreation && permissions.importProject && (
-                            <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
+                            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                                 <ButtonBase
                                     sx={{
                                         width: "100%",
@@ -383,9 +365,7 @@ const Dashboard: React.FC = () => {
                                         active={selectionMode}
                                         icon={selectionMode ? <Done /> : <Checklist />}
                                         label={selectionMode ? "Done" : "Select"}
-                                        onClick={() =>
-                                            selectionMode ? exitSelectionMode() : setSelectionMode(true)
-                                        }
+                                        onClick={() => (selectionMode ? exitSelectionMode() : setSelectionMode(true))}
                                     />
                                     <DashboardActionButton
                                         icon={<DeleteOutline />}
@@ -436,27 +416,17 @@ const Dashboard: React.FC = () => {
                                     >
                                         {/* Hide last modified on public page */}
                                         Sort by:{" "}
-                                        {!isPublicPage ?
-                                            sortBy === "lastModified"
+                                        {!isPublicPage
+                                            ? sortBy === "lastModified"
                                                 ? `Last modified (${sortOrder === "desc" ? "Newest first" : "Oldest first"})`
                                                 : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
-                                            :
-                                            `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
-                                        }
+                                            : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`}
                                     </Box>
                                 </Button>
                             </Paper>
-                            <Tooltip
-                                title={
-                                    viewMode === "grid" ? "List View" : "Grid View"
-                                }
-                            >
+                            <Tooltip title={viewMode === "grid" ? "List View" : "Grid View"}>
                                 <IconButton
-                                    onClick={() =>
-                                        setViewMode(
-                                            viewMode === "grid" ? "list" : "grid",
-                                        )
-                                    }
+                                    onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
                                     sx={{ ml: 2 }}
                                 >
                                     {viewMode === "grid" ? (
@@ -468,13 +438,9 @@ const Dashboard: React.FC = () => {
                             </Tooltip>
                         </Box>
 
-                        <Menu
-                            anchorEl={anchorEl}
-                            open={Boolean(anchorEl)}
-                            onClose={() => setAnchorEl(null)}
-                        >
-                            {!isPublicPage &&
-                                (<MenuItem
+                        <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
+                            {!isPublicPage && (
+                                <MenuItem
                                     onClick={() => handleSort("lastModified")}
                                     sx={{
                                         display: "flex",
@@ -485,15 +451,10 @@ const Dashboard: React.FC = () => {
                                 >
                                     <span>Last modified</span>
                                     {sortBy === "lastModified" && (
-                                        <span>
-                                            {sortOrder === "desc"
-                                                ? "(Oldest first)"
-                                                : "(Newest first)"
-                                            }
-                                        </span>
+                                        <span>{sortOrder === "desc" ? "(Oldest first)" : "(Newest first)"}</span>
                                     )}
-                                </MenuItem>)
-                            }
+                                </MenuItem>
+                            )}
                             <MenuItem
                                 onClick={() => handleSort("name")}
                                 sx={{
@@ -504,11 +465,7 @@ const Dashboard: React.FC = () => {
                                 }}
                             >
                                 <span>Name</span>
-                                {sortBy === "name" && (
-                                    <span>
-                                        {sortOrder === "desc" ? "A to Z" : "Z to A"}
-                                    </span>
-                                )}
+                                {sortBy === "name" && <span>{sortOrder === "desc" ? "A to Z" : "Z to A"}</span>}
                             </MenuItem>
                         </Menu>
                     </Box>
@@ -523,18 +480,10 @@ const Dashboard: React.FC = () => {
                                 mb: 2,
                             }}
                         >
-                            <Typography color="text.secondary">
-                                {selectedProjectIds.size} selected
-                            </Typography>
+                            <Typography color="text.secondary">{selectedProjectIds.size} selected</Typography>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                <Button onClick={() => setSelectedProjectIds(new Set())}>
-                                    Clear selection
-                                </Button>
-                                <Button
-                                    color="error"
-                                    variant="contained"
-                                    onClick={() => setIsBulkDeleteOpen(true)}
-                                >
+                                <Button onClick={() => setSelectedProjectIds(new Set())}>Clear selection</Button>
+                                <Button color="error" variant="contained" onClick={() => setIsBulkDeleteOpen(true)}>
                                     Delete selected
                                 </Button>
                             </Box>
@@ -552,7 +501,7 @@ const Dashboard: React.FC = () => {
                                         xs: 12,
                                         sm: 6,
                                         md: 4,
-                                        lg: 3
+                                        lg: 3,
                                     }}
                                 >
                                     <ProjectCard
@@ -587,22 +536,13 @@ const Dashboard: React.FC = () => {
                         open={isErrorModalOpen}
                         handleClose={closeErrorModal}
                         isAlertErrorComponent
-                        component={
-                            <AlertErrorComponent
-                                message={error as string}
-                            />
-                        }
+                        component={<AlertErrorComponent message={error as string} />}
                     />
                 )}
                 {open && showProjectCreation && permissions.importProject && (
                     <ImportProjectDialog open={open} setOpen={setOpen} />
                 )}
-                {helpDialogOpen && (
-                    <HelpDialog
-                        open={helpDialogOpen}
-                        onClose={() => setHelpDialogOpen(false)}
-                    />
-                )}
+                {helpDialogOpen && <HelpDialog open={helpDialogOpen} onClose={() => setHelpDialogOpen(false)} />}
                 <BulkDeleteProjectsDialog
                     open={isBulkDeleteOpen}
                     selectedCount={selectedProjectIds.size}
@@ -618,10 +558,7 @@ const Dashboard: React.FC = () => {
                 />
             </Box>
             {isLoading && (
-                <Backdrop
-                    open={isLoading}
-                    sx={{ zIndex: theme.zIndex.modal + 1 }}
-                >
+                <Backdrop open={isLoading} sx={{ zIndex: theme.zIndex.modal + 1 }}>
                     <CircularProgress color="inherit" />
                 </Backdrop>
             )}

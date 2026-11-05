@@ -12,10 +12,7 @@ import {
 } from "@mui/material";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
-const AddViewDialogComponent = (props: {
-    open: boolean;
-    onClose: () => void;
-}) => {
+const AddViewDialogComponent = (props: { open: boolean; onClose: () => void }) => {
     const [viewName, setViewName] = useState("");
     const [isCloneView, setIsCloneView] = useState(false);
     const [checkedDs, setCheckedDs] = useState<{ [name: string]: boolean }>({});
@@ -36,13 +33,13 @@ const AddViewDialogComponent = (props: {
     const handleCheckboxChange = (ds: string) => {
         setCheckedDs((prevDs) => ({ ...prevDs, [ds]: !prevDs[ds] }));
     };
-    
+
     const checkInvalidName = (name: string) => {
         return viewManager.all_views.includes(name);
     };
 
     const checkDsSelected = () => {
-        if (dataSources.length < 2) return true; 
+        if (dataSources.length < 2) return true;
         const checkedDsArray = Object.values(checkedDs)?.filter?.((ds) => ds === true);
         return checkedDsArray.length > 0;
     };
