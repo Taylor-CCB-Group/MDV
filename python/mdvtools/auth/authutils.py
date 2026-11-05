@@ -136,13 +136,18 @@ def is_authenticated(project_id=None):
         # whose local user id and admin flag mean nothing here. Re-resolve the user
         # from this deployment's own records on every request, keyed by auth_id.
         # The dummy provider's user has no database row, so it is left as it is.
+        # The row is read on every request, not from user_cache: MDV-Admin
+        # deactivates users by writing to the database from another process, and
+        # nothing refreshes the cache when it does (ADR 0020).
         if (current_app.config.get("DEFAULT_AUTH_METHOD") or "").lower() != "dummy":
             auth_id = user.get("auth_id") if user else None
-            local_user = user_cache.get(auth_id) if auth_id else None
-            if auth_id and local_user is None:
-                # Not cached yet, for example a user created since the last refresh.
+            local_user = None
+            if auth_id:
                 from mdvtools.dbutils.dbmodels import User
                 db_user = User.query.filter_by(auth_id=auth_id).first()
+                if db_user and not db_user.is_active:
+                    session.clear()
+                    return (False, NoAccess(email=db_user.email))
                 if db_user:
                     local_user = {
                         "id": db_user.id,

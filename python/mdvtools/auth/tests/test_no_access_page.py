@@ -128,3 +128,29 @@ def test_active_user_goes_through(app, provider):
 
     assert response.status_code == 200
     assert response.get_json()["email"] == "member@example.org"
+
+
+def test_open_session_is_refused_once_the_user_is_deactivated(app, provider):
+    # ADR 0020: deactivating someone ends access they already have, not only
+    # their next sign-in. MDV-Admin writes is_active straight to the database.
+    db.session.add(
+        User(email="leaver@example.org", auth_id="auth0|leaver", is_active=True, password="")
+    )
+    db.session.commit()
+    client = app.test_client()
+
+    with signed_in_to_auth0(provider, sub="auth0|leaver", email="leaver@example.org"), patch(
+        "mdvtools.auth.authutils.get_auth_provider", return_value=provider
+    ):
+        assert client.get("/whoami").status_code == 200
+
+        User.query.filter_by(auth_id="auth0|leaver").one().is_active = False
+        db.session.commit()
+
+        response = client.get("/whoami")
+
+    assert response.status_code == 403
+    page = response.get_data(as_text=True)
+    assert "leaver@example.org" in page
+    assert CONTACT in page
+    assert sign_out_target(page, "/whoami") == "/logout"
