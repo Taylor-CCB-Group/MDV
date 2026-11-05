@@ -4,7 +4,6 @@
 
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { type Browser, expect, type Page } from "@playwright/test";

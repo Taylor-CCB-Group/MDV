@@ -1,7 +1,7 @@
 // todo - get the gui looking respectable with LinksComponent, and get it to work.
 // todo - get multiple working properly.
 // todo - subgroups
-import { Paper, useTheme } from "@mui/material";
+import { Paper } from "@mui/material";
 import { observer } from "mobx-react-lite";
 import { useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";

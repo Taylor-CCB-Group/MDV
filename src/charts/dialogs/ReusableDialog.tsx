@@ -1,6 +1,5 @@
 import { Button, Container, Dialog, DialogActions, DialogContent } from "@mui/material";
 import type { ReactElement } from "react";
-import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 
 export interface ReusableDialogProps {
     open: boolean;

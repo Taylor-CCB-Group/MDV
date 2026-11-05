@@ -1,6 +1,6 @@
 // import lgui from 'lil-gui';
 import { action } from "mobx";
-import noUiSlider, { create } from "nouislider";
+import noUiSlider from "nouislider";
 import { BaseDialog } from "./Dialog.js";
 import { createEl, createFilterElement } from "./Elements.js";
 

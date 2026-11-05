@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useImage } from "@/react/components/avivatorish/hooks";
 import type { OME_TIFF } from "../../react/components/avivatorish/state";
 import { useViewerStore, useViewerStoreApi } from "../../react/components/avivatorish/state";

@@ -1,4 +1,4 @@
-import { _allowStateChangesInsideComputed, action, makeAutoObservable } from "mobx";
+import { action, makeAutoObservable } from "mobx";
 import {
     createEl,
     makeDraggable,

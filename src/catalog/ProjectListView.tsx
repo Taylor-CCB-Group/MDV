@@ -3,10 +3,8 @@ import {
     DriveFileRenameOutline,
     Image as ImageIcon,
     Info,
-    LockPerson,
     MoreVert,
     Share as ShareIcon,
-    Upload as UploadIcon,
     WarningAmber,
 } from "@mui/icons-material";
 import {
@@ -27,7 +25,7 @@ import {
     Typography,
     useTheme,
 } from "@mui/material";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { buildProjectUrl } from "@/utils/mdvRouting";
 import usePermissions from "./PermissionsContext";
 import ProjectDeleteModal from "./ProjectDeleteModal";

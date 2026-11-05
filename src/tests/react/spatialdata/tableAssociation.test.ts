@@ -1,7 +1,5 @@
 import type { ShapesRenderData } from "@spatialdata/core";
-import type { LayerConfig } from "@spatialdata/vis";
 import { describe, expect, test } from "vitest";
-import { fillColorSchemeFromDataStore } from "@/react/spatialdata/fill_color_scheme";
 import {
     buildAssociatedFeatureStateFromRowMap,
     type DataSourceAssociationCandidate,

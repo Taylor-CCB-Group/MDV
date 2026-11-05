@@ -1,6 +1,6 @@
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, rectSortingStrategy, SortableContext } from "@dnd-kit/sortable";
-import { Clear as ClearIcon, Close as CloseIcon } from "@mui/icons-material";
+import { Clear as ClearIcon } from "@mui/icons-material";
 import {
     Box,
     Button,

@@ -24,7 +24,6 @@ import {
 } from "@mui/material";
 // import RobotPandaSVG from './PandaSVG';
 import LinearProgress from "@mui/material/LinearProgress";
-import _ from "lodash";
 import {
     BotMessageSquare,
     CircleAlert,

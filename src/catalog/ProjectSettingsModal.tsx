@@ -1,4 +1,4 @@
-import { Close as CloseIcon, Edit as EditIcon } from "@mui/icons-material";
+import { Edit as EditIcon } from "@mui/icons-material";
 import {
     Box,
     Button,

@@ -1,5 +1,5 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
-import type { FormEvent, KeyboardEvent } from "react";
+import type { FormEvent } from "react";
 
 const DeleteViewDialogComponent = (props: { open: boolean; onClose: () => void }) => {
     const { viewManager } = window.mdv.chartManager;

@@ -1,4 +1,3 @@
-import { Close as CloseIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import {
     Autocomplete,
@@ -8,7 +7,6 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
-    DialogContentText,
     DialogTitle,
     IconButton,
     MenuItem,

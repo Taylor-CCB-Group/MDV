@@ -15,7 +15,6 @@ import {
 } from "d3";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
-import { getColorLegendCustom } from "../utilities/Color.js";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
 

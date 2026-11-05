@@ -1,4 +1,4 @@
-import { arc, stratify as d3Stratify, tree as d3Tree, scaleLinear, select } from "d3";
+import { arc, stratify as d3Stratify, tree as d3Tree, scaleLinear } from "d3";
 import { getColorLegend } from "../utilities/Color.js";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
