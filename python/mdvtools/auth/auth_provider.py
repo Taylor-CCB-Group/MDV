@@ -53,8 +53,3 @@ class AuthProvider(ABC):
     def validate_user(self) -> Tuple[Optional[dict], Optional[Union[Tuple, NoAccess]]]:
         """Validates and returns user data."""
         pass
-
-    @abstractmethod
-    def sync_users_to_db(self):
-        """ Syncs users from the authentication provider (e.g., Auth0) to the application's database."""
-        pass

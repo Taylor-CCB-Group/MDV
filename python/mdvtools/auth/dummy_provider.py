@@ -54,7 +54,3 @@ class DummyAuthProvider(AuthProvider):
         session.modified = True
         logger.info("Dummy user validated and stored in session.")
         return user_data, None
-
-    def sync_users_to_db(self) -> None:
-        """No-op sync in dummy provider."""
-        logger.info("Dummy sync - skipping user sync.")

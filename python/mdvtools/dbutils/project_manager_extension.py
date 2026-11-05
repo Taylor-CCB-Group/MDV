@@ -706,9 +706,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if not is_owner_or_admin(user, user_permissions):
                     return jsonify({"error": "Only the project owner or an administrator can share the project"}), 403
 
-                # Refresh cache to pick up permission changes from manage_project_permissions.py
-                # Note: sync_users_to_db is no longer called here - the manage_project_permissions.py
-                # script ensures the DB is up to date by syncing at the start of main()
+                # Refresh the cache so the dialog shows roles written outside this process.
                 try:
                     from mdvtools.auth.authutils import cache_user_projects
                     logger.info("Refreshing user and permission cache...")

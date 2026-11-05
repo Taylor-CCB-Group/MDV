@@ -919,7 +919,7 @@ class UserProjectService:
         Give every administrator owner access to every project.
 
         MDV treats administrators as owners of all projects, but those grants are
-        only written in particular places - the Auth0 user sync, and a project
+        only written in particular places - Admin's Make Admin, and a project
         rescan. Anything that creates an administrator or discovers projects
         outside those paths leaves the grants missing, and the administrator sees
         an empty project list. Call this from those places rather than repeating

@@ -17,7 +17,7 @@ from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent, Invitation, InvitationProject
 from mdvtools.dbutils.routes import register_routes
 from mdvtools.auth.register_auth_routes import register_auth_routes
-from mdvtools.auth.authutils import register_before_request_auth, get_auth_provider, cache_user_projects
+from mdvtools.auth.authutils import register_before_request_auth, cache_user_projects
 from mdvtools.dbutils.dbservice import ProjectService, FileService, UserProjectService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
@@ -37,9 +37,6 @@ logger = get_logger(__name__)
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 logger.info(f"Authentication enabled: {ENABLE_AUTH}")
 
-# Opt-in flag: sync_users_to_db() runs on startup as performance improved
-RUN_AUTH0_SYNC_ON_START = os.getenv("RUN_AUTH0_SYNC_ON_START", "0").lower() in ["1", "true", "yes"]
-logger.info(f"Auth0 sync on startup: {RUN_AUTH0_SYNC_ON_START}")
 oauth = None
 if ENABLE_AUTH:
     
@@ -117,19 +114,6 @@ def create_flask_app(config_name=None):
 
             if ENABLE_AUTH:
                 try:
-                    # sync_users_to_db() runs on startup as performance improved
-                    if RUN_AUTH0_SYNC_ON_START:
-                        try:
-                            auth_provider = get_auth_provider()
-                            if hasattr(auth_provider, "sync_users_to_db"):
-                                logger.info("RUN_AUTH0_SYNC_ON_START enabled; syncing users from Auth0...")
-                                auth_provider.sync_users_to_db()
-                                logger.info("Auth0 user sync complete.")
-                            else:
-                                logger.info("Auth provider has no sync_users_to_db(); skipping startup sync.")
-                        except Exception as sync_err:
-                            logger.exception(f"Auth0 startup sync failed; continuing with existing DB state: {sync_err}")
-
                     logger.info("Caching user-projects data...")
                     cache_user_projects()  # Cache the user-project mappings into Redis only when Auth is enabled
 
@@ -664,15 +648,9 @@ def serve_projects_from_filesystem(app, base_dir):
                     # Auth-related setup
                     if ENABLE_AUTH:
                         try:
-                            # NOTE: skipping this as it seems highly redundant to do per project
-                            # and we were hitting rate limits with Auth0
-                            # auth_provider = get_auth_provider()
-                            # auth_provider.sync_users_to_db()  # Sync users and assign permissions
-                            # logger.info("Synced Auth users after adding project.")
-
                             cache_user_projects() #update the cache
                         except Exception as auth_e:
-                            logger.exception(f"Error syncing users or caching for {project_name}: {auth_e}")
+                            logger.exception(f"Error caching user projects for {project_name}: {auth_e}")
 
                     
                     # Optionally add files from the project directory to the database
