@@ -1,6 +1,6 @@
 import { $mobx, type IReactionDisposer } from "mobx";
 import { describe, expect, test, vi } from "vitest";
-import type BaseChart from "@/charts/BaseChart";
+import BaseChart from "@/charts/BaseChart";
 import { ColumnQueryMapper } from "@/datastore/decorateColumnMethod";
 import { type RowsAsColslink, RowsAsColsQuery } from "@/links/link_utils";
 
@@ -54,5 +54,29 @@ describe("ColumnQueryMapper.activeValue", () => {
         const before = m.generation("colorByColumn");
         m.clearActiveQuery("colorByColumn");
         expect(m.generation("colorByColumn")).not.toBe(before);
+    });
+});
+
+// the colour toggles (overlay, log scale, etc.) all re-apply colour-by through this helper
+describe("BaseChart.reapplyColorBy", () => {
+    function stubChart(userValue: unknown[] | undefined, color_by: string | undefined) {
+        const mapper = new ColumnQueryMapper({} as BaseChart<any>, { colorByColumn: "color_by" });
+        if (userValue) mapper.userValues.colorByColumn = userValue;
+        const colorByColumn = vi.fn();
+        const chart = { config: { color_by }, activeQueries: mapper, colorByColumn };
+        return { chart, colorByColumn };
+    }
+
+    test("passes the active query, not the concrete column", () => {
+        const q = new RowsAsColsQuery(link, "genes", 1);
+        const { chart, colorByColumn } = stubChart([q], "gene1");
+        BaseChart.prototype.reapplyColorBy.call(chart as unknown as BaseChart<any>);
+        expect(colorByColumn).toHaveBeenCalledWith(q);
+    });
+
+    test("passes the concrete column when there is no active query", () => {
+        const { chart, colorByColumn } = stubChart(["colA"], "colA");
+        BaseChart.prototype.reapplyColorBy.call(chart as unknown as BaseChart<any>);
+        expect(colorByColumn).toHaveBeenCalledWith("colA");
     });
 });
