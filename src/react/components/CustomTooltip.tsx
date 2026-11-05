@@ -4,7 +4,7 @@ import { Tooltip, type TooltipProps } from "@mui/material";
 export type CustomTooltipProps = {
     tooltipText: string;
     children: React.ReactElement;
-    tooltipProps?: TooltipProps; 
+    tooltipProps?: Partial<TooltipProps>;
 };
 
 const CustomTooltip = ({ tooltipText, tooltipProps, children }: CustomTooltipProps) => {
