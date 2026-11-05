@@ -98,6 +98,13 @@ class WGLChart extends SVGChart {
     }
 
     showTooltip(e, index) {
+        const c = this.config.tooltip.column;
+        const column = this.dataStore.columnIndex[c];
+        // an active link may currently resolve to no column
+        if (!column) {
+            this.tooltip.style.display = "none";
+            return;
+        }
         const rect = this.graphDiv.getBoundingClientRect();
         const row = this.dataStore.getRowAsObject(index);
         const x = e.clientX - rect.left;
@@ -105,10 +112,6 @@ class WGLChart extends SVGChart {
         this.tooltip.style.display = "block";
         this.tooltip.style.left = `${x}px`;
         this.tooltip.style.top = `${y}px`;
-        const c = this.config.tooltip.column;
-        const column = this.dataStore.columnIndex[c];
-        // an active link may currently resolve to no column
-        if (!column) return;
         this.tooltip.textContent = `${column.name}: ${row[c]}`;
     }
 

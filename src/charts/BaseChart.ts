@@ -761,8 +761,8 @@ class BaseChart<T extends BaseConfig> {
         }
         if (this.colorByColumn) {
             if (this.config.color_by === column) {
+                // not an explicit clear: leave any active query so it can recover if the link resolves again
                 clearColorLegendFilter(this, false);
-                this.activeQueries.clearActiveQuery("colorByColumn");
                 this.config.color_by = undefined;
                 this.colorByDefault?.();
             }

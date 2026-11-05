@@ -110,10 +110,13 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
                 const cols = flattenFields(colsOriginalArr);
                 const a = multiCol ? cols : cols[0];
                 const cm = window.mdv.chartManager;
+                // a load that's still pending when the query is replaced or cleared must not be applied
+                const generation = this.activeQueries.generation(target.name);
                 cm._getColumnsThen(
                     dataSource,
                     cols,
                     action(() => {
+                        if (generation !== this.activeQueries.generation(target.name)) return;
                         try {
                             //@ts-ignore array vs single column
                             target.call(this, a, ...args);
@@ -173,6 +176,14 @@ export class ColumnQueryMapper<T extends BaseConfig> {
      * added because of `methodName: 'replacementMethod'` issue, now resolved differently.
      */
     inSetQuery = false;
+    /** Bumped whenever the query for a method is replaced or cleared, to invalidate in-flight column loads. */
+    private generations = new Map<DecoratedMethodName, number>();
+    generation(methodName: DecoratedMethodName) {
+        return this.generations.get(methodName) ?? 0;
+    }
+    private invalidate(methodName: DecoratedMethodName) {
+        this.generations.set(methodName, this.generation(methodName) + 1);
+    }
     /**
      * Called from the implementation of `@loadColumnData` decorator to ensure proper housekeeping of reactions
      * and keeping track of object form of queries for serialisation.
@@ -182,6 +193,7 @@ export class ColumnQueryMapper<T extends BaseConfig> {
     setActiveQuery(methodName: DecoratedMethodName, userValue: UserArgs, callback: () => void) {
         const alreadyInSetQuery = this.inSetQuery;
         this.inSetQuery = true;
+        this.invalidate(methodName);
         if (this.reactionDisposers.has(methodName)) {
             const disposer = this.reactionDisposers.get(methodName);
             disposer?.();
@@ -289,9 +301,10 @@ export class ColumnQueryMapper<T extends BaseConfig> {
     }
     /**
      * Forget any active query for a decorated method, and dispose its update reaction.
-     * For when the user explicitly clears the corresponding setting.
+     * For when the user explicitly clears the corresponding setting; column loads already in flight are discarded.
      */
     clearActiveQuery(methodName: DecoratedMethodName) {
+        this.invalidate(methodName);
         const disposer = this.reactionDisposers.get(methodName);
         if (disposer) {
             disposer();

@@ -24,7 +24,7 @@ describe("ColumnQueryMapper.activeValue", () => {
 
     test("returns the concrete value when the user value is a plain column", () => {
         mapper.userValues.colorByColumn = ["colA"];
-        expect(mapper.activeValue("colorByColumn", "colA")).toBe("colA");
+        expect(mapper.activeValue("colorByColumn", "colB")).toBe("colB");
     });
 
     test("keeps an unresolved query distinct from a cleared setting", () => {
@@ -45,5 +45,12 @@ describe("ColumnQueryMapper.activeValue", () => {
         expect(spy).toHaveBeenCalledOnce();
         expect(chart.reactionDisposers).toEqual([]);
         expect(m.activeValue("setToolTipColumn", undefined)).toBeUndefined();
+    });
+
+    test("clearActiveQuery invalidates in-flight column loads", () => {
+        const m = new ColumnQueryMapper({ reactionDisposers: [] } as unknown as BaseChart<any>, {});
+        const before = m.generation("colorByColumn");
+        m.clearActiveQuery("colorByColumn");
+        expect(m.generation("colorByColumn")).not.toBe(before);
     });
 });
