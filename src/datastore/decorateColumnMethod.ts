@@ -12,12 +12,12 @@ import { RowsAsColsQuery } from "@/links/link_utils";
 function decorateColumnMethod<T extends BaseChart<any>>(method: string, chart: T) {
     // could try to make `method: keyof T`, but that would require a more type juggling...
     // passing { target: chart } as context is not full information - what difference does it make?
-    //@ts-ignore metaprogramming - really not worth the effort to get this to work with typescript
+    //@ts-expect-error metaprogramming - really not worth the effort to get this to work with typescript
     if (chart[method].name === "replacementMethod") {
         console.warn("Method already decorated", method);
         return;
     }
-    //@ts-ignore metaprogramming - really not worth the effort to get this to work with typescript
+    //@ts-expect-error metaprogramming - really not worth the effort to get this to work with typescript
     chart[method] = loadColumnData(chart[method]); //, { target: chart, name: method });
 }
 
@@ -110,12 +110,15 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
                 const cols = flattenFields(colsOriginalArr);
                 const a = multiCol ? cols : cols[0];
                 const cm = window.mdv.chartManager;
+                // a load that's still pending when the query is replaced or cleared must not be applied
+                const generation = this.activeQueries.generation(target.name);
                 cm._getColumnsThen(
                     dataSource,
                     cols,
                     action(() => {
+                        if (generation !== this.activeQueries.generation(target.name)) return;
                         try {
-                            //@ts-ignore array vs single column
+                            //@ts-expect-error array vs single column
                             target.call(this, a, ...args);
                         } catch (e) {
                             console.error("Error in loadColumnData method", e);
@@ -173,6 +176,14 @@ export class ColumnQueryMapper<T extends BaseConfig> {
      * added because of `methodName: 'replacementMethod'` issue, now resolved differently.
      */
     inSetQuery = false;
+    /** Bumped whenever the query for a method is replaced or cleared, to invalidate in-flight column loads. */
+    private generations = new Map<DecoratedMethodName, number>();
+    generation(methodName: DecoratedMethodName) {
+        return this.generations.get(methodName) ?? 0;
+    }
+    private invalidate(methodName: DecoratedMethodName) {
+        this.generations.set(methodName, this.generation(methodName) + 1);
+    }
     /**
      * Called from the implementation of `@loadColumnData` decorator to ensure proper housekeeping of reactions
      * and keeping track of object form of queries for serialisation.
@@ -182,6 +193,7 @@ export class ColumnQueryMapper<T extends BaseConfig> {
     setActiveQuery(methodName: DecoratedMethodName, userValue: UserArgs, callback: () => void) {
         const alreadyInSetQuery = this.inSetQuery;
         this.inSetQuery = true;
+        this.invalidate(methodName);
         if (this.reactionDisposers.has(methodName)) {
             const disposer = this.reactionDisposers.get(methodName);
             disposer?.();
@@ -271,6 +283,36 @@ export class ColumnQueryMapper<T extends BaseConfig> {
     //     config.param = processed;
     //     return config;
     // }
+    /**
+     * The active (possibly un-resolved, e.g. `RowsAsColsQuery`) first argument most recently passed to
+     * a decorated single-column method such as `colorByColumn` or `setToolTipColumn`.
+     *
+     * Settings UI should use this rather than reading the concrete string from `chart.config`, which would
+     * otherwise degrade an active link to the name of whatever column it currently resolves to.
+     *
+     * An active query is returned even when `concrete` is empty: a query that currently resolves to no fields
+     * leaves the config value undefined, but is not the same as the setting having been cleared.
+     * Explicitly clearing a setting must call {@link clearActiveQuery}.
+     */
+    activeValue<V>(methodName: DecoratedMethodName, concrete: V): V | RowsAsColsQuery {
+        const v = this.userValues[methodName]?.[0];
+        if (v instanceof RowsAsColsQuery) return v;
+        return concrete;
+    }
+    /**
+     * Forget any active query for a decorated method, and dispose its update reaction.
+     * For when the user explicitly clears the corresponding setting; column loads already in flight are discarded.
+     */
+    clearActiveQuery(methodName: DecoratedMethodName) {
+        this.invalidate(methodName);
+        const disposer = this.reactionDisposers.get(methodName);
+        if (disposer) {
+            disposer();
+            this.reactionDisposers.delete(methodName);
+            this.chart.reactionDisposers = this.chart.reactionDisposers.filter((v) => v !== disposer);
+        }
+        delete this.userValues[methodName];
+    }
     /**
      * Returns the active parameters for the chart.
      *
