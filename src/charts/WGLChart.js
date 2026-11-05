@@ -107,6 +107,8 @@ class WGLChart extends SVGChart {
         this.tooltip.style.top = `${y}px`;
         const c = this.config.tooltip.column;
         const column = this.dataStore.columnIndex[c];
+        // an active link may currently resolve to no column
+        if (!column) return;
         this.tooltip.textContent = `${column.name}: ${row[c]}`;
     }
 

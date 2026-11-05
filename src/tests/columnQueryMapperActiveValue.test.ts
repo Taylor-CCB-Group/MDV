@@ -1,6 +1,7 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { ColumnQueryMapper } from "@/datastore/decorateColumnMethod";
 import { RowsAsColsQuery, type RowsAsColslink } from "@/links/link_utils";
+import { $mobx, type IReactionDisposer } from "mobx";
 import type BaseChart from "@/charts/BaseChart";
 
 const link: RowsAsColslink = {
@@ -26,8 +27,23 @@ describe("ColumnQueryMapper.activeValue", () => {
         expect(mapper.activeValue("colorByColumn", "colA")).toBe("colA");
     });
 
-    test("ignores a stale query once the config value has been cleared", () => {
-        mapper.userValues.colorByColumn = [new RowsAsColsQuery(link, "genes", 1)];
-        expect(mapper.activeValue("colorByColumn", undefined)).toBeUndefined();
+    test("keeps an unresolved query distinct from a cleared setting", () => {
+        const q = new RowsAsColsQuery(link, "genes", 1);
+        mapper.userValues.setToolTipColumn = [q];
+        // query resolves to no fields -> concrete config value is undefined, but it is still active
+        expect(mapper.activeValue("setToolTipColumn", undefined)).toBe(q);
+    });
+
+    test("clearActiveQuery makes the setting count as cleared", () => {
+        const spy = vi.fn();
+        const dispose: IReactionDisposer = Object.assign(() => spy(), { [$mobx]: {} as IReactionDisposer[typeof $mobx] });
+        const chart = { reactionDisposers: [dispose] } as unknown as BaseChart<any>;
+        const m = new ColumnQueryMapper(chart, { setToolTipColumn: "tooltip.column" });
+        m.userValues.setToolTipColumn = [new RowsAsColsQuery(link, "genes", 1)];
+        m.reactionDisposers.set("setToolTipColumn", dispose);
+        m.clearActiveQuery("setToolTipColumn");
+        expect(spy).toHaveBeenCalledOnce();
+        expect(chart.reactionDisposers).toEqual([]);
+        expect(m.activeValue("setToolTipColumn", undefined)).toBeUndefined();
     });
 });

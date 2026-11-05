@@ -278,15 +278,27 @@ export class ColumnQueryMapper<T extends BaseConfig> {
      * Settings UI should use this rather than reading the concrete string from `chart.config`, which would
      * otherwise degrade an active link to the name of whatever column it currently resolves to.
      *
-     * `concrete` is the current value in the config; if it is empty the column has been cleared
-     * (without going through the decorated method) so any remembered query is stale and is ignored.
+     * An active query is returned even when `concrete` is empty: a query that currently resolves to no fields
+     * leaves the config value undefined, but is not the same as the setting having been cleared.
+     * Explicitly clearing a setting must call {@link clearActiveQuery}.
      */
-    activeValue<V>(methodName: DecoratedMethodName, concrete: V): V | FieldSpec {
-        if (!concrete) return concrete;
-        const args = this.userValues[methodName];
-        const v = args?.[0];
+    activeValue<V>(methodName: DecoratedMethodName, concrete: V): V | RowsAsColsQuery {
+        const v = this.userValues[methodName]?.[0];
         if (v instanceof RowsAsColsQuery) return v;
         return concrete;
+    }
+    /**
+     * Forget any active query for a decorated method, and dispose its update reaction.
+     * For when the user explicitly clears the corresponding setting.
+     */
+    clearActiveQuery(methodName: DecoratedMethodName) {
+        const disposer = this.reactionDisposers.get(methodName);
+        if (disposer) {
+            disposer();
+            this.reactionDisposers.delete(methodName);
+            this.chart.reactionDisposers = this.chart.reactionDisposers.filter(v => v !== disposer);
+        }
+        delete this.userValues[methodName];
     }
     /**
      * Returns the active parameters for the chart.

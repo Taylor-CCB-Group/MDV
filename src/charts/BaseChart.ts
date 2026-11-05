@@ -762,6 +762,7 @@ class BaseChart<T extends BaseConfig> {
         if (this.colorByColumn) {
             if (this.config.color_by === column) {
                 clearColorLegendFilter(this, false);
+                this.activeQueries.clearActiveQuery("colorByColumn");
                 this.config.color_by = undefined;
                 this.colorByDefault?.();
             }
@@ -942,6 +943,9 @@ class BaseChart<T extends BaseConfig> {
                     func: (x) => {
                         if (x === "_none") {
                             clearColorLegendFilter(this, false);
+                            this.activeQueries.clearActiveQuery(
+                                "colorByColumn",
+                            );
                             c.color_by = undefined;
                             this.colorByDefault?.();
                         } else {
