@@ -18,9 +18,11 @@ exports.onExecutePostLogin = async (event, api) => {
   api.idToken.setCustomClaim(`${namespace}connection_strategy`, event.connection.strategy);
   if (event.connection.strategy === "waad" || event.connection.strategy === "oidc") {
     // Microsoft's claim that the tenant owns the email's domain. Nobody has
-    // confirmed yet which connection passes it through, or where it lands on
-    // event.user. Without it, MDV refuses Microsoft sign-ins that have no User
-    // yet.
-    api.idToken.setCustomClaim(`${namespace}xms_edov`, event.user.xms_edov === true);
+    // confirmed yet whether Auth0 puts it on the identity's profileData or on
+    // event.user, so read both. Only a true boolean counts. Without it, MDV
+    // refuses Microsoft sign-ins that have no User yet.
+    const profileData = event.user.identities?.[0]?.profileData ?? {};
+    const xmsEdov = profileData.xms_edov === true || event.user.xms_edov === true;
+    api.idToken.setCustomClaim(`${namespace}xms_edov`, xmsEdov);
   }
 };

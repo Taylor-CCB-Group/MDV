@@ -50,7 +50,26 @@ rule, and accepting it reactivates them.
 
 Auth0's documentation says its native Azure AD connection ignores Entra's optional claims,
 while an Enterprise OpenID Connect connection passes them through, so `xms_edov` probably
-needs an OpenID Connect connection. Someone with rights over the client's Entra app
-registration has to request `xms_edov` as an optional claim. Both have to be confirmed on
-the tenant before a Microsoft connection goes live. If the claim does not arrive, Microsoft
-Invitations cannot be accepted until the connection or the Action provides it.
+needs an OpenID Connect connection.
+
+Someone with rights over the client's Entra app registration has to request `xms_edov`.
+[Microsoft's optional claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/optional-claims-reference)
+says Entra returns it only when the token also carries the `email` claim. The Azure portal
+does not offer `xms_edov` in its list, so
+[Clerk's guide to Microsoft sign-in](https://clerk.com/docs/authentication/social-connections/microsoft)
+adds it through the manifest:
+
+1. Under Token configuration, add the optional claims `email` and `xms_pdl` for the ID
+   token, and turn on the Microsoft Graph email permission when the portal asks. Repeat
+   this for the access token.
+2. In the Manifest, set `acceptMappedClaims` to `true`.
+3. In the manifest's `optionalClaims`, rename each `xms_pdl` entry to `xms_edov`, then save.
+
+The portal may then warn that `xms_edov` is not recognised. Clerk's guide says the warning
+can be ignored. Microsoft's reference lists the claim but does not describe these steps.
+
+Nobody has confirmed whether Auth0 puts the claim on the identity's `profileData` or on the
+user itself, so the post-login Action reads both. The connection type, the claim and where
+it lands have to be confirmed on the tenant before a Microsoft connection goes live. If the
+claim does not arrive, Microsoft Invitations cannot be accepted until the connection or the
+Action provides it.
