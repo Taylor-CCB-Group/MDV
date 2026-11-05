@@ -1,9 +1,9 @@
-import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { useCallback, useMemo, useState } from "react";
-import { replaceMatches } from "../utils/valueReplacementUtil";
 import type { SlickgridReactInstance } from "slickgrid-react";
+import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
+import { replaceMatches } from "../utils/valueReplacementUtil";
 
 export type FoundMatch = {
     value: string | number;

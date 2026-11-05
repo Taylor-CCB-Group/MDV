@@ -1,14 +1,3 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type DataStore from "../../datastore/DataStore.js";
-import { BaseDialog } from "../../utilities/Dialog.js";
-import { createMdvPortal } from "@/react/react_utils";
-import { observer } from "mobx-react-lite";
-import TextField from "@mui/material/TextField";
-import Autocomplete from "@mui/material/Autocomplete";
-
-import BaseChart from "../BaseChart";
-import { DataStoreContext, useDataStore } from "@/react/context.js";
-import JsonView from "react18-json-view";
 import {
     Button,
     Dialog,
@@ -20,31 +9,41 @@ import {
     Paper,
     Typography,
 } from "@mui/material";
+import Autocomplete from "@mui/material/Autocomplete";
 import Grid from "@mui/material/Grid2";
-import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
+import TextField from "@mui/material/TextField";
 import { action, observable, reaction, toJS } from "mobx";
-import type { ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
-import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
+import { observer } from "mobx-react-lite";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import JsonView from "react18-json-view";
 import {
     columnMatchesType,
-    flattenFields,
-    isMultiColumn,
     type FieldSpec,
     type FieldSpecs,
+    flattenFields,
+    isMultiColumn,
 } from "@/lib/columnTypeHelpers";
 import type { Param } from "@/lib/columnTypeHelpers.js";
 import { g, isArray } from "@/lib/utils.js";
+import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
+import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
+import { DataStoreContext, useDataStore } from "@/react/context.js";
+import { createMdvPortal } from "@/react/react_utils";
+import type DataStore from "../../datastore/DataStore.js";
+import { BaseDialog } from "../../utilities/Dialog.js";
+import BaseChart from "../BaseChart";
 import { serialiseConfig } from "../chartConfigUtils.js";
+import type { ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import "react18-json-view/src/style.css";
 // If dark mode is needed, import `dark.css`.
 import "react18-json-view/src/dark.css";
 import "../../utilities/css/JsonDialogStyles.css";
 import { Close as CloseIcon } from "@mui/icons-material";
 import { ErrorBoundary } from "react-error-boundary";
-import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper.js";
 import { preloadLazyChartTypesForPicker } from "@/charts/lazyChartRegistrations";
-import { legacyChartsSetting } from "@/lib/browserSettings";
 import { isLegacyChartType } from "@/charts/legacyCharts";
+import { legacyChartsSetting } from "@/lib/browserSettings";
+import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper.js";
 
 // Draft chart config: param slots are FieldSpec / FieldSpecs until we emit a flat `param` for ChartManager.
 

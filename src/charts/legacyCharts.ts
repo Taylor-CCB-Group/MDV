@@ -1,7 +1,7 @@
-import { convertLegacyChartsSetting } from "@/lib/browserSettings";
 import type DataStore from "@/datastore/DataStore";
-import type { ChartType } from "./ChartTypes";
+import { convertLegacyChartsSetting } from "@/lib/browserSettings";
 import { deckRadiusForClassicRadius } from "@/react/axisScaling";
+import type { ChartType } from "./ChartTypes";
 
 /** Whether a chart type is hidden from the Add Chart dialog as superseded, for this data store. */
 export function isLegacyChartType(type: Pick<ChartType<any>, "legacy">, dataStore: DataStore) {

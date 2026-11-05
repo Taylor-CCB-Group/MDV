@@ -1,11 +1,11 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
     AnnotationDialogComponent,
     getAnnotationColumnChoiceState,
     getEditableAnnotationColumnNames,
 } from "@/charts/dialogs/AnnotationDialogReact";
 import TagModel from "@/table/TagModel";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.mock("@/table/TagModel", () => ({
     default: {

@@ -1,13 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
-import type { Project, ProjectAccessType, RecycledProject } from "../utils/projectUtils";
-import { parseErrorResponse } from "../utils/apiUtils";
 import { apiFetch, buildApiUrl } from "@/utils/mdvRouting";
+import { parseErrorResponse } from "../utils/apiUtils";
 import {
     projectMutationResponseSchema,
     purgeRecycleBinResponseSchema,
     recycleBinResponseSchema,
     restoreRecycledProjectResponseSchema,
 } from "../utils/projectSchemas";
+import type { Project, ProjectAccessType, RecycledProject } from "../utils/projectUtils";
 
 type RescannedProject = {
     id: number;

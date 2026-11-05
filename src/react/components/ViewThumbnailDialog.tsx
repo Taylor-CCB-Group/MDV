@@ -1,29 +1,29 @@
+import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, rectSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import { Clear as ClearIcon, Close as CloseIcon } from "@mui/icons-material";
 import {
     Box,
     Button,
+    Checkbox,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
     FormControlLabel,
+    Grid2,
     IconButton,
+    InputAdornment,
     TextField,
     Typography,
-    Grid2,
-    CircularProgress,
-    InputAdornment,
-    Checkbox,
 } from "@mui/material";
-import { Clear as ClearIcon, Close as CloseIcon } from "@mui/icons-material";
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { arrayMove, SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
-import { stringContainsAll } from "@/lib/utils";
+import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
+import { stringContainsAll } from "@/lib/utils";
 import { useChartManager } from "../hooks";
 import { ViewGalleryCard } from "./ViewGalleryCard";
-import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 
 export type ViewThumbnailDialogProps = {
     open: boolean;

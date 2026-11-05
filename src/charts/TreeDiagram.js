@@ -1,10 +1,10 @@
-import BaseChart from "./BaseChart";
-import SVGChart from "./SVGChart.js";
-import { parseNewick } from "../utilities/clustering.js";
+import { max } from "d3";
 import { easeLinear } from "d3-ease";
 import { cluster } from "d3-hierarchy";
 import { select } from "d3-selection";
-import { max } from "d3";
+import { parseNewick } from "../utilities/clustering.js";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 /** this is somewhat bespoke / subject to review etc. */
 class TreeDiagram extends SVGChart {

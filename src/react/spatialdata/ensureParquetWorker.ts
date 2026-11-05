@@ -1,11 +1,10 @@
-import { ensureWorkers } from "@spatialdata/vis";
-
 // Vite bundles the core parquet worker and hands back a runtime URL. The import is
 // what does the work — it asks Vite to *build* the worker, shared chunks and its own
 // parquet-wasm included. The worker cannot be shipped self-contained, so there is no
 // default URL that survives being re-bundled into MDV's `assets/`; see
 // "Bundling into an application" in the SpatialData.js docs.
 import parquetWorkerUrl from "@spatialdata/core/parquet-worker?worker&url";
+import { ensureWorkers } from "@spatialdata/vis";
 
 /**
  * Enable the core parquet worker before any spatial parquet work.

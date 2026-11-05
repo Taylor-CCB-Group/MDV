@@ -1,17 +1,17 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import type { CategoricalDataType } from "@/charts/charts";
 import { autorun, makeAutoObservable, runInAction } from "mobx";
+import { beforeEach, describe, expect, test, vi } from "vitest";
+import type { BaseConfig } from "@/charts/BaseChart";
+import type { CategoricalDataType } from "@/charts/charts";
+import type { CategoryContourProps } from "./contour_state";
 import {
+    type DualContourLegacyConfig,
+    getContourVisualSettings,
+    getDensitySettings,
+    type HoveredContour,
     useCategoryContour,
     useCategoryContourLegend,
-    getDensitySettings,
-    getContourVisualSettings,
-    type DualContourLegacyConfig,
-    type HoveredContour,
 } from "./contour_state";
-import type { CategoryContourProps } from "./contour_state";
-import type { BaseConfig } from "@/charts/BaseChart";
 import { scatterDefaults } from "./scatter_state";
 
 // Mock all the hooks and dependencies
@@ -37,9 +37,9 @@ vi.mock("use-debounce", () => ({
     useDebounce: vi.fn((value) => [value]),
 }));
 
-import { useFieldSpec, useCategoryFilterIndices, useParamColumns } from "./hooks";
 import { useDataStore } from "./context";
 import { useViewState } from "./deck_state";
+import { useCategoryFilterIndices, useFieldSpec, useParamColumns } from "./hooks";
 
 describe("useCategoryContour", () => {
     const mockCx = {

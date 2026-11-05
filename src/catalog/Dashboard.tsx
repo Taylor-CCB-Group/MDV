@@ -1,4 +1,3 @@
-import { useColorMode } from "@/ThemeProvider";
 import {
     Add,
     Check,
@@ -17,8 +16,8 @@ import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
 import HelpIcon from "@mui/icons-material/Help";
 import {
-    AppBar,
     Alert,
+    AppBar,
     Backdrop,
     Box,
     Button,
@@ -37,25 +36,26 @@ import {
     Typography,
     useTheme,
 } from "@mui/material";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import ProjectCard from "./ProjectCard";
-import ProjectListView from "./ProjectListView";
-import UserProfile from "./UserProfile";
-import mdvLogo from "./assets/mdv_logo.png";
-import useProjects from "./hooks/useProjects";
-import { type SortBy, type SortOrder, sortProjects } from "./utils/projectUtils";
-import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
-import ImportProjectDialog from "@/react/components/ImportProjectDialog";
-import usePermissions from "./PermissionsContext";
-import useAuthEnabled from "./hooks/useAuthEnabled";
 import { RefreshCwIcon } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
-import HelpDialog from "./HelpDialog";
+import ImportProjectDialog from "@/react/components/ImportProjectDialog";
+import { useColorMode } from "@/ThemeProvider";
 import { buildProjectUrl, shouldShowLocalBackendNotice } from "@/utils/mdvRouting";
+import mdvLogo from "./assets/mdv_logo.png";
 import BulkDeleteProjectsDialog from "./components/BulkDeleteProjectsDialog";
 import DashboardActionButton from "./components/DashboardActionButton";
 import ExtensionNavigation from "./components/ExtensionNavigation";
 import RecycleBinDialog from "./components/RecycleBinDialog";
+import HelpDialog from "./HelpDialog";
+import useAuthEnabled from "./hooks/useAuthEnabled";
+import useProjects from "./hooks/useProjects";
+import usePermissions from "./PermissionsContext";
+import ProjectCard from "./ProjectCard";
+import ProjectListView from "./ProjectListView";
+import UserProfile from "./UserProfile";
+import { type SortBy, type SortOrder, sortProjects } from "./utils/projectUtils";
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states

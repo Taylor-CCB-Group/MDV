@@ -1,6 +1,6 @@
+import noUiSlider from "nouislider";
 import { BaseDialog } from "../../utilities/Dialog.js";
 import { createEl } from "../../utilities/Elements.js";
-import noUiSlider from "nouislider";
 
 class CustomDialog extends BaseDialog {
     constructor(config) {

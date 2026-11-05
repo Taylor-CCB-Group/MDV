@@ -1,16 +1,16 @@
-import { select } from "d3-selection";
-import { easeLinear } from "d3-ease";
-import BaseChart from "./BaseChart";
-import SVGChart from "./SVGChart.js";
-import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
-import { getHierarchicalNodes } from "../utilities/clustering.js";
-import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import { easeLinear } from "d3-ease";
+import { scaleSqrt } from "d3-scale";
+import { select } from "d3-selection";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
-import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 import FractionLegend from "@/react/components/legend/FractionLegend";
 import LegendWrapper from "@/react/components/legend/LegendWrapper";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+import { getHierarchicalNodes } from "../utilities/clustering.js";
+import BaseChart from "./BaseChart";
 import { canvasMeasureText, layoutXLabels, stripSharedSubgroupSuffix } from "./dotplot/xAxisLabels";
+import SVGChart from "./SVGChart.js";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {

@@ -1,7 +1,6 @@
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { isColumnLoaded, isColumnOfType } from "@/lib/columnTypeHelpers";
 import {
-    MULTITEXT_EMPTY_INDEX,
     getMultitextCapacity,
     getMultitextDelimiter,
     getMultitextItemValues,
@@ -9,6 +8,7 @@ import {
     inferMultitextEmptyItem,
     isPackedMultitextColumn,
     joinMultitextItems,
+    MULTITEXT_EMPTY_INDEX,
     normalizeMultitextItems,
     splitMultitextItems,
 } from "@/lib/multitext";

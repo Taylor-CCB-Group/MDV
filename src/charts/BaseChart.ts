@@ -1,27 +1,28 @@
-import { getRandomString } from "../utilities/Utilities";
-import { ContextMenu } from "../utilities/ContextMenu.js";
-import { createEl } from "../utilities/Elements.js";
-import { chartTypes } from "./ChartTypes";
-import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
-import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
-import { makeAutoObservable, action, autorun, type IReactionDisposer, type IAutorunOptions } from "mobx";
+import { action, autorun, type IAutorunOptions, type IReactionDisposer, makeAutoObservable } from "mobx";
+import tippy, { type Instance as TippyInstance } from "tippy.js";
 import type DataStore from "@/datastore/DataStore";
-import type { BaseDialog } from "@/utilities/Dialog";
-import type { DataColumn, FieldName, GuiSpecs, Quantiles } from "./charts";
 import type Dimension from "@/datastore/Dimension";
-import { g } from "@/lib/utils";
-import { initialiseChartConfig } from "./chartConfigUtils";
 import { ColumnQueryMapper, decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import { g } from "@/lib/utils";
+import type { BaseDialog } from "@/utilities/Dialog";
+import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
+import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
+import { ContextMenu } from "../utilities/ContextMenu.js";
+import { createEl } from "../utilities/Elements.js";
+import { getRandomString } from "../utilities/Utilities";
+import { chartTypes } from "./ChartTypes";
+import { initialiseChartConfig } from "./chartConfigUtils";
+import type { DataColumn, FieldName, GuiSpecs, Quantiles } from "./charts";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
-import tippy, { type Instance as TippyInstance } from "tippy.js";
 import "tippy.js/dist/tippy.css";
+import { createElement, type ReactNode } from "react";
 import { isDateColumn } from "@/lib/dateFormat";
-import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
-import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import ColorLegend from "@/react/components/legend/ColorLegend";
 import LegendWrapper, { type LegendWrapperComponentProps } from "@/react/components/legend/LegendWrapper";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import {
+    type ColorLegendFilter,
     clearColorLegendFilter,
     destroyColorLegendFilter,
     getActiveCategoricalColorLegendValue,
@@ -29,11 +30,10 @@ import {
     restoreColorLegendFilter,
     setContinuousColorLegendFilter,
     toggleCategoricalColorLegendFilter,
-    type ColorLegendFilter,
 } from "@/react/legend/color_legend/colorLegendFilter";
-import { createElement, type ReactNode } from "react";
-import { getLegacyConversionTarget } from "./legacyCharts";
+import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
+import { getLegacyConversionTarget } from "./legacyCharts";
 export type ChartEventType = string;
 /** A dot on a chart's "more" menu icon, for a problem described in its debug dialog. */
 export type MenuPip = { level: "error" | "notice"; tooltip: string };

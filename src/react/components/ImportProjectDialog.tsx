@@ -1,19 +1,19 @@
-import useProjects from "@/catalog/hooks/useProjects";
-import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
-import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
-import { Container, DropzoneContainer, DynamicText, FileInputLabel } from "@/charts/dialogs/FileUploadDialog";
-import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
 import { CloudUpload as CloudUploadIcon } from "@mui/icons-material";
+import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
+import { BlobReader, ZipReader } from "@zip.js/zip.js";
 import axios, { AxiosError, type AxiosProgressEvent } from "axios";
 import type React from "react";
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
-import { createSocketIOUpload, type SocketIOUploadClient } from "../../charts/dialogs/SocketIOUploadClient";
-import { ZipReader, BlobReader } from "@zip.js/zip.js";
 import { useApiRoot } from "@/catalog/hooks/useApiRoot";
+import useProjects from "@/catalog/hooks/useProjects";
+import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
+import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
+import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
+import { Container, DropzoneContainer, DynamicText, FileInputLabel } from "@/charts/dialogs/FileUploadDialog";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import { buildApiUrl, buildProjectUrl } from "@/utils/mdvRouting";
+import { createSocketIOUpload, type SocketIOUploadClient } from "../../charts/dialogs/SocketIOUploadClient";
 
 // Constants moved to module level to avoid recreation
 const REQUIRED_FILES = new Set(["views.json", "state.json", "datasources.json"]);

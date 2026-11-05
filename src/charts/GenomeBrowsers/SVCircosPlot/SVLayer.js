@@ -1,6 +1,5 @@
-import { project, picking } from "@deck.gl/core";
-import { Layer } from "@deck.gl/core";
-import { Model, Geometry } from "@luma.gl/engine";
+import { Layer, picking, project } from "@deck.gl/core";
+import { Geometry, Model } from "@luma.gl/engine";
 
 /* I could use deck.gl's filtering extension but it 
  it appears to work in a similar way shader-modules.ts line 241

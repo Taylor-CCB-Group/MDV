@@ -1,6 +1,6 @@
+import { describe, expect, test } from "vitest";
 import type DataStore from "@/datastore/DataStore";
 import { fillColorSchemeFromDataStore } from "@/react/spatialdata/fill_color_scheme";
-import { describe, expect, test } from "vitest";
 
 /**
  * The contract here is parity: a column handed to the viewer must come back in the

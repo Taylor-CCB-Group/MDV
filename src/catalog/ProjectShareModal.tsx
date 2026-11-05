@@ -1,4 +1,5 @@
 import { Close as CloseIcon } from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
 import {
     Autocomplete,
     Box,
@@ -21,12 +22,11 @@ import {
     Typography,
 } from "@mui/material";
 import type React from "react";
-import DeleteIcon from "@mui/icons-material/Delete";
-import useProjectShare, { type UserPermission, type RegisteredUser } from "./hooks/useProjectShare";
 import { useState } from "react";
-import { DialogCloseIconButton } from "./ProjectRenameModal";
 import { matchEmail } from "@/lib/utils";
+import useProjectShare, { type RegisteredUser, type UserPermission } from "./hooks/useProjectShare";
 import usePermissions from "./PermissionsContext";
+import { DialogCloseIconButton } from "./ProjectRenameModal";
 
 export interface ProjectShareModalProps {
     open: boolean;

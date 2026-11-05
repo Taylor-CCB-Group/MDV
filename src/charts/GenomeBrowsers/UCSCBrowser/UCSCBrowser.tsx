@@ -1,11 +1,10 @@
-import BaseChart from "../../BaseChart";
-import { g } from "../../../lib/utils";
-import type { BaseConfig } from "../../BaseChart";
-import UCSCBrowserComponent from "./UCSCBrowserComponent";
-import { BaseReactChart } from "../../../react/components/BaseReactChart";
 import type DataStore from "../../../datastore/DataStore";
-import { applyViewMargins } from "../genomicLocationUtils";
-import { type GenomeLocation, GenomeViewMargins } from "../genomicLocationUtils";
+import { g } from "../../../lib/utils";
+import { BaseReactChart } from "../../../react/components/BaseReactChart";
+import type { BaseConfig } from "../../BaseChart";
+import BaseChart from "../../BaseChart";
+import { applyViewMargins, type GenomeLocation, GenomeViewMargins } from "../genomicLocationUtils";
+import UCSCBrowserComponent from "./UCSCBrowserComponent";
 
 //all should be required but have default values
 //will zod take care of this
@@ -102,5 +101,6 @@ BaseChart.types["ucsc_browser"] = {
         config.src = extraControls.url;
     },
 };
+
 export { UCSCBrowserConfig };
 export default UCSCBrowser;

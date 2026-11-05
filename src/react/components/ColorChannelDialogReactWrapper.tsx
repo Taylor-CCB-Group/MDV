@@ -1,11 +1,11 @@
 import { observer } from "mobx-react-lite";
-import { BaseDialog } from "../../utilities/Dialog";
-import type { VivMDVReact } from "./VivMDVReact";
-import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
-import Gui from "./ColorChannelComponents";
+import { BaseDialog } from "../../utilities/Dialog";
+import { createEl } from "../../utilities/ElementsTyped";
 import { ChartProvider } from "../context";
 import type { VivContextType } from "./avivatorish/state";
+import Gui from "./ColorChannelComponents";
+import type { VivMDVReact } from "./VivMDVReact";
 
 const ColorChannelDialogReact = observer(function ColorChannelDialogReact({
     vivStores,

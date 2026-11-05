@@ -1,4 +1,4 @@
-import type { ChartColumnImpact, ColumnRemovalImpact, SavedViewColumnImpact } from "@/charts/types/columnRemoval";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
     Accordion,
     AccordionDetails,
@@ -6,15 +6,15 @@ import {
     Alert,
     Box,
     Button,
-    Divider,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
+    Divider,
     Stack,
     Typography,
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import type { ChartColumnImpact, ColumnRemovalImpact, SavedViewColumnImpact } from "@/charts/types/columnRemoval";
 
 function getUsagePathLabel(path: string) {
     if (path === "param") return "param";

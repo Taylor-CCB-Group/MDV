@@ -1,9 +1,9 @@
 import { action } from "mobx";
+import type DataStore from "@/datastore/DataStore";
+import { g } from "@/lib/utils";
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
-import type DataStore from "@/datastore/DataStore";
-import { g } from "@/lib/utils";
 
 // export type CommonFilter = { noClear?: boolean, invert?: boolean }; //todo - implement these features.
 export type CategoryFilter = { category: string[] };

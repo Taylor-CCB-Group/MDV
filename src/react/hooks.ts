@@ -1,33 +1,33 @@
+import { action, autorun, runInAction } from "mobx";
 import type React from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useChart, useDataStore } from "./context";
-import { getProjectURL } from "../dataloaders/DataLoaderUtil";
-import { getRandomString } from "../utilities/Utilities";
-import { action, autorun, runInAction } from "mobx";
-import type { CategoricalDataType, ColumnName, DataColumn, DataType, LoadedDataColumn } from "../charts/charts";
-import type { VivRoiConfig } from "./components/VivMDVReact";
-import type RangeDimension from "@/datastore/RangeDimension";
-import { useRegionScale } from "./scatter_state";
-import { isArray, notEmpty, parseDelimitedString } from "@/lib/utils";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
+import type RangeDimension from "@/datastore/RangeDimension";
+import { type CategoryFilterColumn, compileCategoryFilter, getCategoryFilterIndices } from "@/lib/categoryFilterUtils";
 import {
     allColumnsLoaded,
-    type FieldSpecs,
-    isColumnLoaded,
     type FieldSpec,
+    type FieldSpecs,
     flattenFields,
+    isColumnLoaded,
 } from "@/lib/columnTypeHelpers";
-import type { SelectionDialogConfig } from "./components/SelectionDialogReact";
-import { compileCategoryFilter, getCategoryFilterIndices, type CategoryFilterColumn } from "@/lib/categoryFilterUtils";
-import { shouldRefreshFilteredIndices } from "./filteredIndicesUtils";
 import {
+    type FilterArrayLike,
     getOwnerVisibleRows,
     isRowFilteredByOtherOwner,
-    type FilterArrayLike,
     type RowScopePredicate,
 } from "@/lib/filterOwnership";
+import { isArray, notEmpty, parseDelimitedString } from "@/lib/utils";
+import type { CategoricalDataType, ColumnName, DataColumn, DataType, LoadedDataColumn } from "../charts/charts";
+import { getProjectURL } from "../dataloaders/DataLoaderUtil";
+import { getRandomString } from "../utilities/Utilities";
 import { useChartManagerContext } from "./chartManagerContext";
+import type { SelectionDialogConfig } from "./components/SelectionDialogReact";
+import type { VivRoiConfig } from "./components/VivMDVReact";
+import { useChart, useDataStore } from "./context";
+import { shouldRefreshFilteredIndices } from "./filteredIndicesUtils";
+import { useRegionScale } from "./scatter_state";
 
 /** Region constraint for `filterPoly` — restricts the polygon filter to rows in a specific region. */
 export type FilterPolyRegionOpts = { regionField: string; regionValue: string };

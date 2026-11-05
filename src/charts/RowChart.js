@@ -1,9 +1,9 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
-import CategoryChart from "./CategoryChart.js";
-import BaseChart from "./BaseChart";
-import { createEl } from "../utilities/Elements.js";
+import { select } from "d3-selection";
 import WordCloud from "wordcloud";
+import { createEl } from "../utilities/Elements.js";
+import BaseChart from "./BaseChart";
+import CategoryChart from "./CategoryChart.js";
 
 class RowChart extends CategoryChart {
     constructor(dataStore, div, config) {

@@ -1,7 +1,7 @@
-import test, { expect } from "@playwright/test";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import test, { expect } from "@playwright/test";
 import { createTemporaryProjectViaSyntheticAnndata, listProjectsViaApi } from "../utils/projectFixtures";
 
 const LEAK_TEST_PREFIX = "intentional-cleanup-failure--synth-anndata";

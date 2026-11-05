@@ -1,13 +1,13 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import LegendCategoricalSvg, {
     getCategoricalLabelMaxWidth,
     LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
     LEGEND_CATEGORICAL_WIDTH,
     legendCategoricalContainerHeight,
 } from "@/react/components/legend/LegendCategoricalSvg";
-import { getContinuousLegendContainerHeight } from "@/react/legend/shared/legendUtils";
 import LegendContinuousSvg, { DEFAULT_CONTINUOUS_LEGEND_WIDTH } from "@/react/components/legend/LegendContinuousSvg";
+import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
+import { getContinuousLegendContainerHeight } from "@/react/legend/shared/legendUtils";
 
 export type ColorLegendProps = {
     spec: ColorLegendSpec;

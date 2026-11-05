@@ -1,8 +1,8 @@
+import { scaleSqrt } from "d3-scale";
 import { getFractionLegendSize } from "@/react/components/legend/FractionLegend";
 import type { FractionLegendSpec } from "@/react/legend/fraction_legend/types";
 import { DEFAULT_CONTINUOUS_LEGEND_WIDTH } from "@/react/legend/shared/legendConstants";
 import { getContinuousLegendContainerHeight } from "@/react/legend/shared/legendUtils";
-import { scaleSqrt } from "d3-scale";
 import { getDotRadius } from "./dotPlotLayout";
 
 export const DOT_PLOT_LEGEND_MARGIN = 8;

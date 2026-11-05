@@ -1,4 +1,10 @@
 import {
+    Close as CloseIcon,
+    Launch as LaunchIcon,
+    Search as SearchIcon,
+    ViewSidebar as ViewSidebarIcon,
+} from "@mui/icons-material";
+import {
     Box,
     Button,
     Dialog,
@@ -13,24 +19,18 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import IconWithTooltip from "@/react/components/IconWithTooltip";
+import { Loader } from "@/react/components/ImportProjectDialog";
+import { useResizeDrawer } from "@/react/hooks";
 import type {
+    ChatDatasourceOption,
     ChatMessage,
     ChatModelOption,
-    ChatDatasourceOption,
-    DatasourceMode,
     ChatProgress,
     ConversationMap,
+    DatasourceMode,
 } from "./ChatAPI";
-import {
-    Close as CloseIcon,
-    Launch as LaunchIcon,
-    Search as SearchIcon,
-    ViewSidebar as ViewSidebarIcon,
-} from "@mui/icons-material";
-import { lazy, Suspense, useMemo, useState, useRef } from "react";
-import IconWithTooltip from "@/react/components/IconWithTooltip";
-import { useResizeDrawer } from "@/react/hooks";
-import { Loader } from "@/react/components/ImportProjectDialog";
 
 const Chatbot = lazy(() => import("./ChatDialogComponent"));
 

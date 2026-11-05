@@ -1,8 +1,8 @@
+import { easeLinear } from "d3-ease";
+import { select } from "d3-selection";
+import { defaultPalette } from "../datastore/DataStore.js";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart";
-import { defaultPalette } from "../datastore/DataStore.js";
-import { select } from "d3-selection";
-import { easeLinear } from "d3-ease";
 
 class MultiBoxPlot extends SVGChart {
     constructor(dataStore, div, config) {

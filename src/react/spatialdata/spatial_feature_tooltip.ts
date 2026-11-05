@@ -1,5 +1,5 @@
-import DOMPurify from "dompurify";
 import type { SpatialFeatureTooltipData } from "@spatialdata/vis";
+import DOMPurify from "dompurify";
 
 export function formatSpatialFeatureTooltipHtml(tooltip: SpatialFeatureTooltipData): string {
     const lines: string[] = [];

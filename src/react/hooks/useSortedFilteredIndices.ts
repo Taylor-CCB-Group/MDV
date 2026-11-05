@@ -1,8 +1,8 @@
+import { autorun } from "mobx";
 import { useEffect, useState } from "react";
-import { useConfig, useSimplerFilteredIndices } from "../hooks";
 import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useDataStore } from "../context";
-import { autorun } from "mobx";
+import { useConfig, useSimplerFilteredIndices } from "../hooks";
 
 /**
  *

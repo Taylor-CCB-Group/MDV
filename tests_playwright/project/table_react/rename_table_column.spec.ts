@@ -1,10 +1,10 @@
 import test, { expect, type Page } from "@playwright/test";
+import { saveCurrentView } from "../../utils/helpers";
 import {
     createTemporaryProjectViaSyntheticAnndata,
     type SyntheticAnndataTemporaryProjectHandle,
     waitForProjectReady,
 } from "../../utils/projectFixtures";
-import { saveCurrentView } from "../../utils/helpers";
 
 const TABLE_CHART_TITLE = "Rename Column Table";
 

@@ -1,8 +1,8 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import * as z from "zod/v4";
 import { ChartConfigSchema } from "../src/charts/schemas/ChartConfigSchema.ts";
 import { DataSourceSchema, DataSourcesArraySchema } from "../src/charts/schemas/DataSourceSchema.ts";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 // Function to generate and save schema
 function generateAndSaveSchema(schema: z.ZodTypeAny, filename: string, outputDir = "./schemas") {

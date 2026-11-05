@@ -1,10 +1,10 @@
+import { act, renderHook } from "@testing-library/react";
+import type { OnBeforeEditCellEventArgs, OnCellChangeEventArgs } from "slickgrid-react";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
-import useEditCell from "@/react/hooks/useEditCell";
 import type { FeedbackAlert } from "@/react/components/FeedbackAlertComponent";
-import { renderHook, act } from "@testing-library/react";
-import { describe, test, expect, beforeEach, vi } from "vitest";
-import type { OnBeforeEditCellEventArgs, OnCellChangeEventArgs } from "slickgrid-react";
+import useEditCell from "@/react/hooks/useEditCell";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 describe("useEditCell", () => {

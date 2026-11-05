@@ -1,4 +1,3 @@
-import { useDataSources } from "@/react/hooks";
 import {
     Button,
     Checkbox,
@@ -11,6 +10,7 @@ import {
     TextField,
 } from "@mui/material";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { useDataSources } from "@/react/hooks";
 
 const AddViewDialogComponent = (props: { open: boolean; onClose: () => void }) => {
     const [viewName, setViewName] = useState("");

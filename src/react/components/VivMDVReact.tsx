@@ -1,30 +1,30 @@
-import BaseChart from "../../charts/BaseChart";
-import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
+import BaseChart from "../../charts/BaseChart";
 import {
+    applyDefaultChannelState,
+    createVivStores,
     type ROI,
+    useViewerStore,
+    useViewerStoreApi,
     type VivConfig,
     type VivContextType,
     VivProvider,
-    useViewerStore,
-    useViewerStoreApi,
-    applyDefaultChannelState,
-    createVivStores,
 } from "./avivatorish/state";
+import { BaseReactChart } from "./BaseReactChart";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
-import { useEffect } from "react";
-import type { ColumnName } from "../../charts/charts";
-import { useImage } from "./avivatorish/hooks";
-import { VivScatter } from "./VivScatterComponent";
-import { useImgUrl } from "../hooks";
-import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
 import { observer } from "mobx-react-lite";
-import { useChart } from "../context";
+import { useEffect } from "react";
 import type DataStore from "@/datastore/DataStore";
-import { g, toArray } from "@/lib/utils";
-import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
 import { allNumeric } from "@/lib/columnTypeHelpers";
+import { g, toArray } from "@/lib/utils";
+import type { ColumnName } from "../../charts/charts";
+import { useChart } from "../context";
+import { useImgUrl } from "../hooks";
+import { type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
+import { useImage } from "./avivatorish/hooks";
+import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
 import { getSharedScatterSettings } from "./sharedScatterSettings";
+import { VivScatter } from "./VivScatterComponent";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...

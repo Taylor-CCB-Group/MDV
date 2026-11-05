@@ -8,13 +8,15 @@ import "./DensityDimension.js";
 import "./ValueSetDimension";
 import "./SortableDimension.js";
 import "./DeepToolsDimension.js";
-import { scaleLinear, scaleSymlog } from "d3-scale";
 import { quantileSorted } from "d3-array";
-import { makeObservable, observable, action } from "mobx";
-import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
-import { isDatatypeNumeric } from "@/lib/utils";
+import { scaleLinear, scaleSymlog } from "d3-scale";
+import { action, makeObservable, observable } from "mobx";
 import { formatDateDays, isDateColumn } from "@/lib/dateFormat";
 import { getMultitextCapacity, getMultitextDelimiter, getMultitextJoinDelimiter } from "@/lib/multitext";
+import { isDatatypeNumeric } from "@/lib/utils";
+import { logValidationError } from "@/lib/validationLogging";
+import { DataSourceSchema } from "../charts/schemas/DataSourceSchema";
+import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
 import {
     findColumnMetadataIndex,
     isSoftDeletedColumn,
@@ -23,8 +25,6 @@ import {
     toColumnMetadata,
     updateColumnMetadata,
 } from "./columnMetadataUtils";
-import { DataSourceSchema } from "../charts/schemas/DataSourceSchema";
-import { logValidationError } from "@/lib/validationLogging";
 
 class DataStore {
     /**
@@ -2112,4 +2112,4 @@ const defaultPalette = [
 const defaultIPalette = ["#3288bd", "#66c2a5", "#abdda4", "#e6f598", "#fee08b", "#fdae61", "#f46d43", "#d53e4f"];
 
 export default DataStore;
-export { hexToRGB, defaultPalette, RGBToHex };
+export { defaultPalette, hexToRGB, RGBToHex };

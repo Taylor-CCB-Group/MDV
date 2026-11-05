@@ -1,5 +1,5 @@
-import SVGChart from "./SVGChart.js";
 import { action } from "mobx";
+import SVGChart from "./SVGChart.js";
 
 class CategoryChart extends SVGChart {
     constructor(dataStore, div, config, axisTypes) {

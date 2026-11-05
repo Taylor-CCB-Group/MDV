@@ -1,8 +1,8 @@
-import DebugErrorComponent, { type ErrorMetadata } from "@/charts/dialogs/DebugErrorComponent";
-import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 import { Error as ErrorIcon } from "@mui/icons-material";
 import { Alert, Button, Container, Paper } from "@mui/material";
 import { useState } from "react";
+import DebugErrorComponent, { type ErrorMetadata } from "@/charts/dialogs/DebugErrorComponent";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
 
 export type ErrorComponentType = {
     error: {

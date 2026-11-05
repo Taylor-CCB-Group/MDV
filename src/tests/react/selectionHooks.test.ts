@@ -1,5 +1,5 @@
-import { getHighlightModifierState, getNextHighlightedRows } from "@/react/selectionHooks";
 import { describe, expect, test } from "vitest";
+import { getHighlightModifierState, getNextHighlightedRows } from "@/react/selectionHooks";
 
 describe("selectionHooks highlight helpers", () => {
     test("replaces highlights by default", () => {

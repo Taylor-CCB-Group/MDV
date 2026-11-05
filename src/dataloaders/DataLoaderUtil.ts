@@ -1,10 +1,9 @@
-import { getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader } from "./DataLoaders";
-import type { DataSource, DataColumn, DataType, LoadedDataColumn } from "@/charts/charts";
-import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { createElement } from "react";
-import { createMdvPortal } from "@/react/react_utils";
+import type { DataColumn, DataSource, DataType, LoadedDataColumn } from "@/charts/charts";
+import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
-import { decompressData } from "./DataLoaders";
+import { createMdvPortal } from "@/react/react_utils";
+import { decompressData, getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader } from "./DataLoaders";
 
 let projectRoot = "";
 /**

@@ -1,10 +1,10 @@
-import type BaseChart from "@/charts/BaseChart";
-import type { BaseDialog } from "@/utilities/Dialog";
-import { observer } from "mobx-react-lite";
-import { createContext, type ReactElement, useContext } from "react";
-import type { createMdvPortal } from "./react_utils";
 import createCache, { type EmotionCache } from "@emotion/cache";
 import { CacheProvider } from "@emotion/react";
+import { observer } from "mobx-react-lite";
+import { createContext, type ReactElement, useContext } from "react";
+import type BaseChart from "@/charts/BaseChart";
+import type { BaseDialog } from "@/utilities/Dialog";
+import type { createMdvPortal } from "./react_utils";
 
 /** All charts and dialogs have this as an `observable` property that can be passed to
  * {@link createMdvPortal} to allow access to the container they should render things like

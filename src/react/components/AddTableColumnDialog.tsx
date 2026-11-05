@@ -1,5 +1,3 @@
-import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
-import type { DataType } from "@/charts/charts";
 import {
     Autocomplete,
     Button,
@@ -12,6 +10,8 @@ import {
     Typography,
 } from "@mui/material";
 import { useEffect, useState } from "react";
+import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
+import type { DataType } from "@/charts/charts";
 
 type CloneableColumn = {
     field: string;

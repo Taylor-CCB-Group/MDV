@@ -1,5 +1,5 @@
-import { useMemo } from "react";
 import { makeAutoObservable } from "mobx";
+import { useMemo } from "react";
 import type { AnyGuiSpec, GuiSpec } from "../../charts/charts";
 
 type StableGuiSpec = AnyGuiSpec & { _stableId?: string };

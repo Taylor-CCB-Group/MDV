@@ -1,4 +1,4 @@
-import { parse, type ParseResult } from "papaparse";
+import { type ParseResult, parse } from "papaparse";
 
 type ColumnType = "float" | "integer" | "boolean" | "date" | "string" | "unknown";
 type DataValue = string | number | boolean | null;

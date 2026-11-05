@@ -1,25 +1,25 @@
-import { AppBar, Box, Chip, Divider, Toolbar, Typography } from "@mui/material";
 import {
-    Home as HomeIcon,
-    Save as SaveIcon,
-    SaveAs as SaveAsIcon,
     Add as AddIcon,
-    Remove as RemoveIcon,
     CloudUpload as CloudUploadIcon,
+    Home as HomeIcon,
+    Remove as RemoveIcon,
+    SaveAs as SaveAsIcon,
+    Save as SaveIcon,
 } from "@mui/icons-material";
+import { AppBar, Box, Chip, Divider, Toolbar, Typography } from "@mui/material";
+import { LockIcon, LockOpenIcon } from "lucide-react";
+import { observer } from "mobx-react-lite";
 import ToggleThemeWrapper from "@/charts/dialogs/ToggleTheme";
+import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
+import { useCurrentProject, useProject } from "@/modules/ProjectContext";
+import { buildDashboardUrl, getApiRootFromDir } from "@/utils/mdvRouting";
+import { useChartManager } from "../hooks";
+import ChatButtons from "./ChatButtons";
+import CustomTooltip from "./CustomTooltip";
+import DebugButton from "./DebugButton";
 import IconWithTooltip from "./IconWithTooltip";
 import ViewSelectorWrapper from "./ViewSelectorComponent";
 import ViewThumbnailComponent from "./ViewThumbnailComponent";
-import { useCurrentProject, useProject } from "@/modules/ProjectContext";
-import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
-import ChatButtons from "./ChatButtons";
-import CustomTooltip from "./CustomTooltip";
-import { LockIcon, LockOpenIcon } from "lucide-react";
-import { observer } from "mobx-react-lite";
-import { useChartManager } from "../hooks";
-import DebugButton from "./DebugButton";
-import { buildDashboardUrl, getApiRootFromDir } from "@/utils/mdvRouting";
 
 const MenuBarComponent = observer(() => {
     const { viewManager, config } = useChartManager();

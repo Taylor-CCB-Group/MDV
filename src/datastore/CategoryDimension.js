@@ -1,5 +1,5 @@
+import { getMultitextCapacity, getMultitextValueItems, MULTITEXT_EMPTY_INDEX } from "@/lib/multitext";
 import Dimension from "./Dimension.js";
-import { MULTITEXT_EMPTY_INDEX, getMultitextCapacity, getMultitextValueItems } from "@/lib/multitext";
 
 function rowHasAnyMultitextItem(data, start, capacity, valueItemsByIndex, selectedItems) {
     for (let offset = 0; offset < capacity; offset++) {

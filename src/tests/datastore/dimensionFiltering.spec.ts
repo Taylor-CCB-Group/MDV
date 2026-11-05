@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import CategoryDimension from "@/datastore/CategoryDimension";
 import type DataStore from "@/datastore/DataStore";
 import type Dimension from "@/datastore/Dimension";
-import CategoryDimension from "@/datastore/CategoryDimension";
 import RangeDimension from "@/datastore/RangeDimension";
 import {
     assertConsistent,

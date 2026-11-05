@@ -1,19 +1,17 @@
-import { useState, useEffect } from "react";
-import { fromBlob, fromUrl } from "geotiff";
-import { Matrix4 } from "@math.gl/core";
-
 import {
+    AdditiveColormap3DExtensions,
+    ColorPalette3DExtensions,
+    getChannelStats,
+    loadMultiTiff,
     loadOmeTiff,
     loadOmeZarr,
-    loadMultiTiff,
-    getChannelStats,
     RENDERING_MODES,
-    ColorPalette3DExtensions,
-    AdditiveColormap3DExtensions,
 } from "@hms-dbmi/viv";
-
-import { GLOBAL_SLIDER_DIMENSION_FIELDS } from "./constants";
+import { Matrix4 } from "@math.gl/core";
+import { fromBlob, fromUrl } from "geotiff";
+import { useEffect, useState } from "react";
 import { isArray } from "@/lib/utils";
+import { GLOBAL_SLIDER_DIMENSION_FIELDS } from "./constants";
 import type { OME_TIFF, PixelSource } from "./state";
 
 // Import and register JPEG2000 decoder

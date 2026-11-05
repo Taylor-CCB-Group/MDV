@@ -1,9 +1,9 @@
 import { computed, makeObservable, observable, runInAction } from "mobx";
+import type DataStore from "@/datastore/DataStore";
+import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import type ChartManager from "../charts/ChartManager";
 import type { ColumnName, DataColumn, DataType, FieldName } from "../charts/charts";
-import type DataStore from "@/datastore/DataStore";
 import type { loadColumnData } from "../datastore/decorateColumnMethod";
-import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 // zod?
 
 export type ChartLink = {

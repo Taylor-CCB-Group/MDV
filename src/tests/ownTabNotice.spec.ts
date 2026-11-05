@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { needsOwnTab, showOwnTabNotice, type FrameState } from "@/utils/ownTabNotice";
+import { type FrameState, needsOwnTab, showOwnTabNotice } from "@/utils/ownTabNotice";
 
 function frameState(framed: boolean, crossOriginIsolated: boolean): FrameState {
     const state: FrameState = { top: null, crossOriginIsolated };

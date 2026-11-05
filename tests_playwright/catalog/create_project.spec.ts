@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { isWorktreeFrontendForPlaywright } from "../utils/helpers";
 import { gotoPath, mockApiRoot, mockExtensionConfig, mockProjects } from "../utils/routes";
 

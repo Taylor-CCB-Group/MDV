@@ -1,5 +1,5 @@
-import type ChartManager from "@/charts/ChartManager";
 import { createContext, type PropsWithChildren, useContext } from "react";
+import type ChartManager from "@/charts/ChartManager";
 
 const ChartManagerContext = createContext<ChartManager | null>(null);
 

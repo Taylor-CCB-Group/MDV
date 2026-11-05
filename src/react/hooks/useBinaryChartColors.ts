@@ -1,6 +1,6 @@
+import { useMemo, useRef } from "react";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
-import { useRef, useMemo } from "react";
 import { useChartColors } from "./useResolvedChartColor";
 
 export function useBinaryChartColors<T extends BaseConfig>(chart: BaseChart<T>): [Uint8Array, number] {

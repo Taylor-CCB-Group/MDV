@@ -1,5 +1,4 @@
 import test, { expect } from "@playwright/test";
-import { createSharedSyntheticAnndataSuite, type SharedSyntheticAnndataSuiteHandle } from "../../utils/projectFixtures";
 import {
     addChartViaUi,
     getAvailableAddableChartTypes,
@@ -7,6 +6,7 @@ import {
     waitForChartByTitle,
     waitForViewUnsavedState,
 } from "../../utils/helpers";
+import { createSharedSyntheticAnndataSuite, type SharedSyntheticAnndataSuiteHandle } from "../../utils/projectFixtures";
 
 test.describe("Chart Creation", () => {
     test.describe.configure({ mode: "serial" });

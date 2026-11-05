@@ -1,9 +1,9 @@
-import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { useCallback, useRef } from "react";
 import type { OnBeforeEditCellEventArgs, OnCellChangeEventArgs, SlickgridReactInstance } from "slickgrid-react";
-import { setCellValueFromString } from "../utils/valueReplacementUtil";
+import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
+import { setCellValueFromString } from "../utils/valueReplacementUtil";
 
 /**
  *

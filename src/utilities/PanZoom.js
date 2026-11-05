@@ -1,4 +1,5 @@
 import { makeDraggable } from "./Elements";
+
 class ImagePanZoom {
     constructor(container, image, config = {}) {
         this.container = container;

@@ -3,11 +3,11 @@ import "./wdyr";
 import "./all_css";
 import { createElement, type TransitionEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { getProject } from "./ProjectContext";
-import { getProjectBootstrapContext, loadProjectRuntime, type LoadedProjectRuntime } from "./projectRuntime";
-import type { DataSource } from "@/charts/charts";
 import type ChartManager from "@/charts/ChartManager";
+import type { DataSource } from "@/charts/charts";
 import { offerOwnTabIfFramed } from "@/utils/ownTabNotice";
+import { getProject } from "./ProjectContext";
+import { getProjectBootstrapContext, type LoadedProjectRuntime, loadProjectRuntime } from "./projectRuntime";
 
 type CreateMdvPortalFn = typeof import("@/react/react_utils").createMdvPortal;
 type ProjectStateHandlerWrapperType = typeof import("@/react/ProjectStateHandler").default;

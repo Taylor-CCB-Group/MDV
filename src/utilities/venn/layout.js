@@ -1,4 +1,4 @@
-import { intersectionArea, circleOverlap, circleCircleIntersection, distance } from "./circleintersection.js";
+import { circleCircleIntersection, circleOverlap, distance, intersectionArea } from "./circleintersection.js";
 
 function zeros(x) {
     const r = new Array(x);
@@ -1062,4 +1062,4 @@ function scaleSolution(solution, width, height, padding) {
     return scaled;
 }
 
-export { venn, lossFunction, normalizeSolution, scaleSolution, nelderMead };
+export { lossFunction, nelderMead, normalizeSolution, scaleSolution, venn };

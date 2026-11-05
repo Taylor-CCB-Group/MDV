@@ -1,9 +1,9 @@
-import { SlickGrid, TextEditor, Overlays } from "../table/SlickGrid.js";
-import { RowSelectionModel } from "../table/RowSelectionModel.js";
 import { DataModel } from "../table/DataModel.js";
-import BaseChart from "./BaseChart";
-import { createEl } from "../utilities/Elements.js";
+import { RowSelectionModel } from "../table/RowSelectionModel.js";
+import { Overlays, SlickGrid, TextEditor } from "../table/SlickGrid.js";
 import { BaseDialog } from "../utilities/Dialog.js";
+import { createEl } from "../utilities/Elements.js";
+import BaseChart from "./BaseChart";
 
 class TableChart extends BaseChart {
     constructor(dataStore, div, config) {

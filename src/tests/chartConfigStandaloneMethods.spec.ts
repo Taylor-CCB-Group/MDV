@@ -1,6 +1,6 @@
-import { describe, test, expect, vi, beforeEach, beforeAll } from "vitest";
+import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { RowsAsColsQuery } from "@/links/link_utils";
-import { initialiseChartConfig, deserialiseParam } from "../charts/chartConfigUtils";
+import { deserialiseParam, initialiseChartConfig } from "../charts/chartConfigUtils";
 import type DataStore from "../datastore/DataStore";
 
 beforeAll(() => {

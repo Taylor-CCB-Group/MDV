@@ -1,14 +1,14 @@
-import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
-import { BaseReactChart } from "./BaseReactChart";
-import type DataStore from "@/datastore/DataStore";
-import TableChartReactComponent from "./TableChartReactComponent";
-import { g } from "@/lib/utils";
 import { action } from "mobx";
 import type { SlickgridReactInstance } from "slickgrid-react";
+import type DataStore from "@/datastore/DataStore";
 import { getTableExportBlob } from "@/datastore/dataExportUtils";
-import { createEl } from "@/utilities/ElementsTyped";
+import { type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
+import { g } from "@/lib/utils";
 import { DataModel } from "@/table/DataModel";
-import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
+import { createEl } from "@/utilities/ElementsTyped";
+import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
+import { BaseReactChart } from "./BaseReactChart";
+import TableChartReactComponent from "./TableChartReactComponent";
 
 const TableChartComponent = () => {
     return <TableChartReactComponent />;

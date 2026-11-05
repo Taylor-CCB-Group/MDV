@@ -1,18 +1,17 @@
-import BaseChart, { type BaseConfig } from "../../BaseChart";
-import { BaseReactChart } from "../../../react/components/BaseReactChart";
-import type DataStore from "../../../datastore/DataStore";
-import IGVBrowserComponent from "./IGVBrowserComponent";
-import { g } from "../../../lib/utils";
 import { action, makeObservable, observable, runInAction } from "mobx";
-import { type IGVBaseFeature, buildBaseFeatures } from "./igvUtils";
-
+import type DataStore from "../../../datastore/DataStore";
+import { g } from "../../../lib/utils";
+import { BaseReactChart } from "../../../react/components/BaseReactChart";
+import BaseChart, { type BaseConfig } from "../../BaseChart";
 import {
     applyViewMargins,
-    locationFromFieldValues,
     type GenomeLocation,
-    type GenomeViewMargins,
     type GenomeMetadata,
+    type GenomeViewMargins,
+    locationFromFieldValues,
 } from "../genomicLocationUtils";
+import IGVBrowserComponent from "./IGVBrowserComponent";
+import { buildBaseFeatures, type IGVBaseFeature } from "./igvUtils";
 
 interface IGVBrowserConfig extends BaseConfig {
     view_margins?: GenomeViewMargins;
@@ -495,6 +494,6 @@ BaseChart.types["igv_browser"] = {
     },
 };
 
-export { BASE_TRACK_ID };
 export type { IGVBrowserConfig };
+export { BASE_TRACK_ID };
 export default IGVBrowser;

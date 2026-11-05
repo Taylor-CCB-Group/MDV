@@ -1,5 +1,3 @@
-import { resolveAutoHistogramYScale } from "@/lib/utils";
-import { isArray } from "@/lib/utils";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 // some of this is quite bloated - could use dynamic imports for some of the more complex components
@@ -15,26 +13,27 @@ import {
     Select,
     Slider,
 } from "@mui/material";
+import { MAX_CHANNELS } from "@vivjs/constants";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { shallow } from "zustand/shallow";
+import { isArray, resolveAutoHistogramYScale } from "@/lib/utils";
 import { useTheme } from "../hooks";
-import { PopoverPicker } from "./ColorPicker";
-import HistogramWidget, { type HistogramLayer, type HistogramScaleType } from "./HistogramWidget";
+import { queryRasterHistogram, type RasterHistogram } from "../utils/rasterHistogram";
+import { COLOR_PALLETE } from "./avivatorish/constants";
 import {
-    type VivContextType,
-    VivProvider,
     useChannelsStore,
     useChannelsStoreApi,
     useLoader,
     useMetadata,
     useViewerStore,
     useViewerStoreApi,
+    type VivContextType,
+    VivProvider,
 } from "./avivatorish/state";
 import { getSingleSelectionStats } from "./avivatorish/utils";
-import { COLOR_PALLETE } from "./avivatorish/constants";
-import { MAX_CHANNELS } from "@vivjs/constants";
+import { PopoverPicker } from "./ColorPicker";
+import HistogramWidget, { type HistogramLayer, type HistogramScaleType } from "./HistogramWidget";
 import { useSpatialImagePanelContext } from "./spatialLayers/ImageLayerPanel";
-import { type RasterHistogram, queryRasterHistogram } from "../utils/rasterHistogram";
 
 const DEFAULT_BRIGHTNESS_CONTRAST = 0.5;
 

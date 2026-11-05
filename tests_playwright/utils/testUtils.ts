@@ -1,6 +1,6 @@
+import path from "node:path";
 import { expect, type Page } from "@playwright/test";
 import { gotoPath, mockApiRoot } from "./routes";
-import path from "node:path";
 
 // Legacy helper kept only for older catalog-driven setup flows.
 // New backend-backed project tests should use ../utils/projectFixtures instead.

@@ -1,10 +1,10 @@
-import { createElement, type ComponentType } from "react";
+import { type ComponentType, createElement } from "react";
 import type { Root } from "react-dom/client";
-import { createMdvPortal } from "@/react/react_utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
-import { createEl } from "@/utilities/ElementsTyped";
+import { createMdvPortal } from "@/react/react_utils";
 import { makeDraggable, makeResizable } from "@/utilities/Elements.js";
+import { createEl } from "@/utilities/ElementsTyped";
 
 export type LegendWrapperPosition = {
     left: string | number;

@@ -1,6 +1,6 @@
 import { select } from "d3";
-import { venn, lossFunction, normalizeSolution, scaleSolution, nelderMead } from "./layout.js";
-import { intersectionArea, distance, getCenter } from "./circleintersection.js";
+import { distance, getCenter, intersectionArea } from "./circleintersection.js";
+import { lossFunction, nelderMead, normalizeSolution, scaleSolution, venn } from "./layout.js";
 
 /*global console:true*/
 

@@ -1,5 +1,5 @@
-import { describe, expect, test, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { describe, expect, test, vi } from "vitest";
 import ColorLegend from "@/react/components/legend/ColorLegend";
 
 describe("ColorLegend", () => {

@@ -1,8 +1,8 @@
+import { Box, Button, Paper, Typography } from "@mui/material";
 import type React from "react";
 import { useEffect } from "react";
-import { Box, Button, Paper, Typography } from "@mui/material";
-import mdvLogo from "./assets/mdv_logo.png";
 import { buildDashboardUrl } from "@/utils/mdvRouting";
+import mdvLogo from "./assets/mdv_logo.png";
 
 const Login: React.FC = () => {
     useEffect(() => {

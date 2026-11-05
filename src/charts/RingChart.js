@@ -1,8 +1,8 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
-import CategoryChart from "./CategoryChart.js";
+import { select } from "d3-selection";
+import { arc, pie } from "d3-shape";
 import BaseChart from "./BaseChart";
-import { pie, arc } from "d3-shape";
+import CategoryChart from "./CategoryChart.js";
 
 class RingChart extends CategoryChart {
     constructor(dataStore, div, config) {

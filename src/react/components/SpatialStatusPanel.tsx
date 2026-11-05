@@ -1,8 +1,8 @@
-import { formatRenderReport } from "@/react/spatialdata/render_report";
-import { webgpuTraceReport } from "@/react/spatialdata/webgpu_trace";
 import { Button } from "@mui/material";
 import { observer } from "mobx-react-lite";
 import { type ReactNode, useState } from "react";
+import { formatRenderReport } from "@/react/spatialdata/render_report";
+import { webgpuTraceReport } from "@/react/spatialdata/webgpu_trace";
 import { RasterIssueList } from "./RasterIssues";
 import type { SpatialDataMdvReact } from "./SpatialDataMDVReact";
 

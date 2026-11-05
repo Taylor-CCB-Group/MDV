@@ -1,8 +1,8 @@
-import useSortedFilteredIndices from "@/react/hooks/useSortedFilteredIndices";
-import { renderHook, waitFor, act } from "@testing-library/react";
-import { describe, test, expect, beforeEach, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { observable, runInAction } from "mobx";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { TableChartReactConfig } from "@/react/components/TableChartReactWrapper";
+import useSortedFilteredIndices from "@/react/hooks/useSortedFilteredIndices";
 
 // Mock the context hooks
 vi.mock("@/react/context", () => ({

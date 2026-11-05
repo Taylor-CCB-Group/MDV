@@ -1,4 +1,4 @@
-import { createEl, addElProps, getElDim } from "./Elements";
+import { addElProps, createEl, getElDim } from "./Elements";
 
 class MultiSelectDropdown {
     constructor(div, options, config) {

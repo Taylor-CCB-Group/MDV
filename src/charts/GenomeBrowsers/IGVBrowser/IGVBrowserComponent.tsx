@@ -1,11 +1,11 @@
-import { observer } from "mobx-react-lite";
-import { useChart } from "@/react/context";
-import { useEffect, useRef, useState } from "react";
-import type IGVBrowser from "./IGVBrowser";
-import { BASE_TRACK_ID } from "./IGVBrowser";
 import type { Browser } from "igv";
+import { observer } from "mobx-react-lite";
+import { useEffect, useRef, useState } from "react";
+import { useChart } from "@/react/context";
 import { useFieldSpec } from "@/react/hooks";
 import { useGenomicInfo } from "../genomicLocationUtils";
+import type IGVBrowser from "./IGVBrowser";
+import { BASE_TRACK_ID } from "./IGVBrowser";
 
 const IGV_DOCUMENT_EVENTS = new Set(["mousemove", "mouseup", "mouseleave", "mouseexit", "keyup"]);
 

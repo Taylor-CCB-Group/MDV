@@ -1,5 +1,5 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDataStore } from "@/react/context";
-import { useEffect, useRef, useMemo, useState } from "react";
 import { getAvailableCategorySelectionValues, shouldRefreshCategorySelectionValues } from "./categorySelectionUtils";
 
 let nextCategorySelectionListenerId = 0;

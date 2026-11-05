@@ -1,3 +1,6 @@
+import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -14,9 +17,6 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import type { RenderStackSpatialElementType } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { observer } from "mobx-react-lite";
@@ -26,34 +26,34 @@ import { ErrorBoundary } from "react-error-boundary";
 import {
     DECK_OVERLAY_IDS,
     DECK_OVERLAY_LABELS,
+    type DeckOverlayId,
     deckHostLayerId,
     deckIdFromHostLayerId,
-    type DeckOverlayId,
 } from "@/react/spatialdata/host_overlay_ids";
-import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import {
     insertHostRenderStackEntry,
     insertSpatialRenderStackEntry,
     isRemovableRenderStackEntry,
     removeRenderStackEntry,
-    reorderRenderStackEntries,
     renderStackEntryIds,
+    reorderRenderStackEntries,
     seedRenderStackFromSpatialData,
     useRenderStackEntry,
     useRenderStackMutation,
 } from "@/react/spatialdata/render_stack_control";
 import { defaultPropsForSpatialElement, listAvailableSpatialEntries } from "@/react/spatialdata/render_stack_defaults";
+import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { useChartSpatialData } from "@/react/spatialdata/shared_spatial_data";
 import { useElementTableAssociation } from "@/react/spatialdata/table_association";
 import { useChart, useDataStore } from "../context";
 import { useConfig, useDataSources } from "../hooks";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
 import ImageLayerPanel from "./spatialLayers/ImageLayerPanel";
 import LabelsLayerPanel from "./spatialLayers/LabelsLayerPanel";
 import PointsLayerPanel from "./spatialLayers/PointsLayerPanel";
 import ShapesLayerPanel from "./spatialLayers/ShapesLayerPanel";
-import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 type InsertOption =
     | { kind: "spatial"; type: RenderStackSpatialElementType; elementKey: string; label: string }

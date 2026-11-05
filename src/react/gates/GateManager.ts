@@ -1,9 +1,9 @@
-import type DataStore from "@/datastore/DataStore";
-import type { Gate } from "./types";
 import { action, computed, makeObservable, observable } from "mobx";
 import type { LoadedDataColumn } from "@/charts/charts";
-import { extractCoords, isPointInPolygon } from "./gateUtils";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
+import type DataStore from "@/datastore/DataStore";
+import { extractCoords, isPointInPolygon } from "./gateUtils";
+import type { Gate } from "./types";
 
 const GATES_COLUMN_NAME = "__gates__";
 const GATE_NONE_VALUE = "N/A";

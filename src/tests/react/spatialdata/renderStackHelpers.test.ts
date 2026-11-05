@@ -25,18 +25,18 @@ vi.mock("@/react/hooks", () => ({
     useConfig: vi.fn(),
 }));
 
+import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 import {
     createRenderStackLayerInputsCache,
     resolveCachedHostDeckLayers,
     syncRenderStackLayerInputs,
 } from "@/react/spatialdata/render_stack_adapter";
-import { createHostOnlyRenderStack, normalizeRenderStack } from "@/react/spatialdata/render_stack_defaults";
 import {
     patchRenderStackEntry,
     removeRenderStackEntry,
     seedRenderStackFromSpatialData,
 } from "@/react/spatialdata/render_stack_control";
-import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
+import { createHostOnlyRenderStack, normalizeRenderStack } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackSpatialRevision, touchRenderStackEntry } from "@/react/spatialdata/render_stack_observe";
 
 type SpatialEntry = Extract<RenderStackEntry, { kind: "spatial" }>;

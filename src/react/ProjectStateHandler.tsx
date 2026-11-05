@@ -1,8 +1,8 @@
-import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
-import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
-import { getPostData } from "@/dataloaders/DataLoaderUtil";
 import { useCallback, useEffect, useState } from "react";
+import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
+import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import { getPostData } from "@/dataloaders/DataLoaderUtil";
 import { useChartManager } from "./hooks";
 
 export type ProjectStateHandlerType = {

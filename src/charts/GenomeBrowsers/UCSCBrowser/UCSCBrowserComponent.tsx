@@ -1,17 +1,19 @@
+import { runInAction } from "mobx";
 import { observer } from "mobx-react-lite";
+import { useEffect, useMemo, useState } from "react";
+import { useProject } from "@/modules/ProjectContext";
 import { useChart } from "@/react/context";
-import { useEffect, useState, useMemo } from "react";
-import { useDebouncedChartSize } from "@/react/hooks";
+import { useDebouncedChartSize, useFieldSpecs } from "@/react/hooks";
+import { useHighlightedIndex } from "@/react/selectionHooks";
+import { buildApiUrl } from "@/utils/mdvRouting";
+import {
+    applyViewMargins,
+    type GenomeLocation,
+    locationFromFieldValues,
+    useGenomicInfo,
+} from "../genomicLocationUtils";
 import type UCSCBrowser from "./UCSCBrowser";
 import type { UCSCBrowserConfig } from "./UCSCBrowser";
-import { useFieldSpecs } from "@/react/hooks";
-import { useHighlightedIndex } from "@/react/selectionHooks";
-import { locationFromFieldValues } from "../genomicLocationUtils";
-import { useGenomicInfo } from "../genomicLocationUtils";
-import { type GenomeLocation, applyViewMargins } from "../genomicLocationUtils";
-import { runInAction } from "mobx";
-import { useProject } from "@/modules/ProjectContext";
-import { buildApiUrl } from "@/utils/mdvRouting";
 
 const UCSCBrowserComponent = observer(() => {
     const chart = useChart() as UCSCBrowser;

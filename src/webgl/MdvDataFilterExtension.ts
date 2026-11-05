@@ -1,7 +1,7 @@
 import type { Layer } from "@deck.gl/core";
 import { DataFilterExtension, type DataFilterExtensionProps } from "@deck.gl/extensions";
 import type { ShaderModule, ShaderPlugin } from "@luma.gl/shadertools";
-import { type WGSLLayerExtension, editWGSL, isWebGPULayer } from "./wgslLayerExtension";
+import { editWGSL, isWebGPULayer, type WGSLLayerExtension } from "./wgslLayerExtension";
 
 /**
  * WGSL twin of the `dataFilter` uniform block from `@deck.gl/extensions`. The field

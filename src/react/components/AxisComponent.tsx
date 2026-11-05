@@ -1,11 +1,11 @@
-import { observer } from "mobx-react-lite";
-import type { AxisConfig, ScatterPlotConfig2D, ScatterPlotConfig3D } from "../scatter_state";
-import type { DataColumn } from "@/charts/charts";
-import { useChartSize, useParamColumns } from "../hooks";
-import { useLayoutEffect, useMemo, useState, type PropsWithChildren } from "react";
 import * as Axis from "@visx/axis";
 import * as Scale from "@visx/scale";
+import { observer } from "mobx-react-lite";
+import { type PropsWithChildren, useLayoutEffect, useMemo, useState } from "react";
+import type { DataColumn } from "@/charts/charts";
 import { dateTickFormat, isDateColumn } from "@/lib/dateFormat";
+import { useChartSize, useParamColumns } from "../hooks";
+import type { AxisConfig, ScatterPlotConfig2D, ScatterPlotConfig3D } from "../scatter_state";
 
 type AxisComponentProps = {
     config: ScatterPlotConfig2D | ScatterPlotConfig3D;

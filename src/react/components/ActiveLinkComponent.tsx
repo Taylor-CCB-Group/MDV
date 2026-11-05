@@ -1,11 +1,11 @@
-import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
-import { observer } from "mobx-react-lite";
-import { useRowsAsColumnsLinks } from "../chartLinkHooks";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { isArray } from "@/lib/utils";
-import { RowsAsColsQuery } from "@/links/link_utils";
 import { Button, TextField } from "@mui/material";
 import { action } from "mobx";
+import { observer } from "mobx-react-lite";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
+import { isArray } from "@/lib/utils";
+import { RowsAsColsQuery } from "@/links/link_utils";
+import { useRowsAsColumnsLinks } from "../chartLinkHooks";
 import TabHeader from "./TabHeader";
 
 type LocalProps<T extends CTypes, M extends boolean> = ColumnSelectionProps<T, M> & {

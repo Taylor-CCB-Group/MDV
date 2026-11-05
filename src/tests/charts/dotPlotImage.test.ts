@@ -1,5 +1,5 @@
-import { buildChartSvg } from "@/react/components/dotplot/dotPlotImage";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildChartSvg } from "@/react/components/dotplot/dotPlotImage";
 
 /** jsdom has no layout, so give elements a box by their `data-box` attribute. */
 function mockBoxes() {

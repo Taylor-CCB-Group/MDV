@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import TextBoxMarkdownRenderer from "@/react/components/textbox/TextBoxMarkdownRenderer";
 import { resetMermaidRuntimeForTests } from "@/react/components/textbox/mermaidUtils";
+import TextBoxMarkdownRenderer from "@/react/components/textbox/TextBoxMarkdownRenderer";
 
 const mermaidMocks = vi.hoisted(() => ({
     initialize: vi.fn(),

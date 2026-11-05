@@ -1,5 +1,5 @@
-import regl from "regl";
 import * as glMatrix from "gl-matrix";
+import regl from "regl";
 import { createEl, makeDraggable } from "../utilities/Elements.js";
 import { Camera } from "./Camera.js";
 

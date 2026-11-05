@@ -3,7 +3,7 @@ import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
 import { g } from "@/lib/utils";
 import { browserHasWebGPU, type DeckBackend, defaultDeckBackend } from "@/react/spatialdata/deck_backend";
 import { getDensitySettings } from "../contour_state";
-import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
+import { type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
 
 type SharedScatterSettingsOptions<C extends ScatterPlotConfig> = {
     chart?: BaseChart<C>;

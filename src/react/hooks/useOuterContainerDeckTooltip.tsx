@@ -1,5 +1,5 @@
 import type { PickingInfo } from "@deck.gl/core";
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import { type RefObject, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOuterContainer } from "../screen_state";
 

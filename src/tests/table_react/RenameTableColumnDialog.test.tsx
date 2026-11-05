@@ -1,7 +1,7 @@
-import RenameTableColumnDialog from "@/react/components/RenameTableColumnDialog";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, test, vi } from "vitest";
+import RenameTableColumnDialog from "@/react/components/RenameTableColumnDialog";
 
 vi.mock("@/catalog/ProjectRenameModal", () => ({
     DialogCloseIconButton: ({ onClose }: { onClose: () => void }) => (

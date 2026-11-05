@@ -5,9 +5,9 @@ import {
     Info,
     LockPerson as LockPersonIcon,
     MoreVert,
-    Upload as UploadIcon,
     Settings,
     Share as ShareIcon,
+    Upload as UploadIcon,
     WarningAmber,
 } from "@mui/icons-material";
 import {
@@ -28,14 +28,14 @@ import {
 } from "@mui/material";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { buildProjectUrl } from "@/utils/mdvRouting";
+import usePermissions from "./PermissionsContext";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
-import type { Permissions, ProjectAccessType } from "./utils/projectUtils";
 import ProjectShareModal from "./ProjectShareModal";
-import usePermissions from "./PermissionsContext";
-import { buildProjectUrl } from "@/utils/mdvRouting";
+import type { Permissions, ProjectAccessType } from "./utils/projectUtils";
 
 export interface ProjectCardProps {
     id: string;

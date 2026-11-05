@@ -1,3 +1,4 @@
+import { makeObservable, observable, runInAction } from "mobx";
 import BaseChart from "@/charts/BaseChart";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import type DataStore from "@/datastore/DataStore";
@@ -7,20 +8,19 @@ import FractionLegend from "@/react/components/legend/FractionLegend";
 import LegendWrapper from "@/react/components/legend/LegendWrapper";
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import type { FractionLegendSpec } from "@/react/legend/fraction_legend/types";
-import { makeObservable, observable, runInAction } from "mobx";
 import { BaseReactChart } from "../BaseReactChart";
 import DotPlotComponent from "./DotPlotComponent";
 import type { DotPlotDot } from "./DotPlotPanel";
 import {
+    adaptDotPlotConfig,
     DOT_PLOT_REACT_OLD_TYPE,
     DOT_PLOT_REACT_TYPE,
     type DotPlotReactConfig,
-    NO_COLUMN,
-    adaptDotPlotConfig,
     getSplitFromDialog,
+    NO_COLUMN,
 } from "./dotPlotConfig";
 import { buildChartSvg } from "./dotPlotImage";
-import { DOT_PLOT_LEGEND_MARGIN, type LegendLayout, buildFractionLegendSpec } from "./dotPlotLegends";
+import { buildFractionLegendSpec, DOT_PLOT_LEGEND_MARGIN, type LegendLayout } from "./dotPlotLegends";
 
 /** How many split values to show when a split column is first chosen: enough to compare two. */
 const DEFAULT_SPLIT_VALUE_COUNT = 2;

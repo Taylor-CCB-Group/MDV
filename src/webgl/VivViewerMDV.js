@@ -1,18 +1,17 @@
-import {
-    loadOmeTiff,
-    DetailView,
-    VolumeView,
-    ColorPaletteExtension,
-    ColorPalette3DExtensions,
-    DETAIL_VIEW_ID,
-    getChannelStats,
-} from "@hms-dbmi/viv";
-
-import { hexToRGB, RGBToHex } from "../datastore/DataStore.js";
 import { Deck } from "@deck.gl/core";
-import { getMultiSelectionStats, getDefaultSelectionStats, getBoundingCube } from "../utilities/VivUtils.js";
+import {
+    ColorPalette3DExtensions,
+    ColorPaletteExtension,
+    DETAIL_VIEW_ID,
+    DetailView,
+    getChannelStats,
+    loadOmeTiff,
+    VolumeView,
+} from "@hms-dbmi/viv";
 import { ScatterplotLayer } from "deck.gl";
+import { hexToRGB, RGBToHex } from "../datastore/DataStore.js";
 import { getRandomString } from "../utilities/Utilities";
+import { getBoundingCube, getDefaultSelectionStats, getMultiSelectionStats } from "../utilities/VivUtils.js";
 
 const tiffs = new Map();
 export function acceptTiffCache(oldTiffs) {

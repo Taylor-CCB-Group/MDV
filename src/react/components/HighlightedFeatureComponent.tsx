@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import { useChart, useDataStore } from "../context";
 import { observer } from "mobx-react-lite";
-// should maybe be FieldName rather than ColumnName here
-import type { DataColumn, ColumnName } from "../../charts/charts";
-import { useHighlightedIndex } from "../selectionHooks";
+import { useEffect, useState } from "react";
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
+// should maybe be FieldName rather than ColumnName here
+import type { ColumnName, DataColumn } from "../../charts/charts";
+import { useChart, useDataStore } from "../context";
+import { useHighlightedIndex } from "../selectionHooks";
 import type { HighlightedFeatureConfig } from "./HighlightedFeatureChart";
 
 /**

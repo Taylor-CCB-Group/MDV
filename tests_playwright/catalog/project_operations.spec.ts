@@ -1,6 +1,6 @@
-import { test, expect } from "@playwright/test";
-import { gotoPath, mockApiRoot, mockExtensionConfig, mockProjects } from "../utils/routes";
+import { expect, test } from "@playwright/test";
 import { project } from "../utils/data";
+import { gotoPath, mockApiRoot, mockExtensionConfig, mockProjects } from "../utils/routes";
 
 test.describe("Project operations", () => {
     test.beforeEach(async ({ page }) => {

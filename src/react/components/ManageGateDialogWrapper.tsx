@@ -1,11 +1,11 @@
-import { BaseDialog } from "@/utilities/Dialog";
+import type { BaseConfig } from "@/charts/BaseChart";
+import BaseChart from "@/charts/BaseChart";
 import { createMdvPortal } from "@/react/react_utils";
+import { BaseDialog } from "@/utilities/Dialog";
+import { truncateWithEllipsis } from "@/utilities/Utilities";
+import { ChartProvider } from "../context";
 import type { ManageGateDialogType } from "./ManageGateDialogComponent";
 import ManageGateDialogContent from "./ManageGateDialogComponent";
-import { ChartProvider } from "../context";
-import BaseChart from "@/charts/BaseChart";
-import type { BaseConfig } from "@/charts/BaseChart";
-import { truncateWithEllipsis } from "@/utilities/Utilities";
 
 const MAX_DIALOG_TITLE_NAME_LENGTH = 40;
 

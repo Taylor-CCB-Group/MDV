@@ -2,11 +2,11 @@ import {
     type DraggingEvent,
     type EditAction,
     type FeatureCollection,
+    fromDeckCoordinateSystem,
     type GeoJsonEditMode,
     type ModeProps,
     type Pick,
     type Position,
-    fromDeckCoordinateSystem,
 } from "@deck.gl-community/editable-layers";
 import { describe, expect, it, vi } from "vitest";
 import { EditMode, PolygonMode, SELECTION_COORDINATE_SYSTEM } from "@/editable-layers/selectionModes";

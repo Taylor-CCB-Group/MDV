@@ -1,10 +1,10 @@
-import WGLChart from "./WGLChart.js";
-import { WGL2DI } from "../webgl/WGL2DI.js";
-import { curveBasis, line } from "d3-shape";
 import { easeLinear } from "d3-ease";
 import { select } from "d3-selection";
-import BaseChart from "./BaseChart";
+import { curveBasis, line } from "d3-shape";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import { WGL2DI } from "../webgl/WGL2DI.js";
+import BaseChart from "./BaseChart";
+import WGLChart from "./WGLChart.js";
 
 class ViolinPlot extends WGLChart {
     useDefaultTitle = false;

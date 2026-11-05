@@ -1,5 +1,5 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
+import { select } from "d3-selection";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
 

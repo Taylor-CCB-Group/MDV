@@ -1,5 +1,5 @@
-import { type DotPlotStatsRequest, computeDotPlotStats } from "@/react/components/dotplot/dotPlotStats";
 import { describe, expect, it } from "vitest";
+import { computeDotPlotStats, type DotPlotStatsRequest } from "@/react/components/dotplot/dotPlotStats";
 
 // six data rows: three of row category 0, three of row category 1
 const base: DotPlotStatsRequest = {

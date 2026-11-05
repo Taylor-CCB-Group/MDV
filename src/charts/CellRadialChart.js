@@ -1,8 +1,7 @@
-import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart";
-import { stratify as d3Stratify, scaleLinear, tree as d3Tree, arc } from "d3";
+import { arc, stratify as d3Stratify, tree as d3Tree, scaleLinear, select } from "d3";
 import { getColorLegend } from "../utilities/Color.js";
-import { select } from "d3";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 class CellRadialChart extends SVGChart {
     constructor(dataStore, div, config) {

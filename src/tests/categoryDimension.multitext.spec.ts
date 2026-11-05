@@ -1,5 +1,5 @@
-import CategoryDimension from "@/datastore/CategoryDimension";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import CategoryDimension from "@/datastore/CategoryDimension";
 
 function createParent(column: any, size: number) {
     return {

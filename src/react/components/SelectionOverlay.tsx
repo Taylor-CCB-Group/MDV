@@ -1,24 +1,24 @@
-import { ButtonGroup, Divider } from "@mui/material"; //check tree-shaking...
-import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
-import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
-import PhotoSizeSelectSmallIcon from "@mui/icons-material/PhotoSizeSelectSmall";
-import DoneOutlinedIcon from "@mui/icons-material/DoneOutlined";
-import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
-import AddCircleOutlinedIcon from "@mui/icons-material/AddCircleOutlined";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSpatialLayers } from "../spatial_context";
-import { observer } from "mobx-react-lite";
-import GateNameDialog from "./GateNameDialog";
-import { DrawPolygonByDraggingMode, TranslateMode, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
-import { EditMode, PolygonMode, RectangleMode } from "@/editable-layers/selectionModes";
-import useGateActions from "../hooks/useGateActions";
-import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
-import IconWithTooltip from "./IconWithTooltip";
+import { DrawPolygonByDraggingMode, type GeoJsonEditMode, TranslateMode } from "@deck.gl-community/editable-layers";
 import { TuneOutlined } from "@mui/icons-material";
+import AddCircleOutlinedIcon from "@mui/icons-material/AddCircleOutlined";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import DoneOutlinedIcon from "@mui/icons-material/DoneOutlined";
+import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
+import PhotoSizeSelectSmallIcon from "@mui/icons-material/PhotoSizeSelectSmall";
+import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
+import { ButtonGroup, Divider } from "@mui/material"; //check tree-shaking...
 import { LassoIcon, SplineIcon } from "lucide-react";
-import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
-import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
+import { observer } from "mobx-react-lite";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { EditMode, PolygonMode, RectangleMode } from "@/editable-layers/selectionModes";
 import { useChart } from "../context";
+import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
+import useGateActions from "../hooks/useGateActions";
+import { useSpatialLayers } from "../spatial_context";
+import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
+import GateNameDialog from "./GateNameDialog";
+import IconWithTooltip from "./IconWithTooltip";
+import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
 
 // material-ui icons, or font-awesome icons... or custom in some cases...
 // mui icons are hefty, not sure about this...

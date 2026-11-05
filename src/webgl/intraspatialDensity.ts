@@ -1,6 +1,6 @@
-import type { ContourLayerProps } from "@/react/contour_state";
 import type { DensityLayerProps } from "@intraspatial/deck";
 import type { Matrix4 } from "@math.gl/core";
+import type { ContourLayerProps } from "@/react/contour_state";
 
 /**
  * Map MDV's heatmap contour props onto @intraspatial/deck's `DensityLayer`, which draws

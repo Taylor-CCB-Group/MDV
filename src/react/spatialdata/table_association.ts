@@ -8,10 +8,10 @@ import { useChartManager, useDataSources } from "@/react/hooks";
 import { fillColorSchemeFromDataStore } from "@/react/spatialdata/fill_color_scheme";
 import { measureSpatial, recordSpatialPerf } from "@/react/spatialdata/perf";
 import {
-    type TableRowPlan,
     datasourceRowsByFeatureId,
     getTableRowResolver,
     planTableRows,
+    type TableRowPlan,
 } from "@/react/spatialdata/table_rows";
 
 type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;

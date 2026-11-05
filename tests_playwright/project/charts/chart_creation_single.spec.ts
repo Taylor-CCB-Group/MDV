@@ -1,5 +1,4 @@
 import test, { expect } from "@playwright/test";
-import { createTemporaryProjectViaSyntheticAnndata } from "../../utils/projectFixtures";
 import {
     addChartViaUi,
     closeTopDialog,
@@ -11,6 +10,7 @@ import {
     waitForChartByTitle,
     waitForViewUnsavedState,
 } from "../../utils/helpers";
+import { createTemporaryProjectViaSyntheticAnndata } from "../../utils/projectFixtures";
 
 test.describe("Chart Creation Single", () => {
     test.setTimeout(180_000);

@@ -1,8 +1,8 @@
+import { g, isArray } from "@/lib/utils";
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import type DataStore from "../../datastore/DataStore";
 import { BaseReactChart } from "./BaseReactChart";
 import { GeneNetworkChartComponent } from "./GeneNetworkChartComponent";
-import { g, isArray } from "@/lib/utils";
 
 export type GeneNetworkConfig = {
     /** Whether to auto-scroll to highlighted genes coming from external interactions. */

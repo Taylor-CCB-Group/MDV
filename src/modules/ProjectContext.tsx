@@ -1,8 +1,8 @@
+import axios from "axios";
+import { createContext, type PropsWithChildren, useContext, useEffect, useState } from "react";
 import useBuildInfo, { type BuildInfo } from "@/catalog/hooks/useBuildInfo";
 import type ChartManager from "@/charts/ChartManager";
 import { buildApiUrl, getApiRootFromDir, getProjectDirFromLocation, normalizeApiRoot } from "@/utils/mdvRouting";
-import axios from "axios";
-import { type PropsWithChildren, createContext, useContext, useEffect, useState } from "react";
 
 export type ProjectInfoBase = {
     root: string;

@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { type RefObject, useCallback, useEffect, useRef } from "react";
 
 export type Range = [number, number];
 export type BrushXScaleType = "linear" | "log";

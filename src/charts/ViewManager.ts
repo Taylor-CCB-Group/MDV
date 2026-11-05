@@ -1,12 +1,12 @@
-import { action, observable, toJS } from "mobx";
-import type ChartManager from "./ChartManager";
-import type { DataSource } from "./charts";
 import _ from "lodash";
-import screenshot from "@/utilities/Screenshot";
+import { action, observable, toJS } from "mobx";
 import { getPostData, getProjectRoot } from "@/dataloaders/DataLoaderUtil";
+import screenshot from "@/utilities/Screenshot";
 import BaseChart from "./BaseChart";
-import { convertLegacyChartConfig, convertLegacyChartConfigNow } from "./legacyCharts";
+import type ChartManager from "./ChartManager";
 import { restoreChartLinks, snapshotChartLinks } from "./chartLinks";
+import type { DataSource } from "./charts";
+import { convertLegacyChartConfig, convertLegacyChartConfigNow } from "./legacyCharts";
 
 /** Per–data-source view config (panel layout and optional highlight state). */
 export type ViewDataDataSource = {

@@ -1,7 +1,7 @@
-import { buildApiUrl } from "@/utils/mdvRouting";
-import { Box, Button } from "@mui/material";
-import useExtensionNavigation from "../hooks/useExtensionNavigation";
 import { Launch } from "@mui/icons-material";
+import { Box, Button } from "@mui/material";
+import { buildApiUrl } from "@/utils/mdvRouting";
+import useExtensionNavigation from "../hooks/useExtensionNavigation";
 
 export default function ExtensionNavigation() {
     const items = useExtensionNavigation();

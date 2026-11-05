@@ -1,16 +1,16 @@
-import { Box } from "@mui/material";
 import { PestControl as PestControlIcon } from "@mui/icons-material";
-import { useState } from "react";
+import { Box } from "@mui/material";
 import { observer } from "mobx-react-lite";
-import IconWithTooltip from "./IconWithTooltip";
-import { useProject } from "@/modules/ProjectContext";
-import { fetchJsonConfig } from "@/dataloaders/DataLoaderUtil";
-import BaseChart from "@/charts/BaseChart";
-import DebugChartReactWrapper from "./DebugJsonDialogReactWrapper";
-import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
-import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
+import { useState } from "react";
 import useBuildInfo from "@/catalog/hooks/useBuildInfo";
+import BaseChart from "@/charts/BaseChart";
+import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import { fetchJsonConfig } from "@/dataloaders/DataLoaderUtil";
+import { useProject } from "@/modules/ProjectContext";
 import { useChartManager } from "../hooks";
+import DebugChartReactWrapper from "./DebugJsonDialogReactWrapper";
+import IconWithTooltip from "./IconWithTooltip";
 
 const DebugButton = observer(() => {
     const [error, setError] = useState<DebugErrorComponentProps["error"] | null>(null);

@@ -1,4 +1,3 @@
-import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 import {
     Box,
     Button,
@@ -12,6 +11,7 @@ import {
     Tooltip,
     Typography,
 } from "@mui/material";
+import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 
 interface CustomPaletteDialogProps {
     open: boolean;

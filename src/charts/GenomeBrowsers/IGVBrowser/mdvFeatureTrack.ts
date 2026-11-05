@@ -6,6 +6,7 @@ type IgvTrackApi = {
 
 const { default: igvBase } = await import("igv");
 const igv = igvBase as typeof igvBase & IgvTrackApi;
+
 import type { IGVBaseFeature } from "./igvUtils";
 import { getStructuralVariantStyle } from "./igvUtils";
 

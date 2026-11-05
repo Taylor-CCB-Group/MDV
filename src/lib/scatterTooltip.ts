@@ -1,6 +1,6 @@
 import type { PickingInfo } from "@deck.gl/core";
 import { escapeHtml } from "@/utilities/Utilities";
-import { findPickedInfo, getPickingInfoLayerId, pickingInfoMatchesLayer, type MDVPickingInfo } from "./deckPicking";
+import { findPickedInfo, getPickingInfoLayerId, type MDVPickingInfo, pickingInfoMatchesLayer } from "./deckPicking";
 
 type TooltipContent =
     | null

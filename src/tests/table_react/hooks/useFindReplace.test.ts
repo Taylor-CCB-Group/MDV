@@ -1,9 +1,9 @@
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
-import useFindReplace from "@/react/hooks/useFindReplace";
 import type { FeedbackAlert } from "@/react/components/FeedbackAlertComponent";
-import { renderHook, act } from "@testing-library/react";
-import { describe, test, expect, beforeEach, vi } from "vitest";
+import useFindReplace from "@/react/hooks/useFindReplace";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 describe("useFindReplace", () => {

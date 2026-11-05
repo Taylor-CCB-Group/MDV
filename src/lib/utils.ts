@@ -1,3 +1,5 @@
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 import type { Param } from "@/charts/ChartTypes";
 import type {
     CategoricalDataType,
@@ -9,8 +11,6 @@ import type {
     LoadedDataColumn,
     NumberDataType,
 } from "@/charts/charts";
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));

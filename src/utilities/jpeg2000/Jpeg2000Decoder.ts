@@ -1,4 +1,4 @@
-import { BaseDecoder, type TypedArray, addDecoder } from "geotiff";
+import { addDecoder, BaseDecoder, type TypedArray } from "geotiff";
 import type { FrameInfo, MainModule as OpenJpegModule } from "./chafey/openjpegjs";
 import openJpegFactory from "./chafey/openjpegjs.js";
 

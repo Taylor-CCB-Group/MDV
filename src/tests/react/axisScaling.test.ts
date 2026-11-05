@@ -1,10 +1,10 @@
+import { describe, expect, test } from "vitest";
 import {
     deckRadiusForClassicRadius,
     fitOrthographicView,
     radiusReferenceRange,
     serialisableZoom,
 } from "@/react/axisScaling";
-import { describe, expect, test } from "vitest";
 
 describe("fitOrthographicView", () => {
     const wide = { minX: 0, maxX: 1, minY: 0, maxY: 10000 };

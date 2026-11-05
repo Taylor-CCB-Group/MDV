@@ -1,12 +1,12 @@
-import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
-import { observer } from "mobx-react-lite";
-import type { DropdownMappedValues } from "@/charts/charts";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { action, makeAutoObservable, observe, runInAction } from "mobx";
-import { DropdownAutocompleteComponent, type DropdownSpec } from "./SettingsDialogComponent";
+import { observer } from "mobx-react-lite";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { DropdownMappedValues } from "@/charts/charts";
+import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
 import { g, isArray } from "@/lib/utils";
-import { getFieldName, subgroupKeyFromFieldName, RowsAsColsQuery, type RowsAsColslink } from "@/links/link_utils";
+import { getFieldName, type RowsAsColslink, RowsAsColsQuery, subgroupKeyFromFieldName } from "@/links/link_utils";
 import { useRowsAsColumnsLinks } from "../chartLinkHooks";
+import { DropdownAutocompleteComponent, type DropdownSpec } from "./SettingsDialogComponent";
 import TabHeader from "./TabHeader";
 
 type LocalProps<T extends CTypes, M extends boolean> = ColumnSelectionProps<T, M> & {

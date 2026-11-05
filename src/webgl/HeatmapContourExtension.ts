@@ -1,11 +1,9 @@
-import { Layer } from "@deck.gl/core";
+import { Layer, type LayerContext, project32 } from "@deck.gl/core";
 import type { Buffer, Device, Texture } from "@luma.gl/core";
+import { log } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
-import { type LayerContext, project32 } from "@deck.gl/core";
-
 import heatmapPresentationFS from "./shaders/heatmap-presentation-layer-fragment.glsl";
 
-import { log } from "@luma.gl/core";
 // log.enable();
 log.level = 0;
 

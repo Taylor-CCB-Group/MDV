@@ -1,8 +1,8 @@
-import WGLScatterPlot from "./WGLScatterPlot.js";
-import BaseChart from "./BaseChart";
 import { geoPath } from "d3-geo";
 import { scaleLinear } from "d3-scale";
 import { createEl } from "../utilities/Elements.js";
+import BaseChart from "./BaseChart";
+import WGLScatterPlot from "./WGLScatterPlot.js";
 import "../datastore/DensityDimension.js";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 

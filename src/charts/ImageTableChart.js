@@ -1,6 +1,6 @@
 import { DataModel } from "../table/DataModel.js";
-import BaseChart from "./BaseChart";
 import ImageTable from "../table/ImageTable.js";
+import BaseChart from "./BaseChart";
 
 class ImageTableChart extends BaseChart {
     constructor(dataStore, div, config) {

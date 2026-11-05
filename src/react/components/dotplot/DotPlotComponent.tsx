@@ -1,3 +1,7 @@
+import { AxisLeft } from "@visx/axis";
+import { scaleBand } from "@visx/scale";
+import { observer } from "mobx-react-lite";
+import { useEffect, useMemo, useState } from "react";
 import type { DataColumn, DataType, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { canvasMeasureText, stripSharedSubgroupSuffix } from "@/charts/dotplot/xAxisLabels";
 import { useChart, useDataStore } from "@/react/context";
@@ -9,16 +13,12 @@ import {
     useParamColumnsExperimental,
 } from "@/react/hooks";
 import { escapeHtml } from "@/utilities/Utilities";
-import { AxisLeft } from "@visx/axis";
-import { scaleBand } from "@visx/scale";
-import { observer } from "mobx-react-lite";
-import { useEffect, useMemo, useState } from "react";
 import DotPlotPanel, { type DotPlotDot } from "./DotPlotPanel";
 import type { DotPlotReact } from "./DotPlotReactWrapper";
 import { type DotPlotReactConfig, getColorRange } from "./dotPlotConfig";
 import { DOT_PLOT_MAX_RADIUS, getDotPlotLayout, getVisibleRows, getXLabelLayout } from "./dotPlotLayout";
-import { type LegendLayout, getLegendLayout } from "./dotPlotLegends";
-import { MISSING_VALUE_COLOR, binnedColorScale, getDotPlotPalette, toCssColors } from "./dotPlotPalettes";
+import { getLegendLayout, type LegendLayout } from "./dotPlotLegends";
+import { binnedColorScale, getDotPlotPalette, MISSING_VALUE_COLOR, toCssColors } from "./dotPlotPalettes";
 import { type DotPlotStats, queryDotPlotStats } from "./dotPlotStats";
 
 type CategoryColumn = LoadedDataColumn<"text" | "text16">;

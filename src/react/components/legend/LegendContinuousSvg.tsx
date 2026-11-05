@@ -1,7 +1,7 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { axisBottom } from "d3";
 import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useBrushX } from "@/react/components/histogram/useBrushX";
 import {
     DEFAULT_CONTINUOUS_LEGEND_HEIGHT,

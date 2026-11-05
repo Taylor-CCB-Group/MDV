@@ -1,29 +1,28 @@
 import type { RenderStack } from "@spatialdata/layers";
 import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
-
-import BaseChart, { type MenuPip } from "../../charts/BaseChart";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
-import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
-import { BaseReactChart } from "./BaseReactChart";
-import { type VivContextType, createVivStores } from "./avivatorish/state";
-import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
+import type { DeckBackend } from "@/react/spatialdata/deck_backend";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
-import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
-import type { ElementIssues } from "./RasterIssues";
-import SpatialStatusPanel from "./SpatialStatusPanel";
-import type { DeckBackend } from "@/react/spatialdata/deck_backend";
-import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
-import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
+import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import {
     type SpatialDataSerializableViewState,
     toSerializableSpatialDataViewState,
 } from "@/react/spatialdata/spatialdata_config";
+import BaseChart, { type MenuPip } from "../../charts/BaseChart";
+import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
+import { createVivStores, type VivContextType } from "./avivatorish/state";
+import { BaseReactChart } from "./BaseReactChart";
+import type { ElementIssues } from "./RasterIssues";
+import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
+import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
+import SpatialStatusPanel from "./SpatialStatusPanel";
+import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 
 export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     type: "SpatialDataMdvRegionReact";

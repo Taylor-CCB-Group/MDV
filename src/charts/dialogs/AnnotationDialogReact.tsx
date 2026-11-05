@@ -1,6 +1,6 @@
+import { createMdvPortal } from "@/react/react_utils";
 import type DataStore from "../../datastore/DataStore.js";
 import { BaseDialog } from "../../utilities/Dialog.js";
-import { createMdvPortal } from "@/react/react_utils";
 import { AnnotationDialogComponent } from "./AnnotationDialogComponent";
 
 export {

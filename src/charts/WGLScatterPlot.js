@@ -1,9 +1,9 @@
-import { WGL2DI } from "../webgl/WGL2DI.js";
-import WGLChart from "./WGLChart.js";
-import BaseChart from "./BaseChart";
+import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil.ts";
 import { BaseDialog } from "../utilities/Dialog.js";
 import { createEl } from "../utilities/Elements.js";
-import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil.ts";
+import { WGL2DI } from "../webgl/WGL2DI.js";
+import BaseChart from "./BaseChart";
+import WGLChart from "./WGLChart.js";
 
 class OffsetDialog extends BaseDialog {
     constructor(scatterPlot) {

@@ -1,18 +1,18 @@
-import DeckGL from "@deck.gl/react";
 import { OrthographicView } from "@deck.gl/core";
+import DeckGL from "@deck.gl/react";
 import { HeatmapLayer } from "deck.gl";
 import { observer } from "mobx-react-lite";
-import BaseChart from "../../charts/BaseChart";
-import { BaseReactChart } from "./BaseReactChart";
-import type { CategoricalDataType, LoadedDataColumn, NumberDataType } from "../../charts/charts";
+import { useCallback, useMemo, useState } from "react";
 import type DataStore from "@/datastore/DataStore";
 import { g } from "@/lib/utils";
-import { useChartSize, useConfig, useFieldSpec, useFieldSpecs, useFilteredIndices, useParamColumns } from "../hooks";
-import { getDensityVisualisationFolder } from "../contour_state";
-import { useCallback, useMemo, useState } from "react";
 import { TriangleLayerContours } from "@/webgl/HeatmapContourExtension";
+import BaseChart from "../../charts/BaseChart";
+import type { CategoricalDataType, LoadedDataColumn, NumberDataType } from "../../charts/charts";
+import { getDensityVisualisationFolder } from "../contour_state";
 import { getFieldColor } from "../fieldColorManager";
+import { useChartSize, useConfig, useFieldSpec, useFieldSpecs, useFilteredIndices, useParamColumns } from "../hooks";
 import { useHighlightCategoryRows } from "../selectionHooks";
+import { BaseReactChart } from "./BaseReactChart";
 import {
     adaptSplatterConfig,
     getSharedSplatterViewState,
