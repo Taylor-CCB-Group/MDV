@@ -291,16 +291,16 @@ class WGLChart extends SVGChart {
                 current_value: c.tooltip.show,
                 func: (x) => {
                     c.tooltip.show = x;
-                    // #297 degrades active link
-                    const cl = c.tooltip.column || cols[0].field;
+                    // keep an active link rather than degrading it to its concrete column #297
+                    const cl = this.activeQueries.activeValue("setToolTipColumn", c.tooltip.column) || cols[0].field;
                     this.setToolTipColumn(cl);
                 },
             },
             {
                 type: "column",
                 label: "Tooltip value",
-                // #297 degrades active link
-                current_value: c.tooltip.column || cols[0].field,
+                // use the active query (if any), not the concrete column name in the config #297
+                current_value: this.activeQueries.activeValue("setToolTipColumn", c.tooltip.column) || cols[0].field,
                 // values: [cols, "name", "field"],
                 func: (x) => {
                     // checkbox won't update as a result of this...

@@ -272,6 +272,23 @@ export class ColumnQueryMapper<T extends BaseConfig> {
     //     return config;
     // }
     /**
+     * The active (possibly un-resolved, e.g. `RowsAsColsQuery`) first argument most recently passed to
+     * a decorated single-column method such as `colorByColumn` or `setToolTipColumn`.
+     *
+     * Settings UI should use this rather than reading the concrete string from `chart.config`, which would
+     * otherwise degrade an active link to the name of whatever column it currently resolves to.
+     *
+     * `concrete` is the current value in the config; if it is empty the column has been cleared
+     * (without going through the decorated method) so any remembered query is stale and is ignored.
+     */
+    activeValue<V>(methodName: DecoratedMethodName, concrete: V): V | FieldSpec {
+        if (!concrete) return concrete;
+        const args = this.userValues[methodName];
+        const v = args?.[0];
+        if (v instanceof RowsAsColsQuery) return v;
+        return concrete;
+    }
+    /**
      * Returns the active parameters for the chart.
      *
      * This is the same as the `config.param` property, but it will be the active state of the parameters,
