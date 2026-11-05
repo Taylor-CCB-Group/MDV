@@ -5,9 +5,9 @@
 
 // todo rearrange - maybe have a datastore.d.ts etc
 import type { CTypes, FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import type { Gate } from "@/react/gates/types";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
-import type { Gate } from "@/react/gates/types";
 
 /**
  * A cleanup function that can be called to dispose of resources.
@@ -44,7 +44,8 @@ type DataStructureTypes = {
     unique: Uint8Array; //raw bytes of strings to be decoded
     multitext: Uint8Array;
 };
-export type { DataType, DataStructureTypes };
+
+export type { DataStructureTypes, DataType };
 /**
  * Union of all the possible data structures that can be used to store column data.
  */

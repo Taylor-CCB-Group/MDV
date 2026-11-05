@@ -1,11 +1,11 @@
 import { Box, Dialog, DialogContent, DialogTitle } from "@mui/material";
 import type React from "react";
-import { DialogCloseIconButton } from "./ProjectRenameModal";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
+import { DialogCloseIconButton } from "./ProjectRenameModal";
 
 export interface ProjectInfoModalProps {
     open: boolean;

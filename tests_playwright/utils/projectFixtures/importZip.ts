@@ -5,12 +5,12 @@
  * Other flows: `syntheticAnndata.ts`, `syntheticSpatial.ts` (disk under `~/mdv` + `/rescan_projects`).
  */
 
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { type APIRequestContext, expect, type Page } from "@playwright/test";
 import { getProjectUrl } from "../projectUrl";
 import { deleteProjectViaApi, shouldDeleteProjectOnCleanup, waitForProjectReady } from "./core";
 import { buildPythonPath, getPythonCandidates, REPO_ROOT } from "./pythonEnv";

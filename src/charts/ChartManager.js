@@ -1,43 +1,43 @@
-import {
-    createEl,
-    makeDraggable,
-    makeResizable,
-    MDVProgress,
-    removeDraggable,
-    removeResizable,
-    createMenuIcon,
-    splitPane,
-} from "../utilities/Elements";
-import BaseChart from "./BaseChart";
+import { csv, json, tsv } from "d3-fetch";
 import DataStore from "../datastore/DataStore.js";
-import CustomDialog from "./dialogs/CustomDialog.js";
 import { ContextMenu } from "../utilities/ContextMenu";
 import { BaseDialog } from "../utilities/Dialog.js";
+import {
+    createEl,
+    createMenuIcon,
+    MDVProgress,
+    makeDraggable,
+    makeResizable,
+    removeDraggable,
+    removeResizable,
+    splitPane,
+} from "../utilities/Elements";
 import { getRandomString } from "../utilities/Utilities";
-import { csv, tsv, json } from "d3-fetch";
+import BaseChart from "./BaseChart";
 import ColorPaletteWrapper from "./dialogs/ColorPaletteWrapper";
-import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
+import CustomDialog from "./dialogs/CustomDialog.js";
 // this is added as a side-effect of importing registerChartModules,
 // then we get the actual class from BaseDialog.experiment
 import FileUploadDialogReact from "./dialogs/FileUploadDialogWrapper";
+import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 
 // Chart and dialog type registrations via side-effect imports.
 import "./registerChartModules";
-import connectIPC from "../utilities/InterProcessCommunication";
-import { addChartLink } from "../links/link_utils";
-import popoutChart from "@/utilities/Popout";
-import { makeObservable, observable, action } from "mobx";
+import { action, makeObservable, observable } from "mobx";
 import { createElement } from "react";
-import { createMdvPortal } from "@/react/react_utils";
-import ViewManager from "./ViewManager";
+import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
-import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
-import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
-import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
-import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
+import { createMdvPortal } from "@/react/react_utils";
+import popoutChart from "@/utilities/Popout";
+import { addChartLink } from "../links/link_utils";
+import connectIPC from "../utilities/InterProcessCommunication";
+import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
+import AddChartDialogReact from "./dialogs/AddChartDialogReact";
+import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
+import ViewManager from "./ViewManager";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first

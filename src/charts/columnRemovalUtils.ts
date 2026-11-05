@@ -1,5 +1,5 @@
 import type { BaseConfig } from "./BaseChart";
-import { chartTypes, type ChartType } from "./ChartTypes";
+import { type ChartType, chartTypes } from "./ChartTypes";
 import type {
     AnalyzeColumnRemovalArgs,
     ChartColumnImpact,

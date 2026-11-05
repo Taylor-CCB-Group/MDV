@@ -1,17 +1,17 @@
-import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
-import { useDataStore } from "../context";
-import type { DataColumn, DataType } from "@/charts/charts";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { observer } from "mobx-react-lite";
-import { Autocomplete, Box, Button, Checkbox, Chip, Divider, Paper, type PaperProps } from "@mui/material";
-import { isArray } from "@/lib/utils";
-import { TextFieldExtended } from "./TextFieldExtended";
-import Grid from "@mui/material/Grid2";
-import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
+import { Autocomplete, Box, Button, Checkbox, Chip, Divider, Paper, type PaperProps } from "@mui/material";
+import Grid from "@mui/material/Grid2";
+import { observer } from "mobx-react-lite";
+import { useCallback, useMemo, useRef, useState } from "react";
+import type { DataColumn, DataType } from "@/charts/charts";
+import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
+import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
+import { isArray } from "@/lib/utils";
+import { useDataStore } from "../context";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { getSelectableColumns } from "./columnDropdownUtils";
+import { TextFieldExtended } from "./TextFieldExtended";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;

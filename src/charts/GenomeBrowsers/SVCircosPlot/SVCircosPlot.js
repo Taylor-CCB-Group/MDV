@@ -1,6 +1,6 @@
+import { BaseReactChart } from "../../../react/components/BaseReactChart";
 import BaseChart from "../../BaseChart";
 import SVCircosPlotComponent from "./SVCircosPlotComponent";
-import { BaseReactChart } from "../../../react/components/BaseReactChart";
 
 class SVCircosPlot extends BaseReactChart {
     colorVersion = 0;

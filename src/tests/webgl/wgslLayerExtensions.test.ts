@@ -1,11 +1,11 @@
-import { MdvDataFilterExtension } from "@/webgl/MdvDataFilterExtension";
-import { MdvScatterplotLayer } from "@/webgl/MdvScatterplotLayer";
-import { ScatterDensityExension, ScatterSquareExtension } from "@/webgl/ScatterDeckExtension";
-import { editWGSL } from "@/webgl/wgslLayerExtension";
 import type { Layer, LayerExtension } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import type { ShaderModule, ShaderPlugin } from "@luma.gl/shadertools";
 import { describe, expect, it } from "vitest";
+import { MdvDataFilterExtension } from "@/webgl/MdvDataFilterExtension";
+import { MdvScatterplotLayer } from "@/webgl/MdvScatterplotLayer";
+import { ScatterDensityExension, ScatterSquareExtension } from "@/webgl/ScatterDeckExtension";
+import { editWGSL } from "@/webgl/wgslLayerExtension";
 
 type Shaders = { source: string; modules: ShaderModule[]; plugins?: ShaderPlugin[]; inject?: Record<string, string> };
 

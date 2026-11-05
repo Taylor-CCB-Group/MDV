@@ -1,10 +1,10 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     CAUSE_WINDOW_MS,
+    entryForLabel,
     type LayerFailureSink,
     LayerFailureTracker,
-    entryForLabel,
 } from "@/react/spatialdata/layer_failures";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Messages as luma reports them for a points layer whose palette texture is too wide.
 const POINTS = "spatialdata-points-transcripts-#L1Htwz";

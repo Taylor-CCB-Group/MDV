@@ -1,12 +1,12 @@
 import type { Layer } from "@deck.gl/core";
 import type { RenderStack, RenderStackEntry, RenderStackHostEntry } from "@spatialdata/layers";
-import { layerConfig, renderStackOrder, type LayerConfig, type RenderStackLayerInputs } from "@spatialdata/vis";
+import { type LayerConfig, layerConfig, type RenderStackLayerInputs, renderStackOrder } from "@spatialdata/vis";
 import { useMemo, useRef } from "react";
 
 import { withoutMdvFieldSpecs } from "./field_spec_projection";
-import { deckIdFromHostLayerId, type DeckOverlayId } from "./host_overlay_ids";
-import { touchRenderStack, renderStackSpatialRevision } from "./render_stack_observe";
+import { type DeckOverlayId, deckIdFromHostLayerId } from "./host_overlay_ids";
 import { measureSpatial } from "./perf";
+import { renderStackSpatialRevision, touchRenderStack } from "./render_stack_observe";
 
 export type MdvDeckOverlayLayers = Record<DeckOverlayId, Layer | null>;
 

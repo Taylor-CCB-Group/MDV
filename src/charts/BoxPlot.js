@@ -1,7 +1,7 @@
-import ViolinPlot from "./ViolinPlot.js";
 import { easeLinear } from "d3-ease";
 import { select } from "d3-selection";
 import BaseChart from "./BaseChart";
+import ViolinPlot from "./ViolinPlot.js";
 
 class BoxPlot extends ViolinPlot {
     constructor(dataStore, div, config) {

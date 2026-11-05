@@ -1,6 +1,6 @@
-import type React from "react";
-import { useState, useCallback, type PropsWithChildren, useRef, useEffect } from "react";
 import { observer } from "mobx-react-lite";
+import type React from "react";
+import { type PropsWithChildren, useCallback, useEffect, useRef, useState } from "react";
 
 export interface TiffChartWrapperProps {
     metadata: any;

@@ -1,29 +1,8 @@
-import type React from "react";
-import { useState, useCallback, useReducer, useEffect, useMemo } from "react";
-import { useDropzone } from "react-dropzone";
-import { observer } from "mobx-react-lite";
-
 import axios, { type AxiosError, type AxiosProgressEvent } from "axios";
-import { useProject } from "../../modules/ProjectContext";
-import { useViewerStoreApi, useChannelsStoreApi } from "../../react/components/avivatorish/state";
-
-import AnndataConflictDialog from "./AnndataConflictDialog";
-import ReusableDialog from "./ReusableDialog";
-
-import { createSocketIOUpload, type SocketIOUploadClient } from "./SocketIOUploadClient";
-import { Container, DropzoneContainer, DynamicText, FileInputLabel } from "./file_upload/FileUploadUI";
-import {
-    FileDropzoneView,
-    H5ReviewView,
-    ProcessingView,
-    RedirectingView,
-    TabularReviewView,
-    TiffReviewView,
-    UploadErrorView,
-    UploadingView,
-    UploadSuccessView,
-    ValidatingView,
-} from "./file_upload/FileUploadViews";
+import { observer } from "mobx-react-lite";
+import type React from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useDropzone } from "react-dropzone";
 import {
     ALLOWED_FILE_TYPES,
     generateDropzoneAccept,
@@ -43,6 +22,24 @@ import type {
     UploadErrorPayload,
     UploadValidationResult,
 } from "@/utils/file_upload/fileUploadTypes";
+import { useProject } from "../../modules/ProjectContext";
+import { useChannelsStoreApi, useViewerStoreApi } from "../../react/components/avivatorish/state";
+import AnndataConflictDialog from "./AnndataConflictDialog";
+import { Container, DropzoneContainer, DynamicText, FileInputLabel } from "./file_upload/FileUploadUI";
+import {
+    FileDropzoneView,
+    H5ReviewView,
+    ProcessingView,
+    RedirectingView,
+    TabularReviewView,
+    TiffReviewView,
+    UploadErrorView,
+    UploadingView,
+    UploadSuccessView,
+    ValidatingView,
+} from "./file_upload/FileUploadViews";
+import ReusableDialog from "./ReusableDialog";
+import { createSocketIOUpload, type SocketIOUploadClient } from "./SocketIOUploadClient";
 
 export { Container, DropzoneContainer, DynamicText, FileInputLabel };
 

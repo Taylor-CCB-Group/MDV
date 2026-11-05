@@ -1,7 +1,7 @@
-import BaseChart from "./BaseChart";
-import { createEl } from "../utilities/Elements.js";
-import CustomDialog from "./dialogs/CustomDialog.js";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
+import { createEl } from "../utilities/Elements.js";
+import BaseChart from "./BaseChart";
+import CustomDialog from "./dialogs/CustomDialog.js";
 
 class GenomeBrowser extends BaseChart {
     constructor(dataStore, div, config) {

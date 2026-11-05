@@ -1,5 +1,5 @@
-import { getActiveChartScopeFilters } from "@/react/hooks";
 import { describe, expect, test } from "vitest";
+import { getActiveChartScopeFilters } from "@/react/hooks";
 
 describe("getActiveChartScopeFilters", () => {
     test("includes a background filter with a column and categories", () => {

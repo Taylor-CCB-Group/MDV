@@ -1,30 +1,30 @@
+import { reaction, toJS } from "mobx";
+import { useEffect, useMemo, useState } from "react";
+import type { BaseConfig } from "@/charts/BaseChart";
 import type {
     AnyGuiSpec,
     CategoricalDataType,
     DataColumn,
     DataType,
     Disposer,
-    LoadedDataColumn,
     FieldName,
+    LoadedDataColumn,
 } from "@/charts/charts";
-import { useEffect, useMemo, useState } from "react";
-import {
-    useCategoryFilterIndices,
-    useConfig,
-    useFilteredIndices,
-    useFieldSpec,
-    useParamColumns,
-    useFieldSpecs,
-} from "./hooks";
+import { type FieldSpec, type FieldSpecs, isColumnLoaded } from "@/lib/columnTypeHelpers";
+import { g, isArray } from "@/lib/utils";
+import type { CategoryLegendItem, FieldLegendItem } from "./components/FieldContourLegend";
 import { useDataStore } from "./context";
 // import { useDebounce } from "use-debounce";
 import { useViewState } from "./deck_state";
-import { g, isArray } from "@/lib/utils";
-import { reaction, toJS } from "mobx";
-import type { BaseConfig } from "@/charts/BaseChart";
-import { type FieldSpec, type FieldSpecs, isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { getFieldColor } from "./fieldColorManager";
-import type { CategoryLegendItem, FieldLegendItem } from "./components/FieldContourLegend";
+import {
+    useCategoryFilterIndices,
+    useConfig,
+    useFieldSpec,
+    useFieldSpecs,
+    useFilteredIndices,
+    useParamColumns,
+} from "./hooks";
 // import { DataFilterExtension } from '@deck.gl/extensions';
 
 /** A contour drawn by `useLegacyDualContour`, as hovered in the density legend. */

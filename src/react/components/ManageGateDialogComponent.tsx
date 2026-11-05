@@ -1,3 +1,8 @@
+import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import {
     Accordion,
     AccordionDetails,
@@ -15,21 +20,16 @@ import {
     Tooltip,
     Typography,
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import IconWithTooltip from "./IconWithTooltip";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import { useCallback, useMemo, useState } from "react";
-import { DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
-import GateNameDialog from "./GateNameDialog";
-import ConfirmDialog from "@/charts/dialogs/ConfirmDialog";
 import { PenBoxIcon } from "lucide-react";
-import { hexToRgb, rgbToHex, truncateWithEllipsis } from "@/utilities/Utilities";
-import type { Gate } from "../gates/types";
 import { observer } from "mobx-react-lite";
+import { useCallback, useMemo, useState } from "react";
+import ConfirmDialog from "@/charts/dialogs/ConfirmDialog";
+import { hexToRgb, rgbToHex, truncateWithEllipsis } from "@/utilities/Utilities";
+import { DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
+import type { Gate } from "../gates/types";
 import { useGateManager } from "../gates/useGateManager";
+import GateNameDialog from "./GateNameDialog";
+import IconWithTooltip from "./IconWithTooltip";
 
 export type ManageGateDialogType = {
     open: boolean;

@@ -1,6 +1,6 @@
+import { BaseDialog } from "../../utilities/Dialog.js";
 import { createEl, createFilterElement } from "../../utilities/Elements";
 import BaseChart from "../BaseChart";
-import { BaseDialog } from "../../utilities/Dialog.js";
 import { ChooseColumnDialog } from "./ChooseColumnDialog";
 
 /**

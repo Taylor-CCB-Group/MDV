@@ -1,5 +1,5 @@
-import DataStore from "@/datastore/DataStore";
 import { describe, expect, test, vi } from "vitest";
+import DataStore from "@/datastore/DataStore";
 
 function createStore() {
     const tempColumn = {

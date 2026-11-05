@@ -1,6 +1,6 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Link, Typography } from "@mui/material";
-import { DialogCloseIconButton } from "./ProjectRenameModal";
 import { HELP_DIALOG_MESSAGE, MDV_DOC_WEBSITE, MDV_EMAIL } from "@/utilities/constants";
+import { DialogCloseIconButton } from "./ProjectRenameModal";
 
 export type HelpDialogType = {
     open: boolean;

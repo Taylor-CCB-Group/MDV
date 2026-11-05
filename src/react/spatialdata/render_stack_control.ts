@@ -1,14 +1,13 @@
 import type { LayerChannelConfig } from "@spatialdata/avivatorish";
+import type { SpatialData } from "@spatialdata/core";
 import type { RenderStack, RenderStackEntry, RenderStackSpatialElementType } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { isObservable, runInAction, set } from "mobx";
 import { useCallback } from "react";
-
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "@/react/components/SpatialDataMDVReact";
 import { useChart } from "@/react/context";
 import { useConfig } from "@/react/hooks";
-import type { SpatialData } from "@spatialdata/core";
-import { deckHostLayerId, deckIdFromHostLayerId, type DeckOverlayId } from "./host_overlay_ids";
+import { type DeckOverlayId, deckHostLayerId, deckIdFromHostLayerId } from "./host_overlay_ids";
 import { spatialEntryAsLayerConfig } from "./render_stack_adapter";
 import {
     createDefaultRenderStack,

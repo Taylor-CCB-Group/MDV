@@ -1,5 +1,5 @@
-import { BaseDialog } from "./Dialog.js";
 import { createEl } from "../utilities/Elements.js";
+import { BaseDialog } from "./Dialog.js";
 
 /**
  * A dialog which allows user to upload files

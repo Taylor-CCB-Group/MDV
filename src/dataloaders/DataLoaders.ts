@@ -6,8 +6,8 @@
  *
  **/
 
-import type { DataColumn, DataSource, DataSourceName, DataType, FieldName } from "@/charts/charts";
 import type { TypedArrayConstructor } from "@luma.gl/core";
+import type { DataColumn, DataSource, DataSourceName, DataType, FieldName } from "@/charts/charts";
 
 type Columns = DataColumn<DataType>[];
 type DataLoaderFaultMode = "empty" | "corrupt" | "timeout";
@@ -326,4 +326,4 @@ async function decompressData(buffer: Uint8Array, fallbackToRaw = false) {
     }
 }
 
-export { getArrayBufferDataLoader, processArrayBuffer, getLocalCompressedBinaryDataLoader, decompressData };
+export { decompressData, getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader, processArrayBuffer };

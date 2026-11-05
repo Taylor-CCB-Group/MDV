@@ -1,10 +1,11 @@
-import { describe, test, expect, vi, beforeEach, beforeAll } from "vitest";
+import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 // Load link_utils before chartConfigUtils so Vitest uses Vite transform (not vi.importActual / Node strip-types).
 import { RowsAsColsQuery } from "@/links/link_utils";
-import { deserialiseParam, initialiseChartConfig, getConcreteFieldNames } from "../charts/chartConfigUtils";
-import type DataStore from "../datastore/DataStore";
 import type BaseChartT from "../charts/BaseChart";
 import type { BaseConfig } from "../charts/BaseChart";
+import { deserialiseParam, getConcreteFieldNames, initialiseChartConfig } from "../charts/chartConfigUtils";
+import type DataStore from "../datastore/DataStore";
+
 type BaseChart = BaseChartT<BaseConfig>;
 
 beforeAll(() => {

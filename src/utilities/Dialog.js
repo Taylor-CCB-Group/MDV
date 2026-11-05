@@ -1,11 +1,11 @@
 import { _allowStateChangesInsideComputed, action, makeAutoObservable } from "mobx";
 import {
     createEl,
-    makeResizable,
     makeDraggable,
-    removeResizable,
-    removeDraggable,
+    makeResizable,
     promoteIfStacked,
+    removeDraggable,
+    removeResizable,
 } from "./Elements.js";
 
 class BaseDialog {

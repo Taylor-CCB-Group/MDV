@@ -16,8 +16,8 @@ import {
 } from "../../utils/helpers";
 import {
     createTemporaryProjectViaSyntheticAnndata,
-    waitForProjectReady,
     type SyntheticAnndataTemporaryProjectHandle,
+    waitForProjectReady,
 } from "../../utils/projectFixtures";
 
 async function getContinuousColorLegendFilterRuntimeState(page: Page, chartTitle: string) {

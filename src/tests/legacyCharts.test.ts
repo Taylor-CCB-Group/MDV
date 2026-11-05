@@ -4,15 +4,15 @@ import "@/charts/TableChart";
 import "@/charts/WGLScatterPlot";
 import "@/react/components/DeckScatterReactWrapper";
 import "@/react/components/VivMDVReact";
+import { afterEach, describe, expect, test } from "vitest";
 import {
     convertLegacyChartConfig,
     convertLegacyChartConfigNow,
     getLegacyConversionTarget,
     isLegacyChartType,
 } from "@/charts/legacyCharts";
-import { convertLegacyChartsSetting } from "@/lib/browserSettings";
 import type DataStore from "@/datastore/DataStore";
-import { afterEach, describe, expect, test } from "vitest";
+import { convertLegacyChartsSetting } from "@/lib/browserSettings";
 
 afterEach(() => {
     convertLegacyChartsSetting.set("off");

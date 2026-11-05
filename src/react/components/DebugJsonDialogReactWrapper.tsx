@@ -1,11 +1,11 @@
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { observer } from "mobx-react-lite";
+import type { ReactNode } from "react";
+import { createMdvPortal } from "@/react/react_utils";
+import type BaseChart from "../../charts/BaseChart";
 import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
-import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./DebugJsonDialogComponent";
-import type BaseChart from "../../charts/BaseChart";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import type { ReactNode } from "react";
 
 type DebugChartReactWrapperOptions = {
     showValidationSection?: boolean;

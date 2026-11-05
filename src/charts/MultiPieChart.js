@@ -1,8 +1,8 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
-import SVGChart from "./SVGChart";
+import { select } from "d3-selection";
+import { arc, pie } from "d3-shape";
 import BaseChart from "./BaseChart";
-import { pie, arc } from "d3-shape";
+import SVGChart from "./SVGChart";
 
 class MultiPieChart extends SVGChart {
     constructor(dataStore, div, config) {

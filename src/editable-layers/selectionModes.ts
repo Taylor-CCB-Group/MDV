@@ -1,17 +1,17 @@
 import {
+    type ClickEvent,
+    CompositeMode,
+    DrawPolygonByDraggingMode,
     DrawPolygonMode,
+    type FeatureCollection,
+    type GeoJsonEditMode,
+    getPickedEditHandle,
+    type ModeProps,
     ModifyMode,
+    type SimpleFeatureCollection,
     // DrawRectangleMode,
     // TransformMode,
     TranslateMode,
-    CompositeMode,
-    DrawPolygonByDraggingMode,
-    getPickedEditHandle,
-    type ClickEvent,
-    type FeatureCollection,
-    type GeoJsonEditMode,
-    type ModeProps,
-    type SimpleFeatureCollection,
 } from "@deck.gl-community/editable-layers";
 import { DrawRectangleByDraggingMode } from "./deck-community-ish/draw-rectangle-by-dragging-mode";
 

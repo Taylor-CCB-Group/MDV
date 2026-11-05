@@ -219,4 +219,4 @@ function getCenter(points) {
     return center;
 }
 
-export { intersectionArea, circleOverlap, circleCircleIntersection, distance, getCenter };
+export { circleCircleIntersection, circleOverlap, distance, getCenter, intersectionArea };

@@ -1,6 +1,6 @@
-import { useLiveCategorySelectionValues } from "@/react/components/categorySelectionHooks";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
+import { useLiveCategorySelectionValues } from "@/react/components/categorySelectionHooks";
 
 const mockUseDataStore = vi.fn();
 

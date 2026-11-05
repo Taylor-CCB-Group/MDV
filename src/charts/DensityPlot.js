@@ -1,10 +1,10 @@
+import { easeLinear } from "d3-ease";
+import { geoPath } from "d3-geo";
+import { scaleLinear, scaleSequential } from "d3-scale";
+import { interpolateYlGnBu } from "d3-scale-chromatic";
+import { select } from "d3-selection";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
-import { select } from "d3-selection";
-import { geoPath } from "d3-geo";
-import { easeLinear } from "d3-ease";
-import { scaleSequential, scaleLinear } from "d3-scale";
-import { interpolateYlGnBu } from "d3-scale-chromatic";
 
 /** @deprecated currently unused? */
 class DensityPlot extends SVGChart {

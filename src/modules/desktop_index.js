@@ -1,12 +1,11 @@
 import "./all_css";
 import ChartManager from "../charts/ChartManager.js";
 import {
+    decompressData,
     getArrayBufferDataLoader,
     getLocalCompressedBinaryDataLoader,
-    decompressData,
 } from "../dataloaders/DataLoaders";
-import { setProjectRoot } from "../dataloaders/DataLoaderUtil";
-import { fetchJsonConfig } from "../dataloaders/DataLoaderUtil";
+import { fetchJsonConfig, setProjectRoot } from "../dataloaders/DataLoaderUtil";
 
 let route = "";
 

@@ -1,11 +1,11 @@
-import * as React from "react";
 import DeckGL from "@deck.gl/react";
-import type { MjolnirEvent } from "mjolnir.js";
+import { ScaleBarLayer } from "@hms-dbmi/viv";
+import type { DeckGLProps, OrbitViewState, OrthographicViewState, PickingInfo } from "deck.gl";
 // import { getVivId } from '@hms-dbmi/views';
 // No need to use the ES6 or React variants.
 import equal from "fast-deep-equal";
-import { ScaleBarLayer } from "@hms-dbmi/viv";
-import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } from "deck.gl";
+import type { MjolnirEvent } from "mjolnir.js";
+import * as React from "react";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 export function getVivId(id: string) {

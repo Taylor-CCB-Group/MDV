@@ -2,12 +2,12 @@
  * `generate_synthetic_anndata_project.py` → folder under `~/mdv` → `/rescan_projects` → registered project id.
  */
 
-import { expect, type Browser, type Page } from "@playwright/test";
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { type Browser, expect, type Page } from "@playwright/test";
 import { getProjectUrl } from "../projectUrl";
 import {
     deleteProjectViaApi,

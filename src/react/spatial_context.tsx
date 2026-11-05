@@ -1,29 +1,29 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type RangeDimension from "../datastore/RangeDimension";
-import { type ScatterPlotConfig, useRegionScale, useScatterplotLayer } from "./scatter_state";
-import { Matrix4 } from "@math.gl/core";
 import {
     CompositeMode,
+    type GeoJsonEditMode,
+    type Position,
     type SimpleFeature,
     type SimpleFeatureCollection,
     type SimpleGeometry,
-    type Position,
-    type GeoJsonEditMode,
 } from "@deck.gl-community/editable-layers";
-import { getVivId } from "./components/avivatorish/MDVivViewer";
-import { type FilterPolyRegionOpts, useChartID, useRangeDimension2D } from "./hooks";
-import { loadColumn } from "@/dataloaders/DataLoaderUtil";
-import type BaseChart from "@/charts/BaseChart";
-import { observer } from "mobx-react-lite";
-import type { BaseConfig } from "@/charts/BaseChart";
+import { Matrix4 } from "@math.gl/core";
 import { action, toJS } from "mobx";
-import { getEmptyFeatureCollection } from "./deck_state";
-import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
+import { observer } from "mobx-react-lite";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type BaseChart from "@/charts/BaseChart";
+import type { BaseConfig } from "@/charts/BaseChart";
+import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { SELECTION_COORDINATE_SYSTEM } from "@/editable-layers/selectionModes";
-import type { HoveredContour } from "./contour_state";
+import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
+import type RangeDimension from "../datastore/RangeDimension";
+import { getVivId } from "./components/avivatorish/MDVivViewer";
 import type { Tool } from "./components/SelectionOverlay";
-import { useGateManager } from "./gates/useGateManager";
+import type { HoveredContour } from "./contour_state";
+import { getEmptyFeatureCollection } from "./deck_state";
 import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "./gates/gateUtils";
+import { useGateManager } from "./gates/useGateManager";
+import { type FilterPolyRegionOpts, useChartID, useRangeDimension2D } from "./hooks";
+import { type ScatterPlotConfig, useRegionScale, useScatterplotLayer } from "./scatter_state";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.

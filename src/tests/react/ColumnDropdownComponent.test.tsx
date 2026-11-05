@@ -1,5 +1,5 @@
-import { getSelectableColumns } from "@/react/components/columnDropdownUtils";
 import { describe, expect, test } from "vitest";
+import { getSelectableColumns } from "@/react/components/columnDropdownUtils";
 
 describe("getSelectableColumns", () => {
     test("includes multitext columns for contour-style categorical pickers", () => {

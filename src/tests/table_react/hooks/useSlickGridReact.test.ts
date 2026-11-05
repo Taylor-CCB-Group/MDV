@@ -1,10 +1,10 @@
-import useSlickGridReact from "@/react/hooks/useSlickGridReact";
-import { renderHook, act } from "@testing-library/react";
-import { describe, test, expect, beforeEach, vi } from "vitest";
+import { act, renderHook } from "@testing-library/react";
 import { observable, runInAction } from "mobx";
-import type { TableChartReactConfig } from "@/react/components/TableChartReactWrapper";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
+import type { TableChartReactConfig } from "@/react/components/TableChartReactWrapper";
+import useSlickGridReact from "@/react/hooks/useSlickGridReact";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 // Mock all the context hooks

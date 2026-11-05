@@ -1,5 +1,6 @@
 import { local } from "d3-selection";
 import Dimension from "./Dimension.js";
+
 class CatColDimension extends Dimension {
     constructor(parent) {
         super(parent);

@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
-import { observer } from "mobx-react-lite";
 // todo - get the gui looking respectable with LinksComponent, and get it to work.
 // todo - get multiple working properly.
 // todo - subgroups
 import { Paper, useTheme } from "@mui/material";
-import { useRowsAsColumnsLinks } from "../chartLinkHooks.js";
-import type { CTypes, ColumnSelectionProps } from "@/lib/columnTypeHelpers.js";
-import { paramAcceptsNumeric } from "@/lib/columnTypeHelpers";
-import ColumnDropdownComponent from "./ColumnDropdownComponent.js";
-import LinkToColumnComponent from "./LinkToColumnComponent.js";
-import ActiveLinkComponent from "./ActiveLinkComponent.js";
+import { observer } from "mobx-react-lite";
+import { useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper.js";
+import { paramAcceptsNumeric } from "@/lib/columnTypeHelpers";
+import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers.js";
 import { isArray } from "@/lib/utils.js";
+import { useRowsAsColumnsLinks } from "../chartLinkHooks.js";
+import ActiveLinkComponent from "./ActiveLinkComponent.js";
+import ColumnDropdownComponent from "./ColumnDropdownComponent.js";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper.js";
+import LinkToColumnComponent from "./LinkToColumnComponent.js";
 import TabHeader from "./TabHeader";
 
 type ColumnMode = "column" | "link" | "active link";

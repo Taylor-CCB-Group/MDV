@@ -1,7 +1,7 @@
-import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart";
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
+import { select } from "d3-selection";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 function getYLabel(c) {
     return c.denominators ? `${c.category} per ${c.denom_unit}` : `% abundance ${c.category}`;

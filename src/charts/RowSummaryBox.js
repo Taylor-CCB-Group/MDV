@@ -1,7 +1,7 @@
-import BaseChart from "./BaseChart";
-import ImagePanZoom from "../utilities/PanZoom.js";
-import { createEl, makeSortable } from "../utilities/Elements.js";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";
+import { createEl, makeSortable } from "../utilities/Elements.js";
+import ImagePanZoom from "../utilities/PanZoom.js";
+import BaseChart from "./BaseChart";
 
 class RowSummaryBox extends BaseChart {
     constructor(dataStore, div, config) {

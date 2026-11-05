@@ -1,4 +1,4 @@
-import { makeAutoObservable, observable, type ObservableMap } from "mobx";
+import { makeAutoObservable, type ObservableMap, observable } from "mobx";
 
 export type ValidationContext = "datasource" | "chart";
 

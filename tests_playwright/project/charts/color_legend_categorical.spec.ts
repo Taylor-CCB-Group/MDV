@@ -15,8 +15,8 @@ import {
 } from "../../utils/helpers";
 import {
     createTemporaryProjectViaSyntheticAnndata,
-    waitForProjectReady,
     type SyntheticAnndataTemporaryProjectHandle,
+    waitForProjectReady,
 } from "../../utils/projectFixtures";
 
 async function clickColorLegendItem(page: Page, chartTitle: string, label: string) {

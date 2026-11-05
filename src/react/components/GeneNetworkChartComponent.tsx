@@ -1,13 +1,12 @@
-import { useMemo, useRef, useLayoutEffect, useState, useCallback, type MouseEvent, type KeyboardEvent } from "react";
-import { observer } from "mobx-react-lite";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useChart } from "../context";
-import { useParamColumns } from "../hooks";
-import { useHighlightedIndices, useHighlightRows } from "../selectionHooks";
-import { useSimplerFilteredIndices } from "../hooks";
+import { observer } from "mobx-react-lite";
+import { type KeyboardEvent, type MouseEvent, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
-import { GeneNetworkInfoComponent } from "./GeneNetworkInfoComponent";
+import { useChart } from "../context";
+import { useParamColumns, useSimplerFilteredIndices } from "../hooks";
+import { useHighlightedIndices, useHighlightRows } from "../selectionHooks";
 import type { GeneNetworkConfig } from "./GeneNetworkChart";
+import { GeneNetworkInfoComponent } from "./GeneNetworkInfoComponent";
 
 /**
  * Get text value from a column at a given index.

@@ -5,8 +5,8 @@ import {
     Info,
     LockPerson,
     MoreVert,
-    Upload as UploadIcon,
     Share as ShareIcon,
+    Upload as UploadIcon,
     WarningAmber,
 } from "@mui/icons-material";
 import {
@@ -28,14 +28,13 @@ import {
     useTheme,
 } from "@mui/material";
 import { useCallback, useMemo, useState } from "react";
+import { buildProjectUrl } from "@/utils/mdvRouting";
+import usePermissions from "./PermissionsContext";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
-import type { Project } from "./utils/projectUtils";
-import type { ProjectAccessType } from "./utils/projectUtils";
 import ProjectShareModal from "./ProjectShareModal";
-import usePermissions from "./PermissionsContext";
-import { buildProjectUrl } from "@/utils/mdvRouting";
+import type { Project, ProjectAccessType } from "./utils/projectUtils";
 
 export type Pvoid = Promise<void>;
 export type ProjectListViewProps = {

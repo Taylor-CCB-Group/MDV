@@ -1,8 +1,8 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
+import { select } from "d3-selection";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
-import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
 class SingleHeatMap extends SVGChart {
     constructor(dataStore, div, config) {

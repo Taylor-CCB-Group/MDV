@@ -1,31 +1,14 @@
-import DeckGL, { type DeckGLRef } from "@deck.gl/react";
-import { type Layer, OrthographicView, OrbitView, type PickingInfo } from "@deck.gl/core";
-import { observer } from "mobx-react-lite";
-import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
+import { type Layer, OrbitView, OrthographicView, type PickingInfo } from "@deck.gl/core";
 import { LineLayer } from "@deck.gl/layers";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { useChart } from "../context";
-import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
+import DeckGL, { type DeckGLRef } from "@deck.gl/react";
 import { action } from "mobx";
+import { observer } from "mobx-react-lite";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import type { DataColumn, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { allNumeric } from "@/lib/columnTypeHelpers";
-import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
-import SelectionOverlay from "./SelectionOverlay";
-import { useScatterRadius } from "../scatter_state";
-import { fitOrthographicView } from "../axisScaling";
-import AxisComponent from "./AxisComponent";
-import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
-import useGateLayers from "../hooks/useGateLayers";
-import FieldContourLegend from "./FieldContourLegend";
-import {
-    useCategoryContourLegend,
-    useFieldContourLegend,
-    type DualContourLegacyConfig,
-    type HoveredContour,
-} from "../contour_state";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
-import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import {
     type DeckDevice,
     type DeckErrorHandlers,
@@ -34,8 +17,25 @@ import {
     useDeckDeviceProps,
 } from "@/react/spatialdata/deck_backend";
 import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
-import { ErrorBoundary } from "react-error-boundary";
+import { fitOrthographicView } from "../axisScaling";
+import { useChart } from "../context";
+import {
+    type DualContourLegacyConfig,
+    type HoveredContour,
+    useCategoryContourLegend,
+    useFieldContourLegend,
+} from "../contour_state";
+import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
+import useGateLayers from "../hooks/useGateLayers";
+import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
+import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
+import { useScatterRadius } from "../scatter_state";
+import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
+import AxisComponent from "./AxisComponent";
+import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import FieldContourLegend from "./FieldContourLegend";
+import SelectionOverlay from "./SelectionOverlay";
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 

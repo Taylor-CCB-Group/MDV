@@ -1,29 +1,29 @@
 import { useCallback, useEffect } from "react";
-// import { useDropzone as useReactDropzone } from 'react-dropzone';
-import { shallow } from "zustand/shallow";
 // eslint-disable-next-line camelcase
 import { unstable_batchedUpdates } from "react-dom";
-
+// import { useDropzone as useReactDropzone } from 'react-dropzone';
+import { shallow } from "zustand/shallow";
+import { useVivConfig } from "@/react/context";
+import { COLOR_PALLETE, FILL_PIXEL_VALUE } from "./constants";
 import {
+    useChannelsStoreApi,
     useImageSettingsStore,
+    useImageSettingsStoreApi,
     useLoader,
     useMetadata,
     useViewerStore,
     useViewerStoreApi,
-    useChannelsStoreApi,
-    useImageSettingsStoreApi,
     // type PixelSource,
 } from "./state";
 import {
-    createLoader,
     buildDefaultSelection,
-    guessRgb,
-    getMultiSelectionStats,
+    createLoader,
     getBoundingCube,
+    getMultiSelectionStats,
+    guessRgb,
     isInterleaved,
 } from "./utils";
-import { COLOR_PALLETE, FILL_PIXEL_VALUE } from "./constants";
-import { useVivConfig } from "@/react/context";
+
 // pending bug fixes...
 
 const EMPTY_RASTER = { width: 0, height: 0, data: new Float32Array() };

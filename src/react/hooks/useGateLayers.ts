@@ -1,14 +1,14 @@
+import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { LoadedDataColumn } from "@/charts/charts";
+import { truncateWithEllipsis } from "@/utilities/Utilities";
+import { getVivId } from "../components/avivatorish/MDVivViewer";
+import type { DeckScatterConfigWithRegion } from "../components/DeckScatterReactWrapper";
+import { computeCentroid, DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
 import { useGateManager } from "../gates/useGateManager";
 import { useChartID, useConfig, useParamColumns } from "../hooks";
-import type { LoadedDataColumn } from "@/charts/charts";
-import { computeCentroid, DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
-import type { DeckScatterConfigWithRegion } from "../components/DeckScatterReactWrapper";
-import { GeoJsonLayer, TextLayer } from "deck.gl";
-import { getVivId } from "../components/avivatorish/MDVivViewer";
 import { useSpatialLayers } from "../spatial_context";
 import useGateActions from "./useGateActions";
-import { truncateWithEllipsis } from "@/utilities/Utilities";
 
 const MAX_LABEL_LENGTH = 18;
 

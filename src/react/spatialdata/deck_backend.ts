@@ -1,6 +1,6 @@
-import { type RenderBackend, renderBackendSetting } from "@/lib/browserSettings";
 import type { CreateDeviceProps, Device } from "@luma.gl/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type RenderBackend, renderBackendSetting } from "@/lib/browserSettings";
 // Side effect: when "WebGPU call tracing" is on, wrap the WebGPU API before any device exists.
 import "./webgpu_trace";
 

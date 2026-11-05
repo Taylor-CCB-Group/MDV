@@ -1,5 +1,6 @@
 import Dimension from "./Dimension.js";
 import RangeDimension from "./RangeDimension.js";
+
 class CatRangeDimension extends RangeDimension {
     constructor(column, parent) {
         super(column, parent);

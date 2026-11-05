@@ -1,12 +1,12 @@
-import {
-    useCloseOnIntersection,
-    useConfig,
-    useDimensionFilter,
-    useOrderedParamColumns,
-    useOwnedFilteredIndices,
-    usePasteHandler,
-} from "../hooks";
-import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
+import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import CachedIcon from "@mui/icons-material/Cached";
+import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 import {
     Accordion,
     AccordionDetails,
@@ -23,45 +23,43 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import { type MouseEvent, useCallback, useEffect, useState, useMemo, useId, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import CachedIcon from "@mui/icons-material/Cached";
-import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
-import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import HighlightOffIcon from "@mui/icons-material/HighlightOff";
-import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import { action, runInAction } from "mobx";
+import { observer } from "mobx-react-lite";
+import { type MouseEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+import { useDebounce } from "use-debounce";
+import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
+import { getNumericColumnData, getSharedNumericColumnData } from "@/lib/columnTypeHelpers";
+import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
+import { formatDateDays, isDateColumn, parseDateDays } from "@/lib/dateFormat";
+import { isArray, resolveAutoHistogramXScaleFromHistogram, resolveAutoHistogramYScale } from "@/lib/utils";
+import { RowsAsColsQuery } from "@/links/link_utils";
+import { createHistogram, queryHistogramWorker } from "@/react/utils/histogram";
+import type { CategoricalDataType, DataColumn, DataType, NumberDataType } from "../../charts/charts";
+import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
+import { useChart, useDataStore } from "../context";
+import {
+    useCloseOnIntersection,
+    useConfig,
+    useDimensionFilter,
+    useOrderedParamColumns,
+    useOwnedFilteredIndices,
+    usePasteHandler,
+} from "../hooks";
+import { useHighlightedIndices } from "../selectionHooks";
+import ColumnSelectionComponent from "./ColumnSelectionComponent";
+import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import HistogramWidget, { type HistogramLayer, type HistogramScaleType } from "./HistogramWidget";
 import type {
-    SelectionDialogConfig,
     CategoryFilter,
     MultiTextFilter,
-    UniqueFilter,
     RangeFilter,
+    SelectionDialogConfig,
+    UniqueFilter,
 } from "./SelectionDialogReact";
-import { observer } from "mobx-react-lite";
-import { action, runInAction } from "mobx";
-import { useChart, useDataStore } from "../context";
-import ColumnSelectionComponent from "./ColumnSelectionComponent";
-import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
-import { ErrorBoundary } from "react-error-boundary";
-import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { TextFieldExtended } from "./TextFieldExtended";
-import { isArray, resolveAutoHistogramXScaleFromHistogram, resolveAutoHistogramYScale } from "@/lib/utils";
-import { formatDateDays, isDateColumn, parseDateDays } from "@/lib/dateFormat";
-import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { arrayMove, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { RowsAsColsQuery } from "@/links/link_utils";
-import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
-import { useHighlightedIndices } from "../selectionHooks";
-import HistogramWidget, { type HistogramLayer, type HistogramScaleType } from "./HistogramWidget";
-import { getNumericColumnData, getSharedNumericColumnData } from "@/lib/columnTypeHelpers";
-import { createHistogram, queryHistogramWorker } from "@/react/utils/histogram";
-import { useDebounce } from "use-debounce";
-import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;

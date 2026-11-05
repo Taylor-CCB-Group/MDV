@@ -1,10 +1,11 @@
 import { createContext, useContext } from "react";
+
 //import type { BaseReactChart } from "./components/BaseReactChart";
 
-import type DataStore from "../datastore/DataStore";
-import type { VivConfig } from "./components/avivatorish/state";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
+import type DataStore from "../datastore/DataStore";
+import type { VivConfig } from "./components/avivatorish/state";
 
 export const ChartContext = createContext<BaseChart<any>>(null as any);
 export const DataStoreContext = createContext<DataStore>(null as any);

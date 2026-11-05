@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type MouseEvent, type KeyboardEvent } from "react";
+import { Link, Paper, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
-import { Paper, Typography, Link } from "@mui/material";
-import z from "zod";
 import clsx from "clsx";
+import { type KeyboardEvent, type MouseEvent, useEffect, useRef, useState } from "react";
+import z from "zod";
 
 // Zod schema for GeneNetwork API response
 const geneNetworkApiResponseSchema = z

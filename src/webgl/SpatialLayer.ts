@@ -1,10 +1,10 @@
 import { CompositeLayer, type Layer, type LayersList } from "@deck.gl/core";
 import type { ScatterplotLayerProps } from "@deck.gl/layers";
 import { ScatterplotLayer } from "@deck.gl/layers";
-import { TriangleLayerContours } from "./HeatmapContourExtension";
-import type { ContourLayerProps } from "@/react/contour_state";
-import { HeatmapLayer } from "deck.gl";
 import { DensityLayer } from "@intraspatial/deck";
+import { HeatmapLayer } from "deck.gl";
+import type { ContourLayerProps } from "@/react/contour_state";
+import { TriangleLayerContours } from "./HeatmapContourExtension";
 import { contourToDensityProps } from "./intraspatialDensity";
 import { MdvScatterplotLayer } from "./MdvScatterplotLayer";
 import { isWebGPULayer } from "./wgslLayerExtension";

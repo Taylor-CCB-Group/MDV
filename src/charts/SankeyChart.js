@@ -1,8 +1,8 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
-import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart";
 import { sankey, sankeyJustify, sankeyLinkHorizontal } from "d3-sankey";
+import { select } from "d3-selection";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 class SankeyChart extends SVGChart {
     constructor(dataStore, div, config) {

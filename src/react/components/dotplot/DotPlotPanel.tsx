@@ -1,7 +1,7 @@
-import type { XLabelLayout } from "@/charts/dotplot/xAxisLabels";
 import { AxisBottom } from "@visx/axis";
 import { scaleBand } from "@visx/scale";
 import { useMemo } from "react";
+import type { XLabelLayout } from "@/charts/dotplot/xAxisLabels";
 import type { DotPlotLayout } from "./dotPlotLayout";
 import { getDotRadius } from "./dotPlotLayout";
 import type { DotPlotGroup } from "./dotPlotStats";

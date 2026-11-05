@@ -1,12 +1,12 @@
-import SVGChart from "./SVGChart.js";
-import { line, area } from "d3-shape";
-import { easeLinear } from "d3-ease";
-import { select } from "d3-selection";
-import { scaleBand, scaleLinear } from "d3-scale";
 import { axisLeft } from "d3-axis";
-import BaseChart from "./BaseChart";
+import { easeLinear } from "d3-ease";
+import { scaleBand, scaleLinear } from "d3-scale";
+import { select } from "d3-selection";
+import { area, line } from "d3-shape";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 class MultiLineChart extends SVGChart {
     constructor(dataStore, div, config) {

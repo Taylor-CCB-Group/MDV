@@ -1,5 +1,6 @@
-import RangeDimension from "./RangeDimension.js";
 import Dimension from "./Dimension";
+import RangeDimension from "./RangeDimension.js";
+
 class DensityDimension extends RangeDimension {
     constructor(parent) {
         super(parent);

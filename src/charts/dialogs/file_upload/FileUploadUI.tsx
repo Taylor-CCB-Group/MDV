@@ -1,4 +1,4 @@
-import { type ChangeEventHandler, type PropsWithChildren, forwardRef } from "react";
+import { type ChangeEventHandler, forwardRef, type PropsWithChildren } from "react";
 
 const colorStyles = {
     blue: {

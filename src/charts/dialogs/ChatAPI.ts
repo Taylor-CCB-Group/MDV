@@ -1,8 +1,8 @@
-import { useProject } from "@/modules/ProjectContext";
+import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as z from "zod/v4";
-import { useQuery } from "@tanstack/react-query";
+import { useProject } from "@/modules/ProjectContext";
 import { useChartManager, useViewManager } from "@/react/hooks";
 
 type ParsedProviderError = {

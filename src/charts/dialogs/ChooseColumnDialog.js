@@ -1,5 +1,5 @@
-import { createEl } from "../../utilities/Elements";
 import { BaseDialog } from "../../utilities/Dialog.js";
+import { createEl } from "../../utilities/Elements";
 import { getRandomString } from "../../utilities/Utilities";
 
 /**

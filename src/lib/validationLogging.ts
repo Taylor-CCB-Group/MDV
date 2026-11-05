@@ -1,5 +1,5 @@
-import type ValidationFindingsStore from "./ValidationFindingsStore";
 import type { ChartConfig } from "@/charts/schemas/ChartConfigSchema";
+import type ValidationFindingsStore from "./ValidationFindingsStore";
 
 type ValidationContext = "datasource" | "chart";
 

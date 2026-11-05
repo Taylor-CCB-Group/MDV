@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import type { BaseConfig } from "@/charts/BaseChart";
-import type { MultiColumnQuery } from "@/links/link_utils";
 import { analyzeChartColumnImpact, analyzeColumnRemoval, getReferencedFields } from "@/charts/columnRemovalUtils";
+import type { MultiColumnQuery } from "@/links/link_utils";
 
 type TestChartConfig = BaseConfig & Record<string, unknown>;
 

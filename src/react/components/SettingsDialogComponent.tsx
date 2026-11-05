@@ -1,11 +1,6 @@
-import { observer } from "mobx-react-lite";
-import { useMemo, useId, useCallback, useState, useRef, useEffect, createContext, useContext } from "react";
-import type { Dispatch, SetStateAction } from "react";
-import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType, Disposer } from "../../charts/charts";
-import { action, autorun, makeAutoObservable, runInAction } from "mobx";
-import { ErrorBoundary } from "react-error-boundary";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { v4 as uuid } from "uuid";
+import { Clear } from "@mui/icons-material";
+import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import {
     Box,
     Button,
@@ -22,26 +17,30 @@ import {
     Slider,
     Typography,
 } from "@mui/material";
+import Autocomplete from "@mui/material/Autocomplete";
 import Checkbox from "@mui/material/Checkbox";
 import TextField from "@mui/material/TextField";
-import Autocomplete from "@mui/material/Autocomplete";
-import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
-import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import { ChartProvider } from "../context";
-import ColumnSelectionComponent from "./ColumnSelectionComponent";
-import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import { g, isArray, notEmpty } from "@/lib/utils";
+import { action, autorun, makeAutoObservable, runInAction } from "mobx";
+import { observer } from "mobx-react-lite";
+import type { Dispatch, SetStateAction } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+import { v4 as uuid } from "uuid";
 import type BaseChart from "@/charts/BaseChart";
-import type { BaseConfig } from "@/charts/BaseChart";
-import type { SettingsDialogState as PersistedSettingsDialogState } from "@/charts/BaseChart";
-import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
-import CustomTooltip from "./CustomTooltip";
-import { useCloseOnIntersection, usePasteHandler } from "../hooks";
+import type { BaseConfig, SettingsDialogState as PersistedSettingsDialogState } from "@/charts/BaseChart";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
-import { Clear } from "@mui/icons-material";
+import { g, isArray, notEmpty } from "@/lib/utils";
+import type { AnyGuiSpec, Disposer, DropDownValues, GuiSpec, GuiSpecType } from "../../charts/charts";
+import { ChartProvider } from "../context";
+import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { useFilteredGroupedSettings } from "../hooks/useFilteredGroupedSettings";
-import { getCategorySelectionDropdownKey } from "./categorySelectionUtils";
+import ColumnSelectionComponent from "./ColumnSelectionComponent";
+import CustomTooltip from "./CustomTooltip";
 import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
+import { getCategorySelectionDropdownKey } from "./categorySelectionUtils";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 const SettingsSearchContext = createContext("");
 const SEARCH_HINT_DURATION_MS = 4000;

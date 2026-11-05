@@ -1,7 +1,7 @@
-import { describe, expect, test } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { g } from "@/lib/utils";
+import { describe, expect, test } from "vitest";
 import type { AnyGuiSpec, GuiSpec } from "@/charts/charts";
+import { g } from "@/lib/utils";
 import { useFilteredGroupedSettings } from "../../react/hooks/useFilteredGroupedSettings";
 
 function getFolder(settings: Array<{ setting: AnyGuiSpec; id: string }>, label: string): GuiSpec<"folder"> | undefined {

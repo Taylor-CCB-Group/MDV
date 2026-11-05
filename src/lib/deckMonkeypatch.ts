@@ -1,6 +1,6 @@
-import type { EventManager } from "mjolnir.js";
 import { Deck } from "@deck.gl/core";
 import { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
+import type { EventManager } from "mjolnir.js";
 import { cpuEditablePicks } from "@/editable-layers/cpuPicks";
 
 // we aren't really using this as an actual subclass, just declaring things as public so we can access them.

@@ -1,24 +1,23 @@
-import type { ReactNode } from "react";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-
-import DebugErrorComponent from "../DebugErrorComponent";
+import type { ReactNode } from "react";
 import type { DatasourceSummary, TiffSummary, UploadErrorPayload } from "@/utils/file_upload/fileUploadTypes";
+import DebugErrorComponent from "../DebugErrorComponent";
 import {
     Button,
     DatasourceNameInput,
+    DropzoneContainer,
     DynamicText,
     FileInputLabel,
     FileSummary,
     FileSummaryHeading,
     FileSummaryText,
-    ProgressBar,
     Message,
+    ProgressBar,
     Spinner,
     StatusContainer,
     SuccessContainer,
     SuccessHeading,
     SuccessText,
-    DropzoneContainer,
 } from "./FileUploadUI";
 
 export function RedirectingView() {

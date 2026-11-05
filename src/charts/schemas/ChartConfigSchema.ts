@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { registerChartConfigSchema, getAllChartConfigSchemas } from "./ChartConfigRegistry";
+import { getAllChartConfigSchemas, registerChartConfigSchema } from "./ChartConfigRegistry";
 
 // Basic data types that can be stored in columns
 export const DataTypeSchema = z

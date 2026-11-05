@@ -1,8 +1,9 @@
 import { createEl } from "../utilities/Elements";
+import { debounce } from "../utilities/Utilities";
+import { WGL2DI } from "../webgl/WGL2DI";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart";
-import { WGL2DI } from "../webgl/WGL2DI";
-import { debounce } from "../utilities/Utilities";
+
 const color_scheme = [
     "#313695",
     "#4575B4",

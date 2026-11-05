@@ -1,12 +1,12 @@
+import {
+    CssBaseline,
+    createTheme,
+    ThemeProvider as MuiThemeProvider,
+    type PaletteMode,
+    useMediaQuery,
+} from "@mui/material";
 import type React from "react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import {
-    ThemeProvider as MuiThemeProvider,
-    createTheme,
-    useMediaQuery,
-    type PaletteMode,
-    CssBaseline,
-} from "@mui/material";
 
 export type ColorMode = {
     toggleColorMode: () => void;

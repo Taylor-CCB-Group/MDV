@@ -1,9 +1,9 @@
+import { createMdvPortal } from "@/react/react_utils";
 import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
-import { createMdvPortal } from "@/react/react_utils";
 import { ChartProvider } from "../context";
-import SpatialLayerDialogComponent from "./SpatialLayerDialogComponent";
 import type { SpatialDataMdvReact } from "./SpatialDataMDVReact";
+import SpatialLayerDialogComponent from "./SpatialLayerDialogComponent";
 
 class SpatialLayerDialogReactWrapper extends BaseDialog {
     _root?: ReturnType<typeof createMdvPortal>;

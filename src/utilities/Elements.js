@@ -567,17 +567,17 @@ function getElDim(el) {
 }
 
 export {
-    createEl,
-    createSVGEl,
-    addResizeListener,
-    makeDraggable,
     addElProps,
-    makeResizable,
-    removeDraggable,
-    removeResizable,
+    addResizeListener,
+    createEl,
     createMenuIcon,
-    makeSortable,
-    splitPane,
+    createSVGEl,
     getElDim,
     MDVProgress,
+    makeDraggable,
+    makeResizable,
+    makeSortable,
+    removeDraggable,
+    removeResizable,
+    splitPane,
 };

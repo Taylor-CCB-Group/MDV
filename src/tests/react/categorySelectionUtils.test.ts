@@ -1,9 +1,9 @@
+import { describe, expect, test, vi } from "vitest";
 import {
     getAvailableCategorySelectionValues,
     getCategorySelectionDropdownKey,
     shouldRefreshCategorySelectionValues,
 } from "@/react/components/categorySelectionUtils";
-import { describe, expect, test, vi } from "vitest";
 
 describe("categorySelectionUtils", () => {
     test("reads single-item values from multitext source columns", () => {

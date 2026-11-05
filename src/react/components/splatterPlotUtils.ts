@@ -1,7 +1,7 @@
 import type { OrthographicViewState } from "@deck.gl/core";
-import type { CategoricalDataType, LoadedDataColumn, NumberDataType } from "../../charts/charts";
-import type { BaseConfig } from "../../charts/BaseChart";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import type { BaseConfig } from "../../charts/BaseChart";
+import type { CategoricalDataType, LoadedDataColumn, NumberDataType } from "../../charts/charts";
 import type { ContourVisualConfig } from "../contour_state";
 
 export const splatterDefaults = {

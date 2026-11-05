@@ -255,4 +255,4 @@ function parseNewick(tree) {
     return d3_hierarchy(r);
 }
 
-export { HierarchicalClustering, getHierarchicalNodes, parseNewick };
+export { getHierarchicalNodes, HierarchicalClustering, parseNewick };

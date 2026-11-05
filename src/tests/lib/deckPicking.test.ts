@@ -1,5 +1,5 @@
-import { ScatterplotLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
+import { ScatterplotLayer } from "@deck.gl/layers";
 import { describe, expect, it, vi } from "vitest";
 import {
     findPickedInfo,

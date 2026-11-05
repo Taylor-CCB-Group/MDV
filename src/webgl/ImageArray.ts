@@ -1,9 +1,9 @@
 import type { Device, Texture } from "@luma.gl/core";
+import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import type DataStore from "../datastore/DataStore";
 import type { DataModel } from "../table/DataModel";
 import { createEl } from "../utilities/Elements";
-import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 
 export type ImageArrayConfig = {
     base_url: string;

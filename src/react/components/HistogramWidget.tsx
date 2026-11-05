@@ -1,14 +1,14 @@
 import * as d3 from "d3";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTheme } from "../hooks";
+import { formatDateDays } from "@/lib/dateFormat";
 import {
-    createBrushScale,
-    useBrushX,
     type BrushXConfig,
     type BrushXScaleType,
+    createBrushScale,
     type Range,
+    useBrushX,
 } from "@/react/components/histogram/useBrushX";
-import { formatDateDays } from "@/lib/dateFormat";
+import { useTheme } from "../hooks";
 
 export type HistogramScaleType = BrushXScaleType;
 export type HistogramBrushConfig = BrushXConfig;

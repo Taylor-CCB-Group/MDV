@@ -1,17 +1,16 @@
+import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
+import { observer } from "mobx-react-lite";
 import type React from "react";
 import { useEffect, useMemo } from "react";
-import { observer } from "mobx-react-lite";
-import { DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
-import { ColorPaletteExtension } from "@hms-dbmi/viv";
+import { shallow } from "zustand/shallow";
+import { useOuterContainer } from "@/react/screen_state";
+import MDVivViewer from "../../react/components/avivatorish/MDVivViewer";
 import {
-    useLoader,
     useChannelsStore,
+    useLoader,
     useViewerStore,
     useViewerStoreApi,
 } from "../../react/components/avivatorish/state";
-import { shallow } from "zustand/shallow";
-import MDVivViewer from "../../react/components/avivatorish/MDVivViewer";
-import { useOuterContainer } from "@/react/screen_state";
 
 export interface SimpleTiffViewerProps {
     width: number;

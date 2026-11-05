@@ -1,9 +1,9 @@
+import { action, type IReactionDisposer } from "mobx";
 import BaseChart, { type BaseConfig } from "@/charts/BaseChart";
 // import { deserialiseParam, type SerialisedParams } from "@/charts/chartConfigUtils";
-import { type FieldSpecs, flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
+import { type FieldSpec, type FieldSpecs, flattenFields } from "@/lib/columnTypeHelpers";
 import { isArray } from "@/lib/utils";
 import { RowsAsColsQuery } from "@/links/link_utils";
-import { action, type IReactionDisposer } from "mobx";
 
 /**
  * Apply the {@link loadColumnData} decorator to a method on a chart class manually at runtime,

@@ -1,9 +1,9 @@
-import { select } from "d3-selection";
-import { easeLinear } from "d3-ease";
-import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart";
 import { brushX } from "d3-brush";
+import { easeLinear } from "d3-ease";
+import { select } from "d3-selection";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 class HistogramChart extends SVGChart {
     constructor(dataStore, div, config) {

@@ -1,7 +1,7 @@
-import { loadColumn } from "@/dataloaders/DataLoaderUtil";
-import TagModel from "@/table/TagModel";
-import { DataModel } from "@/table/DataModel";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { loadColumn } from "@/dataloaders/DataLoaderUtil";
+import { DataModel } from "@/table/DataModel";
+import TagModel from "@/table/TagModel";
 
 vi.mock("@/table/DataModel", () => ({
     DataModel: vi.fn(),

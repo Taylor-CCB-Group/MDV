@@ -1,5 +1,3 @@
-import useBuildInfo from "@/catalog/hooks/useBuildInfo";
-import { DEBUG_ERROR_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
 import { Check, ContentCopy, Error as ErrorIcon, ExpandLess, ExpandMore } from "@mui/icons-material";
 import {
     Alert,
@@ -18,6 +16,8 @@ import {
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import JsonView from "react18-json-view";
+import useBuildInfo from "@/catalog/hooks/useBuildInfo";
+import { DEBUG_ERROR_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
 
 /** Any extra information we may want to use
  *

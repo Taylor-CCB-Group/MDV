@@ -3,13 +3,13 @@ import DataStore from "@/datastore/DataStore";
 import Dimension from "@/datastore/Dimension";
 import {
     applyColorLegendFilter,
+    type ColorLegendFilterChart,
     clearColorLegendFilter,
     getActiveCategoricalColorLegendValue,
     getActiveContinuousColorLegendRange,
     restoreColorLegendFilter,
     setContinuousColorLegendFilter,
     toggleCategoricalColorLegendFilter,
-    type ColorLegendFilterChart,
 } from "@/react/legend/color_legend/colorLegendFilter";
 import type { ColorLegendCategoricalSpec, ColorLegendContinuousSpec } from "@/react/legend/color_legend/types";
 

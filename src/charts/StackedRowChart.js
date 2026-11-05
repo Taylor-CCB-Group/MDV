@@ -1,9 +1,9 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
-import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart";
-import { getHierarchicalNodes } from "../utilities/clustering.js";
+import { select } from "d3-selection";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+import { getHierarchicalNodes } from "../utilities/clustering.js";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 class StackedRowChart extends SVGChart {
     constructor(dataStore, div, config) {

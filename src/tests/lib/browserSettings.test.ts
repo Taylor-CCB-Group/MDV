@@ -1,6 +1,6 @@
-import { defineChoiceSetting } from "@/lib/browserSettings";
 import { autorun } from "mobx";
 import { afterEach, describe, expect, test } from "vitest";
+import { defineChoiceSetting } from "@/lib/browserSettings";
 
 const KEY = "mdv.settings.test";
 

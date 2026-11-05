@@ -1,23 +1,28 @@
+import { action, runInAction } from "mobx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    type Column,
+    Editors,
+    type GridOption,
+    InputEditor,
+    SlickEventHandler,
+    type SlickgridReactInstance,
+} from "slickgrid-react";
+import type { BaseConfig } from "@/charts/BaseChart";
+import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
+import type { ColumnRemovalImpact } from "@/charts/types/columnRemoval";
+import { flattenFields } from "@/lib/columnTypeHelpers";
+import { DataModel } from "@/table/DataModel";
+import { escapeHtml } from "@/utilities/Utilities";
+import type { AddColumnParams } from "../components/AddTableColumnDialog";
+import type { BulkEditAction } from "../components/BulkEditColumnDialog";
+import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
 import type { TableChartReact, TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useChart, useDataStore } from "../context";
 import { useChartID, useChartManager, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
 import { useHighlightedIndices } from "../selectionHooks";
-import { type Column, Editors, type GridOption, type SlickgridReactInstance, SlickEventHandler } from "slickgrid-react";
 import SlickGridDataProvider from "../utils/SlickGridDataProvider";
-import { action, runInAction } from "mobx";
 import useSortedFilteredIndices from "./useSortedFilteredIndices";
-
-import { InputEditor } from "slickgrid-react";
-import { DataModel } from "@/table/DataModel";
-import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
-import type { AddColumnParams } from "../components/AddTableColumnDialog";
-import type { BulkEditAction } from "../components/BulkEditColumnDialog";
-import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
-import type { ColumnRemovalImpact } from "@/charts/types/columnRemoval";
-import type { BaseConfig } from "@/charts/BaseChart";
-import { flattenFields } from "@/lib/columnTypeHelpers";
-import { escapeHtml } from "@/utilities/Utilities";
 
 /**
  * Text editor that sets the HTML input maxLength so the user cannot type

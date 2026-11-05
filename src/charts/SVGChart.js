@@ -1,9 +1,9 @@
-import BaseChart from "./BaseChart";
+import { scaleBand, scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
-import { scaleLinear, scaleBand } from "d3-scale";
+import BaseChart from "./BaseChart";
 import "d3-transition";
+import { axisBottom, axisLeft } from "d3-axis";
 import { easeLinear } from "d3-ease";
-import { axisLeft, axisBottom } from "d3-axis";
 import { cluster } from "d3-hierarchy";
 import { dateTickFormat } from "@/lib/dateFormat";
 

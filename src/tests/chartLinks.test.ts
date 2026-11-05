@@ -1,5 +1,5 @@
-import { restoreChartLinks, snapshotChartLinks, type ChartLink } from "@/charts/chartLinks";
 import { describe, expect, test } from "vitest";
+import { type ChartLink, restoreChartLinks, snapshotChartLinks } from "@/charts/chartLinks";
 
 describe("chart links across replacing a chart", () => {
     test("snapshots only the links the chart takes part in", () => {

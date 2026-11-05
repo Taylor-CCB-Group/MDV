@@ -1,20 +1,19 @@
 import { Typography } from "@mui/material";
-import { pickDefaultSelectionForAdd, serializeChannelConfig, type LayerChannelConfig } from "@spatialdata/avivatorish";
+import { type LayerChannelConfig, pickDefaultSelectionForAdd, serializeChannelConfig } from "@spatialdata/avivatorish";
 import {
     ImageLayerContextProvider,
+    type LayerConfig,
     useImageLayerContext,
     useLayerChannelState,
-    type LayerConfig,
 } from "@spatialdata/vis";
 import { observer } from "mobx-react-lite";
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
-
-import { useChart } from "@/react/context";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "@/react/components/SpatialDataMDVReact";
+import { useChart } from "@/react/context";
 import { toneFromArrays, toneFromVivLayerProps, useImageLayerRuntime } from "@/react/spatialdata/image_layer_runtime";
 import { useRenderStackEntry } from "@/react/spatialdata/render_stack_control";
+import { createVivStores, useChannelsStoreApi, useViewerStoreApi, VivProvider } from "../avivatorish/state";
 import { VivChannelList } from "../ColorChannelComponents";
-import { createVivStores, VivProvider, useChannelsStoreApi, useViewerStoreApi } from "../avivatorish/state";
 
 type ImageLayerConfig = Extract<LayerConfig, { type: "image" }>;
 

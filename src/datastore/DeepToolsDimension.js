@@ -1,5 +1,5 @@
-import SortableDimension from "./SortableDimension.js";
 import Dimension from "./Dimension.js";
+import SortableDimension from "./SortableDimension.js";
 export default class DeepToolsDimension extends SortableDimension {
     constructor(parent) {
         super(parent);

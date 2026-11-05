@@ -15,8 +15,8 @@ import {
 } from "@mui/material";
 import type React from "react";
 import { useState } from "react";
-import type { ProjectAccessType } from "./utils/projectUtils";
 import { DialogCloseIconButton } from "./ProjectRenameModal";
+import type { ProjectAccessType } from "./utils/projectUtils";
 
 export interface ProjectSettingsModalProps {
     id: string;

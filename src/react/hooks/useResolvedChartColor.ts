@@ -1,7 +1,7 @@
+import { useEffect, useMemo } from "react";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import { useFieldSpec } from "@/react/hooks";
-import { useEffect, useMemo } from "react";
 
 export function useChartColors<T extends BaseConfig>(chart: BaseChart<T>) {
     const colorField =

@@ -1,4 +1,5 @@
 import { Slick } from "./Slick.js";
+
 // register namespace
 function RowSelectionModel(options) {
     let _grid;

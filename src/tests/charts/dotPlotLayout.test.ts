@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import {
     DOT_PLOT_MAX_RADIUS,
     DOT_PLOT_RIGHT_MARGIN,
@@ -7,9 +8,8 @@ import {
     getVisibleRows,
     getXLabelLayout,
 } from "@/react/components/dotplot/dotPlotLayout";
-import { MISSING_VALUE_COLOR, binnedColorScale } from "@/react/components/dotplot/dotPlotPalettes";
+import { binnedColorScale, MISSING_VALUE_COLOR } from "@/react/components/dotplot/dotPlotPalettes";
 import type { DotPlotGroup } from "@/react/components/dotplot/dotPlotStats";
-import { describe, expect, it } from "vitest";
 
 const group = (count: number): DotPlotGroup => ({ count, cells: [] });
 

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { mockApiRoot, mockProjects, gotoPath } from "../utils/routes";
 import { project } from "../utils/data";
+import { gotoPath, mockApiRoot, mockProjects } from "../utils/routes";
 
 test.describe("share project", () => {
     test.beforeEach(async ({ page }) => {

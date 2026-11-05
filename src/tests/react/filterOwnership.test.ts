@@ -1,5 +1,5 @@
-import { getOwnerVisibleRows, isRowFilteredByOtherOwner } from "@/lib/filterOwnership";
 import { describe, expect, test } from "vitest";
+import { getOwnerVisibleRows, isRowFilteredByOtherOwner } from "@/lib/filterOwnership";
 
 function toRows(rows: Uint32Array) {
     return Array.from(rows);

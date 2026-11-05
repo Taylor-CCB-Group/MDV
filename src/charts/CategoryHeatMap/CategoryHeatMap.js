@@ -1,5 +1,5 @@
-import { BaseReactChart } from "../../react/components/BaseReactChart";
 import { g } from "../../lib/utils";
+import { BaseReactChart } from "../../react/components/BaseReactChart";
 import BaseChart from "../BaseChart";
 import CategoryHeatmapComponent from "./CategoryHeatmapComponent";
 

@@ -1,17 +1,17 @@
-import { createRoot } from "react-dom/client";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
-import CssBaseline from "@mui/material/CssBaseline";
-import { type PropsWithChildren, type ReactElement, StrictMode, useMemo } from "react";
-import { ProjectProvider } from "@/modules/ProjectContext";
-import { observer } from "mobx-react-lite";
-import type BaseChart from "@/charts/BaseChart";
-import type { BaseDialog } from "@/utilities/Dialog";
-import { OuterContainerProvider, useOuterContainer } from "./screen_state";
 import { createFilterOptions } from "@mui/material";
+import CssBaseline from "@mui/material/CssBaseline";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AUTOCOMPLETE_OPTIONS_LIMIT } from "@/lib/constants";
+import { observer } from "mobx-react-lite";
+import { type PropsWithChildren, type ReactElement, StrictMode, useMemo } from "react";
+import { createRoot } from "react-dom/client";
+import type BaseChart from "@/charts/BaseChart";
 import type ChartManager from "@/charts/ChartManager";
+import { AUTOCOMPLETE_OPTIONS_LIMIT } from "@/lib/constants";
+import { ProjectProvider } from "@/modules/ProjectContext";
+import type { BaseDialog } from "@/utilities/Dialog";
 import { ChartManagerProvider, useChartManagerContext } from "./chartManagerContext";
+import { OuterContainerProvider, useOuterContainer } from "./screen_state";
 
 // todo - think about whether this might lead to unexpected future issues
 

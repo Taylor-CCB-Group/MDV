@@ -1,5 +1,5 @@
 import type { DataColumn, DataType } from "@/charts/charts";
-import { columnMatchesType, type CTypes } from "@/lib/columnTypeHelpers";
+import { type CTypes, columnMatchesType } from "@/lib/columnTypeHelpers";
 
 export function getSelectableColumns(columns: DataColumn<DataType>[], type: CTypes | undefined, exclude?: string[]) {
     return columns

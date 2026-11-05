@@ -3,8 +3,8 @@
 // Copyright (c) vis.gl contributors / Peter Todd
 
 import {
-    DrawPolygonByDraggingMode,
     type DraggingEvent,
+    DrawPolygonByDraggingMode,
     type Feature,
     type ModeProps,
     type Polygon,

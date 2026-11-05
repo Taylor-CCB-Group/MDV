@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react-lite";
-import { useViewerStoreApi, useViewerStore } from "../../react/components/avivatorish/state";
-import type { OME_TIFF } from "../../react/components/avivatorish/state";
-import SimpleTiffViewer from "./SimpleTiffViewer";
+import React, { useEffect, useMemo, useState } from "react";
 import { useImage } from "@/react/components/avivatorish/hooks";
+import type { OME_TIFF } from "../../react/components/avivatorish/state";
+import { useViewerStore, useViewerStoreApi } from "../../react/components/avivatorish/state";
+import SimpleTiffViewer from "./SimpleTiffViewer";
 import TiffChartWrapper from "./TiffChartWrapper";
 
 const TiffVisualization = observer(({ metadata, file }: { metadata: OME_TIFF["metadata"]; file: File }) => {

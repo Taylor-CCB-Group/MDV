@@ -1,48 +1,56 @@
-import { BotMessageSquare, SquareTerminal } from "lucide-react";
-import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen, CircleAlert } from "lucide-react";
-import {
-    type ChatProgress,
-    type ChatMessage,
-    type ChatModelOption,
-    type ChatDatasourceOption,
-    type DatasourceMode,
-    navigateToView,
-} from "./ChatAPI";
-import { forwardRef, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import JsonView from "react18-json-view";
-import ReactMarkdown from "react-markdown";
-import SyntaxHighlighter from "react-syntax-highlighter";
-import { dracula } from "react-syntax-highlighter/dist/esm/styles/hljs";
-// import RobotPandaSVG from './PandaSVG';
-import LinearProgress from "@mui/material/LinearProgress";
+import { Check, Clear as ClearIcon, ContentCopy } from "@mui/icons-material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
     Accordion,
     AccordionDetails,
     AccordionSummary,
     Box,
     Button,
-    Divider,
-    IconButton,
-    InputAdornment,
-    FormControl,
     Checkbox,
+    Divider,
+    FormControl,
     FormControlLabel,
     FormGroup,
+    IconButton,
+    InputAdornment,
     InputLabel,
     MenuItem,
     Select,
     Skeleton,
     TextField,
-    Typography,
     ToggleButton,
     ToggleButtonGroup,
+    Typography,
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+// import RobotPandaSVG from './PandaSVG';
+import LinearProgress from "@mui/material/LinearProgress";
 import _ from "lodash";
-import { Check, ContentCopy, Clear as ClearIcon } from "@mui/icons-material";
-import remarkGfm from "remark-gfm";
+import {
+    BotMessageSquare,
+    CircleAlert,
+    MessageCircleQuestion,
+    NotebookPen,
+    SquareTerminal,
+    Star,
+    ThumbsDown,
+    ThumbsUp,
+} from "lucide-react";
+import { forwardRef, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import SyntaxHighlighter from "react-syntax-highlighter";
+import { dracula } from "react-syntax-highlighter/dist/esm/styles/hljs";
+import JsonView from "react18-json-view";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
+import remarkGfm from "remark-gfm";
+import {
+    type ChatDatasourceOption,
+    type ChatMessage,
+    type ChatModelOption,
+    type ChatProgress,
+    type DatasourceMode,
+    navigateToView,
+} from "./ChatAPI";
 
 export type MessageType = {
     onClose: () => void;

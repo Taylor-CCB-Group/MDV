@@ -2,10 +2,10 @@ import * as z from "zod/v4";
 import {
     BaseConfigSchema,
     ChartColorConfigSchema,
-    FieldSpecSchema,
-    TooltipConfigSchema,
-    ScatterPlotConfigSchema,
     ChartConfigSchema,
+    FieldSpecSchema,
+    ScatterPlotConfigSchema,
+    TooltipConfigSchema,
 } from "../src/charts/schemas/ChartConfigSchema.ts";
 
 // Test individual schemas to isolate the problem

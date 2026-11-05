@@ -7,14 +7,14 @@ import { observer } from "mobx-react-lite";
 import { type ReactNode, useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
 import "../../utilities/css/JsonDialogStyles.css";
-import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Divider, Link, Typography } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Divider, Link, Typography } from "@mui/material";
+import type ValidationFindingsStore from "@/lib/ValidationFindingsStore";
+import type { ValidationFinding } from "@/lib/ValidationFindingsStore";
 import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
 import { useChartManager } from "../hooks";
 import BrowserSettingsSection from "./BrowserSettingsSection";
 import CustomTooltip from "./CustomTooltip";
-import type ValidationFindingsStore from "@/lib/ValidationFindingsStore";
-import type { ValidationFinding } from "@/lib/ValidationFindingsStore";
 
 type JSONObject = { [key: string]: any };
 type DataLoaderFaultMode = "empty" | "corrupt" | "timeout";

@@ -1,8 +1,8 @@
-import { createEl, createSVGEl, makeResizable, makeDraggable } from "./Elements.js";
-import { select } from "d3-selection";
-import { scaleLinear } from "d3-scale";
 import { axisBottom } from "d3-axis";
+import { scaleLinear } from "d3-scale";
+import { select } from "d3-selection";
 import { dateTickFormat } from "@/lib/dateFormat";
+import { createEl, createSVGEl, makeDraggable, makeResizable } from "./Elements.js";
 import { getRandomString } from "./Utilities";
 
 /**
@@ -260,4 +260,4 @@ function getColorBar(colors, config = {}) {
     return container;
 }
 
-export { getColorLegend, getColorBar, getColorLegendCustom };
+export { getColorBar, getColorLegend, getColorLegendCustom };

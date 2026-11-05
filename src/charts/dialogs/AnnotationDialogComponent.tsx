@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState, type MouseEvent, type PropsWithChildren } from "react";
+import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import { Autocomplete, Box, Button, Checkbox, Chip, Divider, Paper, Stack, TextField, Typography } from "@mui/material";
 import { observer } from "mobx-react-lite";
+import { type MouseEvent, type PropsWithChildren, useEffect, useMemo, useState } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import TabHeader from "@/react/components/TabHeader";
 import { getNextHighlightedRows } from "@/react/selectionHooks";
 import type DataStore from "../../datastore/DataStore.js";
 import TagModel, { type TagSelectionScope } from "../../table/TagModel";
-import { Autocomplete, Box, Button, Checkbox, Chip, Divider, Paper, Stack, TextField, Typography } from "@mui/material";
-import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
-import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;

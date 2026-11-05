@@ -1,5 +1,5 @@
-import { useChannelSelectionStats } from "@spatialdata/avivatorish";
 import type { LayerChannelSelection, UseLayerChannelStateResult } from "@spatialdata/avivatorish";
+import { useChannelSelectionStats } from "@spatialdata/avivatorish";
 import { useLayoutEffect } from "react";
 
 import type { StoreApi } from "zustand";

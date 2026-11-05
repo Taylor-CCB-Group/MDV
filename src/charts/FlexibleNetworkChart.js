@@ -1,23 +1,23 @@
-import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart";
 import {
-    forceSimulation,
+    arc,
+    drag,
+    forceCenter,
     forceLink,
     forceManyBody,
-    forceCenter,
-    drag,
-    scaleSqrt,
+    forceSimulation,
+    pie,
     scaleLinear,
+    scaleSqrt,
     schemeReds,
+    select,
     zoom,
     zoomIdentity,
-    pie,
-    arc,
-    select,
 } from "d3";
-import { getColorLegendCustom } from "../utilities/Color.js";
-import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+import { getColorLegendCustom } from "../utilities/Color.js";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 const color_schemes = {
     "blue yellow": ["#115f9a", "#1984c5", "#22a7f0", "#48b5c4", "#76c68f", "#a6d75b", "#c9e52f", "#d0ee11", "#d0f400"],

@@ -1,15 +1,14 @@
+import { Deck, OrthographicView } from "@deck.gl/core";
+// import { ScatterplotExLayer } from "@/webgl/ScatterplotExLayer.js";
+import { ScatterplotLayer } from "@deck.gl/layers";
+import type DataStore from "@/datastore/DataStore.js";
+import type Dimension from "../datastore/Dimension.js";
 import { DataModel } from "../table/DataModel.js";
-import { Deck } from "@deck.gl/core";
-import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import { ImageArray } from "../webgl/ImageArray";
 import { ImageArrayDeckExtension } from "../webgl/ImageArrayDeckExtension";
-// import { ScatterplotExLayer } from "@/webgl/ScatterplotExLayer.js";
-import { ScatterplotLayer } from "@deck.gl/layers";
-import { OrthographicView } from "@deck.gl/core";
-import type Dimension from "../datastore/Dimension.js";
-import type { LoadedDataColumn, GuiSpec, NumberDataType } from "./charts.js";
-import type DataStore from "@/datastore/DataStore.js";
+import BaseChart from "./BaseChart";
+import type { GuiSpec, LoadedDataColumn, NumberDataType } from "./charts.js";
 
 // not a definitive type, but marginally better than 'any', locally for now...
 //type Column = { data: Float32Array; minMax: [number, number] };

@@ -1,16 +1,16 @@
+import { action, makeAutoObservable, observable } from "mobx";
+import type DataStore from "@/datastore/DataStore";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import { isArray } from "@/lib/utils";
+import { logChartValidationError } from "@/lib/validationLogging";
+import { RowsAsColsQuery, type RowsAsColsQuerySerialized } from "@/links/link_utils";
+import type { TooltipConfig } from "@/react/scatter_state";
 import { getRandomString } from "@/utilities/Utilities";
 import type BaseChart from "./BaseChart";
-import { action, makeAutoObservable, observable } from "mobx";
-import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
-import { RowsAsColsQuery, type RowsAsColsQuerySerialized } from "@/links/link_utils";
-import type { FieldName } from "./charts";
-import type DataStore from "@/datastore/DataStore";
-import { isArray } from "@/lib/utils";
 import type { BaseConfig } from "./BaseChart";
-import type { TooltipConfig } from "@/react/scatter_state";
+import type { FieldName } from "./charts";
 import { getChartConfigSchema } from "./schemas/ChartConfigRegistry";
 import { BaseConfigSchema, type ChartConfig } from "./schemas/ChartConfigSchema";
-import { logChartValidationError } from "@/lib/validationLogging";
 
 /**
  * This is a utility module for handling the serialisation and deserialisation of chart configurations.

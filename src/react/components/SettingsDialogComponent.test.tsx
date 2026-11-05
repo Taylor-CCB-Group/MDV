@@ -1,6 +1,6 @@
-import { describe, test, expect, vi } from "vitest";
-import { g } from "@/lib/utils";
+import { describe, expect, test, vi } from "vitest";
 import type { AnyGuiSpec, Disposer } from "@/charts/charts";
+import { g } from "@/lib/utils";
 import {
     collectDisposers,
     createInitialFolderOpenState,
