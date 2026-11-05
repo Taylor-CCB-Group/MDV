@@ -446,19 +446,15 @@ class TestValidateUserBootstrapAndRefusal:
 
         return result, error, mock_user_class, mock_db, new_user
 
-    def test_bootstrap_creates_first_admin_and_assigns_role(self, bootstrap_app, provider):
+    def test_bootstrap_creates_first_admin_without_an_auth0_role(self, bootstrap_app, provider):
+        # Admin rights live only in MDV (ADR 0019), so Auth0's Management API is
+        # never asked for a role.
         user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
 
-        with patch('mdvtools.auth.auth0_provider.GetToken') as mock_get_token, \
-             patch('mdvtools.auth.auth0_provider.Auth0') as mock_auth0_class, \
+        with patch('mdvtools.auth.auth0_provider.Auth0') as mock_auth0_class, \
              patch('mdvtools.dbutils.dbservice.UserProjectService.grant_all_projects_to_admins',
                    return_value=3) as mock_grant, \
              patch('mdvtools.auth.authutils.cache_user_projects') as mock_cache:
-            mock_get_token.return_value.client_credentials.return_value = {"access_token": "mgmt-token"}
-            mock_auth0 = MagicMock()
-            mock_auth0.roles.list.return_value = {"roles": [{"id": "role_admin", "name": "admin"}]}
-            mock_auth0_class.return_value = mock_auth0
-
             result, error, mock_user_class, mock_db, new_user = self._run_validate_user(
                 bootstrap_app, provider, user_info, existing_user_side_effect=[None]
             )
@@ -478,30 +474,23 @@ class TestValidateUserBootstrapAndRefusal:
             password="",
         )
         mock_db.session.add.assert_called_once_with(new_user)
-        mock_auth0.users.add_roles.assert_called_once_with("auth0|new-admin", ["role_admin"])
+        mock_db.session.commit.assert_called()
+        mock_auth0_class.assert_not_called()
 
     def test_bootstrap_still_logs_in_when_project_grant_fails(self, bootstrap_app, provider):
-        """Failing to grant projects must not block login. The administrator exists and
-        holds the Auth0 role; access can still be granted from Admin afterwards."""
+        """Failing to grant projects must not block login. The administrator exists;
+        access can still be granted from Admin afterwards."""
         user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
 
-        with patch('mdvtools.auth.auth0_provider.GetToken') as mock_get_token, \
-             patch('mdvtools.auth.auth0_provider.Auth0') as mock_auth0_class, \
-             patch('mdvtools.dbutils.dbservice.UserProjectService.grant_all_projects_to_admins',
+        with patch('mdvtools.dbutils.dbservice.UserProjectService.grant_all_projects_to_admins',
                    side_effect=Exception("database unavailable")), \
              patch('mdvtools.auth.authutils.cache_user_projects'):
-            mock_get_token.return_value.client_credentials.return_value = {"access_token": "mgmt-token"}
-            mock_auth0 = MagicMock()
-            mock_auth0.roles.list.return_value = {"roles": [{"id": "role_admin", "name": "admin"}]}
-            mock_auth0_class.return_value = mock_auth0
-
             result, error, _mock_user_class, mock_db, _new_user = self._run_validate_user(
                 bootstrap_app, provider, user_info, existing_user_side_effect=[None]
             )
 
         assert error is None
         assert result["is_admin"] is True
-        # Unlike a role-assignment failure, the administrator is kept.
         mock_db.session.delete.assert_not_called()
 
     def test_bootstrap_rejects_nonmatching_email(self, bootstrap_app, provider):
@@ -548,74 +537,12 @@ class TestValidateUserBootstrapAndRefusal:
         assert error == NoAccess(email="admin@example.com")
         mock_db.session.add.assert_not_called()
 
-    def test_bootstrap_discards_the_admin_when_role_assignment_fails(self, bootstrap_app, provider):
-        """The user is flushed but never committed, so a failed role assignment
-        leaves the deployment exactly as it was - nothing to delete, and nothing
-        for a concurrent login's usage event to block."""
-        user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
-
-        with patch('mdvtools.auth.auth0_provider.GetToken') as mock_get_token, \
-             patch('mdvtools.auth.auth0_provider.Auth0') as mock_auth0_class:
-            mock_get_token.return_value.client_credentials.return_value = {"access_token": "mgmt-token"}
-            mock_auth0 = MagicMock()
-            mock_auth0.roles.list.return_value = {"roles": []}  # no 'admin' role in this tenant
-            mock_auth0_class.return_value = mock_auth0
-
-            result, error, _mock_user_class, mock_db, _new_user = self._run_validate_user(
-                bootstrap_app, provider, user_info, existing_user_side_effect=[None]
-            )
-
-        assert result is None
-        assert error[1] == 500
-        mock_db.session.rollback.assert_called_once()
-        mock_db.session.delete.assert_not_called()
-        # The whole point of the ordering: no administrator was ever published.
-        mock_db.session.commit.assert_not_called()
-
-    def test_bootstrap_commits_only_after_the_role_is_assigned(self, bootstrap_app, provider):
-        """Ordering is the fix, so assert the order rather than just the calls."""
-        user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
-        calls = []
-
-        with patch('mdvtools.auth.auth0_provider.GetToken') as mock_get_token, \
-             patch('mdvtools.auth.auth0_provider.Auth0') as mock_auth0_class, \
-             patch('mdvtools.dbutils.dbservice.UserProjectService.grant_all_projects_to_admins',
-                   return_value=0), \
-             patch('mdvtools.auth.authutils.cache_user_projects'):
-            mock_get_token.return_value.client_credentials.return_value = {"access_token": "mgmt-token"}
-            mock_auth0 = MagicMock()
-            mock_auth0.roles.list.return_value = {"roles": [{"id": "role_admin", "name": "admin"}]}
-            mock_auth0.users.add_roles.side_effect = lambda *a, **k: calls.append("assign_role")
-            mock_auth0_class.return_value = mock_auth0
-
-            with patch.object(provider, 'get_token', return_value='dummy-token'), \
-                 patch.object(provider, 'is_token_valid', return_value=True), \
-                 patch.object(provider, 'get_user', return_value=user_info), \
-                 patch('mdvtools.dbutils.dbmodels.User') as mock_user_class, \
-                 patch('mdvtools.dbutils.dbmodels.db') as mock_db:
-
-                mock_db.session = MagicMock()
-                mock_db.session.flush.side_effect = lambda *a, **k: calls.append("flush")
-                mock_db.session.commit.side_effect = lambda *a, **k: calls.append("commit")
-                filter_by_mock = MagicMock()
-                filter_by_mock.first.side_effect = [None]
-                mock_user_class.query.filter_by.return_value = filter_by_mock
-                mock_user_class.query.count.return_value = 0
-
-                with bootstrap_app.test_request_context('/'):
-                    result, error = provider.validate_user()
-
-        assert error is None
-        assert result is not None
-        assert calls[:3] == ["flush", "assign_role", "commit"]
-
     def test_bootstrap_concurrent_race_logs_in_the_winner(self, bootstrap_app, provider):
         """Two requests for the same bootstrap identity race; the loser's insert hits
         the unique constraint on email/auth_id and should just log in as the winner
         rather than surfacing an error to the legitimate administrator.
 
-        The constraint is hit at flush, which is where the INSERT is now issued -
-        before the Auth0 call, so the loser never attempts a role assignment."""
+        The constraint is hit at flush, which is where the INSERT is issued."""
         user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
         winner = MagicMock(id=1, auth_id="auth0|new-admin", email="admin@example.com", is_admin=True)
 

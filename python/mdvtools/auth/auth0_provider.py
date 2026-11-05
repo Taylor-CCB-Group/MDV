@@ -475,14 +475,7 @@ class Auth0Provider(AuthProvider):
             password="",
         )
         db.session.add(user)
-        # Flushed, not committed: the row has to exist for the database to enforce
-        # its unique constraints, but it must not become visible to anything else
-        # until the Auth0 role is in place. Committing first would publish a
-        # working local administrator that Auth0 does not know is one, and undoing
-        # that afterwards is not reliably possible - usage_events.user_id is a
-        # non-nullable foreign key with no cascade, so a concurrent login writing
-        # its login event is enough to block the delete and strand the half-made
-        # administrator. Ordering it this way means there is nothing to undo.
+        # Admin rights live only in MDV (ADR 0019), so no Auth0 role is assigned.
         try:
             db.session.flush()
         except IntegrityError:
@@ -491,20 +484,6 @@ class Auth0Provider(AuthProvider):
             # created the row (e.g. a double-click or two tabs). Log that user in
             # rather than showing the legitimate bootstrap administrator an error.
             return User.query.filter_by(auth_id=auth0_id).first()
-
-        try:
-            self._assign_admin_role(auth0_id)
-        except Exception:
-            logger.exception(
-                "Failed to assign the Auth0 'admin' role to the bootstrap administrator; "
-                "discarding the uncommitted administrator."
-            )
-            # Nothing was ever committed, so this discards the row rather than
-            # deleting a published one. The deployment is left exactly as it was
-            # before the attempt, which is what the old cleanup path was trying
-            # and failing to achieve.
-            db.session.rollback()
-            raise
 
         try:
             db.session.commit()
@@ -534,20 +513,6 @@ class Auth0Provider(AuthProvider):
         logger.info(f"Bootstrapped first administrator: {email}")
         return user
 
-    def _assign_admin_role(self, auth0_id: str) -> None:
-        """Assign the Auth0 tenant's 'admin' role to auth0_id via the Management API."""
-        get_token = GetToken(domain=self.domain, client_id=self.client_id, client_secret=self.client_secret)
-        mgmt_api_token = get_token.client_credentials(audience=f"https://{self.domain}/api/v2/")["access_token"]
-        auth0 = Auth0(self.domain, mgmt_api_token)
-
-        roles_response = auth0.roles.list(name_filter="admin")
-        roles = roles_response.get("roles", []) if isinstance(roles_response, dict) else []
-        role_id = next((role["id"] for role in roles if role.get("name") == "admin"), None)
-        if not role_id:
-            raise RuntimeError("Auth0 tenant has no role named 'admin'.")
-
-        auth0.users.add_roles(auth0_id, [role_id])
-    
     class SyncContext:
         """Context object for user sync operations."""
         def __init__(
