@@ -25,6 +25,7 @@ import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { SettingsDialogState as PersistedSettingsDialogState } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import CustomTooltip from "./CustomTooltip";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 import { Clear } from "@mui/icons-material";
@@ -35,6 +36,7 @@ import {
 import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
 
 const SettingsSearchContext = createContext("");
+const SEARCH_HINT_DURATION_MS = 4000;
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
@@ -1010,6 +1012,12 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
         getInitialSettingsDialogState(chart),
     );
     const { searchTerm, folderStates } = dialogState;
+    // The search box is focused when the dialog opens; show a hint briefly so people know what it's for.
+    const [searchHintOpen, setSearchHintOpen] = useState(true);
+    useEffect(() => {
+        const timer = setTimeout(() => setSearchHintOpen(false), SEARCH_HINT_DURATION_MS);
+        return () => clearTimeout(timer);
+    }, []);
     const setSearchTerm = useCallback((value: string) => {
         setDialogState((previousState) => {
             if (previousState.searchTerm === value) {
@@ -1067,14 +1075,27 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
             <SettingsSearchContext.Provider value={searchTerm}>
                 <SettingsFolderStateContext.Provider value={{ folderStates, setFolderStates }}>
                     <div className="w-full max-h-[80vh]">
+                        <CustomTooltip
+                            tooltipText="Start typing to find a setting by name or folder"
+                            tooltipProps={{
+                                open: searchHintOpen,
+                                onOpen: () => setSearchHintOpen(true),
+                                onClose: () => setSearchHintOpen(false),
+                                placement: "bottom-start",
+                            }}
+                        >
                         <Box sx={{ p: 1 }}>
                             <TextField
+                                autoFocus
                                 fullWidth
                                 size="small"
                                 variant="outlined"
                                 label="Search Settings by Folder or Name"
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={(e) => {
+                                    setSearchHintOpen(false);
+                                    setSearchTerm(e.target.value);
+                                }}
                                 sx={{ backgroundColor: "transparent" }}
                                 slotProps={{
                                     input: {
@@ -1093,6 +1114,7 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
                                 }}
                             />
                         </Box>
+                        </CustomTooltip>
                         {settings.length === 0 && (
                             <Typography variant="body1" color="text.secondary" sx={{ marginTop: 1, p: 1 }}>
                                 {searchTerm.trim().length > 0
