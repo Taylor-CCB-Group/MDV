@@ -1,8 +1,8 @@
-import { describe, expect, test, vi } from "vitest";
-import { ColumnQueryMapper } from "@/datastore/decorateColumnMethod";
-import { RowsAsColsQuery, type RowsAsColslink } from "@/links/link_utils";
 import { $mobx, type IReactionDisposer } from "mobx";
+import { describe, expect, test, vi } from "vitest";
 import type BaseChart from "@/charts/BaseChart";
+import { ColumnQueryMapper } from "@/datastore/decorateColumnMethod";
+import { type RowsAsColslink, RowsAsColsQuery } from "@/links/link_utils";
 
 const link: RowsAsColslink = {
     name_column: "gene",
@@ -36,7 +36,9 @@ describe("ColumnQueryMapper.activeValue", () => {
 
     test("clearActiveQuery makes the setting count as cleared", () => {
         const spy = vi.fn();
-        const dispose: IReactionDisposer = Object.assign(() => spy(), { [$mobx]: {} as IReactionDisposer[typeof $mobx] });
+        const dispose: IReactionDisposer = Object.assign(() => spy(), {
+            [$mobx]: {} as IReactionDisposer[typeof $mobx],
+        });
         const chart = { reactionDisposers: [dispose] } as unknown as BaseChart<any>;
         const m = new ColumnQueryMapper(chart, { setToolTipColumn: "tooltip.column" });
         m.userValues.setToolTipColumn = [new RowsAsColsQuery(link, "genes", 1)];

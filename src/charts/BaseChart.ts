@@ -935,17 +935,12 @@ class BaseChart<T extends BaseConfig> {
                     type: "column",
                     // use the active query (if any), not the concrete column name in the config #297
                     //@ts-expect-error LegacyColorBy should be gone by here
-                    current_value: this.activeQueries.activeValue(
-                        "colorByColumn",
-                        c.color_by,
-                    ),
+                    current_value: this.activeQueries.activeValue("colorByColumn", c.color_by),
                     columnType: filter,
                     func: (x) => {
                         if (x === "_none") {
                             clearColorLegendFilter(this, false);
-                            this.activeQueries.clearActiveQuery(
-                                "colorByColumn",
-                            );
+                            this.activeQueries.clearActiveQuery("colorByColumn");
                             c.color_by = undefined;
                             this.colorByDefault?.();
                         } else {
@@ -1032,7 +1027,7 @@ class BaseChart<T extends BaseConfig> {
                     ["0.05", "0.05"],
                 ] as const,
                 func: (v) => {
-                    //@ts-ignore we could type this, but it's a bit fussy
+                    //@ts-expect-error we could type this, but it's a bit fussy
                     c.trim_color_scale = v;
                     if (c.color_by) {
                         this.reapplyColorBy();

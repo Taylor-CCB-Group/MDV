@@ -12,12 +12,12 @@ import { RowsAsColsQuery } from "@/links/link_utils";
 function decorateColumnMethod<T extends BaseChart<any>>(method: string, chart: T) {
     // could try to make `method: keyof T`, but that would require a more type juggling...
     // passing { target: chart } as context is not full information - what difference does it make?
-    //@ts-ignore metaprogramming - really not worth the effort to get this to work with typescript
+    //@ts-expect-error metaprogramming - really not worth the effort to get this to work with typescript
     if (chart[method].name === "replacementMethod") {
         console.warn("Method already decorated", method);
         return;
     }
-    //@ts-ignore metaprogramming - really not worth the effort to get this to work with typescript
+    //@ts-expect-error metaprogramming - really not worth the effort to get this to work with typescript
     chart[method] = loadColumnData(chart[method]); //, { target: chart, name: method });
 }
 
@@ -118,7 +118,7 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
                     action(() => {
                         if (generation !== this.activeQueries.generation(target.name)) return;
                         try {
-                            //@ts-ignore array vs single column
+                            //@ts-expect-error array vs single column
                             target.call(this, a, ...args);
                         } catch (e) {
                             console.error("Error in loadColumnData method", e);
@@ -309,7 +309,7 @@ export class ColumnQueryMapper<T extends BaseConfig> {
         if (disposer) {
             disposer();
             this.reactionDisposers.delete(methodName);
-            this.chart.reactionDisposers = this.chart.reactionDisposers.filter(v => v !== disposer);
+            this.chart.reactionDisposers = this.chart.reactionDisposers.filter((v) => v !== disposer);
         }
         delete this.userValues[methodName];
     }
