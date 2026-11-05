@@ -12,14 +12,15 @@
 exports.onExecutePostLogin = async (event, api) => {
   const namespace = "https://mdv/";
   api.idToken.setCustomClaim(`${namespace}connection`, event.connection.name);
-  // "auth0" for a password connection and "waad" for Azure AD. MDV picks the
-  // email check from it and refuses any other strategy.
+  // "auth0" for a password connection, and "waad" or "oidc" for Microsoft
+  // through Auth0's Azure AD connection or an OpenID Connect connection to
+  // Entra. MDV picks the email check from it and refuses any other strategy.
   api.idToken.setCustomClaim(`${namespace}connection_strategy`, event.connection.strategy);
-  if (event.connection.strategy === "waad") {
+  if (event.connection.strategy === "waad" || event.connection.strategy === "oidc") {
     // Microsoft's claim that the tenant owns the email's domain. Nobody has
-    // confirmed yet that Auth0's Azure AD connection passes it through, or
-    // where it lands on event.user. Without it, MDV refuses Microsoft sign-ins
-    // that have no User yet.
+    // confirmed yet which connection passes it through, or where it lands on
+    // event.user. Without it, MDV refuses Microsoft sign-ins that have no User
+    // yet.
     api.idToken.setCustomClaim(`${namespace}xms_edov`, event.user.xms_edov === true);
   }
 };

@@ -1105,9 +1105,10 @@ class InvitationService:
         if strategy == "auth0":
             # A password connection: MDV-Admin creates the account verified.
             return sign_in.get("email_verified") is True
-        if strategy == "waad":
-            # Azure AD: Entra's email claim is unverified, but xms_edov says the
-            # tenant owns the email's domain.
+        if strategy in ("waad", "oidc"):
+            # Microsoft, through Auth0's Azure AD connection or an OpenID Connect
+            # connection to Entra: Entra's email claim is unverified, but
+            # xms_edov says the tenant owns the email's domain.
             return sign_in.get("xms_edov") is True
         return False
 

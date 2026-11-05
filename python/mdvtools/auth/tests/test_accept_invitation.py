@@ -2,7 +2,8 @@
 
 The Invitation is accepted only when the email matches, the sign-in came through
 the Invitation's Sign-in method, and Auth0 vouches for the email: email_verified
-for a password connection, Microsoft's xms_edov claim for Azure AD. A post-login
+for a password connection, Microsoft's xms_edov claim for a Microsoft
+connection. A post-login
 Action adds the connection and its strategy to what Auth0 returns.
 
 Requests go through the real auth hook and Auth0Provider against an in-memory
@@ -160,43 +161,55 @@ def test_sign_in_through_another_connection_is_refused(app, provider, admin, pro
     assert_refused(response, invitation)
 
 
-def microsoft_sign_in(sub, email, *, xms_edov=True):
+def microsoft_sign_in(sub, email, *, xms_edov=True, strategy="waad"):
     return {
         "sub": sub,
         "email": email,
         # Entra's email claim is unverified (ADR 0021), so this says nothing.
         "email_verified": False,
         "connection": MICROSOFT,
-        "connection_strategy": "waad",
+        "connection_strategy": strategy,
         "xms_edov": xms_edov,
     }
 
 
-def test_microsoft_sign_in_from_a_verified_domain_opens_the_invited_project(app, provider, admin, project):
+# A Microsoft connection is either Auth0's native Azure AD connection or an
+# Enterprise OpenID Connect connection to Entra (ADR 0021).
+microsoft_strategies = pytest.mark.parametrize("strategy", ["waad", "oidc"])
+
+
+@microsoft_strategies
+def test_microsoft_sign_in_from_a_verified_domain_opens_the_invited_project(
+    app, provider, admin, project, strategy
+):
     invite(admin, "bo@acme.example", MICROSOFT, {project: "viewer"})
 
     response = get_as(
-        app, provider, f"/projects/{project.id}/open", microsoft_sign_in("waad|bo", "bo@acme.example")
+        app,
+        provider,
+        f"/projects/{project.id}/open",
+        microsoft_sign_in(f"{strategy}|bo", "bo@acme.example", strategy=strategy),
     )
 
     assert response.status_code == 200, response.get_data(as_text=True)
 
 
-def test_microsoft_sign_in_without_a_verified_domain_is_refused(app, provider, admin, project):
+@microsoft_strategies
+def test_microsoft_sign_in_without_a_verified_domain_is_refused(app, provider, admin, project, strategy):
     invitation = invite(admin, "bo@acme.example", MICROSOFT, {project: "viewer"})
 
     response = get_as(
         app,
         provider,
         f"/projects/{project.id}/open",
-        microsoft_sign_in("waad|bo", "bo@acme.example", xms_edov=False),
+        microsoft_sign_in(f"{strategy}|bo", "bo@acme.example", xms_edov=False, strategy=strategy),
     )
 
     assert_refused(response, invitation)
 
 
 def test_sign_in_through_a_connection_of_another_kind_is_refused(app, provider, admin, project):
-    # Only password and Azure AD connections have a rule for vouching for the email.
+    # Only password and Microsoft connections have a rule for vouching for the email.
     invitation = invite(admin, "ann@example.org", "google-oauth2", {project: "viewer"})
     sign_in = password_sign_in("google-oauth2|ann", "ann@example.org", connection="google-oauth2")
     sign_in["connection_strategy"] = "google-oauth2"

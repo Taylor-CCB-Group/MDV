@@ -27,8 +27,9 @@ A sign-in accepts an open Invitation only when all of these hold:
 
 Auth0 does not include the connection in what it returns by default, so a post-login Action
 adds the connection's name and strategy as claims. The strategy says which of the last 2
-checks applies. MDV refuses a sign-in through any connection that is neither a password
-connection nor Azure AD.
+checks applies. A Microsoft connection is either Auth0's native Azure AD connection
+(strategy `waad`) or an Enterprise OpenID Connect connection to Entra (strategy `oidc`).
+MDV refuses a sign-in through a connection with any other strategy.
 
 MDV-Admin creates a password account marked as verified, with a random password that it
 discards. Only someone who can read that inbox can then set a password, through the reset
@@ -47,7 +48,9 @@ rule, and accepting it reactivates them.
 
 ## Consequences
 
-Auth0's documentation does not say whether its Azure AD connection passes `xms_edov`
-through. This has to be confirmed on the tenant before a Microsoft connection goes live.
-If it does not arrive, Microsoft Invitations cannot be accepted until the connection or the
-Action provides it.
+Auth0's documentation says its native Azure AD connection ignores Entra's optional claims,
+while an Enterprise OpenID Connect connection passes them through, so `xms_edov` probably
+needs an OpenID Connect connection. Someone with rights over the client's Entra app
+registration has to request `xms_edov` as an optional claim. Both have to be confirmed on
+the tenant before a Microsoft connection goes live. If the claim does not arrive, Microsoft
+Invitations cannot be accepted until the connection or the Action provides it.
