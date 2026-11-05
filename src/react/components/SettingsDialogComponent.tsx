@@ -1081,7 +1081,7 @@ export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T>
                                 open: searchHintOpen,
                                 onOpen: () => setSearchHintOpen(true),
                                 onClose: () => setSearchHintOpen(false),
-                                placement: "bottom-start",
+                                placement: "bottom",
                             }}
                         >
                         <Box sx={{ p: 1 }}>
