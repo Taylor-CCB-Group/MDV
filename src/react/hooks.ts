@@ -1,4 +1,4 @@
-import { action, autorun, runInAction } from "mobx";
+import { action, autorun } from "mobx";
 import type React from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { BaseConfig } from "@/charts/BaseChart";

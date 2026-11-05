@@ -1,4 +1,4 @@
-import { IconButton, type IconButtonProps, Tooltip, type TooltipProps } from "@mui/material";
+import { IconButton, type IconButtonProps, type TooltipProps } from "@mui/material";
 import type React from "react";
 import CustomTooltip from "./CustomTooltip";
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 /**
  * Tests for getMinMaxForColumn and getColumnQuantile methods in DataStore.js

@@ -3,7 +3,7 @@ import { observer } from "mobx-react-lite";
 import { useEffect, useMemo, useState } from "react";
 import { useProject } from "@/modules/ProjectContext";
 import { useChart } from "@/react/context";
-import { useDebouncedChartSize, useFieldSpecs } from "@/react/hooks";
+import { useDebouncedChartSize } from "@/react/hooks";
 import { useHighlightedIndex } from "@/react/selectionHooks";
 import { buildApiUrl } from "@/utils/mdvRouting";
 import {

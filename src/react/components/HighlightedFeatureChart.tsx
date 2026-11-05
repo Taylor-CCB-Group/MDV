@@ -1,4 +1,3 @@
-import { action } from "mobx";
 import { g, isArray } from "@/lib/utils";
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import type DataStore from "../../datastore/DataStore";

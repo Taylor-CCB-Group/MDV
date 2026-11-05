@@ -6,7 +6,7 @@ import {
     SaveAs as SaveAsIcon,
     Save as SaveIcon,
 } from "@mui/icons-material";
-import { AppBar, Box, Chip, Divider, Toolbar, Typography } from "@mui/material";
+import { AppBar, Box, Divider, Toolbar, Typography } from "@mui/material";
 import { LockIcon, LockOpenIcon } from "lucide-react";
 import { observer } from "mobx-react-lite";
 import ToggleThemeWrapper from "@/charts/dialogs/ToggleTheme";

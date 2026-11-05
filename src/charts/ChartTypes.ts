@@ -1,7 +1,7 @@
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
 import type { BaseConfig } from "./BaseChart";
-import type { DataType, ExtraControl, GuiSpecType } from "./charts";
+import type { ExtraControl, GuiSpecType } from "./charts";
 
 /**
  * Annotation of what kind of column (or columns) type a given param will accept.

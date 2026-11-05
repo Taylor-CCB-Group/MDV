@@ -4,7 +4,6 @@ import {
     formatLegendLabel,
     LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
     legendCategoricalBodyHeight,
-    legendCategoricalContainerHeight,
     legendCategoricalRowY,
 } from "@/react/legend/shared/legendUtils";
 

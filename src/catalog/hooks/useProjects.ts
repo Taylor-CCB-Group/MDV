@@ -7,7 +7,7 @@ import {
     recycleBinResponseSchema,
     restoreRecycledProjectResponseSchema,
 } from "../utils/projectSchemas";
-import type { Project, ProjectAccessType, RecycledProject } from "../utils/projectUtils";
+import type { Project, ProjectAccessType } from "../utils/projectUtils";
 
 type RescannedProject = {
     id: number;

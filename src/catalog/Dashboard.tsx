@@ -1,9 +1,6 @@
 import {
     Add,
-    Check,
-    CheckBoxOutlined,
     Checklist,
-    Close,
     DeleteOutline,
     Done,
     Download as DownloadIcon,
