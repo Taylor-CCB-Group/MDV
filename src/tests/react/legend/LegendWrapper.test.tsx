@@ -1,11 +1,9 @@
-import { StrictMode, act, useLayoutEffect, useRef, type ReactElement } from "react";
+import { act, type ReactElement, StrictMode, useLayoutEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
-import LegendWrapper, {
-    type LegendWrapperComponentProps,
-} from "@/react/components/legend/LegendWrapper";
+import LegendWrapper, { type LegendWrapperComponentProps } from "@/react/components/legend/LegendWrapper";
 
 // The real portal adds app providers the wrapper doesn't need; keep StrictMode,
 // since it runs layout effects twice, which is what the saved size has to survive.
@@ -107,10 +105,7 @@ afterEach(() => {
 
 describe("LegendWrapper saved size", () => {
     test("applies a saved size after the legend sets its default size", () => {
-        const { el, wrapper } = renderLegend(
-            { width: 600, height: 600 },
-            { left: 10, top: 10, size: [120, 90] },
-        );
+        const { el, wrapper } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10, size: [120, 90] });
         expect([el.style.width, el.style.height]).toEqual(["120px", "90px"]);
         expect(wrapper.getUserSize()).toEqual([120, 90]);
     });
@@ -122,11 +117,7 @@ describe("LegendWrapper saved size", () => {
     });
 
     test("ignores a saved size when the legend can't be resized", () => {
-        const { el } = renderLegend(
-            { width: 600, height: 600 },
-            { left: 10, top: 10, size: [120, 90] },
-            false,
-        );
+        const { el } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10, size: [120, 90] }, false);
         expect([el.style.width, el.style.height]).toEqual(["180px", "250px"]);
     });
 
@@ -151,10 +142,7 @@ describe("LegendWrapper keeps the legend inside the chart", () => {
     });
 
     test("uses the saved size when deciding whether it fits", () => {
-        const { el } = renderLegend(
-            { width: 400, height: 300 },
-            { left: 250, top: 200, size: [120, 90] },
-        );
+        const { el } = renderLegend({ width: 400, height: 300 }, { left: 250, top: 200, size: [120, 90] });
         // 250 + 120 <= 400 and 200 + 90 <= 300, so it stays where it was saved
         expect([el.style.left, el.style.top]).toEqual(["250px", "200px"]);
     });

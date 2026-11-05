@@ -19,9 +19,5 @@ export function ensureLazyChartTypeRegistered(type: string): Promise<unknown> | 
 }
 
 export async function preloadLazyChartTypesForPicker() {
-    await Promise.all(
-        Object.keys(lazyChartRegistrationLoaders).map((type) =>
-            ensureLazyChartTypeRegistered(type),
-        ),
-    );
+    await Promise.all(Object.keys(lazyChartRegistrationLoaders).map((type) => ensureLazyChartTypeRegistered(type)));
 }

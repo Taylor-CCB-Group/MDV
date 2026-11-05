@@ -8,10 +8,7 @@ export type TextBoxFencedRenderer = ComponentType<TextBoxFencedRendererProps>;
 
 const rendererRegistry = new Map<string, TextBoxFencedRenderer>();
 
-export function registerTextBoxFencedRenderer(
-    language: string,
-    renderer: TextBoxFencedRenderer,
-) {
+export function registerTextBoxFencedRenderer(language: string, renderer: TextBoxFencedRenderer) {
     rendererRegistry.set(language.toLowerCase(), renderer);
 }
 

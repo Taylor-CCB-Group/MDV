@@ -1,15 +1,15 @@
+import { describe, expect, it } from "vitest";
 import {
-    MAX_LEGEND_BAND_FRACTION,
     buildFractionLegendSpec,
     getColorLegendBox,
     getFractionLegendBox,
     getLegendLayout,
+    MAX_LEGEND_BAND_FRACTION,
     DOT_PLOT_LEGEND_MARGIN as m,
     pickEvenly,
 } from "@/react/components/dotplot/dotPlotLegends";
 import { getFractionLegendSize } from "@/react/components/legend/FractionLegend";
 import type { FractionLegendSpec } from "@/react/legend/fraction_legend/types";
-import { describe, expect, it } from "vitest";
 
 const colorRange: [number, number] = [0, 90];
 const input = { width: 1200, height: 800, colorRange, fracMax: 100, maxRadius: 25, reserveSpace: true };

@@ -10,8 +10,6 @@ export type ConfirmDialogType = {
 };
 
 const ConfirmDialog = ({ open, onClose, message, title, onConfirm, isDelete }: ConfirmDialogType) => {
-    
-
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
             <DialogTitle>{title}</DialogTitle>

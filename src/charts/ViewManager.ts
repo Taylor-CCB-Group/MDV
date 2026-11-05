@@ -1,12 +1,12 @@
-import { action, observable, toJS } from "mobx";
-import type ChartManager from "./ChartManager";
-import type { DataSource } from "./charts";
 import _ from "lodash";
-import screenshot from "@/utilities/Screenshot";
+import { action, observable, toJS } from "mobx";
 import { getPostData, getProjectRoot } from "@/dataloaders/DataLoaderUtil";
+import screenshot from "@/utilities/Screenshot";
 import BaseChart from "./BaseChart";
-import { convertLegacyChartConfig, convertLegacyChartConfigNow } from "./legacyCharts";
+import type ChartManager from "./ChartManager";
 import { restoreChartLinks, snapshotChartLinks } from "./chartLinks";
+import type { DataSource } from "./charts";
+import { convertLegacyChartConfig, convertLegacyChartConfigNow } from "./legacyCharts";
 
 /** Per–data-source view config (panel layout and optional highlight state). */
 export type ViewDataDataSource = {
@@ -250,7 +250,7 @@ class ViewManager {
             const root = this.cm.contentDiv;
             const dataUrl = await screenshot(root);
             const dt = performance.now() - t;
-            console.log(`createImageOfView took ${(dt/1000).toFixed(1)}s`);
+            console.log(`createImageOfView took ${(dt / 1000).toFixed(1)}s`);
             return dataUrl;
         } catch (error) {
             console.error("error while creating image", error);
@@ -301,7 +301,7 @@ class ViewManager {
         } catch (error) {
             console.error("error while saving view", error);
         }
-        console.log(`view saved in ${((performance.now() - t)/1000).toFixed(1)}s`);
+        console.log(`view saved in ${((performance.now() - t) / 1000).toFixed(1)}s`);
     }
 
     // Add a new view
@@ -342,10 +342,10 @@ class ViewManager {
             } else {
                 // Get current state before clearing
                 const state = this.cm.getState();
-                
+
                 // Update the view name in the state
                 state.view.name = viewName;
-                
+
                 // Clear existing gridstack instances
                 for (const ds in viewData.dataSources) {
                     if (viewData.dataSources[ds]?.layout === "gridstack") {
@@ -354,7 +354,7 @@ class ViewManager {
                         this.cm.gridStack.destroy(d);
                     }
                 }
-                
+
                 // Clear content and reinitialize
                 contentDiv.innerHTML = "";
                 await this.cm._init(state.view);

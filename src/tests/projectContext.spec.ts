@@ -2,7 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import axios from "axios";
 import { createElement, type PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { ProjectProvider, getProject, getProjectInfoBase, useCurrentProject } from "@/modules/ProjectContext";
+import { getProject, getProjectInfoBase, ProjectProvider, useCurrentProject } from "@/modules/ProjectContext";
 
 describe("ProjectContext", () => {
     let originalMdv: unknown;

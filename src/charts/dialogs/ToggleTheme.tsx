@@ -19,8 +19,8 @@ const ToggleTheme = observer(() => {
             slotProps={{
                 arrow: {
                     sx: {
-                        color: "var(--tooltip_background_color)"
-                    }
+                        color: "var(--tooltip_background_color)",
+                    },
                 },
                 tooltip: {
                     sx: {
@@ -28,8 +28,8 @@ const ToggleTheme = observer(() => {
                         color: "var(--tooltip_text_color)",
                         fontSize: "0.8rem",
                         fontWeight: "normal",
-                    }
-                }
+                    },
+                },
             }}
         >
             <IconButton sx={{ ml: 1 }} onClick={toggleTheme} color="inherit">

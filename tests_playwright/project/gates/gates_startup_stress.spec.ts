@@ -47,17 +47,15 @@ test.describe("gates startup stress", () => {
             const gatesColumnState = await page.evaluate(() => {
                 const mdv = Reflect.get(window, "mdv");
                 const chartManager = mdv?.chartManager;
-                const dataStore =
-                    chartManager?.getDataSource?.("cells") ??
-                    chartManager?.dsIndex?.cells?.dataStore;
+                const dataStore = chartManager?.getDataSource?.("cells") ?? chartManager?.dsIndex?.cells?.dataStore;
                 const gatesColumn = dataStore?.columnIndex?.__gates__;
 
                 return gatesColumn
                     ? {
-                        hasColumn: true,
-                        hasData: Boolean(gatesColumn.data),
-                        datatype: gatesColumn.datatype,
-                    }
+                          hasColumn: true,
+                          hasData: Boolean(gatesColumn.data),
+                          datatype: gatesColumn.datatype,
+                      }
                     : { hasColumn: false };
             });
 

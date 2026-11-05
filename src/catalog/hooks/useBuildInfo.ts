@@ -5,11 +5,11 @@ export type BuildInfo = {
     lastCommitMessage: string;
     buildDate: string;
     dirty: boolean;
-}
+};
 const useBuildInfo = () => {
     /**
      * Returns information about the current build, particularly git revision.
-     * 
+     *
      * Note, hardcoded for vite, this will need to be updated if we switch to a different bundler.
      */
     function getBuildInfo(): BuildInfo {
@@ -33,5 +33,3 @@ const useBuildInfo = () => {
 };
 
 export default useBuildInfo;
-
-

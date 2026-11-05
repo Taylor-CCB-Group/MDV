@@ -1,36 +1,28 @@
 import type { RenderStack } from "@spatialdata/layers";
 import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
-
-import BaseChart, { type MenuPip } from "../../charts/BaseChart";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
-import {
-    type CategoryFilter,
-    type ScatterPlotConfig,
-    scatterDefaults,
-} from "../scatter_state";
-import { BaseReactChart } from "./BaseReactChart";
-import {
-    type VivContextType,
-    createVivStores,
-} from "./avivatorish/state";
-import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
+import type { DeckBackend } from "@/react/spatialdata/deck_backend";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
-import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
-import type { ElementIssues } from "./RasterIssues";
-import SpatialStatusPanel from "./SpatialStatusPanel";
-import type { DeckBackend } from "@/react/spatialdata/deck_backend";
-import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
-import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
+import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import {
     type SpatialDataSerializableViewState,
     toSerializableSpatialDataViewState,
 } from "@/react/spatialdata/spatialdata_config";
+import BaseChart, { type MenuPip } from "../../charts/BaseChart";
+import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
+import { createVivStores, type VivContextType } from "./avivatorish/state";
+import { BaseReactChart } from "./BaseReactChart";
+import type { ElementIssues } from "./RasterIssues";
+import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
+import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
+import SpatialStatusPanel from "./SpatialStatusPanel";
+import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 
 export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     type: "SpatialDataMdvRegionReact";
@@ -42,10 +34,7 @@ export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     render_backend?: DeckBackend | null;
 };
 
-function adaptSpatialDataConfig(
-    originalConfig: SpatialDataMdvReactConfig,
-    dataStore: DataStore,
-) {
+function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataStore: DataStore) {
     const config = { ...scatterDefaults, ...originalConfig };
     if (!dataStore.regions) {
         throw new Error("unexpected attempt to load spatial chart with no regions in datasource");
@@ -227,11 +216,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         this.canvasErrors = [];
     }
 
-    constructor(
-        dataStore: DataStore,
-        div: HTMLDivElement,
-        originalConfig: SpatialDataMdvReactConfig,
-    ) {
+    constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: SpatialDataMdvReactConfig) {
         const seedDefaultSpatialLayers = originalConfig.renderStack === undefined;
         const config = adaptSpatialDataConfig(originalConfig, dataStore);
         super(dataStore, div, config, SpatialDataChartRoot);
@@ -280,10 +265,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             ),
         );
         this.vivStores = createVivStores();
-        this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener(
-            "click",
-            () => this.openLayerDialog(),
-        );
+        this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener("click", () => this.openLayerDialog());
     }
 
     openLayerDialog() {
@@ -402,8 +384,7 @@ BaseChart.types.SpatialDataMdvRegionReact = {
         if (!regions) {
             throw new Error("unexpected attempt to initialise spatialdata chart with no regions in datasource");
         }
-        const regionKey =
-            extraConfig.region ?? spatialRegionOptions(dataStore)[0]?.value;
+        const regionKey = extraConfig.region ?? spatialRegionOptions(dataStore)[0]?.value;
         if (!regionKey) {
             throw new Error("unexpected attempt to initialise spatialdata chart with no spatial regions in datasource");
         }

@@ -1,4 +1,3 @@
-
 type HistogramConfig = {
     data: SharedArrayBuffer;
     min: number;
@@ -9,8 +8,8 @@ type HistogramConfig = {
     length: number;
     // todo pass in related to ~background_filter
     // as it may pertain to the view, or the chart, or in general some node in a graph...
-    // filteredIndices?: SharedArrayBuffer; 
-}
+    // filteredIndices?: SharedArrayBuffer;
+};
 
 self.onmessage = async (event: MessageEvent<HistogramConfig>) => {
     const { arrayType, data, min, max, bins, byteOffset, length } = event.data;
@@ -32,4 +31,4 @@ self.onmessage = async (event: MessageEvent<HistogramConfig>) => {
         }
     }
     self.postMessage(hist);
-}
+};

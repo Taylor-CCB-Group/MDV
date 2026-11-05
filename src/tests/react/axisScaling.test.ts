@@ -1,5 +1,10 @@
-import { deckRadiusForClassicRadius, fitOrthographicView, radiusReferenceRange, serialisableZoom } from "@/react/axisScaling";
 import { describe, expect, test } from "vitest";
+import {
+    deckRadiusForClassicRadius,
+    fitOrthographicView,
+    radiusReferenceRange,
+    serialisableZoom,
+} from "@/react/axisScaling";
 
 describe("fitOrthographicView", () => {
     const wide = { minX: 0, maxX: 1, minY: 0, maxY: 10000 };
@@ -26,7 +31,9 @@ describe("fitOrthographicView", () => {
     });
 
     test("centres on the data", () => {
-        expect(fitOrthographicView({ minX: 10, maxX: 20, minY: -4, maxY: 0 }, 300, 300, "fit").target).toEqual([15, -2, 0]);
+        expect(fitOrthographicView({ minX: 10, maxX: 20, minY: -4, maxY: 0 }, 300, 300, "fit").target).toEqual([
+            15, -2, 0,
+        ]);
     });
 
     test("equal and fit agree when the ranges match the chart shape", () => {

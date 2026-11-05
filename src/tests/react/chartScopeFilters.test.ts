@@ -1,5 +1,5 @@
-import { getActiveChartScopeFilters } from "@/react/hooks";
 import { describe, expect, test } from "vitest";
+import { getActiveChartScopeFilters } from "@/react/hooks";
 
 describe("getActiveChartScopeFilters", () => {
     test("includes a background filter with a column and categories", () => {
@@ -10,7 +10,9 @@ describe("getActiveChartScopeFilters", () => {
     test("ignores a background filter that is unset", () => {
         expect(getActiveChartScopeFilters({})).toEqual([]);
         expect(getActiveChartScopeFilters({ background_filter: null } as never)).toEqual([]);
-        expect(getActiveChartScopeFilters({ background_filter: { column: null, category: ["T"] } } as never)).toEqual([]);
+        expect(getActiveChartScopeFilters({ background_filter: { column: null, category: ["T"] } } as never)).toEqual(
+            [],
+        );
         expect(getActiveChartScopeFilters({ background_filter: { column: "__none__", category: ["T"] } })).toEqual([]);
         expect(getActiveChartScopeFilters({ background_filter: { column: "cell_type", category: [] } })).toEqual([]);
     });

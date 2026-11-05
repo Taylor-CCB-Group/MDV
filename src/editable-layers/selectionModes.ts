@@ -1,17 +1,17 @@
 import {
+    type ClickEvent,
+    CompositeMode,
+    DrawPolygonByDraggingMode,
     DrawPolygonMode,
+    type FeatureCollection,
+    type GeoJsonEditMode,
+    getPickedEditHandle,
+    type ModeProps,
     ModifyMode,
+    type SimpleFeatureCollection,
     // DrawRectangleMode,
     // TransformMode,
     TranslateMode,
-    CompositeMode,
-    DrawPolygonByDraggingMode,
-    getPickedEditHandle,
-    type ClickEvent,
-    type FeatureCollection,
-    type GeoJsonEditMode,
-    type ModeProps,
-    type SimpleFeatureCollection,
 } from "@deck.gl-community/editable-layers";
 import { DrawRectangleByDraggingMode } from "./deck-community-ish/draw-rectangle-by-dragging-mode";
 
@@ -64,10 +64,7 @@ class DrawSelectionPolygonMode extends DrawPolygonMode {
 
 export class EditMode extends CompositeMode {
     constructor() {
-        super(compositeModes([
-            new TranslateMode(),
-            new ModifyMode(),
-        ]));
+        super(compositeModes([new TranslateMode(), new ModifyMode()]));
     }
 
     /**
@@ -81,31 +78,27 @@ export class EditMode extends CompositeMode {
 
 export class RectangleMode extends SelectionCompositeMode {
     constructor() {
-        super(compositeModes([
-            // we pass in modeProps to the layer, not the edit mode.
-            // new DrawRectangleMode(), //with modeConfig: { dragToDraw: true }
-            //our version, which we shouldn't need but looks/works a bit different as of now
-            new DrawRectangleByDraggingMode(),
-            new TranslateMode(),
-        ]));
+        super(
+            compositeModes([
+                // we pass in modeProps to the layer, not the edit mode.
+                // new DrawRectangleMode(), //with modeConfig: { dragToDraw: true }
+                //our version, which we shouldn't need but looks/works a bit different as of now
+                new DrawRectangleByDraggingMode(),
+                new TranslateMode(),
+            ]),
+        );
     }
 }
 
 export class PolygonMode extends SelectionCompositeMode {
     constructor() {
-        super(compositeModes([
-            new DrawSelectionPolygonMode(),
-            new TranslateMode(),
-        ]));
+        super(compositeModes([new DrawSelectionPolygonMode(), new TranslateMode()]));
     }
 }
 
 // todo - figure out weird conflict behaviour with this mode...
 export class FreehandMode extends SelectionCompositeMode {
     constructor() {
-        super(compositeModes([
-            new DrawPolygonByDraggingMode(),
-            new TranslateMode(),
-        ]));
+        super(compositeModes([new DrawPolygonByDraggingMode(), new TranslateMode()]));
     }
 }

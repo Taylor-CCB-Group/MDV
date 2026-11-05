@@ -64,14 +64,21 @@ describe("deckMonkeypatch", () => {
         // re-ids host layers), so it has to be found in the deck rather than passed in
         const { deck, newEventManager, layers } = makeDeck();
         const eventHandler = vi.fn();
-        const editable = new EditableGeoJsonLayer({ id: "deck:selection-#detail#", data: { type: "FeatureCollection", features: [] } });
+        const editable = new EditableGeoJsonLayer({
+            id: "deck:selection-#detail#",
+            data: { type: "FeatureCollection", features: [] },
+        });
         Object.assign(editable, { context: { deck }, state: { _editableLayerState: { eventHandler } } });
         layers.push(editable);
 
         rebindMouseEvents(deck);
 
-        const types = newEventManager.on.mock.calls.filter(([, handler]) => handler === eventHandler).map(([type]) => type);
-        expect(types).toEqual(expect.arrayContaining(["click", "dblclick", "pointermove", "panstart", "panmove", "panend"]));
+        const types = newEventManager.on.mock.calls
+            .filter(([, handler]) => handler === eventHandler)
+            .map(([type]) => type);
+        expect(types).toEqual(
+            expect.arrayContaining(["click", "dblclick", "pointermove", "panstart", "panmove", "panend"]),
+        );
         expect(new Set(types).size).toBe(types.length);
     });
 

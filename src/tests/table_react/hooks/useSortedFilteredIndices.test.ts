@@ -1,8 +1,8 @@
-import useSortedFilteredIndices from "@/react/hooks/useSortedFilteredIndices";
-import { renderHook, waitFor, act } from "@testing-library/react";
-import { describe, test, expect, beforeEach, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { observable, runInAction } from "mobx";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { TableChartReactConfig } from "@/react/components/TableChartReactWrapper";
+import useSortedFilteredIndices from "@/react/hooks/useSortedFilteredIndices";
 
 // Mock the context hooks
 vi.mock("@/react/context", () => ({
@@ -32,9 +32,7 @@ describe("useSortedFilteredIndices", () => {
         const namesArr = ["bb", "aa", "dd", "cc", "ee"];
         const namesBytes = new Uint8Array(namesArr.length * 2);
         const encoder = new TextEncoder();
-        namesArr.forEach(
-            (str, index) => namesBytes.set(encoder.encode(str), index * 2)
-        );
+        namesArr.forEach((str, index) => namesBytes.set(encoder.encode(str), index * 2));
 
         mockDataStore = {
             columnIndex: {
@@ -63,9 +61,7 @@ describe("useSortedFilteredIndices", () => {
                 if (columnId === "tags") {
                     // String length is 2
                     // Will be displayed as Row 0: "E, E", Row 1: "A, A"....
-                    return new Uint16Array([
-                        4, 4, 0, 0, 2, 2, 1, 1, 3, 3,
-                    ]);
+                    return new Uint16Array([4, 4, 0, 0, 2, 2, 1, 1, 3, 3]);
                 }
                 if (columnId === "cell_type") {
                     return new Uint8Array([0, 1, 2, 3, 4]);

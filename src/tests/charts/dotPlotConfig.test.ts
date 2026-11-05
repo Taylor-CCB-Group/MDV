@@ -1,10 +1,10 @@
+import { describe, expect, it } from "vitest";
 import {
-    NO_COLUMN,
     adaptDotPlotConfig,
     getColorRange,
     getSplitFromDialog,
+    NO_COLUMN,
 } from "@/react/components/dotplot/dotPlotConfig";
-import { describe, expect, it } from "vitest";
 
 describe("getSplitFromDialog", () => {
     const columnValues = ["ND", "R baseline", "NR baseline"];

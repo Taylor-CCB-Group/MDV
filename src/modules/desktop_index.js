@@ -1,12 +1,11 @@
 import "./all_css";
 import ChartManager from "../charts/ChartManager.js";
 import {
+    decompressData,
     getArrayBufferDataLoader,
     getLocalCompressedBinaryDataLoader,
-    decompressData,
 } from "../dataloaders/DataLoaders";
-import { setProjectRoot } from "../dataloaders/DataLoaderUtil";
-import { fetchJsonConfig } from "../dataloaders/DataLoaderUtil";
+import { fetchJsonConfig, setProjectRoot } from "../dataloaders/DataLoaderUtil";
 
 let route = "";
 
@@ -31,7 +30,7 @@ function _mdvInit(routeFromTemplate) {
     //get the configs for MDV
     getConfigs(staticFolder).then((resp) => {
         const config = resp.state;
-        
+
         //is view in the URL
         const urlParams = new URLSearchParams(window.location.search);
         const view = urlParams.get("view");
@@ -43,13 +42,9 @@ function _mdvInit(routeFromTemplate) {
             function: staticFolder
                 ? getLocalCompressedBinaryDataLoader(resp.datasources, ".")
                 : getArrayBufferDataLoader(`${route}/get_data`),
-            viewLoader: staticFolder
-                ? async (view) => resp.views[view]
-                : getView,
+            viewLoader: staticFolder ? async (view) => resp.views[view] : getView,
             rowDataLoader: staticFolder ? loadRowDataStatic : loadRowData,
-            binaryDataLoader: staticFolder
-                ? loadBinaryDataStatic
-                : loadBinaryData,
+            binaryDataLoader: staticFolder ? loadBinaryDataStatic : loadBinaryData,
         };
         //listen to events
         const listener = (type, cm, data) => {
@@ -77,13 +72,7 @@ function _mdvInit(routeFromTemplate) {
         };
         //create the app
         console.log(config);
-        new ChartManager(
-            "holder",
-            resp.datasources,
-            dataLoader,
-            config,
-            listener,
-        );
+        new ChartManager("holder", resp.datasources, dataLoader, config, listener);
     });
 }
 //only method required
@@ -107,18 +96,12 @@ async function getView(view) {
 
 //load arbitrary data
 async function loadBinaryDataStatic(datasource, name) {
-    const resp = await fetch(
-        `${route}/binarydata/${datasource}/${name}.gz, {responseType: "arraybuffer"}`,
-    );
+    const resp = await fetch(`${route}/binarydata/${datasource}/${name}.gz, {responseType: "arraybuffer"}`);
     const b = await resp.arrayBuffer();
     return await decompressData(b);
 }
 async function loadBinaryData(datasource, name) {
-    const b = await getData(
-        `${route}/get_binary_data`,
-        { datasource, name },
-        "arraybuffer",
-    );
+    const b = await getData(`${route}/get_binary_data`, { datasource, name }, "arraybuffer");
     return await decompressData(b);
 }
 
@@ -165,9 +148,7 @@ async function getData(url, args, return_type = "json") {
 //changes or adds a param to the browser address bar
 export function changeURLParam(param, value) {
     const url = new URL(window.location);
-    url.searchParams.has(param)
-        ? url.searchParams.set(param, value)
-        : url.searchParams.append(param, value);
+    url.searchParams.has(param) ? url.searchParams.set(param, value) : url.searchParams.append(param, value);
     url.search = url.searchParams;
     history.pushState({}, null, url);
 }

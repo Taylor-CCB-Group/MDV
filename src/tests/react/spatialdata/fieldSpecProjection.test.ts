@@ -2,11 +2,7 @@ import type { RenderStack } from "@spatialdata/layers";
 import { autorun, observable, runInAction } from "mobx";
 import { describe, expect, test } from "vitest";
 
-import {
-    mdvFieldSpecsOf,
-    projectMdvFieldSpecs,
-    withoutMdvFieldSpecs,
-} from "@/react/spatialdata/field_spec_projection";
+import { mdvFieldSpecsOf, projectMdvFieldSpecs, withoutMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 
 /**
  * An "active link" is a column choice that keeps moving: its columns are whatever

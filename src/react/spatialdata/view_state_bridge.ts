@@ -19,9 +19,7 @@ export function toMdvViewState(
     previousViewState: OrthographicViewState | OrbitViewState | null | undefined,
 ): OrthographicViewState {
     const [x, y] = viewState.target;
-    const previousTarget = Array.isArray(previousViewState?.target)
-        ? previousViewState.target
-        : [0, 0, 0];
+    const previousTarget = Array.isArray(previousViewState?.target) ? previousViewState.target : [0, 0, 0];
     return {
         ...(previousViewState ?? {}),
         target: [x, y, previousTarget[2] ?? 0],

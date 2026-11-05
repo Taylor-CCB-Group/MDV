@@ -1,6 +1,6 @@
-import ProjectCard, { type ProjectCardProps } from "@/catalog/ProjectCard";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
+import ProjectCard, { type ProjectCardProps } from "@/catalog/ProjectCard";
 
 vi.mock("@/catalog/PermissionsContext", () => ({
     default: () => ({

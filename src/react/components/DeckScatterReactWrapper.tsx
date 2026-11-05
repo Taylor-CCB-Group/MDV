@@ -1,23 +1,23 @@
-import BaseChart, { copyStylesInline } from "../../charts/BaseChart";
-import { BaseReactChart } from "./BaseReactChart";
+import type { OrbitViewState } from "deck.gl";
 import { action, makeObservable, observable } from "mobx";
-import type { ColumnName } from "../../charts/charts";
 import { observer } from "mobx-react-lite";
+import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
+import type DataStore from "@/datastore/DataStore";
+import { g } from "@/lib/utils";
+import type { DeckBackend } from "@/react/spatialdata/deck_backend";
+import BaseChart, { copyStylesInline } from "../../charts/BaseChart";
+import type { ColumnName } from "../../charts/charts";
+import { serialisableZoom } from "../axisScaling";
 import {
-    scatterAxisDefaults,
-    scatterDefaults,
+    type ScatterPlotConfig,
     type ScatterPlotConfig2D,
     type ScatterPlotConfig3D,
-    type ScatterPlotConfig,
+    scatterAxisDefaults,
+    scatterDefaults,
 } from "../scatter_state";
+import { BaseReactChart } from "./BaseReactChart";
 import DeckScatterComponent from "./DeckScatterComponent";
-import type { OrbitViewState } from "deck.gl";
-import { g } from "@/lib/utils";
-import type DataStore from "@/datastore/DataStore";
-import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
-import type { DeckBackend } from "@/react/spatialdata/deck_backend";
-import { serialisableZoom } from "../axisScaling";
 
 const MainChart = observer(() => {
     return <DeckScatterComponent />;

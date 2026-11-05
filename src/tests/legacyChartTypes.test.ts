@@ -2,8 +2,8 @@ import BaseChart from "@/charts/BaseChart";
 import "@/charts/DensityScatterPlot";
 import "@/charts/WGLScatterPlot";
 import "@/react/components/DeckScatterReactWrapper";
-import { legacyChartsSetting } from "@/lib/browserSettings";
 import { describe, expect, test } from "vitest";
+import { legacyChartsSetting } from "@/lib/browserSettings";
 
 const addable = (id: string) => BaseChart.types[id].allow_user_add !== false;
 

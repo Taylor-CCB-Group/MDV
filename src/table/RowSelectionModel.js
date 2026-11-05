@@ -1,4 +1,5 @@
 import { Slick } from "./Slick.js";
+
 // register namespace
 function RowSelectionModel(options) {
     let _grid;
@@ -14,10 +15,7 @@ function RowSelectionModel(options) {
     function init(grid) {
         _options = Object.assign(_defaults, options);
         _grid = grid;
-        _handler.subscribe(
-            _grid.onActiveCellChanged,
-            wrapHandler(handleActiveCellChange),
-        );
+        _handler.subscribe(_grid.onActiveCellChanged, wrapHandler(handleActiveCellChange));
         _handler.subscribe(_grid.onKeyDown, wrapHandler(handleKeyDown));
         _handler.subscribe(_grid.onClick, wrapHandler(handleClick));
     }
@@ -77,10 +75,7 @@ function RowSelectionModel(options) {
 
     function setSelectedRanges(ranges) {
         // simple check for: empty selection didn't change, prevent firing onSelectedRangesChanged
-        if (
-            (!_ranges || _ranges.length === 0) &&
-            (!ranges || ranges.length === 0)
-        ) {
+        if ((!_ranges || _ranges.length === 0) && (!ranges || ranges.length === 0)) {
             return;
         }
         _ranges = ranges;
@@ -93,14 +88,7 @@ function RowSelectionModel(options) {
 
     function handleActiveCellChange(e, data) {
         if (_options.selectActiveRow && data.row != null) {
-            setSelectedRanges([
-                new Slick.Range(
-                    data.row,
-                    0,
-                    data.row,
-                    _grid.getColumns().length - 1,
-                ),
-            ]);
+            setSelectedRanges([new Slick.Range(data.row, 0, data.row, _grid.getColumns().length - 1)]);
         }
     }
 
@@ -127,8 +115,7 @@ function RowSelectionModel(options) {
             let active;
 
             if (e.which === Slick.keyCode.DOWN) {
-                active =
-                    activeRow.row < bottom || top === bottom ? ++bottom : ++top;
+                active = activeRow.row < bottom || top === bottom ? ++bottom : ++top;
             } else {
                 active = activeRow.row < bottom ? --bottom : --top;
             }
@@ -150,10 +137,7 @@ function RowSelectionModel(options) {
             return false;
         }
 
-        if (
-            !_grid.getOptions().multiSelect ||
-            (!e.ctrlKey && !e.shiftKey && !e.metaKey)
-        ) {
+        if (!_grid.getOptions().multiSelect || (!e.ctrlKey && !e.shiftKey && !e.metaKey)) {
             return false;
         }
 

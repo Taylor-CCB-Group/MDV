@@ -1,12 +1,10 @@
-import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart";
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
+import { select } from "d3-selection";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 function getYLabel(c) {
-    return c.denominators
-        ? `${c.category} per ${c.denom_unit}`
-        : `% abundance ${c.category}`;
+    return c.denominators ? `${c.category} per ${c.denom_unit}` : `% abundance ${c.category}`;
 }
 
 class CustomBoxPlot extends SVGChart {
@@ -36,9 +34,7 @@ class CustomBoxPlot extends SVGChart {
         const p = this.config.param;
         let cat = null;
         if (p.length === 3) {
-            cat = this.dataStore
-                .getColumnValues(this.config.param[2])
-                .indexOf(this.config.category);
+            cat = this.dataStore.getColumnValues(this.config.param[2]).indexOf(this.config.category);
         }
         this.dim.getSankeyData(
             (data) => {
@@ -74,9 +70,7 @@ class CustomBoxPlot extends SVGChart {
 
     getSettings() {
         const c = this.config;
-        const values = this.dataStore
-            .getColumnValues(c.param[2])
-            .map((x) => ({ t: x }));
+        const values = this.dataStore.getColumnValues(c.param[2]).map((x) => ({ t: x }));
         //allow user to change category
         const s = [
             {
@@ -96,10 +90,7 @@ class CustomBoxPlot extends SVGChart {
     }
 
     drawChart() {
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(200)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(200).ease(easeLinear);
         const p = this.config.param;
         this.y_scale.domain([this.data.max + this.data.max / 10, 0]);
         this.updateAxis();
@@ -182,9 +173,7 @@ BaseChart.types["density_box_plot"] = {
     class: CustomBoxPlot,
     required: ["regions"],
     extra_controls: (ds) => {
-        const vs = ds
-            .getColumnList("text")
-            .map((x) => ({ name: x.name, value: x.field }));
+        const vs = ds.getColumnList("text").map((x) => ({ name: x.name, value: x.field }));
         return [
             {
                 type: "dropdown",
@@ -207,11 +196,8 @@ BaseChart.types["density_box_plot"] = {
         //work out area of each region
         for (const reg_name in ds.regions.all_regions) {
             const reg = ds.regions.all_regions[reg_name];
-            const area =
-                (reg.roi.max_x - reg.roi.min_x) *
-                (reg.roi.max_x - reg.roi.min_x);
-            config.denominators[reg_name] =
-                area * (ds.regions.scale * ds.regions.scale);
+            const area = (reg.roi.max_x - reg.roi.min_x) * (reg.roi.max_x - reg.roi.min_x);
+            config.denominators[reg_name] = area * (ds.regions.scale * ds.regions.scale);
         }
     },
 };

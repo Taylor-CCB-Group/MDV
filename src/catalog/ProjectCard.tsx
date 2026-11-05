@@ -3,10 +3,7 @@ import {
     DriveFileRenameOutline,
     Image as ImageIcon,
     Info,
-    LockPerson as LockPersonIcon,
     MoreVert,
-    Upload as UploadIcon,
-    Settings,
     Share as ShareIcon,
     WarningAmber,
 } from "@mui/icons-material";
@@ -27,15 +24,15 @@ import {
     useTheme,
 } from "@mui/material";
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { buildProjectUrl } from "@/utils/mdvRouting";
+import usePermissions from "./PermissionsContext";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
-import type { Permissions, ProjectAccessType } from "./utils/projectUtils";
 import ProjectShareModal from "./ProjectShareModal";
-import usePermissions from "./PermissionsContext";
-import { buildProjectUrl } from "@/utils/mdvRouting";
+import type { Permissions, ProjectAccessType } from "./utils/projectUtils";
 
 export interface ProjectCardProps {
     id: string;
@@ -51,10 +48,7 @@ export interface ProjectCardProps {
     writable: boolean;
     onDelete: (id: string) => Promise<void>;
     onRename: (id: string, newName: string) => Promise<void>;
-    onChangeType: (
-        id: string,
-        newType: ProjectAccessType,
-    ) => Promise<void>;
+    onChangeType: (id: string, newType: ProjectAccessType) => Promise<void>;
     onAddCollaborator: (email: string) => void;
     onExport: (id: string, name: string) => Promise<void>;
     thumbnail?: string;
@@ -90,10 +84,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
     const theme = useTheme();
     const { permissions: operationPermissions, isPublicPage } = usePermissions();
-    
+
     // todo - review how we do stuff like this
     const href = buildProjectUrl(id);
-    
+
     const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation();
         setAnchorEl(event.currentTarget);
@@ -127,21 +121,25 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             data-testid="project_card"
             data-project-id={id}
         >
-            {selectionMode && operationPermissions.deleteProject && permissions.edit && permissions.owner && onSelectionChange && (
-                <Checkbox
-                    checked={selected}
-                    onChange={(event) => onSelectionChange(id, event.target.checked)}
-                    onClick={(event) => event.stopPropagation()}
-                    inputProps={{ "aria-label": `select project ${name}` }}
-                    sx={{
-                        position: "absolute",
-                        top: 8,
-                        left: 8,
-                        bgcolor: "background.paper",
-                        zIndex: 1,
-                    }}
-                />
-            )}
+            {selectionMode &&
+                operationPermissions.deleteProject &&
+                permissions.edit &&
+                permissions.owner &&
+                onSelectionChange && (
+                    <Checkbox
+                        checked={selected}
+                        onChange={(event) => onSelectionChange(id, event.target.checked)}
+                        onClick={(event) => event.stopPropagation()}
+                        inputProps={{ "aria-label": `select project ${name}` }}
+                        sx={{
+                            position: "absolute",
+                            top: 8,
+                            left: 8,
+                            bgcolor: "background.paper",
+                            zIndex: 1,
+                        }}
+                    />
+                )}
             <a
                 href={href}
                 style={{
@@ -164,7 +162,11 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     }}
                 >
                     {thumbnail ? (
-                        <img src={thumbnail} alt="project_thumbnail" style={{ objectFit: "contain", width: "90%", aspectRatio: 3/2 }} />
+                        <img
+                            src={thumbnail}
+                            alt="project_thumbnail"
+                            style={{ objectFit: "contain", width: "90%", aspectRatio: 3 / 2 }}
+                        />
                     ) : (
                         <ImageIcon sx={{ fontSize: 80, color: "text.secondary" }} />
                     )}
@@ -181,26 +183,26 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         justifyContent: "flex-end",
                     }}
                 >
-                    <Tooltip 
-                        title={name} 
+                    <Tooltip
+                        title={name}
                         placement="bottom-start"
                         enterDelay={500}
                         slotProps={{
                             popper: {
                                 modifiers: [
                                     {
-                                        name: 'offset',
+                                        name: "offset",
                                         options: {
                                             offset: [0, -8],
-                                        }
-                                    }
-                                ]
+                                        },
+                                    },
+                                ],
                             },
                             tooltip: {
                                 sx: {
                                     fontSize: "0.9rem",
                                     fontWeight: "normal",
-                                }
+                                },
                             },
                         }}
                     >
@@ -227,19 +229,14 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         </Tooltip>
                     )}
                     {!isPublicPage && (
-                        <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ marginBottom: "0" }}
-                        >
+                        <Typography variant="body2" color="text.secondary" sx={{ marginBottom: "0" }}>
                             Last modified: {lastModified}
                         </Typography>
                     )}
                 </CardContent>
             </a>
 
-            {(hasReadme || hasPermissions) && 
-                (
+            {(hasReadme || hasPermissions) && (
                 <>
                     <IconButton
                         className="menu-button"
@@ -250,8 +247,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                             top: 8,
                             right: 8,
                             bgcolor: "background.paper",
-                            "&:hover": { 
-                                bgcolor: "grey.500"
+                            "&:hover": {
+                                bgcolor: "grey.500",
                             },
                             zIndex: 1,
                         }}
@@ -331,7 +328,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                                     setIsDeleteModalOpen(true);
                                     handleMenuClose();
                                 }}
-                                sx={{color: theme.palette.error.main}}
+                                sx={{ color: theme.palette.error.main }}
                                 disabled={!permissions.edit}
                                 data-testid={`project_delete_${id}`}
                             >
@@ -346,13 +343,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             )}
 
             {hasReadme && (
-                <ProjectInfoModal
-                    open={isInfoModalOpen}
-                    onClose={() => setIsInfoModalOpen(false)}
-                    readme={readme}
-                />
+                <ProjectInfoModal open={isInfoModalOpen} onClose={() => setIsInfoModalOpen(false)} readme={readme} />
             )}
-            
+
             {permissions.edit && (
                 <>
                     <ProjectSettingsModal
@@ -366,26 +359,32 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         onClose={() => setIsSettingsModalOpen(false)}
                     />
 
-                    {operationPermissions.renameProject && <ProjectRenameModal
-                        id={id}
-                        name={name}
-                        open={isRenameModalOpen}
-                        onRename={onRename}
-                        onClose={() => setIsRenameModalOpen(false)}
-                    />}
+                    {operationPermissions.renameProject && (
+                        <ProjectRenameModal
+                            id={id}
+                            name={name}
+                            open={isRenameModalOpen}
+                            onRename={onRename}
+                            onClose={() => setIsRenameModalOpen(false)}
+                        />
+                    )}
 
-                    {operationPermissions.shareProject && isShareModalOpen && <ProjectShareModal
-                        open={isShareModalOpen}
-                        onClose={() => setIsShareModalOpen(false)}
-                        projectId={id}
-                    />}
+                    {operationPermissions.shareProject && isShareModalOpen && (
+                        <ProjectShareModal
+                            open={isShareModalOpen}
+                            onClose={() => setIsShareModalOpen(false)}
+                            projectId={id}
+                        />
+                    )}
 
-                    {operationPermissions.deleteProject && <ProjectDeleteModal
-                        id={id}
-                        open={isDeleteModalOpen}
-                        onDelete={onDelete}
-                        onClose={() => setIsDeleteModalOpen(false)}
-                    />}
+                    {operationPermissions.deleteProject && (
+                        <ProjectDeleteModal
+                            id={id}
+                            open={isDeleteModalOpen}
+                            onDelete={onDelete}
+                            onClose={() => setIsDeleteModalOpen(false)}
+                        />
+                    )}
                 </>
             )}
         </Card>

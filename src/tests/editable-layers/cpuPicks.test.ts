@@ -1,5 +1,5 @@
-import { cpuEditablePicks } from "@/editable-layers/cpuPicks";
 import { describe, expect, it } from "vitest";
+import { cpuEditablePicks } from "@/editable-layers/cpuPicks";
 
 // Screen = data * 2, so distances in screen pixels are twice those in data units.
 const project = (p: readonly number[]) => [p[0] * 2, p[1] * 2];

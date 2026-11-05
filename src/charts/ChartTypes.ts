@@ -1,15 +1,15 @@
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
 import type { BaseConfig } from "./BaseChart";
-import type { DataType, ExtraControl, GuiSpecType } from "./charts";
+import type { ExtraControl, GuiSpecType } from "./charts";
 
 /**
  * Annotation of what kind of column (or columns) type a given param will accept.
- * 
+ *
  * Note that these are not the same as the `DataType` values used in `DataSource`. As well as allowing
  * for `"_multi_column:number"` and `"_multi_column:all"` types, we also have `"number"` - loosely
  * equivalent to `export type NumberDataType = "integer" | "double" | "int32";` in `charts.d.ts`.
- * 
+ *
  * The list of legal values is deemed exhaustive based on the evaluation of
  * ```ts
  * new Set(Object.values(BaseChart.types).flatMap(t => t.params).filter(Boolean).flatMap(p => p.type))
@@ -35,10 +35,10 @@ export type ChartType<T extends BaseConfig> = {
      * a boolean based on evaluation of whether the data store meets arbitrary criteria defined by the chart.
      */
     required?: string[] | ((ds: DataStore) => boolean);
-    /** 
+    /**
      * If extra initialisation logic is required in order to change the internal configuration of the chart
      * into a form that can be used by the chart class, this function can be used to do that.
-     * 
+     *
      * @param config A configuration object for the chart, in the intermediate form used internally by the Add Chart dialog.
      * @param dataSource The data source that the chart will be using (nb, do we mean `DataSource` or `DataStore`? - check, there are
      * frequent inconsistencies around this).

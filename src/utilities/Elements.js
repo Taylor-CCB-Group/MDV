@@ -419,7 +419,7 @@ class MDVProgress {
  * @param {function} [config.ondragend] - a function that is called when dragging ends
  * @param {Document} [config.doc] - the document object to which the event listeners
  * will be added. This is useful when the draggable element is in a different window
- * @param {boolean} [config.snapback] - if set, if the drag is released with the element off 
+ * @param {boolean} [config.snapback] - if set, if the drag is released with the element off
  * the side of its container, it will snap back to the edge. This has known issues and is
  * currently only being used for Dialogs.
  * @param {boolean|object} [config.stack] - promote on drag start; object may set container, group, baseZ
@@ -494,8 +494,8 @@ function makeDraggable(el, config = {}) {
             // Clamp to the container rather than ignoring the move, so an element
             // that starts partly outside (e.g. after the chart shrank) can still be
             // dragged back in.
-            const maxTop = cont.dir === "topleft" ? Infinity : cont.p_bb.height - cont.c_bb.height;
-            const maxLeft = cont.dir === "topleft" ? Infinity : cont.p_bb.width - cont.c_bb.width;
+            const maxTop = cont.dir === "topleft" ? Number.POSITIVE_INFINITY : cont.p_bb.height - cont.c_bb.height;
+            const maxLeft = cont.dir === "topleft" ? Number.POSITIVE_INFINITY : cont.p_bb.width - cont.c_bb.width;
             nt = Math.max(0, Math.min(nt, maxTop));
             nl = Math.max(0, Math.min(nl, maxLeft));
         }
@@ -522,15 +522,15 @@ function makeDraggable(el, config = {}) {
             if (right < 100) {
                 el.style.left = `${100 - el.offsetWidth}px`;
             }
-            if (top > (parentBB.height - 100)) {
+            if (top > parentBB.height - 100) {
                 el.style.top = `${parentBB.height - 100}px`;
             }
-            if (left > (parentBB.width - 100)) {
+            if (left > parentBB.width - 100) {
                 el.style.left = `${parentBB.width - 100}px`;
             }
             // if it is going out of the window at the top, bring the top to 0
             if (top < 0) {
-                el.style.top = '0px';
+                el.style.top = "0px";
             }
         }
 
@@ -569,17 +569,17 @@ function getElDim(el) {
 }
 
 export {
-    createEl,
-    createSVGEl,
-    addResizeListener,
-    makeDraggable,
     addElProps,
-    makeResizable,
-    removeDraggable,
-    removeResizable,
+    addResizeListener,
+    createEl,
     createMenuIcon,
-    makeSortable,
-    splitPane,
+    createSVGEl,
     getElDim,
     MDVProgress,
+    makeDraggable,
+    makeResizable,
+    makeSortable,
+    removeDraggable,
+    removeResizable,
+    splitPane,
 };

@@ -1,4 +1,5 @@
 import { makeDraggable } from "./Elements";
+
 class ImagePanZoom {
     constructor(container, image, config = {}) {
         this.container = container;
@@ -6,7 +7,7 @@ class ImagePanZoom {
         this.img = new Image();
 
         this.img.style.position = "absolute";
-        this.img.style.maxWidth= 'none'
+        this.img.style.maxWidth = "none";
 
         this.img.onload = (e) => {
             this.container.append(this.img);
@@ -27,7 +28,7 @@ class ImagePanZoom {
 
     fit() {
         const box = this.container.getBoundingClientRect();
-        const ratio =  this.img.naturalWidth / this.img.naturalHeight;
+        const ratio = this.img.naturalWidth / this.img.naturalHeight;
         const fitHeight = box.height;
         const fitWidth = fitHeight * ratio;
         this.img.style.height = `${fitHeight}px`;
@@ -48,10 +49,8 @@ class ImagePanZoom {
         amount = amount > 0 ? 1.1 : 0.9;
         const cbox = this.container.getBoundingClientRect();
         const ibox = this.img.getBoundingClientRect();
-        const dx =
-            (event.clientX - cbox.left - this.img.offsetLeft) * (amount - 1);
-        const dy =
-            (event.clientY - cbox.top - this.img.offsetTop) * (amount - 1);
+        const dx = (event.clientX - cbox.left - this.img.offsetLeft) * (amount - 1);
+        const dy = (event.clientY - cbox.top - this.img.offsetTop) * (amount - 1);
 
         this.img.style.width = `${ibox.width * amount}px`;
         this.img.style.height = `${ibox.height * amount}px`;

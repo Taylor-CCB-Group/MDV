@@ -8,9 +8,7 @@ class RangeDimension extends Dimension {
      */
     constructor(parent) {
         super(parent);
-        this.worker = new Worker(
-            new URL("./binWorker.js?v=1", import.meta.url),
-        );
+        this.worker = new Worker(new URL("./binWorker.js?v=1", import.meta.url));
     }
 
     filterSquare(args, columns) {
@@ -26,13 +24,13 @@ class RangeDimension extends Dimension {
 
     /**
      * Polygon containment filter on x/y columns.
-     * 
+     *
      * args can be either:
      *   - an array of polygon vertices
      *   - { points, regionField, regionValue } to additionally restrict rows to a
      *     specific region value.
-     * 
-     * @param {Array<[number, number]> | { points: Array<[number, number]>, regionField: string, regionValue: string }} args 
+     *
+     * @param {Array<[number, number]> | { points: Array<[number, number]>, regionField: string, regionValue: string }} args
      *
      */
     filterPoly(args, columns) {
@@ -103,19 +101,12 @@ class RangeDimension extends Dimension {
 
         const t = performance.now();
         const action = (e) => {
-            console.log(
-                `calculate bins ${col.name} : ${performance.now() - t}`,
-            );
+            console.log(`calculate bins ${col.name} : ${performance.now() - t}`);
             callback(e.data);
         };
         this.worker.onmessage = action;
 
-        this.worker.postMessage([
-            this.filterBuffer,
-            this.parent.filterBuffer,
-            [col.buffer, col.datatype],
-            config,
-        ]);
+        this.worker.postMessage([this.filterBuffer, this.parent.filterBuffer, [col.buffer, col.datatype], config]);
     }
     getBinsAsync(column, config = {}) {
         // wasted hours on this, gave up and made a simpler version for unfiltered histogram.

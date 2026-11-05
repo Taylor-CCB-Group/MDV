@@ -1,4 +1,4 @@
-import { Close as CloseIcon } from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
 import {
     Autocomplete,
     Box,
@@ -7,7 +7,6 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
-    DialogContentText,
     DialogTitle,
     IconButton,
     MenuItem,
@@ -21,12 +20,11 @@ import {
     Typography,
 } from "@mui/material";
 import type React from "react";
-import DeleteIcon from "@mui/icons-material/Delete";
-import useProjectShare, { type UserPermission, type RegisteredUser } from "./hooks/useProjectShare";
 import { useState } from "react";
-import { DialogCloseIconButton } from "./ProjectRenameModal";
 import { matchEmail } from "@/lib/utils";
+import useProjectShare, { type RegisteredUser, type UserPermission } from "./hooks/useProjectShare";
 import usePermissions from "./PermissionsContext";
+import { DialogCloseIconButton } from "./ProjectRenameModal";
 
 export interface ProjectShareModalProps {
     open: boolean;
@@ -186,36 +184,44 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell>Shared Users</TableCell>
-                                                {operationPermissions.editUserPermissions && <TableCell>Permission</TableCell>}
-                                                {operationPermissions.removeUserFromProject && <TableCell align="right">Remove</TableCell>}
+                                                {operationPermissions.editUserPermissions && (
+                                                    <TableCell>Permission</TableCell>
+                                                )}
+                                                {operationPermissions.removeUserFromProject && (
+                                                    <TableCell align="right">Remove</TableCell>
+                                                )}
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {sharedUsers.map((user) => (
                                                 <TableRow key={user.id}>
                                                     <TableCell>{user.email}</TableCell>
-                                                    {operationPermissions.editUserPermissions && <TableCell>
-                                                        <Select
-                                                            value={user.permission}
-                                                            size="small"
-                                                            fullWidth
-                                                            onChange={(e) =>
-                                                                handlePermissionChange(
-                                                                    e.target.value as UserPermission,
-                                                                    user.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            <MenuItem value="View">View</MenuItem>
-                                                            <MenuItem value="Edit">Edit</MenuItem>
-                                                            <MenuItem value="Owner">Owner</MenuItem>
-                                                        </Select>
-                                                    </TableCell>}
-                                                    {operationPermissions.removeUserFromProject && <TableCell align="right">
-                                                        <IconButton onClick={() => handleDeleteUser(user.id)}>
-                                                            <DeleteIcon />
-                                                        </IconButton>
-                                                    </TableCell>}
+                                                    {operationPermissions.editUserPermissions && (
+                                                        <TableCell>
+                                                            <Select
+                                                                value={user.permission}
+                                                                size="small"
+                                                                fullWidth
+                                                                onChange={(e) =>
+                                                                    handlePermissionChange(
+                                                                        e.target.value as UserPermission,
+                                                                        user.id,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <MenuItem value="View">View</MenuItem>
+                                                                <MenuItem value="Edit">Edit</MenuItem>
+                                                                <MenuItem value="Owner">Owner</MenuItem>
+                                                            </Select>
+                                                        </TableCell>
+                                                    )}
+                                                    {operationPermissions.removeUserFromProject && (
+                                                        <TableCell align="right">
+                                                            <IconButton onClick={() => handleDeleteUser(user.id)}>
+                                                                <DeleteIcon />
+                                                            </IconButton>
+                                                        </TableCell>
+                                                    )}
                                                 </TableRow>
                                             ))}
                                         </TableBody>

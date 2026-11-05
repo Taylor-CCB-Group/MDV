@@ -1,9 +1,9 @@
-import { SlickGrid, TextEditor, Overlays } from "../table/SlickGrid.js";
-import { RowSelectionModel } from "../table/RowSelectionModel.js";
 import { DataModel } from "../table/DataModel.js";
-import BaseChart from "./BaseChart";
-import { createEl } from "../utilities/Elements.js";
+import { RowSelectionModel } from "../table/RowSelectionModel.js";
+import { Overlays, SlickGrid, TextEditor } from "../table/SlickGrid.js";
 import { BaseDialog } from "../utilities/Dialog.js";
+import { createEl } from "../utilities/Elements.js";
+import BaseChart from "./BaseChart";
 
 class TableChart extends BaseChart {
     constructor(dataStore, div, config) {
@@ -28,7 +28,7 @@ class TableChart extends BaseChart {
                 ];
             const cw = config.column_widths || {};
             const oldCols = this.grid?.getColumns() || [];
-            oldCols.forEach(c => {
+            oldCols.forEach((c) => {
                 cw[c.field] = c.width;
             });
             for (const c of config.param) {
@@ -61,7 +61,7 @@ class TableChart extends BaseChart {
                 try {
                     this.onDataFiltered();
                 } catch {}
-            })
+            });
         });
         this.options = {
             enableCellNavigation: true,
@@ -75,12 +75,7 @@ class TableChart extends BaseChart {
         };
         this.dataModel = new DataModel(dataStore, { autoupdate: false });
         this.dataModel.setColumns(this.config.param);
-        this.grid = new SlickGrid(
-            this.contentDiv,
-            this.dataModel,
-            cols,
-            this.options,
-        );
+        this.grid = new SlickGrid(this.contentDiv, this.dataModel, cols, this.options);
         this.grid.onHeaderCellRendered.subscribe((e, args) => {
             const c = args.column;
             if (c.editor && this.mode === "edit") {
@@ -121,16 +116,11 @@ class TableChart extends BaseChart {
             func: () => {
                 this.editIcon.firstElementChild.remove();
                 this.mode = this.mode === "select" ? "edit" : "select";
-                const classes =
-                    this.mode === "select"
-                        ? ["fas", "fa-edit"]
-                        : ["fas", "fa-table"];
+                const classes = this.mode === "select" ? ["fas", "fa-edit"] : ["fas", "fa-table"];
                 createEl("i", { classes: classes }, this.editIcon);
                 this.editIcon.setAttribute(
                     "aria-label",
-                    this.mode === "edit"
-                        ? "Change To Selection Mode"
-                        : "Change To Edit Mode",
+                    this.mode === "edit" ? "Change To Selection Mode" : "Change To Edit Mode",
                 );
                 this._changeMode();
             },
@@ -161,9 +151,7 @@ class TableChart extends BaseChart {
 
         let indices = [];
         if (data.indexes) {
-            indices = Array.isArray(data.indexes)
-                ? data.indexes
-                : Object.values(data.indexes);
+            indices = Array.isArray(data.indexes) ? data.indexes : Object.values(data.indexes);
         }
         this._applyHighlightedIndices(indices);
     }
@@ -218,9 +206,7 @@ class TableChart extends BaseChart {
         const config = super.getConfig();
         const cols = this.grid.getColumns();
 
-        config.param = cols
-            .filter((x) => x.field !== "__index__")
-            .map((x) => x.field);
+        config.param = cols.filter((x) => x.field !== "__index__").map((x) => x.field);
         config.column_widths = {};
         for (const c of cols) {
             if (c.width !== 100) {
@@ -275,9 +261,7 @@ class TableChart extends BaseChart {
                 },
             });
             this.overlay = new Overlays({});
-            this.overlay.onFillUpDown.subscribe((e, args) =>
-                this._updateOverlay(args),
-            );
+            this.overlay.onFillUpDown.subscribe((e, args) => this._updateOverlay(args));
 
             this.grid.registerPlugin(this.overlay);
         }
@@ -337,12 +321,7 @@ class TableChart extends BaseChart {
             return;
         }
 
-        this.dataModel.updateRange(
-            column.field,
-            args.range.fromRow,
-            args.range.toRow,
-            args.dir,
-        );
+        this.dataModel.updateRange(column.field, args.range.fromRow, args.range.toRow, args.dir);
         this.grid.invalidate();
     }
     _rowsSelected(args) {
@@ -410,9 +389,7 @@ class TableChart extends BaseChart {
             this._sort(this.config.sort);
         }
         const highlighted =
-            typeof this.dataStore.getHighlightedData === "function"
-                ? this.dataStore.getHighlightedData() || []
-                : [];
+            typeof this.dataStore.getHighlightedData === "function" ? this.dataStore.getHighlightedData() || [] : [];
         this._applyHighlightedIndices(highlighted);
     }
 }
@@ -443,10 +420,7 @@ class EditColumnDialog extends BaseDialog {
                 e.stopImmediatePropagation();
                 return;
             }
-            const suggest = this.dataModel.getValueSuggestion(
-                this.valInput.value,
-                this.col,
-            );
+            const suggest = this.dataModel.getValueSuggestion(this.valInput.value, this.col);
             if (suggest) {
                 this.valInput.value = suggest;
             }
@@ -465,16 +439,8 @@ class EditColumnDialog extends BaseDialog {
     }
 
     _createButton(text, replace) {
-        const d = createEl(
-            "div",
-            { style: { padding: "5px 10px" } },
-            this.columns[1],
-        );
-        createEl(
-            "button",
-            { classes: ["ciview-button"], text: text },
-            d,
-        ).addEventListener("click", () => {
+        const d = createEl("div", { style: { padding: "5px 10px" } }, this.columns[1]);
+        createEl("button", { classes: ["ciview-button"], text: text }, d).addEventListener("click", () => {
             const r = replace || this.replaceInput.value;
             if (r === "_delete_column_") {
                 this.table._removeColumn(this.col);
@@ -526,11 +492,7 @@ class AddColumnDialog extends BaseDialog {
         }
         const d3 = createEl("div", { style: dstyle }, this.dialog);
         createEl("label", { text: "Position" }, d3);
-        this.position = createEl(
-            "input",
-            { style: { width: "100px" }, value: 2 },
-            d3,
-        );
+        this.position = createEl("input", { style: { width: "100px" }, value: 2 }, d3);
 
         setTimeout(() => this.name.focus(), 100);
     }

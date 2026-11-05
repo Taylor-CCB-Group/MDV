@@ -1,14 +1,8 @@
-import useBuildInfo, {type BuildInfo} from "@/catalog/hooks/useBuildInfo";
+import axios from "axios";
+import { createContext, type PropsWithChildren, useContext, useEffect, useState } from "react";
+import useBuildInfo, { type BuildInfo } from "@/catalog/hooks/useBuildInfo";
 import type ChartManager from "@/charts/ChartManager";
 import { buildApiUrl, getApiRootFromDir, getProjectDirFromLocation, normalizeApiRoot } from "@/utils/mdvRouting";
-import axios from "axios";
-import {
-    type PropsWithChildren,
-    createContext,
-    useContext,
-    useEffect,
-    useState,
-} from "react";
 
 export type ProjectInfoBase = {
     root: string;
@@ -36,14 +30,12 @@ export type Project = {
     permissions: { can_read: boolean; can_write: boolean; is_owner: boolean } | null;
 };
 
-/** 
+/**
  * Get project information from the URL and URL parameters.
- * 
+ *
  * This can be used to derive the initial state of the project, or called by non-React code to get similar information.
  */
-function getProjectInfoBaseFromChartManager(
-    chartManagerOverride?: ChartManager,
-): ProjectInfoBase {
+function getProjectInfoBaseFromChartManager(chartManagerOverride?: ChartManager): ProjectInfoBase {
     // Derive initial state from window.location and URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const dir = getProjectDirFromLocation();
@@ -63,9 +55,7 @@ function getProjectInfoBaseFromChartManager(
         throw new Error("ChartManager is not initialised.");
     }
     //! might need to be a bit careful if we end up using this
-    const mainApiRoute = normalizeApiRoot(
-        chartManager.config.mdv_api_root || getApiRootFromDir(root),
-    );
+    const mainApiRoute = normalizeApiRoot(chartManager.config.mdv_api_root || getApiRootFromDir(root));
     // const root = mainApiRoute; // todo establish that we have an actual consistent logic for this
     //! only applies when running with the associated project API routing...
     const projectApiRoute = buildApiUrl(`project/${projectName}`, mainApiRoute).replace(/\/$/, "") + "/";
@@ -76,7 +66,7 @@ function getProjectInfoBaseFromChartManager(
         chartManager,
         mainApiRoute,
         projectApiRoute,
-    };   
+    };
 }
 
 export function getProjectInfoBase(): ProjectInfoBase {
@@ -121,18 +111,11 @@ export function useCurrentProject(): Project | null {
 
 const ProjectContext = createContext<ProjectInfo>(null as any);
 
-export const ProjectProvider = ({
-    children,
-    chartManager,
-}: PropsWithChildren<{ chartManager?: ChartManager }>) => {
+export const ProjectProvider = ({ children, chartManager }: PropsWithChildren<{ chartManager?: ChartManager }>) => {
     const { buildInfo } = useBuildInfo();
     const base = getProjectInfoBaseFromChartManager(chartManager);
 
-    return (
-        <ProjectContext.Provider value={{ ...base, buildInfo }}>
-            {children}
-        </ProjectContext.Provider>
-    );
+    return <ProjectContext.Provider value={{ ...base, buildInfo }}>{children}</ProjectContext.Provider>;
 };
 
 export const useProject = () => useContext(ProjectContext);

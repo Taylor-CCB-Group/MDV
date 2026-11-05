@@ -6,7 +6,7 @@
         --text_color: white;
         --background_color: #f5f5f5;
         --fade_background_color: rgba(245, 245, 245, 0.4);
-        --menu_bar_color: #D6D8DB;
+        --menu_bar_color: #d6d8db;
         --border_menu_bar_color: #c9c9c9;
         --primary_background: #ecf0f1;
         --shadow_color: #888;
@@ -35,7 +35,7 @@
         --text_color: black;
         --background_color: #f5f5f5;
         --fade_background_color: rgba(245, 245, 245, 0.4);
-        --menu_bar_color: #D6D8DB;
+        --menu_bar_color: #d6d8db;
         --border_menu_bar_color: #c9c9c9;
         --primary_background: #ecf0f1;
         --shadow_color: #888;
@@ -88,7 +88,7 @@
     --text_color: black;
     --background_color: #f5f5f5;
     --fade_background_color: rgba(245, 245, 245, 0.4);
-    --menu_bar_color: #D6D8DB;
+    --menu_bar_color: #d6d8db;
     --primary_background: #ecf0f1;
     --shadow_color: #888;
     --input_border_color: rgb(230, 230, 230);
@@ -118,75 +118,73 @@
 .dark a {
     color: #1266f1;
 }
-select, input, textarea {
+select,
+input,
+textarea {
     border: 0.1em solid var(--input_border_color);
     border-radius: 4px;
     background-color: var(--input_background_color);
 }
-.mdv-select{
+.mdv-select {
     border-radius: 3px;
-    font-size:0.8em;
-    margin:2px;
+    font-size: 0.8em;
+    margin: 2px;
 }
 
-.mdv-divider{
-    margin-left:6px;
-    margin-right:6px;
+.mdv-divider {
+    margin-left: 6px;
+    margin-right: 6px;
 }
 
-.mdv-select:focus{
-
-    box-shadow:0px 0px 3px 2px #088AFF;
+.mdv-select:focus {
+    box-shadow: 0px 0px 3px 2px #088aff;
     outline: 0 none;
 }
 
-.mdv-info-text{
-    font-size:0.9em;
-    opacity:0.7;
-    display:block;
-
+.mdv-info-text {
+    font-size: 0.9em;
+    opacity: 0.7;
+    display: block;
 }
 
-.mdv-section{
-    padding:4px;
+.mdv-section {
+    padding: 4px;
 }
 
-.mdv-section-header{
-    background-color:var(--background_color);
+.mdv-section-header {
+    background-color: var(--background_color);
     font-weight: bold;
 }
-.mdv-section-value{
-    white-space:pre-wrap;
+.mdv-section-value {
+    white-space: pre-wrap;
 }
 
-.mdv-image-holder{
-    margin:5px;
-    border:1px solid black;
-    position:relative;
-    overflow:hidden;
+.mdv-image-holder {
+    margin: 5px;
+    border: 1px solid black;
+    position: relative;
+    overflow: hidden;
 }
 
-
-.mdv-checkbox{
-    transform:scale(1.2);
+.mdv-checkbox {
+    transform: scale(1.2);
     vertical-align: middle;
 }
 
-
-.mdv-flex-dynamic{
-    overflow:hidden;
-    white-space:nowrap;
-    text-overflow:ellipsis;
-    flex-grow:1;
-    min-width:0;
+.mdv-flex-dynamic {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    flex-grow: 1;
+    min-width: 0;
 }
 
-.mdv-flex-fixed{
-    flex-shrink:0;
-    flex-grow:0;
+.mdv-flex-fixed {
+    flex-shrink: 0;
+    flex-grow: 0;
 }
 
-.grid-stack  .ciview-chart-panel {
+.grid-stack .ciview-chart-panel {
     box-shadow: 0 0 1em var(--shadow_color);
     /* nb changing box-sizing,  adjusted width in _getContentDimensions()...
     otherwise VolumeView was overflowing.
@@ -213,55 +211,55 @@ reflowed every chart. Handles are still painted and still receive pointer events
 }
 
 /* Overriding grid stack resizer styling to replicate absolute view */
-.grid-stack .ui-resizable-n { 
+.grid-stack .ui-resizable-n {
     position: absolute !important;
     top: var(--resizer-offset) !important;
     left: 0 !important;
     right: 0 !important;
 }
-.grid-stack .ui-resizable-s { 
+.grid-stack .ui-resizable-s {
     position: absolute !important;
     bottom: var(--resizer-offset) !important;
     left: 0 !important;
     right: 0 !important;
- }
-.grid-stack .ui-resizable-e { 
+}
+.grid-stack .ui-resizable-e {
     position: absolute !important;
     top: var(--title_bar_height) !important;
     right: var(--resizer-offset) !important;
     bottom: 0 !important;
     height: calc(100% - var(--title_bar_height)) !important;
 }
-.grid-stack .ui-resizable-w { 
+.grid-stack .ui-resizable-w {
     position: absolute !important;
     top: var(--title_bar_height) !important;
     left: var(--resizer-offset) !important;
     bottom: 0 !important;
     height: calc(100% - var(--title_bar_height)) !important;
- }
- .grid-stack .ui-resizable-ne { 
-     position: absolute !important;
-     top: var(--resizer-offset) !important;
-     right: var(--resizer-offset) !important;
-  }
- .grid-stack .ui-resizable-nw { 
-     position: absolute !important;
-     top: var(--resizer-offset) !important;
-     left: var(--resizer-offset) !important;
-  }
-.grid-stack .ui-resizable-se { 
+}
+.grid-stack .ui-resizable-ne {
+    position: absolute !important;
+    top: var(--resizer-offset) !important;
+    right: var(--resizer-offset) !important;
+}
+.grid-stack .ui-resizable-nw {
+    position: absolute !important;
+    top: var(--resizer-offset) !important;
+    left: var(--resizer-offset) !important;
+}
+.grid-stack .ui-resizable-se {
     position: absolute !important;
     bottom: var(--resizer-offset) !important;
     right: var(--resizer-offset) !important;
     /* To hide the duplicate resize handles at the bottom */
     background: transparent !important;
- }
-.grid-stack .ui-resizable-sw { 
+}
+.grid-stack .ui-resizable-sw {
     position: absolute !important;
     bottom: var(--resizer-offset) !important;
     left: var(--resizer-offset) !important;
     background: transparent !important;
- }
+}
 
 .dark .gridLock {
     border-color: #101010;
@@ -270,10 +268,10 @@ reflowed every chart. Handles are still painted and still receive pointer events
     border-color: #888;
 }
 
-.ciview-chart-panel{
-    display:flex;
-    flex-flow:column;
-    border-radius:5px;
+.ciview-chart-panel {
+    display: flex;
+    flex-flow: column;
+    border-radius: 5px;
     box-shadow: 0 0 1em var(--shadow_color);
 }
 
@@ -288,10 +286,10 @@ reflowed every chart. Handles are still painted and still receive pointer events
     cursor: n-resize;
     background: transparent;
     z-index: 2;
-  }
-  
-  /* Bottom */
-  .resizer-s {
+}
+
+/* Bottom */
+.resizer-s {
     position: absolute;
     bottom: var(--resizer-offset);
     left: 0;
@@ -300,11 +298,11 @@ reflowed every chart. Handles are still painted and still receive pointer events
     cursor: s-resize;
     background: transparent;
     z-index: 2;
-  }
-  
-  /* Right */
-  /* Hardcoding the height of ciview-chart-titlebar (31px) to avoid drag and resize overlap */
-  .resizer-e {
+}
+
+/* Right */
+/* Hardcoding the height of ciview-chart-titlebar (31px) to avoid drag and resize overlap */
+.resizer-e {
     position: absolute;
     top: var(--title_bar_height);
     right: var(--resizer-offset);
@@ -313,10 +311,10 @@ reflowed every chart. Handles are still painted and still receive pointer events
     cursor: e-resize;
     background: transparent;
     z-index: 2;
-  }
-  
-  /* Left */
-  .resizer-w {
+}
+
+/* Left */
+.resizer-w {
     position: absolute;
     top: var(--title_bar_height);
     left: var(--resizer-offset);
@@ -325,10 +323,10 @@ reflowed every chart. Handles are still painted and still receive pointer events
     cursor: w-resize;
     background: transparent;
     z-index: 2;
-  }
-  
-  /* Top-right */
-  .resizer-ne {
+}
+
+/* Top-right */
+.resizer-ne {
     position: absolute;
     top: var(--resizer-offset);
     right: var(--resizer-offset);
@@ -337,10 +335,10 @@ reflowed every chart. Handles are still painted and still receive pointer events
     cursor: ne-resize;
     background: transparent;
     z-index: 2;
-  }
-  
-  /* Top-left */
-  .resizer-nw {
+}
+
+/* Top-left */
+.resizer-nw {
     position: absolute;
     top: var(--resizer-offset);
     left: var(--resizer-offset);
@@ -349,10 +347,10 @@ reflowed every chart. Handles are still painted and still receive pointer events
     cursor: nw-resize;
     background: transparent;
     z-index: 2;
-  }
-  
-  /* Bottom-right */
-  .resizer-se {
+}
+
+/* Bottom-right */
+.resizer-se {
     position: absolute;
     bottom: var(--resizer-offset);
     right: var(--resizer-offset);
@@ -361,10 +359,10 @@ reflowed every chart. Handles are still painted and still receive pointer events
     cursor: se-resize;
     background: transparent;
     z-index: 2;
-  }
-  
-  /* Bottom-left */
-    .resizer-sw {
+}
+
+/* Bottom-left */
+.resizer-sw {
     position: absolute;
     bottom: var(--resizer-offset);
     left: var(--resizer-offset);
@@ -373,34 +371,34 @@ reflowed every chart. Handles are still painted and still receive pointer events
     cursor: sw-resize;
     background: transparent;
     z-index: 2;
-  }  
+}
 
-.ciview-chart-titlebar{
-    display:flex;
-    padding:4px;
+.ciview-chart-titlebar {
+    display: flex;
+    padding: 4px;
     color: var(--text_color);
     background-color: var(--background_color);
-    flex:0 0 auto;
-    font-size:14px;
-    overflow:hidden;
-    border: 1px solid rgba(120,120,120, 0.2); /* Add a subtle border */
+    flex: 0 0 auto;
+    font-size: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(120, 120, 120, 0.2); /* Add a subtle border */
 }
 
 .ciview-contentDiv {
     background-color: var(--primary_background);
 }
 
-.ciview-chart-title{
-    flex-grow:1;
-    text-overflow:ellipsis;
-    overflow:hidden;
-    white-space:nowrap;
+.ciview-chart-title {
+    flex-grow: 1;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
     margin-left: 0.2em;
 }
-.ciview-chart-menuspace{
-    flex-grow:0;
-    white-space:nowrap;
-    display:flex;
+.ciview-chart-menuspace {
+    flex-grow: 0;
+    white-space: nowrap;
+    display: flex;
     flex-flow: row-reverse;
     align-items: center;
 }
@@ -409,11 +407,11 @@ reflowed every chart. Handles are still painted and still receive pointer events
     background-color: #155724;
 }*/
 
-.ciview-chart-content{
-    flex:1 1 auto;
-    position:relative;
+.ciview-chart-content {
+    flex: 1 1 auto;
+    position: relative;
     z-index: 0;
-    min-height:1px;
+    min-height: 1px;
     background-color: var(--main_panel_color);
     color: var(--text_color);
     overflow: hidden;
@@ -437,78 +435,67 @@ reflowed every chart. Handles are still painted and still receive pointer events
     background-color: rgba(186, 186, 186, 0.3);
 }
 
-.row-bar{
-    cursor:pointer;
+.row-bar {
+    cursor: pointer;
 }
 
-
-.pie-arc{
-    cursor:pointer;
+.pie-arc {
+    cursor: pointer;
 }
 
-.row-text{
-    cursor:pointer;
+.row-text {
+    cursor: pointer;
 }
 
-.ciview-button{
+.ciview-button {
     background: var(--button_color);
-    padding:5px 8px;
-    border-radius:5px;
-    cursor:pointer;
-    color:white;
+    padding: 5px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    color: white;
     border: 0;
 }
 
-.ciview-button-sm{
+.ciview-button-sm {
     background: var(--button_color);
-    padding:3px 6px;
-    border-radius:5px;
-    cursor:pointer;
-    color:white;
-    font-size:0.8em;
+    padding: 3px 6px;
+    border-radius: 5px;
+    cursor: pointer;
+    color: white;
+    font-size: 0.8em;
     margin: 0px 3px;
     text-align: center;
     border: 0;
 }
 
-
-
-.ciview-button-disabled{
+.ciview-button-disabled {
     background: var(--button_color);
-    padding:5px 8px;
-    border-radius:5px;
-    opacity:0.6;
-    color:white;
-    pointer-events:none;
-   
+    padding: 5px 8px;
+    border-radius: 5px;
+    opacity: 0.6;
+    color: white;
+    pointer-events: none;
 }
 
-.ciview-disabled{
-    pointer-events:none;
-    opacity:0.6;
+.ciview-disabled {
+    pointer-events: none;
+    opacity: 0.6;
 }
 
-
-
-
-.ciview-center{
+.ciview-center {
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
-
-
-
-
-.ciview-title-div{
-    font-size:16px;
-    font-weight:bold;
-    padding:5px;
+.ciview-title-div {
+    font-size: 16px;
+    font-weight: bold;
+    padding: 5px;
 }
 
-.ciview-padded-div{
-    padding:4px;
+.ciview-padded-div {
+    padding: 4px;
 }
 
 .ciview-main-menu-bar {
@@ -523,101 +510,92 @@ reflowed every chart. Handles are still painted and still receive pointer events
     justify-content: space-between;
 }
 
-.ciview-button:hover{
+.ciview-button:hover {
     box-shadow: 0 2px 5px 0 rgb(0 0 0 / 20%);
 }
 
-.ciview-button-sm:hover{
+.ciview-button-sm:hover {
     box-shadow: 0 2px 5px 0 rgb(0 0 0 / 20%);
 }
 
-.row-bar:hover{
-    opacity:0.6;
+.row-bar:hover {
+    opacity: 0.6;
 }
 
-.pie-arc:hover{
-    opacity:0.6;
+.pie-arc:hover {
+    opacity: 0.6;
 }
 
-
-.ciview-info-alert{
-    padding:8px;
-    width:250px;
-    position:absolute;
-    font-size:18px;
-    z-index:5;
-
+.ciview-info-alert {
+    padding: 8px;
+    width: 250px;
+    position: absolute;
+    font-size: 18px;
+    z-index: 5;
 }
-.ttt{
-   float:right;
+.ttt {
+    float: right;
 }
-.ciview-alert-info{
-    color:#155724;
-    background:#d4edda;
+.ciview-alert-info {
+    color: #155724;
+    background: #d4edda;
     border: 1px solid #c3e6cb;
 }
 
-.ciview-alert-danger{
-    color:#721c24;
-    background:#f8d7da;
+.ciview-alert-danger {
+    color: #721c24;
+    background: #f8d7da;
     border: 1px solid #f5c6cb;
 }
 
-.ciview-alert-warning{
-    color:#856404;
-    background:#fff3cd;
+.ciview-alert-warning {
+    color: #856404;
+    background: #fff3cd;
     border: 1px solid #ffeeba;
 }
 
-
-.civ-dg-div{
-    padding:5px;
+.civ-dg-div {
+    padding: 5px;
 }
 
-.ciview-info-alert-spin{
-    font-size:18px;
-    float:right
-
+.ciview-info-alert-spin {
+    font-size: 18px;
+    float: right;
 }
 
-
-
-.civew-chart-resetbutton{
-    visibility:hidden;
-    
+.civew-chart-resetbutton {
+    visibility: hidden;
 }
 
-
-
-.ciview-chart-icon{
-    cursor:pointer;
+.ciview-chart-icon {
+    cursor: pointer;
     margin: 0px 2px;
 }
 
 /* BaseChart.setMenuPip: a dot on the "more" icon, and on its debug menu item */
-.ciview-menu-pip{
-    position:absolute;
-    top:-2px;
-    right:-1px;
-    width:7px;
-    height:7px;
-    border-radius:50%;
-    pointer-events:none;
+.ciview-menu-pip {
+    position: absolute;
+    top: -2px;
+    right: -1px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    pointer-events: none;
 }
-.ciview-ctm-item .ciview-menu-pip{
-    position:static;
-    display:inline-block;
-    margin-left:2px;
+.ciview-ctm-item .ciview-menu-pip {
+    position: static;
+    display: inline-block;
+    margin-left: 2px;
 }
-.ciview-menu-pip-error{
-    background-color:var(--icon_color_error);
+.ciview-menu-pip-error {
+    background-color: var(--icon_color_error);
 }
-.ciview-menu-pip-notice{
-    background-color:#f2c94c;
+.ciview-menu-pip-notice {
+    background-color: #f2c94c;
 }
 
 .mdv-image-label {
-    position:absolute;
+    position: absolute;
     text-align: center;
 }
 /* messes up border color...
@@ -634,13 +612,13 @@ reflowed every chart. Handles are still painted and still receive pointer events
     color: var(--text_color_error);
 }
 /* Tooltip styles */
-[aria-label][role~="tooltip"]::after { 
-    background:var(--tooltip_background_color); 
+[aria-label][role~="tooltip"]::after {
+    background: var(--tooltip_background_color);
     color: var(--tooltip_text_color);
 }
 
-.dark [aria-label][role~="tooltip"]::before{
-    filter: invert()
+.dark [aria-label][role~="tooltip"]::before {
+    filter: invert();
 }
 
 /* Markdown styles */
@@ -819,7 +797,8 @@ reflowed every chart. Handles are still painted and still receive pointer events
     border: 1px solid var(--border_menu_bar_color);
 }
 
-.markdown-body thead, .markdown-body tbody {
+.markdown-body thead,
+.markdown-body tbody {
     width: 100%;
 }
 
@@ -838,26 +817,26 @@ reflowed every chart. Handles are still painted and still receive pointer events
 }
 
 .markdown-body tr:nth-child(odd) {
-    background-color: var(--primary_background)
+    background-color: var(--primary_background);
 }
 
 .markdown-body tr:nth-child(even) {
-    background-color: var(--background_color)
+    background-color: var(--background_color);
 }
 
-.tippy-content{
+.tippy-content {
     background: var(--tooltip_background_color);
     color: var(--tooltip_text_color);
 }
 
 .tippy-arrow:before {
-   color: var(--tooltip_background_color);
+    color: var(--tooltip_background_color);
 }
 
 /* Slick Grid React styles */
 
 .slickgrid-react-container {
-    .grid-pane, 
+    .grid-pane,
     .slickgrid-container,
     .slick-viewport {
         width: 100%;
@@ -879,9 +858,10 @@ reflowed every chart. Handles are still painted and still receive pointer events
 
     .slick-viewport {
         scrollbar-color: var(--scroll_bar_thumb) var(--scroll_bar_track) !important;
-      }
+    }
 
-    .slick-cell, .slick-header-column {
+    .slick-cell,
+    .slick-header-column {
         border: 0.5px solid transparent !important;
         border-right-color: var(--border_menu_bar_color) !important;
         border-bottom-color: var(--border_menu_bar_color) !important;
@@ -910,7 +890,7 @@ reflowed every chart. Handles are still painted and still receive pointer events
         overflow: hidden !important;
         text-overflow: ellipsis !important;
     }
-    
+
     .slick-column-name {
         /* width: 100%; */
         min-height: 100%;
@@ -971,7 +951,8 @@ reflowed every chart. Handles are still painted and still receive pointer events
         color: var(--text_color) !important;
     }
 
-    .slick-row.even:hover, .slick-row.odd:hover {
+    .slick-row.even:hover,
+    .slick-row.odd:hover {
         background-color: var(--border_menu_bar_color) !important;
     }
 

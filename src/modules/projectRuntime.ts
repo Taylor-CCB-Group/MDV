@@ -39,9 +39,7 @@ export function getProjectBootstrapContext(): ProjectBootstrapContext {
     return { urlParams, isPopout, dir, root, staticFolder, projectId, apiRoot };
 }
 
-export async function loadProjectRuntime(
-    context: ProjectBootstrapContext,
-): Promise<LoadedProjectRuntime> {
+export async function loadProjectRuntime(context: ProjectBootstrapContext): Promise<LoadedProjectRuntime> {
     const { root, dir, staticFolder, urlParams } = context;
     setProjectRoot(root);
 

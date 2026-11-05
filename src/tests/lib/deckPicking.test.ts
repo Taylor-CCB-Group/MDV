@@ -1,5 +1,5 @@
-import { ScatterplotLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
+import { ScatterplotLayer } from "@deck.gl/layers";
 import { describe, expect, it, vi } from "vitest";
 import {
     findPickedInfo,
@@ -41,11 +41,7 @@ describe("deckPicking", () => {
         const gateInfo = pickingInfo("gate-display", 1, { properties: { gateName: "A" } });
         const pickMultipleObjects = vi.fn(() => [duplicatePrimaryInfo, gateInfo]);
 
-        const richInfo = getPickingInfoWithAlternates(
-            primaryInfo,
-            { pickMultipleObjects },
-            { depth: 4, radius: 3 },
-        );
+        const richInfo = getPickingInfoWithAlternates(primaryInfo, { pickMultipleObjects }, { depth: 4, radius: 3 });
 
         expect(pickMultipleObjects).toHaveBeenCalledWith({ x: 12, y: 34, radius: 3, depth: 4 });
         expect(getPickedInfos(richInfo)).toEqual([primaryInfo, gateInfo]);
@@ -64,8 +60,6 @@ describe("deckPicking", () => {
     it("matches source layer ids for composite layer picks", () => {
         const info = pickingInfo("spatial", 3, 84, "spatial.scatterplot-points");
 
-        expect(
-            pickingInfoMatchesLayer(info, (layerId) => layerId.includes("spatial.scatterplot")),
-        ).toBe(true);
+        expect(pickingInfoMatchesLayer(info, (layerId) => layerId.includes("spatial.scatterplot"))).toBe(true);
     });
 });

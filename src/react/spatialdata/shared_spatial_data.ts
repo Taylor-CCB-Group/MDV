@@ -1,8 +1,8 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
+import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "../components/SpatialDataMDVReact";
 import { useChart } from "../context";
 import { useRegion } from "../hooks";
-import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "../components/SpatialDataMDVReact";
 import { NO_SPATIAL_DATA, type SpatialDataState } from "./spatial_data_reader";
 
 export function spatialDataUrlForRegion(region: unknown): string | null {

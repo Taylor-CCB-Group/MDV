@@ -1,14 +1,14 @@
+import { Box, Button, Paper, Typography } from "@mui/material";
 import type React from "react";
 import { useEffect } from "react";
-import { Box, Button, Paper, Typography } from "@mui/material";
-import mdvLogo from "./assets/mdv_logo.png";
 import { buildDashboardUrl } from "@/utils/mdvRouting";
+import mdvLogo from "./assets/mdv_logo.png";
 
 const Login: React.FC = () => {
     useEffect(() => {
         // Check if this is a callback from Auth0
         const params = new URLSearchParams(window.location.search);
-        if (params.get('callback')) {
+        if (params.get("callback")) {
             window.location.href = buildDashboardUrl();
         }
     }, []);

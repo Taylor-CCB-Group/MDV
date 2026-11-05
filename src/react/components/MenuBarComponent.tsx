@@ -1,25 +1,25 @@
-import { AppBar, Box, Chip, Divider, Toolbar, Typography } from "@mui/material";
 import {
-    Home as HomeIcon,
-    Save as SaveIcon,
-    SaveAs as SaveAsIcon,
     Add as AddIcon,
-    Remove as RemoveIcon,
     CloudUpload as CloudUploadIcon,
+    Home as HomeIcon,
+    Remove as RemoveIcon,
+    SaveAs as SaveAsIcon,
+    Save as SaveIcon,
 } from "@mui/icons-material";
+import { AppBar, Box, Divider, Toolbar, Typography } from "@mui/material";
+import { LockIcon, LockOpenIcon } from "lucide-react";
+import { observer } from "mobx-react-lite";
 import ToggleThemeWrapper from "@/charts/dialogs/ToggleTheme";
+import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
+import { useCurrentProject, useProject } from "@/modules/ProjectContext";
+import { buildDashboardUrl, getApiRootFromDir } from "@/utils/mdvRouting";
+import { useChartManager } from "../hooks";
+import ChatButtons from "./ChatButtons";
+import CustomTooltip from "./CustomTooltip";
+import DebugButton from "./DebugButton";
 import IconWithTooltip from "./IconWithTooltip";
 import ViewSelectorWrapper from "./ViewSelectorComponent";
 import ViewThumbnailComponent from "./ViewThumbnailComponent";
-import { useCurrentProject, useProject } from "@/modules/ProjectContext";
-import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
-import ChatButtons from "./ChatButtons";
-import CustomTooltip from "./CustomTooltip";
-import { LockIcon, LockOpenIcon } from "lucide-react";
-import { observer } from "mobx-react-lite";
-import { useChartManager } from "../hooks";
-import DebugButton from "./DebugButton";
-import { buildDashboardUrl, getApiRootFromDir } from "@/utils/mdvRouting";
 
 const MenuBarComponent = observer(() => {
     const { viewManager, config } = useChartManager();
@@ -28,9 +28,7 @@ const MenuBarComponent = observer(() => {
 
     const isEditable = config.permission === "edit";
     const ariaLabel = isEditable ? "editable" : "view only";
-    const homeHref = buildDashboardUrl(
-        mainApiRoute === "/" ? getApiRootFromDir(root) : mainApiRoute,
-    );
+    const homeHref = buildDashboardUrl(mainApiRoute === "/" ? getApiRootFromDir(root) : mainApiRoute);
 
     const handleSaveButtonClick = async () => {
         await viewManager.saveView();
@@ -133,9 +131,9 @@ const MenuBarComponent = observer(() => {
                     <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                         <CustomTooltip
                             tooltipText={
-                                isEditable ? 
-                                "You can edit views and add data." : 
-                                "You can only view, editing is disabled."
+                                isEditable
+                                    ? "You can edit views and add data."
+                                    : "You can only view, editing is disabled."
                             }
                         >
                             <Box
@@ -144,11 +142,11 @@ const MenuBarComponent = observer(() => {
                                 tabIndex={0}
                                 sx={{ marginRight: "10px", marginBottom: "2px" }}
                             >
-                                {
-                                    isEditable ? 
-                                        <LockOpenIcon height={18} aria-hidden="true" focusable="false" /> :
-                                        <LockIcon height={18} aria-hidden="true" focusable="false" /> 
-                                }
+                                {isEditable ? (
+                                    <LockOpenIcon height={18} aria-hidden="true" focusable="false" />
+                                ) : (
+                                    <LockIcon height={18} aria-hidden="true" focusable="false" />
+                                )}
                             </Box>
                         </CustomTooltip>
                         <ChatButtons />

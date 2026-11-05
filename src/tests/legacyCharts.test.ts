@@ -4,15 +4,15 @@ import "@/charts/TableChart";
 import "@/charts/WGLScatterPlot";
 import "@/react/components/DeckScatterReactWrapper";
 import "@/react/components/VivMDVReact";
+import { afterEach, describe, expect, test } from "vitest";
 import {
     convertLegacyChartConfig,
     convertLegacyChartConfigNow,
     getLegacyConversionTarget,
     isLegacyChartType,
 } from "@/charts/legacyCharts";
-import { convertLegacyChartsSetting } from "@/lib/browserSettings";
 import type DataStore from "@/datastore/DataStore";
-import { afterEach, describe, expect, test } from "vitest";
+import { convertLegacyChartsSetting } from "@/lib/browserSettings";
 
 afterEach(() => {
     convertLegacyChartsSetting.set("off");
@@ -85,7 +85,10 @@ describe("convertLegacyChartConfig", () => {
                 { column: null, categories: [] },
                 { column: "cell_type", categories: [] },
             ]) {
-                const config: { type: string; background_filter?: unknown } = { type: "wgl_scatter_plot", background_filter };
+                const config: { type: string; background_filter?: unknown } = {
+                    type: "wgl_scatter_plot",
+                    background_filter,
+                };
                 expect(convertLegacyChartConfig(config)).toBe("wgl_scatter_plot");
                 expect(config.background_filter).toBeUndefined();
             }
@@ -174,11 +177,15 @@ describe("the Viv scatter plot that is not a React chart", () => {
 
     test("leaves a SpatialData region, which would want the SpatialData.js viewer", () => {
         const dataStore = withRegions({ r1: { viv_image: {}, spatial: {} } });
-        expect(getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never, dataStore)).toBeUndefined();
+        expect(
+            getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never, dataStore),
+        ).toBeUndefined();
     });
 
     test("leaves a chart whose region has no Viv image, or that cannot be checked", () => {
-        expect(getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never, withRegions({ r1: {} }))).toBeUndefined();
+        expect(
+            getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never, withRegions({ r1: {} })),
+        ).toBeUndefined();
         expect(getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never)).toBeUndefined();
     });
 });

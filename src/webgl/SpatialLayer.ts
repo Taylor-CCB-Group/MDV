@@ -1,10 +1,10 @@
 import { CompositeLayer, type Layer, type LayersList } from "@deck.gl/core";
 import type { ScatterplotLayerProps } from "@deck.gl/layers";
 import { ScatterplotLayer } from "@deck.gl/layers";
-import { TriangleLayerContours } from "./HeatmapContourExtension";
-import type { ContourLayerProps } from "@/react/contour_state";
-import { HeatmapLayer } from "deck.gl";
 import { DensityLayer } from "@intraspatial/deck";
+import { HeatmapLayer } from "deck.gl";
+import type { ContourLayerProps } from "@/react/contour_state";
+import { TriangleLayerContours } from "./HeatmapContourExtension";
 import { contourToDensityProps } from "./intraspatialDensity";
 import { MdvScatterplotLayer } from "./MdvScatterplotLayer";
 import { isWebGPULayer } from "./wgslLayerExtension";
@@ -43,21 +43,23 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 type: TriangleLayerContours,
             },
         };
-        const densityLayers = contourLayers.filter((l) => l).map(props => {
-            const { extensions, ...p } = this.getSubLayerProps(props);
-            if (isWebGPU) return new DensityLayer(contourToDensityProps(p));
-            return new HeatmapLayer({
-                ...p,
-                _subLayerProps: {
-                    ...contourSubLayerProps,
-                    "triangle-layer": {
-                        contourOpacity: p.contourOpacity,
-                        contourFill: p.contourFill,
-                        fillOpacity: p.fillOpacity,
+        const densityLayers = contourLayers
+            .filter((l) => l)
+            .map((props) => {
+                const { extensions, ...p } = this.getSubLayerProps(props);
+                if (isWebGPU) return new DensityLayer(contourToDensityProps(p));
+                return new HeatmapLayer({
+                    ...p,
+                    _subLayerProps: {
+                        ...contourSubLayerProps,
+                        "triangle-layer": {
+                            contourOpacity: p.contourOpacity,
+                            contourFill: p.contourFill,
+                            fillOpacity: p.fillOpacity,
+                        },
                     },
-                },
+                });
             });
-        });
         return [
             // add 'grey-out' layer here... that implies a different type of data being passed.
             // it might want to know about background_filter...

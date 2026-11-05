@@ -1,8 +1,8 @@
-import WGLScatterPlot from "./WGLScatterPlot.js";
-import BaseChart from "./BaseChart";
 import { geoPath } from "d3-geo";
 import { scaleLinear } from "d3-scale";
 import { createEl } from "../utilities/Elements.js";
+import BaseChart from "./BaseChart";
+import WGLScatterPlot from "./WGLScatterPlot.js";
 import "../datastore/DensityDimension.js";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
@@ -18,7 +18,6 @@ class DensityScatterPlot extends WGLScatterPlot {
         super.drawChart();
     }
     _updateParamScale(p) {
-        
         const mm1 = this.dataStore.getMinMaxForColumn(p[0]);
         const mm2 = this.dataStore.getMinMaxForColumn(p[1]);
         const w = mm1[1] - mm1[0];
@@ -64,10 +63,7 @@ class DensityScatterPlot extends WGLScatterPlot {
         super.onDataFiltered(dim);
         const vals = this.dataStore.getColumnValues(c.param[2]);
         try {
-            this.catKeys = [
-                vals.indexOf(c.category1),
-                vals.indexOf(c.category2),
-            ];
+            this.catKeys = [vals.indexOf(c.category1), vals.indexOf(c.category2)];
             if (this.catKeys[0] === -1 && this.catKeys[1] === -1) {
                 this.data = [null, null];
                 return;
@@ -141,10 +137,7 @@ class DensityScatterPlot extends WGLScatterPlot {
                 this.graph_area.selectAll(`.dp-poly-${i}`).remove();
             } else {
                 const color = this.dataStore.getColumnColors(c.param[2])[ck];
-                const colorScale = scaleLinear(
-                    [0, 1 - c.contour_intensity],
-                    ["white", color],
-                );
+                const colorScale = scaleLinear([0, 1 - c.contour_intensity], ["white", color]);
                 this._drawContours(color, colorScale, i);
             }
         }
@@ -159,9 +152,7 @@ class DensityScatterPlot extends WGLScatterPlot {
                 func: () => {
                     const c = this.config;
                     if (c.background_image) {
-                        this.dataStore.regions.all_regions[
-                            c.region
-                        ].default_image = c.background_image.name;
+                        this.dataStore.regions.all_regions[c.region].default_image = c.background_image.name;
                         this.dataStore.dirtyMetadata.add("regions");
                     }
                 },
@@ -185,10 +176,7 @@ class DensityScatterPlot extends WGLScatterPlot {
         const nyp = nsy(yr[0]) - nsy(this.orig_y_scale[0]) * ll;
         const x = this.margins.left;
         const y = this.margins.top;
-        this.graph_area.attr(
-            "transform",
-            `translate(${x - nxp},${y - nyp}) scale(${nxs},${nys})  `,
-        );
+        this.graph_area.attr("transform", `translate(${x - nxp},${y - nyp}) scale(${nxs},${nys})  `);
     }
 
     getSettings() {
@@ -217,10 +205,7 @@ class DensityScatterPlot extends WGLScatterPlot {
                     const cats = this.dataStore.getColumnValues(x);
                     const cs = cats.slice(0);
                     cs.push("None");
-                    for (const n of [
-                        "Contour Category 1",
-                        "Contour Category 2",
-                    ]) {
+                    for (const n of ["Contour Category 1", "Contour Category 2"]) {
                         controls[n].innerHTML = "";
                         for (const c of cs) {
                             createEl(
@@ -323,7 +308,7 @@ class DensityScatterPlot extends WGLScatterPlot {
         s.push({
             type: "folder",
             label: "Contour Settings",
-            current_value: contourSettings
+            current_value: contourSettings,
         });
         return s;
     }
@@ -384,8 +369,7 @@ BaseChart.types["image_scatter_plot"] = {
         config.roi = sr.roi;
         config.json = sr.json;
         config.background_image = sr.images[sr.default_image];
-        config.title =
-            ec.region + (sr.default_image ? `-${sr.default_image}` : "");
+        config.title = ec.region + (sr.default_image ? `-${sr.default_image}` : "");
     },
 };
 

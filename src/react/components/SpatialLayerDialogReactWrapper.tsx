@@ -1,9 +1,9 @@
+import { createMdvPortal } from "@/react/react_utils";
 import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
-import { createMdvPortal } from "@/react/react_utils";
 import { ChartProvider } from "../context";
-import SpatialLayerDialogComponent from "./SpatialLayerDialogComponent";
 import type { SpatialDataMdvReact } from "./SpatialDataMDVReact";
+import SpatialLayerDialogComponent from "./SpatialLayerDialogComponent";
 
 class SpatialLayerDialogReactWrapper extends BaseDialog {
     _root?: ReturnType<typeof createMdvPortal>;
@@ -16,9 +16,7 @@ class SpatialLayerDialogReactWrapper extends BaseDialog {
 
     constructor(parent: SpatialDataMdvReact) {
         if (parent.__doc__ !== document) {
-            console.warn(
-                "SpatialLayerDialogReactWrapper may have styling issues in popouts...",
-            );
+            console.warn("SpatialLayerDialogReactWrapper may have styling issues in popouts...");
         }
         const config = {
             width: 560,

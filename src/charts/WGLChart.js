@@ -1,7 +1,8 @@
-import SVGChart from "./SVGChart.js";
-import { createEl } from "../utilities/Elements.js";
 import { hexToRGB } from "../datastore/DataStore.js";
+import { createEl } from "../utilities/Elements.js";
+import SVGChart from "./SVGChart.js";
 import "d3-transition";
+
 // import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class WGLChart extends SVGChart {

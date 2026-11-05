@@ -72,7 +72,9 @@ function install() {
         const stack = callerStack(3);
         const begunAt = open.get(encoder);
         if (begunAt) {
-            report(`${call} on encoder ${labelOf(encoder)} while a pass on it is open.\nPass begun at:\n${begunAt}\n${call} at:\n${stack}`);
+            report(
+                `${call} on encoder ${labelOf(encoder)} while a pass on it is open.\nPass begun at:\n${begunAt}\n${call} at:\n${stack}`,
+            );
         }
         record(call, labelOf(encoder), stack);
         open.set(encoder, stack);
@@ -106,7 +108,9 @@ function install() {
         const stack = callerStack(2);
         const begunAt = open.get(this);
         if (begunAt) {
-            report(`finish() on encoder ${labelOf(this)} while a pass on it is open.\nPass begun at:\n${begunAt}\nfinish() at:\n${stack}`);
+            report(
+                `finish() on encoder ${labelOf(this)} while a pass on it is open.\nPass begun at:\n${begunAt}\nfinish() at:\n${stack}`,
+            );
         }
         open.delete(this);
         record("finish", labelOf(this), stack);
@@ -123,7 +127,9 @@ function install() {
     GPUAdapter.prototype.requestDevice = async function (this: GPUAdapter, descriptor?: GPUDeviceDescriptor) {
         const device = await requestDevice.call(this, descriptor);
         device.addEventListener("uncapturederror", (event) => {
-            report(`Uncaptured error on device ${labelOf(device)}: ${event.error.message}\nRecent encoder calls, oldest first:\n${formatRecent(8)}`);
+            report(
+                `Uncaptured error on device ${labelOf(device)}: ${event.error.message}\nRecent encoder calls, oldest first:\n${formatRecent(8)}`,
+            );
         });
         return device;
     };

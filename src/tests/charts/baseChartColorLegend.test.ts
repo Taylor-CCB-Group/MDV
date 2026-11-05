@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import BaseChart from "@/charts/BaseChart";
+import type { LegendWrapperComponentProps } from "@/react/components/legend/LegendWrapper";
 import type {
     ColorLegendCategoricalSpec,
     ColorLegendContinuousSpec,
     ColorLegendSpec,
 } from "@/react/legend/color_legend/types";
-import type { LegendWrapperComponentProps } from "@/react/components/legend/LegendWrapper";
 
 const categorical: ColorLegendCategoricalSpec = {
     kind: "categorical",

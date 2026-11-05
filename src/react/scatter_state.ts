@@ -1,7 +1,25 @@
+import type { LayerExtension, OrbitViewState, OrthographicViewState, PickingInfo } from "@deck.gl/core";
+import type { SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
 import type { Matrix4 } from "@math.gl/core";
-import type { OrbitViewState, OrthographicViewState, PickingInfo } from "@deck.gl/core";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { BaseConfig } from "@/charts/BaseChart";
+import type { ColumnName, DataColumn, DataType } from "@/charts/charts";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import { isDatatypeCategorical } from "@/lib/utils";
+import { escapeHtml } from "@/utilities/Utilities";
+import { MdvDataFilterExtension } from "@/webgl/MdvDataFilterExtension";
+import { MdvScatterplotLayer } from "@/webgl/MdvScatterplotLayer";
+import SpatialLayer from "@/webgl/SpatialLayer";
+import { ScatterDensityExension, ScatterSquareExtension } from "../webgl/ScatterDeckExtension";
+import { type AxisScaling, radiusReferenceRange } from "./axisScaling";
+import { getVivId } from "./components/avivatorish/MDVivViewer";
+import { useMetadata } from "./components/avivatorish/state";
+import type { ViewState } from "./components/VivScatterComponent";
 import { useChart } from "./context";
+import { type DualContourLegacyConfig, type HoveredContour, useLegacyDualContour } from "./contour_state";
+import { getEmptyFeatureCollection } from "./deck_state";
 import {
+    type FilterOwner,
     useChartID,
     useChartSize,
     useConfig,
@@ -9,28 +27,8 @@ import {
     useFieldSpecs,
     useOwnedFilteredIndices,
     useParamColumns,
-    type FilterOwner,
 } from "./hooks";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-import { getVivId } from "./components/avivatorish/MDVivViewer";
-import { useMetadata } from "./components/avivatorish/state";
-import type { ViewState } from "./components/VivScatterComponent";
-import SpatialLayer from "@/webgl/SpatialLayer";
-import { ScatterSquareExtension, ScatterDensityExension } from "../webgl/ScatterDeckExtension";
-import type { LayerExtension } from "@deck.gl/core";
-import { MdvScatterplotLayer } from "@/webgl/MdvScatterplotLayer";
-import { MdvDataFilterExtension } from "@/webgl/MdvDataFilterExtension";
-import { isDatatypeCategorical } from "@/lib/utils";
 import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
-import { type DualContourLegacyConfig, type HoveredContour, useLegacyDualContour } from "./contour_state";
-import type { ColumnName, DataColumn, DataType } from "@/charts/charts";
-import type { SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
-import type { BaseConfig } from "@/charts/BaseChart";
-import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
-import { getEmptyFeatureCollection } from "./deck_state";
-import { escapeHtml } from "@/utilities/Utilities";
-import { type AxisScaling, radiusReferenceRange } from "./axisScaling";
 
 //!!! temporary fix for tsgo preview compatibility
 // import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
@@ -374,11 +372,7 @@ export function useScatterplotLayer(
     const { opacity } = config;
     const radiusScale = useScatterRadius();
 
-    const {
-        aggregateFilteredRows,
-        ownerVisibleRows,
-        isExternallyFiltered,
-    } = useOwnedFilteredIndices(filterOwner);
+    const { aggregateFilteredRows, ownerVisibleRows, isExternallyFiltered } = useOwnedFilteredIndices(filterOwner);
     const data = ownerVisibleRows;
     const params = useParamColumns();
     const [cx, cy, cz] = params;
@@ -485,10 +479,10 @@ export function useScatterplotLayer(
             if (!tooltipCols) return null;
             // return tooltipCols.getValue(data[i]);
             return tooltipCols.map((col) => {
-                    // Sanitise the strings before passing
-                    const value = col.data ? col.getValue(rowIndex) : "loading...";
-                    const strValue = value === undefined || value === null ? "" : String(value);
-                    return `<strong>${escapeHtml(col.name)}:</strong> ${escapeHtml(strValue)}`;
+                // Sanitise the strings before passing
+                const value = col.data ? col.getValue(rowIndex) : "loading...";
+                const strValue = value === undefined || value === null ? "" : String(value);
+                return `<strong>${escapeHtml(col.name)}:</strong> ${escapeHtml(strValue)}`;
             });
         },
         [tooltipCols],
@@ -672,7 +666,13 @@ export function useScatterplotLayer(
                 updateTriggers: {
                     // a full pass over every row; only worth redoing while the layer is shown
                     getFilterValue: greyOnFilter
-                        ? [aggregateFilteredRows, isExternallyFiltered, colorColumn, shouldFilterMissing, fallbackOnZero]
+                        ? [
+                              aggregateFilteredRows,
+                              isExternallyFiltered,
+                              colorColumn,
+                              shouldFilterMissing,
+                              fallbackOnZero,
+                          ]
                         : false,
                     getPosition: [cx.data, cy.data, cz?.data],
                 },

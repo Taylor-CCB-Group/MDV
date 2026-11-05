@@ -1,8 +1,8 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
-import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart";
 import { sankey, sankeyJustify, sankeyLinkHorizontal } from "d3-sankey";
+import { select } from "d3-selection";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 class SankeyChart extends SVGChart {
     constructor(dataStore, div, config) {
@@ -85,16 +85,10 @@ class SankeyChart extends SVGChart {
 
     drawChart() {
         this.updateAxis();
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(400)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(400).ease(easeLinear);
         const cdim = this._getContentDimensions();
         const p = this.config.param;
-        const colors = [
-            this.dataStore.getColumnColors(p[0]),
-            this.dataStore.getColumnColors(p[1]),
-        ];
+        const colors = [this.dataStore.getColumnColors(p[0]), this.dataStore.getColumnColors(p[1])];
         let nodePadding = 20 - this.sankeyData.minNodes;
         nodePadding = nodePadding < 1 ? 1 : nodePadding > 10 ? 10 : nodePadding;
         const san = sankey()
@@ -120,13 +114,9 @@ class SankeyChart extends SVGChart {
             })
             .on("mouseover pointermove", (e, d) => {
                 const s = d.source;
-                const sn = this.dataStore.getColumnValues(
-                    this.config.param[s.param],
-                )[s.ind];
+                const sn = this.dataStore.getColumnValues(this.config.param[s.param])[s.ind];
                 const t = d.target;
-                const tn = this.dataStore.getColumnValues(
-                    this.config.param[t.param],
-                )[t.ind];
+                const tn = this.dataStore.getColumnValues(this.config.param[t.param])[t.ind];
                 this.showToolTip(e, `${sn}<br>${tn}<br>${d.trueValue}`);
             })
             .on("mouseleave", () => {
@@ -141,20 +131,14 @@ class SankeyChart extends SVGChart {
             .attr("stoke-opacity", 0.5)
             .attr("opacity", (d) => {
                 if (this.linkFilter) {
-                    if (
-                        d.source.id === this.linkFilter[0] &&
-                        d.target.id === this.linkFilter[1]
-                    ) {
+                    if (d.source.id === this.linkFilter[0] && d.target.id === this.linkFilter[1]) {
                         return 0.8;
                     }
                     return 0.2;
                 }
 
                 if (this.nodeFilter) {
-                    if (
-                        d.source.id === this.nodeFilter ||
-                        d.target.id === this.nodeFilter
-                    ) {
+                    if (d.source.id === this.nodeFilter || d.target.id === this.nodeFilter) {
                         return 0.8;
                     }
                     return 0.2;
@@ -176,9 +160,7 @@ class SankeyChart extends SVGChart {
                 this.filterCategories(col, values[d.ind]);
             })
             .on("mouseover pointermove", (e, d) => {
-                const n = this.dataStore.getColumnValues(
-                    this.config.param[d.param],
-                )[d.ind];
+                const n = this.dataStore.getColumnValues(this.config.param[d.param])[d.ind];
                 this.showToolTip(e, n);
             })
             .on("mouseleave", () => {

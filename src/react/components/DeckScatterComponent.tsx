@@ -1,31 +1,14 @@
-import DeckGL, { type DeckGLRef } from "@deck.gl/react";
-import { type Layer, OrthographicView, OrbitView, type PickingInfo } from "@deck.gl/core";
-import { observer } from "mobx-react-lite";
-import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
+import { type Layer, OrbitView, OrthographicView, type PickingInfo } from "@deck.gl/core";
 import { LineLayer } from "@deck.gl/layers";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { useChart } from "../context";
-import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
+import DeckGL, { type DeckGLRef } from "@deck.gl/react";
 import { action } from "mobx";
+import { observer } from "mobx-react-lite";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import type { DataColumn, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { allNumeric } from "@/lib/columnTypeHelpers";
-import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
-import SelectionOverlay from "./SelectionOverlay";
-import { useScatterRadius } from "../scatter_state";
-import { fitOrthographicView } from "../axisScaling";
-import AxisComponent from "./AxisComponent";
-import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
-import useGateLayers from "../hooks/useGateLayers";
-import FieldContourLegend from "./FieldContourLegend";
-import {
-    useCategoryContourLegend,
-    useFieldContourLegend,
-    type DualContourLegacyConfig,
-    type HoveredContour,
-} from "../contour_state";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
-import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import {
     type DeckDevice,
     type DeckErrorHandlers,
@@ -34,8 +17,25 @@ import {
     useDeckDeviceProps,
 } from "@/react/spatialdata/deck_backend";
 import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
-import { ErrorBoundary } from "react-error-boundary";
+import { fitOrthographicView } from "../axisScaling";
+import { useChart } from "../context";
+import {
+    type DualContourLegacyConfig,
+    type HoveredContour,
+    useCategoryContourLegend,
+    useFieldContourLegend,
+} from "../contour_state";
+import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
+import useGateLayers from "../hooks/useGateLayers";
+import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
+import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
+import { useScatterRadius } from "../scatter_state";
+import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
+import AxisComponent from "./AxisComponent";
+import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import FieldContourLegend from "./FieldContourLegend";
+import SelectionOverlay from "./SelectionOverlay";
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -246,11 +246,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     //! beware unproject from here is not what we want, should review
     const { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
 
-    const {
-        gateLabelLayer,
-        gateDisplayLayer,
-        controllerOptions,
-    } = useGateLayers();
+    const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
 
     const legendFields = useFieldContourLegend(contourConfig.densityFields);
     const legendCategories = useCategoryContourLegend(contourConfig);
@@ -281,26 +277,34 @@ const DeckScatter = observer(function DeckScatterComponent({
     // if in future we have subgraphs sharing a canvas, we will need to
     // make sure that the view is set up correctly for each subgraph.
     const view = useMemo(() => {
-        return config.dimension === "2d" ? new OrthographicView({
-            id: `scatterplot-view-${id}`,
-            // controller: true,
-            width: chartWidth,
-            height: chartHeight,
-            x: 0,
-            y: 0,
-            flipY: false,
-        }) : new OrbitView({
-            id: `scatterplot-view-${id}`,
-            // controller: true,
-            width: chartWidth,
-            height: chartHeight,
-            x: 0,
-            y: 0,
-        });
+        return config.dimension === "2d"
+            ? new OrthographicView({
+                  id: `scatterplot-view-${id}`,
+                  // controller: true,
+                  width: chartWidth,
+                  height: chartHeight,
+                  x: 0,
+                  y: 0,
+                  flipY: false,
+              })
+            : new OrbitView({
+                  id: `scatterplot-view-${id}`,
+                  // controller: true,
+                  width: chartWidth,
+                  height: chartHeight,
+                  x: 0,
+                  y: 0,
+              });
     }, [chartWidth, chartHeight, config.dimension, id]);
 
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [greyScatterplotLayer, scatterplotLayer, gateDisplayLayer, selectionLayer, gateLabelLayer, axisLinesLayer,
+    const layers = [
+        greyScatterplotLayer,
+        scatterplotLayer,
+        gateDisplayLayer,
+        selectionLayer,
+        gateLabelLayer,
+        axisLinesLayer,
     ].filter((layer): layer is NonNullable<typeof layer> => layer != null);
     const { device, failedOnWebGPU, deviceProps, onDeviceInitialized, onError } = useScatterDeckDevice(
         layers.map((layer) => layer.id),
@@ -328,14 +332,11 @@ const DeckScatter = observer(function DeckScatterComponent({
     const getTooltipContent = useCallback(
         (info: PickingInfo) => {
             const richInfo = getPickingInfoWithAlternates(info, pickAlternates ? deckRef.current?.deck : null);
-            return getCombinedScatterTooltip(
-                richInfo,
-                {
-                    gateDisplayLayerId: gateDisplayLayer?.id,
-                    gateLabelLayerId: gateLabelLayer?.id,
-                    getPointTooltip: getTooltip,
-                },
-            );
+            return getCombinedScatterTooltip(richInfo, {
+                gateDisplayLayerId: gateDisplayLayer?.id,
+                gateLabelLayerId: gateLabelLayer?.id,
+                getPointTooltip: getTooltip,
+            });
         },
         [gateDisplayLayer?.id, gateLabelLayer?.id, getTooltip, pickAlternates],
     );
@@ -366,7 +367,6 @@ const DeckScatter = observer(function DeckScatterComponent({
     // this doesn't seem to help re-register mouse events.
     // const controller = useMemo(() => ({inertia: 10+Math.random()}), [outerContainer])
 
-
     return (
         <>
             <AxisComponent config={config} unproject={unproject}>
@@ -391,7 +391,8 @@ const DeckScatter = observer(function DeckScatterComponent({
                             // deck picks its device once, when created: remount on a backend change.
                             key={device.backend}
                             onError={(error) => {
-                                if (device.backend === "webgpu") failedOnWebGPU(`the canvas failed on WebGPU: ${errorMessage(error)}`);
+                                if (device.backend === "webgpu")
+                                    failedOnWebGPU(`the canvas failed on WebGPU: ${errorMessage(error)}`);
                             }}
                             fallbackRender={({ error }) => (
                                 <ErrorComponentReactWrapper
@@ -416,7 +417,7 @@ const DeckScatter = observer(function DeckScatterComponent({
                                     dragPan: controllerOptions.dragPan,
                                 }}
                                 viewState={viewState}
-                                // initialViewState={viewState} //consider not using react state for this        
+                                // initialViewState={viewState} //consider not using react state for this
                                 views={view}
                                 onViewStateChange={(v) => {
                                     action(() => (config.viewState = v.viewState))();
