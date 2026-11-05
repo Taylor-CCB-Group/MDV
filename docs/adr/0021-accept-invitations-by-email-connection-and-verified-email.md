@@ -20,19 +20,30 @@ self-signup, anyone can register an account with someone else's email.
 A sign-in accepts an open Invitation only when all of these hold:
 
 - the email matches the Invitation's email, ignoring case
-- the sign-in came through the Invitation's Sign-in method, the Auth0 connection, which a
-  post-login Action adds as a claim because Auth0 does not include it by default
-- for the password connection, Auth0 reports the email as verified, which happens when the
-  person sets their password through the emailed link
+- the sign-in came through the Invitation's Sign-in method, the Auth0 connection
+- for the password connection, Auth0 reports the email as verified
 - for a Microsoft connection, the sign-in carries Microsoft's `xms_edov` claim showing that
   the email's domain is verified
+
+Auth0 does not include the connection in what it returns by default, so a post-login Action
+adds the connection's name and strategy as claims. The strategy says which of the last 2
+checks applies. MDV refuses a sign-in through any connection that is neither a password
+connection nor Azure AD.
+
+MDV-Admin creates a password account marked as verified, with a random password that it
+discards. Only someone who can read that inbox can then set a password, through the reset
+email Auth0 sends there. MDV-Admin does not change an account that existed before the
+Invitation, so if that account's email is unverified, its owner has to verify it through
+Auth0 before the Invitation can be accepted.
 
 Each Microsoft connection accepts sign-ins from the client's own Entra tenant only. Together
 with `xms_edov`, this means only the client's tenant can produce a matching email, and only
 from a domain it has proved it owns.
 
 Both Sign-in methods use the same rule, because Microsoft Invitations will outnumber
-password ones and one rule is easier to reason about.
+password ones and one rule is easier to reason about. A Deactivated user who signs in with
+the Auth0 account tied to their User accepts an Invitation that names them by the same
+rule, and accepting it reactivates them.
 
 ## Consequences
 
