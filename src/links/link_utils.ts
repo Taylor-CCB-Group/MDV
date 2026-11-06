@@ -536,9 +536,11 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
             link.observableFields = vals;
         });
     });
-    //todo check link.name is a good id for the listener
     // both events mean "the answer to which rows we expose may have changed" - see createRowSelector
-    tds.addListener(link.name, (type) => {
+    // The id has to be unique among the links *to* `tds`: several dataSources can link to it under the same link
+    // name (e.g. cells and a grid of spots, both to genes), and a listener added with an id that is already in
+    // use replaces the earlier one, which left every link but the last to initialise frozen on its first fields.
+    tds.addListener(`rows_as_columns:${ds.name}:${link.name}`, (type) => {
         if (type === "data_highlighted" || type === "filtered") {
             refreshFields();
         }
