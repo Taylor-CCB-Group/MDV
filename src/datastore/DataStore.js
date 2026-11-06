@@ -850,7 +850,8 @@ class DataStore {
     _filteredIndexWorker = this._createFilteredIndexWorker();
 
     _createFilteredIndexWorker() {
-        const worker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url));
+        // a module worker, as it imports the scan it shares with the main thread
+        const worker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url), { type: "module" });
         // the worker is shared, and the cache is cleared whenever the filter changes, so there can be several
         // requests in flight: replies are matched to requests by id.
         worker.onmessage = (e) => {
