@@ -110,8 +110,9 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
                 const cols = flattenFields(colsOriginalArr);
                 const a = multiCol ? cols : cols[0];
                 const cm = window.mdv.chartManager;
-                // a load that's still pending when the query is replaced or cleared must not be applied
-                const generation = this.activeQueries.generation(target.name);
+                // a load that's still pending when the query is replaced or cleared, or when the query's fields
+                // change again (which re-runs this), must not be applied: loads can finish out of order
+                const generation = this.activeQueries.beginLoad(target.name);
                 cm._getColumnsThen(
                     dataSource,
                     cols,
@@ -176,13 +177,24 @@ export class ColumnQueryMapper<T extends BaseConfig> {
      * added because of `methodName: 'replacementMethod'` issue, now resolved differently.
      */
     inSetQuery = false;
-    /** Bumped whenever the query for a method is replaced or cleared, to invalidate in-flight column loads. */
+    /**
+     * Bumped whenever the query for a method is replaced or cleared, or a new column load starts for it,
+     * to invalidate in-flight column loads.
+     */
     private generations = new Map<DecoratedMethodName, number>();
     generation(methodName: DecoratedMethodName) {
         return this.generations.get(methodName) ?? 0;
     }
     private invalidate(methodName: DecoratedMethodName) {
         this.generations.set(methodName, this.generation(methodName) + 1);
+    }
+    /**
+     * Marks the start of a column load for a method, superseding any that are still in flight.
+     * @returns the generation to compare with {@link generation} when the load finishes
+     */
+    beginLoad(methodName: DecoratedMethodName) {
+        this.invalidate(methodName);
+        return this.generation(methodName);
     }
     /**
      * Called from the implementation of `@loadColumnData` decorator to ensure proper housekeeping of reactions
