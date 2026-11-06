@@ -32,11 +32,13 @@ import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import ProjectShareModal from "./ProjectShareModal";
+import type { ListColumn } from "./utils/catalogPreferences";
 import type { Project, ProjectAccessType } from "./utils/projectUtils";
 
 export type Pvoid = Promise<void>;
 export type ProjectListViewProps = {
     projects: Project[];
+    columns: ListColumn[];
     onDelete: (id: string) => Pvoid;
     onRename: (id: string, name: string) => Pvoid;
     onChangeType: (id: string, type: ProjectAccessType) => Pvoid;
@@ -48,6 +50,7 @@ export type ProjectListViewProps = {
 export type MouseEv = React.MouseEvent<HTMLElement>;
 const ProjectListView = ({
     projects,
+    columns,
     onDelete,
     onRename,
     onExport,
@@ -88,6 +91,12 @@ const ProjectListView = ({
         [handleMenuClose],
     );
 
+    const show = useCallback(
+        (col: ListColumn) =>
+            columns.includes(col) && !(isPublicPage && (col === "lastModified" || col === "filesystem")),
+        [columns, isPublicPage],
+    );
+
     const hasReadme = useCallback((proj: Project) => !!proj.readme, []);
 
     const hasPermissions = useCallback(
@@ -109,10 +118,10 @@ const ProjectListView = ({
                         <TableRow>
                             {selectionMode && <TableCell padding="checkbox" />}
                             <TableCell>Name</TableCell>
-                            <TableCell>Owner</TableCell>
-                            {!isPublicPage && <TableCell>Last Modified</TableCell>}
-                            <TableCell>Type</TableCell>
-                            {!isPublicPage && <TableCell>Filesystem</TableCell>}
+                            {show("owner") && <TableCell>Owner</TableCell>}
+                            {show("lastModified") && <TableCell>Last Modified</TableCell>}
+                            {show("type") && <TableCell>Type</TableCell>}
+                            {show("filesystem") && <TableCell>Filesystem</TableCell>}
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
                     </TableHead>
@@ -149,10 +158,12 @@ const ProjectListView = ({
                                         <Typography>{project.name}</Typography>
                                     </div>
                                 </TableCell>
-                                <TableCell>{project.owner ? project.owner.join(", ") : ""}</TableCell>
-                                {!isPublicPage && <TableCell>{project.lastModified}</TableCell>}
-                                <TableCell>{project.type}</TableCell>
-                                {!isPublicPage && (
+                                {show("owner") && (
+                                    <TableCell>{project.owner ? project.owner.join(", ") : ""}</TableCell>
+                                )}
+                                {show("lastModified") && <TableCell>{project.lastModified}</TableCell>}
+                                {show("type") && <TableCell>{project.type}</TableCell>}
+                                {show("filesystem") && (
                                     <TableCell>
                                         {project.writable ? (
                                             "Writable"
