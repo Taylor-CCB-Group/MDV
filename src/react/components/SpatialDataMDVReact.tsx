@@ -7,7 +7,7 @@ import type { DeckBackend } from "@/react/spatialdata/deck_backend";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
-import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
+import { createHostOnlyRenderStack, type DefaultImageLayerProps } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import {
@@ -32,6 +32,11 @@ export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     viewState?: SpatialDataSerializableViewState | null;
     /** Experimental; null (or absent) follows the browser's default (see `deck_backend.ts`). */
     render_backend?: DeckBackend | null;
+    /**
+     * Props for the image layer added when the chart has no render stack; read when the chart is
+     * created and not kept in its config. Set when a Viv chart is converted, for its channel settings.
+     */
+    defaultImageLayer?: DefaultImageLayerProps;
 };
 
 function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataStore: DataStore) {
@@ -74,6 +79,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     renderStackPropsGeneration = 0;
     /** True only until the first default image layer seed runs for a brand-new chart. */
     seedDefaultSpatialLayers: boolean;
+    /** Props for that default image layer, from the config's `defaultImageLayer`. */
+    readonly defaultImageLayerProps?: DefaultImageLayerProps;
 
     get viewerStore() {
         return this.vivStores?.viewerStore;
@@ -219,8 +226,11 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: SpatialDataMdvReactConfig) {
         const seedDefaultSpatialLayers = originalConfig.renderStack === undefined;
         const config = adaptSpatialDataConfig(originalConfig, dataStore);
+        const { defaultImageLayer } = config;
+        config.defaultImageLayer = undefined;
         super(dataStore, div, config, SpatialDataChartRoot);
         this.seedDefaultSpatialLayers = seedDefaultSpatialLayers;
+        if (seedDefaultSpatialLayers) this.defaultImageLayerProps = defaultImageLayer;
         this.colorByColumn(config.color_by);
         makeObservable(this, {
             colorBy: observable,

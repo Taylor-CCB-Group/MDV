@@ -114,7 +114,8 @@ export const convertLegacyChartsSetting = defineChoiceSetting<"off" | "on">({
     label: "Convert legacy charts (experimental)",
     description:
         "For developers; the behaviour is likely to change. Load charts of a legacy type (such as the classic scatter plots) as their current " +
-        "equivalent. The conversion is saved if the view is saved. Charts with no equivalent, " +
+        "equivalent; turning this on also converts the charts already open. The conversion is saved if the view is saved, " +
+        "and turning this off does not undo it. Charts with no equivalent, " +
         "or that the equivalent could not show faithfully, are left as they are.",
     choices: [
         { value: "off", label: "Off" },

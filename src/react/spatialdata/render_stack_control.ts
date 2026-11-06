@@ -172,7 +172,7 @@ export function seedRenderStackFromSpatialData(
     if (!config.renderStack) {
         runInAction(() => {
             config.renderStack = chart?.seedDefaultSpatialLayers
-                ? createDefaultRenderStack(spatialData, coordinateSystem)
+                ? createDefaultRenderStack(spatialData, coordinateSystem, chart.defaultImageLayerProps)
                 : createHostOnlyRenderStack();
             chart?.finishDefaultSpatialLayerSeed();
             chart?.bumpRenderStackGeneration();
@@ -186,7 +186,13 @@ export function seedRenderStackFromSpatialData(
             throw new Error(`Unexpected config with no renderStack ${config}`);
         }
         if (chart?.seedDefaultSpatialLayers) {
-            changed = insertDefaultImageLayer(config.renderStack, spatialData, coordinateSystem) || changed;
+            changed =
+                insertDefaultImageLayer(
+                    config.renderStack,
+                    spatialData,
+                    coordinateSystem,
+                    chart.defaultImageLayerProps,
+                ) || changed;
             chart.finishDefaultSpatialLayerSeed();
         }
         changed = mergeHostOverlayEntriesInPlace(config.renderStack) || changed;

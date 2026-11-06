@@ -175,11 +175,14 @@ describe("the Viv scatter plot that is not a React chart", () => {
         expect(config).toEqual({ type: "VivMdvRegionReact", region: "r1", viv: { channels: [] } });
     });
 
-    test("leaves a SpatialData region, which would want the SpatialData.js viewer", () => {
+    test("converts a SpatialData region to the SpatialData.js viewer", () => {
         const dataStore = withRegions({ r1: { viv_image: {}, spatial: {} } });
-        expect(
-            getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never, dataStore),
-        ).toBeUndefined();
+        expect(getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never, dataStore)).toBe(
+            "SpatialDataMdvRegionReact",
+        );
+        const config = { type: "viv_scatter_plot", region: "r1", radius: 0.5, viv: { channels: [] } };
+        convertLegacyChartConfigNow(config, dataStore);
+        expect(config).toEqual({ type: "SpatialDataMdvRegionReact", region: "r1", radius: 0.5 });
     });
 
     test("leaves a chart whose region has no Viv image, or that cannot be checked", () => {
@@ -187,5 +190,130 @@ describe("the Viv scatter plot that is not a React chart", () => {
             getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never, withRegions({ r1: {} })),
         ).toBeUndefined();
         expect(getLegacyConversionTarget({ type: "viv_scatter_plot", region: "r1" } as never)).toBeUndefined();
+    });
+});
+
+describe("the Spatial Image Viewer on a SpatialData region", () => {
+    const withRegions = (regions: Record<string, { viv_image?: unknown; spatial?: unknown }>) =>
+        ({ regions: { all_regions: regions } }) as unknown as DataStore;
+    const spatialRegion = withRegions({
+        r1: { viv_image: {}, spatial: { file: "a.zarr", coordinate_system: "global" } },
+    });
+
+    test("becomes the SpatialData.js viewer, keeping the scatter, region and filter settings", () => {
+        const background_filter = { column: "sample", category: "r1" };
+        const category_filters = [{ column: "cell_type", category: ["T"] }];
+        const config = {
+            type: "VivMdvRegionReact",
+            id: "c1",
+            title: "r1-image",
+            region: "r1",
+            param: ["x", "y"],
+            color_by: "cell_type",
+            radius: 4,
+            opacity: 0.6,
+            background_filter,
+            category_filters,
+            contourParameter: "cell_type",
+            roi: { min_x: 0, max_x: 10, min_y: 0, max_y: 10 },
+            json: "r1.json",
+            showJson: true,
+            viv: {
+                channels: [{ name: "DAPI" }],
+                viewerStore: { viewState: { target: [5, 5, 0], zoom: -2 } },
+                channelsStore: { colors: [[255, 0, 0]], contrastLimits: [[0, 100]] },
+            },
+        };
+        expect(convertLegacyChartConfigNow(config, spatialRegion)).toBe("VivMdvRegionReact");
+        expect(config).toEqual({
+            type: "SpatialDataMdvRegionReact",
+            id: "c1",
+            title: "r1-image",
+            region: "r1",
+            param: ["x", "y"],
+            color_by: "cell_type",
+            radius: 4,
+            opacity: 0.6,
+            background_filter,
+            category_filters,
+            contourParameter: "cell_type",
+            viewState: { target: [5, 5, 0], zoom: -2 },
+            defaultImageLayer: { channels: { colors: [[255, 0, 0]], contrastLimits: [[0, 100]] } },
+        });
+    });
+
+    test("keeps the Viv channel settings and tone for the image layer", () => {
+        const channelsStore = {
+            channelsVisible: [true, false],
+            colors: [
+                [255, 0, 0],
+                [0, 255, 0],
+            ],
+            contrastLimits: [
+                [0, 100],
+                [10, 200],
+            ],
+            selections: [
+                { z: 0, c: 0, t: 0 },
+                { z: 0, c: 2, t: 0 },
+            ],
+            brightness: [0.6, 0.5],
+            contrast: [0.4, 0.5],
+            domains: [
+                [0, 255],
+                [0, 255],
+            ],
+        };
+        const config: { type: string; region: string; viv: unknown; defaultImageLayer?: unknown } = {
+            type: "VivMdvRegionReact",
+            region: "r1",
+            viv: { channelsStore },
+        };
+        convertLegacyChartConfigNow(config, spatialRegion);
+        expect(config.defaultImageLayer).toEqual({
+            channels: {
+                channelsVisible: channelsStore.channelsVisible,
+                colors: channelsStore.colors,
+                contrastLimits: channelsStore.contrastLimits,
+                selections: channelsStore.selections,
+            },
+            vivLayerProps: { brightness: [0.6, 0.5], contrast: [0.4, 0.5] },
+        });
+    });
+
+    test("leaves the image layer's defaults when the Viv chart saved no channels, or empty tone", () => {
+        const config = { type: "VivMdvRegionReact", region: "r1", viv: { channelsStore: { brightness: [] } } };
+        convertLegacyChartConfigNow(config, spatialRegion);
+        expect(config).toEqual({ type: "SpatialDataMdvRegionReact", region: "r1" });
+    });
+
+    test("leaves the view to fit the data when the Viv chart saved no position", () => {
+        const config = {
+            type: "VivMdvRegionReact",
+            region: "r1",
+            viv: { channels: [] },
+            viewState: { target: [1, 1] },
+        };
+        convertLegacyChartConfigNow(config, spatialRegion);
+        expect(config).toEqual({ type: "SpatialDataMdvRegionReact", region: "r1" });
+    });
+
+    test("is converted on load only with the setting on", () => {
+        const config = { type: "VivMdvRegionReact", region: "r1", viv: {} };
+        expect(convertLegacyChartConfig(config, spatialRegion)).toBeUndefined();
+        convertLegacyChartsSetting.set("on");
+        expect(convertLegacyChartConfig(config, spatialRegion)).toBe("VivMdvRegionReact");
+        expect(config).toEqual({ type: "SpatialDataMdvRegionReact", region: "r1" });
+    });
+
+    test("stays a Viv chart for a region that is not SpatialData, or that cannot be checked", () => {
+        const vivOnly = withRegions({ r1: { viv_image: {} } });
+        expect(
+            getLegacyConversionTarget({ type: "VivMdvRegionReact", region: "r1" } as never, vivOnly),
+        ).toBeUndefined();
+        expect(getLegacyConversionTarget({ type: "VivMdvRegionReact", region: "r1" } as never)).toBeUndefined();
+        expect(
+            getLegacyConversionTarget({ type: "VivMdvRegionReact", region: "other" } as never, spatialRegion),
+        ).toBeUndefined();
     });
 });
