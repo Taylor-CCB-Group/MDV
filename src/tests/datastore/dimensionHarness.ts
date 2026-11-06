@@ -1,6 +1,11 @@
 import { expect, vi } from "vitest";
 import DataStore from "@/datastore/DataStore";
 import type Dimension from "@/datastore/Dimension";
+import {
+    type FilteredIndexRequest,
+    type FilteredIndexResponse,
+    handleFilteredIndexRequest,
+} from "@/datastore/filteredIndexEval";
 import { type FilterRequest, type FilterResponse, handleFilterRequest } from "@/datastore/rangeFilterEval";
 
 /**
@@ -11,12 +16,21 @@ import { type FilterRequest, type FilterResponse, handleFilterRequest } from "@/
  *
  * With `rangeFilter: true`, the range filter worker is replaced by {@link InProcessFilterWorker},
  * which runs the real message handler a task later, like a worker would.
+ *
+ * With `filteredIndex: true`, the store's filtered index worker is replaced by
+ * {@link InProcessFilteredIndexWorker}, which runs the real message handler when the test tells it to.
  */
-export function stubWorker({ rangeFilter = false } = {}) {
+export function stubWorker({ rangeFilter = false, filteredIndex = false } = {}) {
     const rangeFilterWorkers: InProcessFilterWorker[] = [];
+    const filteredIndexWorkers: InProcessFilteredIndexWorker[] = [];
     vi.stubGlobal(
         "Worker",
         vi.fn().mockImplementation(function MockWorker(url: URL | string) {
+            if (filteredIndex && String(url).includes("filteredIndexWorker")) {
+                const worker = new InProcessFilteredIndexWorker();
+                filteredIndexWorkers.push(worker);
+                return worker;
+            }
             if (rangeFilter && String(url).includes("rangeFilterWorker")) {
                 const worker = new InProcessFilterWorker();
                 rangeFilterWorkers.push(worker);
@@ -30,7 +44,44 @@ export function stubWorker({ rangeFilter = false } = {}) {
             };
         }),
     );
-    return { rangeFilterWorkers };
+    return { rangeFilterWorkers, filteredIndexWorkers };
+}
+
+/**
+ * Stands in for `filteredIndexWorker.ts`. Like a worker, it handles requests one at a time in the order they were
+ * posted, reading the shared filter as it is at that moment - but only when the test calls {@link runNext}, so that
+ * a test can change the filter between a request being posted and the worker getting to it.
+ */
+export class InProcessFilteredIndexWorker {
+    onmessage: ((event: { data: FilteredIndexResponse }) => void) | null = null;
+    onerror: ((event: unknown) => void) | null = null;
+    onmessageerror: ((event: unknown) => void) | null = null;
+    /** posted and not yet handled */
+    queue: FilteredIndexRequest[] = [];
+    posted = 0;
+    terminated = false;
+
+    postMessage(message: FilteredIndexRequest) {
+        this.posted++;
+        this.queue.push(structuredClone(message));
+    }
+
+    /** Handles the oldest waiting request and delivers the reply. */
+    runNext() {
+        const request = this.queue.shift();
+        if (!request) throw new Error("no request waiting");
+        this.onmessage?.({ data: handleFilteredIndexRequest(request) });
+    }
+
+    /** The worker dies (e.g. its script failed to load) without answering what is waiting. */
+    fail() {
+        this.queue.length = 0;
+        this.onerror?.(new Error("worker failed"));
+    }
+
+    terminate() {
+        this.terminated = true;
+    }
 }
 
 /**
