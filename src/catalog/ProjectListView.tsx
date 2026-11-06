@@ -5,6 +5,7 @@ import {
     Info,
     MoreVert,
     Share as ShareIcon,
+    ViewColumn,
     WarningAmber,
 } from "@mui/icons-material";
 import {
@@ -21,6 +22,7 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    TableSortLabel,
     Tooltip,
     Typography,
     useTheme,
@@ -32,13 +34,17 @@ import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import ProjectShareModal from "./ProjectShareModal";
-import type { ListColumn } from "./utils/catalogPreferences";
-import type { Project, ProjectAccessType } from "./utils/projectUtils";
+import { LIST_COLUMNS, type ListColumn } from "./utils/catalogPreferences";
+import type { Project, ProjectAccessType, SortBy, SortOrder } from "./utils/projectUtils";
 
 export type Pvoid = Promise<void>;
 export type ProjectListViewProps = {
     projects: Project[];
     columns: ListColumn[];
+    onColumnsChange: (columns: ListColumn[]) => void;
+    sortBy: SortBy;
+    sortOrder: SortOrder;
+    onSortChange: (sortBy: SortBy) => void;
     onDelete: (id: string) => Pvoid;
     onRename: (id: string, name: string) => Pvoid;
     onChangeType: (id: string, type: ProjectAccessType) => Pvoid;
@@ -51,6 +57,10 @@ export type MouseEv = React.MouseEvent<HTMLElement>;
 const ProjectListView = ({
     projects,
     columns,
+    onColumnsChange,
+    sortBy,
+    sortOrder,
+    onSortChange,
     onDelete,
     onRename,
     onExport,
@@ -59,6 +69,7 @@ const ProjectListView = ({
     selectedProjectIds,
     onSelectionChange,
 }: ProjectListViewProps) => {
+    const [columnsAnchorEl, setColumnsAnchorEl] = useState<HTMLElement | null>(null);
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>();
     const [selectedProject, setSelectedProject] = useState<Project>();
 
@@ -97,6 +108,8 @@ const ProjectListView = ({
         [columns, isPublicPage],
     );
 
+    const ariaSort = (key: SortBy) => (sortBy === key ? (sortOrder === "asc" ? "ascending" : "descending") : "none");
+
     const hasReadme = useCallback((proj: Project) => !!proj.readme, []);
 
     const hasPermissions = useCallback(
@@ -113,16 +126,47 @@ const ProjectListView = ({
     return (
         <>
             <TableContainer component={Paper}>
-                <Table>
+                <Table sx={{ "& td:not(.name-cell), & th:not(.name-cell)": { whiteSpace: "nowrap" } }}>
                     <TableHead>
                         <TableRow>
                             {selectionMode && <TableCell padding="checkbox" />}
-                            <TableCell>Name</TableCell>
+                            <TableCell className="name-cell" sx={{ width: "100%" }} aria-sort={ariaSort("name")}>
+                                <TableSortLabel
+                                    active={sortBy === "name"}
+                                    direction={sortBy === "name" ? sortOrder : "asc"}
+                                    onClick={() => onSortChange("name")}
+                                >
+                                    Name
+                                </TableSortLabel>
+                            </TableCell>
                             {show("owner") && <TableCell>Owner</TableCell>}
-                            {show("lastModified") && <TableCell>Last Modified</TableCell>}
+                            {show("lastModified") && (
+                                <TableCell aria-sort={ariaSort("lastModified")}>
+                                    <TableSortLabel
+                                        active={sortBy === "lastModified"}
+                                        direction={sortBy === "lastModified" ? sortOrder : "desc"}
+                                        onClick={() => onSortChange("lastModified")}
+                                    >
+                                        Last Modified
+                                    </TableSortLabel>
+                                </TableCell>
+                            )}
                             {show("type") && <TableCell>Type</TableCell>}
                             {show("filesystem") && <TableCell>Filesystem</TableCell>}
-                            <TableCell align="right">Actions</TableCell>
+                            <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                                Actions
+                                <Tooltip title="Choose columns">
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => setColumnsAnchorEl(e.currentTarget)}
+                                        aria-label="choose columns"
+                                        data-testid="choose_columns_button"
+                                        sx={{ ml: 0.5 }}
+                                    >
+                                        <ViewColumn fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                            </TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -152,9 +196,17 @@ const ProjectListView = ({
                                             )}
                                     </TableCell>
                                 )}
-                                <TableCell>
+                                <TableCell className="name-cell">
                                     <div className="flex items-center gap-3">
-                                        <ImageIcon sx={{ color: "text.secondary" }} />
+                                        {project.thumbnail ? (
+                                            <img
+                                                src={project.thumbnail}
+                                                alt=""
+                                                style={{ width: 48, height: 32, objectFit: "contain", flexShrink: 0 }}
+                                            />
+                                        ) : (
+                                            <ImageIcon sx={{ width: 48, color: "text.secondary" }} />
+                                        )}
                                         <Typography>{project.name}</Typography>
                                     </div>
                                 </TableCell>
@@ -197,6 +249,23 @@ const ProjectListView = ({
                     </TableBody>
                 </Table>
             </TableContainer>
+
+            <Menu anchorEl={columnsAnchorEl} open={Boolean(columnsAnchorEl)} onClose={() => setColumnsAnchorEl(null)}>
+                {LIST_COLUMNS.filter((c) => !(isPublicPage && c.hiddenOnPublicPage)).map((c) => (
+                    <MenuItem
+                        key={c.id}
+                        dense
+                        onClick={() =>
+                            onColumnsChange(
+                                columns.includes(c.id) ? columns.filter((x) => x !== c.id) : [...columns, c.id],
+                            )
+                        }
+                    >
+                        <Checkbox checked={columns.includes(c.id)} size="small" disableRipple />
+                        {c.label}
+                    </MenuItem>
+                ))}
+            </Menu>
 
             {selectedProject && (
                 <>

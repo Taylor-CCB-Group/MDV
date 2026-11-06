@@ -12,7 +12,6 @@ import {
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
 import HelpIcon from "@mui/icons-material/Help";
-import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import {
     Alert,
     AppBar,
@@ -20,7 +19,6 @@ import {
     Box,
     Button,
     ButtonBase,
-    Checkbox,
     CircularProgress,
     Container,
     Divider,
@@ -57,7 +55,6 @@ import UserProfile from "./UserProfile";
 import {
     type CatalogPreferences,
     hasStoredCatalogPreferences,
-    LIST_COLUMNS,
     type ListColumn,
     loadCatalogPreferences,
     saveCatalogPreferences,
@@ -102,7 +99,6 @@ const Dashboard: React.FC = () => {
     const [sortBy, setSortBy] = useState<SortBy>(initialPrefs.sortBy);
     const [sortOrder, setSortOrder] = useState<SortOrder>(initialPrefs.sortOrder);
     const [columns, setColumns] = useState<ListColumn[]>(initialPrefs.columns);
-    const [columnsAnchorEl, setColumnsAnchorEl] = useState<null | HTMLElement>(null);
     // Persist only on explicit user changes, so public-page fallbacks never overwrite stored choices.
     const persist = useCallback((prefs: CatalogPreferences) => saveCatalogPreferences(prefs), []);
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -150,8 +146,10 @@ const Dashboard: React.FC = () => {
 
     const handleSort = useCallback(
         (newSortBy: SortBy) => {
-            // Toggle order when re-selecting the same option; otherwise start descending
-            const nextOrder: SortOrder = newSortBy === sortBy ? (sortOrder === "asc" ? "desc" : "asc") : "desc";
+            // Toggle order when re-selecting the same option
+            // Names start A to Z; dates start newest first.
+            const defaultOrder: SortOrder = newSortBy === "name" ? "asc" : "desc";
+            const nextOrder: SortOrder = newSortBy === sortBy ? (sortOrder === "asc" ? "desc" : "asc") : defaultOrder;
             setSortBy(newSortBy);
             setSortOrder(nextOrder);
             persist({ viewMode, sortBy: newSortBy, sortOrder: nextOrder, columns });
@@ -451,41 +449,7 @@ const Dashboard: React.FC = () => {
                                     )}
                                 </IconButton>
                             </Tooltip>
-                            {viewMode === "list" && (
-                                <Tooltip title="Choose columns">
-                                    <IconButton
-                                        onClick={(e) => setColumnsAnchorEl(e.currentTarget)}
-                                        aria-label="choose columns"
-                                        data-testid="choose_columns_button"
-                                    >
-                                        <ViewColumnIcon sx={{ fontSize: 32 }} />
-                                    </IconButton>
-                                </Tooltip>
-                            )}
                         </Box>
-
-                        <Menu
-                            anchorEl={columnsAnchorEl}
-                            open={Boolean(columnsAnchorEl)}
-                            onClose={() => setColumnsAnchorEl(null)}
-                        >
-                            {LIST_COLUMNS.filter((c) => !(isPublicPage && c.hiddenOnPublicPage)).map((c) => (
-                                <MenuItem
-                                    key={c.id}
-                                    dense
-                                    onClick={() => {
-                                        const next = columns.includes(c.id)
-                                            ? columns.filter((x) => x !== c.id)
-                                            : [...columns, c.id];
-                                        setColumns(next);
-                                        persist({ viewMode, sortBy, sortOrder, columns: next });
-                                    }}
-                                >
-                                    <Checkbox checked={columns.includes(c.id)} size="small" disableRipple />
-                                    {c.label}
-                                </MenuItem>
-                            ))}
-                        </Menu>
 
                         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
                             {!isPublicPage && (
@@ -571,6 +535,13 @@ const Dashboard: React.FC = () => {
                         <ProjectListView
                             projects={sortedProjects}
                             columns={columns}
+                            sortBy={sortBy}
+                            sortOrder={sortOrder}
+                            onSortChange={handleSort}
+                            onColumnsChange={(next) => {
+                                setColumns(next);
+                                persist({ viewMode, sortBy, sortOrder, columns: next });
+                            }}
                             onDelete={deleteProject}
                             onRename={renameProject}
                             onChangeType={changeProjectType}
