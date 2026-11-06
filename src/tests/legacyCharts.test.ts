@@ -237,7 +237,19 @@ describe("the Spatial Image Viewer on a SpatialData region", () => {
             background_filter,
             category_filters,
             contourParameter: "cell_type",
+            viewState: { target: [5, 5, 0], zoom: -2 },
         });
+    });
+
+    test("leaves the view to fit the data when the Viv chart saved no position", () => {
+        const config = {
+            type: "VivMdvRegionReact",
+            region: "r1",
+            viv: { channels: [] },
+            viewState: { target: [1, 1] },
+        };
+        convertLegacyChartConfigNow(config, spatialRegion);
+        expect(config).toEqual({ type: "SpatialDataMdvRegionReact", region: "r1" });
     });
 
     test("is converted on load only with the setting on", () => {

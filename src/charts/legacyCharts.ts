@@ -64,13 +64,16 @@ const isSpatialDataVivRegion = (config: any, dataStore?: DataStore) => {
 /**
  * The SpatialData.js viewer reads the same scatter, region and filter settings as the Viv viewer, but
  * draws images from a render stack rather than `viv`. Left without one, it adds the store's first image
- * on load. The Viv channel settings and view position are not carried over: the image layer starts with
- * default channels, and the view fits the data, as the Viv view state is in image pixels, which need
- * not be the SpatialData coordinate system's units.
+ * on load. The view position moves to the top-level `viewState`: both viewers draw the scatter in the
+ * same frame. The Viv channel settings are not carried over, so the image layer starts with defaults.
  */
 const adaptVivToSpatialData = (config: any) => {
+    const vivView = config.viv?.viewerStore?.viewState;
     for (const key of ["viv", "roi", "json", "showJson", "background_image", "renderStack", "viewState"]) {
         delete config[key];
+    }
+    if (Array.isArray(vivView?.target)) {
+        config.viewState = { target: [...vivView.target], zoom: vivView.zoom };
     }
 };
 
