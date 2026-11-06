@@ -10,6 +10,7 @@ import {
     regionsScaleFrame,
     withPhysicalUnit,
 } from "@/spatial_stats/analysisFrame";
+import { binAtX, miniCurvePath } from "@/spatial_stats/CrossPcfCurves";
 import { matrixAt, pairCurve } from "@/spatial_stats/CrossPcfMatrix";
 import { crossPcfInDomain, gatherCells } from "@/spatial_stats/crossPcfCompute";
 import type { DomainSource } from "@/spatial_stats/domainSource";
@@ -25,7 +26,18 @@ import {
     refKey,
     resolveDomainSourceRef,
 } from "@/spatial_stats/domainSourceRef";
+import { labelGutter, MIN_CELL, matrixCells, panelLayout } from "@/spatial_stats/layout";
 import { cellsAlong, continuePaint, resolvePairs, startPaint, togglePair } from "@/spatial_stats/pairSelection";
+import {
+    addBin,
+    clampBins,
+    matrixGrid,
+    moveBin,
+    nearestBin,
+    rBinsFrom,
+    removeBin,
+    toSelection,
+} from "@/spatial_stats/rBins";
 import { boundsDomain, imageExtentFromShape } from "@/spatial_stats/regionDomain";
 import { regionImageKey, type SpatialDataTransforms, spatialDataRegionFrame } from "@/spatial_stats/spatialDataFrame";
 import { tweenValue } from "@/spatial_stats/useTweened";
@@ -443,4 +455,98 @@ describe("brushing pairs", () => {
         expect(diag.length).toBeGreaterThanOrEqual(2);
         expect(cellsAlong({ i: 1, j: 1 }, { i: 1, j: 1 })).toEqual([]);
     });
+});
+
+describe("curve interaction helpers", () => {
+    test("plot x maps to the bin under it, clamped to the axis", () => {
+        // 20 bins of 2.5 over a 200 px plot starting at x = 34
+        expect(binAtX(34, 34, 200, 50, 2.5, 20)).toBe(0);
+        expect(binAtX(34 + 45, 34, 200, 50, 2.5, 20)).toBe(4); // r = 11.25
+        expect(binAtX(0, 34, 200, 50, 2.5, 20)).toBe(0);
+        expect(binAtX(1000, 34, 200, 50, 2.5, 20)).toBe(19);
+    });
+
+    test("mini curve spans the box on the shared scale and clips above it", () => {
+        const d = miniCurvePath([0, 1, 4], 20, 10, 2);
+        expect(d).toBe("M0.0,10.0L10.0,5.0L20.0,0.0");
+    });
+});
+
+describe("several r's", () => {
+    test("old single r_bin configs migrate; default is the mean", () => {
+        expect(rBinsFrom({ r_bin: 4 })).toEqual([4]);
+        expect(rBinsFrom({})).toEqual(["mean"]);
+        expect(rBinsFrom({ r_bins: [2, "mean"], r_bin: 4 })).toEqual([2, "mean"]);
+    });
+
+    test("editing keeps one matrix at least and no duplicates", () => {
+        expect(addBin([2], 2)).toEqual([2]);
+        expect(addBin([2], 7)).toEqual([2, 7]);
+        expect(removeBin([2], 0)).toEqual([2]);
+        expect(removeBin([2, 7, "mean"], 1)).toEqual([2, "mean"]);
+        expect(moveBin([2, 7], 1, 9)).toEqual([2, 9]);
+        expect(moveBin([2, 7], 1, 2)).toEqual([2, 7]); // never onto another r's bin
+        expect(clampBins([3, 18, 19, "mean"], 10)).toEqual([3, 9, "mean"]);
+    });
+
+    test("the nearest band is the one a plain drag moves; the mean has no band", () => {
+        expect(nearestBin([2, 12, "mean"], 9)).toBe(1);
+        expect(nearestBin(["mean"], 3)).toBe(-1);
+        expect(toSelection(30, 20)).toEqual({ kind: "bin", k: 19 });
+    });
+
+    test("matrices tile to the largest square that fits", () => {
+        expect(matrixGrid(1, 400, 300)).toEqual({ cols: 1, rows: 1, side: 300 });
+        expect(matrixGrid(2, 800, 300)).toEqual({ cols: 2, rows: 1, side: 300 });
+        expect(matrixGrid(2, 300, 800)).toEqual({ cols: 1, rows: 2, side: 300 });
+        expect(matrixGrid(4, 600, 600).side).toBe(300);
+    });
+});
+
+describe("panel layout", () => {
+    test("label gutter follows the longest category name, within bounds", () => {
+        expect(labelGutter(2)).toBe(24);
+        expect(labelGutter(14)).toBeGreaterThan(labelGutter(4));
+        expect(labelGutter(200)).toBe(130);
+    });
+
+    test("matrices share one label gutter and get equal cells, as large as fit", () => {
+        // 2 matrices of 19 types in 800 × 420 with a 24 px gutter: side by side wins
+        const g = matrixCells(2, 19, 800, 420, 24);
+        expect(g.cols).toBe(2);
+        expect(g.cell * 19 * 2 + 24 + g.gap).toBeLessThanOrEqual(800);
+        expect(g.cell * 19 + 24 + g.strip).toBeLessThanOrEqual(420);
+    });
+
+    test("one matrix sits beside full-height curves; several tile in a row under a wide curve strip", () => {
+        const one = panelLayout(1600, 900, 1, 19, 24);
+        expect(one.stacked).toBe(false);
+        expect(one.curves).toEqual({ width: 760, height: 900 });
+        const three = panelLayout(1900, 950, 3, 19, 24);
+        expect(three.stacked).toBe(true);
+        expect(three.grid).toMatchObject({ cols: 3, rows: 1 });
+        expect(three.grid.cell).toBeGreaterThanOrEqual(26);
+    });
+
+    test("the arrangement chosen is the one with the larger cells", () => {
+        for (const [w, h, m] of [
+            [1900, 950, 3],
+            [1200, 900, 2],
+            [900, 1400, 2],
+        ]) {
+            const l = panelLayout(w, h, m, 19, 24);
+            // the arrangement not chosen, as panelLayout sizes it
+            const sideW = Math.round(Math.min(640, Math.max(280, w * 0.38)));
+            const stackH = Math.round(Math.min(420, Math.max(180, h * 0.38)));
+            const other = l.stacked
+                ? matrixCells(m, 19, w - sideW - 10, h, 24)
+                : matrixCells(m, 19, w, h - stackH - 10, 24);
+            expect(l.grid.cell).toBeGreaterThanOrEqual(other.cell);
+        }
+        expect(panelLayout(500, 900, 2, 19, 24).stacked).toBe(true);
+    });
+});
+
+test("a small chart keeps matrix cells at a usable minimum (and scrolls) rather than vanishing", () => {
+    expect(panelLayout(292, 213, 3, 19, 24).grid.cell).toBe(MIN_CELL);
 });

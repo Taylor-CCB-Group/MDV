@@ -1,5 +1,5 @@
 import type { PcfMatrixBinnedResult } from "intraspatial/spatial/pcf";
-import { type PointerEvent, useMemo, useRef, useState } from "react";
+import { type PointerEvent, useMemo, useRef } from "react";
 import { type Cell, cellsAlong } from "./pairSelection";
 
 /** `g` at one bin, or averaged over all bins. */
@@ -62,9 +62,13 @@ type Props = {
     result: PcfMatrixBinnedResult;
     labels: string[];
     r: RSelection;
-    unit: string;
-    width: number;
-    height: number;
+    /** Side of one matrix cell, px — the same for every matrix in the grid. */
+    cell: number;
+    /** Gutter for the type labels, and whether this matrix shows them: in a grid only the first column
+     *  carries row labels and only the first row column labels, all aligned to the same cells. */
+    labelSize: number;
+    rowLabels: boolean;
+    colLabels: boolean;
     /** Chosen pairs as type ids, with their curve colours — owned by the caller (chart config). */
     selected: readonly (Pair & { colour: string })[];
     /** The pair highlighted across the chart (hovered here, or on a curve or legend item). */
@@ -81,13 +85,24 @@ type Props = {
  * pairs carry a thin ring in their curve colour, inside the cell so neighbours never overlap; the
  * focused pair gets a stronger one, and its row/column labels are emphasised.
  */
-export function CrossPcfMatrix({ result, labels, r, unit, width, height, selected, focus, onFocus, onPaint }: Props) {
+export function CrossPcfMatrix({
+    result,
+    labels,
+    r,
+    cell,
+    labelSize,
+    rowLabels,
+    colLabels,
+    selected,
+    focus,
+    onFocus,
+    onPaint,
+}: Props) {
     const view = useMemo(() => matrixAt(result, r), [result, r]);
     const n = view.types.length;
-    const labelW = 70;
-    const footH = 18;
-    const side = Math.max(0, Math.min(width - labelW - 8, height - labelW - footH));
-    const cell = n > 0 ? side / n : 0;
+    const ox = rowLabels ? labelSize : 0;
+    const oy = colLabels ? labelSize : 0;
+    const side = n * cell;
     const label = (t: number) => labels[t] ?? String(t);
     const at = (t: number) => view.types.indexOf(t);
     const rings = selected.map((p) => ({ ...p, i: at(p.a), j: at(p.b) })).filter((p) => p.i >= 0 && p.j >= 0);
@@ -99,34 +114,31 @@ export function CrossPcfMatrix({ result, labels, r, unit, width, height, selecte
         if (!rowColour.has(p.i)) rowColour.set(p.i, p.colour);
         if (!colColour.has(p.j)) colColour.set(p.j, p.colour);
     }
-    const fontSize = Math.min(11, Math.max(cell, 7));
+    const fontSize = Math.min(12, Math.max(cell * 0.8, 8));
 
     // The stroke lives in a ref: pointer events can arrive faster than renders (a quick drag, a busy
     // page), and each must see the cell the previous one ended on.
     const stroke = useRef<Cell | null>(null);
-    const [painting, setPainting] = useState(false);
     const cellAt = (e: PointerEvent<SVGElement>): Cell | null => {
         const box = e.currentTarget.getBoundingClientRect();
-        const i = Math.floor((e.clientY - box.top - labelW) / cell);
-        const j = Math.floor((e.clientX - box.left - labelW) / cell);
+        const i = Math.floor((e.clientY - box.top - oy) / cell);
+        const j = Math.floor((e.clientX - box.left - ox) / cell);
         return i >= 0 && j >= 0 && i < n && j < n ? { i, j } : null;
     };
     const pairOf = (c: Cell): Pair => ({ a: view.types[c.i], b: view.types[c.j] });
 
     if (n === 0) return <div className="p-2 opacity-70">No cells of any type inside the domain.</div>;
-    const rLabel = r.kind === "mean" ? "mean over r" : `r = ${result.r[r.k].toFixed(1)} ${unit}`;
     const cellBox = (i: number, j: number, inset: number) => ({
         x: j * cell + inset,
         y: i * cell + inset,
         width: Math.max(cell - 0.5 - 2 * inset, 0.5),
         height: Math.max(cell - 0.5 - 2 * inset, 0.5),
     });
-    const fi = focusCell ? focusCell.i * n + focusCell.j : -1;
 
     return (
         <svg
-            width={width}
-            height={height}
+            width={ox + side}
+            height={oy + side}
             role="img"
             aria-label="cross-PCF matrix"
             style={{ cursor: onPaint ? "pointer" : undefined, userSelect: "none", touchAction: "none" }}
@@ -140,7 +152,6 @@ export function CrossPcfMatrix({ result, labels, r, unit, width, height, selecte
                 }
                 e.preventDefault();
                 stroke.current = c;
-                setPainting(true);
                 onPaint({ kind: "start", pair: pairOf(c), modifier: e.shiftKey || e.metaKey || e.ctrlKey });
             }}
             onPointerMove={(e) => {
@@ -155,17 +166,15 @@ export function CrossPcfMatrix({ result, labels, r, unit, width, height, selecte
             }}
             onPointerUp={() => {
                 stroke.current = null;
-                setPainting(false);
             }}
             onPointerCancel={() => {
                 stroke.current = null;
-                setPainting(false);
             }}
             onPointerLeave={() => {
                 if (!stroke.current) onFocus?.(null);
             }}
         >
-            <g transform={`translate(${labelW},${labelW})`}>
+            <g transform={`translate(${ox},${oy})`}>
                 {view.types.map((ti, i) =>
                     view.types.map((tj, j) => (
                         <rect
@@ -189,48 +198,36 @@ export function CrossPcfMatrix({ result, labels, r, unit, width, height, selecte
                         </g>
                     )}
                 </g>
-                {view.types.map((t, i) => (
-                    <text
-                        key={`row-${t}`}
-                        x={-4}
-                        y={i * cell + cell / 2}
-                        textAnchor="end"
-                        dominantBaseline="middle"
-                        fontSize={fontSize}
-                        fontWeight={focusCell?.i === i ? 800 : rowColour.has(i) ? 600 : 400}
-                        fill={rowColour.get(i) ?? "currentColor"}
-                        textDecoration={focusCell?.i === i ? "underline" : undefined}
-                    >
-                        {label(t)}
-                    </text>
-                ))}
-                {view.types.map((t, j) => (
-                    <text
-                        key={`col-${t}`}
-                        transform={`translate(${j * cell + cell / 2},-4) rotate(-60)`}
-                        fontSize={fontSize}
-                        fontWeight={focusCell?.j === j ? 800 : colColour.has(j) ? 600 : 400}
-                        fill={colColour.get(j) ?? "currentColor"}
-                        textDecoration={focusCell?.j === j ? "underline" : undefined}
-                    >
-                        {label(t)}
-                    </text>
-                ))}
+                {rowLabels &&
+                    view.types.map((t, i) => (
+                        <text
+                            key={`row-${t}`}
+                            x={-4}
+                            y={i * cell + cell / 2}
+                            textAnchor="end"
+                            dominantBaseline="middle"
+                            fontSize={fontSize}
+                            fontWeight={focusCell?.i === i ? 800 : rowColour.has(i) ? 600 : 400}
+                            fill={rowColour.get(i) ?? "currentColor"}
+                            textDecoration={focusCell?.i === i ? "underline" : undefined}
+                        >
+                            {label(t)}
+                        </text>
+                    ))}
+                {colLabels &&
+                    view.types.map((t, j) => (
+                        <text
+                            key={`col-${t}`}
+                            transform={`translate(${j * cell + cell / 2},-4) rotate(-60)`}
+                            fontSize={fontSize}
+                            fontWeight={focusCell?.j === j ? 800 : colColour.has(j) ? 600 : 400}
+                            fill={colColour.get(j) ?? "currentColor"}
+                            textDecoration={focusCell?.j === j ? "underline" : undefined}
+                        >
+                            {label(t)}
+                        </text>
+                    ))}
             </g>
-            <text
-                x={labelW}
-                y={labelW + side + 4}
-                dominantBaseline="hanging"
-                fontSize={11}
-                fill="currentColor"
-                opacity={0.8}
-            >
-                {focusCell
-                    ? `${label(focus?.a ?? 0)} → ${label(focus?.b ?? 0)}: g = ${view.value[fi].toFixed(2)} (${rLabel}), ${view.pairs[fi]} pairs`
-                    : painting
-                      ? "painting…"
-                      : `${rLabel}; row = A, column = B; drag to paint pairs, Shift/⌘ to add or remove`}
-            </text>
         </svg>
     );
 }
