@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { linkCycleMembers, StoredFilters, ViewFilterReadiness } from "@/charts/viewFilterReadiness";
+import { allSettledWithin, linkCycleMembers, StoredFilters, ViewFilterReadiness } from "@/charts/viewFilterReadiness";
 
 /** Whether `promise` has resolved, without waiting for it beyond the promise reactions already due. */
 async function isResolved(promise: Promise<unknown>) {
@@ -32,6 +32,30 @@ describe("linkCycleMembers", () => {
 
     test("a dataSource linked to itself is a cycle", () => {
         expect(linkCycleMembers({ genes: ["genes"], cells: ["genes"] })).toEqual(new Set(["genes"]));
+    });
+});
+
+describe("allSettledWithin", () => {
+    test("resolves to true once everything has settled, whether fulfilled or rejected", async () => {
+        const landed = Promise.withResolvers<boolean>();
+        const settled = allSettledWithin([landed.promise, Promise.reject(new Error("worker died"))], 5000);
+        expect(await isResolved(settled)).toBe(false);
+        landed.resolve(true);
+        await expect(settled).resolves.toBe(true);
+    });
+
+    test("resolves to false at the time limit if something never settles", async () => {
+        // e.g. a filter being evaluated on a worker that neither answers nor raises an error
+        const settled = allSettledWithin([new Promise(() => {})], 5000);
+        await vi.advanceTimersByTimeAsync(4999);
+        expect(await isResolved(settled)).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(settled).resolves.toBe(false);
+    });
+
+    test("leaves no timer running once everything has settled", async () => {
+        await allSettledWithin([Promise.resolve()], 5000);
+        expect(vi.getTimerCount()).toBe(0);
     });
 });
 

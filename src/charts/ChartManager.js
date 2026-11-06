@@ -38,7 +38,12 @@ import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 import ViewManager from "./ViewManager";
-import { linkCycleMembers, ViewFilterReadiness } from "./viewFilterReadiness";
+import {
+    allSettledWithin,
+    linkCycleMembers,
+    STORED_FILTERS_TIMEOUT_MS,
+    ViewFilterReadiness,
+} from "./viewFilterReadiness";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -1716,7 +1721,10 @@ export class ChartManager {
     async _whenStoredFiltersApplied(chart) {
         await chart.storedFilters.whenApplied();
         const pending = chart.dataStore.dimensions.map((d) => d.pendingFilter).filter(Boolean);
-        await Promise.allSettled(pending);
+        // a worker that neither answers nor raises an error must not stop the chart, and so the view, from loading
+        if (!(await allSettledWithin(pending, STORED_FILTERS_TIMEOUT_MS))) {
+            console.warn(`Filters on '${chart.dataStore.name}' did not land in time for chart '${chart.config.id}'`);
+        }
     }
 
     /** Sets each dataSource's highlighted rows to those saved with the current view (none, if it saved none). */

@@ -22,6 +22,20 @@ export const STORED_FILTERS_TIMEOUT_MS = 5000;
 export const VIEW_FILTERS_TIMEOUT_MS = 10000;
 
 /**
+ * Waits for every promise to settle, but no longer than `timeoutMs`.
+ * @returns whether they all settled in time
+ */
+export function allSettledWithin(promises: Iterable<PromiseLike<unknown>>, timeoutMs: number) {
+    return new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => resolve(false), timeoutMs);
+        Promise.allSettled(promises).then(() => {
+            clearTimeout(timeout);
+            resolve(true);
+        });
+    });
+}
+
+/**
  * The dataSources that are on a cycle of links.
  *
  * @param waitsOn for each dataSource, the dataSources it has rows-as-columns links to: its charts may wait for

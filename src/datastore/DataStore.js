@@ -852,10 +852,19 @@ class DataStore {
     /**
      * Starts the worker that lists the rows passing the filter, wired up to settle the request each reply
      * answers and to hand its work to the main thread if it fails.
+     * @returns {Worker | null} null if it could not be created
      */
     _createFilteredIndexWorker() {
-        // a module worker, as it imports the scan it shares with the main thread
-        const worker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url), { type: "module" });
+        /** @type {Worker} */
+        let worker;
+        try {
+            // a module worker, as it imports the scan it shares with the main thread
+            worker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url), { type: "module" });
+        } catch (e) {
+            // e.g. a content security policy that blocks workers: this runs while the store is being constructed
+            console.error("Filtered index worker could not be created, using the main thread instead", e);
+            return null;
+        }
         // the worker is shared, and the cache is cleared whenever the filter changes, so there can be several
         // requests in flight: replies are matched to requests by id.
         worker.onmessage = (e) => {

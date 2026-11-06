@@ -119,4 +119,22 @@ describe("DataStore.getFilteredIndices", () => {
         expect(await indices(ds.getFilteredIndices())).toEqual([7]);
         expect(post).toHaveBeenCalledOnce();
     });
+
+    test("if the worker cannot be created, the store is still built and answers on the main thread", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        // e.g. a content security policy that blocks workers; the dimensions' own workers are not under test
+        vi.stubGlobal(
+            "Worker",
+            vi.fn().mockImplementation(function MockWorker(url: URL | string) {
+                if (String(url).includes("filteredIndexWorker")) throw new Error("blocked");
+                return { postMessage: vi.fn(), terminate: vi.fn() };
+            }),
+        );
+        ds = createStore(8, [{ field: "x", datatype: "double", data: ALL }]);
+        dim = ds.getDimension("range_dimension");
+
+        filterTo(2, 4);
+
+        expect(await indices(ds.getFilteredIndices())).toEqual([2, 3, 4]);
+    });
 });
