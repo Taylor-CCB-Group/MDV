@@ -838,6 +838,9 @@ class DataStore {
     }
 
     _filteredIndicesPromise = null;
+    _filteredIndexRequestId = 0;
+    /** @type {Map<number, () => void>} resolvers for requests that the worker has not yet replied to */
+    _filteredIndexPending = new Map();
     _filteredIndexWorker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url));
     /**
      * Get an array of indexes of all the items that are not filtered.
@@ -857,14 +860,23 @@ class DataStore {
                     const worker = this._filteredIndexWorker;
                     const byteLength = this.filterSize * Uint32Array.BYTES_PER_ELEMENT;
                     const outputBuffer = new SharedArrayBuffer(byteLength);
+                    // the worker is shared, and the cache is cleared whenever the filter changes, so there can be several
+                    // requests in flight: replies are matched to requests by id rather than a single `onmessage`.
+                    const id = this._filteredIndexRequestId++;
+                    this._filteredIndexPending.set(id, () => resolve(new Uint32Array(outputBuffer)));
+                    if (!this._filteredIndexWorker.onmessage) {
+                        worker.onmessage = (e) => {
+                            const done = this._filteredIndexPending.get(e.data.id);
+                            this._filteredIndexPending.delete(e.data.id);
+                            done?.();
+                        };
+                    }
                     // todo atomics... not really needed for this, but would be good to illustrate / learn.
                     worker.postMessage({
                         filterBuffer: this.filterBuffer,
                         outputBuffer,
+                        id,
                     });
-                    worker.onmessage = (e) => {
-                        resolve(new Uint32Array(outputBuffer));
-                    };
                 })),
         )();
 

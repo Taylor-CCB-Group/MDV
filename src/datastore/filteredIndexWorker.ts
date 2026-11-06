@@ -3,6 +3,7 @@ onmessage = (
     e: MessageEvent<{
         filterBuffer: SharedArrayBuffer;
         outputBuffer: SharedArrayBuffer;
+        id: number;
     }>,
 ) => {
     //todo atomics.
@@ -13,5 +14,5 @@ onmessage = (
             outputArray[j++] = i;
         }
     }
-    postMessage({ type: "done" });
+    postMessage({ type: "done", id: e.data.id });
 };
