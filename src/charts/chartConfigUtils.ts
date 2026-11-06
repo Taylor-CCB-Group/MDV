@@ -295,3 +295,44 @@ function normalizeLegacyColorLegendConfig(config: LegacyColorLegendConfig) {
         colorLegend.display = colorLegend.dsiplay;
     }
 }
+
+/**
+ * Runs `use` once every column a chart config refers to has loaded data, where the config may refer to columns
+ * through live queries. `use` is where the chart should be constructed.
+ *
+ * A {@link RowsAsColsQuery}'s `fields` follow the filter/highlight on the linked dataSource, which can settle
+ * (asynchronously, e.g. a filter applied by another chart as the view loads) while columns are being loaded. If the
+ * fields are read once before loading and again afterwards - as happens when the chart constructor resolves `param`,
+ * `tooltip.column` etc. - the second read can name a column that was never loaded. So we resolve every spec, load
+ * whatever is missing, and resolve again, until a pass in which nothing was missing.
+ *
+ * `use` is called in the same synchronous run as that final check, so no event (not even an already-queued promise
+ * reaction) can change the queries in between. That is why this takes a callback rather than resolving and leaving
+ * the caller to carry on: resuming from an `await` is already too late. `use` must not be async.
+ *
+ * @param getSpecs every column spec referred to by the config (strings and/or serialised/live queries) - called
+ * again on each attempt so that it reflects the current state of the config
+ * @param getMissing returns the subset of `fields` that doesn't have loaded data
+ * @param load loads data for the given specs (including initialising queries)
+ * @returns the result of `use`
+ */
+export async function withLoadedColumns<T>(
+    ds: DataStore,
+    getSpecs: () => SerialisedColumnParam[],
+    getMissing: (fields: string[]) => string[],
+    load: (specs: SerialisedColumnParam[]) => Promise<unknown>,
+    use: () => T,
+    maxAttempts = 5,
+): Promise<T> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const specs = getSpecs();
+        const params = specs.map((p) => deserialiseParam(ds, p));
+        // `fields` of a query isn't valid until its link has initialised
+        await Promise.all(params.map((p) => (typeof p === "string" ? undefined : p.initialize())));
+        // nothing from here to the end of `use()` may be async
+        const fields = params.flatMap(getConcreteFieldNames);
+        if (getMissing(fields).length === 0) return use();
+        await load(specs);
+    }
+    throw new Error("Column query kept changing while loading data for chart");
+}

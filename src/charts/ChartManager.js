@@ -33,7 +33,7 @@ import { createMdvPortal } from "@/react/react_utils";
 import popoutChart from "@/utilities/Popout";
 import { addChartLink } from "../links/link_utils";
 import connectIPC from "../utilities/InterProcessCommunication";
-import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
+import { deserialiseParam, getConcreteFieldNames, withLoadedColumns } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
@@ -2084,10 +2084,6 @@ export class ChartManager {
     async _addChart(dataSource, config, div, notify = false) {
         //**convert legacy data***********
         const ds = this.dsIndex[dataSource];
-        div.innerHTML = "";
-        div.style.display = "";
-        div.style.alignItems = "";
-        div.style.justifyContent = "";
         const chartType = BaseChart.types[config.type];
         // sometimes the constructor doesn't understand active link, but chart.setParams() does...
         // it somewhat appears to work if we first manifest concrete field names,
@@ -2100,9 +2096,25 @@ export class ChartManager {
         // assert that the initialisation is complete before we consider the chart (and ultimately the view) to be loaded.
         // Also setParams() itself *should* always work - but depends on the chart implementation,
         // and not all charts implement that.
-        const originalParam = config.param.map((p) => deserialiseParam(ds, p));
-        config.param = originalParam.flatMap(getConcreteFieldNames);
-        const chart = new chartType.class(ds.dataStore, div, config);
+        // Active-link queries resolve to whichever columns the linked filter currently selects, which can change
+        // while columns are loading (addChart() loaded the fields as they were then). The chart is constructed in
+        // the same synchronous run as the check that everything its config refers to is loaded.
+        const { chart, originalParam } = await withLoadedColumns(
+            ds.dataStore,
+            () => this._getColumnsRequiredForChart(config),
+            (fields) => this._getMissingColumnData(dataSource, fields),
+            (specs) => this._getColumnsAsync(dataSource, specs),
+            () => {
+                // the div shows a spinner until this point
+                div.innerHTML = "";
+                div.style.display = "";
+                div.style.alignItems = "";
+                div.style.justifyContent = "";
+                const originalParam = config.param.map((p) => deserialiseParam(ds.dataStore, p));
+                config.param = originalParam.flatMap(getConcreteFieldNames);
+                return { chart: new chartType.class(ds.dataStore, div, config), originalParam };
+            },
+        );
         if (originalParam.some((p) => typeof p !== "string")) {
             console.log("setting param with active queries in timeout");
             chart.deferredInit(() => {
