@@ -139,6 +139,47 @@ describe("withLoadedColumns", () => {
         expect(use).toHaveBeenCalledOnce();
     });
 
+    test("uses columns that only become available on the last permitted load", async () => {
+        const store = fakeStore([]);
+        const load = vi.fn(async () => {
+            store.loaded.add("a");
+        });
+        const use = vi.fn(() => "chart");
+        await expect(withLoadedColumns(ds, () => ["a"], store.getMissing, load, use, 1)).resolves.toBe("chart");
+        expect(load).toHaveBeenCalledOnce();
+    });
+
+    test("checks the specs the config has after initialisation, not the ones it had before", async () => {
+        // the config is given a different column while we wait for a query to initialise
+        let specs: (string | typeof query)[] = [query];
+        const gene = { value: "rna_expr|G (rna_expr)|1" };
+        const q = {
+            get fields() {
+                return [gene.value];
+            },
+            initialize: async () => {
+                specs = ["other"];
+            },
+        };
+        vi.spyOn(RowsAsColsQuery, "fromSerialized").mockReturnValue(q as any);
+        const store = fakeStore([gene.value]);
+        const load = vi.fn(async (toLoad: (string | typeof query)[]) => {
+            for (const spec of toLoad) if (typeof spec === "string") store.loaded.add(spec);
+        });
+
+        // `use` stands in for the chart constructor, which reads the config as it is by then
+        const seen = await withLoadedColumns(
+            ds,
+            () => specs,
+            store.getMissing,
+            load,
+            () => specs,
+        );
+
+        expect(seen).toEqual(["other"]);
+        expect(store.getMissing(["other"])).toEqual([]);
+    });
+
     test("gives up if the query never settles", async () => {
         let n = 0;
         const q = {

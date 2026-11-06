@@ -314,6 +314,7 @@ function normalizeLegacyColorLegendConfig(config: LegacyColorLegendConfig) {
  * again on each attempt so that it reflects the current state of the config
  * @param getMissing returns the subset of `fields` that doesn't have loaded data
  * @param load loads data for the given specs (including initialising queries)
+ * @param maxLoads how many times to load before giving up; the columns are checked again after the last one
  * @returns the result of `use`
  */
 export async function withLoadedColumns<T>(
@@ -322,17 +323,20 @@ export async function withLoadedColumns<T>(
     getMissing: (fields: string[]) => string[],
     load: (specs: SerialisedColumnParam[]) => Promise<unknown>,
     use: () => T,
-    maxAttempts = 5,
+    maxLoads = 5,
 ): Promise<T> {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    for (let loads = 0; loads <= maxLoads; loads++) {
         const specs = getSpecs();
         const params = specs.map((p) => deserialiseParam(ds, p));
         // `fields` of a query isn't valid until its link has initialised
         await Promise.all(params.map((p) => (typeof p === "string" ? undefined : p.initialize())));
         // nothing from here to the end of `use()` may be async
+        // `use` will read the config as it is now, so if that changed while we waited, start again with what it says
+        const current = getSpecs();
+        if (current.length !== specs.length || current.some((spec, i) => spec !== specs[i])) continue;
         const fields = params.flatMap(getConcreteFieldNames);
         if (getMissing(fields).length === 0) return use();
-        await load(specs);
+        if (loads < maxLoads) await load(specs);
     }
     throw new Error("Column query kept changing while loading data for chart");
 }
