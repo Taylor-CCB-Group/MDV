@@ -52,6 +52,14 @@ import usePermissions from "./PermissionsContext";
 import ProjectCard from "./ProjectCard";
 import ProjectListView from "./ProjectListView";
 import UserProfile from "./UserProfile";
+import {
+    type CatalogPreferences,
+    hasStoredCatalogPreferences,
+    type ListColumn,
+    loadCatalogPreferences,
+    saveCatalogPreferences,
+    type ViewMode,
+} from "./utils/catalogPreferences";
 import { type SortBy, type SortOrder, sortProjects } from "./utils/projectUtils";
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
@@ -86,9 +94,13 @@ const Dashboard: React.FC = () => {
     // Check if auth is enabled
     const authEnabled = useAuthEnabled();
     const { mode, toggleColorMode } = useColorMode();
-    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-    const [sortBy, setSortBy] = useState<SortBy>("lastModified");
-    const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+    const [initialPrefs] = useState(loadCatalogPreferences);
+    const [viewMode, setViewMode] = useState<ViewMode>(initialPrefs.viewMode);
+    const [sortBy, setSortBy] = useState<SortBy>(initialPrefs.sortBy);
+    const [sortOrder, setSortOrder] = useState<SortOrder>(initialPrefs.sortOrder);
+    const [columns, setColumns] = useState<ListColumn[]>(initialPrefs.columns);
+    // Persist only on explicit user changes, so public-page fallbacks never overwrite stored choices.
+    const persist = useCallback((prefs: CatalogPreferences) => saveCatalogPreferences(prefs), []);
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [open, setOpen] = useState(false);
     const [helpDialogOpen, setHelpDialogOpen] = useState(false);
@@ -107,11 +119,12 @@ const Dashboard: React.FC = () => {
     }, [fetchProjects]);
 
     useEffect(() => {
-        if (!permissionsLoading && isPublicPage) {
+        // Public pages have no last-modified column: fall back to name sort (not persisted).
+        if (!permissionsLoading && isPublicPage && (!hasStoredCatalogPreferences() || sortBy === "lastModified")) {
             setSortBy("name");
             setSortOrder("asc");
         }
-    }, [isPublicPage, permissionsLoading]);
+    }, [isPublicPage, permissionsLoading, sortBy]);
 
     const handleCreateProject = async () => {
         try {
@@ -133,17 +146,16 @@ const Dashboard: React.FC = () => {
 
     const handleSort = useCallback(
         (newSortBy: SortBy) => {
-            if (newSortBy === sortBy) {
-                // Toggle sort order if clicking the same sort option
-                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-            } else {
-                // Set new sort type with default desc order for both cases
-                setSortBy(newSortBy);
-                setSortOrder("desc");
-            }
+            // Toggle order when re-selecting the same option
+            // Names start A to Z; dates start newest first.
+            const defaultOrder: SortOrder = newSortBy === "name" ? "asc" : "desc";
+            const nextOrder: SortOrder = newSortBy === sortBy ? (sortOrder === "asc" ? "desc" : "asc") : defaultOrder;
+            setSortBy(newSortBy);
+            setSortOrder(nextOrder);
+            persist({ viewMode, sortBy: newSortBy, sortOrder: nextOrder, columns });
             setAnchorEl(null);
         },
-        [sortBy, sortOrder],
+        [sortBy, sortOrder, viewMode, columns, persist],
     );
 
     const toggleDropdown = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -423,7 +435,11 @@ const Dashboard: React.FC = () => {
                             </Paper>
                             <Tooltip title={viewMode === "grid" ? "List View" : "Grid View"}>
                                 <IconButton
-                                    onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+                                    onClick={() => {
+                                        const next: ViewMode = viewMode === "grid" ? "list" : "grid";
+                                        setViewMode(next);
+                                        persist({ viewMode: next, sortBy, sortOrder, columns });
+                                    }}
                                     sx={{ ml: 2 }}
                                 >
                                     {viewMode === "grid" ? (
@@ -518,6 +534,14 @@ const Dashboard: React.FC = () => {
                     ) : (
                         <ProjectListView
                             projects={sortedProjects}
+                            columns={columns}
+                            sortBy={sortBy}
+                            sortOrder={sortOrder}
+                            onSortChange={handleSort}
+                            onColumnsChange={(next) => {
+                                setColumns(next);
+                                persist({ viewMode, sortBy, sortOrder, columns: next });
+                            }}
                             onDelete={deleteProject}
                             onRename={renameProject}
                             onChangeType={changeProjectType}
