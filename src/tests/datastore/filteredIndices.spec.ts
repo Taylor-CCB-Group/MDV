@@ -99,13 +99,24 @@ describe("DataStore.getFilteredIndices", () => {
         expect(worker.posted).toBe(1);
     });
 
-    test("if posting to the worker throws, the request is answered on the main thread", async () => {
+    test("if posting to the worker throws, it is dropped: that request, ones in flight and later ones are answered on the main thread", async () => {
         vi.spyOn(console, "error").mockImplementation(() => {});
-        vi.spyOn(worker, "postMessage").mockImplementation(() => {
+        filterTo(2, 4);
+        const inFlight = ds.getFilteredIndices(); // posted, but the worker has not got to it
+        filterTo(5, 6);
+        const post = vi.spyOn(worker, "postMessage").mockImplementation(() => {
             throw new Error("could not be cloned");
         });
-        filterTo(2, 4);
-        expect(await indices(ds.getFilteredIndices())).toEqual([2, 3, 4]);
+
+        const failedPost = ds.getFilteredIndices();
+
+        expect(await indices(failedPost)).toEqual([5, 6]);
+        expect(await indices(inFlight)).toEqual([5, 6]);
         expect(ds._filteredIndexPending.size).toBe(0);
+        expect(worker.terminated).toBe(true);
+
+        filterTo(7, 7);
+        expect(await indices(ds.getFilteredIndices())).toEqual([7]);
+        expect(post).toHaveBeenCalledOnce();
     });
 });

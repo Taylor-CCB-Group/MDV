@@ -858,21 +858,28 @@ class DataStore {
             this._filteredIndexPending.delete(e.data.id);
             request?.settle();
         };
-        const onFailure = (e) => {
-            console.error(`DataStore '${this.name}': filtered index worker failed, using the main thread instead`, e);
-            this._filteredIndexWorker = null;
-            worker.terminate();
-            // nothing will answer the requests that were in flight, so do their work here
-            const unanswered = [...this._filteredIndexPending.values()];
-            this._filteredIndexPending.clear();
-            for (const request of unanswered) {
-                writeFilteredIndices(this.filterArray, request.output);
-                request.settle();
-            }
-        };
+        const onFailure = (e) => this._abandonFilteredIndexWorker(e);
         worker.onerror = onFailure;
         worker.onmessageerror = onFailure;
         return worker;
+    }
+
+    /**
+     * Stops using the filtered index worker after a failure, and answers on the main thread whatever it had not
+     * replied to.
+     */
+    _abandonFilteredIndexWorker(reason) {
+        const worker = this._filteredIndexWorker;
+        if (!worker) return;
+        console.error(`DataStore '${this.name}': filtered index worker failed, using the main thread instead`, reason);
+        this._filteredIndexWorker = null;
+        worker.terminate();
+        const unanswered = [...this._filteredIndexPending.values()];
+        this._filteredIndexPending.clear();
+        for (const request of unanswered) {
+            writeFilteredIndices(this.filterArray, request.output);
+            request.settle();
+        }
     }
 
     /**
@@ -924,8 +931,10 @@ class DataStore {
                 worker.postMessage({ id, filterBuffer: this.filterBuffer, outputBuffer });
                 return request;
             } catch (e) {
-                console.error(`DataStore '${this.name}': could not post to filtered index worker`, e);
+                // a post that fails once is likely to keep failing: drop the worker, which also answers the requests
+                // it still had in flight, and answer this one below
                 this._filteredIndexPending.delete(id);
+                this._abandonFilteredIndexWorker(e);
             }
         }
         writeFilteredIndices(this.filterArray, output);
