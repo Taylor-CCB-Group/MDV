@@ -1,5 +1,7 @@
 import type { PcfMatrixBinnedResult } from "intraspatial/spatial/pcf";
+import { useId } from "react";
 import { pairCurve, type RSelection } from "./CrossPcfMatrix";
+import { useTweened } from "./useTweened";
 
 /** One curve per chosen pair; colours cycle. */
 export const PAIR_COLOURS = ["#e8743b", "#4f8fe0", "#2bb3a6", "#c95fd1", "#d4b020", "#e0526f", "#7dbb42", "#8d7ae6"];
@@ -39,10 +41,16 @@ export function CrossPcfCurves({ result, pairs, preview, r, unit, width, height 
     let gMax = 2;
     for (const c of curves) for (const v of c.g) if (Number.isFinite(v)) gMax = Math.max(gMax, v);
     const yMax = niceMax(gMax);
-    const sx = (rv: number) => left + (rv / rMax) * w;
-    const sy = (gv: number) => top + h - (Math.min(gv, yMax) / yMax) * h;
-    const yTicks = Array.from({ length: Math.min(yMax, 5) + 1 }, (_, i) => (i * yMax) / Math.min(yMax, 5));
-    const xTicks = Array.from({ length: 6 }, (_, i) => (i * rMax) / 5);
+    // Axis ranges ease to their new values; ticks are the new scale's, sliding into place.
+    const yShown = useTweened(yMax);
+    const rShown = useTweened(rMax);
+    const clip = useId();
+    const sx = (rv: number) => left + (rv / rShown) * w;
+    const sy = (gv: number) => top + h - (gv / yShown) * h;
+    const inY = (t: number) => t <= yShown * 1.0001;
+    const inX = (t: number) => t <= rShown * 1.0001;
+    const yTicks = Array.from({ length: Math.min(yMax, 5) + 1 }, (_, i) => (i * yMax) / Math.min(yMax, 5)).filter(inY);
+    const xTicks = Array.from({ length: 6 }, (_, i) => (i * rMax) / 5).filter(inX);
     const path = (g: number[]) =>
         g
             .map((v, k) => `${k ? "L" : "M"}${sx(centres[k]).toFixed(1)},${sy(Number.isFinite(v) ? v : 0).toFixed(1)}`)
@@ -50,6 +58,9 @@ export function CrossPcfCurves({ result, pairs, preview, r, unit, width, height 
 
     return (
         <svg width={width} height={height} role="img" aria-label="cross-PCF curves" fontSize={10}>
+            <clipPath id={clip}>
+                <rect x={left} y={top} width={w} height={h} />
+            </clipPath>
             {r.kind === "bin" && (
                 <rect
                     x={sx(r.k * dr)}
@@ -92,16 +103,18 @@ export function CrossPcfCurves({ result, pairs, preview, r, unit, width, height 
             <text x={left + w / 2} y={top + h + 26} textAnchor="middle" fill="currentColor" opacity={0.8}>
                 {`r (${unit})`}
             </text>
-            {curves.map((c) => (
-                <path
-                    key={c.key}
-                    d={path(c.g)}
-                    fill="none"
-                    stroke={c.colour}
-                    strokeWidth={2}
-                    strokeDasharray={c === curves.at(-1) && preview ? "5 3" : undefined}
-                />
-            ))}
+            <g clipPath={`url(#${clip})`}>
+                {curves.map((c) => (
+                    <path
+                        key={c.key}
+                        d={path(c.g)}
+                        fill="none"
+                        stroke={c.colour}
+                        strokeWidth={2}
+                        strokeDasharray={c === curves.at(-1) && preview ? "5 3" : undefined}
+                    />
+                ))}
+            </g>
             {curves.length === 0 && (
                 <text x={left + w / 2} y={top + h / 2} textAnchor="middle" fill="currentColor" opacity={0.6}>
                     Click matrix cells to add A → B pairs

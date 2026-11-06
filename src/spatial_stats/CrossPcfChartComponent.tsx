@@ -6,7 +6,7 @@ import { useChartSize, useConfig } from "../react/hooks";
 import { withPhysicalUnit } from "./analysisFrame";
 import type { CrossPcfConfig } from "./CrossPcfChart";
 import { CrossPcfCurves, type CurvePair, PAIR_COLOURS } from "./CrossPcfCurves";
-import { CrossPcfMatrix, type RSelection, resolvePairs, togglePair } from "./CrossPcfMatrix";
+import { CrossPcfMatrix, pickPair, type RSelection, resolvePairs } from "./CrossPcfMatrix";
 import { type CrossPcfResult, computeCrossPCF, resolveAnalysisFrame } from "./crossPcf";
 import { domainSourceEnv } from "./domainSourceEnv";
 import { defaultDomainSourceRef, resolveDomainSourceRef } from "./domainSourceRef";
@@ -130,8 +130,8 @@ const Panels = observer(
             hover && !isChosen
                 ? { ...hover, label: `${label(hover.a)} → ${label(hover.b)}`, colour: "currentColor" }
                 : undefined;
-        const toggle = action((a: number, b: number) => {
-            config.pairs = togglePair(config.pairs, label(a), label(b));
+        const pick = action((a: number, b: number, additive: boolean) => {
+            config.pairs = pickPair(config.pairs, label(a), label(b), additive);
         });
         const sideBySide = width >= 640;
         const curvesW = sideBySide ? Math.round(width * 0.55) : width;
@@ -157,7 +157,7 @@ const Panels = observer(
                     width={matrixW}
                     height={matrixH}
                     selected={chosen}
-                    onToggle={toggle}
+                    onPick={pick}
                     onHover={setHover}
                 />
             </div>
