@@ -3,9 +3,9 @@ import BaseChart, { type BaseConfig } from "../charts/BaseChart";
 import type DataStore from "../datastore/DataStore";
 import { BaseReactChart } from "../react/components/BaseReactChart";
 import { CrossPcfChartComponent } from "./CrossPcfChartComponent";
-import { type LabelPair, togglePair } from "./CrossPcfMatrix";
 import { domainSourceEnv } from "./domainSourceEnv";
 import { type DomainSourceRef, listDomainSources, refKey } from "./domainSourceRef";
+import { type LabelPair, togglePair } from "./pairSelection";
 
 export type CrossPcfConfig = BaseConfig & {
     /** Categorical column whose categories are the cell types. */

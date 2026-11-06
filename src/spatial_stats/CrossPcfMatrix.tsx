@@ -1,5 +1,6 @@
 import type { PcfMatrixBinnedResult } from "intraspatial/spatial/pcf";
-import { useMemo, useState } from "react";
+import { type PointerEvent, useMemo, useRef, useState } from "react";
+import { type Cell, cellsAlong } from "./pairSelection";
 
 /** `g` at one bin, or averaged over all bins. */
 export type RSelection = { kind: "mean" } | { kind: "bin"; k: number };
@@ -42,31 +43,6 @@ export function pairCurve(res: PcfMatrixBinnedResult, a: number, b: number): num
     return Array.from(g.subarray(base, base + B));
 }
 
-/** A chosen pair as stored in config: category labels, anchor A → neighbour B (g is asymmetric). */
-export type LabelPair = { a: string; b: string };
-
-/** Configured pairs as type ids of this result; pairs naming a category it doesn't have are dropped. */
-export function resolvePairs(labels: readonly string[], pairs: readonly LabelPair[]) {
-    const out: { a: number; b: number; index: number }[] = [];
-    pairs.forEach((p, index) => {
-        const a = labels.indexOf(p.a);
-        const b = labels.indexOf(p.b);
-        if (a >= 0 && b >= 0) out.push({ a, b, index });
-    });
-    return out;
-}
-
-/** A matrix click: plain picks just A → B; with a modifier (`additive`) it is added, or removed if there. */
-export function pickPair(pairs: readonly LabelPair[], a: string, b: string, additive: boolean): LabelPair[] {
-    return additive ? togglePair(pairs, a, b) : [{ a, b }];
-}
-
-/** `pairs` with A → B added, or removed if already there. */
-export function togglePair(pairs: readonly LabelPair[], a: string, b: string): LabelPair[] {
-    const has = pairs.some((p) => p.a === a && p.b === b);
-    return has ? pairs.filter((p) => !(p.a === a && p.b === b)) : [...pairs, { a, b }];
-}
-
 /** Diverging colour on log2 g: blue = avoidance (g < 1), white = independence, red = attraction. */
 export function gColour(g: number, maxLog2 = 2): string {
     if (!Number.isFinite(g) || g <= 0) return "rgb(40,40,40)";
@@ -76,6 +52,12 @@ export function gColour(g: number, maxLog2 = 2): string {
     return t >= 0 ? `rgb(${mix(200)},${mix(30)},${mix(40)})` : `rgb(${mix(30)},${mix(80)},${mix(200)})`;
 }
 
+type Pair = { a: number; b: number };
+
+/** A brush stroke over the matrix, in type ids: `start` on pointer-down (with whether a modifier was
+ *  held), then `cell` for every further cell the pointer passes over. */
+export type PaintEvent = { kind: "start"; pair: Pair; modifier: boolean } | { kind: "cell"; pair: Pair };
+
 type Props = {
     result: PcfMatrixBinnedResult;
     labels: string[];
@@ -84,24 +66,23 @@ type Props = {
     width: number;
     height: number;
     /** Chosen pairs as type ids, with their curve colours — owned by the caller (chart config). */
-    selected: readonly { a: number; b: number; colour: string }[];
-    /** `additive` when Shift / Ctrl / ⌘ was held: add or remove instead of replacing. */
-    onPick?: (a: number, b: number, additive: boolean) => void;
-    onHover?: (pair: { a: number; b: number } | null) => void;
+    selected: readonly (Pair & { colour: string })[];
+    /** The pair highlighted across the chart (hovered here, or on a curve or legend item). */
+    focus: Pair | null;
+    onFocus?: (pair: Pair | null) => void;
+    onPaint?: (e: PaintEvent) => void;
 };
 
 /**
- * K×K heatmap of cross-PCF at one r (row = anchor type A, column = neighbour type B). A click picks
- * that pair alone; with Shift / Ctrl / ⌘ it adds or removes it. Chosen pairs are ringed in their
- * curve colour on an overlay above the cells, and their row/column labels take that colour.
+ * K×K heatmap of cross-PCF at one r (row = anchor type A, column = neighbour type B).
+ *
+ * Dragging paints pairs: a plain press starts afresh with the pressed pair and adds every cell the
+ * pointer then passes over; Shift / Ctrl / ⌘ edit the current pairs instead (see `startPaint`). Chosen
+ * pairs carry a thin ring in their curve colour, inside the cell so neighbours never overlap; the
+ * focused pair gets a stronger one, and its row/column labels are emphasised.
  */
-export function CrossPcfMatrix({ result, labels, r, unit, width, height, selected, onPick, onHover }: Props) {
+export function CrossPcfMatrix({ result, labels, r, unit, width, height, selected, focus, onFocus, onPaint }: Props) {
     const view = useMemo(() => matrixAt(result, r), [result, r]);
-    const [hover, setHoverState] = useState<{ i: number; j: number } | null>(null);
-    const setHover = (h: { i: number; j: number } | null) => {
-        setHoverState(h);
-        onHover?.(h ? { a: view.types[h.i], b: view.types[h.j] } : null);
-    };
     const n = view.types.length;
     const labelW = 70;
     const footH = 18;
@@ -110,7 +91,8 @@ export function CrossPcfMatrix({ result, labels, r, unit, width, height, selecte
     const label = (t: number) => labels[t] ?? String(t);
     const at = (t: number) => view.types.indexOf(t);
     const rings = selected.map((p) => ({ ...p, i: at(p.a), j: at(p.b) })).filter((p) => p.i >= 0 && p.j >= 0);
-    // A label takes the colour of the first chosen pair it belongs to.
+    const f = focus ? { i: at(focus.a), j: at(focus.b) } : null;
+    const focusCell = f && f.i >= 0 && f.j >= 0 ? f : null;
     const rowColour = new Map<number, string>();
     const colColour = new Map<number, string>();
     for (const p of rings) {
@@ -119,45 +101,94 @@ export function CrossPcfMatrix({ result, labels, r, unit, width, height, selecte
     }
     const fontSize = Math.min(11, Math.max(cell, 7));
 
+    // The stroke lives in a ref: pointer events can arrive faster than renders (a quick drag, a busy
+    // page), and each must see the cell the previous one ended on.
+    const stroke = useRef<Cell | null>(null);
+    const [painting, setPainting] = useState(false);
+    const cellAt = (e: PointerEvent<SVGElement>): Cell | null => {
+        const box = e.currentTarget.getBoundingClientRect();
+        const i = Math.floor((e.clientY - box.top - labelW) / cell);
+        const j = Math.floor((e.clientX - box.left - labelW) / cell);
+        return i >= 0 && j >= 0 && i < n && j < n ? { i, j } : null;
+    };
+    const pairOf = (c: Cell): Pair => ({ a: view.types[c.i], b: view.types[c.j] });
+
     if (n === 0) return <div className="p-2 opacity-70">No cells of any type inside the domain.</div>;
     const rLabel = r.kind === "mean" ? "mean over r" : `r = ${result.r[r.k].toFixed(1)} ${unit}`;
-    // Black / white / colour bands: the white band keeps the ring readable whatever the cell's colour,
-    // and the black one separates it from neighbouring white (g ≈ 1) cells.
-    const ring = (i: number, j: number, colour: string, key: string, dashed = false) => {
-        const pad = 2;
-        const box = { x: j * cell - pad, y: i * cell - pad, width: cell - 0.5 + 2 * pad, height: cell - 0.5 + 2 * pad };
-        return (
-            <g key={key} pointerEvents="none" fill="none">
-                <rect {...box} stroke="black" strokeWidth={7} />
-                <rect {...box} stroke="white" strokeWidth={4.5} />
-                <rect {...box} stroke={colour} strokeWidth={2.5} strokeDasharray={dashed ? "3 2" : undefined} />
-            </g>
-        );
-    };
+    const cellBox = (i: number, j: number, inset: number) => ({
+        x: j * cell + inset,
+        y: i * cell + inset,
+        width: Math.max(cell - 0.5 - 2 * inset, 0.5),
+        height: Math.max(cell - 0.5 - 2 * inset, 0.5),
+    });
+    const fi = focusCell ? focusCell.i * n + focusCell.j : -1;
 
     return (
-        <svg width={width} height={height} role="img" aria-label="cross-PCF matrix" onMouseLeave={() => setHover(null)}>
+        <svg
+            width={width}
+            height={height}
+            role="img"
+            aria-label="cross-PCF matrix"
+            style={{ cursor: onPaint ? "pointer" : undefined, userSelect: "none", touchAction: "none" }}
+            onPointerDown={(e) => {
+                const c = cellAt(e);
+                if (!c || !onPaint || e.button !== 0) return;
+                try {
+                    e.currentTarget.setPointerCapture(e.pointerId); // keep the stroke when it leaves the svg
+                } catch {
+                    // not an active pointer (a synthetic event): the stroke still works inside the svg
+                }
+                e.preventDefault();
+                stroke.current = c;
+                setPainting(true);
+                onPaint({ kind: "start", pair: pairOf(c), modifier: e.shiftKey || e.metaKey || e.ctrlKey });
+            }}
+            onPointerMove={(e) => {
+                const c = cellAt(e);
+                const from = stroke.current;
+                if (from && c && (c.i !== from.i || c.j !== from.j)) {
+                    for (const step of cellsAlong(from, c)) onPaint?.({ kind: "cell", pair: pairOf(step) });
+                    stroke.current = c;
+                }
+                const p = c ? pairOf(c) : null;
+                if (p?.a !== focus?.a || p?.b !== focus?.b) onFocus?.(p);
+            }}
+            onPointerUp={() => {
+                stroke.current = null;
+                setPainting(false);
+            }}
+            onPointerCancel={() => {
+                stroke.current = null;
+                setPainting(false);
+            }}
+            onPointerLeave={() => {
+                if (!stroke.current) onFocus?.(null);
+            }}
+        >
             <g transform={`translate(${labelW},${labelW})`}>
                 {view.types.map((ti, i) =>
                     view.types.map((tj, j) => (
-                        // biome-ignore lint/a11y/noStaticElementInteractions: matrix cells, pointer only for now
                         <rect
                             key={`${ti}-${tj}`}
-                            x={j * cell}
-                            y={i * cell}
-                            width={Math.max(cell - 0.5, 0.5)}
-                            height={Math.max(cell - 0.5, 0.5)}
+                            {...cellBox(i, j, 0)}
                             fill={view.pairs[i * n + j] > 0 ? gColour(view.value[i * n + j]) : "rgb(60,60,60)"}
-                            style={{ cursor: onPick ? "pointer" : undefined }}
-                            onMouseEnter={() => setHover({ i, j })}
-                            onClick={(e) => onPick?.(ti, tj, e.shiftKey || e.metaKey || e.ctrlKey)}
                         />
                     )),
                 )}
-                {rings.map((p) => ring(p.i, p.j, p.colour, `ring-${p.a}-${p.b}`))}
-                {hover &&
-                    !rings.some((p) => p.i === hover.i && p.j === hover.j) &&
-                    ring(hover.i, hover.j, "black", "hover", true)}
+                <g pointerEvents="none" fill="none">
+                    {rings.map((p) => (
+                        <g key={`ring-${p.a}-${p.b}`}>
+                            <rect {...cellBox(p.i, p.j, 1)} stroke="black" strokeWidth={3} />
+                            <rect {...cellBox(p.i, p.j, 1)} stroke={p.colour} strokeWidth={1.75} />
+                        </g>
+                    ))}
+                    {focusCell && (
+                        <g>
+                            <rect {...cellBox(focusCell.i, focusCell.j, -2)} stroke="black" strokeWidth={4} />
+                            <rect {...cellBox(focusCell.i, focusCell.j, -2)} stroke="white" strokeWidth={2} />
+                        </g>
+                    )}
+                </g>
                 {view.types.map((t, i) => (
                     <text
                         key={`row-${t}`}
@@ -166,8 +197,9 @@ export function CrossPcfMatrix({ result, labels, r, unit, width, height, selecte
                         textAnchor="end"
                         dominantBaseline="middle"
                         fontSize={fontSize}
-                        fontWeight={rowColour.has(i) || hover?.i === i ? 700 : 400}
+                        fontWeight={focusCell?.i === i ? 800 : rowColour.has(i) ? 600 : 400}
                         fill={rowColour.get(i) ?? "currentColor"}
+                        textDecoration={focusCell?.i === i ? "underline" : undefined}
                     >
                         {label(t)}
                     </text>
@@ -177,8 +209,9 @@ export function CrossPcfMatrix({ result, labels, r, unit, width, height, selecte
                         key={`col-${t}`}
                         transform={`translate(${j * cell + cell / 2},-4) rotate(-60)`}
                         fontSize={fontSize}
-                        fontWeight={colColour.has(j) || hover?.j === j ? 700 : 400}
+                        fontWeight={focusCell?.j === j ? 800 : colColour.has(j) ? 600 : 400}
                         fill={colColour.get(j) ?? "currentColor"}
+                        textDecoration={focusCell?.j === j ? "underline" : undefined}
                     >
                         {label(t)}
                     </text>
@@ -192,9 +225,11 @@ export function CrossPcfMatrix({ result, labels, r, unit, width, height, selecte
                 fill="currentColor"
                 opacity={0.8}
             >
-                {hover
-                    ? `${label(view.types[hover.i])} → ${label(view.types[hover.j])}: g = ${view.value[hover.i * n + hover.j].toFixed(2)} (${rLabel}), ${view.pairs[hover.i * n + hover.j]} pairs`
-                    : `${rLabel}; row = A, column = B; click picks a pair, Shift/⌘-click adds or removes`}
+                {focusCell
+                    ? `${label(focus?.a ?? 0)} → ${label(focus?.b ?? 0)}: g = ${view.value[fi].toFixed(2)} (${rLabel}), ${view.pairs[fi]} pairs`
+                    : painting
+                      ? "painting…"
+                      : `${rLabel}; row = A, column = B; drag to paint pairs, Shift/⌘ to add or remove`}
             </text>
         </svg>
     );

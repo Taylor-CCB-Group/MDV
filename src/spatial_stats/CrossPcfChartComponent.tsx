@@ -1,15 +1,16 @@
 import { action } from "mobx";
 import { observer } from "mobx-react-lite";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDataStore } from "../react/context";
 import { useChartSize, useConfig } from "../react/hooks";
 import { withPhysicalUnit } from "./analysisFrame";
 import type { CrossPcfConfig } from "./CrossPcfChart";
-import { CrossPcfCurves, type CurvePair, PAIR_COLOURS } from "./CrossPcfCurves";
-import { CrossPcfMatrix, pickPair, type RSelection, resolvePairs } from "./CrossPcfMatrix";
+import { CrossPcfCurves, type CurvePair, PAIR_COLOURS, PairLegend } from "./CrossPcfCurves";
+import { CrossPcfMatrix, type PaintEvent, type RSelection } from "./CrossPcfMatrix";
 import { type CrossPcfResult, computeCrossPCF, resolveAnalysisFrame } from "./crossPcf";
 import { domainSourceEnv } from "./domainSourceEnv";
 import { defaultDomainSourceRef, resolveDomainSourceRef } from "./domainSourceRef";
+import { continuePaint, type PaintMode, removePair, resolvePairs, startPaint } from "./pairSelection";
 
 type State =
     | { status: "idle" | "running" }
@@ -113,11 +114,19 @@ const clampR = (r: RSelection, nBins: number): RSelection =>
     r.kind === "bin" ? { kind: "bin", k: Math.min(r.k, nBins - 1) } : r;
 
 /** Curves for the chosen pairs beside the matrix (stacked when the chart is narrow), as in the mock. */
+type Pair = { a: number; b: number };
+
+/**
+ * Curves (with their legend) beside the matrix — stacked when the chart is narrow — sharing one
+ * focused pair: hovering a curve, a legend item or a matrix cell highlights that pair in all three.
+ */
 const Panels = observer(
     ({ res, r, width, height }: { res: CrossPcfResult; r: RSelection; width: number; height: number }) => {
         const config = useConfig<CrossPcfConfig>();
-        const [hover, setHover] = useState<{ a: number; b: number } | null>(null);
+        const [focus, setFocus] = useState<Pair | null>(null);
+        const stroke = useRef<PaintMode>("add");
         const label = (t: number) => res.labels[t] ?? String(t);
+        const asLabels = (p: Pair) => ({ a: label(p.a), b: label(p.b) });
         // Colour follows the pair's position in config, so it doesn't jump when another domain lacks a type.
         const chosen: CurvePair[] = resolvePairs(res.labels, config.pairs).map((p) => ({
             a: p.a,
@@ -125,30 +134,55 @@ const Panels = observer(
             label: `${label(p.a)} → ${label(p.b)}`,
             colour: PAIR_COLOURS[p.index % PAIR_COLOURS.length],
         }));
-        const isChosen = hover && chosen.some((p) => p.a === hover.a && p.b === hover.b);
+        const focusChosen = focus && chosen.some((p) => p.a === focus.a && p.b === focus.b);
         const preview: CurvePair | undefined =
-            hover && !isChosen
-                ? { ...hover, label: `${label(hover.a)} → ${label(hover.b)}`, colour: "currentColor" }
+            focus && !focusChosen
+                ? { ...focus, label: `${label(focus.a)} → ${label(focus.b)}`, colour: "currentColor" }
                 : undefined;
-        const pick = action((a: number, b: number, additive: boolean) => {
-            config.pairs = pickPair(config.pairs, label(a), label(b), additive);
+        const paint = action((e: PaintEvent) => {
+            if (e.kind === "start") {
+                const s = startPaint(config.pairs, asLabels(e.pair), e.modifier);
+                stroke.current = s.mode;
+                config.pairs = s.pairs;
+            } else {
+                const next = continuePaint(config.pairs, asLabels(e.pair), stroke.current);
+                // moving over a cell the stroke already covers changes nothing: don't churn the config
+                if (next.length !== config.pairs.length) config.pairs = next;
+            }
+        });
+        const remove = action((p: Pair) => {
+            config.pairs = removePair(config.pairs, asLabels(p));
+            setFocus(null);
         });
         const sideBySide = width >= 640;
-        const curvesW = sideBySide ? Math.round(width * 0.55) : width;
-        const curvesH = sideBySide ? Math.min(height, Math.round(curvesW * 0.7)) : Math.round(height * 0.4);
+        const curvesW = sideBySide ? Math.round(width * 0.58) : width;
+        const curvesH = sideBySide ? Math.min(height, Math.round(curvesW * 0.62)) : Math.round(height * 0.4);
+        const legendW = 120;
         const matrixW = sideBySide ? width - curvesW : width;
         const matrixH = sideBySide ? height : height - curvesH;
         return (
             <div className={sideBySide ? "flex flex-row" : "flex flex-col"}>
-                <CrossPcfCurves
-                    result={res}
-                    pairs={chosen}
-                    preview={preview}
-                    r={r}
-                    unit={res.frame.unit}
-                    width={curvesW}
-                    height={curvesH}
-                />
+                <div className="flex flex-row" style={{ width: curvesW, height: curvesH }}>
+                    <CrossPcfCurves
+                        result={res}
+                        pairs={chosen}
+                        preview={preview}
+                        focus={focus}
+                        onFocus={setFocus}
+                        r={r}
+                        unit={res.frame.unit}
+                        width={curvesW - legendW}
+                        height={curvesH}
+                    />
+                    <PairLegend
+                        pairs={chosen}
+                        preview={preview}
+                        focus={focus}
+                        onFocus={setFocus}
+                        onRemove={remove}
+                        height={curvesH}
+                    />
+                </div>
                 <CrossPcfMatrix
                     result={res}
                     labels={res.labels}
@@ -157,8 +191,9 @@ const Panels = observer(
                     width={matrixW}
                     height={matrixH}
                     selected={chosen}
-                    onPick={pick}
-                    onHover={setHover}
+                    focus={focus}
+                    onFocus={setFocus}
+                    onPaint={paint}
                 />
             </div>
         );
