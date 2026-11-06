@@ -1,14 +1,10 @@
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import type DataStore from "@/datastore/DataStore";
-import { spatialDataUrlForRegion } from "@/react/spatialdata/shared_spatial_data";
-import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import { type AnalysisFrame, regionsScaleFrame } from "./analysisFrame";
 import type { CrossPcfRequest, CrossPcfResponse } from "./crossPcfCompute";
 import type { DomainSource } from "./domainSource";
-import { type ConvertedRegion, spatialDataRegionFrame } from "./spatialDataFrame";
-
-/** Store reads for frame resolution outside any chart (a chart keeps its own reader). */
-const reader = createSpatialDataReader();
+import { readRegionStore } from "./regionSpatialData";
+import { spatialDataRegionFrame } from "./spatialDataFrame";
 
 /**
  * The analysis frame for rows of `region` (a key of `regions.all_regions`): the SpatialData
@@ -17,21 +13,13 @@ const reader = createSpatialDataReader();
  * (converted projects also carry image-only regions such as a lossy OME-TIFF, which don't count).
  */
 export async function resolveAnalysisFrame(dataStore: DataStore, region?: string): Promise<AnalysisFrame> {
-    const regions = dataStore.regions;
-    const all: Record<string, ConvertedRegion> = regions?.all_regions ?? {};
-    const spatialKeys = Object.keys(all).filter((k) => spatialDataUrlForRegion(all[k]));
-    const key = region ?? (spatialKeys.length === 1 ? spatialKeys[0] : undefined);
-    const entry: ConvertedRegion | undefined = key ? regions?.all_regions[key] : undefined;
-    const fallback = regionsScaleFrame(regions);
-    const url = entry ? spatialDataUrlForRegion(entry) : null;
-    if (!entry || !url) return fallback;
-    try {
-        const frame = spatialDataRegionFrame(await reader.read(url).promise, entry);
-        if ("error" in frame) return { ...fallback, provenance: `${fallback.provenance} (${frame.error})` };
-        return frame;
-    } catch (e) {
-        return { ...fallback, provenance: `${fallback.provenance} (store read failed: ${e})` };
-    }
+    const fallback = regionsScaleFrame(dataStore.regions);
+    const { entry, sdata, error } = await readRegionStore(dataStore, region);
+    if (error) return { ...fallback, provenance: `${fallback.provenance} (${error})` };
+    if (!entry || !sdata) return fallback;
+    const frame = spatialDataRegionFrame(sdata, entry);
+    if ("error" in frame) return { ...fallback, provenance: `${fallback.provenance} (${frame.error})` };
+    return frame;
 }
 
 export type CrossPcfOptions = {
@@ -45,6 +33,8 @@ export type CrossPcfOptions = {
     nBins?: number;
     /** Clip each anchor's annulus to the domain — exact near the boundary. Default true. */
     edgeCorrected?: boolean;
+    /** Abort terminates the worker; the promise rejects with the signal's reason. */
+    signal?: AbortSignal;
 };
 
 export type CrossPcfResult = CrossPcfResponse & {
@@ -85,7 +75,7 @@ export async function computeCrossPCF(
         y: { buffer: yCol.data.buffer, datatype: yCol.datatype },
         type: { buffer: typeCol.data.buffer, datatype: typeCol.datatype, nTypes: labels.length },
         frame,
-        domain: source.toDomain(frame),
+        domain: await source.toDomain(frame),
         rMax: opts.rMax ?? 100,
         nBins: opts.nBins ?? 20,
         edgeCorrected: opts.edgeCorrected ?? true,
@@ -99,6 +89,8 @@ export async function computeCrossPCF(
     const worker = new Worker(new URL("./crossPcfWorker.ts", import.meta.url), { type: "module" });
     try {
         const result = await new Promise<CrossPcfResponse>((resolve, reject) => {
+            opts.signal?.throwIfAborted();
+            opts.signal?.addEventListener("abort", () => reject(opts.signal?.reason), { once: true });
             worker.onmessage = (e: MessageEvent<{ result?: CrossPcfResponse; error?: string }>) =>
                 e.data.result ? resolve(e.data.result) : reject(new Error(e.data.error));
             worker.onerror = (e) => reject(new Error(e.message));
