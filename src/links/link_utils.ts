@@ -387,6 +387,48 @@ export function subgroupKeyFromFieldName(field: string): string | null {
     const prefix = field.split("|")[0];
     return prefix.length > 0 ? prefix : null;
 }
+/** The parts of a {@link DataStore} that {@link createRowSelector} depends on. */
+type RowSource = {
+    getHighlightedData(): number[] | undefined;
+    /** per-row filter state: 0 means the row passes all filters */
+    filterArray: Uint8Array;
+    getFilteredIndices(): Promise<ArrayLike<number>>;
+};
+
+/**
+ * Decides which rows a rows-as-columns link should currently expose, and delivers them to `apply`.
+ *
+ * The rule is: the highlighted rows that pass the current filter, or if there are none, the filtered rows.
+ * (A highlight can include rows that are filtered out: it's saved with the view and restored independently of the
+ * filters, and nothing clears it when a filter changes.)
+ *
+ * `refresh()` should be called on any `filtered` or `data_highlighted` event. It deliberately reads the
+ * current state of the store rather than any event payload, so the result doesn't depend on the order in which the
+ * events arrive. The filtered rows come from a worker, so a result is dropped if `refresh()` has been called again
+ * in the meantime - the latest call always wins regardless of the order in which the async parts finish.
+ */
+export function createRowSelector(source: RowSource, apply: (rows: ArrayLike<number>) => void) {
+    let latest = 0;
+    let current: Promise<void> = Promise.resolve();
+    return function refresh() {
+        const id = ++latest;
+        const highlighted = source.getHighlightedData() ?? [];
+        const visible = highlighted.filter((i) => source.filterArray[i] === 0);
+        if (visible.length > 0) {
+            apply(visible);
+            current = Promise.resolve();
+            return current;
+        }
+        current = source.getFilteredIndices().then((filtered) => {
+            // superseded: whoever superseded us will apply their result; wait for that so that callers
+            // awaiting `refresh()` can rely on the link reflecting the final state.
+            if (id !== latest) return current;
+            apply(filtered);
+        });
+        return current;
+    };
+}
+
 /**
  * A given rows-as-columns `link` has a single listener; `observableFields` are subgroup-agnostic row picks.
  * Which matrix/subgroup those rows resolve to is chosen per {@link RowsAsColsQuery} (or per `FieldName` prefix in manual link mode).
@@ -486,32 +528,19 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
     const getField = (index: number) => {
         return new RAColumn(index);
     };
-    async function setFieldsFromFilter() {
-        //! this Array.from could be suboptimal for large numbers of indices
-        //at risk of overthinking, but we could have a lazy filteredIndices iterator...
-        const filteredIndices = await tds.getFilteredIndices();
-        const vals = Array.from(filteredIndices).map(getField);
+    //! this Array.from could be suboptimal for large numbers of indices
+    //at risk of overthinking, but we could have a lazy filteredIndices iterator...
+    const refreshFields = createRowSelector(tds, (rows) => {
+        const vals = Array.from(rows).map(getField);
         runInAction(() => {
             link.observableFields = vals;
         });
-    }
+    });
     //todo check link.name is a good id for the listener
-    tds.addListener(link.name, async (type, data) => {
-        if (type === "data_highlighted") {
-            // when highlight changes to empty, go back to showing 'filtered'
-            // would be nice to have a better type for data here.
-            if (data.indexes.length === 0) {
-                setFieldsFromFilter();
-                return;
-            }
-            const vals = data.indexes.map(getField);
-            runInAction(() => {
-                link.observableFields = vals;
-            });
-        } else if (type === "filtered") {
-            // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
-
-            setFieldsFromFilter();
+    // both events mean "the answer to which rows we expose may have changed" - see createRowSelector
+    tds.addListener(link.name, (type) => {
+        if (type === "data_highlighted" || type === "filtered") {
+            refreshFields();
         }
     });
     console.log("settings initial fields for link...", link);
@@ -519,7 +548,7 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
         //initial population so sync callers will have something to work with
         link.observableFields = [getField(0)];
     });
-    await setFieldsFromFilter();
+    await refreshFields();
     console.log("link initialized", link);
 }
 export function getRowsAsColumnsLinks(dataStore: DataStore) {
