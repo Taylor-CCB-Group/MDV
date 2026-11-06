@@ -14,6 +14,19 @@ let genes: DataStore;
 let cells: DataStore;
 let grid: DataStore;
 let workers: InProcessFilteredIndexWorker[];
+/**
+ * Stands in for a view that is loading: the dataSources whose charts have yet to apply the filters saved with
+ * them. Resolve an entry with {@link filtersApplied}.
+ */
+let awaitingFilters: Map<string, PromiseWithResolvers<void>>;
+function awaitFilters(dataSource: string) {
+    awaitingFilters.set(dataSource, Promise.withResolvers<void>());
+}
+function filtersApplied(dataSource: string) {
+    const waiting = awaitingFilters.get(dataSource);
+    awaitingFilters.delete(dataSource);
+    waiting?.resolve();
+}
 
 /** a dataSource with a rows-as-columns link to `genes` - the link config is not shared between dataSources */
 function linkedStore(name: string) {
@@ -50,6 +63,7 @@ const fieldsFor = (...rows: number[]) => rows.map((i) => getFieldName("gs", GENE
 
 beforeEach(() => {
     workers = stubWorker({ filteredIndex: true }).filteredIndexWorkers;
+    awaitingFilters = new Map();
     vi.spyOn(console, "log").mockImplementation(() => {});
     genes = new DataStore(GENES.length, {
         name: "genes",
@@ -63,6 +77,9 @@ beforeEach(() => {
         chartManager: {
             dataSources: [genes, cells, grid].map((dataStore) => ({ name: dataStore.name, dataStore })),
             loadColumnSetAsync: async () => {},
+            areViewFiltersApplied: (dataSource: string) => !awaitingFilters.has(dataSource),
+            whenViewFiltersApplied: (dataSource: string) =>
+                awaitingFilters.get(dataSource)?.promise ?? Promise.resolve(),
         },
     });
 });
@@ -132,5 +149,67 @@ describe("a link's fields over time", () => {
         stop();
 
         expect(history.length).toBe(before);
+    });
+});
+
+describe("a link while a view loads", () => {
+    /** every value `query.fields` takes from now on, as something observing the link would see them */
+    function recordFields(q: RowsAsColsQuery) {
+        const history: string[][] = [];
+        const stop = autorun(() => {
+            history.push(q.fields);
+        });
+        return { history, stop };
+    }
+    const applyGenesFilter = () =>
+        genes.getDimension("category_dimension").filter("filterCategories", ["name"], ["B", "D"]);
+
+    test("is not ready for a chart until the linked dataSource has the view's filters, then has the rows that pass", async () => {
+        awaitFilters("genes");
+        const fromCells = query(cells);
+        let resolvedTo: string[] | undefined;
+        fromCells.initialize().then(() => {
+            resolvedTo = fromCells.fields;
+        });
+        await settle();
+        expect(resolvedTo).toBeUndefined();
+
+        // a chart on genes applies the filter saved with it, and the view load reports genes ready straight after
+        applyGenesFilter();
+        filtersApplied("genes");
+        await settle();
+
+        expect(resolvedTo).toEqual(fieldsFor(1, 3));
+    });
+
+    test("exposes no rows until then: not the unfiltered rows, nor a placeholder", async () => {
+        awaitFilters("genes");
+        const { history, stop } = recordFields(query(cells));
+        await settle();
+        applyGenesFilter();
+        await settle();
+        expect(history.filter((fields) => fields.length > 0)).toEqual([]);
+
+        filtersApplied("genes");
+        await settle();
+        stop();
+
+        expect(history.filter((fields) => fields.length > 0)).toEqual([fieldsFor(1, 3)]);
+    });
+
+    test("drops the rows it had when another view starts loading", async () => {
+        const fromCells = query(cells);
+        await settle();
+        expect(fromCells.fields).toEqual(fieldsFor(0, 1, 2, 3));
+
+        // the next view begins to load: its charts on genes have not applied their filters yet
+        awaitFilters("genes");
+        fromCells.link.refresh?.();
+        expect(fromCells.fields).toEqual([]);
+
+        applyGenesFilter();
+        filtersApplied("genes");
+        await settle();
+        expect(fromCells.fields).toEqual(fieldsFor(1, 3));
     });
 });

@@ -38,6 +38,7 @@ import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 import ViewManager from "./ViewManager";
+import { linkCycleMembers, ViewFilterReadiness } from "./viewFilterReadiness";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -784,6 +785,14 @@ export class ChartManager {
         }
         //add charts - any columns will be added dynamically
         this._inInit = true;
+        // While the view loads, an active link is not resolved for a chart until the dataSource it links to has the
+        // filters saved with the view, which are applied by that dataSource's own charts - see viewFilterReadiness.ts
+        this._viewFilterReadiness?.abandon();
+        this._viewFilterReadiness = new ViewFilterReadiness(charts, linkCycleMembers(this._rowsAsColumnsLinkTargets()));
+        // links that are already set up drop the rows they had for the previous view, until the new one's are known
+        for (const ds of this.dataSources) {
+            for (const link of Object.values(ds.dataStore.links ?? {})) link.rows_as_columns?.refresh?.();
+        }
         // Restore highlighted rows from view data (e.g. after loading or switching view) before any chart is added.
         // Active links resolve to the highlighted rows, so a chart built before the highlight is known would
         // resolve - and load columns for - whatever rows its link exposes without it, then change when it arrives.
@@ -1670,6 +1679,46 @@ export class ChartManager {
         }
     }
 
+    /** For each dataSource, the dataSources it has rows-as-columns links to. */
+    _rowsAsColumnsLinkTargets() {
+        /** @type {Record<string, string[]>} */
+        const targets = {};
+        for (const ds of this.dataSources) {
+            const links = ds.dataStore.links ?? {};
+            targets[ds.name] = Object.keys(links).filter((name) => links[name].rows_as_columns);
+        }
+        return targets;
+    }
+
+    /**
+     * Whether `dataSource` has the filters saved with the current view: false while a view is loading and some
+     * of its charts on that dataSource have yet to apply theirs.
+     * @param {string} dataSource
+     */
+    areViewFiltersApplied(dataSource) {
+        return this._viewFilterReadiness?.isReady(dataSource) ?? true;
+    }
+
+    /**
+     * Resolves once the charts of a view that is loading have applied the filters saved with them to `dataSource`.
+     * Resolves straight away when no view is loading, or it has no charts on that dataSource.
+     * @param {string} dataSource
+     * @returns {Promise<void>}
+     */
+    whenViewFiltersApplied(dataSource) {
+        return this._viewFilterReadiness?.whenReady(dataSource) ?? Promise.resolve();
+    }
+
+    /**
+     * Resolves once a newly added chart has applied the filters saved in its config - including any that are
+     * evaluated on a worker - to its dataStore.
+     */
+    async _whenStoredFiltersApplied(chart) {
+        await chart.storedFilters.whenApplied();
+        const pending = chart.dataStore.dimensions.map((d) => d.pendingFilter).filter(Boolean);
+        await Promise.allSettled(pending);
+    }
+
     /** Sets each dataSource's highlighted rows to those saved with the current view (none, if it saved none). */
     _restoreHighlights() {
         for (const dsName of Object.keys(this.viewData.dataSources || {})) {
@@ -1780,7 +1829,8 @@ export class ChartManager {
             // - other charts wanting to use similar neededCols end up not having data?
             // links should be initialised here as well...
             await this._getColumnsAsync(dataSource, neededCols);
-            await this._addChart(dataSource, config, div, notify);
+            const chart = await this._addChart(dataSource, config, div, notify);
+            await this._whenStoredFiltersApplied(chart);
         } catch (error) {
             console.error("Failed to add chart", {
                 chartId: config.id,
@@ -1866,6 +1916,8 @@ export class ChartManager {
             //not rethrowing doesn't help recovering from missing data in other charts.
             //throw new Error(error); //probably not a great way to handle this
         } finally {
+            // whether it has applied its filters or failed to load, this chart is no longer a reason to wait
+            this._viewFilterReadiness?.settle(dataSource, config);
             this._markInitialChartLoadComplete(config);
         }
     }

@@ -207,6 +207,16 @@ export type RowsAsColslink = {
      */
     valueToRowIndex?: Map<string, number>;
     initPromise: Promise<void>;
+    /**
+     * Added at runtime: resolves once `observableFields` reflects the linked dataSource's filter and highlight as
+     * they are when this is called (after a filter changes, the rows that pass it are worked out asynchronously).
+     */
+    settled?: () => Promise<void>;
+    /**
+     * Added at runtime: works out `observableFields` afresh. While a view is loading and the linked dataSource
+     * does not have that view's filters yet, this leaves the link with no rows until it does.
+     */
+    refresh?: () => Promise<void>;
 };
 /**
  * Represents an active query for a set of columns based on the currently highlighted or filtered rows.
@@ -329,8 +339,17 @@ export class RowsAsColsQuery implements MultiColumnQuery {
         const sg = this.effectiveSubgroupKey;
         return this.link.observableFields.slice(0, this.maxItems).map((f) => f.fieldNameForSubgroup(sg));
     }
+    /**
+     * Resolves when `fields` is ready to be used for a chart that is being added.
+     *
+     * While a view is loading that is not until the linked dataSource has the filters saved with the view (see
+     * `viewFilterReadiness.ts`): before then, `fields` names rows that are about to be filtered out, and a chart
+     * built on them would load their columns, draw them, and then change.
+     */
     async initialize() {
-        return this.link.initPromise;
+        await this.link.initPromise;
+        await window.mdv.chartManager.whenViewFiltersApplied(this.linkedDsName);
+        await this.link.settled?.();
     }
     /**
      * JSON serialisation that can be used to recreate the query object.
@@ -541,19 +560,46 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
             link.observableFields = vals;
         });
     });
+    // While a view is loading, the rows that pass the linked dataSource's filter are not the ones the view is
+    // going to show until that dataSource's charts have applied the filters saved with them (see
+    // viewFilterReadiness.ts). Until then the link exposes no rows at all, so that nothing observing it loads
+    // columns for - and draws - rows that are about to be filtered out; it then resolves once, to what is settled.
+    let held: Promise<void> | undefined;
+    const refresh = (): Promise<void> => {
+        if (cm.areViewFiltersApplied(tds.name)) return refreshFields();
+        if (!held) {
+            if (link.observableFields.length > 0) {
+                runInAction(() => {
+                    link.observableFields = [];
+                });
+            }
+            held = cm.whenViewFiltersApplied(tds.name).then(() => {
+                held = undefined;
+                // (not `refreshFields`: another view may have started loading in the meantime)
+                return refresh();
+            });
+        }
+        return held;
+    };
+    let lastRefresh = Promise.resolve();
+    link.settled = () => lastRefresh;
+    link.refresh = () => {
+        lastRefresh = refresh();
+        return lastRefresh;
+    };
     // both events mean "the answer to which rows we expose may have changed" - see createRowSelector
     // The id has to be unique among the links *to* `tds`: several dataSources can link to it under the same link
     // name (e.g. cells and a grid of spots, both to genes), and a listener added with an id that is already in
     // use replaces the earlier one, which left every link but the last to initialise frozen on its first fields.
     tds.addListener(`rows_as_columns:${ds.name}:${link.name}`, (type) => {
         if (type === "data_highlighted" || type === "filtered") {
-            refreshFields();
+            link.refresh?.();
         }
     });
     console.log("settings initial fields for link...", link);
     // if rows are highlighted this sets the fields before it returns; otherwise they follow from a worker
-    const initialised = refreshFields();
-    if (link.observableFields.length === 0) {
+    const initialised = link.refresh();
+    if (link.observableFields.length === 0 && !held) {
         runInAction(() => {
             //initial population so sync callers will have something to work with
             link.observableFields = [getField(0)];

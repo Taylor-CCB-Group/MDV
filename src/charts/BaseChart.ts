@@ -34,6 +34,7 @@ import {
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 import { getLegacyConversionTarget } from "./legacyCharts";
+import { StoredFilters } from "./viewFilterReadiness";
 export type ChartEventType = string;
 /** A dot on a chart's "more" menu icon, for a problem described in its debug dialog. */
 export type MenuPip = { level: "error" | "notice"; tooltip: string };
@@ -371,6 +372,12 @@ class BaseChart<T extends BaseConfig> {
             container: this.__doc__.body,
         });
     }
+    /**
+     * The filters saved in this chart's config that it applies some time after its constructor returns
+     * (e.g. in React effects). A view that is loading waits for these before resolving active links to this
+     * chart's dataSource - see `viewFilterReadiness.ts`. Nothing to do for filters applied in the constructor.
+     */
+    storedFilters = new StoredFilters();
     _deferredInits: Promise<void>[] = [];
     /**
      * During chart initialisation, we defer some actions until after the constructor has returned.

@@ -99,6 +99,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     const [selectAll, setSelectAll] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
     const dim = useDimensionFilter(column);
+    const chart = useChart();
     const conf = useConfig<SelectionDialogConfig>();
     const values = useLiveCategorySelectionValues(column.field);
     const filter = useFilterConfig(column);
@@ -129,12 +130,14 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         // filter could be undefined - but we previously checked for null causing component to crash
         if (!filter || filter.category.length === 0) {
             dim.removeFilter();
+            chart.storedFilters.applied(column.field);
             return;
         }
         //probably there is better place to set this
 
-        dim.filter("filterCategories", [column.field], value, true);
-    }, [dim, column.field, value, filter]);
+        // (reporting it lets a view that is loading know this dataSource has the filter saved with it)
+        chart.storedFilters.applied(column.field, dim.filter("filterCategories", [column.field], value, true));
+    }, [dim, column.field, value, filter, chart]);
 
     const toggleOption = useCallback(
         (option: string) => {
@@ -316,6 +319,7 @@ const MultiTextComponent = observer(({ column }: Props<"multitext">) => {
 
 const UniqueComponent = observer(({ column }: Props<"unique">) => {
     const dim = useDimensionFilter(column);
+    const chart = useChart();
     const filters = useConfig<SelectionDialogConfig>().filters;
     const filter = useFilterConfig(column);
     const [initialValue] = useState(filter);
@@ -323,11 +327,12 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
         if (!dim) return;
         if (filter === null) {
             dim.removeFilter();
+            chart.storedFilters.applied(column.field);
             return;
         }
-        dim.filter("filterUnique", [column.field], filter, true);
+        chart.storedFilters.applied(column.field, dim.filter("filterUnique", [column.field], filter, true));
         //return () => dim.removeFilter(); //handled by useDimensionFilter
-    }, [dim, column.field, filter]);
+    }, [dim, column.field, filter, chart]);
     const [localFilter, setLocalFilter] = useState(filter || "");
     return (
         <TextField
@@ -349,6 +354,7 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
  */
 function useRangeFilter(column: DataColumn<NumberDataType>) {
     const filter = useDimensionFilter(column);
+    const chart = useChart();
     const conf = useConfig<SelectionDialogConfig>();
     //nb - we may want to allow value to be null, rather than defaulting to minMax
     //relates to e.g. clearBrush function
@@ -377,11 +383,12 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         const value = debouncedValue;
         if (!value) {
             filter.removeFilter();
+            chart.storedFilters.applied(column.field);
             return;
         }
         const [min, max] = value;
-        filter.filter("filterRange", [column.field], { min, max }, true);
-    }, [column, filter, debouncedValue]);
+        chart.storedFilters.applied(column.field, filter.filter("filterRange", [column.field], { min, max }, true));
+    }, [column, filter, debouncedValue, chart]);
 
     const { ownerVisibleRows: filteredIndices } = useOwnedFilteredIndices(filter);
     const highlightedIndices = useHighlightedIndices();
