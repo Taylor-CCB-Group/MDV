@@ -22,7 +22,6 @@ import {
     CircularProgress,
     Container,
     Divider,
-    Grid2 as Grid,
     IconButton,
     InputBase,
     Menu,
@@ -56,6 +55,16 @@ import { type SortBy, type SortOrder, sortProjects } from "./utils/projectUtils"
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states
+/**
+ * Responsive grid: cards stay at least 300px wide. The container is capped at 1440px,
+ * which leaves room for four columns at most (about 324px each) on large displays.
+ */
+const projectGridSx = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+    gap: 4,
+} as const;
+
 const Dashboard: React.FC = () => {
     // Production builds hide project creation and import unless the build sets
     // VITE_SHOW_PROJECT_CREATION=true, as deployments where users make their own projects do.
@@ -264,7 +273,7 @@ const Dashboard: React.FC = () => {
                     </Toolbar>
                 </AppBar>
 
-                <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+                <Container maxWidth={false} sx={{ mt: 4, mb: 4, maxWidth: 1440 }}>
                     {showLocalBackendNotice && (
                         <Alert severity="info" sx={{ mb: 3 }}>
                             This preview build needs to talk to an MDV app running locally on{" "}
@@ -279,9 +288,9 @@ const Dashboard: React.FC = () => {
                             {rescanWarning}
                         </Alert>
                     )}
-                    <Grid container spacing={3} sx={{ mb: 4 }}>
+                    <Box sx={{ ...projectGridSx, mb: 4 }}>
                         {showProjectCreation && permissions.createProject && (
-                            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                            <Box>
                                 <ButtonBase
                                     sx={{
                                         width: "100%",
@@ -310,10 +319,10 @@ const Dashboard: React.FC = () => {
                                         </Typography>
                                     </Paper>
                                 </ButtonBase>
-                            </Grid>
+                            </Box>
                         )}
                         {showProjectCreation && permissions.importProject && (
-                            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                            <Box>
                                 <ButtonBase
                                     sx={{
                                         width: "100%",
@@ -342,9 +351,9 @@ const Dashboard: React.FC = () => {
                                         </Typography>
                                     </Paper>
                                 </ButtonBase>
-                            </Grid>
+                            </Box>
                         )}
-                    </Grid>
+                    </Box>
 
                     <Box
                         sx={{
@@ -490,17 +499,9 @@ const Dashboard: React.FC = () => {
                     <Divider sx={{ mb: 2 }} />
 
                     {viewMode === "grid" ? (
-                        <Grid container spacing={4}>
+                        <Box sx={projectGridSx}>
                             {sortedProjects.map((project) => (
-                                <Grid
-                                    key={project.id}
-                                    size={{
-                                        xs: 12,
-                                        sm: 6,
-                                        md: 4,
-                                        lg: 3,
-                                    }}
-                                >
+                                <Box key={project.id}>
                                     <ProjectCard
                                         {...project}
                                         onDelete={deleteProject}
@@ -512,9 +513,9 @@ const Dashboard: React.FC = () => {
                                         selected={selectedProjectIds.has(project.id)}
                                         onSelectionChange={handleSelectionChange}
                                     />
-                                </Grid>
+                                </Box>
                             ))}
-                        </Grid>
+                        </Box>
                     ) : (
                         <ProjectListView
                             projects={sortedProjects}
