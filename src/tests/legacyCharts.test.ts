@@ -238,7 +238,53 @@ describe("the Spatial Image Viewer on a SpatialData region", () => {
             category_filters,
             contourParameter: "cell_type",
             viewState: { target: [5, 5, 0], zoom: -2 },
+            defaultImageLayer: { channels: { colors: [[255, 0, 0]], contrastLimits: [[0, 100]] } },
         });
+    });
+
+    test("keeps the Viv channel settings and tone for the image layer", () => {
+        const channelsStore = {
+            channelsVisible: [true, false],
+            colors: [
+                [255, 0, 0],
+                [0, 255, 0],
+            ],
+            contrastLimits: [
+                [0, 100],
+                [10, 200],
+            ],
+            selections: [
+                { z: 0, c: 0, t: 0 },
+                { z: 0, c: 2, t: 0 },
+            ],
+            brightness: [0.6, 0.5],
+            contrast: [0.4, 0.5],
+            domains: [
+                [0, 255],
+                [0, 255],
+            ],
+        };
+        const config: { type: string; region: string; viv: unknown; defaultImageLayer?: unknown } = {
+            type: "VivMdvRegionReact",
+            region: "r1",
+            viv: { channelsStore },
+        };
+        convertLegacyChartConfigNow(config, spatialRegion);
+        expect(config.defaultImageLayer).toEqual({
+            channels: {
+                channelsVisible: channelsStore.channelsVisible,
+                colors: channelsStore.colors,
+                contrastLimits: channelsStore.contrastLimits,
+                selections: channelsStore.selections,
+            },
+            vivLayerProps: { brightness: [0.6, 0.5], contrast: [0.4, 0.5] },
+        });
+    });
+
+    test("leaves the image layer's defaults when the Viv chart saved no channels, or empty tone", () => {
+        const config = { type: "VivMdvRegionReact", region: "r1", viv: { channelsStore: { brightness: [] } } };
+        convertLegacyChartConfigNow(config, spatialRegion);
+        expect(config).toEqual({ type: "SpatialDataMdvRegionReact", region: "r1" });
     });
 
     test("leaves the view to fit the data when the Viv chart saved no position", () => {

@@ -62,19 +62,42 @@ const isSpatialDataVivRegion = (config: any, dataStore?: DataStore) => {
 };
 
 /**
+ * The Viv chart's saved channel settings as the SpatialData.js image layer's: the same per-channel
+ * arrays, with tone in `vivLayerProps`. Undefined if it saved none, so the layer starts with defaults.
+ */
+const vivChannelsToImageLayer = (channelsStore: any) => {
+    if (!channelsStore || typeof channelsStore !== "object") return undefined;
+    const channels: Record<string, unknown> = {};
+    for (const key of ["colors", "contrastLimits", "channelsVisible", "selections"]) {
+        if (Array.isArray(channelsStore[key])) channels[key] = channelsStore[key];
+    }
+    const vivLayerProps: Record<string, unknown> = {};
+    for (const key of ["brightness", "contrast"]) {
+        if (Array.isArray(channelsStore[key]) && channelsStore[key].length) vivLayerProps[key] = channelsStore[key];
+    }
+    if (!Object.keys(channels).length && !Object.keys(vivLayerProps).length) return undefined;
+    return {
+        ...(Object.keys(channels).length ? { channels } : {}),
+        ...(Object.keys(vivLayerProps).length ? { vivLayerProps } : {}),
+    };
+};
+
+/**
  * The SpatialData.js viewer reads the same scatter, region and filter settings as the Viv viewer, but
  * draws images from a render stack rather than `viv`. Left without one, it adds the store's first image
- * on load. The view position moves to the top-level `viewState`: both viewers draw the scatter in the
- * same frame. The Viv channel settings are not carried over, so the image layer starts with defaults.
+ * on load, with the Viv channel settings from `defaultImageLayer`. The view position moves to the
+ * top-level `viewState`: both viewers draw the scatter in the same frame.
  */
 const adaptVivToSpatialData = (config: any) => {
     const vivView = config.viv?.viewerStore?.viewState;
+    const defaultImageLayer = vivChannelsToImageLayer(config.viv?.channelsStore);
     for (const key of ["viv", "roi", "json", "showJson", "background_image", "renderStack", "viewState"]) {
         delete config[key];
     }
     if (Array.isArray(vivView?.target)) {
         config.viewState = { target: [...vivView.target], zoom: vivView.zoom };
     }
+    if (defaultImageLayer) config.defaultImageLayer = defaultImageLayer;
 };
 
 /**

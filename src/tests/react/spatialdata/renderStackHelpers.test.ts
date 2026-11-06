@@ -337,6 +337,31 @@ describe("render stack defaults", () => {
         expect(chart.finishDefaultSpatialLayerSeed).toHaveBeenCalled();
     });
 
+    test("seedRenderStackFromSpatialData gives the first image layer the chart's default image props", () => {
+        const config = {
+            type: "SpatialDataMdvRegionReact",
+            renderStack: createHostOnlyRenderStack(),
+        } as const;
+        const defaultImageLayerProps = {
+            channels: { colors: [[255, 0, 0]], contrastLimits: [[0, 100]] },
+            vivLayerProps: { brightness: [0.6] },
+        };
+        const chart = {
+            seedDefaultSpatialLayers: true,
+            defaultImageLayerProps,
+            bumpRenderStackGeneration: vi.fn(),
+            bumpRenderStackPropsGeneration: vi.fn(),
+            finishDefaultSpatialLayerSeed: vi.fn(),
+        };
+        seedRenderStackFromSpatialData(config as never, fakeSpatialData(), "global", chart as never);
+        const image = config.renderStack.entries.find(
+            (entry) => entry.kind === "spatial" && entry.source.elementType === "image",
+        );
+        expect(image?.props).toEqual({ opacity: 1, ...defaultImageLayerProps });
+        // a copy, so editing the layer leaves the chart's props alone
+        expect(image?.props.channels).not.toBe(defaultImageLayerProps.channels);
+    });
+
     test("seedRenderStackFromSpatialData keeps persisted host-only stacks spatial-free", () => {
         const config = {
             type: "SpatialDataMdvRegionReact",

@@ -1,3 +1,4 @@
+import type { LayerChannelConfig } from "@spatialdata/avivatorish";
 import type { SpatialData, SpatialElement } from "@spatialdata/core";
 import {
     RENDER_STACK_SCHEMA_VERSION,
@@ -88,11 +89,25 @@ export function listAvailableSpatialEntries(spatialData: SpatialData, coordinate
     return spatialEntries;
 }
 
-function firstImageSpatialEntry(spatialData: SpatialData, coordinateSystem: string): RenderStackEntry | null {
+/**
+ * Props for the image layer a chart adds when it starts without one, such as the channel settings
+ * of a Viv chart converted to the SpatialData.js viewer.
+ */
+export type DefaultImageLayerProps = {
+    channels?: LayerChannelConfig;
+    vivLayerProps?: Record<string, unknown>;
+};
+
+function firstImageSpatialEntry(
+    spatialData: SpatialData,
+    coordinateSystem: string,
+    props?: DefaultImageLayerProps,
+): RenderStackEntry | null {
     const matching = elementsForCoordinateSystem(spatialData.images, coordinateSystem);
     const firstKey = matching[0]?.[0];
     if (!firstKey) return null;
-    return spatialEntry("image", firstKey);
+    // a copy, so that editing the layer does not edit `props`
+    return spatialEntry("image", firstKey, props ? structuredClone(props) : {});
 }
 
 export function createHostOnlyRenderStack(): RenderStack {
@@ -102,9 +117,13 @@ export function createHostOnlyRenderStack(): RenderStack {
     };
 }
 
-export function createDefaultRenderStack(spatialData: SpatialData, coordinateSystem: string): RenderStack {
+export function createDefaultRenderStack(
+    spatialData: SpatialData,
+    coordinateSystem: string,
+    imageProps?: DefaultImageLayerProps,
+): RenderStack {
     const spatialEntries: RenderStackEntry[] = [];
-    const imageEntry = firstImageSpatialEntry(spatialData, coordinateSystem);
+    const imageEntry = firstImageSpatialEntry(spatialData, coordinateSystem, imageProps);
     if (imageEntry) {
         spatialEntries.push(imageEntry);
     }
@@ -120,11 +139,12 @@ export function insertDefaultImageLayer(
     stack: RenderStack,
     spatialData: SpatialData,
     coordinateSystem: string,
+    imageProps?: DefaultImageLayerProps,
 ): boolean {
     const hasImage = stack.entries.some((entry) => entry.kind === "spatial" && entry.source.elementType === "image");
     if (hasImage) return false;
 
-    const imageEntry = firstImageSpatialEntry(spatialData, coordinateSystem);
+    const imageEntry = firstImageSpatialEntry(spatialData, coordinateSystem, imageProps);
     if (!imageEntry) return false;
 
     const firstHostIndex = stack.entries.findIndex((entry) => entry.kind === "host");
