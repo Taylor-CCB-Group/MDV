@@ -10,7 +10,7 @@ import {
     regionsScaleFrame,
     withPhysicalUnit,
 } from "@/spatial_stats/analysisFrame";
-import { matrixAt, pairCurve, resolvePairs, togglePair } from "@/spatial_stats/CrossPcfMatrix";
+import { matrixAt, pairCurve, pickPair, resolvePairs, togglePair } from "@/spatial_stats/CrossPcfMatrix";
 import { crossPcfInDomain, gatherCells } from "@/spatial_stats/crossPcfCompute";
 import type { DomainSource } from "@/spatial_stats/domainSource";
 import {
@@ -27,6 +27,7 @@ import {
 } from "@/spatial_stats/domainSourceRef";
 import { boundsDomain, imageExtentFromShape } from "@/spatial_stats/regionDomain";
 import { regionImageKey, type SpatialDataTransforms, spatialDataRegionFrame } from "@/spatial_stats/spatialDataFrame";
+import { tweenValue } from "@/spatial_stats/useTweened";
 
 /** A 400×400 square with a 100×100 hole, in data-column units (pixels). */
 const holed: SimpleFeatureCollection = {
@@ -394,4 +395,24 @@ describe("matrix view", () => {
         expect(togglePair(one, "acinar", "ductal")).toHaveLength(2);
         expect(togglePair(one, "ductal", "acinar")).toEqual([]);
     });
+});
+
+test("a plain pick replaces the pairs; an additive pick toggles one", () => {
+    const two = [
+        { a: "ductal", b: "acinar" },
+        { a: "beta", b: "beta" },
+    ];
+    expect(pickPair(two, "beta", "ductal", false)).toEqual([{ a: "beta", b: "ductal" }]);
+    expect(pickPair(two, "ductal", "acinar", false)).toEqual([{ a: "ductal", b: "acinar" }]);
+    expect(pickPair(two, "beta", "beta", true)).toEqual([{ a: "ductal", b: "acinar" }]);
+    expect(pickPair(two, "beta", "ductal", true)).toHaveLength(3);
+});
+
+test("scale tween eases out and lands on the target", () => {
+    expect(tweenValue(2, 10, 0)).toBe(2);
+    expect(tweenValue(2, 10, 1)).toBe(10);
+    expect(tweenValue(2, 10, 2)).toBe(10);
+    const mid = tweenValue(2, 10, 0.5);
+    expect(mid).toBeGreaterThan(6); // ease-out: past halfway at half time
+    expect(mid).toBeLessThan(10);
 });
