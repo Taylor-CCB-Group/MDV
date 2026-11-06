@@ -23,6 +23,7 @@ export function writeFilteredIndices(filterArray: Uint8Array, output: Uint32Arra
     }
 }
 
+/** The worker's message handler: fills the request's output buffer and returns the reply to post. */
 export function handleFilteredIndexRequest(request: FilteredIndexRequest): FilteredIndexResponse {
     //todo atomics.
     writeFilteredIndices(new Uint8Array(request.filterBuffer), new Uint32Array(request.outputBuffer));

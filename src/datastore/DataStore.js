@@ -849,6 +849,10 @@ class DataStore {
     /** @type {Worker | null} null once it has failed: the indices are then worked out on the main thread */
     _filteredIndexWorker = this._createFilteredIndexWorker();
 
+    /**
+     * Starts the worker that lists the rows passing the filter, wired up to settle the request each reply
+     * answers and to hand its work to the main thread if it fails.
+     */
     _createFilteredIndexWorker() {
         // a module worker, as it imports the scan it shares with the main thread
         const worker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url), { type: "module" });
@@ -909,7 +913,10 @@ class DataStore {
         return this._filteredIndicesPromise;
     }
 
-    /** @returns {Promise<Uint32Array>} */
+    /**
+     * Works out the indices of the rows that pass the filter: on the worker, or here if it can't be used.
+     * @returns {Promise<Uint32Array>} the indices for the filter as it is when this resolves
+     */
     _requestFilteredIndices() {
         const outputBuffer = new SharedArrayBuffer(this.filterSize * Uint32Array.BYTES_PER_ELEMENT);
         const output = new Uint32Array(outputBuffer);

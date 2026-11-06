@@ -410,6 +410,7 @@ type RowSource = {
 export function createRowSelector(source: RowSource, apply: (rows: ArrayLike<number>) => void) {
     let latest = 0;
     let current: Promise<void> = Promise.resolve();
+    /** @returns a promise that resolves once the rows for the store's state at the latest call have been applied */
     return function refresh() {
         const id = ++latest;
         const highlighted = source.getHighlightedData() ?? [];

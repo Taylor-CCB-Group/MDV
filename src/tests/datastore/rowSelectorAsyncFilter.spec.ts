@@ -10,8 +10,10 @@ import { assertConsistent, createStore, passingRows, stubWorker } from "./dimens
  * safe against a real DataStore / Dimension whose async results we deliver by hand.
  */
 
+/** Stands in for a worker-backed dimension: a filter's result is applied when the test delivers it. */
 class DeferredDimension extends Dimension {
     resolvers: ((mask: Uint8Array) => void)[] = [];
+    /** A filter method that keeps only the rows in `keep`, once delivered. */
     filterDeferred(args: { keep: number[] }) {
         const { promise, resolve } = Promise.withResolvers<Uint8Array>();
         this.resolvers.push((mask) => {
@@ -20,6 +22,7 @@ class DeferredDimension extends Dimension {
         });
         return this.commitFilter(promise);
     }
+    /** Resolves a pending filter result (the latest by default), as the worker replying would. */
     deliver(index = this.resolvers.length - 1) {
         this.resolvers[index](new Uint8Array(this.parent.size));
     }
