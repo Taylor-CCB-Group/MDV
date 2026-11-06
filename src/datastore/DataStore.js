@@ -25,6 +25,7 @@ import {
     toColumnMetadata,
     updateColumnMetadata,
 } from "./columnMetadataUtils";
+import { writeFilteredIndices } from "./filteredIndexEval";
 
 class DataStore {
     /**
@@ -107,6 +108,7 @@ class DataStore {
         // so for now, rather than using makeAutoObservable, we'll just manually add the mobx stuff we need:
         makeObservable(this, {
             _filteredIndicesPromise: observable,
+            invalidateFilteredIndices: action,
             _callListeners: action,
             //columns: observable, //will probably have clone issues...
         });
@@ -839,9 +841,48 @@ class DataStore {
 
     _filteredIndicesPromise = null;
     _filteredIndexRequestId = 0;
-    /** @type {Map<number, () => void>} resolvers for requests that the worker has not yet replied to */
+    /**
+     * Requests the worker has not yet replied to, by id.
+     * @type {Map<number, { output: Uint32Array, settle: () => void }>}
+     */
     _filteredIndexPending = new Map();
-    _filteredIndexWorker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url));
+    /** @type {Worker | null} null once it has failed: the indices are then worked out on the main thread */
+    _filteredIndexWorker = this._createFilteredIndexWorker();
+
+    _createFilteredIndexWorker() {
+        const worker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url));
+        // the worker is shared, and the cache is cleared whenever the filter changes, so there can be several
+        // requests in flight: replies are matched to requests by id.
+        worker.onmessage = (e) => {
+            const request = this._filteredIndexPending.get(e.data.id);
+            this._filteredIndexPending.delete(e.data.id);
+            request?.settle();
+        };
+        const onFailure = (e) => {
+            console.error(`DataStore '${this.name}': filtered index worker failed, using the main thread instead`, e);
+            this._filteredIndexWorker = null;
+            worker.terminate();
+            // nothing will answer the requests that were in flight, so do their work here
+            const unanswered = [...this._filteredIndexPending.values()];
+            this._filteredIndexPending.clear();
+            for (const request of unanswered) {
+                writeFilteredIndices(this.filterArray, request.output);
+                request.settle();
+            }
+        };
+        worker.onerror = onFailure;
+        worker.onmessageerror = onFailure;
+        return worker;
+    }
+
+    /**
+     * Drops the cached filtered indices. They are dropped on any 'filtered' event; this is for a change to the
+     * filter state that is only announced later (an async filter result being applied).
+     */
+    invalidateFilteredIndices() {
+        this._filteredIndicesPromise = null;
+    }
+
     /**
      * Get an array of indexes of all the items that are not filtered.
      * Subsequent calls will return a cached version of a reference to the promised array.
@@ -850,37 +891,45 @@ class DataStore {
      * @returns {Promise<Uint32Array>} A promise that resolves to an array of indexes
      */
     async getFilteredIndices() {
-        if (this._filteredIndicesPromise) {
+        if (!this._filteredIndicesPromise) {
             // will be null if the filter has changed since the last call
-            return this._filteredIndicesPromise;
+            const request = this._requestFilteredIndices();
+            action(() => {
+                this._filteredIndicesPromise = request;
+            })();
         }
-        action(
-            () =>
-                (this._filteredIndicesPromise = new Promise((resolve, reject) => {
-                    const worker = this._filteredIndexWorker;
-                    const byteLength = this.filterSize * Uint32Array.BYTES_PER_ELEMENT;
-                    const outputBuffer = new SharedArrayBuffer(byteLength);
-                    // the worker is shared, and the cache is cleared whenever the filter changes, so there can be several
-                    // requests in flight: replies are matched to requests by id rather than a single `onmessage`.
-                    const id = this._filteredIndexRequestId++;
-                    this._filteredIndexPending.set(id, () => resolve(new Uint32Array(outputBuffer)));
-                    if (!this._filteredIndexWorker.onmessage) {
-                        worker.onmessage = (e) => {
-                            const done = this._filteredIndexPending.get(e.data.id);
-                            this._filteredIndexPending.delete(e.data.id);
-                            done?.();
-                        };
-                    }
-                    // todo atomics... not really needed for this, but would be good to illustrate / learn.
-                    worker.postMessage({
-                        filterBuffer: this.filterBuffer,
-                        outputBuffer,
-                        id,
-                    });
-                })),
-        )();
-
         return this._filteredIndicesPromise;
+    }
+
+    /** @returns {Promise<Uint32Array>} */
+    _requestFilteredIndices() {
+        const outputBuffer = new SharedArrayBuffer(this.filterSize * Uint32Array.BYTES_PER_ELEMENT);
+        const output = new Uint32Array(outputBuffer);
+        const worker = this._filteredIndexWorker;
+        if (worker) {
+            const id = this._filteredIndexRequestId++;
+            const request = new Promise((resolve) => {
+                const settle = () => {
+                    // The filter is scanned as it is when the worker gets to it, into a buffer sized for it as it was
+                    // when this was requested. If it has changed in between (which clears the cache), the output need
+                    // not match any one state of it - a buffer with room for three rows scanned when only one still
+                    // passes holds [n, 0, 0] - so answer with the indices for the filter as it is now.
+                    if (this._filteredIndicesPromise !== request) resolve(this.getFilteredIndices());
+                    else resolve(output);
+                };
+                this._filteredIndexPending.set(id, { output, settle });
+            });
+            try {
+                // todo atomics... not really needed for this, but would be good to illustrate / learn.
+                worker.postMessage({ id, filterBuffer: this.filterBuffer, outputBuffer });
+                return request;
+            } catch (e) {
+                console.error(`DataStore '${this.name}': could not post to filtered index worker`, e);
+                this._filteredIndexPending.delete(id);
+            }
+        }
+        writeFilteredIndices(this.filterArray, output);
+        return Promise.resolve(output);
     }
 
     /**

@@ -101,10 +101,10 @@ describe("createRowSelector against async filters", () => {
         expect(applied.at(-1)).toEqual([1, 2]);
     });
 
-    // `filterArray` changes when an async result lands, but 'filtered' (which also invalidates the cached filtered
-    // indices) is raised a few microtask ticks later. A highlight event can arrive inside that window, where the
-    // cached indices are stale, so the selector may transiently apply the old filtered rows - but the 'filtered'
-    // event that follows must always correct it.
+    // `filterArray` changes when an async result lands, but 'filtered' is raised a few microtask ticks later. A
+    // highlight event can arrive inside that window (it is raised from a promise), and if the highlight is filtered
+    // out the selector asks for the filtered rows: those must be the rows for the committed filter, not the ones
+    // cached for the filter before it.
     test.each([0, 1, 2, 3, 4, 5, 6, 7])(
         "a highlight event %i ticks after an async filter commits still ends consistent",
         async (ticks) => {
@@ -140,6 +140,8 @@ describe("createRowSelector against async filters", () => {
             await done;
             await new Promise((r) => setTimeout(r, 0));
             expect(applied.at(-1)).toEqual([1, 2]);
+            // and the rows cached for the filter before the commit are never exposed after it
+            expect(applied.slice(1)).not.toContainEqual(ALL);
         },
     );
 });
