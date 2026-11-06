@@ -784,6 +784,10 @@ export class ChartManager {
         }
         //add charts - any columns will be added dynamically
         this._inInit = true;
+        // Restore highlighted rows from view data (e.g. after loading or switching view) before any chart is added.
+        // Active links resolve to the highlighted rows, so a chart built before the highlight is known would
+        // resolve - and load columns for - whatever rows its link exposes without it, then change when it arrives.
+        this._restoreHighlights();
         const chartPromises = [];
         for (const ds in charts) {
             for (const ch of charts[ds]) {
@@ -798,19 +802,9 @@ export class ChartManager {
         // We are relying on the config being stable/settled when these promises resolve.
         console.log("after await Promise.all(chartPromises);");
 
-        // Restore highlighted indices from view data (e.g. after loading or switching view)
-        // this should probably happen before chart init so that they have stable config when finished
-        for (const dsName of Object.keys(this.viewData.dataSources || {})) {
-            const spec = this.viewData.dataSources[dsName];
-            const highlight = spec?.highlight;
-            const dstore = this.dsIndex[dsName]?.dataStore;
-            if (!dstore?.dataHighlighted) continue;
-            if (Array.isArray(highlight) && highlight.length > 0) {
-                dstore.dataHighlighted(highlight, null);
-            } else {
-                dstore.dataHighlighted([], null);
-            }
-        }
+        // ... and announce the highlights again now that the charts exist: some only show a highlight in response
+        // to the event. (This doesn't change what active links resolve to, so nothing is loaded again.)
+        this._restoreHighlights();
 
         //this could be a time to _callListeners("view_loaded",this.currentView)
         //but I'm not going to interfere with the current logic
@@ -1673,6 +1667,16 @@ export class ChartManager {
     _callListeners(type, data) {
         for (const id in this.listeners) {
             this.listeners[id](type, this, data);
+        }
+    }
+
+    /** Sets each dataSource's highlighted rows to those saved with the current view (none, if it saved none). */
+    _restoreHighlights() {
+        for (const dsName of Object.keys(this.viewData.dataSources || {})) {
+            const highlight = this.viewData.dataSources[dsName]?.highlight;
+            const dstore = this.dsIndex[dsName]?.dataStore;
+            if (!dstore?.dataHighlighted) continue;
+            dstore.dataHighlighted(Array.isArray(highlight) ? [...highlight] : [], null);
         }
     }
 

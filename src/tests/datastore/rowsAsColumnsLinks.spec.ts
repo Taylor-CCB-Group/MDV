@@ -1,3 +1,4 @@
+import { autorun } from "mobx";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import DataStore from "@/datastore/DataStore";
 import { getFieldName, RowsAsColsQuery } from "@/links/link_utils";
@@ -95,5 +96,41 @@ describe("two dataSources linked to the same rows-as-columns dataSource", () => 
 
         expect(fromGrid.fields).toEqual(fieldsFor(1, 3));
         expect(fromCells.fields).toEqual(fieldsFor(1, 3));
+    });
+});
+
+describe("a link's fields over time", () => {
+    /** every value `query.fields` takes from now on, as something observing the link would see them */
+    function recordFields(q: RowsAsColsQuery) {
+        const history: string[][] = [];
+        const stop = autorun(() => {
+            history.push(q.fields);
+        });
+        return { history, stop };
+    }
+
+    test("a link that initialises when rows are already highlighted only ever exposes those rows", async () => {
+        // as when a view is loaded: its highlight is restored before any chart resolves the link
+        genes.dataHighlighted([2], {});
+        const { history, stop } = recordFields(query(cells));
+        await settle();
+        stop();
+
+        expect(history.filter((fields) => fields.length > 0)).toEqual([fieldsFor(2)]);
+    });
+
+    test("an event that leaves the rows as they were is not a change to the link's fields", async () => {
+        genes.dataHighlighted([2], {});
+        const { history, stop } = recordFields(query(cells));
+        await settle();
+        const before = history.length;
+
+        // the highlight is announced again once a view's charts exist, for those that only show it on the event
+        genes.dataHighlighted([2], {});
+        genes.triggerFilter();
+        await settle();
+        stop();
+
+        expect(history.length).toBe(before);
     });
 });

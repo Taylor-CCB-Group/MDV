@@ -531,6 +531,10 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
     //! this Array.from could be suboptimal for large numbers of indices
     //at risk of overthinking, but we could have a lazy filteredIndices iterator...
     const refreshFields = createRowSelector(tds, (rows) => {
+        // An event that leaves the rows as they were (a highlight announced again, a filter that excludes none of
+        // them) must not look like a change: everything observing the link would load and apply its fields again.
+        const current = link.observableFields;
+        if (current.length === rows.length && current.every((field, i) => field.index === rows[i])) return;
         const vals = Array.from(rows).map(getField);
         runInAction(() => {
             link.observableFields = vals;
@@ -546,11 +550,15 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
         }
     });
     console.log("settings initial fields for link...", link);
-    runInAction(() => {
-        //initial population so sync callers will have something to work with
-        link.observableFields = [getField(0)];
-    });
-    await refreshFields();
+    // if rows are highlighted this sets the fields before it returns; otherwise they follow from a worker
+    const initialised = refreshFields();
+    if (link.observableFields.length === 0) {
+        runInAction(() => {
+            //initial population so sync callers will have something to work with
+            link.observableFields = [getField(0)];
+        });
+    }
+    await initialised;
     console.log("link initialized", link);
 }
 export function getRowsAsColumnsLinks(dataStore: DataStore) {
