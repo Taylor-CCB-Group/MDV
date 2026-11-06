@@ -24,7 +24,10 @@ import { PenBoxIcon } from "lucide-react";
 import { observer } from "mobx-react-lite";
 import { useCallback, useMemo, useState } from "react";
 import ConfirmDialog from "@/charts/dialogs/ConfirmDialog";
+import { runCrossPcfDebug } from "@/spatial_stats/crossPcfDebug";
+import { gateDomainSource } from "@/spatial_stats/domainSource";
 import { hexToRgb, rgbToHex, truncateWithEllipsis } from "@/utilities/Utilities";
+import { useDataStore } from "../context";
 import { DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
 import type { Gate } from "../gates/types";
 import { useGateManager } from "../gates/useGateManager";
@@ -59,6 +62,7 @@ const ManageGateDialogContent = observer(
         activeRegion,
     }: ManageGateDialogType) => {
         const gateManager = useGateManager();
+        const dataStore = useDataStore();
         const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
         const [selectedId, setSelectedId] = useState<string | null>(null);
         const [renameGateId, setRenameGateId] = useState<string | null>(null);
@@ -261,6 +265,16 @@ const ManageGateDialogContent = observer(
                                 <FileUploadOutlinedIcon />
                             </ListItemIcon>
                             <ListItemText>Export (as GeoJSON)</ListItemText>
+                        </MenuItem>
+                        <MenuItem
+                            onClick={() => {
+                                // Debug slice: result goes to the console until there is a chart for it.
+                                const gate = gateManager.gates.get(selectedId);
+                                if (gate) runCrossPcfDebug(dataStore, gateDomainSource(gate));
+                                handleMenuClose();
+                            }}
+                        >
+                            <ListItemText inset>Cross-PCF (debug, console)</ListItemText>
                         </MenuItem>
                         <Divider />
                         <MenuItem
