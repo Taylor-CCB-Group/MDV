@@ -8,11 +8,17 @@ export const PAIR_COLOURS = ["#e8743b", "#4f8fe0", "#2bb3a6", "#c95fd1", "#d4b02
 
 export type CurvePair = { a: number; b: number; label: string; colour: string };
 
+type Pair = { a: number; b: number };
+const isPair = (p: Pair, q: Pair | null) => !!q && p.a === q.a && p.b === q.b;
+
 type Props = {
     result: PcfMatrixBinnedResult;
     pairs: CurvePair[];
-    /** A transient extra curve (the hovered matrix cell), drawn dashed. */
+    /** A transient extra curve (a focused pair that isn't chosen), drawn dashed. */
     preview?: CurvePair;
+    /** The pair highlighted across the chart: its curve is drawn on top and the others fade. */
+    focus: Pair | null;
+    onFocus?: (pair: Pair | null) => void;
     r: RSelection;
     unit: string;
     width: number;
@@ -22,7 +28,7 @@ type Props = {
 const niceMax = (v: number) => (v <= 2 ? 2 : v <= 3 ? 3 : v <= 5 ? 5 : Math.ceil(v / 5) * 5);
 
 /** g(r) for the chosen pairs, with the g = 1 line and the matrix's current r bin shaded. */
-export function CrossPcfCurves({ result, pairs, preview, r, unit, width, height }: Props) {
+export function CrossPcfCurves({ result, pairs, preview, focus, onFocus, r, unit, width, height }: Props) {
     const left = 34;
     const right = 8;
     const top = 8;
@@ -104,31 +110,105 @@ export function CrossPcfCurves({ result, pairs, preview, r, unit, width, height 
                 {`r (${unit})`}
             </text>
             <g clipPath={`url(#${clip})`}>
-                {curves.map((c) => (
-                    <path
-                        key={c.key}
-                        d={path(c.g)}
-                        fill="none"
-                        stroke={c.colour}
-                        strokeWidth={2}
-                        strokeDasharray={c === curves.at(-1) && preview ? "5 3" : undefined}
-                    />
-                ))}
+                {/* Focused curve last, so it is drawn on top. */}
+                {[...curves.filter((c) => !isPair(c, focus)), ...curves.filter((c) => isPair(c, focus))].map((c) => {
+                    const focused = isPair(c, focus);
+                    const faded = focus !== null && !focused;
+                    return (
+                        <g key={c.key}>
+                            <path
+                                d={path(c.g)}
+                                fill="none"
+                                stroke={c.colour}
+                                strokeWidth={focused ? 3.5 : 1.75}
+                                strokeOpacity={faded ? 0.15 : 0.95}
+                                strokeDasharray={c.key.endsWith("-preview") ? "5 3" : undefined}
+                                pointerEvents="none"
+                            />
+                            {/* a wide invisible line makes thin curves easy to hover */}
+                            <path
+                                d={path(c.g)}
+                                fill="none"
+                                stroke="transparent"
+                                strokeWidth={10}
+                                pointerEvents="stroke"
+                                style={{ cursor: "pointer" }}
+                                onPointerEnter={() => onFocus?.({ a: c.a, b: c.b })}
+                                onPointerLeave={() => onFocus?.(null)}
+                            />
+                        </g>
+                    );
+                })}
             </g>
             {curves.length === 0 && (
                 <text x={left + w / 2} y={top + h / 2} textAnchor="middle" fill="currentColor" opacity={0.6}>
-                    Click matrix cells to add A → B pairs
+                    Drag across matrix cells to choose A → B pairs
                 </text>
             )}
-            {/* Legend, top right, one line per curve. */}
-            <g transform={`translate(${left + w - 4},${top + 4})`}>
-                {curves.map((c, i) => (
-                    <text key={`l${c.key}`} y={i * 12} textAnchor="end" dominantBaseline="hanging" fill={c.colour}>
-                        {c.label}
-                        {c === curves.at(-1) && preview ? " (hover)" : ""}
-                    </text>
-                ))}
-            </g>
         </svg>
+    );
+}
+
+/** The chosen pairs as a list beside the plot: hover highlights the pair everywhere, × removes it. */
+export function PairLegend({
+    pairs,
+    preview,
+    focus,
+    onFocus,
+    onRemove,
+    height,
+}: {
+    pairs: CurvePair[];
+    preview?: CurvePair;
+    focus: Pair | null;
+    onFocus?: (pair: Pair | null) => void;
+    onRemove?: (pair: Pair) => void;
+    height: number;
+}) {
+    const items = preview ? [...pairs, preview] : pairs;
+    return (
+        <ul className="m-0 p-0 overflow-y-auto text-xs" style={{ listStyle: "none", maxHeight: height, minWidth: 96 }}>
+            {items.map((p) => {
+                const focused = isPair(p, focus);
+                const isPreview = p === preview;
+                return (
+                    <li
+                        key={`${p.a}-${p.b}${isPreview ? "-preview" : ""}`}
+                        className="flex items-center gap-1 px-1 rounded"
+                        style={{
+                            background: focused ? "rgba(255,255,255,0.12)" : undefined,
+                            opacity: focus && !focused ? 0.45 : 1,
+                            fontWeight: focused ? 700 : 400,
+                        }}
+                        onPointerEnter={() => onFocus?.({ a: p.a, b: p.b })}
+                        onPointerLeave={() => onFocus?.(null)}
+                    >
+                        <span
+                            aria-hidden
+                            style={{
+                                width: 14,
+                                height: 0,
+                                borderTop: `${focused ? 3 : 2}px ${isPreview ? "dashed" : "solid"} ${p.colour}`,
+                                flex: "none",
+                            }}
+                        />
+                        <span className="truncate flex-1" style={{ color: p.colour }}>
+                            {p.label}
+                        </span>
+                        {!isPreview && onRemove && (
+                            <button
+                                type="button"
+                                aria-label={`Remove ${p.label}`}
+                                className="opacity-60 hover:opacity-100 px-1"
+                                style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}
+                                onClick={() => onRemove({ a: p.a, b: p.b })}
+                            >
+                                ×
+                            </button>
+                        )}
+                    </li>
+                );
+            })}
+        </ul>
     );
 }

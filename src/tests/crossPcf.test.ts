@@ -10,7 +10,7 @@ import {
     regionsScaleFrame,
     withPhysicalUnit,
 } from "@/spatial_stats/analysisFrame";
-import { matrixAt, pairCurve, pickPair, resolvePairs, togglePair } from "@/spatial_stats/CrossPcfMatrix";
+import { matrixAt, pairCurve } from "@/spatial_stats/CrossPcfMatrix";
 import { crossPcfInDomain, gatherCells } from "@/spatial_stats/crossPcfCompute";
 import type { DomainSource } from "@/spatial_stats/domainSource";
 import {
@@ -25,6 +25,7 @@ import {
     refKey,
     resolveDomainSourceRef,
 } from "@/spatial_stats/domainSourceRef";
+import { cellsAlong, continuePaint, resolvePairs, startPaint, togglePair } from "@/spatial_stats/pairSelection";
 import { boundsDomain, imageExtentFromShape } from "@/spatial_stats/regionDomain";
 import { regionImageKey, type SpatialDataTransforms, spatialDataRegionFrame } from "@/spatial_stats/spatialDataFrame";
 import { tweenValue } from "@/spatial_stats/useTweened";
@@ -397,17 +398,6 @@ describe("matrix view", () => {
     });
 });
 
-test("a plain pick replaces the pairs; an additive pick toggles one", () => {
-    const two = [
-        { a: "ductal", b: "acinar" },
-        { a: "beta", b: "beta" },
-    ];
-    expect(pickPair(two, "beta", "ductal", false)).toEqual([{ a: "beta", b: "ductal" }]);
-    expect(pickPair(two, "ductal", "acinar", false)).toEqual([{ a: "ductal", b: "acinar" }]);
-    expect(pickPair(two, "beta", "beta", true)).toEqual([{ a: "ductal", b: "acinar" }]);
-    expect(pickPair(two, "beta", "ductal", true)).toHaveLength(3);
-});
-
 test("scale tween eases out and lands on the target", () => {
     expect(tweenValue(2, 10, 0)).toBe(2);
     expect(tweenValue(2, 10, 1)).toBe(10);
@@ -415,4 +405,42 @@ test("scale tween eases out and lands on the target", () => {
     const mid = tweenValue(2, 10, 0.5);
     expect(mid).toBeGreaterThan(6); // ease-out: past halfway at half time
     expect(mid).toBeLessThan(10);
+});
+
+describe("brushing pairs", () => {
+    const two = [
+        { a: "ductal", b: "acinar" },
+        { a: "beta", b: "beta" },
+    ];
+    const p = (a: string, b: string) => ({ a, b });
+
+    test("a plain stroke starts afresh and adds what it passes over", () => {
+        let s = startPaint(two, p("beta", "ductal"), false);
+        expect(s).toEqual({ pairs: [p("beta", "ductal")], mode: "add" });
+        s = { ...s, pairs: continuePaint(s.pairs, p("beta", "acinar"), s.mode) };
+        expect(continuePaint(s.pairs, p("beta", "acinar"), s.mode)).toEqual([p("beta", "ductal"), p("beta", "acinar")]);
+    });
+
+    test("a modified stroke adds from an unchosen cell and removes from a chosen one", () => {
+        const add = startPaint(two, p("x", "y"), true);
+        expect(add.mode).toBe("add");
+        expect(add.pairs).toHaveLength(3);
+        const rem = startPaint(two, p("beta", "beta"), true);
+        expect(rem).toEqual({ pairs: [p("ductal", "acinar")], mode: "remove" });
+        // the same stroke never adds back
+        expect(continuePaint(rem.pairs, p("x", "y"), rem.mode)).toEqual([p("ductal", "acinar")]);
+        expect(continuePaint(rem.pairs, p("ductal", "acinar"), rem.mode)).toEqual([]);
+    });
+
+    test("cells along a jump are all visited, in order, without the start", () => {
+        expect(cellsAlong({ i: 0, j: 0 }, { i: 0, j: 3 })).toEqual([
+            { i: 0, j: 1 },
+            { i: 0, j: 2 },
+            { i: 0, j: 3 },
+        ]);
+        const diag = cellsAlong({ i: 0, j: 0 }, { i: 2, j: 2 });
+        expect(diag.at(-1)).toEqual({ i: 2, j: 2 });
+        expect(diag.length).toBeGreaterThanOrEqual(2);
+        expect(cellsAlong({ i: 1, j: 1 }, { i: 1, j: 1 })).toEqual([]);
+    });
 });
