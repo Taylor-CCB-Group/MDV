@@ -6,6 +6,7 @@ import { CrossPcfChartComponent } from "./CrossPcfChartComponent";
 import { domainSourceEnv } from "./domainSourceEnv";
 import { type DomainSourceRef, listDomainSources, refKey } from "./domainSourceRef";
 import { type LabelPair, togglePair } from "./pairSelection";
+import { clampBins, type RBin, rBinsFrom } from "./rBins";
 
 export type CrossPcfConfig = BaseConfig & {
     /** Categorical column whose categories are the cell types. */
@@ -19,18 +20,19 @@ export type CrossPcfConfig = BaseConfig & {
     r_max: number;
     n_bins: number;
     edge_corrected: boolean;
-    /** Bin shown in the matrix, or the mean over r. */
-    r_bin: number | "mean";
+    /** The r's shown: one matrix and one band on the curves each — a bin index, or the mean over r. */
+    r_bins: RBin[];
     /** µm per unit, applied only when the store leaves its unit unstated (0 = none). */
     um_per_unit: number;
 };
 
 class CrossPcfChart extends BaseReactChart<CrossPcfConfig> {
-    constructor(dataStore: DataStore, div: string | HTMLDivElement, config: CrossPcfConfig) {
+    constructor(dataStore: DataStore, div: string | HTMLDivElement, config: CrossPcfConfig & { r_bin?: RBin }) {
         config.r_max ??= 100;
         config.n_bins ??= 20;
         config.edge_corrected ??= true;
-        config.r_bin ??= "mean";
+        config.r_bins = rBinsFrom(config); // migrates the single `r_bin` of earlier versions
+        config.r_bin = undefined; // and the JSON copy the base class makes drops it
         config.um_per_unit ??= 0;
         // Unset is `null`, not absent: the config is JSON-copied then made observable key by key, so a key
         // that isn't there (or is `undefined`) when that happens is never tracked.
@@ -130,7 +132,7 @@ class CrossPcfChart extends BaseReactChart<CrossPcfConfig> {
                 step: 1,
                 func: (v) => {
                     c.n_bins = v;
-                    if (typeof c.r_bin === "number" && c.r_bin >= v) c.r_bin = "mean";
+                    c.r_bins = clampBins(c.r_bins, v);
                 },
             }),
             g({

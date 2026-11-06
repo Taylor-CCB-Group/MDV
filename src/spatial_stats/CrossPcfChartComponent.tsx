@@ -6,11 +6,13 @@ import { useChartSize, useConfig } from "../react/hooks";
 import { withPhysicalUnit } from "./analysisFrame";
 import type { CrossPcfConfig } from "./CrossPcfChart";
 import { CrossPcfCurves, type CurvePair, PAIR_COLOURS, PairLegend } from "./CrossPcfCurves";
-import { CrossPcfMatrix, type PaintEvent, type RSelection } from "./CrossPcfMatrix";
+import { CrossPcfMatrix, matrixAt, type PaintEvent } from "./CrossPcfMatrix";
 import { type CrossPcfResult, computeCrossPCF, resolveAnalysisFrame } from "./crossPcf";
 import { domainSourceEnv } from "./domainSourceEnv";
 import { defaultDomainSourceRef, resolveDomainSourceRef } from "./domainSourceRef";
+import { labelGutter, panelLayout } from "./layout";
 import { continuePaint, type PaintMode, removePair, resolvePairs, startPaint } from "./pairSelection";
+import { addBin, clampBins, moveBin, type RBin, rColour, removeBin, toSelection } from "./rBins";
 
 type State =
     | { status: "idle" | "running" }
@@ -68,7 +70,6 @@ export const CrossPcfChartComponent = observer(() => {
         return () => abort.abort();
     }, [dataStore, source, typeColumn, rMax, nBins, edgeCorrected, umPerUnit]);
 
-    const r: RSelection = config.r_bin === "mean" ? { kind: "mean" } : { kind: "bin", k: config.r_bin };
     const res = shown;
     const inside = res ? res.candidates - (res.outside ?? 0) : 0;
     const headerH = 52;
@@ -86,32 +87,13 @@ export const CrossPcfChartComponent = observer(() => {
                         <span className="truncate" title={`frame: ${res.frame.provenance}`}>
                             {`${inside} cells, ${res.labels.length} ${res.typeColumn} types, ${res.ms.toFixed(0)} ms`}
                         </span>
-                        <input
-                            type="range"
-                            aria-label="r bin"
-                            min={-1}
-                            max={res.nBins - 1}
-                            value={config.r_bin === "mean" ? -1 : config.r_bin}
-                            onChange={action((e) => {
-                                const k = Number(e.currentTarget.value);
-                                config.r_bin = k < 0 ? "mean" : k;
-                            })}
-                        />
-                        <span className="whitespace-nowrap">
-                            {r.kind === "mean"
-                                ? `mean, r < ${(res.r[res.nBins - 1] + res.r[0]).toFixed(0)} ${res.frame.unit}`
-                                : `r = ${res.r[r.kind === "bin" ? Math.min(r.k, res.nBins - 1) : 0].toFixed(1)} ${res.frame.unit}`}
-                        </span>
                     </div>
                 )}
             </div>
-            {res && <Panels res={res} r={clampR(r, res.nBins)} width={width} height={Math.max(0, height - headerH)} />}
+            {res && <Panels res={res} width={width} height={Math.max(0, height - headerH)} />}
         </div>
     );
 });
-
-const clampR = (r: RSelection, nBins: number): RSelection =>
-    r.kind === "bin" ? { kind: "bin", k: Math.min(r.k, nBins - 1) } : r;
 
 /** Curves for the chosen pairs beside the matrix (stacked when the chart is narrow), as in the mock. */
 type Pair = { a: number; b: number };
@@ -120,82 +102,211 @@ type Pair = { a: number; b: number };
  * Curves (with their legend) beside the matrix — stacked when the chart is narrow — sharing one
  * focused pair: hovering a curve, a legend item or a matrix cell highlights that pair in all three.
  */
-const Panels = observer(
-    ({ res, r, width, height }: { res: CrossPcfResult; r: RSelection; width: number; height: number }) => {
-        const config = useConfig<CrossPcfConfig>();
-        const [focus, setFocus] = useState<Pair | null>(null);
-        const stroke = useRef<PaintMode>("add");
-        const label = (t: number) => res.labels[t] ?? String(t);
-        const asLabels = (p: Pair) => ({ a: label(p.a), b: label(p.b) });
-        // Colour follows the pair's position in config, so it doesn't jump when another domain lacks a type.
-        const chosen: CurvePair[] = resolvePairs(res.labels, config.pairs).map((p) => ({
-            a: p.a,
-            b: p.b,
-            label: `${label(p.a)} → ${label(p.b)}`,
-            colour: PAIR_COLOURS[p.index % PAIR_COLOURS.length],
-        }));
-        const focusChosen = focus && chosen.some((p) => p.a === focus.a && p.b === focus.b);
-        const preview: CurvePair | undefined =
-            focus && !focusChosen
-                ? { ...focus, label: `${label(focus.a)} → ${label(focus.b)}`, colour: "currentColor" }
-                : undefined;
-        const paint = action((e: PaintEvent) => {
-            if (e.kind === "start") {
-                const s = startPaint(config.pairs, asLabels(e.pair), e.modifier);
-                stroke.current = s.mode;
-                config.pairs = s.pairs;
-            } else {
-                const next = continuePaint(config.pairs, asLabels(e.pair), stroke.current);
-                // moving over a cell the stroke already covers changes nothing: don't churn the config
-                if (next.length !== config.pairs.length) config.pairs = next;
-            }
-        });
-        const remove = action((p: Pair) => {
-            config.pairs = removePair(config.pairs, asLabels(p));
-            setFocus(null);
-        });
-        const sideBySide = width >= 640;
-        const curvesW = sideBySide ? Math.round(width * 0.58) : width;
-        const curvesH = sideBySide ? Math.min(height, Math.round(curvesW * 0.62)) : Math.round(height * 0.4);
-        const legendW = 120;
-        const matrixW = sideBySide ? width - curvesW : width;
-        const matrixH = sideBySide ? height : height - curvesH;
-        return (
-            <div className={sideBySide ? "flex flex-row" : "flex flex-col"}>
-                <div className="flex flex-row" style={{ width: curvesW, height: curvesH }}>
+const Panels = observer(({ res, width, height }: { res: CrossPcfResult; width: number; height: number }) => {
+    const config = useConfig<CrossPcfConfig>();
+    const [focus, setFocus] = useState<Pair | null>(null);
+    const stroke = useRef<PaintMode>("add");
+    const label = (t: number) => res.labels[t] ?? String(t);
+    const asLabels = (p: Pair) => ({ a: label(p.a), b: label(p.b) });
+    // Colour follows the pair's position in config, so it doesn't jump when another domain lacks a type.
+    const chosen: CurvePair[] = resolvePairs(res.labels, config.pairs).map((p) => ({
+        a: p.a,
+        b: p.b,
+        label: `${label(p.a)} → ${label(p.b)}`,
+        colour: PAIR_COLOURS[p.index % PAIR_COLOURS.length],
+    }));
+    const focusChosen = focus && chosen.some((p) => p.a === focus.a && p.b === focus.b);
+    const preview: CurvePair | undefined =
+        focus && !focusChosen
+            ? { ...focus, label: `${label(focus.a)} → ${label(focus.b)}`, colour: "currentColor" }
+            : undefined;
+    const paint = action((e: PaintEvent) => {
+        if (e.kind === "start") {
+            const s = startPaint(config.pairs, asLabels(e.pair), e.modifier);
+            stroke.current = s.mode;
+            config.pairs = s.pairs;
+        } else {
+            const next = continuePaint(config.pairs, asLabels(e.pair), stroke.current);
+            // moving over a cell the stroke already covers changes nothing: don't churn the config
+            if (next.length !== config.pairs.length) config.pairs = next;
+        }
+    });
+    const remove = action((p: Pair) => {
+        config.pairs = removePair(config.pairs, asLabels(p));
+        setFocus(null);
+    });
+
+    // r's: one band on the curves and one matrix each
+    const bins = clampBins(config.r_bins, res.nBins);
+    const rs = bins.map((bin, i) => ({ bin, colour: rColour(i) }));
+    const moveR = action((index: number, k: number) => {
+        config.r_bins = moveBin(config.r_bins, index, k);
+    });
+    const addR = action((b: RBin) => {
+        config.r_bins = addBin(config.r_bins, b);
+    });
+    const removeR = action((index: number) => {
+        config.r_bins = removeBin(config.r_bins, index);
+    });
+    const rText = (b: RBin) =>
+        b === "mean"
+            ? `mean, r < ${(res.r[res.nBins - 1] + res.r[0]).toFixed(0)} ${res.frame.unit}`
+            : `r = ${res.r[b].toFixed(1)} ${res.frame.unit}`;
+
+    const barH = 26; // r chips
+    const readoutH = 22;
+    const bodyH = Math.max(0, height - barH - readoutH);
+    const m = rs.length;
+    const view = matrixAt(res, { kind: "mean" }); // only for which types have cells (same for every r)
+    const n = view.types.length;
+    const labelSize = labelGutter(Math.max(1, ...view.types.map((t) => label(t).length)), 12);
+    const L = panelLayout(width, bodyH, m, n, labelSize);
+    const { cols, cell, gap, strip } = L.grid;
+    const matrixPx = n * cell;
+
+    // One readout for the whole chart: the focused pair's g at every r shown, else a hint.
+    const readout = (() => {
+        if (!focus)
+            return "row = A (anchor), column = B (neighbour) · drag over cells to paint pairs, Shift/⌘ to add or remove";
+        const at = (b: RBin) => {
+            const v = matrixAt(res, toSelection(b, res.nBins));
+            const i = v.types.indexOf(focus.a);
+            const j = v.types.indexOf(focus.b);
+            if (i < 0 || j < 0) return "—";
+            const k = i * v.types.length + j;
+            return `g ${v.value[k].toFixed(2)} (${v.pairs[k]} pairs) at ${b === "mean" ? "mean" : `${res.r[b].toFixed(1)} ${res.frame.unit}`}`;
+        };
+        return `${label(focus.a)} → ${label(focus.b)}: ${bins.map(at).join(" · ")}`;
+    })();
+
+    const chipButton = { background: "none", border: "none", color: "inherit", cursor: "pointer" } as const;
+    return (
+        <div className="flex flex-col text-sm">
+            <div className="flex items-center gap-2 px-2" style={{ height: barH }}>
+                {rs.map(({ bin, colour }, i) => (
+                    <span
+                        key={`chip-${bin}`}
+                        className="flex items-center gap-1 px-1.5 rounded whitespace-nowrap"
+                        style={{ border: `1px solid ${colour}` }}
+                    >
+                        <span aria-hidden style={{ width: 9, height: 9, background: colour, borderRadius: 2 }} />
+                        {rText(bin)}
+                        {m > 1 && (
+                            <button
+                                type="button"
+                                aria-label={`Remove ${rText(bin)}`}
+                                className="opacity-60 hover:opacity-100"
+                                style={chipButton}
+                                onClick={() => removeR(i)}
+                            >
+                                ×
+                            </button>
+                        )}
+                    </span>
+                ))}
+                {!bins.includes("mean") && (
+                    <button
+                        type="button"
+                        className="opacity-70 hover:opacity-100 px-1.5 rounded whitespace-nowrap"
+                        style={{ ...chipButton, border: "1px dashed currentColor" }}
+                        onClick={() => addR("mean")}
+                    >
+                        + mean over r
+                    </button>
+                )}
+                <span className="opacity-60 truncate text-xs">
+                    drag a band on the curves to move it, Shift-press to add one
+                </span>
+            </div>
+            <div className="px-2 truncate opacity-90" style={{ height: readoutH }} title={readout}>
+                {readout}
+            </div>
+            {/* scrolls only when the matrices hit their minimum cell size */}
+            <div
+                className={L.stacked ? "flex flex-col" : "flex flex-row"}
+                style={{ gap, height: bodyH, overflow: "auto" }}
+            >
+                <div className="flex flex-row" style={{ width: L.curves.width, height: L.curves.height }}>
                     <CrossPcfCurves
                         result={res}
                         pairs={chosen}
                         preview={preview}
                         focus={focus}
                         onFocus={setFocus}
-                        r={r}
+                        rs={rs}
+                        onMoveR={moveR}
+                        onAddR={addR}
                         unit={res.frame.unit}
-                        width={curvesW - legendW}
-                        height={curvesH}
+                        width={L.curves.width - L.legendWidth}
+                        height={L.curves.height}
                     />
                     <PairLegend
+                        result={res}
                         pairs={chosen}
                         preview={preview}
                         focus={focus}
                         onFocus={setFocus}
                         onRemove={remove}
-                        height={curvesH}
+                        height={L.curves.height}
                     />
                 </div>
-                <CrossPcfMatrix
-                    result={res}
-                    labels={res.labels}
-                    r={r}
-                    unit={res.frame.unit}
-                    width={matrixW}
-                    height={matrixH}
-                    selected={chosen}
-                    focus={focus}
-                    onFocus={setFocus}
-                    onPaint={paint}
-                />
+                {/* Matrices share one label gutter: row labels left of the first column, column labels
+                    above the first row, so every cell lines up across the grid. */}
+                <div
+                    className="grid"
+                    style={{
+                        gridTemplateColumns: [labelSize + matrixPx, ...Array(Math.max(0, cols - 1)).fill(matrixPx)]
+                            .map((w) => `${w}px`)
+                            .join(" "),
+                        columnGap: gap,
+                        rowGap: gap,
+                        alignContent: "start",
+                    }}
+                >
+                    {rs.map(({ bin, colour }, i) => {
+                        const firstCol = i % cols === 0;
+                        const firstRow = i < cols;
+                        return (
+                            <div key={`matrix-${bin}`}>
+                                <div
+                                    className="flex items-center gap-1 px-1"
+                                    style={{
+                                        height: strip,
+                                        marginLeft: firstCol ? labelSize : 0,
+                                        borderTop: `3px solid ${colour}`,
+                                    }}
+                                >
+                                    <span className="truncate flex-1">{rText(bin)}</span>
+                                    {m > 1 && (
+                                        <button
+                                            type="button"
+                                            aria-label={`Remove matrix at ${rText(bin)}`}
+                                            className="opacity-60 hover:opacity-100"
+                                            style={chipButton}
+                                            onClick={() => removeR(i)}
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </div>
+                                <CrossPcfMatrix
+                                    result={res}
+                                    labels={res.labels}
+                                    r={toSelection(bin, res.nBins)}
+                                    cell={cell}
+                                    labelSize={labelSize}
+                                    rowLabels={firstCol}
+                                    colLabels={firstRow}
+                                    selected={chosen}
+                                    focus={focus}
+                                    onFocus={setFocus}
+                                    onPaint={paint}
+                                />
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
-        );
-    },
-);
+        </div>
+    );
+});
