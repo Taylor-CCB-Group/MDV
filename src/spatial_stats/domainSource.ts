@@ -18,7 +18,8 @@ export interface DomainSource {
     readonly columns: readonly [string, string];
     /** Restrict cells to rows whose `regions.region_field` equals this. */
     readonly region?: string;
-    toDomain(frame: AnalysisFrame): Domain;
+    /** May load (a region's extent, later a mask) — hence the promise. */
+    toDomain(frame: AnalysisFrame): Domain | Promise<Domain>;
 }
 
 type Ring = [number, number][];
@@ -70,12 +71,13 @@ export function gateDomainSource(gate: Gate): DomainSource {
  */
 export function selectionDomainSource(config: {
     selectionFeatureCollection?: SimpleFeatureCollection;
-    param: readonly string[];
+    param: readonly unknown[];
     region?: string;
     title?: string;
 }): DomainSource | undefined {
     const geometry = config.selectionFeatureCollection;
     if (!geometry || featureRings(geometry).length === 0) return undefined;
     const [x, y] = config.param;
+    if (typeof x !== "string" || typeof y !== "string") return undefined;
     return geometryDomainSource(`selection in "${config.title ?? "chart"}"`, geometry, [x, y], config.region);
 }

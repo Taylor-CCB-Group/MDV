@@ -20,7 +20,7 @@ type SelectionChart = {
     dataStore: DataStore;
     config: {
         selectionFeatureCollection?: SimpleFeatureCollection;
-        param: readonly string[];
+        param: readonly unknown[];
         region?: string;
         title?: string;
     };
