@@ -10,6 +10,7 @@ Classes:
     FileService: Manages file-related database operations
     UserService: Manages user-related database operations
     UserProjectService: Manages user-project relationships and permissions
+    InvitationService: Accepts an Invitation when someone signs in
 
 All services follow a consistent pattern:
     - Static methods for stateless operations
@@ -23,10 +24,11 @@ Example:
     >>> new_project = ProjectService.add_new_project('/path/to/project', 'My Project')
 """
 
-from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject, UsageEvent
+from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject, UsageEvent, Invitation, InvitationProject
 from datetime import datetime
 from mdvtools.mdvproject import MDVProject, forget_project_thumbnail, get_project_thumbnail
 from typing import Optional
+from sqlalchemy import func
 import os
 import shutil
 from mdvtools.logging_config import get_logger
@@ -325,6 +327,7 @@ class ProjectService:
 
             File.query.filter_by(project_id=project_id).delete(synchronize_session=False)
             UserProject.query.filter_by(project_id=project_id).delete(synchronize_session=False)
+            InvitationProject.query.filter_by(project_id=project_id).delete(synchronize_session=False)
             # Detach the usage history rather than deleting it. The foreign key
             # would block this delete otherwise, and dropping the rows would make
             # last month's access numbers silently change when somebody empties
@@ -925,7 +928,7 @@ class UserProjectService:
         Give every administrator owner access to every project.
 
         MDV treats administrators as owners of all projects, but those grants are
-        only written in particular places - the Auth0 user sync, and a project
+        only written in particular places - Admin's Make Admin, and a project
         rescan. Anything that creates an administrator or discovers projects
         outside those paths leaves the grants missing, and the administrator sees
         an empty project list. Call this from those places rather than repeating
@@ -1028,6 +1031,95 @@ class UserProjectService:
             logger.exception(f"Error in remove_user_from_project: {e}")
             db.session.rollback()  # Rollback in case of error
             raise
+
+
+class InvitationService:
+    """Accepts an Invitation when someone signs in with no User (ADRs 0019 and 0021)."""
+
+    @staticmethod
+    def accept_for_sign_in(sign_in: dict) -> Optional[User]:
+        """Accept the open Invitation this sign-in matches, and return its User.
+
+        sign_in holds what Auth0 returned: sub, email, email_verified, and the
+        connection, connection_strategy and xms_edov claims the post-login
+        Action adds. Returns None, changing nothing, when no open Invitation
+        matches.
+        """
+        invitation = next(
+            (
+                invitation
+                for invitation in Invitation.open_for_email(sign_in.get("email") or "")
+                if InvitationService._sign_in_matches(invitation, sign_in)
+            ),
+            None,
+        )
+        if invitation is None:
+            return None
+        try:
+            now = datetime.now()
+            if invitation.user_id is None:
+                user = User(email=invitation.email, auth_id=sign_in["sub"], is_active=True, confirmed_at=now)
+                db.session.add(user)
+                db.session.flush()
+            else:
+                # The Invitation moves an existing User to this Auth0 account, so the
+                # account they signed in with before no longer reaches them (ADR 0019).
+                user = db.session.get(User, invitation.user_id)
+                if user is None:
+                    return None
+                user.auth_id = sign_in["sub"]
+                user.email = invitation.email
+                user.is_active = True
+            for grant in invitation.projects:
+                # The Invitation's role replaces any earlier role on the project.
+                UserProject.query.filter_by(user_id=user.id, project_id=grant.project_id).delete()
+                db.session.add(
+                    UserProject(
+                        user_id=user.id,
+                        project_id=grant.project_id,
+                        is_owner=grant.role == "owner",
+                        can_read=True,
+                        can_write=grant.role in ("editor", "owner"),
+                    )
+                )
+            invitation.accepted_at = now
+            invitation.accepted_user_id = user.id
+            db.session.commit()
+            return user
+        except Exception as e:
+            logger.exception(f"Failed to accept Invitation {invitation.id}: {e}")
+            db.session.rollback()
+            raise
+
+    @staticmethod
+    def _sign_in_matches(invitation: Invitation, sign_in: dict) -> bool:
+        if sign_in.get("connection") != invitation.connection:
+            return False
+        # An Auth0 account tied to one User cannot accept an Invitation for
+        # anyone else, or two Users would share it.
+        account_user = User.query.filter_by(auth_id=sign_in.get("sub")).first()
+        if account_user is not None and account_user.id != invitation.user_id:
+            return False
+        # Nor can it take the email of a User the Invitation does not name.
+        # Older Users' emails were stored as typed, so compare ignoring case.
+        email_user = User.query.filter(func.lower(User.email) == invitation.email).first()
+        if email_user is not None and email_user.id != invitation.user_id:
+            logger.warning(
+                f"Invitation {invitation.id} cannot be accepted: its email belongs to "
+                f"User {email_user.id}, whom it does not name."
+            )
+            return False
+        # The connection's strategy says who vouches for the email (ADR 0021).
+        strategy = sign_in.get("connection_strategy")
+        if strategy == "auth0":
+            # A password connection: MDV-Admin creates the account verified.
+            return sign_in.get("email_verified") is True
+        if strategy in ("waad", "oidc"):
+            # Microsoft, through Auth0's Azure AD connection or an OpenID Connect
+            # connection to Entra: Entra's email claim is unverified, but
+            # xms_edov says the tenant owns the email's domain.
+            return sign_in.get("xms_edov") is True
+        return False
 
 
 class UsageEventService:

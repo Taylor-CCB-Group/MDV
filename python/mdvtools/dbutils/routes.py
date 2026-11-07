@@ -192,7 +192,7 @@ def register_routes(app, ENABLE_AUTH):
             """
             Reloads the in-memory user/project caches from the database.
 
-            Needed because out-of-band DB changes (e.g. the Auth0 sync run via
+            Needed because out-of-band DB changes (e.g. a script run via
             `docker exec`) update the DB in a separate process and never touch the
             running server's cache, so they stay invisible until reload. Hitting this
             (as a logged-in admin) refreshes the live cache without a container restart.

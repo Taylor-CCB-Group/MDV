@@ -1,6 +1,8 @@
 from functools import wraps
 
-from flask import abort, current_app, has_request_context, redirect, request, session
+from flask import abort, current_app, has_request_context, redirect, render_template, request, session
+
+from mdvtools.auth.auth_provider import NoAccess
 from mdvtools.logging_config import get_logger
 
 # Setup logging
@@ -91,9 +93,10 @@ def is_authenticated(project_id=None):
 
     :param project_id: Optional project ID (int or str). If provided and auth is
         enabled, requires the user to have read-level access to this project.
-    :return: Tuple (success: bool, reason: Optional[str]). When success is True,
-        reason is None. When False, reason is a short message for logging (e.g.
-        "Authentication required.", "No access to this project.").
+    :return: Tuple (success: bool, reason). When success is True, reason is None.
+        When False, reason is a short message for logging (e.g. "Authentication
+        required.", "No access to this project."), or NoAccess for a person the
+        provider signed in who has no active User here.
     """
     ENABLE_AUTH = current_app.config.get("ENABLE_AUTH", False)
 
@@ -108,6 +111,8 @@ def is_authenticated(project_id=None):
             current_app.logger.error(f"Failed to get auth provider: {e}")
             return (False, "Authentication unavailable.")
         user, error_response = provider.validate_user()
+        if isinstance(error_response, NoAccess):
+            return (False, error_response)
         if user is None or error_response is not None:
             return (False, "Authentication required.")
 
@@ -131,13 +136,18 @@ def is_authenticated(project_id=None):
         # whose local user id and admin flag mean nothing here. Re-resolve the user
         # from this deployment's own records on every request, keyed by auth_id.
         # The dummy provider's user has no database row, so it is left as it is.
+        # The row is read on every request, not from user_cache: MDV-Admin
+        # deactivates users by writing to the database from another process, and
+        # nothing refreshes the cache when it does (ADR 0020).
         if (current_app.config.get("DEFAULT_AUTH_METHOD") or "").lower() != "dummy":
             auth_id = user.get("auth_id") if user else None
-            local_user = user_cache.get(auth_id) if auth_id else None
-            if auth_id and local_user is None:
-                # Not cached yet, for example a user created since the last refresh.
+            local_user = None
+            if auth_id:
                 from mdvtools.dbutils.dbmodels import User
                 db_user = User.query.filter_by(auth_id=auth_id).first()
+                if db_user and not db_user.is_active:
+                    session.clear()
+                    return (False, NoAccess(email=db_user.email))
                 if db_user:
                     local_user = {
                         "id": db_user.id,
@@ -201,7 +211,17 @@ def register_before_request_auth(app):
         if any(requested_path.startswith(route) for route in whitelist_routes):
             return None
 
-        ok, _reason = is_authenticated()
+        ok, reason = is_authenticated()
+        if isinstance(reason, NoAccess):
+            # Sending them to sign in would loop: the provider still has them
+            # signed in, so it would hand them straight back here.
+            page = render_template(
+                "no_access.html",
+                email=reason.email,
+                sign_in_method=reason.sign_in_method,
+                contact=app.config.get("MDV_ACCESS_CONTACT"),
+            )
+            return page, 403
         if not ok:
             redirect_uri = app.config.get("LOGIN_REDIRECT_URL", "/login_dev")
             logger.info(f"Unauthorized access to {requested_path}. Redirecting.")

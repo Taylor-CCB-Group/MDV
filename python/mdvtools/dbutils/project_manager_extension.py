@@ -708,9 +708,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if not is_owner_or_admin(user, user_permissions):
                     return jsonify({"error": "Only the project owner or an administrator can share the project"}), 403
 
-                # Refresh cache to pick up permission changes from manage_project_permissions.py
-                # Note: sync_users_to_db is no longer called here - the manage_project_permissions.py
-                # script ensures the DB is up to date by syncing at the start of main()
+                # Refresh the cache so the dialog shows roles written outside this process.
                 try:
                     from mdvtools.auth.authutils import cache_user_projects
                     logger.info("Refreshing user and permission cache...")
@@ -728,7 +726,8 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 user_projects = UserProject.query.filter_by(project_id=project_id).all()
                 for up in user_projects:
                     user_obj = User.query.get(up.user_id)
-                    if not user_obj:
+                    # A Deactivated user keeps their roles but is not shown (ADR 0020).
+                    if not user_obj or not user_obj.is_active:
                         continue
 
                     shared_users_list.append({
@@ -741,7 +740,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
                 # Step 4: Get unshared users for dropdown
                 # Read from database to ensure we have all users (including newly synced ones)
-                all_db_users = User.query.all()
+                all_db_users = User.query.filter_by(is_active=True).all()
                 shared_user_ids = {u["id"] for u in shared_users_list}
                 all_users = [
                     {"id": u.id, "email": u.email}
@@ -791,6 +790,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
                 if not target_user_id or permission not in ["view", "edit", "owner"]:
                     return jsonify({"error": "Invalid user or permission"}), 400
+
+                target_user = db.session.get(User, target_user_id)
+                if target_user is not None and not target_user.is_active:
+                    return jsonify({"error": "This user is deactivated, so the project cannot be shared with them"}), 400
 
                 # Step 4: Determine permission flags
                 is_owner = permission == "owner"

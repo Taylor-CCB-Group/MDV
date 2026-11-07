@@ -14,10 +14,10 @@ from mdvtools.server import add_safe_headers
 from mdvtools.entry_assets import register_entry_assets
 from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprint
-from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent
+from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent, Invitation, InvitationProject
 from mdvtools.dbutils.routes import register_routes
 from mdvtools.auth.register_auth_routes import register_auth_routes
-from mdvtools.auth.authutils import register_before_request_auth, get_auth_provider, cache_user_projects
+from mdvtools.auth.authutils import register_before_request_auth, cache_user_projects
 from mdvtools.dbutils.dbservice import ProjectService, FileService, UserProjectService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
@@ -37,9 +37,6 @@ logger = get_logger(__name__)
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 logger.info(f"Authentication enabled: {ENABLE_AUTH}")
 
-# Opt-in flag: sync_users_to_db() runs on startup as performance improved
-RUN_AUTH0_SYNC_ON_START = os.getenv("RUN_AUTH0_SYNC_ON_START", "0").lower() in ["1", "true", "yes"]
-logger.info(f"Auth0 sync on startup: {RUN_AUTH0_SYNC_ON_START}")
 oauth = None
 if ENABLE_AUTH:
     
@@ -113,22 +110,10 @@ def create_flask_app(config_name=None):
                 ensure_usage_events_table()
             except Exception as e:
                 logger.warning(f"Skipping usage_events table setup: {e}")
+            ensure_invitation_tables()
 
             if ENABLE_AUTH:
                 try:
-                    # sync_users_to_db() runs on startup as performance improved
-                    if RUN_AUTH0_SYNC_ON_START:
-                        try:
-                            auth_provider = get_auth_provider()
-                            if hasattr(auth_provider, "sync_users_to_db"):
-                                logger.info("RUN_AUTH0_SYNC_ON_START enabled; syncing users from Auth0...")
-                                auth_provider.sync_users_to_db()
-                                logger.info("Auth0 user sync complete.")
-                            else:
-                                logger.info("Auth provider has no sync_users_to_db(); skipping startup sync.")
-                        except Exception as sync_err:
-                            logger.exception(f"Auth0 startup sync failed; continuing with existing DB state: {sync_err}")
-
                     logger.info("Caching user-projects data...")
                     cache_user_projects()  # Cache the user-project mappings into Redis only when Auth is enabled
 
@@ -408,11 +393,17 @@ def load_config(app, config_name=None, enable_auth=False):
                     app.config["AUTH0_PUBLIC_KEY_URI"] = os.getenv('AUTH0_PUBLIC_KEY_URI') or config.get('AUTH0_PUBLIC_KEY_URI')
                     app.config["AUTH0_AUDIENCE"] = os.getenv('AUTH0_AUDIENCE') or config.get('AUTH0_AUDIENCE')
                     app.config["AUTH0_DB_CONNECTION"] = os.getenv('AUTH0_DB_CONNECTION') or config.get('AUTH0_DB_CONNECTION')
+                    # Optional: comma-separated names of the site's Microsoft connections,
+                    # which the admin extension offers as Sign-in methods for Invitations.
+                    app.config["AUTH0_MICROSOFT_CONNECTIONS"] = os.getenv('AUTH0_MICROSOFT_CONNECTIONS') or config.get('AUTH0_MICROSOFT_CONNECTIONS')
                     # Optional: while the local database has zero users, a verified Auth0
                     # identity matching this email may bootstrap as the first administrator.
                     # Leave unset once bootstrap is no longer needed for this deployment.
                     app.config["MDV_BOOTSTRAP_ADMIN_EMAIL"] = os.getenv('MDV_BOOTSTRAP_ADMIN_EMAIL') or config.get('MDV_BOOTSTRAP_ADMIN_EMAIL')
-                
+                    # Optional: who the no-access page tells people to contact, such as
+                    # an email address or a team name. The page leaves it out when unset.
+                    app.config["MDV_ACCESS_CONTACT"] = os.getenv('MDV_ACCESS_CONTACT') or config.get('MDV_ACCESS_CONTACT')
+
                 app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
                 app.config["SHIBBOLETH_LOGIN_URL"] = os.getenv('SHIBBOLETH_LOGIN_URL') or config.get('SHIBBOLETH_LOGIN_URL')
                 app.config["SHIBBOLETH_LOGOUT_URL"] = os.getenv('SHIBBOLETH_LOGOUT_URL') or config.get('SHIBBOLETH_LOGOUT_URL')
@@ -455,6 +446,15 @@ def ensure_usage_events_table():
         # checkfirst=True is check-then-act, so two workers racing can both pass
         # the check. Gunicorn runs -w 1 today but will not forever.
         logger.warning(f"Could not ensure the usage_events table exists: {e}")
+
+def ensure_invitation_tables():
+    """Create the Invitation tables on an existing database, where create_all() never runs.
+
+    Unlike usage_events, these hold access data, so a failure here is raised and
+    stops startup rather than leaving Admins unable to invite anyone.
+    """
+    Invitation.__table__.create(bind=db.engine, checkfirst=True)
+    InvitationProject.__table__.create(bind=db.engine, checkfirst=True)
 
 def warn_if_project_ids_can_be_reused():
     """Log a warning when a SQLite projects table can give a purged project's ID to
@@ -648,15 +648,9 @@ def serve_projects_from_filesystem(app, base_dir):
                     # Auth-related setup
                     if ENABLE_AUTH:
                         try:
-                            # NOTE: skipping this as it seems highly redundant to do per project
-                            # and we were hitting rate limits with Auth0
-                            # auth_provider = get_auth_provider()
-                            # auth_provider.sync_users_to_db()  # Sync users and assign permissions
-                            # logger.info("Synced Auth users after adding project.")
-
                             cache_user_projects() #update the cache
                         except Exception as auth_e:
-                            logger.exception(f"Error syncing users or caching for {project_name}: {auth_e}")
+                            logger.exception(f"Error caching user projects for {project_name}: {auth_e}")
 
                     
                     # Optionally add files from the project directory to the database

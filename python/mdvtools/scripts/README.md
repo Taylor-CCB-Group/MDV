@@ -45,4 +45,4 @@ python python/mdvtools/scripts/project_json_history.py restore /path/to/projects
 
 ## Other scripts
 
-This directory also contains `migrate_projects_autoincrement.py` (rebuild a SQLite database so project ids are not reused) and `manage_project_permissions.py` (grant project access). Each script's `--help` and module docstring describe that command.
+This directory also contains `migrate_projects_autoincrement.py`, which rebuilds a SQLite database so project ids are not reused. Its `--help` and module docstring describe the command.

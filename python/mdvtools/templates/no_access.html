@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>No access to this MDV site</title>
+    {# Plain HTML with no bundle, so the page still works when the frontend build does not. #}
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 36rem; margin: 4rem auto; padding: 0 1rem; line-height: 1.5; color: #1f2933; }
+      h1 { font-size: 1.5rem; }
+      a { color: #1d4ed8; }
+    </style>
+  </head>
+  <body>
+    <h1>No access to this MDV site</h1>
+    {% if sign_in_method %}
+    <p>You signed in as <strong>{{ email }}</strong> through <strong>{{ sign_in_method }}</strong>, but this site has not given that account access.</p>
+    {% else %}
+    <p>You signed in as <strong>{{ email }}</strong>, but this site has not given that account access.</p>
+    {% endif %}
+    {% if contact %}
+    <p>If you think you should have access, contact {{ contact }}.</p>
+    {% endif %}
+    {# Relative to this page, so it still resolves behind a proxy that strips a path prefix. #}
+    <p><a href="{{ '../' * (request.path.count('/') - 1) }}logout">Sign out and use another account</a></p>
+  </body>
+</html>

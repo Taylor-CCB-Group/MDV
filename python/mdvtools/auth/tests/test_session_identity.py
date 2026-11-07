@@ -6,14 +6,12 @@ hook re-resolves session["user"] from this deployment's own users on every
 request, keyed by the provider's auth_id.
 """
 
-from types import SimpleNamespace
-from unittest.mock import patch
-
 import pytest
 from flask import Flask, jsonify, session
 
 from mdvtools.auth.authutils import register_before_request_auth
 from mdvtools.auth.dummy_provider import DummyAuthProvider
+from mdvtools.dbutils.dbmodels import User, db
 
 # The same Auth0 account as recorded by the deployment that issued the cookie,
 # where it happens to be user 2 and an administrator.
@@ -30,8 +28,11 @@ def app():
         ENABLE_AUTH=True,
         DEFAULT_AUTH_METHOD="auth0",
         LOGIN_REDIRECT_URL="/login_dev",
+        SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
+        SQLALCHEMY_TRACK_MODIFICATIONS=False,
     )
     app.secret_key = "test_secret"
+    db.init_app(app)
     register_before_request_auth(app)
 
     @app.route("/whoami")
@@ -39,7 +40,13 @@ def app():
         # Stands in for every route that reads session["user"] after the auth hook.
         return jsonify(session["user"])
 
-    return app
+    with app.app_context():
+        db.create_all()
+        db.session.add(User(**LOCAL_USER, is_active=True, password=""))
+        db.session.commit()
+        yield app
+        db.session.remove()
+        db.drop_all()
 
 
 @pytest.fixture
@@ -51,8 +58,7 @@ def client(app):
 
 
 def test_foreign_session_user_is_replaced_by_local_user(client):
-    with patch("mdvtools.auth.authutils.user_cache", {LOCAL_USER["auth_id"]: dict(LOCAL_USER)}):
-        rv = client.get("/whoami")
+    rv = client.get("/whoami")
 
     assert rv.status_code == 200
     assert rv.get_json() == LOCAL_USER
@@ -60,23 +66,12 @@ def test_foreign_session_user_is_replaced_by_local_user(client):
         assert sess["user"] == LOCAL_USER
 
 
-def test_session_user_missing_from_cache_is_resolved_from_database(client):
-    # A user created since the last cache refresh must not be logged out.
-    with patch("mdvtools.auth.authutils.user_cache", {}), \
-         patch("mdvtools.dbutils.dbmodels.User") as mock_user:
-        mock_user.query.filter_by.return_value.first.return_value = SimpleNamespace(**LOCAL_USER)
-        rv = client.get("/whoami")
+def test_session_user_unknown_to_this_deployment_is_logged_out(app):
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user"] = {**FOREIGN_SESSION_USER, "auth_id": "auth0|stranger"}
 
-    assert rv.status_code == 200
-    assert rv.get_json() == LOCAL_USER
-    mock_user.query.filter_by.assert_called_once_with(auth_id=LOCAL_USER["auth_id"])
-
-
-def test_session_user_unknown_to_this_deployment_is_logged_out(client):
-    with patch("mdvtools.auth.authutils.user_cache", {}), \
-         patch("mdvtools.dbutils.dbmodels.User") as mock_user:
-        mock_user.query.filter_by.return_value.first.return_value = None
-        rv = client.get("/whoami")
+    rv = client.get("/whoami")
 
     assert rv.status_code == 302
     assert rv.headers["Location"].endswith("/login_dev")
@@ -92,10 +87,7 @@ def test_dummy_auth_session_user_is_left_alone(app):
     with client.session_transaction() as sess:
         sess["user"] = dummy_user
 
-    with patch("mdvtools.auth.authutils.user_cache", {}), \
-         patch("mdvtools.dbutils.dbmodels.User") as mock_user:
-        mock_user.query.filter_by.return_value.first.return_value = None
-        rv = client.get("/whoami")
+    rv = client.get("/whoami")
 
     assert rv.status_code == 200
     assert rv.get_json() == dummy_user

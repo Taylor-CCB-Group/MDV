@@ -1,7 +1,23 @@
 from abc import ABC, abstractmethod
 # from flask import Response
 from flask.typing import ResponseReturnValue
-from typing import Optional, Tuple
+from dataclasses import dataclass
+from typing import Optional, Tuple, Union
+
+
+@dataclass(frozen=True)
+class NoAccess:
+    """A person the provider signed in who has no active User on this deployment.
+
+    validate_user returns it in place of an error response, so the auth hook can
+    show the no-access page instead of sending them back to sign in, which would
+    loop through the provider (ADR 0019).
+    """
+
+    email: str
+    # The Auth0 connection they signed in through, when the provider knows it.
+    sign_in_method: Optional[str] = None
+
 
 class AuthProvider(ABC):
     @abstractmethod
@@ -34,11 +50,6 @@ class AuthProvider(ABC):
         pass
 
     @abstractmethod
-    def validate_user(self) -> Tuple[Optional[dict], Optional[Tuple]]:
+    def validate_user(self) -> Tuple[Optional[dict], Optional[Union[Tuple, NoAccess]]]:
         """Validates and returns user data."""
-        pass
-
-    @abstractmethod
-    def sync_users_to_db(self):
-        """ Syncs users from the authentication provider (e.g., Auth0) to the application's database."""
         pass

@@ -82,7 +82,7 @@ def add_unowned_project(tmp_path, name="orphan"):
 
 
 def add_user(email, auth_id, *, is_admin=False):
-    user = User(email=email, auth_id=auth_id, is_admin=is_admin)
+    user = User(email=email, auth_id=auth_id, is_active=True, is_admin=is_admin)
     db.session.add(user)
     db.session.commit()
     return user
