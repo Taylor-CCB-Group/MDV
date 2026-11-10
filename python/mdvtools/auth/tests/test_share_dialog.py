@@ -5,6 +5,9 @@ access. Until then they appear neither among a Project's members nor in the list
 of people it can be shared with, and the share routes refuse to add them or
 change their role.
 
+An Admin is Owner of every project (ADR 0019), so the share routes also refuse
+to lower or remove an Admin's role, and add an Admin only as Owner.
+
 Requests go to ProjectManagerExtension's real routes against an in-memory
 database, with the signed-in Owner put straight into the session. The auth hook
 is left out because these tests do not change sign-in.
@@ -38,8 +41,8 @@ def app():
         db.drop_all()
 
 
-def add_user(email, *, is_active=True):
-    user = User(email=email, auth_id=f"auth0|{email}", is_active=is_active)
+def add_user(email, *, is_active=True, is_admin=False):
+    user = User(email=email, auth_id=f"auth0|{email}", is_active=is_active, is_admin=is_admin)
     db.session.add(user)
     db.session.commit()
     return user
@@ -142,3 +145,36 @@ def test_changing_an_active_users_role_updates_it(app, owner, project):
     db.session.expire_all()
     changed = UserProject.query.filter_by(user_id=active.id, project_id=project.id).one()
     assert (changed.can_write, changed.is_owner) == (True, False)
+
+
+def role_of(user, project):
+    db.session.expire_all()
+    row = UserProject.query.filter_by(user_id=user.id, project_id=project.id).one()
+    return (row.can_read, row.can_write, row.is_owner)
+
+
+@pytest.mark.parametrize("change", ["edit", "delete"])
+def test_an_admins_role_cannot_be_changed_or_removed(app, owner, project, change):
+    admin = add_user("admin@example.org", is_admin=True)
+    UserProjectService.add_or_update_user_project(admin.id, project.id, is_owner=True, can_write=True)
+
+    response = client_for(app, owner).post(
+        f"/projects/{project.id}/share/{admin.id}/{change}", json={"permission": "view"}
+    )
+
+    assert response.status_code == 400
+    assert "admin" in response.get_json()["error"].lower()
+    assert role_of(admin, project) == (True, True, True)
+
+
+def test_an_admin_can_be_added_to_a_project_only_as_owner(app, owner, project):
+    admin = add_user("admin@example.org", is_admin=True)
+    client = client_for(app, owner)
+    url = f"/projects/{project.id}/share"
+
+    refused = client.post(url, json={"user_id": admin.id, "permission": "view"})
+    added = client.post(url, json={"user_id": admin.id, "permission": "owner"})
+
+    assert refused.status_code == 400
+    assert added.status_code == 200, added.get_data(as_text=True)
+    assert role_of(admin, project) == (True, True, True)

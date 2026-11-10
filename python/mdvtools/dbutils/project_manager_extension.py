@@ -52,6 +52,13 @@ def is_owner_or_admin(user, permissions):
     return bool(user.get("is_admin", False))
 
 
+# An Admin is Owner of every project (ADR 0019), so their role on one project
+# changes only with their Admin rights.
+ADMIN_ROLE_LOCKED = (
+    "An Admin is Owner of every project. Remove their Admin rights to change their project roles."
+)
+
+
 def record_project_event(project_id, event_type, details=None):
     """Record one project-management usage event.
 
@@ -792,6 +799,8 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 target_user = db.session.get(User, target_user_id)
                 if target_user is not None and not target_user.is_active:
                     return jsonify({"error": "This user is deactivated, so the project cannot be shared with them"}), 400
+                if target_user is not None and target_user.is_admin and permission != "owner":
+                    return jsonify({"error": ADMIN_ROLE_LOCKED}), 400
 
                 # Step 4: Determine permission flags
                 is_owner = permission == "owner"
@@ -860,6 +869,8 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 target_user = db.session.get(User, user_id)
                 if target_user is not None and not target_user.is_active:
                     return jsonify({"error": "This user is deactivated, so their project role cannot be changed"}), 400
+                if target_user is not None and target_user.is_admin:
+                    return jsonify({"error": ADMIN_ROLE_LOCKED}), 400
 
                 is_owner = new_permission == "owner"
                 can_write = new_permission in ["edit", "owner"]
@@ -915,6 +926,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
                 if not is_owner_or_admin(user, user_permissions):
                     return jsonify({"error": "Only the project owner or an administrator can remove users"}), 403
+
+                target_user = db.session.get(User, user_id)
+                if target_user is not None and target_user.is_admin:
+                    return jsonify({"error": ADMIN_ROLE_LOCKED}), 400
 
                 # Step 4: Remove the user from the project using the service method
                 UserProjectService.remove_user_from_project(user_id, project_id)
