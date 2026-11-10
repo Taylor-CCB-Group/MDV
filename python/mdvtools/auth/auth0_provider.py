@@ -406,6 +406,11 @@ class Auth0Provider(AuthProvider):
                 user = self._accept_invitation(user_info)
                 if user is None:
                     return None, NoAccess(email=email, sign_in_method=user_info.get("connection"))
+            else:
+                # An active User can still hold an Invitation that names them, for
+                # example when an Admin reactivated them before they signed in. Their
+                # account belongs to them, so no other Invitation can match.
+                user = self._accept_invitation(user_info) or user
 
             # Add the user to the in-memory cache
             user_data = {"id": user.id, "auth_id": user.auth_id, "email": user.email, "is_admin": user.is_admin}

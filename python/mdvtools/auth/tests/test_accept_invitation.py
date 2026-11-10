@@ -1,4 +1,4 @@
-"""A sign-in with no User accepts an open Invitation (ADRs 0019 and 0021).
+"""A sign-in accepts an open Invitation for its account (ADRs 0019 and 0021).
 
 The Invitation is accepted only when the email matches, the sign-in came through
 the Invitation's Sign-in method, and Auth0 vouches for the email: email_verified
@@ -296,3 +296,50 @@ def test_new_account_cannot_take_the_email_of_a_user_the_invitation_does_not_nam
     )
 
     assert_refused(response, invitation)
+
+
+def test_user_reactivated_before_signing_in_still_accepts_the_invitation(
+    app, provider, admin, project
+):
+    # An Admin invites a Deactivated user, then reactivates them before they
+    # sign in. Their usual account still accepts the Invitation that names them.
+    user = User(email="eve@example.org", auth_id="auth0|eve", is_active=False)
+    db.session.add(user)
+    db.session.commit()
+    db.session.add(UserProject(user_id=user.id, project_id=project.id, can_read=True))
+    db.session.commit()
+    invitation = invite(admin, "eve@example.org", PASSWORD, {project: "editor"}, user_id=user.id)
+    user.is_active = True
+    db.session.commit()
+
+    response = get_as(
+        app, provider, f"/projects/{project.id}/open", password_sign_in("auth0|eve", "eve@example.org")
+    )
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    editor = {"can_read": True, "can_write": True, "is_owner": False}
+    assert UserProjectService.get_user_project_permissions(user.id, project.id) == editor
+    db.session.expire_all()
+    assert invitation.accepted_user_id == user.id
+    assert Invitation.open_for_email("eve@example.org") == []
+
+
+def test_active_user_signing_in_leaves_an_invitation_that_does_not_name_them(
+    app, provider, admin, project
+):
+    user = User(email="fay@example.org", auth_id="auth0|fay", is_active=True)
+    db.session.add(user)
+    db.session.commit()
+    db.session.add(UserProject(user_id=user.id, project_id=project.id, can_read=True))
+    db.session.commit()
+    invitation = invite(admin, "fay@example.org", PASSWORD, {project: "owner"})
+
+    response = get_as(
+        app, provider, f"/projects/{project.id}/open", password_sign_in("auth0|fay", "fay@example.org")
+    )
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    viewer = {"can_read": True, "can_write": False, "is_owner": False}
+    assert UserProjectService.get_user_project_permissions(user.id, project.id) == viewer
+    db.session.expire_all()
+    assert invitation.accepted_at is None
