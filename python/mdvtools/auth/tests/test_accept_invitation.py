@@ -379,3 +379,21 @@ def test_admin_reactivated_before_signing_in_keeps_admin_rights(app, provider, a
     db.session.expire_all()
     assert invitation.accepted_user_id == user.id
     assert user.is_admin is True
+
+
+def test_invitation_is_refused_while_another_user_holds_its_email_in_another_case(
+    app, provider, admin, project
+):
+    # Older Users' emails were stored as typed, so two Users can hold the same
+    # email in different cases. Whichever row the database returns first, the
+    # Invitation must not reach the User it does not name.
+    named = User(email="ivy@example.org", auth_id="auth0|ivy", is_active=False)
+    db.session.add_all([named, User(email="Ivy@Example.org", auth_id="auth0|ivy-old", is_active=True)])
+    db.session.commit()
+    invitation = invite(admin, "ivy@example.org", PASSWORD, {project: "viewer"}, user_id=named.id)
+
+    response = get_as(
+        app, provider, f"/projects/{project.id}/open", password_sign_in("auth0|ivy", "ivy@example.org")
+    )
+
+    assert_refused(response, invitation)

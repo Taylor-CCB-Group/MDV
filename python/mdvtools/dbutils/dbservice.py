@@ -1098,8 +1098,12 @@ class InvitationService:
             return False
         # Nor can it take the email of a User the Invitation does not name.
         # Older Users' emails were stored as typed, so compare ignoring case.
-        email_user = User.query.filter(func.lower(User.email) == invitation.email).first()
-        if email_user is not None and email_user.id != invitation.user_id:
+        # Two older Users can hold the same email in different cases, so look
+        # for any User other than the named one.
+        email_user = User.query.filter(
+            func.lower(User.email) == invitation.email, User.id != invitation.user_id
+        ).first()
+        if email_user is not None:
             logger.warning(
                 f"Invitation {invitation.id} cannot be accepted: its email belongs to "
                 f"User {email_user.id}, whom it does not name."
