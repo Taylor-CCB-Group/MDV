@@ -7,9 +7,18 @@
  * puts it in the /userinfo response MDV reads. Add it to the Login flow of
  * each tenant with an MDV site.
  *
+ * Auth0 runs a post-login Action for every application in the tenant, so this
+ * one adds claims only for applications marked as MDV sites. Mark each MDV
+ * site's application with the application metadata key "mdv" set to "true"
+ * (Applications > the application > Settings > Advanced Settings >
+ * Application Metadata).
+ *
  * The claim names must match CLAIM_NAMESPACE in mdvtools/auth/auth0_provider.py.
  */
 exports.onExecutePostLogin = async (event, api) => {
+  if (event.client.metadata?.mdv !== "true") {
+    return;
+  }
   const namespace = "https://mdv/";
   api.idToken.setCustomClaim(`${namespace}connection`, event.connection.name);
   // "auth0" for a password connection, and "waad" or "oidc" for Microsoft
