@@ -1,5 +1,5 @@
-import { ACCESS_DENIED_MESSAGES, GENERIC_DENIAL, getAccessDenial } from "@/login/accessDenial";
 import { describe, expect, test } from "vitest";
+import { ACCESS_DENIED_MESSAGES, GENERIC_DENIAL, getAccessDenial } from "@/login/accessDenial";
 
 describe("getAccessDenial", () => {
     test("shows sign-in when the server sent no reason", () => {

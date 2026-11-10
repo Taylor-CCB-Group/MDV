@@ -1,6 +1,6 @@
-import { getAppMountPath } from "@/utils/mdvRouting";
 import { Button, Stack, Typography } from "@mui/material";
 import type React from "react";
+import { getAppMountPath } from "@/utils/mdvRouting";
 import AuthCard from "./AuthCard";
 import type { AccessDenial } from "./accessDenial";
 
