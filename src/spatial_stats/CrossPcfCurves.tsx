@@ -26,6 +26,9 @@ type Props = {
     onMoveR?: (index: number, k: number) => void;
     /** Shift-press in the plot (or any press when only the mean is shown) adds an r there. */
     onAddR?: (k: number) => void;
+    /** The r (index into `rs`) highlighted across the chart; hovering or dragging a band sets it. */
+    rFocus: number | null;
+    onRFocus?: (index: number | null) => void;
     unit: string;
     width: number;
     height: number;
@@ -62,6 +65,8 @@ export function CrossPcfCurves({
     rs,
     onMoveR,
     onAddR,
+    rFocus,
+    onRFocus,
     unit,
     width,
     height,
@@ -148,10 +153,18 @@ export function CrossPcfCurves({
                 } else if (bins[index] !== k) onMoveR(index, k);
                 drag.current = { index, k };
                 setDragIndex(index);
+                onRFocus?.(index);
             }}
             onPointerMove={(e) => {
                 const d = drag.current;
-                if (!d || !onMoveR) return;
+                if (!d) {
+                    // not dragging: the band under the pointer, if any, is the focused r
+                    const over = inPlot(e) ? bins.indexOf(binAt(e)) : -1;
+                    const next = over >= 0 ? over : null;
+                    if (next !== rFocus) onRFocus?.(next);
+                    return;
+                }
+                if (!onMoveR) return;
                 const k = binAt(e);
                 if (k !== d.k) {
                     onMoveR(d.index, k);
@@ -160,31 +173,46 @@ export function CrossPcfCurves({
             }}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
+            onPointerLeave={() => {
+                if (!drag.current && rFocus !== null) onRFocus?.(null);
+            }}
         >
             <clipPath id={clip}>
                 <rect x={left} y={top} width={w} height={h} />
             </clipPath>
-            {rs.map(({ bin, colour }, index) =>
-                bin === "mean" ? null : (
+            {rs.map(({ bin, colour }, index) => {
+                if (bin === "mean") return null;
+                const focused = rFocus === index || dragIndex === index;
+                const receded = rFocus !== null && !focused;
+                const x = sx(bin * dr);
+                const bw = sx(dr) - sx(0);
+                return (
                     <g key={`band-${bin}`} pointerEvents="none">
                         <rect
-                            x={sx(bin * dr)}
+                            x={x}
                             y={top}
-                            width={sx(dr) - sx(0)}
+                            width={bw}
                             height={h}
                             fill={colour}
-                            fillOpacity={dragIndex === index ? 0.26 : 0.13}
+                            fillOpacity={focused ? 0.3 : receded ? 0.06 : 0.13}
                         />
+                        {focused && (
+                            <>
+                                <line x1={x} x2={x} y1={top} y2={top + h} stroke={colour} strokeWidth={1.5} />
+                                <line x1={x + bw} x2={x + bw} y1={top} y2={top + h} stroke={colour} strokeWidth={1.5} />
+                            </>
+                        )}
                         {/* grab handle on the axis, so the band reads as draggable */}
                         <path
-                            d={`M${sx((bin + 0.5) * dr)},${top + h + 1} l-5,7 h10 z`}
+                            d={`M${sx((bin + 0.5) * dr)},${top + h + 1} ${focused ? "l-7,10 h14" : "l-5,7 h10"} z`}
                             fill={colour}
+                            fillOpacity={receded ? 0.5 : 1}
                             stroke="black"
                             strokeWidth={0.75}
                         />
                     </g>
-                ),
-            )}
+                );
+            })}
             {yTicks.map((t) => (
                 <g key={`y${t}`}>
                     <line x1={left} x2={left + w} y1={sy(t)} y2={sy(t)} stroke="currentColor" strokeOpacity={0.12} />
@@ -221,7 +249,9 @@ export function CrossPcfCurves({
                 {/* Focused curve last, so it is drawn on top. */}
                 {[...curves.filter((c) => !isPair(c, focus)), ...curves.filter((c) => isPair(c, focus))].map((c) => {
                     const focused = isPair(c, focus);
-                    const faded = focus !== null && !focused;
+                    // Hovering an unchosen pair (the dashed preview) only recedes the chosen curves a little,
+                    // so they stay comparable with it; focusing a chosen one dims the rest more.
+                    const fade = focus === null || focused ? 0.95 : preview ? 0.75 : 0.4;
                     return (
                         <g key={c.key}>
                             <path
@@ -229,7 +259,7 @@ export function CrossPcfCurves({
                                 fill="none"
                                 stroke={c.colour}
                                 strokeWidth={focused ? 3.5 : 1.75}
-                                strokeOpacity={faded ? 0.15 : 0.95}
+                                strokeOpacity={fade}
                                 strokeDasharray={c.key.endsWith("-preview") ? "5 3" : undefined}
                                 pointerEvents="none"
                             />
@@ -287,7 +317,7 @@ export function PairLegend({
                         className="flex items-center gap-1 px-1 rounded"
                         style={{
                             background: focused ? "rgba(255,255,255,0.12)" : undefined,
-                            opacity: focus && !focused ? 0.45 : 1,
+                            opacity: focus === null || focused ? 1 : preview ? 0.8 : 0.55,
                             fontWeight: focused ? 700 : 400,
                         }}
                         onPointerEnter={() => onFocus?.({ a: p.a, b: p.b })}

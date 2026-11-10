@@ -1,5 +1,5 @@
 import type { PcfMatrixBinnedResult } from "intraspatial/spatial/pcf";
-import { type PointerEvent, useMemo, useRef } from "react";
+import { type PointerEvent, useId, useMemo, useRef } from "react";
 import { type Cell, cellsAlong } from "./pairSelection";
 
 /** `g` at one bin, or averaged over all bins. */
@@ -119,6 +119,7 @@ export function CrossPcfMatrix({
     // The stroke lives in a ref: pointer events can arrive faster than renders (a quick drag, a busy
     // page), and each must see the cell the previous one ended on.
     const stroke = useRef<Cell | null>(null);
+    const maskId = useId();
     const cellAt = (e: PointerEvent<SVGElement>): Cell | null => {
         const box = e.currentTarget.getBoundingClientRect();
         const i = Math.floor((e.clientY - box.top - oy) / cell);
@@ -183,6 +184,30 @@ export function CrossPcfMatrix({
                             fill={view.pairs[i * n + j] > 0 ? gColour(view.value[i * n + j]) : "rgb(60,60,60)"}
                         />
                     )),
+                )}
+                {/* Row A and column B of the focused cell stand out: everything else is shaded (a mask cuts the
+                    row and column out of the shade, so their colours stay true), with edge lines along them. */}
+                {focusCell && (
+                    <g pointerEvents="none">
+                        <mask id={maskId}>
+                            <rect x={0} y={0} width={side} height={side} fill="white" />
+                            <rect x={0} y={focusCell.i * cell} width={side} height={cell} fill="black" />
+                            <rect x={focusCell.j * cell} y={0} width={cell} height={side} fill="black" />
+                        </mask>
+                        <rect
+                            x={0}
+                            y={0}
+                            width={side}
+                            height={side}
+                            fill="black"
+                            fillOpacity={0.42}
+                            mask={`url(#${maskId})`}
+                        />
+                        <g fill="none" stroke="white" strokeOpacity={0.85} strokeWidth={1.25}>
+                            <rect x={0} y={focusCell.i * cell} width={side - 0.5} height={cell - 0.5} />
+                            <rect x={focusCell.j * cell} y={0} width={cell - 0.5} height={side - 0.5} />
+                        </g>
+                    </g>
                 )}
                 <g pointerEvents="none" fill="none">
                     {rings.map((p) => (
