@@ -28,7 +28,9 @@ person with no User (ADR 0019), so the page does not show that MDV still holds t
 MDV never blocks, unblocks or deletes the Auth0 account. The User row stays, so usage history
 still names them. An Admin can reactivate them, which restores their projects.
 
-Signing in never reactivates a User. Only an Admin's action does.
+Signing in reactivates a User only when it accepts an Invitation an Admin sent them (ADR
+0019). Deactivating a User revokes any open Invitation that names them, so a sign-in cannot
+undo a later deactivation.
 
 ## Consequences
 

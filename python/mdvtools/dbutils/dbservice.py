@@ -1060,7 +1060,12 @@ class InvitationService:
                     return None
                 user.auth_id = sign_in["sub"]
                 user.email = invitation.email
-                user.is_active = True
+                if not user.is_active:
+                    # Deactivating an Admin leaves is_admin set. The Invitation
+                    # grants only its projects, so Admin rights come back only
+                    # when an Admin gives them again.
+                    user.is_active = True
+                    user.is_admin = False
             for grant in invitation.projects:
                 # The Invitation's role replaces any earlier role on the project.
                 UserProject.query.filter_by(user_id=user.id, project_id=grant.project_id).delete()

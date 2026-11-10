@@ -28,7 +28,8 @@ creates their User and grants the projects, so they see their projects straight 
 Invitation sent to an existing User moves them to a new Sign-in method and can carry a new
 email. Inviting the email of an active User grants the projects directly. Inviting a
 Deactivated user reactivates them with their earlier Project roles, and a role chosen in the
-Invitation replaces the earlier role on that project. Invitations are kept after they are
+Invitation replaces the earlier role on that project. It does not restore Admin rights, which
+an Admin has to give again. Invitations are kept after they are
 accepted, revoked or expired, so a User's history shows who invited them.
 
 Admin rights live only in MDV. Only Admins can invite people. Owners keep sharing their
