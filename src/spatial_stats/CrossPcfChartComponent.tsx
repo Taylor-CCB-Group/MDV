@@ -105,6 +105,8 @@ type Pair = { a: number; b: number };
 const Panels = observer(({ res, width, height }: { res: CrossPcfResult; width: number; height: number }) => {
     const config = useConfig<CrossPcfConfig>();
     const [focus, setFocus] = useState<Pair | null>(null);
+    // The r highlighted across the chart: its band, chip and matrix stand out, the others recede.
+    const [rFocus, setRFocus] = useState<number | null>(null);
     const stroke = useRef<PaintMode>("add");
     const label = (t: number) => res.labels[t] ?? String(t);
     const asLabels = (p: Pair) => ({ a: label(p.a), b: label(p.b) });
@@ -147,6 +149,7 @@ const Panels = observer(({ res, width, height }: { res: CrossPcfResult; width: n
     });
     const removeR = action((index: number) => {
         config.r_bins = removeBin(config.r_bins, index);
+        setRFocus(null); // indices shift
     });
     const rText = (b: RBin) =>
         b === "mean"
@@ -187,7 +190,14 @@ const Panels = observer(({ res, width, height }: { res: CrossPcfResult; width: n
                     <span
                         key={`chip-${bin}`}
                         className="flex items-center gap-1 px-1.5 rounded whitespace-nowrap"
-                        style={{ border: `1px solid ${colour}` }}
+                        style={{
+                            border: `${rFocus === i ? 2 : 1}px solid ${colour}`,
+                            background: rFocus === i ? `${colour}33` : undefined,
+                            fontWeight: rFocus === i ? 700 : 400,
+                            opacity: rFocus !== null && rFocus !== i ? 0.6 : 1,
+                        }}
+                        onPointerEnter={() => setRFocus(i)}
+                        onPointerLeave={() => setRFocus(null)}
                     >
                         <span aria-hidden style={{ width: 9, height: 9, background: colour, borderRadius: 2 }} />
                         {rText(bin)}
@@ -236,6 +246,8 @@ const Panels = observer(({ res, width, height }: { res: CrossPcfResult; width: n
                         rs={rs}
                         onMoveR={moveR}
                         onAddR={addR}
+                        rFocus={rFocus}
+                        onRFocus={setRFocus}
                         unit={res.frame.unit}
                         width={L.curves.width - L.legendWidth}
                         height={L.curves.height}
@@ -267,13 +279,24 @@ const Panels = observer(({ res, width, height }: { res: CrossPcfResult; width: n
                         const firstCol = i % cols === 0;
                         const firstRow = i < cols;
                         return (
-                            <div key={`matrix-${bin}`}>
+                            <div
+                                key={`matrix-${bin}`}
+                                onPointerEnter={() => setRFocus(i)}
+                                onPointerLeave={() => setRFocus(null)}
+                                style={{
+                                    // the other r's recede a little while one is in focus
+                                    opacity: rFocus !== null && rFocus !== i ? 0.55 : 1,
+                                    transition: "opacity 120ms",
+                                }}
+                            >
                                 <div
                                     className="flex items-center gap-1 px-1"
                                     style={{
                                         height: strip,
                                         marginLeft: firstCol ? labelSize : 0,
-                                        borderTop: `3px solid ${colour}`,
+                                        borderTop: `${rFocus === i ? 5 : 3}px solid ${colour}`,
+                                        background: rFocus === i ? `${colour}26` : undefined,
+                                        fontWeight: rFocus === i ? 700 : 400,
                                     }}
                                 >
                                     <span className="truncate flex-1">{rText(bin)}</span>
