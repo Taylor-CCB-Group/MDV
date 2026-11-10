@@ -1108,6 +1108,12 @@ class InvitationService:
 
     @staticmethod
     def _sign_in_matches(invitation: Invitation, sign_in: dict) -> bool:
+        """Whether this sign-in may accept the Invitation under ADR 0021's rule.
+
+        The sign-in must come through the Invitation's connection, its account and
+        email must not belong to a User the Invitation does not name, and Auth0
+        must vouch for the email in the way the connection's strategy calls for.
+        """
         if sign_in.get("connection") != invitation.connection:
             return False
         # An Auth0 account tied to one User cannot accept an Invitation for

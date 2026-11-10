@@ -65,9 +65,13 @@ def register_auth_routes(app):
                 session.clear()  # Clear session on error
                 return jsonify({"error": "Failed to complete authentication process."}), 500
 
-        # Route for logout (clears the session and redirects to home)
         @app.route('/logout')
         def logout():
+            """Clear the session and sign out through the provider used to sign in.
+
+            The no-access page links here, so it works for someone MDV gives no
+            access to, as well as for a signed-in User.
+            """
             try:
                 auth_method = session.get("auth_method")
                 logger.info(f"Logout initiated for auth method: {auth_method}")

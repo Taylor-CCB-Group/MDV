@@ -131,6 +131,10 @@ class Invitation(db.Model):
         self.expires_at = self.sent_at + INVITATION_LIFETIME
 
     def is_open(self, at=None):
+        """Whether a sign-in can still accept it, at the given time or now.
+
+        An accepted, revoked or expired Invitation is closed.
+        """
         if self.accepted_at is not None or self.revoked_at is not None:
             return False
         at = at or datetime.now()
@@ -169,6 +173,7 @@ class InvitationProject(db.Model):
 
     @validates('role')
     def _check_role(self, _key, role):
+        """Refuse any role but viewer, editor or owner, the Invitation vocabulary."""
         if role not in PROJECT_ROLES:
             raise ValueError(f"Project role must be one of {PROJECT_ROLES}, not {role!r}")
         return role
