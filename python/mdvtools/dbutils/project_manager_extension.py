@@ -740,7 +740,9 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         "email": user_obj.email,
                         "permission": (
                             "Owner" if up.is_owner else "Edit" if up.can_write else "View"
-                        )
+                        ),
+                        # So the dialog can lock an Admin's role.
+                        "is_admin": bool(user_obj.is_admin),
                     })
 
                 # Step 4: Get unshared users for dropdown
@@ -748,7 +750,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 all_db_users = User.query.filter_by(is_active=True).all()
                 shared_user_ids = {u["id"] for u in shared_users_list}
                 all_users = [
-                    {"id": u.id, "email": u.email}
+                    {"id": u.id, "email": u.email, "is_admin": bool(u.is_admin)}
                     for u in all_db_users
                     if u.id not in shared_user_ids
                 ]

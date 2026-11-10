@@ -178,3 +178,18 @@ def test_an_admin_can_be_added_to_a_project_only_as_owner(app, owner, project):
     assert refused.status_code == 400
     assert added.status_code == 200, added.get_data(as_text=True)
     assert role_of(admin, project) == (True, True, True)
+
+
+def test_members_and_people_to_share_with_say_who_is_an_admin(app, owner, project):
+    # The dialog locks an Admin's role and adds an Admin as Owner.
+    admin = add_user("admin@example.org", is_admin=True)
+    UserProjectService.add_or_update_user_project(admin.id, project.id, is_owner=True, can_write=True)
+    add_user("other-admin@example.org", is_admin=True)
+    add_user("ann@example.org")
+
+    body = client_for(app, owner).get(f"/projects/{project.id}/share").get_json()
+
+    members = {u["email"]: u["is_admin"] for u in body["shared_users"]}
+    candidates = {u["email"]: u["is_admin"] for u in body["all_users"]}
+    assert members == {"owner@example.org": False, "admin@example.org": True}
+    assert candidates == {"other-admin@example.org": True, "ann@example.org": False}

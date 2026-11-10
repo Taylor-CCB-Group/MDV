@@ -3,6 +3,7 @@ import {
     Autocomplete,
     Box,
     Button,
+    Chip,
     CircularProgress,
     Dialog,
     DialogActions,
@@ -18,6 +19,7 @@ import {
     TableHead,
     TableRow,
     TextField,
+    Tooltip,
     Typography,
 } from "@mui/material";
 import type React from "react";
@@ -27,6 +29,8 @@ import { useState } from "react";
 import { DialogCloseIconButton } from "./ProjectRenameModal";
 import { matchEmail } from "@/lib/utils";
 import usePermissions from "./PermissionsContext";
+
+const ADMIN_ROLE_LOCKED = "An Admin is Owner of every project. Remove their Admin rights to change their project roles.";
 
 export interface ProjectShareModalProps {
     open: boolean;
@@ -54,7 +58,8 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
 
     const handleAddNewUser = async () => {
         if (newUser) {
-            await addUser(newUser.id, "View");
+            // The server adds an Admin only as Owner.
+            await addUser(newUser.id, newUser.is_admin ? "Owner" : "View");
             setEmail("");
             setNewUser(null);
         }
@@ -193,12 +198,20 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                         <TableBody>
                                             {sharedUsers.map((user) => (
                                                 <TableRow key={user.id}>
-                                                    <TableCell>{user.email}</TableCell>
+                                                    <TableCell>
+                                                        {user.email}
+                                                        {user.is_admin && (
+                                                            <Tooltip title={ADMIN_ROLE_LOCKED}>
+                                                                <Chip label="Admin" size="small" sx={{ ml: 1 }} />
+                                                            </Tooltip>
+                                                        )}
+                                                    </TableCell>
                                                     {operationPermissions.editUserPermissions && <TableCell>
                                                         <Select
                                                             value={user.permission}
                                                             size="small"
                                                             fullWidth
+                                                            disabled={user.is_admin}
                                                             onChange={(e) =>
                                                                 handlePermissionChange(
                                                                     e.target.value as UserPermission,
@@ -212,9 +225,17 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                                         </Select>
                                                     </TableCell>}
                                                     {operationPermissions.removeUserFromProject && <TableCell align="right">
-                                                        <IconButton onClick={() => handleDeleteUser(user.id)}>
-                                                            <DeleteIcon />
-                                                        </IconButton>
+                                                        <Tooltip title={user.is_admin ? ADMIN_ROLE_LOCKED : "Remove"}>
+                                                            <span>
+                                                                <IconButton
+                                                                    aria-label="Remove"
+                                                                    disabled={user.is_admin}
+                                                                    onClick={() => handleDeleteUser(user.id)}
+                                                                >
+                                                                    <DeleteIcon />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
                                                     </TableCell>}
                                                 </TableRow>
                                             ))}
