@@ -857,6 +857,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if new_permission not in ["view", "edit", "owner"]:
                     return jsonify({"error": "Invalid permission value"}), 400
 
+                target_user = db.session.get(User, user_id)
+                if target_user is not None and not target_user.is_active:
+                    return jsonify({"error": "This user is deactivated, so their project role cannot be changed"}), 400
+
                 is_owner = new_permission == "owner"
                 can_write = new_permission in ["edit", "owner"]
                 can_read = True  # Always true for project access

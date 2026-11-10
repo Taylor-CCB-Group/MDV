@@ -2,7 +2,8 @@
 
 A Deactivated user keeps their Project roles, so reactivating them restores
 access. Until then they appear neither among a Project's members nor in the list
-of people it can be shared with, and the share route refuses to add them.
+of people it can be shared with, and the share routes refuse to add them or
+change their role.
 
 Requests go to ProjectManagerExtension's real routes against an in-memory
 database, with the signed-in Owner put straight into the session. The auth hook
@@ -111,3 +112,32 @@ def test_sharing_with_an_active_user_grants_the_role(app, owner, project):
 
     assert response.status_code == 200, response.get_data(as_text=True)
     assert UserProject.query.filter_by(user_id=active.id, project_id=project.id).first() is not None
+
+
+def test_changing_a_deactivated_users_role_is_refused(app, owner, project):
+    deactivated = add_user("bo@example.org", is_active=False)
+    UserProjectService.add_or_update_user_project(deactivated.id, project.id, is_owner=False, can_write=False)
+
+    response = client_for(app, owner).post(
+        f"/projects/{project.id}/share/{deactivated.id}/edit", json={"permission": "owner"}
+    )
+
+    assert response.status_code == 400
+    assert "deactivated" in response.get_json()["error"].lower()
+    db.session.expire_all()
+    kept = UserProject.query.filter_by(user_id=deactivated.id, project_id=project.id).one()
+    assert (kept.can_write, kept.is_owner) == (False, False)
+
+
+def test_changing_an_active_users_role_updates_it(app, owner, project):
+    active = add_user("ann@example.org")
+    UserProjectService.add_or_update_user_project(active.id, project.id, is_owner=False, can_write=False)
+
+    response = client_for(app, owner).post(
+        f"/projects/{project.id}/share/{active.id}/edit", json={"permission": "edit"}
+    )
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    db.session.expire_all()
+    changed = UserProject.query.filter_by(user_id=active.id, project_id=project.id).one()
+    assert (changed.can_write, changed.is_owner) == (True, False)
