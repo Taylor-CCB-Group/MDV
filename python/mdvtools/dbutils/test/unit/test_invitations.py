@@ -88,6 +88,7 @@ def test_open_invitations_for_an_email_ignore_case_and_skip_closed_ones(admin):
     now = datetime(2026, 11, 20, 10, 0)
     open_one = new_invitation(admin, sent_at=datetime(2026, 11, 10, 10, 0))
     new_invitation(admin, sent_at=SENT)  # expired on 19 November
+    new_invitation(admin, sent_at=datetime(2026, 11, 10, 10, 0), accepted_at=datetime(2026, 11, 11, 10, 0))
     new_invitation(admin, sent_at=datetime(2026, 11, 10, 10, 0), revoked_at=datetime(2026, 11, 11, 10, 0))
     new_invitation(admin, email="bob@example.org", sent_at=datetime(2026, 11, 10, 10, 0))
 

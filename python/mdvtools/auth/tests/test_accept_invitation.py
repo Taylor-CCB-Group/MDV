@@ -109,6 +109,35 @@ def password_sign_in(sub, email, *, verified=True, connection=PASSWORD):
     }
 
 
+@pytest.mark.parametrize(
+    "claims, expected",
+    [
+        pytest.param(
+            {
+                "https://mdv/connection": MICROSOFT,
+                "https://mdv/connection_strategy": "oidc",
+                "https://mdv/xms_edov": True,
+            },
+            (MICROSOFT, "oidc", True),
+            id="claims from the Action",
+        ),
+        pytest.param({"https://mdv/xms_edov": "true"}, (None, None, False), id="xms_edov not a boolean"),
+        pytest.param({}, (None, None, False), id="no Action"),
+    ],
+)
+def test_sign_in_claims_are_read_from_userinfo(provider, claims, expected):
+    # The other tests stub get_user, so this is what checks the claim names
+    # MDV reads against the ones the post-login Action writes.
+    userinfo = {"sub": "waad|ann", "email": "ann@acme.example", **claims}
+    with patch("mdvtools.auth.auth0_provider.requests.get") as get:
+        get.return_value.status_code = 200
+        get.return_value.json.return_value = userinfo
+        user = provider.get_user({"access_token": "token"})
+
+    assert user is not None
+    assert (user["connection"], user["connection_strategy"], user["xms_edov"]) == expected
+
+
 def get_as(app, provider, path, sign_in):
     """Request path as someone Auth0 has just signed in with these claims."""
     with patch.multiple(
@@ -121,13 +150,17 @@ def get_as(app, provider, path, sign_in):
 
 
 def test_new_person_with_a_password_invitation_opens_the_invited_project(app, provider, admin, project):
-    invite(admin, "ann@example.org", PASSWORD, {project: "viewer"})
+    invitation = invite(admin, "ann@example.org", PASSWORD, {project: "viewer"})
 
     response = get_as(
         app, provider, f"/projects/{project.id}/open", password_sign_in("auth0|ann", "Ann@Example.org")
     )
 
     assert response.status_code == 200, response.get_data(as_text=True)
+    db.session.expire_all()
+    assert invitation.accepted_at is not None
+    assert invitation.accepted_user_id == User.query.filter_by(auth_id="auth0|ann").one().id
+    assert Invitation.open_for_email("ann@example.org") == []
 
 
 def assert_refused(response, invitation):

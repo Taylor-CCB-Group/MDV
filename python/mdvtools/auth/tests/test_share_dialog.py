@@ -111,7 +111,8 @@ def test_sharing_with_an_active_user_grants_the_role(app, owner, project):
     )
 
     assert response.status_code == 200, response.get_data(as_text=True)
-    assert UserProject.query.filter_by(user_id=active.id, project_id=project.id).first() is not None
+    granted = UserProject.query.filter_by(user_id=active.id, project_id=project.id).one()
+    assert (granted.can_read, granted.can_write, granted.is_owner) == (True, False, False)
 
 
 def test_changing_a_deactivated_users_role_is_refused(app, owner, project):
