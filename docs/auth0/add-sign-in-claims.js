@@ -26,12 +26,22 @@ exports.onExecutePostLogin = async (event, api) => {
   // Entra. MDV picks the email check from it and refuses any other strategy.
   api.idToken.setCustomClaim(`${namespace}connection_strategy`, event.connection.strategy);
   if (event.connection.strategy === "waad" || event.connection.strategy === "oidc") {
-    // Microsoft's claim that the tenant owns the email's domain. Nobody has
-    // confirmed yet whether Auth0 puts it on the identity's profileData or on
-    // event.user, so read both. Only a true boolean counts. Without it, MDV
-    // refuses Microsoft sign-ins that have no User yet.
-    const profileData = event.user.identities?.[0]?.profileData ?? {};
-    const xmsEdov = profileData.xms_edov === true || event.user.xms_edov === true;
+    // Microsoft's claim that the tenant owns the email's domain. Only a true
+    // boolean counts. Without it, MDV refuses Microsoft sign-ins that have no
+    // User yet. Auth0's native Azure AD connection is reported to drop custom
+    // claims, so use an OpenID Connect connection and confirm the claim
+    // arrives before offering it (ADR 0021).
+    //
+    // Read it only from the identity this sign-in used. With linked
+    // accounts, the root profile belongs to the primary identity, the first
+    // in the list, and each linked identity keeps its attributes in its own
+    // profileData. Nobody has confirmed where Auth0 puts the claim for a
+    // primary identity, so for one read both.
+    const identities = event.user.identities ?? [];
+    const index = identities.findIndex((identity) => identity.connection === event.connection.name);
+    const profileData = index === -1 ? {} : identities[index].profileData ?? {};
+    const xmsEdov =
+      profileData.xms_edov === true || (index === 0 && event.user.xms_edov === true);
     api.idToken.setCustomClaim(`${namespace}xms_edov`, xmsEdov);
   }
 };

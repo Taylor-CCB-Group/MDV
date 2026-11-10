@@ -68,8 +68,13 @@ adds it through the manifest:
 The portal may then warn that `xms_edov` is not recognised. Clerk's guide says the warning
 can be ignored. Microsoft's reference lists the claim but does not describe these steps.
 
-Nobody has confirmed whether Auth0 puts the claim on the identity's `profileData` or on the
-user itself, so the post-login Action reads both. The connection type, the claim and where
-it lands have to be confirmed on the tenant before a Microsoft connection goes live. If the
+The post-login Action reads the claim only from the identity the sign-in used, so a linked
+account cannot pass on another connection's verification. Auth0's
+[account linking documentation](https://auth0.com/docs/manage-users/user-accounts/user-account-linking)
+keeps the primary identity's attributes on the root profile and puts each linked identity's
+attributes in its own `profileData`. Nobody has confirmed where the claim lands for a
+primary identity, so for one the Action reads both. The connection type, the claim and where
+it lands have to be confirmed on the tenant before a Microsoft connection goes live, for
+example by logging `event.user` from a test Action on that connection. If the
 claim does not arrive, Microsoft Invitations cannot be accepted until the connection or the
 Action provides it.
