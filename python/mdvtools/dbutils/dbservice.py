@@ -1065,7 +1065,8 @@ class InvitationService:
             if claim.rowcount != 1:
                 logger.info(f"Invitation {invitation.id} closed before its sign-in could accept it.")
                 db.session.rollback()
-                return None
+                user = User.query.filter_by(auth_id=sign_in["sub"]).first()
+                return user if user is not None and user.is_active else None
             if invitation.user_id is None:
                 user = User(email=invitation.email, auth_id=sign_in["sub"], is_active=True, confirmed_at=now)
                 db.session.add(user)

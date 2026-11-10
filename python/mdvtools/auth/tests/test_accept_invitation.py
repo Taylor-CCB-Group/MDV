@@ -433,6 +433,41 @@ def test_invitation_is_refused_while_another_user_holds_its_email_in_another_cas
     assert_refused(response, invitation)
 
 
+@pytest.mark.parametrize("winner_active, same_account", [(True, True), (False, True), (True, False)])
+def test_second_acceptance_after_first_commits(app, provider, admin, project, winner_active, same_account):
+    invitation = invite(admin, "jo@example.org", PASSWORD, {project: "viewer"})
+    sign_in = password_sign_in("auth0|jo", "jo@example.org")
+    winner_sign_in = sign_in if same_account else password_sign_in("auth0|other", "jo@example.org")
+    matches = InvitationService._sign_in_matches
+    winners = []
+
+    def accepted_once_matched(candidate, claims):
+        matched = matches(candidate, claims)
+        if matched:
+            # Both requests picked the open invitation. Finish the first
+            # acceptance before the second request tries its conditional update.
+            with patch.object(InvitationService, "_sign_in_matches", staticmethod(matches)):
+                winner = InvitationService.accept_for_sign_in(winner_sign_in)
+            assert winner is not None
+            winners.append(winner.id)
+            if not winner_active:
+                winner.is_active = False
+                db.session.commit()
+        return matched
+
+    with patch.object(InvitationService, "_sign_in_matches", staticmethod(accepted_once_matched)):
+        response = get_as(app, provider, f"/projects/{project.id}/open", sign_in)
+
+    assert response.status_code == (200 if winner_active and same_account else 403)
+    db.session.expire_all()
+    assert invitation.accepted_at is not None
+    assert invitation.accepted_user_id == winners[0]
+    assert invitation.revoked_at is None
+    assert User.query.filter_by(email="jo@example.org").count() == 1
+    assert UserProject.query.filter_by(project_id=project.id, user_id=winners[0]).count() == 1
+    assert User.query.filter_by(id=winners[0]).one().is_active == winner_active
+
+
 def test_invitation_revoked_while_its_sign_in_is_accepted_grants_nothing(app, provider, admin, project):
     # An Admin revokes the Invitation after MDV has picked it but before MDV
     # writes the acceptance. The plain SQL update commits the revoke without
