@@ -28,7 +28,7 @@ from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject, Usag
 from datetime import datetime
 from mdvtools.mdvproject import MDVProject
 from typing import Optional
-from sqlalchemy import func
+from sqlalchemy import func, update
 import os
 import shutil
 from mdvtools.logging_config import get_logger
@@ -1048,6 +1048,24 @@ class InvitationService:
             return None
         try:
             now = datetime.now()
+            # Claim the Invitation before writing anything else. An Admin can
+            # revoke it after it was picked, and the database checks it is
+            # still open when this update takes the row's write lock.
+            claim = db.session.execute(
+                update(Invitation)
+                .where(
+                    Invitation.id == invitation.id,
+                    Invitation.accepted_at.is_(None),
+                    Invitation.revoked_at.is_(None),
+                    Invitation.expires_at > now,
+                )
+                .values(accepted_at=now)
+                .execution_options(synchronize_session=False)
+            )
+            if claim.rowcount != 1:
+                logger.info(f"Invitation {invitation.id} closed before its sign-in could accept it.")
+                db.session.rollback()
+                return None
             if invitation.user_id is None:
                 user = User(email=invitation.email, auth_id=sign_in["sub"], is_active=True, confirmed_at=now)
                 db.session.add(user)
@@ -1057,6 +1075,7 @@ class InvitationService:
                 # account they signed in with before no longer reaches them (ADR 0019).
                 user = db.session.get(User, invitation.user_id)
                 if user is None:
+                    db.session.rollback()
                     return None
                 user.auth_id = sign_in["sub"]
                 user.email = invitation.email

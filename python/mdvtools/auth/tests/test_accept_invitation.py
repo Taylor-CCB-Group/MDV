@@ -16,12 +16,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from flask import Flask
+from sqlalchemy import update
 
 import mdvtools
 from mdvtools.auth.auth0_provider import Auth0Provider
 from mdvtools.auth.authutils import is_authenticated, register_before_request_auth
 from mdvtools.dbutils.dbmodels import Invitation, InvitationProject, Project, User, UserProject, db
-from mdvtools.dbutils.dbservice import UserProjectService
+from mdvtools.dbutils.dbservice import InvitationService, UserProjectService
 
 PASSWORD = "Username-Password-Authentication"
 MICROSOFT = "acme-entra"
@@ -397,3 +398,31 @@ def test_invitation_is_refused_while_another_user_holds_its_email_in_another_cas
     )
 
     assert_refused(response, invitation)
+
+
+def test_invitation_revoked_while_its_sign_in_is_accepted_grants_nothing(app, provider, admin, project):
+    # An Admin revokes the Invitation after MDV has picked it but before MDV
+    # writes the acceptance. The plain SQL update commits the revoke without
+    # changing the copy MDV already loaded, as a revoke from MDV-Admin would.
+    invitation = invite(admin, "jo@example.org", PASSWORD, {project: "viewer"})
+    matches = InvitationService._sign_in_matches
+
+    def revoked_once_matched(candidate, sign_in):
+        matched = matches(candidate, sign_in)
+        if matched:
+            db.session.execute(
+                update(Invitation).where(Invitation.id == candidate.id).values(revoked_at=datetime.now())
+            )
+            db.session.commit()
+        return matched
+
+    with patch.object(InvitationService, "_sign_in_matches", staticmethod(revoked_once_matched)):
+        response = get_as(
+            app, provider, f"/projects/{project.id}/open", password_sign_in("auth0|jo", "jo@example.org")
+        )
+
+    assert response.status_code == 403
+    db.session.expire_all()
+    assert User.query.filter_by(email="jo@example.org").first() is None
+    assert UserProject.query.filter_by(project_id=project.id).count() == 0
+    assert (invitation.accepted_at, invitation.revoked_at is not None) == (None, True)
