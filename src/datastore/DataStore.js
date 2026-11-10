@@ -8,17 +8,15 @@ import "./DensityDimension.js";
 import "./ValueSetDimension";
 import "./SortableDimension.js";
 import "./DeepToolsDimension.js";
-import { scaleLinear, scaleSymlog } from "d3-scale";
 import { quantileSorted } from "d3-array";
-import { makeObservable, observable, action } from "mobx";
-import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
-import { isDatatypeNumeric } from "@/lib/utils";
+import { scaleLinear, scaleSymlog } from "d3-scale";
+import { action, makeObservable, observable } from "mobx";
 import { formatDateDays, isDateColumn } from "@/lib/dateFormat";
-import {
-    getMultitextCapacity,
-    getMultitextDelimiter,
-    getMultitextJoinDelimiter,
-} from "@/lib/multitext";
+import { getMultitextCapacity, getMultitextDelimiter, getMultitextJoinDelimiter } from "@/lib/multitext";
+import { isDatatypeNumeric } from "@/lib/utils";
+import { logValidationError } from "@/lib/validationLogging";
+import { DataSourceSchema } from "../charts/schemas/DataSourceSchema";
+import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
 import {
     findColumnMetadataIndex,
     isSoftDeletedColumn,
@@ -27,9 +25,7 @@ import {
     toColumnMetadata,
     updateColumnMetadata,
 } from "./columnMetadataUtils";
-import { DataSourceSchema } from "../charts/schemas/DataSourceSchema";
-import { logValidationError } from "@/lib/validationLogging";
-
+import { writeFilteredIndices } from "./filteredIndexEval";
 
 class DataStore {
     /**
@@ -112,6 +108,7 @@ class DataStore {
         // so for now, rather than using makeAutoObservable, we'll just manually add the mobx stuff we need:
         makeObservable(this, {
             _filteredIndicesPromise: observable,
+            invalidateFilteredIndices: action,
             _callListeners: action,
             //columns: observable, //will probably have clone issues...
         });
@@ -130,9 +127,7 @@ class DataStore {
 
         if (config.row_data_loader) {
             if (!dataLoader?.rowDataLoader) {
-                console.warn(
-                    `datasource ${this.name} requires a row data loader but none has been supplied`,
-                );
+                console.warn(`datasource ${this.name} requires a row data loader but none has been supplied`);
             } else {
                 this.rowDataLoader = dataLoader.rowDataLoader;
                 this.rowData = new Map();
@@ -140,9 +135,7 @@ class DataStore {
         }
         if (config.binary_data_loader) {
             if (!dataLoader?.binaryDataLoader) {
-                console.warn(
-                    `datasource ${this.name} requires a binary data loader but none has been supplied`,
-                );
+                console.warn(`datasource ${this.name} requires a binary data loader but none has been supplied`);
             } else {
                 this.binaryDataLoader = dataLoader.binaryDataLoader;
                 this.binaryData = new Map();
@@ -166,7 +159,7 @@ class DataStore {
         this.images = config.images;
         this.genome_browser = config.genome_browser;
         this.tree_diagram = config.tree_diagram;
-        this.genome=config.genome;
+        this.genome = config.genome;
 
         if (config.columns) {
             const originalColumns = config.columns;
@@ -267,10 +260,7 @@ class DataStore {
             try {
                 this.listeners[id](type, data);
             } catch (e) {
-                console.error(
-                    `Error calling listener '${id}' for event '${type}'`,
-                    e,
-                );
+                console.error(`Error calling listener '${id}' for event '${type}'`, e);
             }
         }
     }
@@ -282,7 +272,7 @@ class DataStore {
      * be removed
      */
     removeAllFilters() {
-        //clear in one go 
+        //clear in one go
         this.filterArray.fill(0);
         const noclear = [];
         for (const dim of this.dimensions) {
@@ -290,14 +280,14 @@ class DataStore {
                 noclear.push(dim);
                 continue;
             }
-            if (dim.bgfData){
+            dim.cancelPendingFilter();
+            if (dim.bgfData) {
                 for (let i = 0; i < this.size; i++) {
-                    if (dim.filterArray[i] ===1 || dim.filterArray[i] === 3) {
-                        dim.filterArray[i] -=1;
+                    if (dim.filterArray[i] === 1 || dim.filterArray[i] === 3) {
+                        dim.filterArray[i] -= 1;
                     }
                 }
-            }
-            else{
+            } else {
                 dim.filterArray.fill(0);
             }
 
@@ -333,11 +323,24 @@ class DataStore {
      */
     dataChanged(columns, is_dirty = true) {
         let hasFiltered = false;
+        const pending = [];
         for (const d of this.dimensions) {
             //this method will not call any listeners- wait until all done
             if (d.reFilterOnDataChanged(columns)) {
-                hasFiltered = true;
+                if (d.pendingFilter) pending.push(d.pendingFilter);
+                else hasFiltered = true;
             }
+        }
+        // async filters land later: one 'filtered' once they have all been applied
+        if (pending.length) {
+            Promise.allSettled(pending).then((outcomes) => {
+                let committed = false;
+                for (const o of outcomes) {
+                    if (o.status === "fulfilled") committed ||= o.value;
+                    else console.error("async refilter failed", o.reason);
+                }
+                if (committed) this._callListeners("filtered");
+            });
         }
         if (is_dirty) {
             for (const c of columns) {
@@ -363,9 +366,7 @@ class DataStore {
     dataHighlighted(indexes, source) {
         indexes.sort((a, b) => a - b);
         this.highightedData = indexes;
-        this.loadRowData(indexes[0]).then((data) =>
-            this._callListeners("data_highlighted", { indexes, source, data }),
-        );
+        this.loadRowData(indexes[0]).then((data) => this._callListeners("data_highlighted", { indexes, source, data }));
     }
 
     async loadRowData(index) {
@@ -526,11 +527,7 @@ class DataStore {
                 let v = col.data[index];
                 if (col.datatype === "text" || col.datatype === "text16") {
                     v = col.values[v];
-                } else if (
-                    col.datatype === "double" ||
-                    col.datatype === "integer" ||
-                    col.datatype === "int32"
-                ) {
+                } else if (col.datatype === "double" || col.datatype === "integer" || col.datatype === "int32") {
                     if (Number.isNaN(v)) {
                         v = "missing";
                     } else if (isDateColumn(col)) {
@@ -539,23 +536,15 @@ class DataStore {
                 }
                 //multitext displayed as comma delimited values
                 else if (col.datatype === "multitext") {
-                    const delim = getMultitextJoinDelimiter(
-                        getMultitextDelimiter(col),
-                    );
+                    const delim = getMultitextJoinDelimiter(getMultitextDelimiter(col));
                     const capacity = getMultitextCapacity(col);
-                    const d = col.data.slice(
-                        index * capacity,
-                        index * capacity + capacity,
-                    );
+                    const d = col.data.slice(index * capacity, index * capacity + capacity);
                     v = Array.from(d.filter((x) => x !== 65535))
                         .map((x) => col.values[x])
                         .join(delim);
                 } else {
                     v = this.textDecoder.decode(
-                        col.data.slice(
-                            index * col.stringLength,
-                            index * col.stringLength + col.stringLength,
-                        ),
+                        col.data.slice(index * col.stringLength, index * col.stringLength + col.stringLength),
                     );
                     v = v.replaceAll("\0", "");
                 }
@@ -626,9 +615,7 @@ class DataStore {
                 }
                 if (match) {
                     const index = Math.floor(i / sl);
-                    const v = this.textDecoder
-                        .decode(col.data.slice(index * sl, index * sl + sl))
-                        .replaceAll("\0", "");
+                    const v = this.textDecoder.decode(col.data.slice(index * sl, index * sl + sl)).replaceAll("\0", "");
                     matches.push({
                         value: v,
                         index: index,
@@ -699,9 +686,7 @@ class DataStore {
     addColumnFromField(field) {
         const data = field.split("|");
         if (data.length !== 3) {
-            throw new Error(
-                `field ${field} cannot be found in datasource ${this.name}`,
-            );
+            throw new Error(`field ${field} cannot be found in datasource ${this.name}`);
         }
         let g = this.subtypeToGroup[data[0]];
         let sg = null;
@@ -855,9 +840,70 @@ class DataStore {
     }
 
     _filteredIndicesPromise = null;
-    _filteredIndexWorker = new Worker(
-        new URL("./filteredIndexWorker.ts", import.meta.url),
-    );
+    _filteredIndexRequestId = 0;
+    /**
+     * Requests the worker has not yet replied to, by id.
+     * @type {Map<number, { output: Uint32Array, settle: () => void }>}
+     */
+    _filteredIndexPending = new Map();
+    /** @type {Worker | null} null once it has failed: the indices are then worked out on the main thread */
+    _filteredIndexWorker = this._createFilteredIndexWorker();
+
+    /**
+     * Starts the worker that lists the rows passing the filter, wired up to settle the request each reply
+     * answers and to hand its work to the main thread if it fails.
+     * @returns {Worker | null} null if it could not be created
+     */
+    _createFilteredIndexWorker() {
+        /** @type {Worker} */
+        let worker;
+        try {
+            // a module worker, as it imports the scan it shares with the main thread
+            worker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url), { type: "module" });
+        } catch (e) {
+            // e.g. a content security policy that blocks workers: this runs while the store is being constructed
+            console.error("Filtered index worker could not be created, using the main thread instead", e);
+            return null;
+        }
+        // the worker is shared, and the cache is cleared whenever the filter changes, so there can be several
+        // requests in flight: replies are matched to requests by id.
+        worker.onmessage = (e) => {
+            const request = this._filteredIndexPending.get(e.data.id);
+            this._filteredIndexPending.delete(e.data.id);
+            request?.settle();
+        };
+        const onFailure = (e) => this._abandonFilteredIndexWorker(e);
+        worker.onerror = onFailure;
+        worker.onmessageerror = onFailure;
+        return worker;
+    }
+
+    /**
+     * Stops using the filtered index worker after a failure, and answers on the main thread whatever it had not
+     * replied to.
+     */
+    _abandonFilteredIndexWorker(reason) {
+        const worker = this._filteredIndexWorker;
+        if (!worker) return;
+        console.error(`DataStore '${this.name}': filtered index worker failed, using the main thread instead`, reason);
+        this._filteredIndexWorker = null;
+        worker.terminate();
+        const unanswered = [...this._filteredIndexPending.values()];
+        this._filteredIndexPending.clear();
+        for (const request of unanswered) {
+            writeFilteredIndices(this.filterArray, request.output);
+            request.settle();
+        }
+    }
+
+    /**
+     * Drops the cached filtered indices. They are dropped on any 'filtered' event; this is for a change to the
+     * filter state that is only announced later (an async filter result being applied).
+     */
+    invalidateFilteredIndices() {
+        this._filteredIndicesPromise = null;
+    }
+
     /**
      * Get an array of indexes of all the items that are not filtered.
      * Subsequent calls will return a cached version of a reference to the promised array.
@@ -866,31 +912,50 @@ class DataStore {
      * @returns {Promise<Uint32Array>} A promise that resolves to an array of indexes
      */
     async getFilteredIndices() {
-        if (this._filteredIndicesPromise) {
+        if (!this._filteredIndicesPromise) {
             // will be null if the filter has changed since the last call
-            return this._filteredIndicesPromise;
+            const request = this._requestFilteredIndices();
+            action(() => {
+                this._filteredIndicesPromise = request;
+            })();
         }
-        action(
-            () =>
-                (this._filteredIndicesPromise = new Promise(
-                    (resolve, reject) => {
-                        const worker = this._filteredIndexWorker;
-                        const byteLength =
-                            this.filterSize * Uint32Array.BYTES_PER_ELEMENT;
-                        const outputBuffer = new SharedArrayBuffer(byteLength);
-                        // todo atomics... not really needed for this, but would be good to illustrate / learn.
-                        worker.postMessage({
-                            filterBuffer: this.filterBuffer,
-                            outputBuffer,
-                        });
-                        worker.onmessage = (e) => {
-                            resolve(new Uint32Array(outputBuffer));
-                        };
-                    },
-                )),
-        )();
-
         return this._filteredIndicesPromise;
+    }
+
+    /**
+     * Works out the indices of the rows that pass the filter: on the worker, or here if it can't be used.
+     * @returns {Promise<Uint32Array>} the indices for the filter as it is when this resolves
+     */
+    _requestFilteredIndices() {
+        const outputBuffer = new SharedArrayBuffer(this.filterSize * Uint32Array.BYTES_PER_ELEMENT);
+        const output = new Uint32Array(outputBuffer);
+        const worker = this._filteredIndexWorker;
+        if (worker) {
+            const id = this._filteredIndexRequestId++;
+            const request = new Promise((resolve) => {
+                const settle = () => {
+                    // The filter is scanned as it is when the worker gets to it, into a buffer sized for it as it was
+                    // when this was requested. If it has changed in between (which clears the cache), the output need
+                    // not match any one state of it - a buffer with room for three rows scanned when only one still
+                    // passes holds [n, 0, 0] - so answer with the indices for the filter as it is now.
+                    if (this._filteredIndicesPromise !== request) resolve(this.getFilteredIndices());
+                    else resolve(output);
+                };
+                this._filteredIndexPending.set(id, { output, settle });
+            });
+            try {
+                // todo atomics... not really needed for this, but would be good to illustrate / learn.
+                worker.postMessage({ id, filterBuffer: this.filterBuffer, outputBuffer });
+                return request;
+            } catch (e) {
+                // a post that fails once is likely to keep failing: drop the worker, which also answers the requests
+                // it still had in flight, and answer this one below
+                this._filteredIndexPending.delete(id);
+                this._abandonFilteredIndexWorker(e);
+            }
+        }
+        writeFilteredIndices(this.filterArray, output);
+        return Promise.resolve(output);
     }
 
     /**
@@ -933,9 +998,7 @@ class DataStore {
      */
     setColumnOffset(data, update) {
         if (!this.offsets) {
-            throw new Error(
-                "Attempting to set offsets but none are specified in config",
-            );
+            throw new Error("Attempting to set offsets but none are specified in config");
         }
         data.filter = data.filter || "all";
         //give default values to this group if it has none
@@ -1035,16 +1098,9 @@ class DataStore {
 
                 if (rotation) {
                     if (!v.rotation_center) {
-                        v.rotation_center = this._getRotationOrigin(
-                            o.groups,
-                            i,
-                            fv,
-                        );
+                        v.rotation_center = this._getRotationOrigin(o.groups, i, fv);
                     }
-                    val.rotation_center = [
-                        v.rotation_center[0] + v.offsets[0],
-                        v.rotation_center[1] + v.offsets[1],
-                    ];
+                    val.rotation_center = [v.rotation_center[0] + v.offsets[0], v.rotation_center[1] + v.offsets[1]];
                 }
 
                 if (single) {
@@ -1084,9 +1140,7 @@ class DataStore {
         filter = filter || "all";
         const o = this.offsets;
         if (!o) {
-            throw new Error(
-                "Attempting to reset offsets but none are specified in config",
-            );
+            throw new Error("Attempting to reset offsets but none are specified in config");
         }
         delete this.offsets.values[filter][group];
         let fc = null;
@@ -1139,14 +1193,8 @@ class DataStore {
                     if (rotation) {
                         const cx = v.rotation_center[0];
                         const cy = v.rotation_center[1];
-                        const nx =
-                            v.cos * (x.data[n] - cx) +
-                            v.sin * (y.data[n] - cy) +
-                            cx;
-                        const ny =
-                            v.cos * (y.data[n] - cy) -
-                            v.sin * (x.data[n] - cx) +
-                            cy;
+                        const nx = v.cos * (x.data[n] - cx) + v.sin * (y.data[n] - cy) + cx;
+                        const ny = v.cos * (y.data[n] - cy) - v.sin * (x.data[n] - cx) + cy;
                         x.data[n] = nx;
                         y.data[n] = ny;
                     } else {
@@ -1180,12 +1228,7 @@ class DataStore {
         if (col.datatype === "unique") {
             for (let n = 0; n < this.size; n++) {
                 let v = this.textDecoder
-                    .decode(
-                        col.data.slice(
-                            n * col.stringLength,
-                            n * col.stringLength + col.stringLength,
-                        ),
-                    )
+                    .decode(col.data.slice(n * col.stringLength, n * col.stringLength + col.stringLength))
                     .replaceAll("\0", "");
                 //needed for some cell ids
                 if (v.includes("#")) {
@@ -1276,15 +1319,8 @@ class DataStore {
             buffer = data;
         }
         c.buffer = buffer;
-        if (
-            c.datatype === "integer" ||
-            c.datatype === "double" ||
-            c.datatype === "int32"
-        ) {
-            const dataArray = (c.data =
-                c.datatype === "int32"
-                    ? new Int32Array(buffer)
-                    : new Float32Array(buffer));
+        if (c.datatype === "integer" || c.datatype === "double" || c.datatype === "int32") {
+            const dataArray = (c.data = c.datatype === "int32" ? new Int32Array(buffer) : new Float32Array(buffer));
             if (!c.minMax) {
                 console.log(`Calculating min/max for ${c.name}`);
                 const computed = this._computeMinMaxFromData(c);
@@ -1295,10 +1331,7 @@ class DataStore {
                 const a = c.data.filter((x) => !Number.isNaN(x)).sort();
                 c.quantiles = {};
                 for (const q of [0.05, 0.01, 0.001]) {
-                    c.quantiles[q] = [
-                        quantileSorted(a, q),
-                        quantileSorted(a, 1 - q),
-                    ];
+                    c.quantiles[q] = [quantileSorted(a, q), quantileSorted(a, 1 - q)];
                 }
             }
         } else if (c.datatype === "multitext" || c.datatype === "text16") {
@@ -1422,16 +1455,9 @@ class DataStore {
             }
             return buff;
         }
-        if (
-            col.datatype === "integer" ||
-            col.datatype === "double" ||
-            col.datatype === "int32"
-        ) {
+        if (col.datatype === "integer" || col.datatype === "double" || col.datatype === "int32") {
             const buff = new SharedArrayBuffer(this.size * 4);
-            const a =
-                col.datatype === "int32"
-                    ? new Int32Array(buff)
-                    : new Float32Array(buff);
+            const a = col.datatype === "int32" ? new Int32Array(buff) : new Float32Array(buff);
 
             for (let i = 0; i < len; i++) {
                 a[i] = arr[i];
@@ -1545,18 +1571,10 @@ class DataStore {
             return !Number.isFinite(v) || (ov.fallbackOnZero && v === 0);
         }
         //simply return the color associated with the value
-        if (
-            c.datatype === "text" ||
-            c.datatype === "text16" ||
-            c.datatype === "multitext"
-        ) {
+        if (c.datatype === "text" || c.datatype === "text16" || c.datatype === "multitext") {
             return (x) => colors[data[x]];
         }
-        if (
-            c.datatype === "integer" ||
-            c.datatype === "double" ||
-            c.datatype === "int32"
-        ) {
+        if (c.datatype === "integer" || c.datatype === "double" || c.datatype === "int32") {
             const min = ov.min == null ? c.minMax[0] : ov.min;
             const max = ov.max == null ? c.minMax[1] : ov.max;
             const bins = config.bins || 100;
@@ -1585,7 +1603,7 @@ class DataStore {
             if (config.useValue) {
                 return getColor;
             }
-            return x => getColor(data[x]);
+            return (x) => getColor(data[x]);
         }
     }
 
@@ -1647,9 +1665,7 @@ class DataStore {
     setColumnColors(column, colors, notify = false) {
         const c = this.columnIndex[column];
         if (colors.length !== c.values.length) {
-            throw new Error(
-                `${column} being set with incorrect number of columns `,
-            );
+            throw new Error(`${column} being set with incorrect number of columns `);
         }
         c.colors = colors.slice(0);
         this.dirtyColumns.colors_changed[column] = true;
@@ -1670,11 +1686,7 @@ class DataStore {
         /** @type {Column} */
         const c = typeof column === "string" ? this.columnIndex[column] : column;
         const rArr = config.asArray;
-        if (
-            c.datatype === "double" ||
-            c.datatype === "integer" ||
-            c.datatype === "int32"
-        ) {
+        if (c.datatype === "double" || c.datatype === "integer" || c.datatype === "int32") {
             const ov = config.overideValues || {};
             const c_colors = ov.colors || c.colors || defaultIPalette;
             const min = ov.min === undefined ? c.minMax[0] : ov.min;
@@ -1698,24 +1710,16 @@ class DataStore {
             }
             if (useLog) {
                 //calculate new colors based on a log scale
-                const logScale = scaleSymlog()
-                    .domain([min, max])
-                    .range([0, bins])
-                    .clamp(true);
+                const logScale = scaleSymlog().domain([min, max]).range([0, bins]).clamp(true);
                 const newColors = new Array(bins + 1);
                 for (let i = 0; i < bins + 1; i++) {
-                    newColors[i] =
-                        colors[Math.floor(logScale(min + i * interval_size))];
+                    newColors[i] = colors[Math.floor(logScale(min + i * interval_size))];
                 }
                 colors = newColors;
             }
             return colors;
         }
-        if (
-            c.datatype === "text" ||
-            c.datatype === "multitext" ||
-            c.datatype === "text16"
-        ) {
+        if (c.datatype === "text" || c.datatype === "multitext" || c.datatype === "text16") {
             let colors = c.colors;
             if (!colors) {
                 const vlen = c.values.length;
@@ -1728,9 +1732,7 @@ class DataStore {
                     for (let n = 0; n < times; n++) {
                         colors = colors.concat(defaultPalette);
                     }
-                    colors = colors.concat(
-                        defaultPalette.slice(0, vlen % dlen),
-                    );
+                    colors = colors.concat(defaultPalette.slice(0, vlen % dlen));
                 }
             }
 
@@ -1763,17 +1765,17 @@ class DataStore {
     /**
      * Normalizes a minMax array to ensure [min, max] ordering.
      * Handles edge cases like reversed order, NaN values, and the "all NaN" sentinel case.
-     * 
+     *
      * **Invariant**: Always returns [min, max] where min <= max.
-     * 
+     *
      * **Edge cases**:
      * - All-NaN columns default to [0, 0]
      * - Reversed arrays are automatically normalized
      * - Invalid values (NaN, Infinity) trigger computation from data
-     * 
+     *
      * **Note**: Backwards ranges (where min > max might be semantically meaningful)
      * are not supported. If needed, handle at a higher level.
-     * 
+     *
      * @param {Column} c - The column object (needed to compute from data if needed)
      * @param {[number, number] | null | undefined} raw - The raw minMax array
      * @returns {[number, number]} Normalized [min, max], or [0, 0] if invalid and no data available
@@ -1827,11 +1829,7 @@ class DataStore {
      */
     getMinMaxForColumn(column) {
         let c = this.columnIndex[column];
-        if (
-            !c &&
-            typeof column === "string" &&
-            column.includes("|")
-        ) {
+        if (!c && typeof column === "string" && column.includes("|")) {
             try {
                 this.addColumnFromField(column);
             } catch (_err) {
@@ -1840,9 +1838,7 @@ class DataStore {
             c = this.columnIndex[column];
         }
         if (!c) {
-            throw new Error(
-                `Trying to get minMax for unknown column '${column}' in datasource '${this.name}'`,
-            );
+            throw new Error(`Trying to get minMax for unknown column '${column}' in datasource '${this.name}'`);
         }
         if (!isDatatypeNumeric(c.datatype)) {
             throw new Error(`Trying to get minMax for non-numeric column '${column}'`);
@@ -1944,7 +1940,7 @@ class DataStore {
         // if the column is a linked field, there is a chance that it won't be in the columnIndex
         // that is a problem because then we throw an error here.
         if (column === undefined) {
-            console.warn('getColumnValues(undefined)');
+            console.warn("getColumnValues(undefined)");
             return [];
         }
         const v = this.columnIndex[column]?.values;
@@ -1954,9 +1950,7 @@ class DataStore {
         }
         // could throw here if v is undefined (ie bad column arg)
         if (format === "name_value") {
-            const ls = Array.from(v, (x) => ({ name: x, value: x })).sort(
-                (a, b) => a.name.localeCompare(b.name),
-            );
+            const ls = Array.from(v, (x) => ({ name: x, value: x })).sort((a, b) => a.name.localeCompare(b.name));
             return ls;
         }
         return v;
@@ -2054,7 +2048,6 @@ class DataStore {
         }
         this._removeVisibleColumn(column, notify);
     }
-
 }
 
 function linspace(start, end, n) {
@@ -2203,16 +2196,7 @@ const defaultPalette = [
     "#FDE8DC",
 ];
 
-const defaultIPalette = [
-    "#3288bd",
-    "#66c2a5",
-    "#abdda4",
-    "#e6f598",
-    "#fee08b",
-    "#fdae61",
-    "#f46d43",
-    "#d53e4f",
-];
+const defaultIPalette = ["#3288bd", "#66c2a5", "#abdda4", "#e6f598", "#fee08b", "#fdae61", "#f46d43", "#d53e4f"];
 
 export default DataStore;
-export { hexToRGB, defaultPalette, RGBToHex };
+export { defaultPalette, hexToRGB, RGBToHex };

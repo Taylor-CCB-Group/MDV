@@ -13,8 +13,4 @@ const root = createRoot(container);
 // than to sign-in, which Auth0 would complete straight back into the denial.
 const denial = getAccessDenial();
 
-root.render(
-    <CustomThemeProvider>
-        {denial ? <AccessDenied denial={denial} /> : <Login />}
-    </CustomThemeProvider>
-);
+root.render(<CustomThemeProvider>{denial ? <AccessDenied denial={denial} /> : <Login />}</CustomThemeProvider>);

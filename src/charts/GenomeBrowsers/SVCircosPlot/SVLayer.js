@@ -1,6 +1,5 @@
-import { project, picking } from "@deck.gl/core";
-import { Layer } from "@deck.gl/core";
-import { Model, Geometry } from "@luma.gl/engine";
+import { Layer, picking, project } from "@deck.gl/core";
+import { Geometry, Model } from "@luma.gl/engine";
 
 /* I could use deck.gl's filtering extension but it 
  it appears to work in a similar way shader-modules.ts line 241
@@ -117,131 +116,134 @@ void main(void) {
 `;
 
 const svLayerModule = {
-  name: 'svLayer',
-  uniformTypes: {
-    radius: 'f32',
-    rotation: 'f32',
-    center: 'vec2<f32>',
-    totalLength: 'f32'
-  },
-  defaultUniforms: {
-    radius: 150.0,
-    rotation: 0.0,
-    center: [0.0, 0.0],
-    totalLength: 3088269832.0
-  }
+    name: "svLayer",
+    uniformTypes: {
+        radius: "f32",
+        rotation: "f32",
+        center: "vec2<f32>",
+        totalLength: "f32",
+    },
+    defaultUniforms: {
+        radius: 150.0,
+        rotation: 0.0,
+        center: [0.0, 0.0],
+        totalLength: 3088269832.0,
+    },
 };
 
 class SVLayer extends Layer {
-  static layerName = 'SVLayer';
+    static layerName = "SVLayer";
 
-  initializeState() {
-    this.getAttributeManager().addInstanced({
-      instancePosition: {
-        size: 3,
-        accessor: 'getSV'
-      },
-      instanceFilter:{
-        size:1,
-        type:"uint8",
-        accessor:"getFilter"
-      },
-    
-      instanceColor: {
-        size: 3,
-        type: "uint8",
-        accessor: 'getColor'
-      }
-    });
+    initializeState() {
+        this.getAttributeManager().addInstanced({
+            instancePosition: {
+                size: 3,
+                accessor: "getSV",
+            },
+            instanceFilter: {
+                size: 1,
+                type: "uint8",
+                accessor: "getFilter",
+            },
 
-    this.setState({ model: this._getModel() });
-    this._updateSVUniforms();
-  }
+            instanceColor: {
+                size: 3,
+                type: "uint8",
+                accessor: "getColor",
+            },
+        });
 
-  getShaders() {
-    return {
-      vs,
-      fs,
-      modules: [project, picking, svLayerModule]
-    };
-  }
-
-  updateState(params) {
-    super.updateState(params);
-
-    const { changeFlags } = params;
-    if (!this.state.model) {
-      this.setState({ model: this._getModel() });
+        this.setState({ model: this._getModel() });
+        this._updateSVUniforms();
     }
 
-    if (changeFlags.propsChanged || changeFlags.dataChanged) {
-      this._updateSVUniforms();
+    getShaders() {
+        return {
+            vs,
+            fs,
+            modules: [project, picking, svLayerModule],
+        };
     }
 
-    const trig = changeFlags.updateTriggersChanged;
-    if (trig) {
-      const am = this.getAttributeManager();
-      if (trig.getColor) {
-        const attribute = am.attributes['instanceColor'];
-        attribute.updateSubBuffer();
-      }
-      if (trig.getFilter) {
-        const attribute = am.attributes['instanceFilter'];
-        attribute.updateSubBuffer();
-      }
+    updateState(params) {
+        super.updateState(params);
+
+        const { changeFlags } = params;
+        if (!this.state.model) {
+            this.setState({ model: this._getModel() });
+        }
+
+        if (changeFlags.propsChanged || changeFlags.dataChanged) {
+            this._updateSVUniforms();
+        }
+
+        const trig = changeFlags.updateTriggersChanged;
+        if (trig) {
+            const am = this.getAttributeManager();
+            if (trig.getColor) {
+                const attribute = am.attributes["instanceColor"];
+                attribute.updateSubBuffer();
+            }
+            if (trig.getFilter) {
+                const attribute = am.attributes["instanceFilter"];
+                attribute.updateSubBuffer();
+            }
+        }
     }
-  }
 
-  finalizeState() {
-    const { model } = this.state;
-    if (model) {
-      model.destroy();
+    finalizeState() {
+        const { model } = this.state;
+        if (model) {
+            model.destroy();
+        }
+        super.finalizeState();
     }
-    super.finalizeState();
-  }
 
-  draw() {
-    const { model } = this.state;
-    if (model) {
-      model.draw(this.context.renderPass);
+    draw() {
+        const { model } = this.state;
+        if (model) {
+            model.draw(this.context.renderPass);
+        }
     }
-  }
 
-  getNumInstances() {
-    const sv = this.props.data?.attributes?.getSV;
-    if (sv?.length) return sv.length / 3;
-    return 0;
-  }
+    getNumInstances() {
+        const sv = this.props.data?.attributes?.getSV;
+        if (sv?.length) return sv.length / 3;
+        return 0;
+    }
 
-  _getModel() {
-    const NUM_SEGMENTS = 12;
-    const geometry = new Geometry({
-      topology: 'line-strip',
-      vertexCount: NUM_SEGMENTS,
-      isInstanced:true,
-      attributes: {
-          t: { size: 1, value: new Float32Array([...Array(NUM_SEGMENTS).keys()].map(i => i / (NUM_SEGMENTS - 1))) }
-      },
-    });
+    _getModel() {
+        const NUM_SEGMENTS = 12;
+        const geometry = new Geometry({
+            topology: "line-strip",
+            vertexCount: NUM_SEGMENTS,
+            isInstanced: true,
+            attributes: {
+                t: {
+                    size: 1,
+                    value: new Float32Array([...Array(NUM_SEGMENTS).keys()].map((i) => i / (NUM_SEGMENTS - 1))),
+                },
+            },
+        });
 
-    return new Model(this.context.device, {
-      ...this.getShaders(),
-      geometry,
-      isInstanced: true,
-      bufferLayout: this.getAttributeManager().getBufferLayouts()
-    });
-  }
+        return new Model(this.context.device, {
+            ...this.getShaders(),
+            geometry,
+            isInstanced: true,
+            bufferLayout: this.getAttributeManager().getBufferLayouts(),
+        });
+    }
 
-  _updateSVUniforms() {
-    this.setShaderModuleProps({
-      svLayer: {
-        radius: this.props.radius || 150.0,
-        center: this.props.center || [0.0, 0.0],
-        rotation: this.props.rotation || 0.0,
-        totalLength: this.props.totalLength || 3088269832.0
-      }
-    });
-  }
+    _updateSVUniforms() {
+        this.setShaderModuleProps({
+            svLayer: {
+                radius: this.props.radius || 150.0,
+                center: this.props.center || [0.0, 0.0],
+                rotation: this.props.rotation || 0.0,
+                totalLength: this.props.totalLength || 3088269832.0,
+            },
+        });
+    }
 }
 
 export default SVLayer;

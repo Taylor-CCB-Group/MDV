@@ -1,38 +1,37 @@
-import { getDefaultInitialViewState, ColorPaletteExtension, DetailView } from "@hms-dbmi/viv";
-import { observer } from "mobx-react-lite";
-import { useMemo, useEffect, useRef, useState, useCallback } from "react";
-import { shallow } from "zustand/shallow";
-import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
-import SelectionOverlay from "./SelectionOverlay";
-import FieldContourLegend from "./FieldContourLegend";
-import { useFieldContourLegend } from "../contour_state";
-import type { DualContourLegacyConfig } from "../contour_state";
-import type { FieldName } from "@/charts/charts";
-import { useLoader, type OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
-import { useViewStateLink } from "../chartLinkHooks";
-import { useChart } from "../context";
-import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import { GeoJsonLayer } from "@deck.gl/layers";
-import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
-import type { VivRoiConfig } from "./VivMDVReact";
+import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
+import type { DeckGLProps, OrbitViewState, OrthographicViewState, PickingInfo } from "deck.gl";
+import { observer } from "mobx-react-lite";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { shallow } from "zustand/shallow";
+import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
-import { useOuterContainer } from "../screen_state";
-import type { DeckGLProps, OrbitViewState, OrthographicViewState, PickingInfo } from "deck.gl";
+import { useViewStateLink } from "../chartLinkHooks";
+import { useChart } from "../context";
+import type { DualContourLegacyConfig, HoveredContour } from "../contour_state";
+import { useCategoryContourLegend, useFieldContourLegend } from "../contour_state";
+import { useChartID, useChartSize, useConfig, useRegion } from "../hooks";
 import useGateLayers from "../hooks/useGateLayers";
-import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
+import { useOuterContainer } from "../screen_state";
+import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
+import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
+import { type OME_TIFF, useChannelsStore, useLoader, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
+import FieldContourLegend from "./FieldContourLegend";
+import SelectionOverlay from "./SelectionOverlay";
+import type { VivRoiConfig } from "./VivMDVReact";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
 /** somewhat comparable to avivator `<Viewer />` */
 export const VivScatter = () => {
     const chart = useChart();
-    const [hoveredField, setHoveredField] = useState<FieldName | null>(null);
+    const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
 
     return (
-        <SpatialAnnotationProvider chart={chart} hoveredFieldId={hoveredField} setHoveredFieldId={setHoveredField}>
-            <Main hoveredField={hoveredField} setHoveredField={setHoveredField} />
+        <SpatialAnnotationProvider chart={chart} hoveredContour={hoveredContour} setHoveredContour={setHoveredContour}>
+            <Main hoveredContour={hoveredContour} setHoveredContour={setHoveredContour} />
         </SpatialAnnotationProvider>
     );
 };
@@ -70,11 +69,11 @@ const useJsonLayer = (showJson: boolean) => {
 
 const Main = observer(
     ({
-        hoveredField,
-        setHoveredField,
+        hoveredContour,
+        setHoveredContour,
     }: {
-        hoveredField: FieldName | null;
-        setHoveredField: (fieldId: FieldName | null) => void;
+        hoveredContour: HoveredContour | null;
+        setHoveredContour: (contour: HoveredContour | null) => void;
     }) => {
         // type of this to be sorted - before we accessed ome.data, but maybe this is the 'data'...
         const ome = useLoader() as OME_TIFF["data"]; // useOmeTiff();
@@ -93,25 +92,18 @@ const Main = observer(
         // passing showJson from here to make use of this being `observer`
         const jsonLayer = useJsonLayer(showJson);
 
-        const {
-            gateLabelLayer,
-            gateDisplayLayer,
-            controllerOptions,
-        } = useGateLayers();
+        const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
 
         // Get field contour legend data
         const config = useConfig<DualContourLegacyConfig>();
         const legendFields = useFieldContourLegend(config.densityFields);
+        const legendCategories = useCategoryContourLegend(config);
 
         // Legend visibility - fixed position in bottom-left
         const showLegend = config.field_legend.display;
 
         // Fixed bottom-left position: 10px from left, 10px from bottom
         const legendPosition = { x: 10, y: 10 };
-
-        const handleFieldHover = (fieldId: FieldName | null) => {
-            setHoveredField(fieldId);
-        };
 
         // maybe more efficient to pick out properties like this... but it's very repetitive/verbose
         const { colors, contrastLimits, channelsVisible, selections, brightness, contrast } = useChannelsStore(
@@ -173,28 +165,16 @@ const Main = observer(
                 brightness,
                 contrast,
             }),
-                [
-                ome,
-                selections,
-                contrastLimits,
-                extensions,
-                colors,
-                channelsVisible,
-                brightness,
-                contrast,
-            ],
+            [ome, selections, contrastLimits, extensions, colors, channelsVisible, brightness, contrast],
         );
 
         const getTooltipContent = useCallback(
             (info: PickingInfo) => {
-                return getCombinedScatterTooltip(
-                    info,
-                    {
-                        gateDisplayLayerId: gateDisplayLayer?.id,
-                        gateLabelLayerId: gateLabelLayer?.id,
-                        getPointTooltip: getTooltip,
-                    },
-                );
+                return getCombinedScatterTooltip(info, {
+                    gateDisplayLayerId: gateDisplayLayer?.id,
+                    gateLabelLayerId: gateLabelLayer?.id,
+                    getPointTooltip: getTooltip,
+                });
             },
             [gateDisplayLayer?.id, gateLabelLayer?.id, getTooltip],
         );
@@ -215,10 +195,10 @@ const Main = observer(
                     gateDisplayLayer,
                     selectionLayer,
                     gateLabelLayer,
-                ].filter(l => l !== null),
+                ].filter((l) => l !== null),
                 id: `${id}deck`,
                 // deviceProps: {
-                //     webgl: {                    
+                //     webgl: {
                 //         depth: true,
                 //         preserveDrawingBuffer: true,
                 //         antialias: true,
@@ -250,11 +230,13 @@ const Main = observer(
         return (
             <>
                 <SelectionOverlay />
-                {showLegend && legendFields.length > 0 && (
-                    <FieldContourLegend 
-                        fields={legendFields} 
+                {showLegend && (
+                    <FieldContourLegend
+                        fields={legendFields}
+                        categories={legendCategories.items}
+                        categoryLabel={legendCategories.label}
                         position={legendPosition}
-                        onFieldHover={handleFieldHover}
+                        onContourHover={setHoveredContour}
                     />
                 )}
                 <div
@@ -273,21 +255,16 @@ const Main = observer(
                 >
                     <MDVivViewer
                         outerContainer={outerContainer}
-                        selectionLayer={selectionLayer}
                         views={[detailView]}
                         layerProps={[layerConfig]}
                         viewStates={[{ ...viewState, id: detailId }]}
                         // not really expecting OrbitViewState... yet... but we will for 3D.
-                        onViewStateChange={(e: {viewState: OrthographicViewState | OrbitViewState}) => {
+                        onViewStateChange={(e: { viewState: OrthographicViewState | OrbitViewState }) => {
                             viewerStore.setState({
                                 viewState: { ...e.viewState, id: detailId },
                             });
                             if (vsDebugDivRef.current)
-                                vsDebugDivRef.current.innerText = JSON.stringify(
-                                    e.viewState,
-                                    null,
-                                    2,
-                                );
+                                vsDebugDivRef.current.innerText = JSON.stringify(e.viewState, null, 2);
                         }}
                         deckProps={deckProps}
                     />
@@ -295,4 +272,5 @@ const Main = observer(
                 {tooltipPortal}
             </>
         );
-});
+    },
+);

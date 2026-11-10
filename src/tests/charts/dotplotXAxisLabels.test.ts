@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+    type FixedXLabelLayoutInput,
+    layoutFixedXLabels,
     layoutXLabels,
     type MeasureText,
     stripSharedSubgroupSuffix,
@@ -26,9 +28,7 @@ function plainColumn(name: string) {
 
 describe("stripSharedSubgroupSuffix", () => {
     it("drops the suffix when every column shares one subgroup", () => {
-        const columns = ["CD4", "CD8A", "GZMB"].map((g, i) =>
-            subgroupColumn(g, "rna_expr", i),
-        );
+        const columns = ["CD4", "CD8A", "GZMB"].map((g, i) => subgroupColumn(g, "rna_expr", i));
         expect(stripSharedSubgroupSuffix(columns)).toEqual(["CD4", "CD8A", "GZMB"]);
     });
 
@@ -96,10 +96,7 @@ describe("layoutXLabels", () => {
     const longLabels = Array.from({ length: 10 }, (_, i) => `LONG_GENE_NAME_${i}_abcd`);
 
     it("lays labels flat at the user's font size when they fit", () => {
-        const layout = layoutXLabels(
-            { ...base, labels: ["CD4", "CD8A", "GZMB", "NKG7"] },
-            measure,
-        );
+        const layout = layoutXLabels({ ...base, labels: ["CD4", "CD8A", "GZMB", "NKG7"] }, measure);
         expect(layout).toEqual({
             angle: 0,
             fontSize: 10,
@@ -128,44 +125,29 @@ describe("layoutXLabels", () => {
     });
 
     it("caps the margin at 30% of a short chart's height", () => {
-        const layout = layoutXLabels(
-            { ...base, labels: longLabels, chartHeight: 200 },
-            measure,
-        );
+        const layout = layoutXLabels({ ...base, labels: longLabels, chartHeight: 200 }, measure);
         expect(layout.margin).toBeLessThanOrEqual(60);
     });
 
     it("shortens the first labels more when they would reach past the left edge", () => {
-        const layout = layoutXLabels(
-            { ...base, labels: longLabels, plotLeft: 20 },
-            measure,
-        );
+        const layout = layoutXLabels({ ...base, labels: longLabels, plotLeft: 20 }, measure);
         expect(layout.labels[0].length).toBeLessThan(layout.labels[1].length);
     });
 
     it("shows full labels and grows the margin when not truncating", () => {
-        const layout = layoutXLabels(
-            { ...base, labels: longLabels, truncate: false },
-            measure,
-        );
+        const layout = layoutXLabels({ ...base, labels: longLabels, truncate: false }, measure);
         expect(layout.labels).toEqual(longLabels);
         expect(layout.margin).toBeGreaterThan(X_MARGIN_MAX_PX);
     });
 
     it("leaves room for the dots when full labels would not fit", () => {
-        const layout = layoutXLabels(
-            { ...base, labels: longLabels, truncate: false, chartHeight: 100 },
-            measure,
-        );
+        const layout = layoutXLabels({ ...base, labels: longLabels, truncate: false, chartHeight: 100 }, measure);
         expect(layout.margin).toBe(60);
     });
 
     it("shrinks the font to fit narrow columns", () => {
         // 20 columns of 13px: 13·sin45 / 1.1 ≈ 8.4px
-        const layout = layoutXLabels(
-            { ...base, labels: Array(20).fill("LONGERNAME"), plotWidth: 260 },
-            measure,
-        );
+        const layout = layoutXLabels({ ...base, labels: Array(20).fill("LONGERNAME"), plotWidth: 260 }, measure);
         expect(layout.fontSize).toBeCloseTo((13 * Math.SQRT1_2) / 1.1);
         expect(layout.fontSize).toBeLessThan(10);
     });
@@ -191,11 +173,75 @@ describe("layoutXLabels", () => {
         it("labels only every nth column when thinning", () => {
             const layout = layoutXLabels({ ...crowded, thin: true }, measure);
             // 7px · 1.1 / (5.25 · sin45) → every 3rd column
-            const labelled = layout.labels
-                .map((l, i) => (l === "" ? null : i))
-                .filter((i) => i !== null);
+            const labelled = layout.labels.map((l, i) => (l === "" ? null : i)).filter((i) => i !== null);
             expect(labelled).toHaveLength(20);
             expect(labelled.slice(0, 3)).toEqual([0, 3, 6]);
         });
+    });
+});
+
+describe("layoutFixedXLabels", () => {
+    // 10 columns, 56px each
+    const base: FixedXLabelLayoutInput = {
+        labels: Array.from({ length: 10 }, (_, i) => `LONG_GENE_NAME_${i}_abcd`),
+        plotLeft: 110,
+        plotWidth: 560,
+        chartHeight: 400,
+        fontSize: 10,
+        titleSize: 0,
+        truncate: true,
+        thin: false,
+        angle: 45,
+        margin: 60,
+    };
+    const width = (label: string) => measure(label, base.fontSize);
+
+    it("keeps the user's angle, font size and margin", () => {
+        const layout = layoutFixedXLabels(base, measure);
+        expect(layout).toMatchObject({ angle: 45, fontSize: 10, margin: 60 });
+    });
+
+    it("shortens 45° labels to the room the axis height leaves", () => {
+        const layout = layoutFixedXLabels(base, measure);
+        // (60 - (9 + 10·sin45 + 4)) / sin45 ≈ 56px of text
+        for (const label of layout.labels) {
+            expect(label).toContain("…");
+            expect(width(label)).toBeLessThanOrEqual(57);
+        }
+    });
+
+    it("keeps more of each label on a taller axis", () => {
+        const short = layoutFixedXLabels(base, measure);
+        const tall = layoutFixedXLabels({ ...base, margin: 120 }, measure);
+        expect(tall.labels[5].length).toBeGreaterThan(short.labels[5].length);
+    });
+
+    it("shortens flat labels to the column width", () => {
+        const layout = layoutFixedXLabels({ ...base, angle: 0 }, measure);
+        for (const label of layout.labels) {
+            expect(label).toContain("…");
+            expect(width(label)).toBeLessThanOrEqual(56 - 4);
+        }
+    });
+
+    it("leaves labels as they are with neither option on", () => {
+        for (const angle of [0, 45] as const) {
+            const layout = layoutFixedXLabels({ ...base, angle, truncate: false }, measure);
+            expect(layout.labels).toEqual(base.labels);
+        }
+    });
+
+    it("labels only every nth column when full flat labels overlap", () => {
+        const layout = layoutFixedXLabels({ ...base, angle: 0, truncate: false, thin: true }, measure);
+        // 132px labels in 56px columns → every 3rd column
+        const labelled = layout.labels.map((l, i) => (l === "" ? null : i)).filter((i) => i !== null);
+        expect(labelled).toEqual([0, 3, 6, 9]);
+    });
+
+    it("labels only every nth column when 45° labels are too close", () => {
+        // 60 columns in 315px: 10px · 1.1 / (5.25 · sin45) → every 3rd column
+        const crowded = { ...base, plotWidth: 315, labels: Array(60).fill("GENE00"), thin: true };
+        const labelled = layoutFixedXLabels(crowded, measure).labels.filter((l) => l !== "");
+        expect(labelled).toHaveLength(20);
     });
 });

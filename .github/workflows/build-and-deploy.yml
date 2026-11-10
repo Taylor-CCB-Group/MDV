@@ -13,13 +13,40 @@ on:
       - main
 
 jobs:
+  # Nightly builds only fill gaps: skip the build when main's HEAD already has an image.
+  check-image:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.image.outputs.exists }}
+    steps:
+      - name: Check whether an image for HEAD is already on Docker Hub
+        id: image
+        run: |
+          IMAGE="${{ secrets.DOCKER_HUB_USERNAME }}/mdv:${{ github.sha }}"
+          if OUTPUT=$(docker buildx imagetools inspect "$IMAGE" 2>&1); then
+            echo "Image for ${{ github.sha }} already exists, skipping build"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          elif echo "$OUTPUT" | grep -q ": not found$"; then
+            echo "No image for ${{ github.sha }} yet, building"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          else
+            echo "Could not check Docker Hub for ${{ github.sha }}:"
+            echo "$OUTPUT"
+            exit 1
+          fi
+
   build-and-deploy:
+    needs: check-image
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy]')) ||
-      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+      !cancelled() &&
+      (needs.check-image.result == 'skipped' || needs.check-image.outputs.exists == 'false') && (
+        github.event_name == 'schedule' ||
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy]')) ||
+        (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+      )
 
     steps:
       - name: Checkout code
@@ -27,27 +54,6 @@ jobs:
         with:
           # Fetch all history for all branches and tags
           fetch-depth: 0
-
-      - name: Get last successful commit hash for scheduled runs
-        if: github.event_name == 'schedule'
-        id: last_successful_commit
-        run: |
-          LAST_SUCCESSFUL_COMMIT=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs?status=success&branch=main&per_page=1" | jq -r '.workflow_runs[0].head_sha')
-          echo "Last successful commit: $LAST_SUCCESSFUL_COMMIT"
-          echo "last_commit_sha=$LAST_SUCCESSFUL_COMMIT" >> $GITHUB_OUTPUT
-
-      - name: Get latest commit hash for scheduled runs
-        if: github.event_name == 'schedule'
-        id: latest_commit
-        run: |
-          LATEST_COMMIT=$(git rev-parse HEAD)
-          echo "Latest commit on main: $LATEST_COMMIT"
-          echo "latest_commit_sha=$LATEST_COMMIT" >> $GITHUB_OUTPUT
-
-      - name: Check for new commits before building on schedule
-        if: github.event_name == 'schedule' && steps.last_successful_commit.outputs.last_commit_sha == steps.latest_commit.outputs.latest_commit_sha
-        uses: andymckay/cancel-action@0.2
 
       - name: Set up Docker Buildx
         id: buildx
@@ -73,12 +79,7 @@ jobs:
       - name: Generate release notes
         id: release_notes
         run: |
-          # For scheduled runs, get logs since last successful build. Otherwise, get the last commit.
-          if [ "${{ github.event_name }}" == "schedule" ]; then
-            RELEASE_NOTES=$(git log --pretty=format:"%h - %s" ${{ steps.last_successful_commit.outputs.last_commit_sha }}..${{ steps.latest_commit.outputs.latest_commit_sha }} | tr '\n' ' ' | sed 's/"/\\"/g')
-          else
-            RELEASE_NOTES=$(git log -1 --pretty=format:"%h - %s" | sed 's/"/\\"/g')
-          fi
+          RELEASE_NOTES=$(git log -1 --pretty=format:"%h - %s" | sed 's/"/\\"/g')
           echo "release_notes=$RELEASE_NOTES" >> $GITHUB_OUTPUT
           echo "Release notes: $RELEASE_NOTES"
 

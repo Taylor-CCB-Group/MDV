@@ -1,5 +1,4 @@
 import test, { expect } from "@playwright/test";
-import { createTemporaryProjectViaSyntheticAnndata } from "../../utils/projectFixtures";
 import {
     addChartViaUi,
     closeTopDialog,
@@ -11,13 +10,12 @@ import {
     waitForChartByTitle,
     waitForViewUnsavedState,
 } from "../../utils/helpers";
+import { createTemporaryProjectViaSyntheticAnndata } from "../../utils/projectFixtures";
 
 test.describe("Chart Creation Single", () => {
     test.setTimeout(180_000);
 
-    test("creates one 2D scatter chart smoke path using synthetic AnnData project", async ({
-        page,
-    }) => {
+    test("creates one 2D scatter chart smoke path using synthetic AnnData project", async ({ page }) => {
         const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
             synthetic: {
                 profile: "minimal",
@@ -81,9 +79,7 @@ test.describe("Chart Creation Single", () => {
                     throw new Error("ChartManager _addChart hook is unavailable.");
                 }
 
-                chartManager._addChart = async function patchedAddChart(
-                    ...args: unknown[]
-                ) {
+                chartManager._addChart = async function patchedAddChart(...args: unknown[]) {
                     chartManager._addChart = originalAddChart;
                     throw new Error("Playwright forced chart creation failure");
                 };

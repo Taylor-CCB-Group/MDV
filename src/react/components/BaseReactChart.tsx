@@ -11,10 +11,9 @@ function Fallback() {
             <h2>BaseReactChart</h2>
             <p>BaseReactChart is a base class for charts that use React.</p>
             <p>
-                As of this writing, in order to implement a new React-based
-                chart, make a class that extends BaseReactChart, and make it
-                call the super constructor with an argument for the (mobx
-                observable) function that does the react rendering.
+                As of this writing, in order to implement a new React-based chart, make a class that extends
+                BaseReactChart, and make it call the super constructor with an argument for the (mobx observable)
+                function that does the react rendering.
             </p>
             <p>See `react.md` for more detail...</p>
         </>
@@ -65,11 +64,7 @@ export abstract class BaseReactChart<T extends BaseConfig> extends BaseChart<T> 
         // any mobx state, so we can't just hide it in the base class.
         // (although maybe we could design a hook that hides it?)
         // const Observed = observer(ReactComponentFunction);
-        this.reactEl = createEl(
-            "div",
-            { classes: ["react-chart"] },
-            this.contentDiv,
-        ); //other things may still be added to contentDiv outside react (e.g. legend)
+        this.reactEl = createEl("div", { classes: ["react-chart"] }, this.contentDiv); //other things may still be added to contentDiv outside react (e.g. legend)
         this.ComponentFn = ReactComponentFunction;
         this.mountReact();
     }

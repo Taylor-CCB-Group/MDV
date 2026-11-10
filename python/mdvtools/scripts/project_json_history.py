@@ -166,8 +166,30 @@ def list_revisions(project: Path) -> list[dict[str, object]]:
         manifest_path = child / "manifest.json"
         if child.is_dir() and manifest_path.is_file():
             manifests.append(_read_manifest(manifest_path))
+    # created_at has one-second resolution, so revisions made in the same second
+    # are ordered by their depth in the parent chain (a child is always newer)
+    parents = {str(item.get("id", "")): item.get("parent") for item in manifests}
+    depths: dict[str, int] = {}
+
+    def depth(rev_id: str) -> int:
+        chain: list[str] = []
+        current: object = rev_id
+        while isinstance(current, str) and current in parents and current not in depths:
+            if current in chain:  # corrupt history with a cycle
+                break
+            chain.append(current)
+            current = parents[current]
+        base = depths.get(current, -1) if isinstance(current, str) else -1
+        for offset, item in enumerate(reversed(chain), start=1):
+            depths[item] = base + offset
+        return depths.get(rev_id, 0)
+
     manifests.sort(
-        key=lambda item: (str(item.get("created_at", "")), str(item.get("id", ""))),
+        key=lambda item: (
+            str(item.get("created_at", "")),
+            depth(str(item.get("id", ""))),
+            str(item.get("id", "")),
+        ),
         reverse=True,
     )
     return manifests

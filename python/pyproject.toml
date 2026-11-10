@@ -6,7 +6,7 @@ authors = [
     { name = "Martin Sergeant", email = "m.j.sergeant1@googlemail.com" },
     { name = "PeterTodd", email = "peter.todd@well.ox.ac.uk" },
 ]
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.12,<3.13"
 # Standalone PyPI long description (rendered on the package page, no repo context).
 # Dev-facing setup lives in README.md; release process in ../docs/RELEASING.md.
 readme = "PYPI_README.md"
@@ -14,7 +14,6 @@ license = "GPL-3.0-only"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
 # Slim core: project manipulation, viewing, MDVProject.serve(), and spatial.
@@ -31,16 +30,19 @@ dependencies = [
     "numpy<2.3.0",
     "numcodecs>=0.16.1",
     "pandas==2.3.2",
-    "scanpy==1.11.4",
+    # the leiden extra adds igraph and leidenalg, which `--compute-x-umap` needs
+    # for sc.tl.leiden; scanpy already requires umap-learn for sc.tl.umap
+    "scanpy[leiden]==1.11.4",
     "scipy>=1.11.3,<2",
     "werkzeug>=3.0.2,<4",
     "gevent>=25.5.1,<26",
     "polars>=1.31.0,<2",
     # spatial stays in core (preserves current PyPI behaviour). jp2k.py imports
     # generate-tiff-offsets at module level, so it must be core too.
-    "spatialdata>=0.7.2,<0.8",
-    "spatialdata-io>=0.6.0,<0.7",
+    "spatialdata>=0.8.0,<0.9",
+    "spatialdata-io>=0.7.1,<0.8",
     "generate-tiff-offsets>=0.1.7,<0.2",
+    "spatialdata-js-util[write]>=0.2.0,<0.3",
     # genomic operations
     "pysam==0.24.0",
     "pyranges>=0.1.4,<0.2",
@@ -91,8 +93,8 @@ Homepage = "https://github.com/Taylor-CCB-Group/MDV"
 mdvtools = "mdvtools.cli:cli"
 
 [tool.uv]
-# Pin uv for CI and local dev. Docker pins the same version via pip (see Dockerfile).
-required-version = "0.11.14"
+# Minimum uv only; newer releases are fine. CI and Docker install the latest uv.
+required-version = ">=0.11.14"
 
 [tool.uv.build-backend]
 module-root = ""
@@ -113,15 +115,13 @@ dev = [
     "pytest>=8.1.1,<9",
     "ome-types>=0.5.0,<0.6",
     "jupyterlab==4.4.9",
-    "leidenalg>=0.10.2,<0.11",
     "setuptools==80.9.0",
     "packaging>=24.0,<25",
     "pillow>=10.3.0,<11",
     "seaborn>=0.13.2,<0.14",
-    "umap-learn>=0.5.6,<0.6",
     "statsmodels>=0.14.2,<0.15",
     "spatialdata-plot>=0.2.12,<0.3",
-    "dummy-spatialdata>=0.1.9,<0.2 ; python_full_version >= '3.12' and python_full_version < '3.13'",
+    "dummy-spatialdata>=0.1.9,<0.2",
     # also a runtime dep of the chat feature (see `app` extra); kept here for `make lint`/`make format`
     "ruff>=0.3.7,<0.4",
 ]

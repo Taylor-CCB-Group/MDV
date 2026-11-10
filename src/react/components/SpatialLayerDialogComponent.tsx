@@ -1,8 +1,14 @@
+import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
+    Alert,
+    AlertTitle,
     Autocomplete,
     Checkbox,
     Collapse,
@@ -11,23 +17,8 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import {
-    DndContext,
-    PointerSensor,
-    closestCenter,
-    useSensor,
-    useSensors,
-    type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-    SortableContext,
-    useSortable,
-    verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import type { RenderStackSpatialElementType } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
-import { useSpatialData } from "@spatialdata/react";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -35,36 +26,34 @@ import { ErrorBoundary } from "react-error-boundary";
 import {
     DECK_OVERLAY_IDS,
     DECK_OVERLAY_LABELS,
+    type DeckOverlayId,
     deckHostLayerId,
     deckIdFromHostLayerId,
-    type DeckOverlayId,
 } from "@/react/spatialdata/host_overlay_ids";
-import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import {
     insertHostRenderStackEntry,
     insertSpatialRenderStackEntry,
     isRemovableRenderStackEntry,
     removeRenderStackEntry,
-    reorderRenderStackEntries,
     renderStackEntryIds,
+    reorderRenderStackEntries,
     seedRenderStackFromSpatialData,
     useRenderStackEntry,
     useRenderStackMutation,
 } from "@/react/spatialdata/render_stack_control";
-import {
-    defaultPropsForSpatialElement,
-    listAvailableSpatialEntries,
-} from "@/react/spatialdata/render_stack_defaults";
+import { defaultPropsForSpatialElement, listAvailableSpatialEntries } from "@/react/spatialdata/render_stack_defaults";
+import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
+import { useChartSpatialData } from "@/react/spatialdata/shared_spatial_data";
 import { useElementTableAssociation } from "@/react/spatialdata/table_association";
 import { useChart, useDataStore } from "../context";
 import { useConfig, useDataSources } from "../hooks";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
 import ImageLayerPanel from "./spatialLayers/ImageLayerPanel";
 import LabelsLayerPanel from "./spatialLayers/LabelsLayerPanel";
 import PointsLayerPanel from "./spatialLayers/PointsLayerPanel";
 import ShapesLayerPanel from "./spatialLayers/ShapesLayerPanel";
-import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 type InsertOption =
     | { kind: "spatial"; type: RenderStackSpatialElementType; elementKey: string; label: string }
@@ -77,10 +66,38 @@ function isLayerConfigOfType<TType extends LayerConfig["type"]>(
     return layer?.type === type;
 }
 
+/** Why a layer was turned off; shown above its properties until it is turned back on. */
+const LayerFailureDetails = observer(function LayerFailureDetails({ entryId }: { entryId: string }) {
+    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    const failure = chart.layerFailures.get(entryId);
+    if (!failure) return null;
+    return (
+        <Alert severity="warning" sx={{ mb: 1, "& .MuiAlert-message": { minWidth: 0 } }}>
+            <AlertTitle>This layer failed to draw and was turned off</AlertTitle>
+            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                {failure.reason}
+            </Typography>
+            {failure.detail && (
+                <Typography
+                    variant="caption"
+                    component="pre"
+                    sx={{ mt: 1, whiteSpace: "pre-wrap", wordBreak: "break-word", opacity: 0.8 }}
+                >
+                    {failure.detail}
+                </Typography>
+            )}
+            <Typography variant="caption" component="p" sx={{ mt: 1 }}>
+                {failure.source === "webgpu" ? "WebGPU" : "deck.gl"} error
+                {failure.count > 1 ? `, reported ${failure.count} times` : ""}. Turn the layer back on to try again.
+            </Typography>
+        </Alert>
+    );
+});
+
 const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: string }) {
     const dataStore = useDataStore();
     const dataSources = useDataSources();
-    const { spatialData } = useSpatialData();
+    const { spatialData } = useChartSpatialData();
     const { entry, layer, patchLayer } = useRenderStackEntry(entryId);
     const spatialElementType = entry?.kind === "spatial" ? entry.source.elementType : undefined;
     const spatialElementKey = entry?.kind === "spatial" ? entry.source.elementKey : undefined;
@@ -92,8 +109,8 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
     );
     const layerDataStore =
         tableAssociation.status === "resolved"
-            ? dataSources.find((dataSource) => dataSource.name === tableAssociation.dataSourceName)
-                  ?.dataStore ?? dataStore
+            ? (dataSources.find((dataSource) => dataSource.name === tableAssociation.dataSourceName)?.dataStore ??
+              dataStore)
             : dataStore;
 
     if (!entry) return null;
@@ -121,12 +138,7 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
             );
         case "points":
             if (!isLayerConfigOfType(layer, "points")) return null;
-            return (
-                <PointsLayerPanel
-                    config={layer}
-                    updateLayer={patchLayer}
-                />
-            );
+            return <PointsLayerPanel config={layer} updateLayer={patchLayer} />;
         case "labels":
             if (!isLayerConfigOfType(layer, "labels")) return null;
             return (
@@ -155,15 +167,10 @@ const LayerTreeRow = observer(function LayerTreeRow({
     onRemove: (entryId: string) => void;
     indent?: boolean;
 }) {
+    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const { entry, patchEntry, patchProps } = useRenderStackEntry(entryId);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: entryId });
+    const failure = chart.layerFailures.get(entryId);
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: entryId });
 
     if (!entry) return null;
 
@@ -180,8 +187,9 @@ const LayerTreeRow = observer(function LayerTreeRow({
         <div
             ref={setNodeRef}
             style={style}
-            className={`flex items-center gap-1 py-0.5 cursor-pointer rounded ${indent ? "pl-5 pr-1" : "px-1"} ${selected ? "bg-blue-100 dark:bg-blue-900/30" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
+            className={`flex items-center gap-1 py-0.5 cursor-pointer rounded ${indent ? "pl-5 pr-1" : "px-1"} ${selected ? "bg-blue-100 dark:bg-blue-900/30" : failure ? "bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:hover:bg-amber-900/50" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
             onClick={() => onSelect(entryId)}
+            title={failure ? `Failed and turned off: ${failure.reason}` : undefined}
         >
             <IconButton
                 {...attributes}
@@ -196,17 +204,19 @@ const LayerTreeRow = observer(function LayerTreeRow({
                 size="small"
                 checked={entry.visible}
                 onClick={(e) => e.stopPropagation()}
-                onChange={(e) => patchEntry({ visible: e.target.checked })}
+                onChange={(e) => {
+                    // turning a failed layer back on is a retry: forget the failure so it can be reported again
+                    if (e.target.checked) chart.clearLayerFailure(entryId);
+                    patchEntry({ visible: e.target.checked });
+                }}
                 sx={{ p: 0.25, flexShrink: 0 }}
             />
+            {failure && <WarningAmberIcon fontSize="small" color="warning" sx={{ flexShrink: 0 }} />}
             <Typography variant="body2" className="grow truncate select-none">
                 {renderStackEntryDisplayName(entry)}
             </Typography>
             {supportsOpacity && (
-                <div
-                    className="w-20 px-1 flex-shrink-0"
-                    onClick={(e) => e.stopPropagation()}
-                >
+                <div className="w-20 px-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <Slider
                         size="small"
                         min={0}
@@ -239,7 +249,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
 const SpatialLayerDialogComponent = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const config = useConfig<SpatialDataMdvReactConfig>();
-    const { spatialData } = useSpatialData();
+    const { spatialData } = useChartSpatialData();
     const stack = config.renderStack;
     const mutateStack = useRenderStackMutation();
     const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
@@ -248,8 +258,8 @@ const SpatialLayerDialogComponent = observer(() => {
     // actually, just hidden in this UI for now.
     const [deckCollapsed, setDeckCollapsed] = useState(false);
     const coordinateSystem = //todo datasources schema including spatial regions when referring to dataStore here.
-        (chart.dataStore.regions?.all_regions[config.region] as { spatial?: { coordinate_system?: string } })
-            ?.spatial?.coordinate_system ?? null;
+        (chart.dataStore.regions?.all_regions[config.region] as { spatial?: { coordinate_system?: string } })?.spatial
+            ?.coordinate_system ?? null;
 
     useEffect(() => {
         if (!spatialData || !coordinateSystem) return;
@@ -339,39 +349,49 @@ const SpatialLayerDialogComponent = observer(() => {
     const onRemove = useCallback(
         (id: string) => {
             mutateStack((current) => removeRenderStackEntry(current, id));
+            chart.clearLayerFailure(id);
             if (selectedEntryId === id) setSelectedEntryId(null);
         },
-        [mutateStack, selectedEntryId],
+        [chart, mutateStack, selectedEntryId],
     );
 
     if (!stack?.entries.length) {
         return (
             <div className="block w-full p-3">
-                <Typography color="text.secondary">
-                    Layer stack is loading…
-                </Typography>
+                <Typography color="text.secondary">Layer stack is loading…</Typography>
             </div>
         );
     }
 
     // crude bypass of MDV layers in dialog for now.
-    const entryIds = renderStackEntryIds(stack);//.filter(id => !id.startsWith("deck:"));
-    const spatialEntryIds = entryIds.filter(id => !id.startsWith("deck:"));
-    const hostEntryIds = [] satisfies string[];//entryIds.filter(id => id.startsWith("deck:"));
+    const entryIds = renderStackEntryIds(stack); //.filter(id => !id.startsWith("deck:"));
+    const spatialEntryIds = entryIds.filter((id) => !id.startsWith("deck:"));
+    const hostEntryIds = [] satisfies string[]; //entryIds.filter(id => id.startsWith("deck:"));
 
     return (
         <div className="flex flex-col w-full h-full">
             {/* Layer tree */}
-            <div className="flex-none overflow-y-auto border-b border-gray-200 dark:border-gray-700" style={{ maxHeight: "40%" }}>
+            <div
+                className="flex-none overflow-y-auto border-b border-gray-200 dark:border-gray-700"
+                style={{ maxHeight: "40%" }}
+            >
                 {spatialEntryIds.length > 0 && (
                     <>
                         <button
                             type="button"
                             className="flex w-full items-center gap-1 px-1 py-0.5 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
-                            onClick={() => setSpatialCollapsed(c => !c)}
+                            onClick={() => setSpatialCollapsed((c) => !c)}
                         >
-                            {spatialCollapsed ? <ChevronRightIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                            <Typography variant="caption" color="text.secondary" className="font-semibold uppercase tracking-wide select-none">
+                            {spatialCollapsed ? (
+                                <ChevronRightIcon fontSize="small" />
+                            ) : (
+                                <ExpandMoreIcon fontSize="small" />
+                            )}
+                            <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                className="font-semibold uppercase tracking-wide select-none"
+                            >
                                 Spatial elements
                             </Typography>
                         </button>
@@ -398,10 +418,18 @@ const SpatialLayerDialogComponent = observer(() => {
                         <button
                             type="button"
                             className="flex w-full items-center gap-1 px-1 py-0.5 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
-                            onClick={() => setDeckCollapsed(c => !c)}
+                            onClick={() => setDeckCollapsed((c) => !c)}
                         >
-                            {deckCollapsed ? <ChevronRightIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                            <Typography variant="caption" color="text.secondary" className="font-semibold uppercase tracking-wide select-none">
+                            {deckCollapsed ? (
+                                <ChevronRightIcon fontSize="small" />
+                            ) : (
+                                <ExpandMoreIcon fontSize="small" />
+                            )}
+                            <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                className="font-semibold uppercase tracking-wide select-none"
+                            >
                                 Deck overlays
                             </Typography>
                         </button>
@@ -438,6 +466,7 @@ const SpatialLayerDialogComponent = observer(() => {
                             />
                         )}
                     >
+                        <LayerFailureDetails entryId={selectedEntryId} />
                         <LayerDetails entryId={selectedEntryId} />
                     </ErrorBoundary>
                 ) : (
@@ -452,17 +481,11 @@ const SpatialLayerDialogComponent = observer(() => {
                 <Autocomplete
                     size="small"
                     options={insertOptions}
-                    groupBy={(option) =>
-                        option.kind === "spatial" ? "Spatial elements" : "Deck overlays"
-                    }
+                    groupBy={(option) => (option.kind === "spatial" ? "Spatial elements" : "Deck overlays")}
                     getOptionLabel={(option) => option.label}
                     onChange={(_, value) => onInsert(value)}
                     renderInput={(params) => (
-                        <TextField
-                            {...params}
-                            label="Insert layer"
-                            placeholder="Choose a layer to add"
-                        />
+                        <TextField {...params} label="Insert layer" placeholder="Choose a layer to add" />
                     )}
                 />
             </div>

@@ -1,30 +1,20 @@
 import type { Layer } from "@deck.gl/core";
 import type { SpatialData } from "@spatialdata/core";
-import {
-    RENDER_STACK_SCHEMA_VERSION,
-    type RenderStack,
-    type RenderStackEntry,
-} from "@spatialdata/layers";
+import { RENDER_STACK_SCHEMA_VERSION, type RenderStack, type RenderStackEntry } from "@spatialdata/layers";
 import { describe, expect, test, vi } from "vitest";
 
 vi.mock("@spatialdata/vis", () => ({
-    layerConfig: (
-        type: string,
-        base: Record<string, unknown>,
-        props: Record<string, unknown> = {},
-    ) => ({ ...props, ...base, type }),
+    layerConfig: (type: string, base: Record<string, unknown>, props: Record<string, unknown> = {}) => ({
+        ...props,
+        ...base,
+        type,
+    }),
     renderStackToLayerInputs: (stack: RenderStack) => ({
         layers: {},
-        layerOrder: stack.entries
-            .filter((entry) => entry.kind === "spatial")
-            .map((entry) => entry.id),
+        layerOrder: stack.entries.filter((entry) => entry.kind === "spatial").map((entry) => entry.id),
     }),
     renderStackOrder: (stack: RenderStack | undefined, fallback: string[]) =>
-        stack
-            ? stack.entries
-                  .filter((entry) => entry.kind === "spatial")
-                  .map((entry) => entry.id)
-            : fallback,
+        stack ? stack.entries.filter((entry) => entry.kind === "spatial").map((entry) => entry.id) : fallback,
 }));
 
 vi.mock("@/react/context", () => ({
@@ -35,25 +25,19 @@ vi.mock("@/react/hooks", () => ({
     useConfig: vi.fn(),
 }));
 
+import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 import {
     createRenderStackLayerInputsCache,
     resolveCachedHostDeckLayers,
     syncRenderStackLayerInputs,
 } from "@/react/spatialdata/render_stack_adapter";
 import {
-    createHostOnlyRenderStack,
-    normalizeRenderStack,
-} from "@/react/spatialdata/render_stack_defaults";
-import {
     patchRenderStackEntry,
     removeRenderStackEntry,
     seedRenderStackFromSpatialData,
 } from "@/react/spatialdata/render_stack_control";
-import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
-import {
-    renderStackSpatialRevision,
-    touchRenderStackEntry,
-} from "@/react/spatialdata/render_stack_observe";
+import { createHostOnlyRenderStack, normalizeRenderStack } from "@/react/spatialdata/render_stack_defaults";
+import { renderStackSpatialRevision, touchRenderStackEntry } from "@/react/spatialdata/render_stack_observe";
 
 type SpatialEntry = Extract<RenderStackEntry, { kind: "spatial" }>;
 type HostEntry = Extract<RenderStackEntry, { kind: "host" }>;
@@ -180,10 +164,7 @@ describe("render stack adapter", () => {
         const stack = renderStack([imageA, imageB]);
         const cache = createRenderStackLayerInputsCache();
 
-        expect(syncRenderStackLayerInputs(stack, cache).layerOrder).toEqual([
-            "image-a",
-            "image-b",
-        ]);
+        expect(syncRenderStackLayerInputs(stack, cache).layerOrder).toEqual(["image-a", "image-b"]);
 
         removeRenderStackEntry(stack, "image-a");
         const next = syncRenderStackLayerInputs(stack, cache);
@@ -293,10 +274,7 @@ describe("render stack adapter", () => {
     test("resolves only visible host entries and refreshes host clones", () => {
         const visibleHostId = deckHostLayerId("scatter");
         const hiddenHostId = deckHostLayerId("selection");
-        const stack = renderStack([
-            hostEntry(visibleHostId),
-            hostEntry(hiddenHostId, false),
-        ]);
+        const stack = renderStack([hostEntry(visibleHostId), hostEntry(hiddenHostId, false)]);
         const { clone, sourceLayer } = fakeDeckLayer("scatter");
         const resolver = vi.fn(() => sourceLayer);
 
@@ -350,18 +328,38 @@ describe("render stack defaults", () => {
             bumpRenderStackPropsGeneration: vi.fn(),
             finishDefaultSpatialLayerSeed: vi.fn(),
         };
-        seedRenderStackFromSpatialData(
-            config as never,
-            fakeSpatialData(),
-            "global",
-            chart as never,
-        );
+        seedRenderStackFromSpatialData(config as never, fakeSpatialData(), "global", chart as never);
         expect(
             config.renderStack?.entries.some(
                 (entry) => entry.kind === "spatial" && entry.source.elementType === "image",
             ),
         ).toBe(true);
         expect(chart.finishDefaultSpatialLayerSeed).toHaveBeenCalled();
+    });
+
+    test("seedRenderStackFromSpatialData gives the first image layer the chart's default image props", () => {
+        const config = {
+            type: "SpatialDataMdvRegionReact",
+            renderStack: createHostOnlyRenderStack(),
+        } as const;
+        const defaultImageLayerProps = {
+            channels: { colors: [[255, 0, 0]], contrastLimits: [[0, 100]] },
+            vivLayerProps: { brightness: [0.6] },
+        };
+        const chart = {
+            seedDefaultSpatialLayers: true,
+            defaultImageLayerProps,
+            bumpRenderStackGeneration: vi.fn(),
+            bumpRenderStackPropsGeneration: vi.fn(),
+            finishDefaultSpatialLayerSeed: vi.fn(),
+        };
+        seedRenderStackFromSpatialData(config as never, fakeSpatialData(), "global", chart as never);
+        const image = config.renderStack.entries.find(
+            (entry) => entry.kind === "spatial" && entry.source.elementType === "image",
+        );
+        expect(image?.props).toEqual({ opacity: 1, ...defaultImageLayerProps });
+        // a copy, so editing the layer leaves the chart's props alone
+        expect(image?.props.channels).not.toBe(defaultImageLayerProps.channels);
     });
 
     test("seedRenderStackFromSpatialData keeps persisted host-only stacks spatial-free", () => {
@@ -375,15 +373,8 @@ describe("render stack defaults", () => {
             bumpRenderStackPropsGeneration: vi.fn(),
             finishDefaultSpatialLayerSeed: vi.fn(),
         };
-        seedRenderStackFromSpatialData(
-            config as never,
-            fakeSpatialData(),
-            "global",
-            chart as never,
-        );
-        expect(
-            config.renderStack?.entries.every((entry) => entry.kind === "host"),
-        ).toBe(true);
+        seedRenderStackFromSpatialData(config as never, fakeSpatialData(), "global", chart as never);
+        expect(config.renderStack?.entries.every((entry) => entry.kind === "host")).toBe(true);
         expect(chart.finishDefaultSpatialLayerSeed).not.toHaveBeenCalled();
         expect(chart.bumpRenderStackPropsGeneration).toHaveBeenCalledTimes(1);
     });
@@ -400,12 +391,7 @@ describe("render stack defaults", () => {
             bumpRenderStackPropsGeneration: vi.fn(),
             finishDefaultSpatialLayerSeed: vi.fn(),
         };
-        seedRenderStackFromSpatialData(
-            config as never,
-            fakeSpatialData(),
-            "global",
-            chart as never,
-        );
+        seedRenderStackFromSpatialData(config as never, fakeSpatialData(), "global", chart as never);
         expect(config.renderStack).toBe(stackBefore);
     });
 
@@ -421,8 +407,6 @@ describe("render stack defaults", () => {
 
         expect(normalized.entries[0]).toBe(savedImage);
         expect(normalized.entries.some((entry) => entry.kind === "host")).toBe(true);
-        expect(
-            normalized.entries.filter((entry) => entry.kind === "spatial").length,
-        ).toBe(1);
+        expect(normalized.entries.filter((entry) => entry.kind === "spatial").length).toBe(1);
     });
 });

@@ -2,6 +2,7 @@ import os
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.server import add_safe_headers
+from mdvtools.entry_assets import register_entry_assets
 from flask import Flask, render_template, jsonify, request
 import json
 import threading
@@ -72,6 +73,7 @@ def watch_folder(app: Flask):
 if __name__ == "__main__":
     app = Flask(__name__)
     app.after_request(add_safe_headers)
+    register_entry_assets(app)
     ProjectBlueprint.register_app(app)
 
     for p in projects:

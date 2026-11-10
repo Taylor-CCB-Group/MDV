@@ -39,6 +39,7 @@ import "../react/components/VivMDVReact";
 import "../react/components/SpatialDataMDVReact";
 import "../react/components/DeckScatterReactWrapper";
 import "../react/components/SplatterPlotReactWrapper";
+import "../react/components/dotplot/DotPlotReactWrapper";
 import "../charts/dialogs/AnnotationDialogReact";
 import "../react/components/HighlightedFeatureChart";
 import "../react/components/GeneNetworkChart";

@@ -262,6 +262,32 @@ def test_a_foreign_key_violation_already_in_the_original_is_reported_and_does_no
     assert (tmp_path / "mdv.sqlite3.pre-autoincrement").exists()
 
 
+def test_a_foreign_key_to_a_column_with_no_unique_index_is_reported_and_does_not_block_the_swap(
+    db_path, tmp_path, capsys
+):
+    """An export from Postgres can keep projects.genome's reference to genomes.name
+    and drop the UNIQUE on genomes.name, and SQLite cannot check a reference to a
+    column with no unique index. The new database takes the UNIQUE from the models."""
+    run_sql(
+        db_path,
+        [
+            "DROP TABLE genomes",
+            "CREATE TABLE genomes (id INTEGER PRIMARY KEY, name VARCHAR(50) NOT NULL, label TEXT,"
+            " data JSON, database TEXT, date_added DATETIME NOT NULL, connections INTEGER,"
+            " icon TEXT, is_public BOOLEAN NOT NULL, chrom_sizes JSON, small_icon TEXT)",
+        ],
+    )
+
+    assert main([str(db_path)]) == 0
+
+    assert "references a column with no unique index:\n  projects\n" in capsys.readouterr().out
+    assert (tmp_path / "mdv.sqlite3.pre-autoincrement").exists()
+    with closing(sqlite3.connect(db_path)) as connection:
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+        projects = connection.execute("SELECT sql FROM sqlite_master WHERE name = 'projects'").fetchone()
+    assert "AUTOINCREMENT" in projects[0]
+
+
 def test_the_app_warns_when_a_sqlite_projects_table_can_reuse_ids(db_path, caplog):
     app = app_for(f"sqlite:///{db_path}")
 

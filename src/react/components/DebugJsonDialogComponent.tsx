@@ -4,16 +4,17 @@ import "react18-json-view/src/style.css";
 // If dark mode is needed, import `dark.css`.
 import "react18-json-view/src/dark.css";
 import { observer } from "mobx-react-lite";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
 import "../../utilities/css/JsonDialogStyles.css";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Divider, Link, Typography } from "@mui/material";
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
-import { useChartManager } from "../hooks";
-import CustomTooltip from "./CustomTooltip";
 import type ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import type { ValidationFinding } from "@/lib/ValidationFindingsStore";
+import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
+import { useChartManager } from "../hooks";
+import BrowserSettingsSection from "./BrowserSettingsSection";
+import CustomTooltip from "./CustomTooltip";
 
 type JSONObject = { [key: string]: any };
 type DataLoaderFaultMode = "empty" | "corrupt" | "timeout";
@@ -45,7 +46,7 @@ function setDataLoaderFaultMode(mode: DataLoaderFaultMode | null) {
  * given a filter string and a json object, return a new json object that is a subset of the input json
  * matching the filter should mean that a given node is included in the output
  * if all (case insensitive) elements of filterArray appear somewhere in the node or its path.
- * credit ChatGPT for the code (copilot failed) 
+ * credit ChatGPT for the code (copilot failed)
  * Adendum: the ChatGPT code did not meet the spec, so I had to fix it.
  * This had caused me to spend a lot longer debugging when I was trying to use it before I realised this was at fault.
  * */
@@ -58,10 +59,7 @@ function filterJSON(obj: JSONObject, filter: string): JSONObject {
         return filterArray.every((f) => combinedString.includes(f));
     }
 
-    function recursiveFilter(
-        current: JSONObject,
-        path: string[],
-    ): JSONObject | null {
+    function recursiveFilter(current: JSONObject, path: string[]): JSONObject | null {
         // we should return the whole subtree if the current node matches the filter
         if (matchesFilter("", path)) {
             return current;
@@ -146,9 +144,7 @@ function ValidationFindingCard({ finding }: { finding: ValidationFinding }) {
             }}
         >
             <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 1 }}>
-                <Typography sx={{ fontWeight: 700 }}>
-                    {finding.subject}
-                </Typography>
+                <Typography sx={{ fontWeight: 700 }}>{finding.subject}</Typography>
                 <Typography variant="body2" sx={{ opacity: 0.75 }}>
                     Repeated {finding.count} {finding.count === 1 ? "time" : "times"}
                 </Typography>
@@ -184,12 +180,8 @@ function ValidationFindingCard({ finding }: { finding: ValidationFinding }) {
                     <Typography variant="body2">No issue details recorded.</Typography>
                 )}
             </Box>
-            {latest?.rawConfig !== undefined && (
-                <FindingDetailsJson label="Raw config" value={latest.rawConfig} />
-            )}
-            {latest?.details !== undefined && (
-                <FindingDetailsJson label="Details" value={latest.details} />
-            )}
+            {latest?.rawConfig !== undefined && <FindingDetailsJson label="Raw config" value={latest.rawConfig} />}
+            {latest?.details !== undefined && <FindingDetailsJson label="Details" value={latest.details} />}
         </Box>
     );
 }
@@ -216,7 +208,8 @@ function ValidationFindingGroup({
                 return (
                     <Box key={subject} sx={{ mb: 1.5 }}>
                         <Typography variant="body2" sx={{ mb: 0.75, opacity: 0.8 }}>
-                            {subject}: {findings.length} grouped {findings.length === 1 ? "finding" : "findings"}, {repeatCount} total {repeatCount === 1 ? "report" : "reports"}
+                            {subject}: {findings.length} grouped {findings.length === 1 ? "finding" : "findings"},{" "}
+                            {repeatCount} total {repeatCount === 1 ? "report" : "reports"}
                         </Typography>
                         {findings.map((finding) => (
                             <ValidationFindingCard key={finding.signature} finding={finding} />
@@ -228,11 +221,7 @@ function ValidationFindingGroup({
     );
 }
 
-export function ValidationIssuesSection({
-    validationFindings,
-}: {
-    validationFindings?: ValidationFindingsStore;
-}) {
+export function ValidationIssuesSection({ validationFindings }: { validationFindings?: ValidationFindingsStore }) {
     const snapshot = validationFindings?.snapshot;
     const hasAnyFindings = Boolean(validationFindings?.hasAny);
 
@@ -246,11 +235,7 @@ export function ValidationIssuesSection({
                 <Typography>
                     Total: <strong>{snapshot.totalCount}</strong>
                 </Typography>
-                <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => validationFindings.clearAll()}
-                >
+                <Button variant="outlined" size="small" onClick={() => validationFindings.clearAll()}>
                     Clear
                 </Button>
             </Box>
@@ -264,18 +249,18 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     json,
     header,
     showValidationSection = false,
+    chartPanel,
 }: {
     json: any;
     header?: string;
     showValidationSection?: boolean;
+    /** The chart's own status and problems (`BaseChart.getDebugPanel`), shown first. */
+    chartPanel?: ReactNode;
 }) {
     const [filter, setFilter] = useState("");
     const [debouncedFilter] = useDebounce(filter, 300); //why is this returning a tuple?
     const { validationFindings } = useChartManager();
-    const jsonWithoutValidationFindings = useMemo(
-        () => omitValidationFindings(json),
-        [json],
-    );
+    const jsonWithoutValidationFindings = useMemo(() => omitValidationFindings(json), [json]);
     const filteredJson = useMemo(
         () => filterJSON(jsonWithoutValidationFindings, debouncedFilter),
         [jsonWithoutValidationFindings, debouncedFilter],
@@ -290,52 +275,63 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     return (
         <div className="overflow-auto p-4" style={{ userSelect: "text" }}>
             {header && <h2 className="text-lg font-semibold mb-4">{header}</h2>}
-            <Accordion sx={{
-                border: "1px solid var(--border_menu_bar_color)",
-                mb: 2,
-            }}>
+            {chartPanel && (
+                <Accordion
+                    defaultExpanded
+                    sx={{
+                        border: "1px solid var(--border_menu_bar_color)",
+                        mb: 2,
+                    }}
+                >
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="h6">Chart status</Typography>
+                    </AccordionSummary>
+                    <Divider />
+                    <AccordionDetails sx={{ mt: 1 }}>{chartPanel}</AccordionDetails>
+                </Accordion>
+            )}
+            <Accordion
+                sx={{
+                    border: "1px solid var(--border_menu_bar_color)",
+                    mb: 2,
+                }}
+            >
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="h6">
-                        Report an issue or a bug
-                    </Typography>
+                    <Typography variant="h6">Report an issue or a bug</Typography>
                 </AccordionSummary>
                 <Divider />
                 <AccordionDetails sx={{ mt: 1 }}>
                     <Typography>
-                        {DEBUG_JSON_REPORT_MESSAGE[0]}
-                        {' '}
-                        <Link 
-                            href={`mailto:${MDV_EMAIL}?subject=MDV%20Bug%20Report`} 
-                            sx={{ 
+                        {DEBUG_JSON_REPORT_MESSAGE[0]}{" "}
+                        <Link
+                            href={`mailto:${MDV_EMAIL}?subject=MDV%20Bug%20Report`}
+                            sx={{
                                 textDecoration: "none",
-                                "&.MuiLink-root": { color: "info.main" }
+                                "&.MuiLink-root": { color: "info.main" },
                             }}
                         >
                             {MDV_EMAIL}
                         </Link>
                     </Typography>
-                    <Typography sx={{mt: 1}}>
-                        {DEBUG_JSON_REPORT_MESSAGE[1]}
-                    </Typography>
-                    <Typography sx={{mt: 1}}>
-                        {DEBUG_JSON_REPORT_MESSAGE[2]}
-                    </Typography>
+                    <Typography sx={{ mt: 1 }}>{DEBUG_JSON_REPORT_MESSAGE[1]}</Typography>
+                    <Typography sx={{ mt: 1 }}>{DEBUG_JSON_REPORT_MESSAGE[2]}</Typography>
                 </AccordionDetails>
             </Accordion>
 
-            <Accordion sx={{
-                border: "1px solid var(--border_menu_bar_color)",
-                mb: 2,
-            }}>
+            <Accordion
+                sx={{
+                    border: "1px solid var(--border_menu_bar_color)",
+                    mb: 2,
+                }}
+            >
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="h6">
-                        Fault Injection
-                    </Typography>
+                    <Typography variant="h6">Fault Injection</Typography>
                 </AccordionSummary>
                 <Divider />
                 <AccordionDetails sx={{ mt: 1 }}>
                     <Typography sx={{ mb: 1 }}>
-                        Select a one-shot fault to apply to the next <code>/get_data</code> request. The project reloads automatically.
+                        Select a one-shot fault to apply to the next <code>/get_data</code> request. The project reloads
+                        automatically.
                     </Typography>
                     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                         <CustomTooltip tooltipText="The frontend discards one loaded column batch and returns no data.">
@@ -357,6 +353,21 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                 </AccordionDetails>
             </Accordion>
 
+            <Accordion
+                sx={{
+                    border: "1px solid var(--border_menu_bar_color)",
+                    mb: 2,
+                }}
+            >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="h6">Browser settings</Typography>
+                </AccordionSummary>
+                <Divider />
+                <AccordionDetails sx={{ mt: 1 }}>
+                    <BrowserSettingsSection />
+                </AccordionDetails>
+            </Accordion>
+
             {showValidationSection && (
                 <Accordion
                     defaultExpanded={hasAnyFindings}
@@ -366,9 +377,7 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                     }}
                 >
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Typography variant="h6">
-                            Validation issues
-                        </Typography>
+                        <Typography variant="h6">Validation issues</Typography>
                     </AccordionSummary>
                     <Divider />
                     <AccordionDetails sx={{ mt: 1 }}>
@@ -384,12 +393,12 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                 placeholder="Filter..."
                 className="w-full mb-4 mt-4 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             />
-            <JsonView 
-                src={filteredJson} 
+            <JsonView
+                src={filteredJson}
                 style={{
-                    fontSize: '0.875rem',
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                    padding: "10px"
+                    fontSize: "0.875rem",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                    padding: "10px",
                 }}
                 collapsed={1}
             />

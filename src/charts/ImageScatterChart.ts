@@ -1,15 +1,14 @@
+import { Deck, OrthographicView } from "@deck.gl/core";
+// import { ScatterplotExLayer } from "@/webgl/ScatterplotExLayer.js";
+import { ScatterplotLayer } from "@deck.gl/layers";
+import type DataStore from "@/datastore/DataStore.js";
+import type Dimension from "../datastore/Dimension.js";
 import { DataModel } from "../table/DataModel.js";
-import { Deck } from "@deck.gl/core";
-import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import { ImageArray } from "../webgl/ImageArray";
 import { ImageArrayDeckExtension } from "../webgl/ImageArrayDeckExtension";
-// import { ScatterplotExLayer } from "@/webgl/ScatterplotExLayer.js";
-import { ScatterplotLayer } from "@deck.gl/layers";
-import { OrthographicView } from "@deck.gl/core";
-import type Dimension from "../datastore/Dimension.js";
-import type { LoadedDataColumn, GuiSpec, NumberDataType } from "./charts.js";
-import type DataStore from "@/datastore/DataStore.js";
+import BaseChart from "./BaseChart";
+import type { GuiSpec, LoadedDataColumn, NumberDataType } from "./charts.js";
 
 // not a definitive type, but marginally better than 'any', locally for now...
 //type Column = { data: Float32Array; minMax: [number, number] };
@@ -40,11 +39,7 @@ class ImageScatterChart extends BaseChart<any> {
         this.dataModel = new DataModel(dataStore, { autoupdate: false });
 
         //---- PJT XXX::: this always trips me up... wasting too much time here...
-        this.dataModel.setColumns([
-            ...config.param,
-            image_key,
-            config.image_title,
-        ]);
+        this.dataModel.setColumns([...config.param, image_key, config.image_title]);
         this.dataModel.updateModel();
         //----------------
         const s = Number.parseInt(texture_size);
@@ -81,10 +76,7 @@ class ImageScatterChart extends BaseChart<any> {
 
                     const titleColumn = this.config.image_title;
                     //no image_title sometimes?
-                    const text = this.dataModel.getItemField(
-                        index,
-                        titleColumn,
-                    );
+                    const text = this.dataModel.getItemField(index, titleColumn);
                     if (!picked) return null;
                     return (
                         picked && {
@@ -114,10 +106,7 @@ class ImageScatterChart extends BaseChart<any> {
         function n(col: Column, i: number, space: number) {
             const { minMax } = col;
             //TODO scaling options
-            return (
-                (space * (col.data[i] - minMax[0])) / (minMax[1] - minMax[0]) -
-                space / 2
-            );
+            return (space * (col.data[i] - minMax[0])) / (minMax[1] - minMax[0]) - space / 2;
         }
 
         /// deck can take any 'data' with a 'length' property, if we have accessors for synthesizing the data by index,
@@ -155,9 +144,7 @@ class ImageScatterChart extends BaseChart<any> {
             // getFillColor: this.colorBy ? (i: K)=>[...this.colorBy(i), this.opacity] : [255, 255, 255, this.opacity],
             opacity: this.opacity / 255,
             saturation: this.saturation,
-            getFillColor: (colorBy
-                ? (i: K) => colorBy(i)
-                : [255, 255, 255]) as unknown as any,
+            getFillColor: (colorBy ? (i: K) => colorBy(i) : [255, 255, 255]) as unknown as any,
             imageArray,
             updateTriggers: {
                 // what is this actually for?
@@ -304,17 +291,13 @@ BaseChart.types["ImageScatterChart"] = {
         config.image_key = i.key_column;
     },
     extra_controls: (dataStore) => {
-        const imageSets: {name: string, value: string}[] = [];
+        const imageSets: { name: string; value: string }[] = [];
         for (const iname in dataStore.images) {
             imageSets.push({ name: iname, value: iname });
         }
         console.log("imageSets", imageSets);
-        const sortableColumns = dataStore
-            .getLoadedColumns()
-            .map((c) => ({ name: c, value: c }));
-        const imageSizes = [32, 64, 128, 256, 512, 1024]
-            .map((s) => `${s}`)
-            .map((s) => ({ name: s, value: s }));
+        const sortableColumns = dataStore.getLoadedColumns().map((c) => ({ name: c, value: c }));
+        const imageSizes = [32, 64, 128, 256, 512, 1024].map((s) => `${s}`).map((s) => ({ name: s, value: s }));
         return [
             //drop down of available image sets
             {

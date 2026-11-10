@@ -1,6 +1,6 @@
 import type { Polygon, SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
-import type { Gate } from "./types";
 import { v4 as uuid } from "uuid";
+import type { Gate } from "./types";
 
 export const DEFAULT_GATE_COLOR: [number, number, number] = [76, 175, 80];
 export const SELECTION_FILL_COLOR: [number, number, number, number] = [200, 200, 200, 50];
@@ -110,12 +110,7 @@ type RelevantGatesArgs = {
     region?: string;
 };
 
-export function getRelevantGates({
-    gates,
-    xField,
-    yField,
-    region,
-}: RelevantGatesArgs): Gate[] {
+export function getRelevantGates({ gates, xField, yField, region }: RelevantGatesArgs): Gate[] {
     if (!xField || !yField) return [];
 
     return gates.filter((gate) => {

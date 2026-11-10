@@ -1,43 +1,8 @@
-import type React from "react";
-import {
-    useState,
-    useCallback,
-    useReducer,
-    useEffect,
-    useMemo
-} from "react";
-import { useDropzone } from "react-dropzone";
-import { observer } from "mobx-react-lite";
-
 import axios, { type AxiosError, type AxiosProgressEvent } from "axios";
-import { useProject } from "../../modules/ProjectContext";
-import {
-    useViewerStoreApi,
-    useChannelsStoreApi,
-} from "../../react/components/avivatorish/state";
-
-import AnndataConflictDialog from "./AnndataConflictDialog";
-import ReusableDialog from "./ReusableDialog";
-
-import { createSocketIOUpload, type SocketIOUploadClient } from "./SocketIOUploadClient";
-import {
-    Container,
-    DropzoneContainer,
-    DynamicText,
-    FileInputLabel,
-} from "./file_upload/FileUploadUI";
-import {
-    FileDropzoneView,
-    H5ReviewView,
-    ProcessingView,
-    RedirectingView,
-    TabularReviewView,
-    TiffReviewView,
-    UploadErrorView,
-    UploadingView,
-    UploadSuccessView,
-    ValidatingView,
-} from "./file_upload/FileUploadViews";
+import { observer } from "mobx-react-lite";
+import type React from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useDropzone } from "react-dropzone";
 import {
     ALLOWED_FILE_TYPES,
     generateDropzoneAccept,
@@ -50,31 +15,38 @@ import {
     getProjectIdFromRoot,
     getSocketPath,
 } from "@/utils/file_upload/fileUploadHelpers";
-import {
-    createInitialUploadDialogState,
-    fileUploadReducer,
-} from "@/utils/file_upload/fileUploadReducer";
+import { createInitialUploadDialogState, fileUploadReducer } from "@/utils/file_upload/fileUploadReducer";
 import type {
     DatasourceSummary,
     TiffSummary,
     UploadErrorPayload,
     UploadValidationResult,
 } from "@/utils/file_upload/fileUploadTypes";
+import { useProject } from "../../modules/ProjectContext";
+import { useChannelsStoreApi, useViewerStoreApi } from "../../react/components/avivatorish/state";
+import AnndataConflictDialog from "./AnndataConflictDialog";
+import { Container, DropzoneContainer, DynamicText, FileInputLabel } from "./file_upload/FileUploadUI";
+import {
+    FileDropzoneView,
+    H5ReviewView,
+    ProcessingView,
+    RedirectingView,
+    TabularReviewView,
+    TiffReviewView,
+    UploadErrorView,
+    UploadingView,
+    UploadSuccessView,
+    ValidatingView,
+} from "./file_upload/FileUploadViews";
+import ReusableDialog from "./ReusableDialog";
+import { createSocketIOUpload, type SocketIOUploadClient } from "./SocketIOUploadClient";
 
-export {
-    Container,
-    DropzoneContainer,
-    DynamicText,
-    FileInputLabel,
-};
+export { Container, DropzoneContainer, DynamicText, FileInputLabel };
 
 // Use dynamic import for the worker
-const DatasourceWorker = new Worker(
-    new URL("./datasourceWorker.ts", import.meta.url),
-    {
-        type: "module",
-    },
-);
+const DatasourceWorker = new Worker(new URL("./datasourceWorker.ts", import.meta.url), {
+    type: "module",
+});
 
 const EMPTY_VALIDATION_RESULT: UploadValidationResult = {
     columnNames: [],
@@ -114,17 +86,13 @@ const useFileUploadProgress = () => {
 
 //todo figure out why type inference is failing with observer if we take out the `React.FC<...>` here
 //also - are we actually observing anything here? not that it particularly matters (apart from type inference, apparently)
-const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
-    observer(({ onClose, onResize, onLoadingStateChange, socketioClientRef }: FileUploadDialogComponentProps) => {
+const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = observer(
+    ({ onClose, onResize, onLoadingStateChange, socketioClientRef }: FileUploadDialogComponentProps) => {
         const { root, chartManager, mainApiRoute } = useProject();
 
-        const [selectedOption, setSelectedOption] = useState<string | null>(
-            null,
-        );
+        const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
-        const [updatedNamesArray, setUpdatedNamesArray] = useState<string[]>(
-            [],
-        );
+        const [updatedNamesArray, setUpdatedNamesArray] = useState<string[]>([]);
 
         const handleSelect = useCallback((value: string) => {
             setSelectedOption(value);
@@ -140,13 +108,9 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             setShowMetadata((prevState) => !prevState);
         };
 
-        const [datasourceSummary, setDatasourceSummary] = useState<DatasourceSummary>(
-            EMPTY_DATASOURCE_SUMMARY,
-        );
+        const [datasourceSummary, setDatasourceSummary] = useState<DatasourceSummary>(EMPTY_DATASOURCE_SUMMARY);
 
-        const [tiffSummary, setTiffSummary] = useState<TiffSummary>(
-            EMPTY_TIFF_SUMMARY,
-        );
+        const [tiffSummary, setTiffSummary] = useState<TiffSummary>(EMPTY_TIFF_SUMMARY);
 
         const [columnNames, setColumnNames] = useState<string[]>([]);
         const [columnTypes, setColumnTypes] = useState<string[]>([]);
@@ -155,15 +119,9 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
         // TIFF
         const channelsStore = useChannelsStoreApi();
 
-        const [state, dispatch] = useReducer(
-            fileUploadReducer,
-            undefined,
-            createInitialUploadDialogState,
-        );
+        const [state, dispatch] = useReducer(fileUploadReducer, undefined, createInitialUploadDialogState);
 
-        const isBusy =
-            state.stage.kind === "uploading" ||
-            state.stage.kind === "processing";
+        const isBusy = state.stage.kind === "uploading" || state.stage.kind === "processing";
 
         useEffect(() => {
             onLoadingStateChange(isBusy);
@@ -177,8 +135,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
 
         const viewerStore = useViewerStoreApi();
 
-        const { progress, resetProgress, setProgress } =
-            useFileUploadProgress();
+        const { progress, resetProgress, setProgress } = useFileUploadProgress();
 
         const resetLocalState = useCallback(() => {
             setDatasourceName("");
@@ -282,11 +239,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         //         onResize(totalWidth, 745);
                         //     }
                         // };
-                        const totalWidth = calculateTotalWidth(
-                            columnNames,
-                            columnTypes,
-                            secondRowValues,
-                        );
+                        const totalWidth = calculateTotalWidth(columnNames, columnTypes, secondRowValues);
                         onResize(totalWidth, 745);
 
                         dispatch({
@@ -300,25 +253,16 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         break;
                     }
                     case "tiff": {
-                        const dataSources =
-                            window.mdv.chartManager?.dataSources ?? [];
-                        const namesArray = dataSources.map(
-                            (dataSource) => dataSource.name,
-                        );
-                        setUpdatedNamesArray([
-                            ...namesArray,
-                            "new datasource",
-                        ]);
+                        const dataSources = window.mdv.chartManager?.dataSources ?? [];
+                        const namesArray = dataSources.map((dataSource) => dataSource.name);
+                        setUpdatedNamesArray([...namesArray, "new datasource"]);
                         setTiffSummary({
                             fileName: file.name,
                             fileSize: formatFileSizeMb(file.size),
                         });
                         // Process TIFF file
                         // handleSubmitFile(acceptedFiles);
-                        onResize(
-                            fileConfig.processingConfig.defaultWidth,
-                            fileConfig.processingConfig.defaultHeight,
-                        );
+                        onResize(fileConfig.processingConfig.defaultWidth, fileConfig.processingConfig.defaultHeight);
                         dispatch({
                             type: "SET_VALIDATION_RESULT",
                             payload: EMPTY_VALIDATION_RESULT,
@@ -349,10 +293,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                             setErrorStage({
                                 message: "Error processing H5 file",
                                 status: 500,
-                                traceback:
-                                    error instanceof Error
-                                        ? error.message
-                                        : String(error),
+                                traceback: error instanceof Error ? error.message : String(error),
                             });
                         }
                         break;
@@ -362,14 +303,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         return;
                 }
             },
-            [
-                columnNames,
-                columnTypes,
-                onResize,
-                resetLocalState,
-                secondRowValues,
-                setErrorStage,
-            ],
+            [columnNames, columnTypes, onResize, resetLocalState, secondRowValues, setErrorStage],
         );
 
         const handleDatasourceNameChange = useCallback((event: any) => {
@@ -381,17 +315,12 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             }));
         }, []);
 
-        const { getRootProps, getInputProps, isDragActive, fileRejections } =
-            useDropzone({
-                onDrop,
-                accept: generateDropzoneAccept(),
-                multiple: false,
-                maxSize: Math.max(
-                    ...Object.values(ALLOWED_FILE_TYPES).map(
-                        (config) => config.maxSize || 0,
-                    ),
-                ),
-            });
+        const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
+            onDrop,
+            accept: generateDropzoneAccept(),
+            multiple: false,
+            maxSize: Math.max(...Object.values(ALLOWED_FILE_TYPES).map((config) => config.maxSize || 0)),
+        });
 
         const rejectionMessage = useMemo(() => {
             let message = "";
@@ -400,39 +329,27 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 fileRejections.forEach((fileRejection) => {
                     fileRejection.errors.forEach((error) => {
                         fileRejectionMessages.push(error.message);
-                    })
-                })
+                    });
+                });
 
                 message = fileRejectionMessages.join(", ");
             } else {
                 message = "Drag and drop files here or click the button below to upload";
             }
             return message;
-        }, [fileRejections])
+        }, [fileRejections]);
 
-        const rejectionMessageStyle =
-            fileRejections.length > 0 ? "text-red-500" : "";
+        const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
 
-        const supportedFileTypes = useMemo(
-            () => getSupportedFileExtensions(),
-            [],
-        );
+        const supportedFileTypes = useMemo(() => getSupportedFileExtensions(), []);
 
-        const getTextWidth = (
-            canvas: HTMLCanvasElement,
-            context: CanvasRenderingContext2D,
-            text: string,
-        ) => {
+        const getTextWidth = (canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, text: string) => {
             context.font = `${getComputedStyle(document.body).fontSize} Arial`;
             return context.measureText(text).width;
         };
 
         // Function to calculate the maximum total width needed for the ColumnPreview component
-        const calculateTotalWidth = (
-            columnNames: string[],
-            columnTypes: string[],
-            secondRowValues: string[],
-        ) => {
+        const calculateTotalWidth = (columnNames: string[], columnTypes: string[], secondRowValues: string[]) => {
             const canvas = document.createElement("canvas");
             const context = canvas.getContext("2d");
             if (!context) {
@@ -444,64 +361,47 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             let maxColumnSecondRowWidth = 0;
 
             // Calculate the maximum width of column names
-            maxColumnNameWidth = Math.max(
-                ...columnNames.map((name) =>
-                    getTextWidth(canvas, context, name),
-                ),
-            );
+            maxColumnNameWidth = Math.max(...columnNames.map((name) => getTextWidth(canvas, context, name)));
 
             // Calculate the maximum width of column types
-            maxColumnTypeWidth = Math.max(
-                ...columnTypes.map((type) =>
-                    getTextWidth(canvas, context, type),
-                ),
-            );
+            maxColumnTypeWidth = Math.max(...columnTypes.map((type) => getTextWidth(canvas, context, type)));
 
             // Calculate the maximum width of second row values
-            maxColumnSecondRowWidth = Math.max(
-                ...secondRowValues.map((value) =>
-                    getTextWidth(canvas, context, value),
-                ),
-            );
+            maxColumnSecondRowWidth = Math.max(...secondRowValues.map((value) => getTextWidth(canvas, context, value)));
 
             // Calculate the total width needed for the ColumnPreview component
-            const totalWidth =
-                maxColumnNameWidth +
-                maxColumnTypeWidth +
-                maxColumnSecondRowWidth +
-                32; // Add padding
+            const totalWidth = maxColumnNameWidth + maxColumnTypeWidth + maxColumnSecondRowWidth + 32; // Add padding
             canvas.remove();
             return Math.max(800, totalWidth);
         };
 
-        const handleUploadError = useCallback((error: AxiosError | unknown) => {
-            const errorPayload = axios.isAxiosError(error)
-                ? {
-                      message:
-                          error.response?.data ||
-                          error.request?.responseText ||
-                          "An error occurred while processing the upload.",
-                      status: error.response?.status || 500,
-                      traceback: error.message,
-                  }
-                : {
-                      message: "An error occurred while processing the upload.",
-                      status: 500,
-                      traceback:
-                          error instanceof Error
-                              ? error.message
-                              : String(error),
-                  };
+        const handleUploadError = useCallback(
+            (error: AxiosError | unknown) => {
+                const errorPayload = axios.isAxiosError(error)
+                    ? {
+                          message:
+                              error.response?.data ||
+                              error.request?.responseText ||
+                              "An error occurred while processing the upload.",
+                          status: error.response?.status || 500,
+                          traceback: error.message,
+                      }
+                    : {
+                          message: "An error occurred while processing the upload.",
+                          status: 500,
+                          traceback: error instanceof Error ? error.message : String(error),
+                      };
 
-            setErrorStage(errorPayload);
-        }, [setErrorStage]);
+                setErrorStage(errorPayload);
+            },
+            [setErrorStage],
+        );
 
         // HTTP Upload function (original implementation)
         const handleHttpUpload = async () => {
             if (!state.selectedFiles.length) {
                 setErrorStage({
-                    message:
-                        "No files selected. Please select a file before uploading.",
+                    message: "No files selected. Please select a file before uploading.",
                     status: 400,
                 });
                 return;
@@ -530,9 +430,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 },
                 onUploadProgress: (progressEvent: AxiosProgressEvent) => {
                     if (progressEvent.total) {
-                        const percentComplete = Math.round(
-                            (progressEvent.loaded * 100) / progressEvent.total,
-                        );
+                        const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
                         setProgress(percentComplete);
                     } else {
                         // console.warn("Upload progress not computable");
@@ -556,14 +454,9 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         formData.append("datasourceName", datasourceName);
                         if (fileConfig.processingConfig.requiresMetadata) {
                             try {
-                                formData.append(
-                                    "tiffMetadata",
-                                    JSON.stringify(state.tiffMetadata),
-                                );
+                                formData.append("tiffMetadata", JSON.stringify(state.tiffMetadata));
                             } catch (jsonError) {
-                                throw new Error(
-                                    "Invalid JSON format in tiffMetadata",
-                                );
+                                throw new Error("Invalid JSON format in tiffMetadata");
                             }
                         }
                         break;
@@ -572,11 +465,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         break;
                 }
 
-                const response = await axios.post(
-                    `${root}/${fileConfig.processingConfig.endpoint}`,
-                    formData,
-                    config,
-                );
+                const response = await axios.post(`${root}/${fileConfig.processingConfig.endpoint}`, formData, config);
                 if (response.status === 200) {
                     if (fileConfig.type === "tiff") {
                         chartManager.saveState();
@@ -596,15 +485,10 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         });
                     }
                 } else {
-                    throw new Error(
-                        `Server responded with status ${response.status}`,
-                    );
+                    throw new Error(`Server responded with status ${response.status}`);
                 }
             } catch (error) {
-                if (
-                    axios.isAxiosError(error) &&
-                    error.response?.status === 409
-                ) {
+                if (axios.isAxiosError(error) && error.response?.status === 409) {
                     dispatch({
                         type: "SET_CONFLICT_DATA",
                         payload: {
@@ -626,8 +510,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
         const handleSocketIOUpload = async () => {
             if (!state.selectedFiles.length) {
                 setErrorStage({
-                    message:
-                        "No files selected. Please select a file before uploading.",
+                    message: "No files selected. Please select a file before uploading.",
                     status: 400,
                 });
                 return;
@@ -657,12 +540,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 }
 
                 const socketPath = getSocketPath(String(mainApiRoute));
-                console.log('Project ID:', projectId);
-                console.log('Namespace:', `/project/${projectId}`);
-                console.log('Socket Path:', socketPath);
-                
-                const isTabularForSocket =
-                    fileConfig.type === "csv" || fileConfig.type === "tsv";
+                console.log("Project ID:", projectId);
+                console.log("Namespace:", `/project/${projectId}`);
+                console.log("Socket Path:", socketPath);
+
+                const isTabularForSocket = fileConfig.type === "csv" || fileConfig.type === "tsv";
 
                 // Create SocketIO upload client
                 const uploadClient = createSocketIOUpload({
@@ -680,7 +562,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                     },
                     onStatusChange: (status: string, message?: string) => {
                         console.log(`Upload status: ${status}`, message);
-                        if (status === 'processing') {
+                        if (status === "processing") {
                             dispatch({
                                 type: "SET_STAGE",
                                 payload: { kind: "processing" },
@@ -688,14 +570,14 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         }
                     },
                     onError: (error: any) => {
-                        console.error('SocketIO upload error:', error);
+                        console.error("SocketIO upload error:", error);
                         setErrorStage({
-                            message: error.message || 'Upload failed',
+                            message: error.message || "Upload failed",
                             status: 500,
                         });
                     },
                     onSuccess: (result: any) => {
-                        console.log('SocketIO upload success:', result);
+                        console.log("SocketIO upload success:", result);
 
                         if (fileConfig.type === "tiff") {
                             chartManager.saveState();
@@ -728,8 +610,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                 payload: { kind: "success" },
                             });
                         }
-
-                    }
+                    },
                 });
 
                 // Store client in state for potential cancellation
@@ -737,11 +618,10 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
 
                 // Start the upload
                 await uploadClient.upload();
-
             } catch (error) {
                 console.error("SocketIO upload error:", error);
                 setErrorStage({
-                    message: error instanceof Error ? error.message : 'Upload failed',
+                    message: error instanceof Error ? error.message : "Upload failed",
                     status: 500,
                 });
             }
@@ -750,8 +630,8 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
         // Main upload handler that chooses between HTTP and SocketIO
         const handleUploadClick = async () => {
             console.log(`Using ${state.uploadMethod} upload method`);
-            
-            if (state.uploadMethod === 'socketio') {
+
+            if (state.uploadMethod === "socketio") {
                 await handleSocketIOUpload();
             } else {
                 await handleHttpUpload();
@@ -778,15 +658,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             formData.append("label", label);
 
             try {
-                const response = await axios.patch(
-                    `${root}/combine_anndata`,
-                    formData,
-                    {
-                        headers: {
-                            "Content-Type": "multipart/form-data",
-                        },
+                const response = await axios.patch(`${root}/combine_anndata`, formData, {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
                     },
-                );
+                });
 
                 if (response.status === 200) {
                     dispatch({
@@ -814,10 +690,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             onResize(450, 320);
         }, [onResize, resetLocalState, state.socketioClient]);
 
-        const handleCombineError = (error: {
-            message: string;
-            status?: number;
-        }) => {
+        const handleCombineError = (error: { message: string; status?: number }) => {
             console.error("Conflict dialog error:", error);
             setErrorStage({
                 message: error.message,
@@ -843,10 +716,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 });
                 console.log("Response:", response);
             } catch (error) {
-                console.error(
-                    "Full URL that failed:",
-                    `${root}/combine_anndata`,
-                );
+                console.error("Full URL that failed:", `${root}/combine_anndata`);
                 if (axios.isAxiosError(error)) {
                     console.error("Response data:", error.response?.data);
                     console.error("Response status:", error.response?.status);
@@ -867,10 +737,8 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
             console.log(`Switched to ${newMethod} upload method`);
         };
 
-        const isReadyForReview =
-            state.stage.kind === "ready" && state.validationResult !== null;
-        const currentError =
-            state.stage.kind === "error" ? state.stage.error : null;
+        const isReadyForReview = state.stage.kind === "ready" && state.validationResult !== null;
+        const currentError = state.stage.kind === "error" ? state.stage.error : null;
 
         return (
             <Container>
@@ -911,8 +779,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                     <ValidatingView />
                 ) : isReadyForReview ? (
                     <>
-                        {(state.fileType === "csv" ||
-                            state.fileType === "tsv") && (
+                        {(state.fileType === "csv" || state.fileType === "tsv") && (
                             <TabularReviewView
                                 datasourceName={datasourceName}
                                 datasourceSummary={datasourceSummary}
@@ -920,7 +787,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                 isDatasourceDisabled={state.selectedFiles.length === 0}
                                 onUpload={handleUploadClick}
                                 onCancel={handleClose}
-                                columnPreview={(
+                                columnPreview={
                                     <>
                                         {/* <ColumnPreview
                                             columnNames={columnNames}
@@ -928,7 +795,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                             secondRowValues={secondRowValues}
                                         /> */}
                                     </>
-                                )}
+                                }
                             />
                         )}
 
@@ -941,7 +808,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                 onToggleView={toggleView}
                                 onUpload={handleUploadClick}
                                 onCancel={handleClose}
-                                datasourceDropdown={(
+                                datasourceDropdown={
                                     <>
                                         {/* <DatasourceDropdown
                                             options={
@@ -950,7 +817,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                                             onSelect={handleSelect}
                                         /> */}
                                     </>
-                                )}
+                                }
                             />
                         )}
 
@@ -976,9 +843,10 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                 )}
             </Container>
         );
-    });
+    },
+);
 
-const Wrapper = (props: Omit<FileUploadDialogComponentProps, 'onLoadingStateChange' | 'socketioClientRef'>) => {
+const Wrapper = (props: Omit<FileUploadDialogComponentProps, "onLoadingStateChange" | "socketioClientRef">) => {
     const [open, setOpen] = useState(true);
     const [, setIsLoading] = useState(false);
     const [socketioClient, setSocketioClient] = useState<SocketIOUploadClient | null>(null);
@@ -990,20 +858,20 @@ const Wrapper = (props: Omit<FileUploadDialogComponentProps, 'onLoadingStateChan
         setOpen(false);
         props.onClose();
     };
-    
+
     return (
-        <ReusableDialog 
-            open={open} 
-            handleClose={handleClose} 
+        <ReusableDialog
+            open={open}
+            handleClose={handleClose}
             // Pass component with the new callback prop
             component={
-                <FileUploadDialogComponent 
-                    {...props} 
-                    onClose={handleClose} 
+                <FileUploadDialogComponent
+                    {...props}
+                    onClose={handleClose}
                     onLoadingStateChange={setIsLoading}
                     socketioClientRef={setSocketioClient}
                 />
-            } 
+            }
         />
     );
 };

@@ -186,12 +186,18 @@ def main():
     # Otherwise, use normal command parsing for single assignment
     parser = argparse.ArgumentParser(
         description='Manage project permissions for users',
-        epilog='Usage: python manage_project_permissions.py <file_path> OR python manage_project_permissions.py assign --email ... --project ... --permission ...'
+        epilog='Usage: python manage_project_permissions.py <file_path> OR python manage_project_permissions.py sync OR python manage_project_permissions.py assign --email ... --project ... --permission ...'
     )
     
     # Create subparsers for different commands
     subparsers = parser.add_subparsers(dest='command', help='Commands', required=True)
-    
+
+    # Sync-only command (populate users from Auth0; admins auto-get ownership of all projects)
+    subparsers.add_parser(
+        'sync',
+        help='Sync users from Auth0 to the DB only (no permission assignment)'
+    )
+
     # Single assignment command
     assign_parser = subparsers.add_parser('assign', help='Assign permission for a single user and project')
     assign_parser.add_argument('--email', required=True, help='User email')
@@ -203,9 +209,12 @@ def main():
 
     # Create application context
     with app.app_context():
-        # Sync users from Auth0 first to ensure DB is up to date
-        sync_users_from_auth0()
-        if args.command == 'assign':
+        if args.command == 'sync':
+            # Sync only — populates users and auto-assigns admins ownership of all projects
+            success = sync_users_from_auth0()
+        elif args.command == 'assign':
+            # Sync users from Auth0 first to ensure DB is up to date, then assign
+            sync_users_from_auth0()
             success = assign_permissions(args.email, args.project, args.permission)
         else:
             parser.print_help()

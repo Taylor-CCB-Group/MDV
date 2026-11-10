@@ -72,19 +72,17 @@ export default class VivContrastExtension extends VivLayerExtension<ContrastProp
         };
     }
 
-    updateState(
-        this: Layer<ContrastProps>,
-        params: UpdateParameters<Layer<ContrastProps>>,
-        extension: this,
-    ): void {
+    updateState(this: Layer<ContrastProps>, params: UpdateParameters<Layer<ContrastProps>>, extension: this): void {
         super.updateState(params, extension);
         const { props } = params;
         const { contrast = [], brightness = [] } = props;
-        const getNumChannels = "getNumChannels" in this && typeof this.getNumChannels === "function"
-            ? this.getNumChannels.bind(this)
-            : undefined;
-        const numChannels = getNumChannels?.()
-            ?? ("selections" in props && Array.isArray(props.selections) ? props.selections.length : 0);
+        const getNumChannels =
+            "getNumChannels" in this && typeof this.getNumChannels === "function"
+                ? this.getNumChannels.bind(this)
+                : undefined;
+        const numChannels =
+            getNumChannels?.() ??
+            ("selections" in props && Array.isArray(props.selections) ? props.selections.length : 0);
         const vivContrastUniforms: Record<string, number> = {};
 
         for (let i = 0; i < numChannels; i++) {

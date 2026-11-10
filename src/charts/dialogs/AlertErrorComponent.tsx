@@ -74,9 +74,7 @@ const AlertErrorComponent = ({ message, title, alertType = "error" }: AlertError
                                 gap: 1,
                             }}
                         >
-                            <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>
-                                {message}
-                            </span>
+                            <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>{message}</span>
                             {alertType === "error" && (
                                 <Tooltip title="Copy error message">
                                     <IconButton
@@ -98,11 +96,11 @@ const AlertErrorComponent = ({ message, title, alertType = "error" }: AlertError
                         <Box sx={{ p: 2, mt: 1 }}>
                             <Typography>
                                 {ALERT_ERROR_REPORT_MESSAGE}{" "}
-                                <Link 
+                                <Link
                                     href={`mailto:${MDV_EMAIL}?subject=MDV%20Issue%20Report`}
-                                    sx={{ 
+                                    sx={{
                                         textDecoration: "none",
-                                        "&.MuiLink-root": { color: "info.main" }
+                                        "&.MuiLink-root": { color: "info.main" },
                                     }}
                                 >
                                     {MDV_EMAIL}

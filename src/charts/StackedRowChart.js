@@ -1,9 +1,9 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
-import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart";
-import { getHierarchicalNodes } from "../utilities/clustering.js";
+import { select } from "d3-selection";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+import { getHierarchicalNodes } from "../utilities/clustering.js";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 class StackedRowChart extends SVGChart {
     constructor(dataStore, div, config) {
@@ -109,10 +109,7 @@ class StackedRowChart extends SVGChart {
         const yvalues = this.dataStore.getColumnValues(c.param[0]);
         const xvalues = this.dataStore.getColumnValues(c.param[1]);
 
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(tTime)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
 
         this.x_scale.domain([0, 1]);
         this.y_scale.domain(this.sortedData.map((x) => yvalues[x.id]));
@@ -125,20 +122,12 @@ class StackedRowChart extends SVGChart {
                 (enter) =>
                     enter
                         .append("g")
-                        .attr(
-                            "transform",
-                            (d, i) =>
-                                `translate(0,${vgap * (i + 1) + bheight * i})`,
-                        )
+                        .attr("transform", (d, i) => `translate(0,${vgap * (i + 1) + bheight * i})`)
                         .attr("class", "stacked-row"),
                 (update) =>
                     update
                         .transition(trans)
-                        .attr(
-                            "transform",
-                            (d, i) =>
-                                `translate(0,${vgap * (i + 1) + bheight * i})`,
-                        ),
+                        .attr("transform", (d, i) => `translate(0,${vgap * (i + 1) + bheight * i})`),
             )
             .selectAll("rect")
             .data(

@@ -7,10 +7,11 @@ import time
 import json
 import logging
 from urllib.parse import quote
-from sqlalchemy import text, create_engine
+from sqlalchemy import text, create_engine, make_url
 from sqlalchemy.exc import OperationalError
 from flask import Flask
 from mdvtools.server import add_safe_headers
+from mdvtools.entry_assets import register_entry_assets
 from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent
@@ -35,6 +36,10 @@ logger = get_logger(__name__)
 # Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 logger.info(f"Authentication enabled: {ENABLE_AUTH}")
+
+# Opt-in flag: sync_users_to_db() runs on startup as performance improved
+RUN_AUTH0_SYNC_ON_START = os.getenv("RUN_AUTH0_SYNC_ON_START", "0").lower() in ["1", "true", "yes"]
+logger.info(f"Auth0 sync on startup: {RUN_AUTH0_SYNC_ON_START}")
 oauth = None
 if ENABLE_AUTH:
     
@@ -56,6 +61,7 @@ def create_flask_app(config_name=None):
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
     app.url_map.strict_slashes = False
     app.after_request(add_safe_headers)
+    register_entry_assets(app)
     
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,   # Prevent JavaScript from accessing cookies
@@ -87,9 +93,12 @@ def create_flask_app(config_name=None):
     try:
         logger.info("Creating tables")
         with app.app_context():
-            logger.info("Waiting for DB to set up")
-            if config_name != 'test':
+            db_backend = app.config.get('DB_BACKEND', 'sqlite')
+            if config_name != 'test' and db_backend == 'postgres':
+                logger.info("Waiting for PostgreSQL to set up")
                 wait_for_database(app)
+            elif config_name != 'test':
+                logger.info("SQLite backend selected; skipping PostgreSQL readiness checks")
             if not tables_exist():
                 logger.info("Creating database tables")
                 db.create_all()
@@ -107,8 +116,19 @@ def create_flask_app(config_name=None):
 
             if ENABLE_AUTH:
                 try:
-                    # Note: sync_users_to_db() is no longer called automatically on startup.
-                    # It should only be called manually from manage_project_permissions.py script.
+                    # sync_users_to_db() runs on startup as performance improved
+                    if RUN_AUTH0_SYNC_ON_START:
+                        try:
+                            auth_provider = get_auth_provider()
+                            if hasattr(auth_provider, "sync_users_to_db"):
+                                logger.info("RUN_AUTH0_SYNC_ON_START enabled; syncing users from Auth0...")
+                                auth_provider.sync_users_to_db()
+                                logger.info("Auth0 user sync complete.")
+                            else:
+                                logger.info("Auth provider has no sync_users_to_db(); skipping startup sync.")
+                        except Exception as sync_err:
+                            logger.exception(f"Auth0 startup sync failed; continuing with existing DB state: {sync_err}")
+
                     logger.info("Caching user-projects data...")
                     cache_user_projects()  # Cache the user-project mappings into Redis only when Auth is enabled
 
@@ -172,31 +192,20 @@ def wait_for_database(app):
     """Wait for the database to be ready before proceeding."""
     max_retries = 30
     delay = 5  # seconds
-    db_name = os.getenv('DB_NAME')
-    
+    # Use the settings load_config resolved, which may have come from env, Docker secrets or config.json
+    target_url = make_url(app.config['SQLALCHEMY_DATABASE_URI'])
+    db_name = target_url.database
+
     if not db_name:
-        error_message = "Error: DB_NAME environment variable is not set"
+        error_message = "Error: the database URI has no database name"
         logger.error(error_message)
         raise ValueError(error_message)
 
     # First connect to postgres database to check/create our target database
-    postgres_uri = 'postgresql://{}:{}@{}/postgres'.format(
-        os.getenv('DB_USER'),
-        os.getenv('DB_PASSWORD'),
-        os.getenv('DB_HOST')
-    )
-    
-    # Construct target URI once since environment variables don't change
-    target_uri = 'postgresql://{}:{}@{}/{}'.format(
-        os.getenv('DB_USER'),
-        os.getenv('DB_PASSWORD'),
-        os.getenv('DB_HOST'),
-        db_name
-    )
-    
-    # Update the database URI in the app config (this is the same as the initial URI from load_config)
-    app.config['SQLALCHEMY_DATABASE_URI'] = target_uri
-    
+    postgres_uri = target_url.set(database='postgres').render_as_string(hide_password=False)
+    target_uri = target_url.render_as_string(hide_password=False)
+    db_schema = app.config.get('DB_SCHEMA', '')
+
     for attempt in range(max_retries):
         try:
             # First connect to postgres database
@@ -231,6 +240,17 @@ def wait_for_database(app):
             # The engine should already be valid since the URI hasn't changed
             test_connection = None
             try:
+                if db_schema:
+                    schema_engine = create_engine(target_uri, isolation_level="AUTOCOMMIT")
+                    schema_connection = None
+                    try:
+                        schema_connection = schema_engine.connect()
+                        schema_connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{db_schema}"'))
+                        logger.info(f"Ensured database schema exists: {db_schema}")
+                    finally:
+                        if schema_connection:
+                            schema_connection.close()
+                        schema_engine.dispose()
                 test_connection = db.engine.connect()
                 test_connection.execute(text('SELECT 1'))
                 logger.info("Successfully connected to target database")
@@ -312,18 +332,49 @@ def load_config(app, config_name=None, enable_auth=False):
         if config_name == 'test':
             app.config['PREFERRED_URL_SCHEME'] = 'http'
             app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+            app.config['DB_BACKEND'] = 'sqlite'
         else:
             app.config['PREFERRED_URL_SCHEME'] = 'https'
-            
-            db_user = os.getenv('DB_USER') or read_secret('db_user')
-            db_password = os.getenv('DB_PASSWORD') or read_secret('db_password')
-            db_name = os.getenv('DB_NAME') or read_secret('db_name')
-            db_host = os.getenv('DB_HOST') or app.config.get('db_host')
+            db_backend = (os.getenv('DB_BACKEND') or '').strip().lower()
+            if not db_backend:
+                # Configs written before DB_BACKEND existed always used postgres and set only
+                # DB_* values or Docker secrets. Defaulting those to sqlite would start the app
+                # on a new, empty database while the real one sits unused.
+                has_postgres_settings = any(
+                    os.getenv(name) for name in ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME']
+                ) or os.path.exists('/run/secrets/db_user')
+                if has_postgres_settings:
+                    logger.warning("DB_BACKEND is not set but postgres settings are present; using postgres. Set DB_BACKEND=postgres to remove this warning.")
+                    db_backend = 'postgres'
+                else:
+                    db_backend = 'sqlite'
+            elif db_backend not in ['sqlite', 'postgres']:
+                raise ValueError(f"Unknown DB_BACKEND '{db_backend}'; expected 'sqlite' or 'postgres'.")
 
-            if not all([db_user, db_password, db_name, db_host]):
-                raise ValueError("Error: One or more required secrets or configurations are missing.")
-            
-            app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+            app.config['DB_BACKEND'] = db_backend
+
+            if db_backend == 'sqlite':
+                sqlite_db_path = (os.getenv('SQLITE_DB_PATH') or '/app/mdv/mdv.sqlite3').strip()
+                app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{sqlite_db_path}'
+                logger.info(f"Database backend selected: sqlite (path: {sqlite_db_path})")
+            else:
+                db_user = os.getenv('DB_USER') or read_secret('db_user')
+                db_password = os.getenv('DB_PASSWORD') or read_secret('db_password')
+                db_name = os.getenv('DB_NAME') or read_secret('db_name')
+                db_host = os.getenv('DB_HOST') or app.config.get('db_host')
+                db_schema = (os.getenv('DB_SCHEMA') or '').strip()
+
+                if not all([db_user, db_password, db_name, db_host]):
+                    raise ValueError("Error: One or more required secrets or configurations are missing.")
+                
+                app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+                app.config['DB_SCHEMA'] = db_schema
+                if db_schema:
+                    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+                        'connect_args': {'options': f'-csearch_path={db_schema}'}
+                    }
+                    logger.info(f"Using database schema: {db_schema}")
+                logger.info(f"Database backend selected: postgres (host: {db_host}, db: {db_name})")
 
 
             # Only configure Auth0 if ENABLE_AUTH is True
@@ -545,8 +596,9 @@ def serve_projects_from_filesystem(app, base_dir):
         projects_in_db = {project.path for project in Project.query.with_entities(Project.path).all()}
         logger.info(f"Project paths in DB: {projects_in_db}")
 
-        # Get all project directories in the filesystem
-        project_paths_in_fs = {os.path.join(base_dir, d) for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d)) and d != 'lost+found'}
+        # Get all project directories in the filesystem, leaving out hidden folders and
+        # folders that do not hold a whole project
+        project_paths_in_fs = {os.path.join(base_dir, d) for d in os.listdir(base_dir) if d != 'lost+found' and not d.startswith('.') and is_valid_mdv_project(os.path.join(base_dir, d))}
         logger.info(f"Project paths in filesystem: {project_paths_in_fs}")
 
         # Determine which project paths are in the filesystem but not in the database

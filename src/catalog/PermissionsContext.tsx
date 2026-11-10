@@ -1,11 +1,4 @@
-import {
-    type ReactNode,
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useState,
-} from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { apiFetch } from "@/utils/mdvRouting";
 
 export interface ProjectOperationPermissions {
@@ -38,24 +31,21 @@ interface PermissionsContextType {
     isLoading: boolean;
     error: string | null;
     isPublicPage: boolean;
+    isAdmin: boolean;
 }
 
-const PermissionsContext = createContext<PermissionsContextType | undefined>(
-    undefined,
-);
+const PermissionsContext = createContext<PermissionsContextType | undefined>(undefined);
 
 /**
  * Provider component that fetches project operation permissions
  */
-export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
-    children,
-}) => {
-    const [permissions, setPermissions] =
-        useState<ProjectOperationPermissions>(defaultPermissions);
+export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [permissions, setPermissions] = useState<ProjectOperationPermissions>(defaultPermissions);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     //! Public page is true by default
     const [isPublicPage, setIsPublicPage] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     const fetchPermissions = useCallback(async () => {
         setIsLoading(true);
@@ -71,6 +61,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
                 return;
             }
             const data = await response.json();
+            setIsAdmin(data.is_admin === true);
 
             if (data.project_manager) {
                 const project_manager = data.project_manager;
@@ -80,7 +71,7 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
                 if (!pmOperations) {
                     setIsPublicPage(false);
                 }
-                
+
                 // If any permission doesn't exist, then we assign it as false
                 const projectPermissions: ProjectOperationPermissions = {
                     createProject: data.project_manager?.createProject ?? false,
@@ -110,13 +101,9 @@ export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
         fetchPermissions();
     }, [fetchPermissions]);
 
-    const value = { permissions, isLoading, error, isPublicPage };
+    const value = { permissions, isLoading, error, isPublicPage, isAdmin };
 
-    return (
-        <PermissionsContext.Provider value={value}>
-            {children}
-        </PermissionsContext.Provider>
-    );
+    return <PermissionsContext.Provider value={value}>{children}</PermissionsContext.Provider>;
 };
 
 // A custom hook to consume Project Permissions

@@ -1,10 +1,10 @@
-import WGLChart from "./WGLChart.js";
-import { WGL2DI } from "../webgl/WGL2DI.js";
-import { curveBasis, line } from "d3-shape";
 import { easeLinear } from "d3-ease";
 import { select } from "d3-selection";
-import BaseChart from "./BaseChart";
+import { curveBasis, line } from "d3-shape";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import { WGL2DI } from "../webgl/WGL2DI.js";
+import BaseChart from "./BaseChart";
+import WGLChart from "./WGLChart.js";
 
 class ViolinPlot extends WGLChart {
     useDefaultTitle = false;
@@ -24,10 +24,10 @@ class ViolinPlot extends WGLChart {
             this.useDefaultTitle = true;
             config.title = `${x_name} x ${y_name}`;
         }
-        
+
         const c = this.config;
         c.brush = c.brush || "poly";
-        
+
         //disable scroll zoom / pan
         const appConf = { brush: c.brush, noCameraControl: true };
 
@@ -48,10 +48,10 @@ class ViolinPlot extends WGLChart {
                 this._createPolyFilter(range);
             }
         });
-        
+
         c.radius = c.radius || 5;
         c.opacity = c.opacity || 0.8;
-        
+
         this.app.setPointRadius(this.config.radius);
         this.app.setPointOpacity(this.config.opacity);
         this.data = [];
@@ -164,12 +164,10 @@ class ViolinPlot extends WGLChart {
                 [x_min, x_max],
                 [y_min, y_max],
             ];
-            this.dim(
-                "filterSquare",
-                [this.xPos, this.valueField],
-                { range1: this.filter[0], range2: this.filter[1] },
-                [this.xPos, 1],
-            );
+            this.dim("filterSquare", [this.xPos, this.valueField], { range1: this.filter[0], range2: this.filter[1] }, [
+                this.xPos,
+                1,
+            ]);
             this.app.refresh();
         }
     }
@@ -179,13 +177,16 @@ class ViolinPlot extends WGLChart {
             return;
         }
 
-        if (dim !== this.dim) {
+        if (dim === this.dim) {
+            // large datasets filter on a worker, so our own result can land after filter() returns
+            this.app.refresh();
+        } else {
             if (dim === "all_removed") {
                 this.app.clearBrush();
                 this.app.setFilter(false);
                 this.resetButton.style.display = "none";
             }
-            this.config
+            this.config;
             const c = this.config;
             this.ticks = this.y_scale.ticks(c.intervals);
             this.dim.getKernalDensity(
@@ -205,10 +206,7 @@ class ViolinPlot extends WGLChart {
     }
 
     drawChart() {
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(400)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(400).ease(easeLinear);
         const scales = [];
         const catLen = this.data.length;
 
@@ -268,9 +266,7 @@ class ViolinPlot extends WGLChart {
         }
 
         const colors = this.dataStore.getColumnColors(this.config.param[0]);
-        const ga = this.graph_area
-            .selectAll(".violin-curve")
-            .data(display_data, (d) => `A${d.id}`);
+        const ga = this.graph_area.selectAll(".violin-curve").data(display_data, (d) => `A${d.id}`);
         ga.join("path")
             .attr("class", "violin-curve")
             .transition(trans)

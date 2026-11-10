@@ -7,11 +7,7 @@ export interface ColumnPreviewProps {
     secondRowValues: string[];
 }
 
-export const ColumnPreview: React.FC<ColumnPreviewProps> = ({
-    columnNames,
-    columnTypes,
-    secondRowValues,
-}) => {
+export const ColumnPreview: React.FC<ColumnPreviewProps> = ({ columnNames, columnTypes, secondRowValues }) => {
     const [searchQuery, setSearchQuery] = useState<string>("");
 
     // Filter the columns based on the search query
@@ -21,9 +17,7 @@ export const ColumnPreview: React.FC<ColumnPreviewProps> = ({
             type: columnTypes[index],
             value: secondRowValues[index],
         }))
-        .filter((column) =>
-            column.name.toLowerCase().includes(searchQuery.toLowerCase()),
-        );
+        .filter((column) => column.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     return (
         <div className="border border-gray-300 rounded-lg shadow-md dark:border-gray-700 w-full mx-10">

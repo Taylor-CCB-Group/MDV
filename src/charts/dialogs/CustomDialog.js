@@ -1,6 +1,6 @@
+import noUiSlider from "nouislider";
 import { BaseDialog } from "../../utilities/Dialog.js";
 import { createEl } from "../../utilities/Elements.js";
-import noUiSlider from "nouislider";
 
 class CustomDialog extends BaseDialog {
     constructor(config) {
@@ -58,11 +58,7 @@ class CustomDialog extends BaseDialog {
                 }
                 this[s.type](s, d);
                 if (s.description) {
-                    createEl(
-                        "div",
-                        { text: s.description, styles: { fontSize: "12px" } },
-                        d,
-                    );
+                    createEl("div", { text: s.description, styles: { fontSize: "12px" } }, d);
                 }
             }
         }

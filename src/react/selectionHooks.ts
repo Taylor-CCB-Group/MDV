@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
 
 type CategoryRows = {
@@ -26,9 +26,7 @@ function getUniqueRows(rowIndexes: ArrayLike<number>) {
  * Normalizes keyboard modifiers into the shared highlight semantics used by row-selection UIs.
  * Ctrl/Cmd toggle wins over Shift-add when both are pressed.
  */
-export function getHighlightModifierState(
-    modifiers?: HighlightModifierInput,
-): HighlightModifierState {
+export function getHighlightModifierState(modifiers?: HighlightModifierInput): HighlightModifierState {
     const toggle = !!(modifiers?.ctrlKey || modifiers?.metaKey);
     return {
         add: !toggle && !!modifiers?.shiftKey,
@@ -47,9 +45,7 @@ export function getNextHighlightedRows(
     if (toggle) {
         const currentRows = getUniqueRows(currentHighlightedRows);
         const currentRowSet = new Set(currentRows);
-        const shouldRemoveGroup = targetRows.every((rowIndex) =>
-            currentRowSet.has(rowIndex),
-        );
+        const shouldRemoveGroup = targetRows.every((rowIndex) => currentRowSet.has(rowIndex));
 
         if (shouldRemoveGroup) {
             const targetRowSet = new Set(targetRows);
@@ -66,10 +62,7 @@ export function getNextHighlightedRows(
     return targetRows;
 }
 
-export function getHighlightedRowsFromCategoryIndices(
-    categoryIndices: number[],
-    categories: CategoryRows[],
-) {
+export function getHighlightedRowsFromCategoryIndices(categoryIndices: number[], categories: CategoryRows[]) {
     const highlightedRows = new Set<number>();
     for (const categoryIndex of categoryIndices) {
         const categoryRows = categories[categoryIndex]?.rows;
@@ -97,9 +90,7 @@ export function useHighlightedIndex() {
 export function useHighlightedIndices() {
     const dataStore = useDataStore();
     // Create a copy to avoid a reference to mutable state - not that we anticipate an actual issue in this case.
-    const [highlightedIndices, setHighlightedIndices] = useState<number[]>(
-        dataStore.highightedData?.slice() || []
-    );
+    const [highlightedIndices, setHighlightedIndices] = useState<number[]>(dataStore.highightedData?.slice() || []);
     const listenerKeyRef = useRef<string | null>(null);
     let listenerKey = listenerKeyRef.current;
     if (listenerKey === null) {
@@ -111,9 +102,7 @@ export function useHighlightedIndices() {
         const listener = (type: string, data: { indexes: number[] | Record<number, number> }) => {
             if (type === "data_highlighted") {
                 // Handle both array and object formats (is this necessary?)
-                const indices = Array.isArray(data.indexes) 
-                    ? data.indexes 
-                    : Object.values(data.indexes);
+                const indices = Array.isArray(data.indexes) ? data.indexes : Object.values(data.indexes);
                 setHighlightedIndices(indices);
             }
         };
@@ -135,11 +124,14 @@ export function useHighlightedIndices() {
 export function useHighlightRows() {
     const chart = useChart();
     const dataStore = useDataStore();
-    
-    return useCallback((rowIndexes: number[]) => {
-        // dataHighlighted expects an array of numbers
-        dataStore.dataHighlighted(rowIndexes, chart);
-    }, [chart, dataStore]);
+
+    return useCallback(
+        (rowIndexes: number[]) => {
+            // dataHighlighted expects an array of numbers
+            dataStore.dataHighlighted(rowIndexes, chart);
+        },
+        [chart, dataStore],
+    );
 }
 
 /**
@@ -151,9 +143,7 @@ export function useHighlightRowsWithModifiers() {
 
     return useCallback(
         (rowIndexes: ArrayLike<number>, modifiers?: HighlightModifierInput) => {
-            highlightRows(
-                getNextHighlightedRows(rowIndexes, highlightedIndices, modifiers),
-            );
+            highlightRows(getNextHighlightedRows(rowIndexes, highlightedIndices, modifiers));
         },
         [highlightRows, highlightedIndices],
     );
@@ -167,8 +157,11 @@ export function useHighlightRowsWithModifiers() {
 export function useHighlightCategoryRows(categories: CategoryRows[]) {
     const highlightRows = useHighlightRows();
 
-    return useCallback((categoryIndices: number[]) => {
-        const rows = getHighlightedRowsFromCategoryIndices(categoryIndices, categories);
-        highlightRows(rows);
-    }, [categories, highlightRows]);
+    return useCallback(
+        (categoryIndices: number[]) => {
+            const rows = getHighlightedRowsFromCategoryIndices(categoryIndices, categories);
+            highlightRows(rows);
+        },
+        [categories, highlightRows],
+    );
 }

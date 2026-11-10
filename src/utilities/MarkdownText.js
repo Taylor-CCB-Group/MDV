@@ -1,5 +1,5 @@
-import { marked } from "marked";
 import purify from "dompurify";
+import { marked } from "marked";
 
 function renderText(text) {
     if (!text) return "";

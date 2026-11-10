@@ -7,15 +7,11 @@ export type ColumnMetadataLike = Record<string, unknown> & {
     originalData?: unknown;
 };
 
-export function isSoftDeletedColumn(
-    column: ColumnMetadataLike | null | undefined,
-): boolean {
+export function isSoftDeletedColumn(column: ColumnMetadataLike | null | undefined): boolean {
     return Boolean(column?.deleted);
 }
 
-export function toColumnMetadata(
-    column: ColumnMetadataLike,
-): ColumnMetadataLike {
+export function toColumnMetadata(column: ColumnMetadataLike): ColumnMetadataLike {
     const metadata = { ...column };
     delete metadata.data;
     delete metadata.buffer;
@@ -29,16 +25,11 @@ export function toColumnMetadata(
     return metadata;
 }
 
-export function normalizeColumnsMetadata(
-    columns: ColumnMetadataLike[] | undefined,
-): ColumnMetadataLike[] {
+export function normalizeColumnsMetadata(columns: ColumnMetadataLike[] | undefined): ColumnMetadataLike[] {
     return (columns ?? []).map((column) => toColumnMetadata(column));
 }
 
-export function findColumnMetadataIndex(
-    columns: ColumnMetadataLike[] | undefined,
-    field: string,
-): number {
+export function findColumnMetadataIndex(columns: ColumnMetadataLike[] | undefined, field: string): number {
     return (columns ?? []).findIndex((item) => item.field === field);
 }
 
@@ -62,11 +53,6 @@ export function updateColumnMetadata(
     return normalizeColumnsMetadata(nextColumns);
 }
 
-export function removeColumnMetadata(
-    columns: ColumnMetadataLike[] | undefined,
-    field: string,
-): ColumnMetadataLike[] {
-    return normalizeColumnsMetadata(
-        (columns ?? []).filter((column) => column.field !== field),
-    );
+export function removeColumnMetadata(columns: ColumnMetadataLike[] | undefined, field: string): ColumnMetadataLike[] {
+    return normalizeColumnsMetadata((columns ?? []).filter((column) => column.field !== field));
 }

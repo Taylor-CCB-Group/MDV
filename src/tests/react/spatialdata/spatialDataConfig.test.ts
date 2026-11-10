@@ -4,9 +4,10 @@ import { toSerializableSpatialDataViewState } from "@/react/spatialdata/spatiald
 
 describe("toSerializableSpatialDataViewState", () => {
     test("extracts target + zoom from a view state", () => {
-        expect(
-            toSerializableSpatialDataViewState({ target: [1, 2, 0], zoom: 3 }),
-        ).toEqual({ target: [1, 2, 0], zoom: 3 });
+        expect(toSerializableSpatialDataViewState({ target: [1, 2, 0], zoom: 3 })).toEqual({
+            target: [1, 2, 0],
+            zoom: 3,
+        });
     });
 
     test("returns null when there is no target", () => {

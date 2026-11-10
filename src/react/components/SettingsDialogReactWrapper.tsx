@@ -1,12 +1,12 @@
 import { observer } from "mobx-react-lite";
+import type { BaseConfig } from "@/charts/BaseChart";
+import BaseChart from "@/charts/BaseChart";
+import { createMdvPortal } from "@/react/react_utils";
 import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
-import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./SettingsDialogComponent";
-import BaseChart from "@/charts/BaseChart";
-import type { BaseConfig } from "@/charts/BaseChart";
 
-const SettingsDialog = observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
+const SettingsDialog = observer(<T extends BaseConfig>({ chart }: { chart: BaseChart<T> }) => {
     // const config = chart.getConfig(); //instrument with mobx etc
     return <Gui chart={chart} />;
 });
@@ -26,7 +26,7 @@ class SettingsDialogReactWrapper<T extends BaseConfig> extends BaseDialog {
         // it isn't only used by 'charts', but e.g. tracks.
         const typeName = BaseChart.types[chart.config.type].name;
         const name = `${chart.config.title} (${typeName})`;
-            //chart.config.title || `${chart.config.type} ${chart.config.id}`;
+        //chart.config.title || `${chart.config.type} ${chart.config.id}`;
         const config = {
             width: 500,
             title: `Settings: ${name}`,
@@ -41,11 +41,7 @@ class SettingsDialogReactWrapper<T extends BaseConfig> extends BaseDialog {
     }
     init(chart: BaseChart<T>) {
         const div = createEl("div", {}, this.dialog);
-        this.root = createMdvPortal(
-            <SettingsDialog chart={chart} />,
-            div,
-            this,
-        );
+        this.root = createMdvPortal(<SettingsDialog chart={chart} />, div, this);
     }
     close() {
         super.close();
@@ -54,10 +50,7 @@ class SettingsDialogReactWrapper<T extends BaseConfig> extends BaseDialog {
         // I don't think there's any 'this' weirdness going on here...
         // some kind of react voodoo?
         if (this.root) this.root.unmount();
-        else
-            console.warn(
-                "not unmounting react root for dialog because of weirdness",
-            );
+        else console.warn("not unmounting react root for dialog because of weirdness");
     }
 }
 

@@ -2,16 +2,12 @@
 onmessage = (e) => {
     const data = [];
     for (const item of e.data[3]) {
-        data.push(
-            item[1] === "int32"
-                ? new Int32Array(item[0])
-                : new Float32Array(item[0]),
-        );
+        data.push(item[1] === "int32" ? new Int32Array(item[0]) : new Float32Array(item[0]));
     }
     const dLen = data.length;
     const config = e.data[4];
     const cat = config.y_datatype === "text16" ? new Uint16Array(e.data[2]) : new Uint8Array(e.data[2]);
-    
+
     const len = cat.length;
     let valLen = config.values.length;
     const scaleVals = config.scaleVals;
@@ -35,31 +31,9 @@ onmessage = (e) => {
     }
     const catTotals = new Array(valLen).fill(0);
     if (config.method === "mean") {
-        addAverages(
-            result,
-            data,
-            len,
-            dLen,
-            gFilter,
-            lFilter,
-            cat,
-            catTotals,
-            valLen,
-            scaleVals,
-            );
+        addAverages(result, data, len, dLen, gFilter, lFilter, cat, catTotals, valLen, scaleVals);
     } else {
-        addMedians(
-            result,
-            data,
-            len,
-            dLen,
-            gFilter,
-            lFilter,
-            cat,
-            catTotals,
-            valLen,
-            scaleVals
-        );
+        addMedians(result, data, len, dLen, gFilter, lFilter, cat, catTotals, valLen, scaleVals);
     }
 
     const indexR = [];
@@ -92,18 +66,7 @@ onmessage = (e) => {
     });
 };
 
-function addMedians(
-    result,
-    data,
-    len,
-    dLen,
-    gFilter,
-    lFilter,
-    cat,
-    catTotals,
-    valLen,
-    scaleVals
-) {
+function addMedians(result, data, len, dLen, gFilter, lFilter, cat, catTotals, valLen, scaleVals) {
     const t = performance.now();
     for (let i = 0; i < len; i++) {
         if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
@@ -154,18 +117,7 @@ function addMedians(
     }
 }
 
-function addMedianst(
-    result,
-    data,
-    len,
-    dLen,
-    gFilter,
-    lFilter,
-    cat,
-    catTotals,
-    valLen,
-    scaleVals,
-) {
+function addMedianst(result, data, len, dLen, gFilter, lFilter, cat, catTotals, valLen, scaleVals) {
     const t = performance.now();
     for (let i = 0; i < len; i++) {
         if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
@@ -195,18 +147,7 @@ function addMedianst(
     }
 }
 
-function addAverages(
-    result,
-    data,
-    len,
-    dLen,
-    gFilter,
-    lFilter,
-    cat,
-    catTotals,
-    valLen,
-    scaleVals
-) {
+function addAverages(result, data, len, dLen, gFilter, lFilter, cat, catTotals, valLen, scaleVals) {
     for (let i = 0; i < len; i++) {
         if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = cat[i];
@@ -283,10 +224,10 @@ function addSimpleMean(data, gFilter, lFilter, catData, conf) {
 
 function shouldIncludeRow(i, gFilter, lFilter) {
     //never include background filtered rows
-    if (lFilter[i] >1) {
+    if (lFilter[i] > 1) {
         return false;
     }
-   
+
     if (gFilter[i] !== 0 && gFilter[i] !== lFilter[i]) {
         return false;
     }

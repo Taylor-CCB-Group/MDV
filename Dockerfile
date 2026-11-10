@@ -48,9 +48,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
     || (cat /var/log/apt/term.log && exit 1)
 
-# Pin uv to match tool.uv.required-version in python/pyproject.toml.
+# Latest uv; python/pyproject.toml only sets a minimum (tool.uv.required-version).
 # Base image ships uv via pip; `uv self update` only works for standalone installs.
-RUN pip install --no-cache-dir 'uv==0.11.14'
+RUN pip install --no-cache-dir uv
 
 # Switch to the pn user early in the process to avoid permission issues
 USER pn
@@ -85,7 +85,7 @@ WORKDIR /app
 # DECISION: Using virtual environments for security and permission isolation,
 # `.bashrc` is used to activate the virtual environment automatically.
 # uv sync uses `.venv` in the project directory by default.
-# uv is pinned as root (see pip install above) to match python/pyproject.toml required-version.
+# uv is installed as root (see pip install above).
 
 # Prefer binary wheels to avoid slow/fragile source builds (e.g., numcodecs on arm64)
 ENV PIP_PREFER_BINARY=1

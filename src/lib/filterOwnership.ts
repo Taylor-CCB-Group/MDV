@@ -56,34 +56,33 @@ export function isRowFilteredByOtherOwner(
     return localFilter == null || globalValue !== localFilter[rowIndex];
 }
 
+/**
+ * Rows the owning chart should draw, scanned from the current global filter (the
+ * worker-computed `aggregateRows` can lag behind it). Runs over every row on each filter
+ * change, so the per-row test is inlined with the cheap checks first.
+ */
 export function getOwnerVisibleRows({
     globalFilter,
     localFilter,
     localFilterIsActive = false,
     scopePredicate,
 }: OwnerVisibleRowsInput) {
-    if (!localFilterIsActive) {
-        const rows: number[] = [];
-        for (let rowIndex = 0; rowIndex < globalFilter.length; rowIndex += 1) {
-            if ((globalFilter[rowIndex] ?? 0) !== 0) continue;
-            if (scopePredicate && !scopePredicate(rowIndex)) continue;
-            rows.push(rowIndex);
+    const local = localFilterIsActive ? (localFilter ?? null) : null;
+    const size = globalFilter.length;
+    const rows = new Uint32Array(size);
+    let count = 0;
+    for (let rowIndex = 0; rowIndex < size; rowIndex++) {
+        const globalValue = globalFilter[rowIndex] ?? 0;
+        if (local) {
+            // see isRowVisibleToFilterOwner
+            const localValue = local[rowIndex];
+            if (localValue === 2) continue;
+            if (globalValue !== 0 && globalValue !== localValue) continue;
+        } else if (globalValue !== 0) {
+            continue;
         }
-        return Uint32Array.from(rows);
+        if (scopePredicate && !scopePredicate(rowIndex)) continue;
+        rows[count++] = rowIndex;
     }
-
-    const rows: number[] = [];
-    for (let rowIndex = 0; rowIndex < globalFilter.length; rowIndex += 1) {
-        if (
-            isRowVisibleToFilterOwner(
-                rowIndex,
-                globalFilter,
-                localFilter,
-                scopePredicate,
-            )
-        ) {
-            rows.push(rowIndex);
-        }
-    }
-    return Uint32Array.from(rows);
+    return rows.slice(0, count);
 }
