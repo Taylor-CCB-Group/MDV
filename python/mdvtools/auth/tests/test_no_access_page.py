@@ -19,6 +19,7 @@ from flask import Flask, jsonify, session
 import mdvtools
 from mdvtools.auth.auth0_provider import Auth0Provider
 from mdvtools.auth.authutils import register_before_request_auth
+from mdvtools.auth.register_auth_routes import register_auth_routes
 from mdvtools.dbutils.dbmodels import User, db
 
 CONTACT = "MDV support, mdv-support@example.org"
@@ -32,6 +33,8 @@ def app():
         ENABLE_AUTH=True,
         DEFAULT_AUTH_METHOD="auth0",
         LOGIN_REDIRECT_URL="/login_dev",
+        AUTH0_DOMAIN="test.auth0.com",
+        AUTH0_CLIENT_ID="client",
         MDV_ACCESS_CONTACT=CONTACT,
         SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
@@ -171,3 +174,58 @@ def test_open_session_is_refused_once_the_user_is_deactivated(app, provider):
     assert "leaver@example.org" in page
     assert CONTACT in page
     assert sign_out_target(page, "/whoami") == "/logout"
+
+
+AUTH0_LOGOUT = "https://test.auth0.com/v2/logout"
+
+
+@pytest.fixture()
+def sign_out_route(app, provider):
+    """The real /logout route, using the stubbed provider."""
+    with patch("mdvtools.auth.authutils.get_auth_provider", return_value=provider):
+        register_auth_routes(app)
+
+
+def signed_in_client(app):
+    """A browser that started at /login, which records the sign-in method."""
+    client = app.test_client()
+    with client.session_transaction() as browser_session:
+        browser_session["auth_method"] = "auth0"
+    return client
+
+
+def test_person_with_no_user_can_sign_out_of_auth0(app, provider, sign_out_route):
+    client = signed_in_client(app)
+
+    with signed_in_to_auth0(provider, sub="auth0|stranger", email="stranger@example.org"), patch(
+        "mdvtools.auth.authutils.get_auth_provider", return_value=provider
+    ):
+        page = client.get("/whoami").get_data(as_text=True)
+        response = client.get(sign_out_target(page, "/whoami"))
+
+    assert response.status_code == 302
+    assert response.headers["Location"].startswith(AUTH0_LOGOUT)
+
+
+def test_deactivated_user_can_sign_out_of_auth0_after_their_session_is_cleared(
+    app, provider, sign_out_route
+):
+    db.session.add(
+        User(email="leaver@example.org", auth_id="auth0|leaver", is_active=True, password="")
+    )
+    db.session.commit()
+    client = signed_in_client(app)
+
+    with signed_in_to_auth0(provider, sub="auth0|leaver", email="leaver@example.org"), patch(
+        "mdvtools.auth.authutils.get_auth_provider", return_value=provider
+    ):
+        assert client.get("/whoami").status_code == 200
+
+        User.query.filter_by(auth_id="auth0|leaver").one().is_active = False
+        db.session.commit()
+
+        page = client.get("/whoami").get_data(as_text=True)
+        response = client.get(sign_out_target(page, "/whoami"))
+
+    assert response.status_code == 302
+    assert response.headers["Location"].startswith(AUTH0_LOGOUT)

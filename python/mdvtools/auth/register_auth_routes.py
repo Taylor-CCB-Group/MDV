@@ -76,14 +76,9 @@ def register_auth_routes(app):
                 session.clear()
                 session.modified = True
 
-                # Get the appropriate provider if method is set
-                if auth_method:
-                    auth_provider = get_auth_provider()
-                    return auth_provider.logout()
-
-                # Fallback for unknown or missing auth method
-                logger.warning("No auth method found in session during logout.")
-                return jsonify({"message": "Session cleared, but auth method unknown."}), 200
+                # With no auth_method in the session, as for a Deactivated user whose
+                # session MDV has already cleared, this is the site's default provider.
+                return get_auth_provider().logout()
 
             except Exception as e:
                 logger.exception(f"In register_auth_routes: Error during logout: {e}")

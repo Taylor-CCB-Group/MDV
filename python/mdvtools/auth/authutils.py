@@ -193,6 +193,8 @@ def register_before_request_auth(app):
         '/login_sso',
         '/login',
         '/callback',
+        # The no-access page links here, and the hook would show that page again.
+        '/logout',
         '/favicon.ico',
         '/flask/js/',
         '/static',
