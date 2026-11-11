@@ -3,11 +3,14 @@ import {
     CompositeMode,
     DrawPolygonByDraggingMode,
     DrawPolygonMode,
+    type EditAction,
+    type Feature,
     type FeatureCollection,
     type GeoJsonEditMode,
     getPickedEditHandle,
     type ModeProps,
     ModifyMode,
+    type SimpleFeature,
     type SimpleFeatureCollection,
     // DrawRectangleMode,
     // TransformMode,
@@ -101,4 +104,38 @@ export class FreehandMode extends SelectionCompositeMode {
     constructor() {
         super(compositeModes([new DrawPolygonByDraggingMode(), new TranslateMode()]));
     }
+}
+
+/**
+ * Edits that editable-layers emits with `updatedData: props.data`: they only change the drawing in
+ * progress, which the layer keeps in its mode and redraws itself (`setNeedsUpdate`).
+ *
+ * They must not be written back as the selection. The layer is given a new selection only when
+ * React re-renders, so `props.data` can still be the previous selection - a hover move straight
+ * after finishing a shape (`updateTentativeFeature` fires on every pointer move) would put it back.
+ */
+const NON_DATA_EDIT_TYPES: ReadonlySet<string> = new Set([
+    "updateTentativeFeature",
+    "addTentativePosition",
+    "cancelFeature",
+    "invalidPolygon",
+    "invalidHole",
+]);
+
+function isSimpleFeature(feature: Feature | undefined): feature is SimpleFeature {
+    // GeoJSON allows a null geometry, which a persisted selection could carry
+    return feature?.geometry != null && feature.geometry.type !== "GeometryCollection";
+}
+
+/**
+ * The selection an edit from the selection layer leaves, or `null` if it doesn't change it.
+ * The selection holds one shape: the last feature of the edited collection.
+ */
+export function selectionFromEdit({
+    editType,
+    updatedData,
+}: EditAction<FeatureCollection>): SimpleFeatureCollection | null {
+    if (NON_DATA_EDIT_TYPES.has(editType)) return null;
+    const feature = updatedData.features.at(-1);
+    return { ...updatedData, features: isSimpleFeature(feature) ? [feature] : [] };
 }
