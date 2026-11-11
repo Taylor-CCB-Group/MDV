@@ -282,6 +282,96 @@ async function checkAllTools(ui: Page, page: Page, id: string, box: Box, where: 
     });
 }
 
+/** Let deck and React catch up: two animation frames in the chart's window, then a short wait. */
+async function settle(ui: Page) {
+    await ui.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await ui.waitForTimeout(300);
+}
+
+/** Pointer moves with no button held, straight after finishing a shape - what a real mouse does next. */
+async function hoverAfterFinishing(ui: Page, box: Box) {
+    for (const [fx, fy] of [
+        [0.5, 0.5],
+        [0.52, 0.48],
+        [0.55, 0.5],
+    ]) {
+        await ui.mouse.move(...at(box, fx, fy));
+    }
+}
+
+type SyncPointerEvent = { type: "down" | "up" | "move"; at: Point };
+
+/**
+ * Dispatch pointer events on the deck canvas in a single task, as a fast real mouse delivers them.
+ * Each `page.mouse` call is its own round trip, which gives React time to re-render in between and
+ * hides races between an edit and the layer getting its new data. Hover moves need the mouse event
+ * as well as the pointer one: mjolnir takes hover from `mousemove`, drags from pointer events.
+ */
+async function dispatchInOneTask(ui: Page, id: string, events: SyncPointerEvent[]) {
+    await chartScope(ui, id)
+        .locator("canvas")
+        .evaluateAll((canvases, events) => {
+            const canvas = canvases.reduce((a, b) =>
+                b.clientWidth * b.clientHeight > a.clientWidth * a.clientHeight ? b : a,
+            );
+            for (const { type, at } of events) {
+                const buttons = type === "down" ? 1 : 0;
+                const init = { clientX: at[0], clientY: at[1], button: 0, buttons, bubbles: true, cancelable: true };
+                canvas.dispatchEvent(
+                    new PointerEvent(`pointer${type}`, {
+                        ...init,
+                        pointerId: 1,
+                        pointerType: "mouse",
+                        isPrimary: true,
+                    }),
+                );
+                canvas.dispatchEvent(new MouseEvent(`mouse${type}`, init));
+            }
+        }, events);
+}
+
+/**
+ * Freehand around a square without clearing first or waiting for the commit. With `quickHover`, the
+ * release and the first hover move after it arrive together, like a quick real mouse.
+ */
+async function dragFreehand(
+    ui: Page,
+    id: string,
+    box: Box,
+    [x0, y0, x1, y1]: [number, number, number, number],
+    { quickHover }: { quickHover: boolean },
+) {
+    const corners = [at(box, x0, y0), at(box, x1, y0), at(box, x1, y1), at(box, x0, y1)];
+    await ui.mouse.move(...corners[0], { steps: 3 });
+    await ui.mouse.down();
+    for (const corner of [...corners.slice(1), corners[0]]) {
+        await ui.mouse.move(...corner, { steps: 8 });
+    }
+    if (!quickHover) {
+        await ui.mouse.up();
+        return;
+    }
+    await dispatchInOneTask(ui, id, [
+        { type: "up", at: corners[0] },
+        { type: "move", at: at(box, 0.5, 0.5) },
+    ]);
+    // keep the browser's own button state in step; the drag has already ended
+    await ui.mouse.up();
+}
+
+function centreX(ring: Point[]) {
+    const xs = ring.map((p) => p[0]);
+    return (Math.min(...xs) + Math.max(...xs)) / 2;
+}
+
+/** The single selected ring once things have settled. */
+async function settledRing(ui: Page, page: Page, id: string): Promise<Point[]> {
+    await settle(ui);
+    const { rings } = await readState(page, id);
+    expect(rings).toHaveLength(1);
+    return rings[0];
+}
+
 /**
  * Map data coordinates to screen using the polygon drawn in (a): clicks and vertices correspond in
  * order, and the view is orthographic so each axis is linear.
@@ -351,6 +441,78 @@ test.describe("Scatter selection tools", () => {
             box = await measureCanvas(page, id);
 
             await checkAllTools(page, page, id, box, "(h) popped back in");
+        } finally {
+            if (handle !== undefined) {
+                await handle.cleanup();
+            }
+        }
+    });
+
+    /**
+     * The layer only gets a new selection when React re-renders, and until then editable-layers hands
+     * edits the previous one: writing those back put the old shape back as soon as the pointer moved.
+     */
+    test("a shape drawn over an existing selection stays selected when the pointer moves on", async ({ page }) => {
+        const title = `Selection Persistence ${Date.now()}`;
+        let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
+        try {
+            handle = await createTemporaryProjectViaSyntheticAnndata(page, {
+                nameSegment: `scatter-selection-persistence--${Date.now()}`,
+                synthetic: { profile: "realistic", nCells: 200, nGenes: 12, force: true },
+            });
+            const id = await addScatterChart(page, title);
+            const box = await measureCanvas(page, id);
+            await warmUp(page, page, id, box);
+
+            await selectTool(page, id, "Freehand");
+            await dragFreehand(page, id, box, [0.15, 0.3, 0.4, 0.7], { quickHover: false });
+            await expect.poll(async () => (await readState(page, id)).rings.length).toBe(1);
+            let previous = await settledRing(page, page, id);
+
+            await test.step("freehand over freehand", async () => {
+                await dragFreehand(page, id, box, [0.6, 0.3, 0.85, 0.7], { quickHover: true });
+                await hoverAfterFinishing(page, box);
+                const ring = await settledRing(page, page, id);
+                expect(ring).not.toEqual(previous);
+                expect(centreX(ring)).toBeGreaterThan(centreX(previous));
+                previous = ring;
+            });
+
+            await test.step("polygon over freehand", async () => {
+                await selectTool(page, id, "Polygon");
+                const points = [at(box, 0.15, 0.3), at(box, 0.4, 0.3), at(box, 0.4, 0.7), at(box, 0.2, 0.75)];
+                for (const [x, y] of points.slice(0, 3)) {
+                    await page.mouse.move(x, y, { steps: 3 });
+                    await page.mouse.click(x, y);
+                    await pause(page);
+                }
+                await page.mouse.move(...points[3], { steps: 3 });
+                // double-click the last vertex and move on, in one task
+                await dispatchInOneTask(page, id, [
+                    { type: "down", at: points[3] },
+                    { type: "up", at: points[3] },
+                    { type: "down", at: points[3] },
+                    { type: "up", at: points[3] },
+                    { type: "move", at: at(box, 0.5, 0.5) },
+                ]);
+                await hoverAfterFinishing(page, box);
+                const ring = await settledRing(page, page, id);
+                expect(ring).toHaveLength(5);
+                expect(centreX(ring)).toBeLessThan(centreX(previous));
+                previous = ring;
+            });
+
+            await test.step("quick rectangle over polygon", async () => {
+                await selectTool(page, id, "Rectangle");
+                await page.mouse.move(...at(box, 0.6, 0.3), { steps: 3 });
+                await page.mouse.down();
+                await page.mouse.move(...at(box, 0.85, 0.7));
+                await page.mouse.up();
+                await hoverAfterFinishing(page, box);
+                const ring = await settledRing(page, page, id);
+                expect(ring).toHaveLength(5);
+                expect(centreX(ring)).toBeGreaterThan(centreX(previous));
+            });
         } finally {
             if (handle !== undefined) {
                 await handle.cleanup();
