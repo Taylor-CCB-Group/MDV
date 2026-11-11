@@ -48,9 +48,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
     || (cat /var/log/apt/term.log && exit 1)
 
-# Latest uv; python/pyproject.toml only sets a minimum (tool.uv.required-version).
-# Base image ships uv via pip; `uv self update` only works for standalone installs.
-RUN pip install --no-cache-dir uv
+# Latest uv, at least the minimum in python/pyproject.toml (tool.uv.required-version).
+# Base image ships uv via pip, so --upgrade is needed or pip keeps the bundled version.
+# `uv self update` only works for standalone installs.
+RUN pip install --no-cache-dir --upgrade "uv>=0.11.14"
 
 # Switch to the pn user early in the process to avoid permission issues
 USER pn
