@@ -68,9 +68,7 @@ def test_myeloid_comparison_views_use_one_compound_dot_plot(view_name, split_by,
     ("view_name", "split_by", "split_values"),
     [
         (synovial.Q6_VIEW_NAME, synovial.DIAGNOSIS, synovial.Q6_DIAGNOSES),
-        (synovial.Q7_VIEW_NAME, synovial.DIAGNOSIS, synovial.Q6_DIAGNOSES),
         (synovial.Q8_VIEW_NAME, synovial.TNF_RESPONSE, synovial.Q8_GROUPS),
-        (synovial.Q9_VIEW_NAME, synovial.TNF_RESPONSE, synovial.Q8_GROUPS),
     ],
 )
 def test_synovial_comparison_views_use_one_compound_dot_plot(view_name, split_by, split_values):

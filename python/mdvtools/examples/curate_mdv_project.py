@@ -40,6 +40,7 @@ from mdvtools.examples.rename_softdelete_mdv_project_fields import (
 from mdvtools.template_views.create_question_views import (
     GENE_COLLECTIONS,
     GENES,
+    HEAT_MAP_FEATURES,
     NAME_FIELD,
     Q1_VIEW_NAME,
     Q2_VIEW_NAME,
@@ -50,6 +51,7 @@ from mdvtools.template_views.create_question_views import (
     LinkedFeatures,
     atomic_write_json,
     box_plot,
+    category_counts,
     cell_filter,
     composition_bar,
     compound_dot_plot,
@@ -58,6 +60,7 @@ from mdvtools.template_views.create_question_views import (
     feature_table,
     gene_info,
     heat_map,
+    place_legends,
     placed,
     resolve_feature_fields,
     scatter,
@@ -369,10 +372,11 @@ def umap_chart(
     title: str,
     x_field: str,
     y_field: str,
-    color_by: str,
+    color_by: str | dict[str, Any],
     tooltip: str,
     only: tuple[str, str] | None = None,
 ) -> dict[str, Any]:
+    """`color_by` is a field, or a `feature_query` for the selected gene (active link)."""
     chart = scatter(title, [x_field, y_field], color_by, tooltip)
     if only:
         chart["category_filters"] = [{"column": only[0], "category": [only[1]]}]
@@ -380,6 +384,7 @@ def umap_chart(
 
 
 def gene_panel(datasource: str, names: list[str]) -> list[dict[str, Any]]:
+    """`names` are the genes the list starts on; charts follow the genes picked in it."""
     del datasource
     return [
         placed(feature_list("Marker genes", names), [0, 0], [270, 400]),
@@ -459,24 +464,18 @@ def plan_question_views(
     group_label = column_label(group, "Cell Group")
     dot_field = str(dot_category.get("field")) if dot_category else ""
     dot_label = column_label(dot_category, group_label)
-    selected = feature_query(LinkedFeatures(gene_name, subgroup, markers), DOT_PLOT_FEATURES)
-    highlight = [gene for gene in ("CD14", "S100A8", "TNF") if gene in fields] or markers[:3]
+    gene_features = LinkedFeatures(gene_name, subgroup, markers)
+    selected = feature_query(gene_features, DOT_PLOT_FEATURES)
+    start_gene = markers[0]
+    counts = category_counts(datasources)
 
     def accept(name: str, view: dict[str, Any]) -> None:
         if name in views:
             skipped.append({"question": name, "reason": "already in the project"})
             return
-        built[name] = spread_layout(view)
+        built[name] = place_legends(spread_layout(view), counts)
 
     if umap_x and umap_y and group_field:
-        maps = [
-            placed(
-                umap_chart(gene, umap_x, umap_y, fields[gene], dot_field or group_field),
-                [390 + index * 400, 125],
-                [395, 340],
-            )
-            for index, gene in enumerate(highlight)
-        ]
         accept(
             Q1_VIEW_NAME,
             question_view(
@@ -487,35 +486,42 @@ def plan_question_views(
                         text_box(
                             "About this page",
                             f"**Where is my gene of interest expressed across cell populations?** "
-                            f"The first map shows **{group_label}**. The next maps show where "
-                            f"{', '.join(highlight)} are expressed (darker = higher). In the **dot plot**, "
-                            f"a bigger dot means more cells express the gene, and a darker dot means a "
-                            f"higher average level. The **heat map** shows the average level of the marker "
-                            f"genes in each {dot_label}.\n\n"
+                            f"The first map shows **{group_label}**. The second map shows where the "
+                            f"selected gene is expressed (darker = higher). In the **dot plot**, a bigger "
+                            f"dot means more cells express the gene, and a darker dot means a higher average "
+                            f"level. The **heat map** shows the average level of the selected genes (up to "
+                            f"{HEAT_MAP_FEATURES}) in each {group_label}.\n\n"
                             f"**To look at other genes:** click a gene in the list on the right "
-                            f"(Ctrl/Cmd-click to pick several).",
+                            f"(Ctrl/Cmd-click to pick several) and the charts update; the map shows the "
+                            f"first gene picked.",
                         ),
                         [0, 0],
                         [LAYOUT_WIDTH, 120],
                     ),
-                    placed(umap_chart(group_label, umap_x, umap_y, group_field, dot_field or group_field), [0, 125], [385, 340]),
-                    *maps,
+                    placed(umap_chart(group_label, umap_x, umap_y, group_field, dot_field or group_field), [0, 125], [790, 340]),
+                    placed(
+                        umap_chart(
+                            "Selected Gene Expression",
+                            umap_x,
+                            umap_y,
+                            feature_query(gene_features, 1),
+                            dot_field or group_field,
+                        ),
+                        [795, 125],
+                        [795, 340],
+                    ),
                     placed(
                         compound_dot_plot(f"Selected genes by {dot_label}", dot_field, selected),
-                        [0, 475],
-                        [700, 390],
+                        [0, 470],
+                        [930, 640],
                     ),
                     placed(
-                        heat_map(
-                            f"Marker genes by {group_label} (average expression)",
-                            group_field,
-                            [fields[gene] for gene in markers],
-                        ),
-                        [710, 475],
-                        [880, 390],
+                        heat_map(group_label, group_field, feature_query(gene_features, HEAT_MAP_FEATURES)),
+                        [935, 470],
+                        [655, 640],
                     ),
                 ],
-                gene_panel(gene_name, markers),
+                gene_panel(gene_name, [start_gene]),
             ),
         )
     else:
@@ -573,8 +579,8 @@ def plan_question_views(
             if gene in fields and protein in set(present_names(protein_table, [protein]))
         ]
         protein_failed = False
+        protein_features = LinkedFeatures(protein_name, protein_subgroup, [protein for _, protein in pairs])
         if pairs and dot_field:
-            protein_features = LinkedFeatures(protein_name, protein_subgroup, [protein for _, protein in pairs])
             try:
                 with h5py.File(project / "datafile.h5", "r") as handle:
                     resolve_feature_fields(handle, datasources, protein_features)
@@ -599,7 +605,11 @@ def plan_question_views(
                                     "About this page",
                                     "**Is the expression concordant with protein expression?** "
                                     "The left dot plot shows **RNA** and the right one shows **protein** "
-                                    "for the pairs already measured in this project.",
+                                    "for the pairs already measured in this project. The maps below show "
+                                    "the selected gene's RNA and the selected protein: similar colour "
+                                    "patterns mean RNA and protein agree. **To compare a gene with its "
+                                    "protein:** click the gene in the genes list and its protein in the "
+                                    "proteins list.",
                                 ),
                                 [0, 0],
                                 [LAYOUT_WIDTH, 120],
@@ -625,10 +635,38 @@ def plan_question_views(
                                 [800, 130],
                                 [790, 500],
                             ),
+                            *(
+                                [
+                                    placed(
+                                        umap_chart(
+                                            "Selected Gene Expression",
+                                            umap_x,
+                                            umap_y,
+                                            feature_query(LinkedFeatures(gene_name, subgroup, [pairs[0][0]]), 1),
+                                            dot_field,
+                                        ),
+                                        [0, 635],
+                                        [790, 360],
+                                    ),
+                                    placed(
+                                        umap_chart(
+                                            "Selected Protein",
+                                            umap_x,
+                                            umap_y,
+                                            feature_query(protein_features, 1),
+                                            dot_field,
+                                        ),
+                                        [800, 635],
+                                        [790, 360],
+                                    ),
+                                ]
+                                if umap_x and umap_y
+                                else []
+                            ),
                         ],
-                        gene_name: gene_panel(gene_name, [gene for gene, _ in pairs]),
+                        gene_name: gene_panel(gene_name, [pairs[0][0]]),
                         protein_name: [
-                            placed(feature_list("Marker proteins", [protein for _, protein in pairs]), [0, 0], [270, 400]),
+                            placed(feature_list("Marker proteins", [pairs[0][1]]), [0, 0], [270, 400]),
                             placed(feature_table("Click a protein to plot it"), [0, 405], [270, 455]),
                         ],
                     },
@@ -654,7 +692,6 @@ def plan_question_views(
             [795, 505],
             [795, 355],
         )
-        box_gene = "CD14" if "CD14" in fields else markers[0]
         accept(
             Q6_VIEW_NAME,
             question_view(
@@ -665,24 +702,27 @@ def plan_question_views(
                         text_box(
                             "About this page",
                             f"**How comparable is the expression across different diseases?** "
-                            f"The **heat map** shows average marker expression by **{diagnosis_label}**. "
-                            f"The **box plot** shows how {box_gene} varies within each group.",
+                            f"The **heat map** shows the average level of the selected genes (up to "
+                            f"{HEAT_MAP_FEATURES}) by **{diagnosis_label}**. The **box plot** shows how the "
+                            f"first selected gene varies within each group. **To change genes:** click genes "
+                            f"in the list on the right (Ctrl/Cmd-click to pick several).",
                         ),
                         [0, 0],
                         [1100, 140],
                     ),
                     placed(cell_filter(f"Focus on {dot_label}", [dot_field]), [1105, 0], [485, 140]),
                     placed(
-                        heat_map(
-                            f"Marker genes by {diagnosis_label} (average expression)",
-                            diagnosis_field,
-                            [fields[gene] for gene in markers],
-                        ),
+                        heat_map(diagnosis_label, diagnosis_field, feature_query(gene_features, HEAT_MAP_FEATURES)),
                         [0, 150],
                         [790, 710],
                     ),
                     placed(
-                        box_plot(f"{box_gene} by {diagnosis_label}", diagnosis_field, fields[box_gene]),
+                        box_plot(
+                            f"Gene Expression by {diagnosis_label}",
+                            diagnosis_field,
+                            feature_query(gene_features, 1),
+                            x_label=diagnosis_label,
+                        ),
                         [795, 150],
                         [795, 345],
                     ),

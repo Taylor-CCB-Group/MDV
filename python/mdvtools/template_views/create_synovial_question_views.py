@@ -17,9 +17,11 @@ from typing import Any
 import h5py
 
 from mdvtools.template_views.create_question_views import (
+    HEAT_MAP_FEATURES,
     LinkedFeatures,
     atomic_write_json,
     box_plot,
+    category_counts,
     cell_filter,
     composition_bar,
     compound_dot_plot,
@@ -27,10 +29,10 @@ from mdvtools.template_views.create_question_views import (
     feature_query,
     gene_info,
     heat_map,
+    place_legends,
     placed,
     resolve_feature_fields,
     scatter,
-    spread_layout,
     text_box,
 )
 
@@ -50,6 +52,7 @@ INFLAMMATION = "rna:inflammation_status"
 PATIENT = "rna:patient_id"
 HAD_TNF = "rna:had_tnf"
 TNF_RESPONSE = "rna:tnf_response"
+DATA_SET = "rna:data_set"
 
 LAYOUT_WIDTH = 1590
 DOT_PLOT_FEATURES = 5
@@ -63,36 +66,22 @@ MARKER_GENES = [
     "VWF", "PLVAP", "PODXL", "ACKR1", "TAGLN", "NOTCH3", "RGS5", "MYH11",
 ]
 
-# Same collections as the myeloid atlas, without IL3RA, which is not in this RNA table.
-GENE_COLLECTIONS = {
-    "Monocyte": ["CD14", "S100A8", "FCGR3A", "ITGAL", "CD48", "TNFRSF14"],
-    "Tissue macrophage": ["CD68", "MERTK", "LYVE1", "VSIG4", "ELMO1"],
-    "Lipid-associated macrophage": ["SPP1", "GPNMB", "TREM2"],
-    "Inflammatory response": ["TNF", "IL1B", "TREM1", "ICAM1", "CD274", "MX1", "ETS2"],
-    "Dendritic cell": ["CD1C", "FCER1A", "XCR1", "LAMP3", "TCF4"],
-    "Progenitor and proliferating": ["CD34", "CPA3", "MKI67"],
-}
-
 RNA = LinkedFeatures(datasource=RNA_DATASOURCE, subgroup=SUBGROUP, names=MARKER_GENES)
-COLLECTION_GENES = list(dict.fromkeys(gene for genes in GENE_COLLECTIONS.values() for gene in genes))
-PLOTTED_GENES = LinkedFeatures(
-    datasource=RNA_DATASOURCE,
-    subgroup=SUBGROUP,
-    names=list(dict.fromkeys([*MARKER_GENES, *COLLECTION_GENES])),
-)
 
 Q1_VIEW_NAME = "Where is my gene of interest expressed across cell populations?"
-Q1_FEATURE_GENES = ["CD14", "S100A8", "TNF"]
+# Charts follow the genes picked in the genes panel (active links); Q1's panel starts on one gene.
+Q1_START_GENE = "TNFRSF1B"
 Q2_VIEW_NAME = "Is the expression different between disease stages/patient groups/tissue types?"
 Q2_PATIENTS = ["CARTR02522", "CARTR02514", "CARTR02521", "CARTR02512", "CARTR02518"]
 Q6_VIEW_NAME = "How comparable is the expression across different diseases?"
-Q6_DIAGNOSES = ["RA", "PsA"]
-Q6_BOX_GENE = "CD14"
+Q6_DIAGNOSES = ["RA", "PsA", "Healthy", "OA"]
+# Q7 and Q9 were removed from the project. The names stay so older copies still sort and convert.
 Q7_VIEW_NAME = "How comparable is the expression of gene collections/signatures across different diseases?"
 Q8_VIEW_NAME = "Contrasting responders and non-responders to TNF inhibitor"
 Q8_GROUPS = ["responder", "non_responder"]
 Q8_GROUP_TITLES = {"responder": "Responder", "non_responder": "Non-responder"}
 Q8_BOX_GENE = "TNF"
+Q8_DATA_SETS = ["cartography"]
 Q9_VIEW_NAME = "Comparing groups: is the UMAP different between TNF responders and non-responders?"
 
 # Titles and axis labels only. Chart parameters keep the field id.
@@ -129,21 +118,15 @@ EXACT_TITLES = {
 LEGACY_VIEWS = ("metadata", "Summary", "Stroma", "MNP", "T_NK", "B_plasma", "temp")
 
 
-def collection_sentence() -> str:
-    names = list(GENE_COLLECTIONS)
-    return ", ".join(names[:-1]) + f", and {names[-1]}"
-
-
 Q1_TEXT = f"""\
 **Where is my gene of interest expressed across cell populations?** \
-The first map shows the cell groups. The next maps show where \
-{", ".join(Q1_FEATURE_GENES)} are expressed (darker = higher). In the **dot plot**, a bigger dot \
-means more cells of that cell type express the gene, and a darker dot means a higher average \
-level. The **heat map** shows the average level of the marker genes in each cell group. \
-**MS4A1** in the gene list is CD20.
+The first map shows the cell groups. The second map shows where the selected gene is expressed \
+(darker = higher). In the **dot plot**, a bigger dot means more cells of that cell type express \
+the gene, and a darker dot means a higher average level. The **heat map** shows the average level \
+of the selected genes (up to {HEAT_MAP_FEATURES}) in each cell group. **MS4A1** in the gene list is CD20.
 
 **To look at other genes:** click a gene in the list on the right (Ctrl/Cmd-click to pick \
-several) and the dot plot updates.
+several) and the charts update; the map shows the first gene picked.
 """
 
 Q2_TEXT = f"""\
@@ -152,8 +135,8 @@ The **dot plots** compare the selected genes by **Diagnosis**, **Biopsy Site**, 
 **Inflammation Status** and **Patient**: a bigger dot means more cells express the gene, and a \
 darker dot means a higher average level.
 
-**To compare groups:** pick one or more diagnoses, biopsy sites or cell types in **Choose groups \
-to compare**, and every chart uses only those cells. **To change patients:** the **Patient** chart \
+**To compare groups:** pick one or more diagnoses, biopsy sites, cell types or inflammation states \
+in **Choose groups to compare**, and every chart uses only those cells. **To change patients:** the **Patient** chart \
 shows {len(Q2_PATIENTS)} example patients, a panel each, by cell group. Click its settings icon (⚙) \
 and pick patients under **Split values**. **To change genes:** click genes in the list on the right \
 (Ctrl/Cmd-click to pick several).
@@ -162,69 +145,44 @@ and pick patients under **Split values**. **To change genes:** click genes in th
 Q6_TEXT = f"""\
 **How comparable is the expression across different diseases?** The **heat map** shows the \
 average level of the marker genes in every diagnosis, so genes that are high everywhere stand \
-out from disease-specific ones. The **box plot** shows how {Q6_BOX_GENE} varies between cells \
-within each diagnosis. The **dot plot** shows the selected genes in each cell type, with a \
-panel each for {" and ".join(Q6_DIAGNOSES)}: similar dots mean the gene behaves the same way in \
-both diseases.
+out from disease-specific ones. The **dot plot** shows the selected genes in each cell type, with \
+a panel each for {", ".join(Q6_DIAGNOSES[:-1])} and {Q6_DIAGNOSES[-1]}: similar dots mean the gene \
+behaves the same way in those diagnoses.
 
 **To focus on a cell population:** pick cell types in **Focus on cell types** (all charts \
-update). **To change genes in the dot plots:** click genes in the list on the right \
+update). **To change genes in the dot plot:** click genes in the list on the right \
 (Ctrl/Cmd-click to pick several). **To compare other diseases:** click the dot plot's settings icon \
 (⚙) and choose diagnoses under **Split values**.
-"""
-
-Q7_TEXT = f"""\
-**How comparable are gene collections across different diseases?** A gene collection is a group \
-of marker genes that together mark a cell type or process. The collections are {collection_sentence()}. \
-The **heat map** shows the average level of each of those genes in every diagnosis. The \
-**dot plot** shows the genes you select, in each cell type, with a panel each for \
-{" and ".join(Q6_DIAGNOSES)}.
-
-**To choose genes:** click genes in the list on the right (Ctrl/Cmd-click to pick several). \
-**To focus on a cell population:** pick cell types in **Focus on cell types**. **To compare other \
-diseases:** click the dot plot's settings icon (⚙) and choose diagnoses under **Split values**.
 """
 
 Q8_TEXT = """\
 **Contrasting TNF inhibitor responders and non-responders.** The **dot plot** shows the \
 selected genes in each cell group, with a panel each for responders and non-responders. The **bar** shows the mix \
 of cell groups, and the **box plot** shows how TNF varies in each response group. The page \
-starts on RA samples with a prior TNF inhibitor.
+starts on RA samples from the cartography data set with a prior TNF inhibitor.
 
-**To change the comparison:** choose a diagnosis and a prior TNF inhibitor value in **Choose \
-patients to compare**. **To change genes:** click genes in the list on the right \
+**To change the comparison:** choose a diagnosis, a prior TNF inhibitor value and a data set in \
+**Choose patients to compare**. **To change genes:** click genes in the list on the right \
 (Ctrl/Cmd-click to pick several).
 
 **How the groups were defined:** Responder and Non-responder are the values of TNF Treatment \
 Response. The page keeps cells whose Prior TNF Inhibitor value is Yes.
 """
 
-Q9_TEXT = """\
-**Is the UMAP different between TNF responders and non-responders?** The two **UMAPs** show \
-responder cells and non-responder cells, coloured by cell group. A region that fills or empties \
-points to a shift in cell groups. The **bar** shows the proportion of each cell group in the two \
-response groups. The **dot plot** shows the selected genes in each cell group, with a panel \
-each for responders and non-responders. The page starts \
-on RA samples with a prior TNF inhibitor.
-
-**To change the comparison:** choose a diagnosis and a prior TNF inhibitor value in **Choose \
-patients to compare**. **To change genes:** click genes in the list on the right \
-(Ctrl/Cmd-click to pick several). Response is TNF Treatment Response for cells with Prior TNF \
-Inhibitor set to Yes.
-"""
+def umap(title: str, color_by: str | dict[str, Any]) -> dict[str, Any]:
+    """`color_by` is a field, or a `feature_query` for the selected gene (active link)."""
+    return scatter(title, [UMAP_X, UMAP_Y], color_by, CELL_TYPE)
 
 
-def umap(title: str, color_by: str, only: tuple[str, str] | None = None) -> dict[str, Any]:
-    chart = scatter(title, [UMAP_X, UMAP_Y], color_by, CELL_TYPE)
-    if only:
-        chart["category_filters"] = [{"column": only[0], "category": [only[1]]}]
-    return chart
+# Layouts are the final pixel positions from the hand-tuned synovial views (Nov 2026), so these
+# views are not passed through spread_layout. Charts are [x, y], [width, height].
 
 
-def marker_panel(names: list[str]) -> list[dict[str, Any]]:
+def marker_panel(start: list[str] | None = None) -> list[dict[str, Any]]:
+    """Marker gene list (starting on `start`, default all markers) above the Gene Info chart."""
     return [
-        placed(feature_list("Marker genes", names), [0, 0], [270, 400]),
-        placed(gene_info("Click a gene to plot it"), [0, 405], [270, 455]),
+        placed(feature_list("Marker genes", start or MARKER_GENES), [0, 0], [270, 400]),
+        placed(gene_info("Click a gene to plot it"), [0, 425], [270, 455]),
     ]
 
 
@@ -236,34 +194,30 @@ def rna_view(
             CELLS: {"panelWidth": 85},
             RNA_DATASOURCE: {"panelWidth": 15},
         },
-        "initialCharts": {CELLS: cells, RNA_DATASOURCE: panel or marker_panel(MARKER_GENES)},
+        "initialCharts": {CELLS: cells, RNA_DATASOURCE: panel or marker_panel()},
     }
 
 
 def build_q1_view(fields: dict[str, str]) -> dict[str, Any]:
-    maps = [
-        placed(umap(gene, fields[gene]), [390 + index * 400, 125], [395, 340])
-        for index, gene in enumerate(Q1_FEATURE_GENES)
-    ]
-    return rna_view([
-        placed(text_box("About this page", Q1_TEXT), [0, 0], [LAYOUT_WIDTH, 120]),
-        placed(umap("Cell Group", CELL_GROUP), [0, 125], [385, 340]),
-        *maps,
-        placed(
-            compound_dot_plot("Selected genes by Cell Type", CELL_TYPE, feature_query(RNA, DOT_PLOT_FEATURES)),
-            [0, 475],
-            [700, 390],
-        ),
-        placed(
-            heat_map(
-                "Marker genes by Cell Group (average expression)",
-                CELL_GROUP,
-                [fields[gene] for gene in MARKER_GENES],
+    del fields
+    return rna_view(
+        [
+            placed(text_box("About this page", Q1_TEXT), [0, 0], [LAYOUT_WIDTH, 120]),
+            placed(umap("Cell Group", CELL_GROUP), [84, 143], [585, 340]),
+            placed(umap("Selected Gene Expression", feature_query(RNA, 1)), [794, 142], [587, 344]),
+            placed(
+                compound_dot_plot("Selected genes by Cell Type", CELL_TYPE, feature_query(RNA, DOT_PLOT_FEATURES)),
+                [4, 533],
+                [929, 733],
             ),
-            [710, 475],
-            [880, 390],
-        ),
-    ])
+            placed(
+                heat_map("Cell Group", CELL_GROUP, feature_query(RNA, HEAT_MAP_FEATURES), y_label_size=108),
+                [981, 522],
+                [626, 628],
+            ),
+        ],
+        marker_panel([Q1_START_GENE]),
+    )
 
 
 def build_q2_view(fields: dict[str, str]) -> dict[str, Any]:
@@ -271,18 +225,18 @@ def build_q2_view(fields: dict[str, str]) -> dict[str, Any]:
     selected = feature_query(RNA, DOT_PLOT_FEATURES)
     return rna_view([
         placed(text_box("About this page", Q2_TEXT), [0, 0], [1100, 200]),
-        placed(
-            cell_filter("Choose groups to compare", [DIAGNOSIS, SITE, CELL_TYPE]),
-            [1105, 0],
-            [485, 200],
-        ),
-        placed(compound_dot_plot("Selected genes by Diagnosis", DIAGNOSIS, selected), [0, 205], [500, 655]),
+        placed(compound_dot_plot("Selected genes by Diagnosis", DIAGNOSIS, selected), [0, 225], [482, 655]),
         # Dot plots are sized to leave room for their legends above the plot.
-        placed(compound_dot_plot("Selected genes by Biopsy Site", SITE, selected), [505, 205], [540, 655]),
+        placed(compound_dot_plot("Selected genes by Biopsy Site", SITE, selected), [506, 225], [521, 655]),
         placed(
             compound_dot_plot("Selected genes by Inflammation Status", INFLAMMATION, selected),
-            [1050, 205],
-            [592, 435],
+            [1050, 230],
+            [558, 415],
+        ),
+        placed(
+            cell_filter("Choose groups to compare", [DIAGNOSIS, SITE, CELL_TYPE, INFLAMMATION]),
+            [1051, 697],
+            [517, 511],
         ),
         # The React dot plot can't limit its rows to a few patients, so it has a panel per
         # example patient instead.
@@ -294,162 +248,73 @@ def build_q2_view(fields: dict[str, str]) -> dict[str, Any]:
                 split=(PATIENT, Q2_PATIENTS),
                 y_label_size=110,
             ),
-            [0, 865],
-            [1030, 385],
+            [0, 905],
+            [1013, 385],
         ),
     ])
 
 
 def build_q6_view(fields: dict[str, str]) -> dict[str, Any]:
-    selected = feature_query(RNA, DOT_PLOT_FEATURES)
-    per_disease = placed(
-        compound_dot_plot(
-            f"Selected genes in {' and '.join(Q6_DIAGNOSES)}",
-            CELL_TYPE,
-            selected,
-            split=(DIAGNOSIS, Q6_DIAGNOSES),
-        ),
-        [795, 505],
-        [795, 355],
-    )
     return rna_view([
-        placed(text_box("About this page", Q6_TEXT), [0, 0], [1100, 150]),
-        placed(cell_filter("Focus on cell types", [CELL_TYPE]), [1105, 0], [485, 150]),
+        placed(text_box("About this page", Q6_TEXT), [0, 0], [1547, 150]),
         placed(
             heat_map(
                 "Marker genes by Diagnosis (average expression)",
                 DIAGNOSIS,
                 [fields[gene] for gene in MARKER_GENES],
+                y_label_size=168,
+                y_tickfont=7,
             ),
-            [0, 155],
-            [790, 705],
+            [0, 175],
+            [771, 809],
         ),
         placed(
-            box_plot(f"{Q6_BOX_GENE} by Diagnosis", DIAGNOSIS, fields[Q6_BOX_GENE]),
-            [795, 155],
-            [795, 345],
-        ),
-        per_disease,
-    ])
-
-
-def build_q7_view(fields: dict[str, str]) -> dict[str, Any]:
-    selected = feature_query(
-        LinkedFeatures(RNA_DATASOURCE, SUBGROUP, COLLECTION_GENES),
-        max(len(genes) for genes in GENE_COLLECTIONS.values()),
-    )
-    per_disease = placed(
-        compound_dot_plot(
-            f"Collection genes in {' and '.join(Q6_DIAGNOSES)}",
-            CELL_TYPE,
-            selected,
-            split=(DIAGNOSIS, Q6_DIAGNOSES),
-        ),
-        [795, 205],
-        [795, 655],
-    )
-    return rna_view(
-        [
-            placed(text_box("About this page", Q7_TEXT), [0, 0], [1100, 190]),
-            placed(cell_filter("Focus on cell types", [CELL_TYPE]), [1105, 0], [485, 190]),
-            placed(
-                heat_map(
-                    "Collection genes by Diagnosis (average expression)",
-                    DIAGNOSIS,
-                    [fields[gene] for gene in COLLECTION_GENES],
-                    y_label_size=150,
-                ),
-                [0, 205],
-                [790, 655],
+            compound_dot_plot(
+                "Selected genes by Diagnosis",
+                CELL_TYPE,
+                feature_query(RNA, DOT_PLOT_FEATURES),
+                split=(DIAGNOSIS, Q6_DIAGNOSES),
             ),
-            per_disease,
-        ],
-        marker_panel(COLLECTION_GENES),
-    )
+            [787, 175],
+            [795, 907],
+        ),
+        placed(cell_filter("Focus on cell types", [CELL_TYPE]), [30, 1001], [734, 299]),
+    ])
 
 
 def build_q8_view(fields: dict[str, str]) -> dict[str, Any]:
-    selected = feature_query(RNA, DOT_PLOT_FEATURES)
-    by_response = placed(
-        compound_dot_plot(
-            "Selected genes by TNF Treatment Response",
-            CELL_GROUP,
-            selected,
-            split=(TNF_RESPONSE, Q8_GROUPS),
-            y_label_size=110,
-        ),
-        [0, 200],
-        [1590, 390],
-    )
     return rna_view([
-        placed(text_box("About this page", Q8_TEXT), [0, 0], [1100, 190]),
+        placed(text_box("About this page", Q8_TEXT), [0, 0], [1093, 191]),
         placed(
             cell_filter(
                 "Choose patients to compare",
-                [DIAGNOSIS, HAD_TNF, TNF_RESPONSE],
-                {DIAGNOSIS: ["RA"], HAD_TNF: ["Yes"], TNF_RESPONSE: Q8_GROUPS},
+                [DIAGNOSIS, HAD_TNF, TNF_RESPONSE, DATA_SET],
+                {DIAGNOSIS: ["RA"], HAD_TNF: ["Yes"], TNF_RESPONSE: Q8_GROUPS, DATA_SET: Q8_DATA_SETS},
             ),
-            [1105, 0],
-            [485, 190],
+            [1117, 0],
+            [473, 190],
         ),
-        by_response,
+        placed(
+            compound_dot_plot(
+                "Selected genes by TNF Treatment Response",
+                CELL_GROUP,
+                feature_query(RNA, DOT_PLOT_FEATURES),
+                split=(TNF_RESPONSE, Q8_GROUPS),
+                y_label_size=110,
+            ),
+            [0, 220],
+            [878, 485],
+        ),
+        placed(
+            box_plot(f"{Q8_BOX_GENE} by TNF Treatment Response", TNF_RESPONSE, fields[Q8_BOX_GENE]),
+            [916, 212],
+            [672, 296],
+        ),
         placed(
             composition_bar("Cell Group mix by TNF Treatment Response", TNF_RESPONSE, CELL_GROUP),
-            [0, 600],
-            [790, 260],
+            [922, 541],
+            [662, 310],
         ),
-        placed(
-            box_plot(
-                f"{Q8_BOX_GENE} by TNF Treatment Response",
-                TNF_RESPONSE,
-                fields[Q8_BOX_GENE],
-            ),
-            [795, 600],
-            [795, 260],
-        ),
-    ])
-
-
-def build_q9_view(fields: dict[str, str]) -> dict[str, Any]:
-    del fields
-    selected = feature_query(RNA, DOT_PLOT_FEATURES)
-    maps = [
-        placed(
-            umap(f"Cell Group: {Q8_GROUP_TITLES[group]}", CELL_GROUP, only=(TNF_RESPONSE, group)),
-            [index * 530, 185],
-            [520, 370],
-        )
-        for index, group in enumerate(Q8_GROUPS)
-    ]
-    by_response = placed(
-        compound_dot_plot(
-            "Selected genes by TNF Treatment Response",
-            CELL_GROUP,
-            selected,
-            split=(TNF_RESPONSE, Q8_GROUPS),
-            y_label_size=110,
-        ),
-        [0, 565],
-        [1590, 423],
-    )
-    return rna_view([
-        placed(text_box("About this page", Q9_TEXT), [0, 0], [1100, 175]),
-        placed(
-            cell_filter(
-                "Choose patients to compare",
-                [DIAGNOSIS, HAD_TNF, TNF_RESPONSE],
-                {DIAGNOSIS: ["RA"], HAD_TNF: ["Yes"], TNF_RESPONSE: Q8_GROUPS},
-            ),
-            [1105, 0],
-            [485, 175],
-        ),
-        *maps,
-        placed(
-            composition_bar("Cell Group mix by TNF Treatment Response", TNF_RESPONSE, CELL_GROUP),
-            [1060, 185],
-            [530, 370],
-        ),
-        by_response,
     ])
 
 
@@ -457,9 +322,7 @@ VIEW_BUILDERS = {
     Q1_VIEW_NAME: build_q1_view,
     Q2_VIEW_NAME: build_q2_view,
     Q6_VIEW_NAME: build_q6_view,
-    Q7_VIEW_NAME: build_q7_view,
     Q8_VIEW_NAME: build_q8_view,
-    Q9_VIEW_NAME: build_q9_view,
 }
 
 
@@ -475,7 +338,7 @@ def validate_project(datasources: list[dict[str, Any]]) -> None:
     fields = {column.get("field") for column in cells.get("columns", [])}
     required = [
         UMAP_X, UMAP_Y, CELL_GROUP, CELL_TYPE, DIAGNOSIS, SITE, INFLAMMATION, PATIENT,
-        HAD_TNF, TNF_RESPONSE,
+        HAD_TNF, TNF_RESPONSE, DATA_SET,
     ]
     missing = [field for field in required if field not in fields]
     if missing:
@@ -487,11 +350,12 @@ def validate_project(datasources: list[dict[str, Any]]) -> None:
     gene_names = set(
         next(column["values"] for column in datasource(datasources, RNA_DATASOURCE)["columns"] if column.get("field") == "name")
     )
-    absent = [gene for gene in PLOTTED_GENES.names if gene not in gene_names]
+    absent = [gene for gene in [*RNA.names, Q1_START_GENE] if gene not in gene_names]
     if absent:
         raise ValueError(f"Genes missing from '{RNA_DATASOURCE}': {absent}")
     for field, categories in (
-        (DIAGNOSIS, ["RA", "PsA"]),
+        (DIAGNOSIS, Q6_DIAGNOSES),
+        (DATA_SET, Q8_DATA_SETS),
         (HAD_TNF, ["Yes"]),
         (TNF_RESPONSE, Q8_GROUPS),
         (PATIENT, Q2_PATIENTS),
@@ -571,12 +435,24 @@ def retitle_existing_views(views: dict[str, Any], only: set[str] | None = None) 
     return changed
 
 
+def prepend_text(view: dict[str, Any], markdown: str) -> None:
+    """Put `markdown` above the text of the view's first text box."""
+    for charts in view["initialCharts"].values():
+        for chart in charts:
+            if chart.get("type") == "text_box_chart":
+                chart["text"] = f"{markdown.strip()}\n\n{chart['text']}"
+                return
+
+
 def h5_stamp(project_path: Path) -> tuple[int, int]:
     stat = (project_path / "datafile.h5").stat()
     return stat.st_size, stat.st_mtime_ns
 
 
-def add_synovial_question_views(project_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
+def add_synovial_question_views(
+    project_path: Path, *, dry_run: bool = False, treatment_disclaimer: str | None = None
+) -> dict[str, Any]:
+    """`treatment_disclaimer` (Markdown) goes above the text of the TNF response page."""
     project_path = project_path.expanduser().resolve()
     views_path = project_path / "views.json"
     state_path = project_path / "state.json"
@@ -589,7 +465,7 @@ def add_synovial_question_views(project_path: Path, *, dry_run: bool = False) ->
     datasources = json.loads(datasources_path.read_text(encoding="utf-8"))
     validate_project(datasources)
     with h5py.File(project_path / "datafile.h5", "r") as handle:
-        fields = resolve_feature_fields(handle, datasources, PLOTTED_GENES)
+        fields = resolve_feature_fields(handle, datasources, RNA)
     after_read = h5_stamp(project_path)
     if after_read != before:
         raise RuntimeError(f"Reading datafile.h5 changed it: {before} -> {after_read}")
@@ -598,11 +474,14 @@ def add_synovial_question_views(project_path: Path, *, dry_run: bool = False) ->
     state = json.loads(state_path.read_text(encoding="utf-8"))
     retitled = retitle_existing_views(views)
     all_views = list(state.get("all_views") or [])
+    counts = category_counts(datasources)
     for name, build in VIEW_BUILDERS.items():
-        views[name] = spread_layout(build(fields))
+        views[name] = place_legends(build(fields), counts)
         if name not in all_views:
             all_views.append(name)
     state["all_views"] = all_views
+    if treatment_disclaimer:
+        prepend_text(views[Q8_VIEW_NAME], treatment_disclaimer)
 
     summary: dict[str, Any] = {
         "project": str(project_path),
@@ -683,6 +562,11 @@ def main() -> int:
     parser.add_argument("--project", type=Path, default=DEFAULT_PROJECT)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
+        "--treatment-disclaimer",
+        type=Path,
+        help="Markdown file to show above the text of the TNF response page.",
+    )
+    parser.add_argument(
         "--legacy-only",
         action="store_true",
         help="Retitle the existing non-question views and fix the T_NK UMAP. Do not rewrite question views.",
@@ -691,7 +575,9 @@ def main() -> int:
     if args.legacy_only:
         print(json.dumps(update_legacy_views(args.project, dry_run=args.dry_run), indent=2))
         return 0
-    print(json.dumps(add_synovial_question_views(args.project, dry_run=args.dry_run), indent=2))
+    disclaimer = args.treatment_disclaimer.expanduser().read_text(encoding="utf-8") if args.treatment_disclaimer else None
+    summary = add_synovial_question_views(args.project, dry_run=args.dry_run, treatment_disclaimer=disclaimer)
+    print(json.dumps(summary, indent=2))
     return 0
 
 

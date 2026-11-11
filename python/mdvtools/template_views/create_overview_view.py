@@ -207,12 +207,20 @@ def stacked_chart(rows: Column, stacks: Column) -> dict[str, Any]:
         "title": f"{stacks.name} by {rows.name}",
         "param": [rows.field, stacks.field],
         "axis": bar_axes(stacked=True),
-        "color_legend": {"display": True, "pos": [8, 8]},
+        "color_legend": {"display": True},
     }
 
 
-def build_overview_view(roles: Roles, title: str, abstract: str, datasource: str = CELLS) -> dict[str, Any]:
-    """Return a view with the same chart set and sizes as the myeloid Cell atlas."""
+def build_overview_view(
+    roles: Roles,
+    title: str,
+    abstract: str,
+    datasource: str = CELLS,
+    counts: dict[str, dict[str, int]] | None = None,
+) -> dict[str, Any]:
+    """Return a view with the same chart set and sizes as the myeloid Cell atlas.
+
+    Legends go bottom-right, sized from `counts` (datasource -> field -> categories)."""
     text = {
         "type": "text_box_chart",
         "title": "",
@@ -238,10 +246,11 @@ def build_overview_view(roles: Roles, title: str, abstract: str, datasource: str
         {**chart, "position": list(position), "size": list(size), "id": chart_id(used)}
         for chart, (position, size) in layout
     ]
-    return questions.spread_layout({
+    view = questions.spread_layout({
         "dataSources": {datasource: {"panelWidth": 100}},
         "initialCharts": {datasource: charts},
     })
+    return questions.place_legends(view, counts or {})
 
 
 def order_views(all_views: list[str], overview: str) -> list[str]:
@@ -293,7 +302,11 @@ def add_overview_view(
 
     roles = choose_roles(cells, overrides or {})
     view = build_overview_view(
-        roles, title or PLACEHOLDER_TITLE, abstract or PLACEHOLDER_ABSTRACT, datasource
+        roles,
+        title or PLACEHOLDER_TITLE,
+        abstract or PLACEHOLDER_ABSTRACT,
+        datasource,
+        questions.category_counts(datasources),
     )
     current = [name for name in state.get("all_views") or [] if isinstance(name, str)]
     missing = [name for name in current if name not in views and name != view_name]

@@ -88,17 +88,20 @@ BUILDER_GAP = 5
 CHART_GAP = 25
 
 Q1_VIEW_NAME = "Where is my gene of interest expressed across cell populations?"
-Q1_FEATURE_GENES = GENES.names[:3]
+# Charts follow the genes picked in the genes panel (active links); the panel starts on one gene.
+Q1_START_GENE = "TNFRSF14"
+HEAT_MAP_FEATURES = 10
 
 Q1_TEXT = f"""\
 **Where is my gene of interest expressed across cell populations?** \
-The first map shows the myeloid cell subgroups. The next maps show where \
-{", ".join(Q1_FEATURE_GENES)} are expressed (darker = higher). In the **dot plot**, a bigger dot \
-means more cells in that cell state express the gene, and a darker dot means a higher average \
-level. The **heat map** shows the average level of all {len(GENES.names)} marker genes in each cell state.
+The first map shows the myeloid cell subgroups. The second map shows where the selected gene is \
+expressed (darker = higher). In the **dot plot**, a bigger dot means more cells in that cell \
+state express the gene, and a darker dot means a higher average level. The **heat map** shows \
+the average level of the selected genes (up to {HEAT_MAP_FEATURES}) in each cell state.
 
 **To look at other genes:** click a gene in the list on the right (Ctrl/Cmd-click to pick \
-several) and the dot plot updates. Type a gene name in **Marker genes** to add it to the list.
+several) and the charts update; the map shows the first gene picked. Type a gene name in \
+**Marker genes** to add it to the list.
 """
 
 
@@ -120,7 +123,8 @@ and pick patients under **Split values**. **To change genes:** click genes in th
 
 
 Q3_VIEW_NAME = "Is the expression concordant with protein expression (CITE-seq)?"
-Q3_PAIRS = [("CD14", "adt_CD14"), ("FCGR3A", "adt_CD16")]
+# The genes and proteins panels start on this matching pair.
+Q3_START_PAIR = ("TNFRSF14", "adt_TNFRSF14")
 Q3_MATCHING = [
     ("CD14", "adt_CD14"), ("FCGR3A", "adt_CD16"), ("ITGAL", "adt_CD11a"), ("CD274", "adt_PD-L1"),
     ("ICAM1", "adt_ICAM1"), ("TNFRSF14", "adt_TNFRSF14"), ("CD48", "adt_CD48"),
@@ -131,8 +135,9 @@ Q3_TEXT = f"""\
 **Is the expression concordant with protein expression?** Protein was measured (CITE-seq) for \
 most cells. The left dot plot shows **RNA** for the selected genes and the right one shows \
 **protein** for the selected proteins, in each cell state. The page starts on the batches with \
-protein data (**Cells with protein data**, top right), so every chart uses only those cells. The maps below compare {" and ".join(f"{g} RNA with {p}" for g, p in Q3_PAIRS)} protein: \
-similar colour patterns mean RNA and protein agree.
+protein data (**Cells with protein data**, top right), so every chart uses only those cells. The \
+maps below show the selected gene's RNA and the selected protein: similar colour patterns mean \
+RNA and protein agree.
 
 **To compare a gene with its protein:** click the gene in the genes list and its protein in the \
 proteins list (Ctrl/Cmd-click to pick several). Matching pairs: \
@@ -160,13 +165,12 @@ def collection_score_field(collection: str) -> str:
 
 Q6_VIEW_NAME = "How comparable is the expression across different diseases?"
 Q6_DIAGNOSES = ["Crohns disease", "Ulcerative colitis"]
-Q6_BOX_GENE = GENES.names[0]
 
 Q6_TEXT = f"""\
 **How comparable is the expression across different diseases?** The **heat map** shows the \
-average level of all marker genes in every diagnosis, so genes that are high everywhere stand \
-out from disease-specific ones. The **box plot** shows how {Q6_BOX_GENE} varies between cells \
-within each diagnosis. The **dot plot** shows the selected genes in each cell state, with a \
+average level of the selected genes (up to {HEAT_MAP_FEATURES}) in every diagnosis, so genes that \
+are high everywhere stand out from disease-specific ones. The **box plot** shows how the first \
+selected gene varies between cells within each diagnosis. The **dot plot** shows the selected genes in each cell state, with a \
 panel each for {" and ".join(Q6_DIAGNOSES)}: similar dots mean the gene behaves the same way in \
 both diseases.
 
@@ -360,12 +364,62 @@ def spread_layout(view: dict[str, Any], gap: int = CHART_GAP) -> dict[str, Any]:
     return view
 
 
+LEGEND_WIDTH = 180
+LEGEND_MAX_HEIGHT = 120
+GUESSED_CATEGORIES = 6
+
+
+def category_counts(datasources: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """Datasource -> text field -> number of categories."""
+    return {
+        str(ds.get("name")): {
+            str(column.get("field")): len(column.get("values") or [])
+            for column in ds.get("columns", [])
+            if column.get("datatype") in ("text", "text16", "multitext")
+        }
+        for ds in datasources
+    }
+
+
+def place_legends(view: dict[str, Any], counts: dict[str, dict[str, int]]) -> dict[str, Any]:
+    """Move colour legends off the plot, in place. A legend that already has a ``pos`` stays.
+
+    Scatter plot and stacked bar legends go bottom-right, above the x axis; long category lists
+    scroll inside LEGEND_MAX_HEIGHT. Heat map legends go in the empty corner under the row labels.
+    """
+    for ds_name, charts in view.get("initialCharts", {}).items():
+        for chart in charts:
+            legend = chart.get("color_legend")
+            size = chart.get("size")
+            if not isinstance(legend, dict) or not legend.get("display") or "pos" in legend or not size:
+                continue
+            width, height = size
+            if chart.get("type") == "heat_map":
+                legend["pos"] = [8, height - 120]
+                continue
+            if chart.get("type") == "wgl_scatter_plot_dev":
+                field = chart.get("color_by")
+            elif chart.get("type") == "stacked_row_chart":
+                field = chart["param"][-1]
+            else:
+                continue
+            if not isinstance(field, str):
+                # Continuous colour from an active link: a fixed-height colour bar.
+                legend["pos"] = [width - LEGEND_WIDTH - 10, height - 140]
+                continue
+            rows = counts.get(ds_name, {}).get(field, GUESSED_CATEGORIES)
+            legend_height = min(20 + 16 * rows, LEGEND_MAX_HEIGHT)
+            legend["pos"] = [width - LEGEND_WIDTH - 10, height - legend_height - 75]
+            legend["size"] = [LEGEND_WIDTH, legend_height]
+    return view
+
+
 def text_box(title: str, text: str) -> dict[str, Any]:
     return {"type": "text_box_chart", "title": title, "param": [], "text": text}
 
 
 def umap(
-    title: str, color_by: str, only: tuple[str, str] | None = None
+    title: str, color_by: str | dict[str, Any], only: tuple[str, str] | None = None
 ) -> dict[str, Any]:
     """`only=(column, value)` restricts this chart (not the others) to cells with that value."""
     chart = scatter(title, [UMAP_X, UMAP_Y], color_by, CELL_STATE)
@@ -374,14 +428,15 @@ def umap(
     return chart
 
 
-def scatter(title: str, xy: list[str], color_by: str, tooltip: str) -> dict[str, Any]:
+def scatter(title: str, xy: list[str], color_by: str | dict[str, Any], tooltip: str) -> dict[str, Any]:
+    """`color_by` is a field, or a `feature_query` to colour by the selected gene (active link)."""
     return {
         "type": "wgl_scatter_plot_dev",
         "title": title,
         "legend": "",
         "param": xy,
         "color_by": color_by,
-        "color_legend": {"display": True, "pos": [5, 5]},
+        "color_legend": {"display": True},
         "field_legend": {"display": True},
         "tooltip": {"show": True, "column": [tooltip]},
         "dimension": "2d",
@@ -470,26 +525,39 @@ def compound_dot_plot(
 
 
 def heat_map(
-    title: str, category: str, fields: list[str], y_label_size: int = 90
+    title: str,
+    category: str,
+    fields: list[str] | dict[str, Any],
+    y_label_size: int = 90,
+    y_tickfont: int = 9,
 ) -> dict[str, Any]:
+    """`fields` is a list of columns, or a `feature_query` for the selected genes (active link)."""
+    columns = fields if isinstance(fields, list) else [fields]
     return {
         "type": "heat_map",
         "title": title,
         "legend": "",
-        "param": [category, *fields],
+        "param": [category, *columns],
         "method": "mean",
         "cluster_rows": False,
         "cluster_columns": False,
         "axis": {
             "x": {"label": "", "rotate_labels": True, "size": 150, "textSize": 13, "tickfont": 9},
-            "y": {"label": "", "size": y_label_size, "textSize": 13, "tickfont": 9},
+            "y": {"label": "", "size": y_label_size, "textSize": 13, "tickfont": y_tickfont},
         },
         "color_scale": {"log": False, "trim": "0.05"},
-        "color_legend": {"display": True, "pos": [0, 0]},
+        "color_legend": {"display": True},
     }
 
 
-def box_plot(title: str, category: str, field: str) -> dict[str, Any]:
+def box_plot(
+    title: str,
+    category: str,
+    field: str | dict[str, Any],
+    x_label: str = "",
+    y_label: str = "Expression",
+) -> dict[str, Any]:
+    """`field` is a column, or a `feature_query` for the selected gene (active link)."""
     return {
         "type": "box_plot",
         "title": title,
@@ -498,8 +566,8 @@ def box_plot(title: str, category: str, field: str) -> dict[str, Any]:
         "color_by": category,
         "color_legend": {"display": False},
         "axis": {
-            "x": {"label": "", "rotate_labels": True, "size": 110, "textSize": 13, "tickfont": 10},
-            "y": {"label": "Expression", "size": 45, "textSize": 13, "tickfont": 10},
+            "x": {"label": x_label, "rotate_labels": True, "size": 110, "textSize": 13, "tickfont": 10},
+            "y": {"label": y_label, "size": 45, "textSize": 13, "tickfont": 10},
         },
         "tooltip": {"show": False},
         "default_color": "#377eb8",
@@ -519,7 +587,7 @@ def composition_bar(title: str, group_by: str, split_by: str) -> dict[str, Any]:
         "legend": "",
         "param": [group_by, split_by],
         "sort": "name",
-        "color_legend": {"display": True, "pos": [5, 5]},
+        "color_legend": {"display": True},
         "axis": {
             "x": {"label": "Proportion of cells", "size": 35, "textSize": 13, "tickfont": 10},
             "y": {"label": "", "size": 110, "textSize": 13, "tickfont": 11},
@@ -591,17 +659,22 @@ def gene_info(title: str) -> dict[str, Any]:
     }
 
 
-def genes_panel() -> list[dict[str, Any]]:
+# Layouts are the final pixel positions from the hand-tuned myeloid views (Nov 2026), so these
+# views are not passed through spread_layout. Charts are [x, y], [width, height].
+
+
+def genes_panel(names: list[str] | None = None) -> list[dict[str, Any]]:
+    """Marker gene list (starting on `names`, default all markers) above the Gene Info chart."""
     return [
-        placed(feature_list("Marker genes", GENES.names), [0, 0], [270, 400]),
-        placed(gene_info("Click a gene to plot it"), [0, 405], [270, 455]),
+        placed(feature_list("Marker genes", names or GENES.names), [0, 0], [270, 400]),
+        placed(gene_info("Click a gene to plot it"), [0, 425], [270, 455]),
     ]
 
 
-def proteins_panel() -> list[dict[str, Any]]:
+def proteins_panel(names: list[str] | None = None) -> list[dict[str, Any]]:
     return [
-        placed(feature_list("Marker proteins", PROTEINS.names), [0, 0], [270, 400]),
-        placed(feature_table("Click a protein to plot it"), [0, 405], [270, 455]),
+        placed(feature_list("Marker proteins", names or PROTEINS.names), [0, 0], [270, 400]),
+        placed(feature_table("Click a protein to plot it"), [0, 425], [270, 455]),
     ]
 
 
@@ -612,7 +685,7 @@ def collections_panel() -> list[dict[str, Any]]:
             [0, 0],
             [270, 300],
         ),
-        placed(gene_info("Genes in the collection"), [0, 305], [270, 555]),
+        placed(gene_info("Genes in the collection"), [0, 325], [270, 555]),
     ]
 
 
@@ -634,51 +707,53 @@ class ProjectFields:
     protein_batches: list[str]
 
 
+def selected_feature_umap(title: str, features: LinkedFeatures) -> dict[str, Any]:
+    """UMAP coloured by the first selected gene or protein (active link)."""
+    return umap(title, feature_query(features, 1))
+
+
 def build_q1_view(fields: ProjectFields) -> dict[str, Any]:
-    features = [
-        placed(umap(gene, fields.features[gene]), [435 + i * 385, 125], [380, 350])
-        for i, gene in enumerate(Q1_FEATURE_GENES)
-    ]
-    return genes_view([
-        placed(text_box("About this page", Q1_TEXT), [0, 0], [WIDE_LAYOUT_WIDTH, 120]),
-        placed(umap("Cell Subgroup", CELL_SUBGROUP), [0, 125], [430, 350]),
-        *features,
-        placed(
-            compound_dot_plot(
-                "Selected genes by Cell State", CELL_STATE, feature_query(GENES, DOT_PLOT_FEATURES)
+    del fields
+    return genes_view(
+        [
+            placed(text_box("About this page", Q1_TEXT), [0, 0], [WIDE_LAYOUT_WIDTH, 120]),
+            placed(umap("Cell Subgroup", CELL_SUBGROUP), [0, 145], [659, 350]),
+            placed(selected_feature_umap("Selected Gene Expression", GENES), [821, 148], [511, 350]),
+            placed(
+                compound_dot_plot(
+                    "Selected genes by Cell State", CELL_STATE, feature_query(GENES, DOT_PLOT_FEATURES)
+                ),
+                [0, 520],
+                [590, 380],
             ),
-            [0, 480],
-            [600, 380],
-        ),
-        placed(
-            heat_map(
-                "Marker genes by Cell State (average expression)",
-                CELL_STATE,
-                [fields.features[g] for g in GENES.names],
+            placed(
+                heat_map("Cell State", CELL_STATE, feature_query(GENES, HEAT_MAP_FEATURES), y_label_size=68, y_tickfont=8),
+                [612, 528],
+                [993, 379],
             ),
-            [605, 480],
-            [985, 380],
-        ),
-    ])
+        ],
+        genes_panel([Q1_START_GENE]),
+    )
 
 
 def build_q2_view(fields: ProjectFields) -> dict[str, Any]:
+    del fields
     selected = feature_query(GENES, DOT_PLOT_FEATURES)
     return genes_view([
-        placed(text_box("About this page", Q2_TEXT), [0, 0], [1100, 200]),
+        placed(text_box("About this page", Q2_TEXT), [0, 0], [1099, 200]),
         placed(
             cell_filter("Choose groups to compare", [DIAGNOSIS, DISEASE, CELL_STATE]),
-            [1105, 0],
-            [485, 200],
+            [1124, 0],
+            [467, 200],
         ),
-        placed(compound_dot_plot("Selected genes by Diagnosis", DIAGNOSIS, selected), [0, 205], [470, 655]),
-        placed(compound_dot_plot("Selected genes by Disease", DISEASE, selected), [475, 205], [555, 325]),
-        placed(compound_dot_plot("Selected genes by Tissue", TISSUE, selected), [475, 535], [555, 325]),
+        placed(compound_dot_plot("Selected genes by Diagnosis", DIAGNOSIS, selected), [0, 225], [453, 675]),
+        placed(compound_dot_plot("Selected genes by Disease", DISEASE, selected), [477, 225], [536, 325]),
+        placed(compound_dot_plot("Selected genes by Tissue", TISSUE, selected), [477, 575], [536, 325]),
         # Dot plots are sized to leave room for their legends above the plot.
         placed(
             compound_dot_plot("Selected genes by Inflammation Status", INFLAMMATION, selected),
-            [1035, 205],
-            [592, 415],
+            [1037, 225],
+            [590, 435],
         ),
         # The React dot plot can't limit its rows to a few patients, so it has a panel per
         # example patient instead.
@@ -690,32 +765,21 @@ def build_q2_view(fields: ProjectFields) -> dict[str, Any]:
                 split=(PATIENT, Q2_PATIENTS),
                 y_label_size=90,
             ),
-            [0, 865],
-            [1030, 385],
+            [0, 925],
+            [1013, 385],
         ),
     ])
 
 
 def build_q3_view(fields: ProjectFields) -> dict[str, Any]:
-    half = PROTEIN_VIEW_LAYOUT_WIDTH // 2
-    quarter = PROTEIN_VIEW_LAYOUT_WIDTH // 4
-    pair_maps = []
-    for i, (gene, protein) in enumerate(Q3_PAIRS):
-        for j, (name, kind) in enumerate(((gene, "RNA"), (protein, "protein"))):
-            pair_maps.append(
-                placed(
-                    umap(f"{name} ({kind})", fields.features[name]),
-                    [(2 * i + j) * quarter, 505],
-                    [quarter - 5, 355],
-                )
-            )
+    gene, protein = Q3_START_PAIR
     cells = [
-        placed(text_box("About this page", Q3_TEXT), [0, 0], [900, 150]),
+        placed(text_box("About this page", Q3_TEXT), [0, 0], [892, 150]),
         # The React dot plot can't limit its cells, so the page filter does it for every chart.
         placed(
             cell_filter("Cells with protein data", [BATCH], {BATCH: fields.protein_batches}),
-            [905, 0],
-            [PROTEIN_VIEW_LAYOUT_WIDTH - 905, 150],
+            [915, 0],
+            [395, 150],
         ),
         placed(
             compound_dot_plot(
@@ -723,8 +787,8 @@ def build_q3_view(fields: ProjectFields) -> dict[str, Any]:
                 CELL_STATE,
                 feature_query(GENES, DOT_PLOT_FEATURES),
             ),
-            [0, 155],
-            [half - 5, 345],
+            [0, 175],
+            [622, 345],
         ),
         placed(
             compound_dot_plot(
@@ -732,70 +796,56 @@ def build_q3_view(fields: ProjectFields) -> dict[str, Any]:
                 CELL_STATE,
                 feature_query(PROTEINS, DOT_PLOT_FEATURES),
             ),
-            [half, 155],
-            [half, 345],
+            [641, 178],
+            [646, 345],
         ),
-        *pair_maps,
+        placed(selected_feature_umap("Selected Gene Expression", GENES), [53, 548], [532, 363]),
+        placed(selected_feature_umap("Selected Protein", PROTEINS), [653, 546], [589, 363]),
     ]
     return {
         "dataSources": {ds: {"panelWidth": width} for ds, width in PROTEIN_VIEW_PANEL_WIDTHS.items()},
         "initialCharts": {
             CELLS: cells,
-            GENES.datasource: genes_panel(),
-            PROTEINS.datasource: proteins_panel(),
+            GENES.datasource: genes_panel([gene]),
+            PROTEINS.datasource: proteins_panel([protein]),
         },
     }
 
 
 def build_q6_view(fields: ProjectFields) -> dict[str, Any]:
+    del fields
     selected = feature_query(GENES, DOT_PLOT_FEATURES)
-    per_disease = placed(
-        compound_dot_plot(
-            f"Selected genes in {' and '.join(Q6_DIAGNOSES)}",
-            CELL_STATE,
-            selected,
-            split=(DIAGNOSIS, Q6_DIAGNOSES),
-        ),
-        [795, 505],
-        [795, 355],
-    )
     return genes_view([
-        placed(text_box("About this page", Q6_TEXT), [0, 0], [1100, 150]),
-        placed(cell_filter("Focus on cell states", [CELL_STATE]), [1105, 0], [485, 150]),
+        placed(text_box("About this page", Q6_TEXT), [0, 0], [1093, 150]),
+        placed(cell_filter("Focus on cell states", [CELL_STATE]), [1117, 0], [473, 150]),
+        placed(heat_map("Diagnosis", DIAGNOSIS, feature_query(GENES, HEAT_MAP_FEATURES)), [0, 175], [771, 725]),
         placed(
-            heat_map(
-                "Marker genes by Diagnosis (average expression)",
-                DIAGNOSIS,
-                [fields.features[g] for g in GENES.names],
+            box_plot(
+                "Gene Expression by Diagnosis", DIAGNOSIS, feature_query(GENES, 1), x_label="Diagnosis"
             ),
-            [0, 155],
-            [790, 705],
-        ),
-        placed(
-            box_plot(f"{Q6_BOX_GENE} by Diagnosis", DIAGNOSIS, fields.features[Q6_BOX_GENE]),
-            [795, 155],
+            [795, 175],
             [795, 345],
         ),
-        per_disease,
+        placed(
+            compound_dot_plot(
+                f"Selected genes in {' and '.join(Q6_DIAGNOSES)}",
+                CELL_STATE,
+                selected,
+                split=(DIAGNOSIS, Q6_DIAGNOSES),
+            ),
+            [795, 545],
+            [795, 355],
+        ),
     ])
 
 
 def build_q7_view(fields: ProjectFields) -> dict[str, Any]:
+    del fields
     collection_genes = feature_query(GENES, max(len(g) for g in GENE_COLLECTIONS.values()))
-    per_disease = placed(
-        compound_dot_plot(
-            f"Collection genes in {' and '.join(Q7_DIAGNOSES)}",
-            CELL_STATE,
-            collection_genes,
-            split=(DIAGNOSIS, Q7_DIAGNOSES),
-        ),
-        [795, 155],
-        [795, 705],
-    )
     return genes_view(
         [
-            placed(text_box("About this page", Q7_TEXT), [0, 0], [1100, 150]),
-            placed(cell_filter("Focus on cell states", [CELL_STATE]), [1105, 0], [485, 150]),
+            placed(text_box("About this page", Q7_TEXT), [0, 0], [1093, 150]),
+            placed(cell_filter("Focus on cell states", [CELL_STATE]), [1117, 0], [473, 150]),
             placed(
                 heat_map(
                     "Gene collection scores by Diagnosis (average)",
@@ -803,49 +853,59 @@ def build_q7_view(fields: ProjectFields) -> dict[str, Any]:
                     [collection_score_field(c) for c in GENE_COLLECTIONS],
                     y_label_size=190,
                 ),
-                [0, 155],
-                [790, 400],
+                [0, 175],
+                [771, 400],
             ),
             placed(
                 box_plot(
-                    f"{Q7_DEFAULT_COLLECTION} score by Diagnosis",
+                    "Gene collection score by Diagnosis",
                     DIAGNOSIS,
                     collection_score_field(Q7_DEFAULT_COLLECTION),
+                    y_label=f"{Q7_DEFAULT_COLLECTION} score",
                 ),
-                [0, 560],
-                [790, 300],
+                [0, 600],
+                [771, 300],
             ),
-            per_disease,
+            placed(
+                compound_dot_plot(
+                    f"Collection genes in {' and '.join(Q7_DIAGNOSES)}",
+                    CELL_STATE,
+                    collection_genes,
+                    split=(DIAGNOSIS, Q7_DIAGNOSES),
+                ),
+                [795, 175],
+                [795, 725],
+            ),
         ],
         collections_panel(),
     )
 
 
 def build_q8_view(fields: ProjectFields) -> dict[str, Any]:
+    del fields
     selected = feature_query(GENES, DOT_PLOT_FEATURES)
-    groups = placed(
-        compound_dot_plot(
-            "Selected genes by group",
-            CELL_SUBGROUP,
-            selected,
-            split=(RESPONSE_STAGE, RESPONSE_STAGE_GROUPS),
-            y_label_size=90,
-        ),
-        [0, 220],
-        [1185, 640],
-    )
     return genes_view([
-        placed(text_box("About this page", Q8_TEXT), [0, 0], [1100, 215]),
+        placed(text_box("About this page", Q8_TEXT), [0, 0], [1073, 215]),
         placed(
             cell_filter(
                 "Choose patients to compare",
                 [DIAGNOSIS, TISSUE, THERAPY, RESPONSE_STAGE],
                 {**Q8_DEFAULTS, RESPONSE_STAGE: RESPONSE_STAGE_GROUPS},
             ),
-            [1105, 0],
-            [485, 215],
+            [1097, 0],
+            [493, 215],
         ),
-        groups,
+        placed(
+            compound_dot_plot(
+                "Selected genes by group",
+                CELL_SUBGROUP,
+                selected,
+                split=(RESPONSE_STAGE, RESPONSE_STAGE_GROUPS),
+                y_label_size=90,
+            ),
+            [0, 240],
+            [1175, 660],
+        ),
         placed(
             heat_map(
                 "Gene collection scores by group",
@@ -853,17 +913,18 @@ def build_q8_view(fields: ProjectFields) -> dict[str, Any]:
                 [collection_score_field(c) for c in GENE_COLLECTIONS],
                 y_label_size=190,
             ),
-            [1190, 220],
-            [400, 318],
+            [1200, 240],
+            [390, 318],
         ),
         placed(
             box_plot(
                 f"{Q8_BOX_COLLECTION} score by group",
                 RESPONSE_STAGE,
                 collection_score_field(Q8_BOX_COLLECTION),
+                y_label=f"{Q8_BOX_COLLECTION} score",
             ),
-            [1190, 543],
-            [400, 317],
+            [1200, 583],
+            [390, 317],
         ),
     ])
 
@@ -874,6 +935,8 @@ def volcano_plot() -> dict[str, Any]:
         "Volcano plot: change after treatment", [DEG_LOG2_FOLD, DEG_EVIDENCE], DEG_CHANGE, NAME_FIELD
     )
     chart["tooltip"]["column"] = [NAME_FIELD, DEG_CHANGE, DEG_LOG2_FOLD, DEG_ADJUSTED_P]
+    # Top right: the significant genes sit in the upper corners, the bulk at the bottom.
+    chart["color_legend"] = {"display": True, "pos": [300, 60], "size": [162, 82]}
     return chart
 
 
@@ -882,53 +945,53 @@ def deg_panel() -> list[dict[str, Any]]:
         placed(
             category_list("Show genes", DEG_TOP_FIELD, [DEG_TOP_UP, DEG_TOP_DOWN]), [0, 0], [465, 150]
         ),
-        placed(volcano_plot(), [0, 155], [465, 400]),
-        placed(gene_info("Genes (click to plot)"), [0, 560], [465, 300]),
+        placed(volcano_plot(), [0, 175], [465, 400]),
+        placed(gene_info("Genes (click to plot)"), [0, 600], [465, 300]),
     ]
 
 
 def build_q9_view(fields: ProjectFields) -> dict[str, Any]:
+    del fields
     selected = feature_query(GENES, 2 * DEG_TOP)
     umaps = [
         placed(
             umap(f"Cell Subgroup at {stage}", CELL_SUBGROUP, only=(TREATMENT_STAGE, stage)),
-            [i * 465, 205],
-            [460, 400],
+            position,
+            size,
         )
-        for i, stage in enumerate(DEG_GROUPS)
+        for stage, (position, size) in zip(DEG_GROUPS, (([0, 225], [441, 400]), ([465, 225], [460, 400])))
     ]
-    by_stage = placed(
-        compound_dot_plot(
-            f"Selected genes at {' and '.join(DEG_GROUPS)}",
-            CELL_SUBGROUP,
-            selected,
-            split=(TREATMENT_STAGE, list(DEG_GROUPS)),
-            y_label_size=90,
-        ),
-        [0, 610],
-        [1400, 423],
-    )
     return {
         "dataSources": {ds: {"panelWidth": width} for ds, width in Q9_PANEL_WIDTHS.items()},
         "initialCharts": {
             CELLS: [
-                placed(text_box("About this page", Q9_TEXT), [0, 0], [900, 200]),
+                placed(text_box("About this page", Q9_TEXT), [0, 0], [882, 200]),
                 placed(
                     cell_filter(
                         "Choose patients to compare",
                         [DIAGNOSIS, TISSUE, THERAPY, TREATMENT_STAGE],
                         {**DEG_COMPARISON, TREATMENT_STAGE: list(DEG_GROUPS)},
                     ),
-                    [905, 0],
-                    [495, 200],
+                    [906, 0],
+                    [494, 200],
                 ),
                 *umaps,
                 placed(
                     composition_bar("Cell mix by treatment stage", TREATMENT_STAGE, CELL_SUBGROUP),
-                    [930, 205],
-                    [470, 400],
+                    [949, 225],
+                    [451, 400],
                 ),
-                by_stage,
+                placed(
+                    compound_dot_plot(
+                        f"Selected genes at {' and '.join(DEG_GROUPS)}",
+                        CELL_SUBGROUP,
+                        selected,
+                        split=(TREATMENT_STAGE, list(DEG_GROUPS)),
+                        y_label_size=90,
+                    ),
+                    [0, 650],
+                    [1400, 423],
+                ),
             ],
             GENES.datasource: deg_panel(),
         },
@@ -1279,12 +1342,13 @@ def add_question_views(project_path: Path, *, dry_run: bool = False) -> dict[str
         added_fields += add_treatment_deg(project_path, datasources)
         datasources = json.loads(datasources_path.read_text(encoding="utf-8"))
     fields = resolve_project_fields(project_path, datasources)
+    counts = category_counts(datasources)
     views = json.loads(views_path.read_text(encoding="utf-8"))
     state = json.loads(state_path.read_text(encoding="utf-8"))
 
     all_views = list(state.get("all_views") or [])
     for name, build in VIEW_BUILDERS.items():
-        views[name] = spread_layout(build(fields))
+        views[name] = place_legends(build(fields), counts)
         if name not in all_views:
             all_views.append(name)
     state["all_views"] = all_views
