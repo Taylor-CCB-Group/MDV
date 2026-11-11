@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import { expect, type Page } from "@playwright/test";
 import { getProjectUrl } from "../projectUrl";
 import {
+    assertProjectPathUnregistered,
     deleteProjectViaApi,
     ensurePlaywrightMdvRoot,
     generateProjectOffShare,
@@ -107,12 +108,14 @@ export async function createTemporaryProjectViaSyntheticSpatial(
     const nameSegment = options.nameSegment ?? `synth-spatial--playwright-rescan--scatter-table--${Date.now()}`;
     const projectPath = options.projectPath ?? path.join(mdvRoot, nameSegment);
 
+    // before `try`: its catch deletes projectPath, which must not touch an existing project
+    const projectsBefore = await listProjectsViaApi(page.request);
+    const projectIdsBefore = new Set(projectsBefore.map((project) => String(project.id)));
+    assertProjectPathUnregistered(projectsBefore, projectPath);
+
     let projectId: string | undefined;
 
     try {
-        const projectsBefore = await listProjectsViaApi(page.request);
-        const projectIdsBefore = new Set(projectsBefore.map((project) => String(project.id)));
-
         await generateProjectOffShare(projectPath, (stagingPath) =>
             runSyntheticSpatialProjectCli(stagingPath, options.synthetic ?? {}),
         );

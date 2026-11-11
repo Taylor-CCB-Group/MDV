@@ -120,6 +120,25 @@ export async function triggerRescanProjects(request: APIRequestContext) {
     });
 }
 
+function isProjectInFolder(project: ProjectListSummary, projectPath: string) {
+    const folder = path.basename(projectPath);
+    return project.name === folder || path.basename(project.path ?? "") === folder;
+}
+
+/**
+ * Fail before generating into a folder the backend already has a project for: replacing its files
+ * leaves that row pointing at them, so the rescan never registers a new project and cleanup, which
+ * deletes by the new id, would leave the row behind.
+ */
+export function assertProjectPathUnregistered(projects: ProjectListSummary[], projectPath: string) {
+    const existing = projects.find((project) => isProjectInFolder(project, projectPath));
+    if (existing) {
+        throw new Error(
+            `Project ${existing.id} is already registered for ${projectPath}; use a fresh nameSegment / projectPath.`,
+        );
+    }
+}
+
 /**
  * Rescan until the project in `projectPath` is registered under a new id. The backend's view of a
  * Docker Desktop shared folder can lag the host, so a single rescan may not see a folder that was
@@ -132,14 +151,11 @@ export async function rescanUntilRegistered(
     projectIdsBefore: Set<string>,
     timeoutMs = 30_000,
 ): Promise<ProjectListSummary | undefined> {
-    const folder = path.basename(projectPath);
     const deadline = Date.now() + timeoutMs;
     for (;;) {
         await triggerRescanProjects(request);
         const created = (await listProjectsViaApi(request)).find(
-            (project) =>
-                !projectIdsBefore.has(String(project.id)) &&
-                (project.name === folder || path.basename(project.path ?? "") === folder),
+            (project) => !projectIdsBefore.has(String(project.id)) && isProjectInFolder(project, projectPath),
         );
         if (created || Date.now() > deadline) {
             return created;
