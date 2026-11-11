@@ -49,7 +49,8 @@ async function addScatterChart(page: Page, title: string): Promise<string> {
             const param = umap.every((f) => numeric.includes(f)) ? umap : numeric.slice(0, 2);
             if (param.length < 2) throw new Error(`need two numeric columns in ${dsName}, got ${numeric}`);
             cm.addChart(dsName, {
-                type: "wgl_scatter_plot_dev",
+                // DECK_CONTOUR_SCATTER_TYPE: what Add Chart's "2D Scatter Plot" creates
+                type: "DeckContourScatter",
                 id,
                 title,
                 param,
@@ -216,6 +217,71 @@ async function checkController(ui: Page, page: Page, id: string, box: Box) {
     await expect.poll(async () => (await readState(page, id)).viewState?.zoom).not.toBe(before.zoom);
 }
 
+type DataToScreen = (p: Point) => Point;
+
+/** (d): Modify removes a clicked vertex of the selection. Returns the edited ring. */
+async function removeVertex(ui: Page, page: Page, id: string, box: Box, toScreen: DataToScreen, ring: Point[]) {
+    await selectTool(ui, id, "Modify");
+    await ui.mouse.move(...at(box, 0.5, 0.5), { steps: 5 });
+    await pause(ui);
+    // a vertex away from where the freehand started and finished
+    const vertex = toScreen(ring[Math.floor(ring.length / 2)]);
+    await ui.mouse.move(...vertex, { steps: 5 });
+    await pause(ui);
+    await ui.mouse.click(...vertex);
+    await expect.poll(async () => (await readState(page, id)).rings[0]?.length).toBe(ring.length - 1);
+    return (await readState(page, id)).rings[0];
+}
+
+/** (e): with a selection, Pan drags it - every vertex by the same delta - and leaves the view alone. */
+async function translateSelection(ui: Page, page: Page, id: string, box: Box, ring: Point[]) {
+    await selectTool(ui, id, "Pan");
+    const view = await waitForViewState(page, id);
+    const [sx, sy] = at(box, 0.5, 0.5);
+    await ui.mouse.move(sx, sy, { steps: 5 });
+    await pause(ui);
+    await ui.mouse.down();
+    await ui.mouse.move(sx + 60, sy + 40, { steps: 10 });
+    await ui.mouse.up();
+    await expect.poll(async () => (await readState(page, id)).rings[0]?.[0]).not.toEqual(ring[0]);
+    const { rings, viewState } = await readState(page, id);
+    expect(rings[0].length).toBe(ring.length);
+    const [dx, dy] = [rings[0][0][0] - ring[0][0], rings[0][0][1] - ring[0][1]];
+    expect(Math.hypot(dx, dy)).toBeGreaterThan(0);
+    for (let k = 0; k < ring.length; k++) {
+        expect(rings[0][k][0] - ring[k][0]).toBeCloseTo(dx, 6);
+        expect(rings[0][k][1] - ring[k][1]).toBeCloseTo(dy, 6);
+    }
+    expect(viewState?.target).toEqual(view.target);
+}
+
+/**
+ * (a) to (f) in whichever window the chart is in: polygon (which also calibrates data to screen),
+ * freehand, modify, drag the selection, then pan and zoom the view.
+ */
+async function checkAllTools(ui: Page, page: Page, id: string, box: Box, where: string) {
+    let toScreen: DataToScreen | undefined;
+    await test.step(`${where}: (a, b) polygon finishes on double-click, keeping its point, without zooming`, async () => {
+        const { points, ring } = await drawPolygonWithDoubleClick(ui, page, id, box);
+        expect(ring[4][0]).not.toBe(ring[3][0]);
+        toScreen = makeDataToScreen(points, ring);
+    });
+    let square: Point[] = [];
+    await test.step(`${where}: (c) freehand drag draws one polygon`, async () => {
+        square = await drawFreehandSquare(ui, page, id, box);
+    });
+    await test.step(`${where}: (d) modify removes the clicked vertex`, async () => {
+        if (!toScreen) throw new Error("no calibration from (a)");
+        square = await removeVertex(ui, page, id, box, toScreen, square);
+    });
+    await test.step(`${where}: (e) pan with a selection translates every vertex by the same delta`, async () => {
+        await translateSelection(ui, page, id, box, square);
+    });
+    await test.step(`${where}: (f) pan and wheel move the view`, async () => {
+        await checkController(ui, page, id, box);
+    });
+}
+
 /**
  * Map data coordinates to screen using the polygon drawn in (a): clicks and vertices correspond in
  * order, and the view is orthographic so each axis is linear.
@@ -259,57 +325,7 @@ test.describe("Scatter selection tools", () => {
             let box = await measureCanvas(page, id);
             await warmUp(page, page, id, box);
 
-            let calibration: ReturnType<typeof makeDataToScreen> | undefined;
-            await test.step("(a, b) polygon finishes on double-click, keeping its point, without zooming", async () => {
-                const { points, ring } = await drawPolygonWithDoubleClick(page, page, id, box);
-                expect(ring[4][0]).not.toBe(ring[3][0]);
-                calibration = makeDataToScreen(points, ring);
-            });
-
-            let square: Point[] = [];
-            await test.step("(c) freehand drag draws one polygon", async () => {
-                square = await drawFreehandSquare(page, page, id, box);
-            });
-
-            await test.step("(d) modify removes the clicked vertex", async () => {
-                if (!calibration) throw new Error("no calibration from (a)");
-                await selectTool(page, id, "Modify");
-                await page.mouse.move(...at(box, 0.5, 0.5), { steps: 5 });
-                await pause(page);
-                // a vertex away from where the freehand started and finished
-                const vertex = calibration(square[Math.floor(square.length / 2)]);
-                await page.mouse.move(...vertex, { steps: 5 });
-                await pause(page);
-                await page.mouse.click(...vertex);
-                await expect.poll(async () => (await readState(page, id)).rings[0]?.length).toBe(square.length - 1);
-                square = (await readState(page, id)).rings[0];
-            });
-
-            await test.step("(e) pan with a selection translates every vertex by the same delta", async () => {
-                await selectTool(page, id, "Pan");
-                const view = await waitForViewState(page, id);
-                const [sx, sy] = at(box, 0.5, 0.5);
-                await page.mouse.move(sx, sy, { steps: 5 });
-                await pause(page);
-                await page.mouse.down();
-                await page.mouse.move(sx + 60, sy + 40, { steps: 10 });
-                await page.mouse.up();
-                await expect.poll(async () => (await readState(page, id)).rings[0]?.[0]).not.toEqual(square[0]);
-                const { rings, viewState } = await readState(page, id);
-                expect(rings[0].length).toBe(square.length);
-                const [dx, dy] = [rings[0][0][0] - square[0][0], rings[0][0][1] - square[0][1]];
-                expect(Math.hypot(dx, dy)).toBeGreaterThan(0);
-                for (let k = 0; k < square.length; k++) {
-                    expect(rings[0][k][0] - square[k][0]).toBeCloseTo(dx, 6);
-                    expect(rings[0][k][1] - square[k][1]).toBeCloseTo(dy, 6);
-                }
-                // dragging the selection doesn't also pan the view
-                expect(viewState?.target).toEqual(view.target);
-            });
-
-            await test.step("(f) pan and wheel move the view", async () => {
-                await checkController(page, page, id, box);
-            });
+            await checkAllTools(page, page, id, box, "in place");
 
             const [popup] = await Promise.all([
                 page.waitForEvent("popup"),
@@ -323,15 +339,7 @@ test.describe("Scatter selection tools", () => {
                 await expect(chartScope(popup, id).locator('button[aria-label="Polygon"]')).toBeVisible();
                 const popupBox = await measureCanvas(popup, id);
 
-                await test.step("(g) popped out: polygon", async () => {
-                    await drawPolygonWithDoubleClick(popup, page, id, popupBox);
-                });
-                await test.step("(g) popped out: freehand", async () => {
-                    await drawFreehandSquare(popup, page, id, popupBox);
-                });
-                await test.step("(g) popped out: pan and wheel", async () => {
-                    await checkController(popup, page, id, popupBox);
-                });
+                await checkAllTools(popup, page, id, popupBox, "(g) popped out");
             } finally {
                 if (!popup.isClosed()) {
                     await popup.close({ runBeforeUnload: true });
@@ -342,12 +350,7 @@ test.describe("Scatter selection tools", () => {
             await expect.poll(async () => (await measureCanvas(page, id)).width).toBeGreaterThan(100);
             box = await measureCanvas(page, id);
 
-            await test.step("(h) popped back in: polygon", async () => {
-                await drawPolygonWithDoubleClick(page, page, id, box);
-            });
-            await test.step("(h) popped back in: pan and wheel", async () => {
-                await checkController(page, page, id, box);
-            });
+            await checkAllTools(page, page, id, box, "(h) popped back in");
         } finally {
             if (handle !== undefined) {
                 await handle.cleanup();
