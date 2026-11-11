@@ -1,4 +1,4 @@
-import { Close as CloseIcon, Edit as EditIcon } from "@mui/icons-material";
+import { Edit as EditIcon } from "@mui/icons-material";
 import {
     Box,
     Button,
@@ -15,8 +15,8 @@ import {
 } from "@mui/material";
 import type React from "react";
 import { useState } from "react";
-import type { ProjectAccessType } from "./utils/projectUtils";
 import { DialogCloseIconButton } from "./ProjectRenameModal";
+import type { ProjectAccessType } from "./utils/projectUtils";
 
 export interface ProjectSettingsModalProps {
     id: string;
@@ -24,10 +24,7 @@ export interface ProjectSettingsModalProps {
     type: ProjectAccessType;
     open: boolean;
     onRename: (id: string, newName: string) => Promise<void>;
-    onChangeType: (
-        id: string,
-        newType: ProjectAccessType,
-    ) => Promise<void>;
+    onChangeType: (id: string, newType: ProjectAccessType) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
     onClose: () => void;
 }
@@ -96,11 +93,7 @@ const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                     <InputLabel>Project Type</InputLabel>
                     <Select
                         value={newType}
-                        onChange={(e) =>
-                            setNewType(
-                                e.target.value as ProjectAccessType,
-                            )
-                        }
+                        onChange={(e) => setNewType(e.target.value as ProjectAccessType)}
                         label="Project Type"
                     >
                         <MenuItem value="Editable">Editable</MenuItem>

@@ -1,17 +1,6 @@
-// biome-ignore lint/suspicious/noGlobalAssign: <explanation>
-onmessage = (
-    e: MessageEvent<{
-        filterBuffer: SharedArrayBuffer;
-        outputBuffer: SharedArrayBuffer;
-    }>,
-) => {
-    //todo atomics.
-    const filterArray = new Uint8Array(e.data.filterBuffer);
-    const outputArray = new Uint32Array(e.data.outputBuffer);
-    for (let i = 0, j = 0; i < filterArray.length; i++) {
-        if (filterArray[i] === 0) {
-            outputArray[j++] = i;
-        }
-    }
-    postMessage({ type: "done" });
+import { type FilteredIndexRequest, handleFilteredIndexRequest } from "./filteredIndexEval";
+
+// Lists the rows that pass a DataStore's filter into a shared buffer; see filteredIndexEval.ts.
+self.onmessage = (event: MessageEvent<FilteredIndexRequest>) => {
+    self.postMessage(handleFilteredIndexRequest(event.data));
 };

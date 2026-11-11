@@ -1,9 +1,9 @@
 import { computed, makeObservable, observable, runInAction } from "mobx";
+import type DataStore from "@/datastore/DataStore";
+import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import type ChartManager from "../charts/ChartManager";
 import type { ColumnName, DataColumn, DataType, FieldName } from "../charts/charts";
-import type DataStore from "@/datastore/DataStore";
 import type { loadColumnData } from "../datastore/decorateColumnMethod";
-import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 // zod?
 
 export type ChartLink = {
@@ -43,10 +43,7 @@ export type HighlightColumnLink = {
 };
 
 /** this is unused, but we may want to review introducing related functionality */
-export function addHighlightColumnLink(
-    link: HighlightColumnLink,
-    cm: ChartManager,
-) {
+export function addHighlightColumnLink(link: HighlightColumnLink, cm: ChartManager) {
     /// this implementation filled in by copilot & not yet read / used...
     const ds = cm.getDataSource(link.source_ds);
     if (!ds) {
@@ -55,9 +52,7 @@ export function addHighlightColumnLink(
     }
     const srcCol = ds.columnIndex[link.source_column];
     if (!srcCol) {
-        console.error(
-            `Column ${link.source_column} not found in DataStore ${link.source_ds}`,
-        );
+        console.error(`Column ${link.source_column} not found in DataStore ${link.source_ds}`);
         return;
     }
     if (!isColumnLoaded(srcCol)) {
@@ -75,12 +70,9 @@ export function addHighlightColumnLink(
             if (target.set_color) targetChart.colorByColumn(newValue);
             if (target.set_title) targetChart.setTitle(newValue);
             if (target.set_tooltip) {
-                if (targetChart.setToolTipColumn)
-                    targetChart.setToolTipColumn(newValue);
+                if (targetChart.setToolTipColumn) targetChart.setToolTipColumn(newValue);
                 else if (targetChart.config.tooltip) {
-                    runInAction(
-                        () => (targetChart.config.tooltip.column = newValue),
-                    );
+                    runInAction(() => (targetChart.config.tooltip.column = newValue));
                 }
             }
             if (target.set_param) {
@@ -113,9 +105,7 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
     const ds = chart.dataSource.dataStore;
     const srcCol = ds.columnIndex[link.column];
     if (!srcCol) {
-        console.error(
-            `"chart_columnval_link" link column "${link.column}" not found in dataStore "${ds.name}"`,
-        );
+        console.error(`"chart_columnval_link" link column "${link.column}" not found in dataStore "${ds.name}"`);
         return;
     }
     if (!isColumnLoaded(srcCol)) {
@@ -132,12 +122,9 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
             if (link.set_title) target.setTitle(newValue);
             // if (link.set_legend) chart.setLegend(newValue); //todo
             if (link.set_tooltip) {
-                if (target.setToolTipColumn)
-                    target.setToolTipColumn(link.column);
+                if (target.setToolTipColumn) target.setToolTipColumn(link.column);
                 else if (target.config.tooltip) {
-                    runInAction(
-                        () => (target.config.tooltip.column = newValue),
-                    );
+                    runInAction(() => (target.config.tooltip.column = newValue));
                 }
             }
             if (link.set_param) {
@@ -202,16 +189,16 @@ export type RowsAsColslink = {
             name: string;
             label: string;
             type: string;
-        }
-    },
-    /** 
+        };
+    };
+    /**
      * added at runtime, observable array corresponding to currently selected/highlighted items.
      * In order to support multiple subgroups, should this be Map<string, IRowAsColumn[]> (or Record, not important)
      */
     observableFields: IRowAsColumn[];
     //^^ what if it was iterator instead of Array? and/or `column` can be a computed value?
     // observableColumns: DataColumn<DataType>[]; //computed?
-    /** 
+    /**
      * Added at runtime, given a value appearing in `name_column`, the index of a row corresponding to that value.
      * This can be used in the formation of a {@link FieldName}
      * ! note, we should be able to use 'unique' values in the name_column, and would like to do away with this
@@ -220,10 +207,20 @@ export type RowsAsColslink = {
      */
     valueToRowIndex?: Map<string, number>;
     initPromise: Promise<void>;
-}
+    /**
+     * Added at runtime: resolves once `observableFields` reflects the linked dataSource's filter and highlight as
+     * they are when this is called (after a filter changes, the rows that pass it are worked out asynchronously).
+     */
+    settled?: () => Promise<void>;
+    /**
+     * Added at runtime: works out `observableFields` afresh. While a view is loading and the linked dataSource
+     * does not have that view's filters yet, this leaves the link with no rows until it does.
+     */
+    refresh?: () => Promise<void>;
+};
 /**
  * Represents an active query for a set of columns based on the currently highlighted or filtered rows.
- * ? in cases where only a single (virtual) column is needed, we can still use this interface 
+ * ? in cases where only a single (virtual) column is needed, we can still use this interface
  * but only access the first element of the `columns` array?
  * probably better to have a distinct interface for that.
  */
@@ -232,9 +229,9 @@ export interface MultiColumnQuery {
     fields: FieldName[];
     /**
      * When the query is first created, it may need to perform some async initialization:
-     * in the case of a `RowsAsColsQuery`, it needs to know the values of the `name_column` 
+     * in the case of a `RowsAsColsQuery`, it needs to know the values of the `name_column`
      * in the linked dataSource.
-     * 
+     *
      * Implementation note: as far as this interface is concerned, maybe this
      * could be optional - we could have a conformant `MultiColumnQuery`
      * that doesn't need any async initialization. For example, if it was for
@@ -254,7 +251,7 @@ type RowsAsColsPrefs = {
     //if paused, that implies we might remember the concrete values of the columns.
     //could maybe have a firstIndex as well as maxItems, for pagination
     maxItems: number;
-}
+};
 export type RowsAsColsQuerySerialized = {
     linkedDsName: string;
     /**
@@ -271,10 +268,10 @@ class DeserializedQueryError extends Error {
         // maybe something more generic or tailored in future
         public readonly serialized: RowsAsColsQuerySerialized,
         public readonly dataStore: DataStore,
-        message: string
+        message: string,
     ) {
         super(message);
-        this.name = 'DeserializedQueryError';
+        this.name = "DeserializedQueryError";
     }
 
     // Helper to suggest fixes in UI (not really useful but something to maybe build on later)
@@ -290,11 +287,11 @@ class DeserializedQueryError extends Error {
 /**
  * Represents an active query for a set of columns based on the currently highlighted or filtered rows
  * in a linked {@link DataSource}. Can be used in place of a {@link string} representing a column {@link FieldName}
- * 
+ *
  * Lazily evaluates with side-effects that will add column metadata into the parent {@link DataStore}, up
  * to the number specified by `maxItems`. Loading column data is handled separately as of now - for example with
  * by a {@link loadColumnData} decorator or `methods_using_columns`.
- * 
+ *
  * @param link - the link configuration object, with observable properties
  * @param maxItems - the maximum number of columns to return
  * @param subgroupName - optional subgroup key under `link.subgroups` (empty = first subgroup)
@@ -309,7 +306,12 @@ export class RowsAsColsQuery implements MultiColumnQuery {
     @observable accessor maxItems: number;
     /** Subgroup key under `link.subgroups`; empty string means "first available subgroup". */
     @observable accessor subgroupName: string;
-    constructor(public link: RowsAsColslink, public linkedDsName: string, maxItems = 1, subgroupName = "") {
+    constructor(
+        public link: RowsAsColslink,
+        public linkedDsName: string,
+        maxItems = 1,
+        subgroupName = "",
+    ) {
         this.maxItems = maxItems;
         this.subgroupName = subgroupName;
     }
@@ -330,19 +332,24 @@ export class RowsAsColsQuery implements MultiColumnQuery {
         // how would we pause this? (see class comment — a paused query might freeze on concrete fields)
         // could be kept in some optional `pausedFields` property?
         const sg = this.effectiveSubgroupKey;
-        return this.link.observableFields
-            .slice(0, this.maxItems)
-            .map((f) => f.columnForSubgroup(sg));
+        return this.link.observableFields.slice(0, this.maxItems).map((f) => f.columnForSubgroup(sg));
     }
     @computed
     get fields() {
         const sg = this.effectiveSubgroupKey;
-        return this.link.observableFields
-            .slice(0, this.maxItems)
-            .map((f) => f.fieldNameForSubgroup(sg));
+        return this.link.observableFields.slice(0, this.maxItems).map((f) => f.fieldNameForSubgroup(sg));
     }
+    /**
+     * Resolves when `fields` is ready to be used for a chart that is being added.
+     *
+     * While a view is loading that is not until the linked dataSource has the filters saved with the view (see
+     * `viewFilterReadiness.ts`): before then, `fields` names rows that are about to be filtered out, and a chart
+     * built on them would load their columns, draw them, and then change.
+     */
     async initialize() {
-        return this.link.initPromise;
+        await this.link.initPromise;
+        await window.mdv.chartManager.whenViewFiltersApplied(this.linkedDsName);
+        await this.link.settled?.();
     }
     /**
      * JSON serialisation that can be used to recreate the query object.
@@ -366,7 +373,7 @@ export class RowsAsColsQuery implements MultiColumnQuery {
      * @internal This should only be called by the `deserialiseParam` factory method.
      */
     static fromSerialized(ds: DataStore, serialized: RowsAsColsQuerySerialized) {
-        const link = getRowsAsColumnsLinks(ds).find(l => l?.linkedDs.name === serialized.linkedDsName)?.link;
+        const link = getRowsAsColumnsLinks(ds).find((l) => l?.linkedDs.name === serialized.linkedDsName)?.link;
         if (!link) {
             throw new DeserializedQueryError(serialized, ds, `Link not found for ${serialized.linkedDsName}`);
         }
@@ -399,6 +406,49 @@ export function subgroupKeyFromFieldName(field: string): string | null {
     const prefix = field.split("|")[0];
     return prefix.length > 0 ? prefix : null;
 }
+/** The parts of a {@link DataStore} that {@link createRowSelector} depends on. */
+type RowSource = {
+    getHighlightedData(): number[] | undefined;
+    /** per-row filter state: 0 means the row passes all filters */
+    filterArray: Uint8Array;
+    getFilteredIndices(): Promise<ArrayLike<number>>;
+};
+
+/**
+ * Decides which rows a rows-as-columns link should currently expose, and delivers them to `apply`.
+ *
+ * The rule is: the highlighted rows that pass the current filter, or if there are none, the filtered rows.
+ * (A highlight can include rows that are filtered out: it's saved with the view and restored independently of the
+ * filters, and nothing clears it when a filter changes.)
+ *
+ * `refresh()` should be called on any `filtered` or `data_highlighted` event. It deliberately reads the
+ * current state of the store rather than any event payload, so the result doesn't depend on the order in which the
+ * events arrive. The filtered rows come from a worker, so a result is dropped if `refresh()` has been called again
+ * in the meantime - the latest call always wins regardless of the order in which the async parts finish.
+ */
+export function createRowSelector(source: RowSource, apply: (rows: ArrayLike<number>) => void) {
+    let latest = 0;
+    let current: Promise<void> = Promise.resolve();
+    /** @returns a promise that resolves once the rows for the store's state at the latest call have been applied */
+    return function refresh() {
+        const id = ++latest;
+        const highlighted = source.getHighlightedData() ?? [];
+        const visible = highlighted.filter((i) => source.filterArray[i] === 0);
+        if (visible.length > 0) {
+            apply(visible);
+            current = Promise.resolve();
+            return current;
+        }
+        current = source.getFilteredIndices().then((filtered) => {
+            // superseded: whoever superseded us will apply their result; wait for that so that callers
+            // awaiting `refresh()` can rely on the link reflecting the final state.
+            if (id !== latest) return current;
+            apply(filtered);
+        });
+        return current;
+    };
+}
+
 /**
  * A given rows-as-columns `link` has a single listener; `observableFields` are subgroup-agnostic row picks.
  * Which matrix/subgroup those rows resolve to is chosen per {@link RowsAsColsQuery} (or per `FieldName` prefix in manual link mode).
@@ -498,69 +548,93 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
     const getField = (index: number) => {
         return new RAColumn(index);
     };
-    async function setFieldsFromFilter() {
-        //! this Array.from could be suboptimal for large numbers of indices
-        //at risk of overthinking, but we could have a lazy filteredIndices iterator...
-        const filteredIndices = await tds.getFilteredIndices();
-        const vals = Array.from(filteredIndices).map(getField);
+    //! this Array.from could be suboptimal for large numbers of indices
+    //at risk of overthinking, but we could have a lazy filteredIndices iterator...
+    const refreshFields = createRowSelector(tds, (rows) => {
+        // An event that leaves the rows as they were (a highlight announced again, a filter that excludes none of
+        // them) must not look like a change: everything observing the link would load and apply its fields again.
+        const current = link.observableFields;
+        if (current.length === rows.length && current.every((field, i) => field.index === rows[i])) return;
+        const vals = Array.from(rows).map(getField);
         runInAction(() => {
             link.observableFields = vals;
         });
-    }
-    //todo check link.name is a good id for the listener
-    tds.addListener(link.name, async (type, data) => {
-        if (type === "data_highlighted") {
-            // when highlight changes to empty, go back to showing 'filtered'
-            // would be nice to have a better type for data here.
-            if (data.indexes.length === 0) {
-                setFieldsFromFilter();
-                return;
+    });
+    // While a view is loading, the rows that pass the linked dataSource's filter are not the ones the view is
+    // going to show until that dataSource's charts have applied the filters saved with them (see
+    // viewFilterReadiness.ts). Until then the link exposes no rows at all, so that nothing observing it loads
+    // columns for - and draws - rows that are about to be filtered out; it then resolves once, to what is settled.
+    let held: Promise<void> | undefined;
+    const refresh = (): Promise<void> => {
+        if (cm.areViewFiltersApplied(tds.name)) return refreshFields();
+        if (!held) {
+            if (link.observableFields.length > 0) {
+                runInAction(() => {
+                    link.observableFields = [];
+                });
             }
-            const vals = data.indexes.map(getField);
-            runInAction(() => {
-                link.observableFields = vals;
+            held = cm.whenViewFiltersApplied(tds.name).then(() => {
+                held = undefined;
+                // (not `refreshFields`: another view may have started loading in the meantime)
+                return refresh();
             });
-        } else if (type === "filtered") {
-            // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
-            
-            setFieldsFromFilter();
+        }
+        return held;
+    };
+    let lastRefresh = Promise.resolve();
+    link.settled = () => lastRefresh;
+    link.refresh = () => {
+        lastRefresh = refresh();
+        return lastRefresh;
+    };
+    // both events mean "the answer to which rows we expose may have changed" - see createRowSelector
+    // The id has to be unique among the links *to* `tds`: several dataSources can link to it under the same link
+    // name (e.g. cells and a grid of spots, both to genes), and a listener added with an id that is already in
+    // use replaces the earlier one, which left every link but the last to initialise frozen on its first fields.
+    tds.addListener(`rows_as_columns:${ds.name}:${link.name}`, (type) => {
+        if (type === "data_highlighted" || type === "filtered") {
+            link.refresh?.();
         }
     });
     console.log("settings initial fields for link...", link);
-    runInAction(() => {
-        //initial population so sync callers will have something to work with
-        link.observableFields = [getField(0)];
-    });
-    await setFieldsFromFilter();
+    // if rows are highlighted this sets the fields before it returns; otherwise they follow from a worker
+    const initialised = link.refresh();
+    if (link.observableFields.length === 0 && !held) {
+        runInAction(() => {
+            //initial population so sync callers will have something to work with
+            link.observableFields = [getField(0)];
+        });
+    }
+    await initialised;
     console.log("link initialized", link);
 }
 export function getRowsAsColumnsLinks(dataStore: DataStore) {
     const dataSources = window.mdv.chartManager.dataSources;
     if (dataStore.links) {
-        const result = Object.keys(dataStore.links).map((linkedDsName) => {
-            if (!dataStore.links) throw "unreachable";
-            const links = dataStore.links[linkedDsName];
-            if (links.rows_as_columns) {
-                // first pass... there can be only one or zero.
-                // how often will users actually want to link multiple dataSources in this way?
-                // perhaps not often - but let's handle it so we don't have to change it later or have bugs.
-                // There are also multiple subgroups within a single linked dataSource - also important to support.
-                // UI should be simpler for the common case with a single linked dataSource/sg.
-                // Are there any crazy edge cases we should consider - like indirect links? links to self?
-                // !! this should be ok now, but we should test with multiple links.
-                const linkedDs = dataSources.find(
-                    (ds) => ds.name === linkedDsName,
-                );
-                if (!linkedDs) {
-                    throw new Error();
+        const result = Object.keys(dataStore.links)
+            .map((linkedDsName) => {
+                if (!dataStore.links) throw "unreachable";
+                const links = dataStore.links[linkedDsName];
+                if (links.rows_as_columns) {
+                    // first pass... there can be only one or zero.
+                    // how often will users actually want to link multiple dataSources in this way?
+                    // perhaps not often - but let's handle it so we don't have to change it later or have bugs.
+                    // There are also multiple subgroups within a single linked dataSource - also important to support.
+                    // UI should be simpler for the common case with a single linked dataSource/sg.
+                    // Are there any crazy edge cases we should consider - like indirect links? links to self?
+                    // !! this should be ok now, but we should test with multiple links.
+                    const linkedDs = dataSources.find((ds) => ds.name === linkedDsName);
+                    if (!linkedDs) {
+                        throw new Error();
+                    }
+                    // todo make sure the link is reasonably typed
+                    const link = links.rows_as_columns as RowsAsColslink;
+                    // we could be lazier about this, especially if we have a lot of links.
+                    initRacListener(link, dataStore, linkedDs.dataStore);
+                    return { linkedDs, link };
                 }
-                // todo make sure the link is reasonably typed
-                const link = links.rows_as_columns as RowsAsColslink;
-                // we could be lazier about this, especially if we have a lot of links.
-                initRacListener(link, dataStore, linkedDs.dataStore);
-                return { linkedDs, link };
-            }
-        }).filter(l => l !== undefined); //todo type-safety of filter
+            })
+            .filter((l) => l !== undefined); //todo type-safety of filter
         return result;
     }
     return [];

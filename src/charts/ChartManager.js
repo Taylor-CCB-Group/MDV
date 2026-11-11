@@ -1,43 +1,49 @@
-import {
-    createEl,
-    makeDraggable,
-    makeResizable,
-    MDVProgress,
-    removeDraggable,
-    removeResizable,
-    createMenuIcon,
-    splitPane,
-} from "../utilities/Elements";
-import BaseChart from "./BaseChart";
+import { csv, json, tsv } from "d3-fetch";
 import DataStore from "../datastore/DataStore.js";
-import CustomDialog from "./dialogs/CustomDialog.js";
 import { ContextMenu } from "../utilities/ContextMenu";
 import { BaseDialog } from "../utilities/Dialog.js";
+import {
+    createEl,
+    createMenuIcon,
+    MDVProgress,
+    makeDraggable,
+    makeResizable,
+    removeDraggable,
+    removeResizable,
+    splitPane,
+} from "../utilities/Elements";
 import { getRandomString } from "../utilities/Utilities";
-import { csv, tsv, json } from "d3-fetch";
+import BaseChart from "./BaseChart";
 import ColorPaletteWrapper from "./dialogs/ColorPaletteWrapper";
-import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
+import CustomDialog from "./dialogs/CustomDialog.js";
 // this is added as a side-effect of importing registerChartModules,
 // then we get the actual class from BaseDialog.experiment
 import FileUploadDialogReact from "./dialogs/FileUploadDialogWrapper";
+import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 
 // Chart and dialog type registrations via side-effect imports.
 import "./registerChartModules";
-import connectIPC from "../utilities/InterProcessCommunication";
-import { addChartLink } from "../links/link_utils";
-import popoutChart from "@/utilities/Popout";
-import { makeObservable, observable, action } from "mobx";
+import { action, makeObservable, observable } from "mobx";
 import { createElement } from "react";
-import { createMdvPortal } from "@/react/react_utils";
-import ViewManager from "./ViewManager";
+import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
-import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
-import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
-import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
-import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
+import { createMdvPortal } from "@/react/react_utils";
+import popoutChart from "@/utilities/Popout";
+import { addChartLink } from "../links/link_utils";
+import connectIPC from "../utilities/InterProcessCommunication";
+import { deserialiseParam, getConcreteFieldNames, withLoadedColumns } from "./chartConfigUtils";
+import AddChartDialogReact from "./dialogs/AddChartDialogReact";
+import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
+import ViewManager from "./ViewManager";
+import {
+    allSettledWithin,
+    linkCycleMembers,
+    STORED_FILTERS_TIMEOUT_MS,
+    ViewFilterReadiness,
+} from "./viewFilterReadiness";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -54,9 +60,7 @@ const column_orders = {
 
 class MissingColumnDataError extends Error {
     constructor(dataSource, missingColumns, requestedColumns) {
-        super(
-            `Failed to load required column data for datasource "${dataSource}": ${missingColumns.join(", ")}`,
-        );
+        super(`Failed to load required column data for datasource "${dataSource}": ${missingColumns.join(", ")}`);
         this.name = "MissingColumnDataError";
         this.dataSource = dataSource;
         this.missingColumns = missingColumns;
@@ -91,19 +95,15 @@ function getPreferredColorScheme() {
 }
 function listenPreferredColorScheme(callback) {
     if (window.matchMedia) {
-        const colorSchemeQuery = window.matchMedia(
-            "(prefers-color-scheme: dark)",
-        );
-        colorSchemeQuery.addEventListener("change", () =>
-            callback(getPreferredColorScheme()),
-        );
+        const colorSchemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+        colorSchemeQuery.addEventListener("change", () => callback(getPreferredColorScheme()));
     }
 }
 
 /**
-* The object to manage charts [Chart Manager](../../docs/extradocs/chartmanager.md)
-* 
-*/
+ * The object to manage charts [Chart Manager](../../docs/extradocs/chartmanager.md)
+ *
+ */
 export class ChartManager {
     validationFindings = new ValidationFindingsStore();
     /**
@@ -116,31 +116,27 @@ export class ChartManager {
      *   - viewLoader - The function that will load the each view  (not necessay if only one view)
      *   - rowDataLoader - (optional) an asunc function which is given the datasource name and row index
      *     returns unstructured data . A datasource's config requires row_data_loader:true to activate the loader
-     *   - files - specifies the files to load the data 
+     *   - files - specifies the files to load the data
      * @param {Object} config extra settings
      * @param {Object[]} [config.initialCharts] A list of chart configs to initially load if
      * no views are specified
-     * @param {string[]} [config.all_views] A list of views that can be loaded (a suitable 
+     * @param {string[]} [config.all_views] A list of views that can be loaded (a suitable
      * view loader is required to atually load the view)
      * @param {string} [config.current_view] the current view (only used with all views)
      * @param {string} [config.permission] the level of permission the user has. This just makes certain
      * options unavaliable. Any logic should be handled when a state_saved event is broadcast
      * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
-     * @param {boolean?} [config.chat_enabled] 
+     * @param {boolean?} [config.chat_enabled]
      * @param {string?} [config.mdv_api_root]
      * @param {boolean?} [config.show_gallery_on_open] whether to open the gallery view by default
      * @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
      * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
-     * 
+     *
      */
     constructor(div, dataSources, dataLoader, config = {}, listener = null) {
         if (!window.isSecureContext) {
-            alert(
-                "This application requires a secure context (https / localhost)",
-            );
-            throw new Error(
-                "This application requires a secure context (https / localhost)",
-            );
+            alert("This application requires a secure context (https / localhost)");
+            throw new Error("This application requires a secure context (https / localhost)");
         }
         // manage global singleton
         if (!window.mdv) {
@@ -148,9 +144,7 @@ export class ChartManager {
             window.mdv = {};
         }
         if (window.mdv.chartManager) {
-            console.warn(
-                "Making another ChartManager... had believed this to be a singleton",
-            );
+            console.warn("Making another ChartManager... had believed this to be a singleton");
         }
         window.mdv.chartManager = this;
 
@@ -210,8 +204,7 @@ export class ChartManager {
 
         //set up container and top(main menu)
         /** @type {HTMLElement} */
-        this.containerDiv =
-            typeof div === "string" ? document.getElementById(div) : div;
+        this.containerDiv = typeof div === "string" ? document.getElementById(div) : div;
         this.containerDiv.style.display = "flex";
         this.containerDiv.style.flexDirection = "column";
 
@@ -238,24 +231,24 @@ export class ChartManager {
         this.config = config;
 
         //!!! ChatMDV specific, but we really should be using websocket for other things
-        //let's have a think. we may have websocket, but not chat... 
+        //let's have a think. we may have websocket, but not chat...
         //we *do* anticipate finding out about chat with a similar mechanism (flag as part of state.json)
         //but websocket should be ubiquitous
         if (config.websocket) {
-            console.log('websocket is enabled');
+            console.log("websocket is enabled");
             const fn = async () => {
                 // previously, we were always calling connectIPC - but it was only relevant to earlier experiment with Unity
                 // and we had disabled websocket on server.
-                // started experimenting with socketio for chatMDV - mechanism is working, to an extent... 
+                // started experimenting with socketio for chatMDV - mechanism is working, to an extent...
                 // but actually, REST is probably best for this (maybe a protocol agnostic abstraction).
                 // try/catch doesn't help when it gets stuck in await...
                 // console.warn('websocket is not currently supported but used as flag for chat experiment - will be fixed very soon')
                 try {
                     const { socket, sendMessage } = await connectIPC(this);
-                    console.log('connected to socketio');
+                    console.log("connected to socketio");
                     this.ipc = { socket, sendMessage };
                 } catch (error) {
-                    console.error('Failed to connect to websocket', error);
+                    console.error("Failed to connect to websocket", error);
                 }
             };
             fn();
@@ -298,7 +291,6 @@ export class ChartManager {
 
         //add links and create gate manager for each datasource
         for (const ds of this.dataSources) {
-
             // Gate manager is created after initialising the config
             try {
                 getOrCreateGateManager(ds.dataStore);
@@ -311,31 +303,19 @@ export class ChartManager {
                 for (const ods in links) {
                     const _ods = this.dsIndex[ods].dataStore;
                     if (!_ods) {
-                        console.warn(
-                            `datasource ${ds.name} has link to non-existent datasource ${ods}`,
-                        );
+                        console.warn(`datasource ${ds.name} has link to non-existent datasource ${ods}`);
                         return;
                     }
                     // pjt: could there be cases where we want more than one of a given type of link between two data sources?
                     // if so, we can support that by making these functions undertand how to interpret the links object appropriately.
                     if (links[ods].interactions) {
-                        this._addInteractionLinks(
-                            ds.dataStore,
-                            _ods,
-                            links[ods].interactions,
-                        );
+                        this._addInteractionLinks(ds.dataStore, _ods, links[ods].interactions);
                     }
                     if (links[ods].valueset) {
-                        this._addValuesetLink(
-                            ds.dataStore,
-                            _ods,
-                            links[ods].valueset,
-                        );
+                        this._addValuesetLink(ds.dataStore, _ods, links[ods].valueset);
                     }
                     if (links[ods].column_pointer) {
-                        console.warn(
-                            "experimental column_pointer links not currently supported",
-                        );
+                        console.warn("experimental column_pointer links not currently supported");
                         // this._addColumnPointerLink(ds.dataStore, _ods,links[ods].column_pointer);
                     }
                 }
@@ -358,70 +338,37 @@ export class ChartManager {
             this._getColumnsAsync(ds.name, [link.source_column]),
             this._getColumnsAsync(ods.name, [link.dest_column]),
         ]).then(() => {
-            ds.addListener(
-                `${ds.name}-${ods.name}_valueset`,
-                async (type, data) => {
-                    // if the current view doesn't use the ods, don't bother filtering
-                    if (!this.viewData.dataSources[ods.name]) return;
-                    if (type === "filtered") {
-                        //`data` may be a (Range)Dimension (which has a `filterArray` property),
-                        //or 'undefined', or a string like "all_removed", or who knows what else...
-                        if (
-                            !data ||
-                            typeof data === "string" ||
-                            !data.filterArray
-                        ) {
-                            valuesetFilter.removeFilter();
-                            return;
-                        }
-                        await this._getColumnsAsync(ds.name, [
-                            link.source_column,
-                        ]);
-                        const resultSet = await data.getValueSet(
-                            link.source_column,
-                        );
-                        await this._getColumnsAsync(ods.name, [
-                            link.dest_column,
-                        ]);
-                        valuesetFilter.filter(
-                            "filterValueset",
-                            [link.dest_column],
-                            resultSet,
-                        );
-                    } else if (type === "data_highlighted") {
-                        // todo - review whether this whole valuesetLink is really relevant,
-                        // and if so whether to consider empty highlight logic here.
-                        await this._getColumnsAsync(ds.name, [
-                            link.source_column,
-                        ]);
-                        await this._getColumnsAsync(ods.name, [
-                            link.dest_column,
-                        ]);
-                        const { indexes } = data;
-                        if (isTextLike) {
-                            // given a set of indexes into the source column, get the corresponding values
-                            // the result should be a set of strings, and "filterValueset" will be responsible
-                            // for filtering the destination column based on those strings
-                            const resultSet = new Set(
-                                indexes.map(
-                                    (i) => srcCol.values[srcCol.data[i]],
-                                ),
-                            );
-                            valuesetFilter.filter(
-                                "filterValueset",
-                                [link.dest_column],
-                                resultSet,
-                            );
-                        } else {
-                            valuesetFilter.filter(
-                                "filterValueset",
-                                [link.dest_column],
-                                new Set(indexes),
-                            );
-                        }
+            ds.addListener(`${ds.name}-${ods.name}_valueset`, async (type, data) => {
+                // if the current view doesn't use the ods, don't bother filtering
+                if (!this.viewData.dataSources[ods.name]) return;
+                if (type === "filtered") {
+                    //`data` may be a (Range)Dimension (which has a `filterArray` property),
+                    //or 'undefined', or a string like "all_removed", or who knows what else...
+                    if (!data || typeof data === "string" || !data.filterArray) {
+                        valuesetFilter.removeFilter();
+                        return;
                     }
-                },
-            );
+                    await this._getColumnsAsync(ds.name, [link.source_column]);
+                    const resultSet = await data.getValueSet(link.source_column);
+                    await this._getColumnsAsync(ods.name, [link.dest_column]);
+                    valuesetFilter.filter("filterValueset", [link.dest_column], resultSet);
+                } else if (type === "data_highlighted") {
+                    // todo - review whether this whole valuesetLink is really relevant,
+                    // and if so whether to consider empty highlight logic here.
+                    await this._getColumnsAsync(ds.name, [link.source_column]);
+                    await this._getColumnsAsync(ods.name, [link.dest_column]);
+                    const { indexes } = data;
+                    if (isTextLike) {
+                        // given a set of indexes into the source column, get the corresponding values
+                        // the result should be a set of strings, and "filterValueset" will be responsible
+                        // for filtering the destination column based on those strings
+                        const resultSet = new Set(indexes.map((i) => srcCol.values[srcCol.data[i]]));
+                        valuesetFilter.filter("filterValueset", [link.dest_column], resultSet);
+                    } else {
+                        valuesetFilter.filter("filterValueset", [link.dest_column], new Set(indexes));
+                    }
+                }
+            });
         });
     }
 
@@ -440,34 +387,26 @@ export class ChartManager {
         // if (!targetChart) throw new Error(`No chart with id ${link.target_chart} found`);
 
         const isTextLike = srcCol.values; // perhaps 'unique' should also be considered text-like / valid?
-        if (!isTextLike)
-            throw new Error(
-                "Only text-like columns are supported for column pointer links",
-            );
-        ds.addListener(
-            `${ds.name}-${ods.name}_column_pointer`,
-            async (type, data) => {
-                //don't think we need mobx action as autoObservable is used
-                if (type === "data_highlighted") {
-                    const targetChart = this.charts[link.target_chart]?.chart;
-                    if (!targetChart) {
-                        console.log(
-                            `No chart with id ${link.target_chart} found - bypassing column pointer link`,
-                        );
-                        return;
-                    }
-                    await this._getColumnsAsync(ds.name, [link.source_column]);
-                    // data probably looks something like `{indexes: Array(1), source: undefined, data: null, dataStore: DataStore}`
-                    const { indexes } = data;
-                    const newValue = srcCol.values[srcCol.data[indexes[0]]];
-                    targetChart.config[link.target_property] = newValue;
-                    targetChart.setTitle(newValue); //could be optional - or use some kind of template?
-                    if (link.target_property === "color_by") {
-                        targetChart.colorByColumn(newValue);
-                    }
+        if (!isTextLike) throw new Error("Only text-like columns are supported for column pointer links");
+        ds.addListener(`${ds.name}-${ods.name}_column_pointer`, async (type, data) => {
+            //don't think we need mobx action as autoObservable is used
+            if (type === "data_highlighted") {
+                const targetChart = this.charts[link.target_chart]?.chart;
+                if (!targetChart) {
+                    console.log(`No chart with id ${link.target_chart} found - bypassing column pointer link`);
+                    return;
                 }
-            },
-        );
+                await this._getColumnsAsync(ds.name, [link.source_column]);
+                // data probably looks something like `{indexes: Array(1), source: undefined, data: null, dataStore: DataStore}`
+                const { indexes } = data;
+                const newValue = srcCol.values[srcCol.data[indexes[0]]];
+                targetChart.config[link.target_property] = newValue;
+                targetChart.setTitle(newValue); //could be optional - or use some kind of template?
+                if (link.target_property === "color_by") {
+                    targetChart.colorByColumn(newValue);
+                }
+            }
+        });
     }
 
     _addInteractionLinks(ds, ods, links) {
@@ -485,58 +424,35 @@ export class ChartManager {
                 { link_to: pc, col: pc },
             ],
         });
-        ds.addListener(
-            `${ds.name}-${ods.name}_interaction`,
-            async (type, data) => {
-                if (type === "data_highlighted") {
-                    //get the two interacting items plus pivot
-                    await this._getColumnsAsync(ds.name, [c1, c2, pc]);
-                    const info = ds.getRowAsObject(data.indexes[0], [
-                        c1,
-                        c2,
-                        pc,
-                    ]);
-                    //get pivot from the other datasource
-                    await this._getColumnsAsync(ods.name, [icols[2]]);
-                    //filter the two interacting items
-                    //would be nice if this could be maybe async / lazy / different ways of composing filters?
+        ds.addListener(`${ds.name}-${ods.name}_interaction`, async (type, data) => {
+            if (type === "data_highlighted") {
+                //get the two interacting items plus pivot
+                await this._getColumnsAsync(ds.name, [c1, c2, pc]);
+                const info = ds.getRowAsObject(data.indexes[0], [c1, c2, pc]);
+                //get pivot from the other datasource
+                await this._getColumnsAsync(ods.name, [icols[2]]);
+                //filter the two interacting items
+                //would be nice if this could be maybe async / lazy / different ways of composing filters?
 
-                    const args = [info[c1], info[c2]];
-                    // @ts-ignore should revisit this at some point
-                    args.operand = "and"; //force multitext to use "and"
+                const args = [info[c1], info[c2]];
+                // @ts-ignore should revisit this at some point
+                args.operand = "and"; //force multitext to use "and"
 
-                    interactionFilter.filter(
-                        "filterCategories",
-                        [icols[2]],
-                        args,
-                    );
-                    //show the region if not already displayed
-                    if (
-                        links.is_single_region &&
-                        ods.regions &&
-                        this.dsPanes[ods.name]
-                    ) {
-                        if (
-                            !this.getAllCharts(ods.name).find(
-                                (x) => x.config.region === info[pc],
-                            )
-                        ) {
-                            const conf = {
-                                type: "image_scatter_plot",
-                            };
-                            //add the default parameters
-                            BaseChart.types["image_scatter_plot"].init(
-                                conf,
-                                ods,
-                                { region: info[pc] },
-                            );
-                            //add the chart
-                            this.addChart(ods.name, conf);
-                        }
+                interactionFilter.filter("filterCategories", [icols[2]], args);
+                //show the region if not already displayed
+                if (links.is_single_region && ods.regions && this.dsPanes[ods.name]) {
+                    if (!this.getAllCharts(ods.name).find((x) => x.config.region === info[pc])) {
+                        const conf = {
+                            type: "image_scatter_plot",
+                        };
+                        //add the default parameters
+                        BaseChart.types["image_scatter_plot"].init(conf, ods, { region: info[pc] });
+                        //add the chart
+                        this.addChart(ods.name, conf);
                     }
                 }
-            },
-        );
+            }
+        });
     }
 
     _setUpChangeLayoutMenu(ds) {
@@ -574,15 +490,15 @@ export class ChartManager {
                 removeDraggable(div);
             });
         }
-        
+
         view.layout = type;
         //will add the appropriate layout depending on the current layout type
         this.getAllCharts(ds.name).forEach((x) => {
             //the chart is popped out so not subject to the layout manager
-            if (x.__doc__ !== document){
+            if (x.__doc__ !== document) {
                 return;
             }
-            this._makeChartRD(x, ds)
+            this._makeChartRD(x, ds);
         });
     }
 
@@ -702,20 +618,19 @@ export class ChartManager {
         //only one view hard coded in config
         //! This else block is not called, but if it is called at some point, make sure the state save works properly
         else {
-            this._init(config.only_view, firstTime)
-            .then(async () => {
-                    const state = this.getState();
-                    if (!state.view?.viewImage) {
-                        // todo: update the error handler function in future
-                        await this.viewManager.saveView((state) => {
-                            console.log("Error occurred: ", state.chartErrors);
-                            return false;
-                        });
-                    }
-                    // Open the view gallery on initial load if show_gallery_on_open is true
-                    if (firstTime && config.show_gallery_on_open) {
-                        this.viewManager.setShowGallery(true);
-                    }
+            this._init(config.only_view, firstTime).then(async () => {
+                const state = this.getState();
+                if (!state.view?.viewImage) {
+                    // todo: update the error handler function in future
+                    await this.viewManager.saveView((state) => {
+                        console.log("Error occurred: ", state.chartErrors);
+                        return false;
+                    });
+                }
+                // Open the view gallery on initial load if show_gallery_on_open is true
+                if (firstTime && config.show_gallery_on_open) {
+                    this.viewManager.setShowGallery(true);
+                }
             });
         }
     }
@@ -843,15 +758,9 @@ export class ChartManager {
                 }
                 for (const scc of ds.syncColumnColors) {
                     try {
-                        this._sync_colors(
-                            scc.columns,
-                            this.dsIndex[scc.dataSource].dataStore,
-                            ds,
-                        );
+                        this._sync_colors(scc.columns, this.dsIndex[scc.dataSource].dataStore, ds);
                     } catch (error) {
-                        console.warn(
-                            `error syncing colors for '${ds.name}' and '${scc.dataSource}'`,
-                        );
+                        console.warn(`error syncing colors for '${ds.name}' and '${scc.dataSource}'`);
                     }
                 }
             }
@@ -881,32 +790,35 @@ export class ChartManager {
         }
         //add charts - any columns will be added dynamically
         this._inInit = true;
+        // While the view loads, an active link is not resolved for a chart until the dataSource it links to has the
+        // filters saved with the view, which are applied by that dataSource's own charts - see viewFilterReadiness.ts
+        this._viewFilterReadiness?.abandon();
+        this._viewFilterReadiness = new ViewFilterReadiness(charts, linkCycleMembers(this._rowsAsColumnsLinkTargets()));
+        // links that are already set up drop the rows they had for the previous view, until the new one's are known
+        for (const ds of this.dataSources) {
+            for (const link of Object.values(ds.dataStore.links ?? {})) link.rows_as_columns?.refresh?.();
+        }
+        // Restore highlighted rows from view data (e.g. after loading or switching view) before any chart is added.
+        // Active links resolve to the highlighted rows, so a chart built before the highlight is known would
+        // resolve - and load columns for - whatever rows its link exposes without it, then change when it arrives.
+        this._restoreHighlights();
         const chartPromises = [];
         for (const ds in charts) {
             for (const ch of charts[ds]) {
+                this.viewManager.convertLegacyChartOnLoad(ds, ch);
                 chartPromises.push(this.addChart(ds, ch));
             }
         }
-        console.log('before await Promise.all(chartPromises);');
+        console.log("before await Promise.all(chartPromises);");
         await Promise.all(chartPromises);
         // it prints some "decorated loadColumnData method called" after this line...
         // is it ever with a value that would cause the chart.getConfig() to have a different result?
         // We are relying on the config being stable/settled when these promises resolve.
-        console.log('after await Promise.all(chartPromises);');
+        console.log("after await Promise.all(chartPromises);");
 
-        // Restore highlighted indices from view data (e.g. after loading or switching view)
-        // this should probably happen before chart init so that they have stable config when finished
-        for (const dsName of Object.keys(this.viewData.dataSources || {})) {
-            const spec = this.viewData.dataSources[dsName];
-            const highlight = spec?.highlight;
-            const dstore = this.dsIndex[dsName]?.dataStore;
-            if (!dstore?.dataHighlighted) continue;
-            if (Array.isArray(highlight) && highlight.length > 0) {
-                dstore.dataHighlighted(highlight, null);
-            } else {
-                dstore.dataHighlighted([], null);
-            }
-        }
+        // ... and announce the highlights again now that the charts exist: some only show a highlight in response
+        // to the event. (This doesn't change what active links resolve to, so nothing is loaded again.)
+        this._restoreHighlights();
 
         //this could be a time to _callListeners("view_loaded",this.currentView)
         //but I'm not going to interfere with the current logic
@@ -1020,10 +932,7 @@ export class ChartManager {
             }
         }
         if (config.background_filter) {
-            if (
-                config.background_filter.column &&
-                config.background_filter.column !== "__none__"
-            ) {
+            if (config.background_filter.column && config.background_filter.column !== "__none__") {
                 set.add(config.background_filter.column);
             }
         }
@@ -1073,10 +982,7 @@ export class ChartManager {
             for (let i = 0; i < data.length; i++) {
                 const row = data[i];
                 if (i + (1 % 100) === 0) {
-                    this.updateInfoAlert(
-                        iid,
-                        `processed ${i}/${data.length} rows`,
-                    );
+                    this.updateInfoAlert(iid, `processed ${i}/${data.length} rows`);
                 }
                 for (const col in cols) {
                     cols[col].push(row[col]);
@@ -1086,10 +992,7 @@ export class ChartManager {
             for (const col in cols) {
                 ds.setColumnData(col, cols[col]);
                 proc++;
-                this.updateInfoAlert(
-                    iid,
-                    `processed ${proc}/${all_cols.length} columns`,
-                );
+                this.updateInfoAlert(iid, `processed ${proc}/${all_cols.length} columns`);
             }
             this.updateInfoAlert(iid, "complete", { duration: 2000 });
             if (callback) {
@@ -1161,18 +1064,15 @@ export class ChartManager {
                 field: cl.field,
             };
             const numRows = dataStore.size;
-            
+
             // Add datatype-specific metadata required to reconstruct client-created columns on reload.
-            if (
-                (cl.datatype === "unique" || cl.datatype === "multitext") &&
-                cl.stringLength
-            ) {
+            if ((cl.datatype === "unique" || cl.datatype === "multitext") && cl.stringLength) {
                 md.stringLength = cl.stringLength;
             }
             if (cl.datatype === "multitext" && cl.delimiter) {
                 md.delimiter = cl.delimiter;
             }
-            
+
             let arr;
             if (cl.datatype === "unique") {
                 // For unique columns, convert Uint8Array to array of strings (expected by server)
@@ -1180,21 +1080,19 @@ export class ChartManager {
                 const stringLength = cl.stringLength;
 
                 if (!stringLength || typeof stringLength !== "number" || stringLength <= 0) {
-                    console.error(
-                        `Column ${c} has invalid or missing stringLength: ${stringLength}.`
-                    );
+                    console.error(`Column ${c} has invalid or missing stringLength: ${stringLength}.`);
                     // Fallback as empty values to keep it consistent with other columns
                     return { metadata: md, data: new Array(numRows).fill("") };
                 }
 
                 arr = new Array(numRows);
-                
+
                 for (let i = 0; i < numRows; i++) {
                     const baseIndex = i * stringLength;
 
                     if (!cl.data || baseIndex + stringLength > cl.data.length) {
                         throw new Error(
-                            `Invalid unique-column buffer for '${c}' at row ${i} (stringLength=${stringLength}).`
+                            `Invalid unique-column buffer for '${c}' at row ${i} (stringLength=${stringLength}).`,
                         );
                     }
 
@@ -1211,7 +1109,7 @@ export class ChartManager {
                     arr[i] = cl.data[i];
                 }
             }
-            
+
             return { metadata: md, data: arr };
         }
     }
@@ -1232,8 +1130,7 @@ export class ChartManager {
                 initialCharts[ds.name] = [];
                 const w = this.dsPanes[ds.name].style.width;
                 const re2 = /calc\((.+)\%.+/;
-                this.viewData.dataSources[ds.name].panelWidth =
-                    Number.parseFloat(w.match(re2)[1]);
+                this.viewData.dataSources[ds.name].panelWidth = Number.parseFloat(w.match(re2)[1]);
             }
 
             updatedColumns[ds.name] = this._getUpdatedColumns(ds.dataStore);
@@ -1242,10 +1139,7 @@ export class ChartManager {
             if (dstore.dirtyMetadata.size !== 0) {
                 metadata[ds.name] = {};
                 for (const param of dstore.dirtyMetadata) {
-                    metadata[ds.name][param] =
-                        param === "columns"
-                            ? dstore.getAllColumnsMetadata()
-                            : dstore[param];
+                    metadata[ds.name][param] = param === "columns" ? dstore.getAllColumnsMetadata() : dstore[param];
                 }
             }
         }
@@ -1259,15 +1153,13 @@ export class ChartManager {
                 const div = chart.getDiv();
                 const d = this.viewData.dataSources[chInfo.dataSource.name];
                 if (d?.layout === "gridstack") {
-                   //this is handled by gridstack now
+                    //this is handled by gridstack now
                 } else {
                     config.position = [div.offsetLeft, div.offsetTop];
                 }
                 initialCharts[chInfo.dataSource.name].push(config);
             } catch (error) {
-                console.error(
-                    `chart ${chid} failed to getConfig - ${error.message}`,
-                );
+                console.error(`chart ${chid} failed to getConfig - ${error.message}`);
                 chartErrors.push(error);
             }
         }
@@ -1280,7 +1172,9 @@ export class ChartManager {
             if (!view.dataSources[ds.name]) {
                 // not expecting that there should be any highlight data to save when the dataSource is not part of the view
                 if (h) {
-                    console.warn(`unexpected highlighted data for dataSource '${ds.name}' which is not part of current viewData`);
+                    console.warn(
+                        `unexpected highlighted data for dataSource '${ds.name}' which is not part of current viewData`,
+                    );
                 }
                 continue;
             }
@@ -1300,7 +1194,7 @@ export class ChartManager {
             metadata: metadata,
             //untested - what happens if we include this (including in what we save to server?)
             //could be useful... but I'm leaving it out now in case of unexpected issues.
-            chartErrors, 
+            chartErrors,
         };
     }
 
@@ -1329,9 +1223,7 @@ export class ChartManager {
     addMenuIcon(dataSource, icon, text, func, right = false) {
         const pos = dataSource === "_main" ? "bottom-right" : "bottom";
         const el =
-            dataSource === "_main"
-                ? right ? this.rightMenuBar : this.leftMenuBar
-                : this.dsIndex[dataSource].menuBar;
+            dataSource === "_main" ? (right ? this.rightMenuBar : this.leftMenuBar) : this.dsIndex[dataSource].menuBar;
         return createMenuIcon(
             icon,
             {
@@ -1366,12 +1258,7 @@ export class ChartManager {
             spinner = createEl(
                 "i",
                 {
-                    classes: [
-                        "fas",
-                        "fa-spinner",
-                        "fa-spin",
-                        "ciview-info-alert-spin",
-                    ],
+                    classes: ["fas", "fa-spinner", "fa-spin", "ciview-info-alert-spin"],
                 },
                 div,
             );
@@ -1476,10 +1363,7 @@ export class ChartManager {
             t.columns.push(col_list);
             col_list = [];
         }
-        t.alertID = this.createInfoAlert(
-            `Loading Columns:0/${columns.length}`,
-            { spinner: true },
-        );
+        t.alertID = this.createInfoAlert(`Loading Columns:0/${columns.length}`, { spinner: true });
         const max = Math.min(t.columns.length, threads);
 
         for (let n = 0; n < max; n++) {
@@ -1516,9 +1400,7 @@ export class ChartManager {
                 for (const col of resp) {
                     dataStore.setColumnData(col.field, col.data);
                 }
-                const missingColumns = columns.filter(
-                    (column) => !loadedFields.has(column.field),
-                );
+                const missingColumns = columns.filter((column) => !loadedFields.has(column.field));
                 if (missingColumns.length) {
                     console.error("Column data loader omitted requested columns", {
                         dataSource,
@@ -1574,29 +1456,19 @@ export class ChartManager {
                 const total = trans.columns.length;
                 const loaded = trans.columnsLoaded;
                 let all_loaded = loaded * col_list.length;
-                all_loaded =
-                    all_loaded > trans.totalColumns
-                        ? trans.totalColumns
-                        : all_loaded;
+                all_loaded = all_loaded > trans.totalColumns ? trans.totalColumns : all_loaded;
                 if (trans.failedColumns.length > 0) {
-                    this.updateInfoAlert(
-                        trans.alertID,
-                        `Failed to load ${trans.failedColumns.length} columns`,
-                        { type: "danger" },
-                    );
+                    this.updateInfoAlert(trans.alertID, `Failed to load ${trans.failedColumns.length} columns`, {
+                        type: "danger",
+                    });
                     // return;
                 } else {
-                    this.updateInfoAlert(
-                        trans.alertID,
-                        `Loading Columns:${all_loaded}/${trans.totalColumns}`,
-                    );
+                    this.updateInfoAlert(trans.alertID, `Loading Columns:${all_loaded}/${trans.totalColumns}`);
                 }
                 if (loaded >= total) {
-                    this.updateInfoAlert(
-                        trans.alertID,
-                        `Loaded ${total} column${total === 1 ? "" : "s"}`,
-                        { duration: 2000 },
-                    );
+                    this.updateInfoAlert(trans.alertID, `Loaded ${total} column${total === 1 ? "" : "s"}`, {
+                        duration: 2000,
+                    });
                     trans.callback(trans.failedColumns);
                     delete this.transactions[trans.id];
                 }
@@ -1770,7 +1642,7 @@ export class ChartManager {
                     iconElement.setAttribute("aria-label", "Exit Full Screen");
                     this.isFullscreen = true;
                 }
-             } else {
+            } else {
                 if (iconEl) {
                     iconEl.classList.remove("fa-compress");
                     iconEl.classList.add("fa-expand");
@@ -1779,7 +1651,6 @@ export class ChartManager {
                 this.isFullscreen = false;
             }
         });
-
     }
 
     /**
@@ -1813,6 +1684,59 @@ export class ChartManager {
         }
     }
 
+    /** For each dataSource, the dataSources it has rows-as-columns links to. */
+    _rowsAsColumnsLinkTargets() {
+        /** @type {Record<string, string[]>} */
+        const targets = {};
+        for (const ds of this.dataSources) {
+            const links = ds.dataStore.links ?? {};
+            targets[ds.name] = Object.keys(links).filter((name) => links[name].rows_as_columns);
+        }
+        return targets;
+    }
+
+    /**
+     * Whether `dataSource` has the filters saved with the current view: false while a view is loading and some
+     * of its charts on that dataSource have yet to apply theirs.
+     * @param {string} dataSource
+     */
+    areViewFiltersApplied(dataSource) {
+        return this._viewFilterReadiness?.isReady(dataSource) ?? true;
+    }
+
+    /**
+     * Resolves once the charts of a view that is loading have applied the filters saved with them to `dataSource`.
+     * Resolves straight away when no view is loading, or it has no charts on that dataSource.
+     * @param {string} dataSource
+     * @returns {Promise<void>}
+     */
+    whenViewFiltersApplied(dataSource) {
+        return this._viewFilterReadiness?.whenReady(dataSource) ?? Promise.resolve();
+    }
+
+    /**
+     * Resolves once a newly added chart has applied the filters saved in its config - including any that are
+     * evaluated on a worker - to its dataStore.
+     */
+    async _whenStoredFiltersApplied(chart) {
+        await chart.storedFilters.whenApplied();
+        const pending = chart.dataStore.dimensions.map((d) => d.pendingFilter).filter(Boolean);
+        // a worker that neither answers nor raises an error must not stop the chart, and so the view, from loading
+        if (!(await allSettledWithin(pending, STORED_FILTERS_TIMEOUT_MS))) {
+            console.warn(`Filters on '${chart.dataStore.name}' did not land in time for chart '${chart.config.id}'`);
+        }
+    }
+
+    /** Sets each dataSource's highlighted rows to those saved with the current view (none, if it saved none). */
+    _restoreHighlights() {
+        for (const dsName of Object.keys(this.viewData.dataSources || {})) {
+            const highlight = this.viewData.dataSources[dsName]?.highlight;
+            const dstore = this.dsIndex[dsName]?.dataStore;
+            if (!dstore?.dataHighlighted) continue;
+            dstore.dataHighlighted(Array.isArray(highlight) ? [...highlight] : [], null);
+        }
+    }
+
     /**
      * Adds a chart to the app. Returns asyncronously when needed columns have loaded and the chart has been added
      * (will reject if there is an error)
@@ -1826,10 +1750,10 @@ export class ChartManager {
             await ensureLazyChartTypeRegistered(config.type);
         }
         if (!BaseChart.types[config.type]) {
-            this.createInfoAlert(
-                `Tried to add unknown chart type '${config.type}'`,
-                { type: "danger", duration: 2000 },
-            );
+            this.createInfoAlert(`Tried to add unknown chart type '${config.type}'`, {
+                type: "danger",
+                duration: 2000,
+            });
             throw `Unknown chart type ${config.type}`;
         }
         if (typeof config.param === "string") {
@@ -1848,14 +1772,8 @@ export class ChartManager {
         ) {
             const l = config.location;
             const b = 5;
-            config.size = [
-                l.width * 90 + l.width * b - b,
-                l.height * 40 + l.height * b - b,
-            ];
-            config.position = [
-                (l.x + 1) * b + l.x * 90,
-                (l.y + 1) * b + l.y * 40,
-            ];
+            config.size = [l.width * 90 + l.width * b - b, l.height * 40 + l.height * b - b];
+            config.position = [(l.x + 1) * b + l.x * 90, (l.y + 1) * b + l.y * 40];
         }
         //**convert legacy data***********
         const ds = this.dsIndex[dataSource];
@@ -1919,7 +1837,8 @@ export class ChartManager {
             // - other charts wanting to use similar neededCols end up not having data?
             // links should be initialised here as well...
             await this._getColumnsAsync(dataSource, neededCols);
-            await this._addChart(dataSource, config, div, notify);
+            const chart = await this._addChart(dataSource, config, div, notify);
+            await this._whenStoredFiltersApplied(chart);
         } catch (error) {
             console.error("Failed to add chart", {
                 chartId: config.id,
@@ -1947,27 +1866,29 @@ export class ChartManager {
                 },
                 div,
             );
-            const errorObj = error instanceof Error ? 
-                error 
-                :
-                typeof(error) === "string" ?
-                    { message: error }
-                    :
-                    { message: "An error occurred while creating the chart" };
-            createMdvPortal(createElement(ErrorComponentReactWrapper, {
-                error: errorObj,
-                height,
-                width,
-                extraMetaData: {
-                    config,
-                    dataSource,
-                    neededColumns: neededCols,
-                    ...(error instanceof MissingColumnDataError && {
-                        missingColumns: error.missingColumns,
-                        requestedColumns: error.requestedColumns,
-                    }),
-                },
-            }), debugNode);
+            const errorObj =
+                error instanceof Error
+                    ? error
+                    : typeof error === "string"
+                      ? { message: error }
+                      : { message: "An error occurred while creating the chart" };
+            createMdvPortal(
+                createElement(ErrorComponentReactWrapper, {
+                    error: errorObj,
+                    height,
+                    width,
+                    extraMetaData: {
+                        config,
+                        dataSource,
+                        neededColumns: neededCols,
+                        ...(error instanceof MissingColumnDataError && {
+                            missingColumns: error.missingColumns,
+                            requestedColumns: error.requestedColumns,
+                        }),
+                    },
+                }),
+                debugNode,
+            );
             const closeButtonContainer = createEl(
                 "div",
                 {
@@ -1975,9 +1896,9 @@ export class ChartManager {
                         position: "absolute",
                         top: "10px",
                         right: "10px",
-                    }
+                    },
                 },
-                div
+                div,
             );
 
             createMenuIcon(
@@ -1999,21 +1920,17 @@ export class ChartManager {
                     },
                 },
                 closeButtonContainer,
-            )
+            );
             //not rethrowing doesn't help recovering from missing data in other charts.
             //throw new Error(error); //probably not a great way to handle this
         } finally {
+            // whether it has applied its filters or failed to load, this chart is no longer a reason to wait
+            this._viewFilterReadiness?.settle(dataSource, config);
             this._markInitialChartLoadComplete(config);
         }
     }
 
-    _getColumnsFromOtherSource(
-        dataSource,
-        otherDataSource,
-        columns,
-        indexCol,
-        func,
-    ) {
+    _getColumnsFromOtherSource(dataSource, otherDataSource, columns, indexCol, func) {
         this._getColumnsThen(otherDataSource, columns.concat(indexCol), () => {
             const ds = this.dsIndex[dataSource].dataStore;
             const ods = this.dsIndex[otherDataSource].dataStore;
@@ -2033,11 +1950,8 @@ export class ChartManager {
                     c1.quantiles = c2.quantiles;
                 }
 
-                const buf = new SharedArrayBuffer(
-                    ds.size * (c1.datatype === "text" ? 1 : 4),
-                );
-                const arrType =
-                    c1.datatype === "text" ? Uint8Array : Float32Array;
+                const buf = new SharedArrayBuffer(ds.size * (c1.datatype === "text" ? 1 : 4));
+                const arrType = c1.datatype === "text" ? Uint8Array : Float32Array;
                 return {
                     col: x,
                     data: buf,
@@ -2086,12 +2000,11 @@ export class ChartManager {
         // there could be links as well as column `fields` in columns.
         // let's make a mechanism for awaiting the link - and initial linked cols.
         const ds = this.dsIndex[dataSource].dataStore;
-        const links = columns.map((c) => deserialiseParam(ds, c)).filter(c => typeof c !== 'string');
-        const linkPromises = links.map(link => link.initialize());
+        const links = columns.map((c) => deserialiseParam(ds, c)).filter((c) => typeof c !== "string");
+        const linkPromises = links.map((link) => link.initialize());
         await Promise.all(linkPromises);
-        const linkedFields = links.flatMap(link => link.fields);
+        const linkedFields = links.flatMap((link) => link.fields);
         const allColumns = columns.concat(linkedFields);
-        
 
         // let's add some error handling here...
         const result = await new Promise((resolve) => {
@@ -2147,19 +2060,9 @@ export class ChartManager {
                         //get index column
                         this._getColumnsThen(dataSource, [link.index], () => {
                             //then get all the other columns
-                            this._getColumnsFromOtherSource(
-                                dataSource,
-                                ods,
-                                otherCols,
-                                link.index,
-                                () => {
-                                    this._getColumnsThen(
-                                        dataSource,
-                                        thisCols,
-                                        func,
-                                    );
-                                },
-                            );
+                            this._getColumnsFromOtherSource(dataSource, ods, otherCols, link.index, () => {
+                                this._getColumnsThen(dataSource, thisCols, func);
+                            });
                         });
                         return;
                     }
@@ -2180,9 +2083,7 @@ export class ChartManager {
             }
             const col = dStore.columnIndex[fieldKey];
             if (!col) {
-                const metadata = dStore
-                    .getAllColumnsMetadata?.()
-                    .find((column) => column.field === fieldKey);
+                const metadata = dStore.getAllColumnsMetadata?.().find((column) => column.field === fieldKey);
                 // Soft-deleted table columns can temporarily disappear from columnIndex while
                 // stale chart reactions still ask for them. Restore real datasource columns
                 // from metadata first, and only use addColumnFromField() for true virtual
@@ -2209,10 +2110,7 @@ export class ChartManager {
         else {
             this.loadColumnSet(reqCols, dataSource, (failedColumns = []) => {
                 if (failedColumns.length) {
-                    console.warn(
-                        "got columns with some failures",
-                        failedColumns,
-                    );
+                    console.warn("got columns with some failures", failedColumns);
                 }
                 this._haveColumnsLoaded(columns, dataSource, func);
             });
@@ -2236,10 +2134,7 @@ export class ChartManager {
     _haveColumnsLoaded(neededCols, dataSource, func) {
         const dStore = this.dsIndex[dataSource].dataStore;
         for (const col of neededCols) {
-            const key =
-                typeof col === "string"
-                    ? this._resolveToDataStoreFieldKey(dStore, col)
-                    : col;
+            const key = typeof col === "string" ? this._resolveToDataStoreFieldKey(dStore, col) : col;
             if (this.columnsLoading[dataSource][key]) {
                 setTimeout(() => {
                     this._haveColumnsLoaded(neededCols, dataSource, func);
@@ -2253,38 +2148,39 @@ export class ChartManager {
     async _addChart(dataSource, config, div, notify = false) {
         //**convert legacy data***********
         const ds = this.dsIndex[dataSource];
-        div.innerHTML = "";
-        div.style.display = "";
-        div.style.alignItems = "";
-        div.style.justifyContent = "";
         const chartType = BaseChart.types[config.type];
         // sometimes the constructor doesn't understand active link, but chart.setParams() does...
-        // it somewhat appears to work if we first manifest concrete field names, 
+        // it somewhat appears to work if we first manifest concrete field names,
         // then set the real params in a setTimeout()...
         // but we're resorting to setTimeout for a few things and it's going to be hard to manage...
         // are we sure that this timeout will happen after the one that instruments decorators etc?
-        // seems dodgy to rely on setTimeout order. 
+        // seems dodgy to rely on setTimeout order.
         // *We now have chart.deferredInit() for this purpose*
         // As long as the order in which these methods are called, this should allow us to at least
         // assert that the initialisation is complete before we consider the chart (and ultimately the view) to be loaded.
         // Also setParams() itself *should* always work - but depends on the chart implementation,
         // and not all charts implement that.
-        const originalParam = config.param.map(p => deserialiseParam(ds, p));
-        let fields = originalParam.flatMap(getConcreteFieldNames);
-        if (originalParam.some(p => typeof p !== 'string')) {
-            // Linked fields can change while loading (e.g. the linked datasource's initial filter
-            // is applied), and some constructors read column data synchronously.
-            for (let attempt = 0; attempt < 3; attempt++) {
-                await this._getColumnsAsync(dataSource, fields);
-                const resolved = originalParam.flatMap(getConcreteFieldNames);
-                if (resolved.join() === fields.join()) break;
-                fields = resolved;
-            }
-        }
-        config.param = fields;
-        const chart = new chartType.class(ds.dataStore, div, config);
-        if (originalParam.some(p => typeof p !== 'string')) {
-            console.log('setting param with active queries in timeout');
+        // Active-link queries resolve to whichever columns the linked filter currently selects, which can change
+        // while columns are loading (addChart() loaded the fields as they were then). The chart is constructed in
+        // the same synchronous run as the check that everything its config refers to is loaded.
+        const { chart, originalParam } = await withLoadedColumns(
+            ds.dataStore,
+            () => this._getColumnsRequiredForChart(config),
+            (fields) => this._getMissingColumnData(dataSource, fields),
+            (specs) => this._getColumnsAsync(dataSource, specs),
+            () => {
+                // the div shows a spinner until this point
+                div.innerHTML = "";
+                div.style.display = "";
+                div.style.alignItems = "";
+                div.style.justifyContent = "";
+                const originalParam = config.param.map((p) => deserialiseParam(ds.dataStore, p));
+                config.param = originalParam.flatMap(getConcreteFieldNames);
+                return { chart: new chartType.class(ds.dataStore, div, config), originalParam };
+            },
+        );
+        if (originalParam.some((p) => typeof p !== "string")) {
+            console.log("setting param with active queries in timeout");
             chart.deferredInit(() => {
                 chart.setParams(originalParam);
             });
@@ -2295,24 +2191,18 @@ export class ChartManager {
         };
         this._makeChartRD(chart, ds);
         // @ts-ignore
-        chart.popoutIcon = chart.addMenuIcon(
-            "fas fa-external-link-alt",
-            "popout",
-            {
-                func: () => {
-                    this._popOutChart(chart);
-                },
+        chart.popoutIcon = chart.addMenuIcon("fas fa-external-link-alt", "popout", {
+            func: () => {
+                this._popOutChart(chart);
             },
-        );
-        chart
-            .addMenuIcon("fas fa-times", "remove chart")
-            .addEventListener("click", () => {
-                chart.remove();
-                div.remove();
-                delete this.charts[chart.config.id];
-                this._removeLinks(chart);
-                this._callListeners("chart_removed", chart);
-            });
+        });
+        chart.addMenuIcon("fas fa-times", "remove chart").addEventListener("click", () => {
+            chart.remove();
+            div.remove();
+            delete this.charts[chart.config.id];
+            this._removeLinks(chart);
+            this._callListeners("chart_removed", chart);
+        });
 
         // @ts-ignore
         if (chart.setupLinks) {
@@ -2325,11 +2215,7 @@ export class ChartManager {
                 );
             }
             for (const lnk of ds.dataStore.accessOtherDataStore) {
-                this._giveChartAccess(
-                    chart,
-                    this.dsIndex[lnk.dataSource].dataStore,
-                    lnk.index,
-                );
+                this._giveChartAccess(chart, this.dsIndex[lnk.dataSource].dataStore, lnk.index);
             }
         }
 
@@ -2343,11 +2229,7 @@ export class ChartManager {
                 this._getColumnsThen(cll.dataSource, columns, callback);
             };
             // @ts-ignore
-            chart.createColumnLinks(
-                this.dsIndex[cll.dataSource].dataStore,
-                cll.columns,
-                func,
-            );
+            chart.createColumnLinks(this.dsIndex[cll.dataSource].dataStore, cll.columns, func);
         }
 
         await chart.deferredInitsReady();
@@ -2395,9 +2277,7 @@ export class ChartManager {
             // some other types of link may be interpreted within chart code (e.g. react effect does "view_state")
             case "color_by_column":
                 link.set_color = true;
-                console.warn(
-                    "legacy color_by_column link type - use chart_columnval_link with set_color=true instead",
-                );
+                console.warn("legacy color_by_column link type - use chart_columnval_link with set_color=true instead");
                 addChartLink(link, this);
                 break;
             case "chart_columnval_link":
@@ -2431,11 +2311,7 @@ export class ChartManager {
                     }
                 }
             } catch (error) {
-                console.error(
-                    `Error removing links for chart '${cid}'`,
-                    error,
-                    link,
-                );
+                console.error(`Error removing links for chart '${cid}'`, error, link);
             }
         }
         for (const i of linksToRemove) {
@@ -2562,17 +2438,13 @@ export class ChartManager {
     }
 
     /**
-     * @param {BaseChart} chart 
+     * @param {BaseChart} chart
      * @param {import("@/charts/charts").DataSource} ds
      */
     _makeChartRD(chart, ds) {
         //if (!ds) console.error(`_makeChartRD called without ds - resize / drag etc may not work properly`);
         //^^ actually doesn't make much difference to non-gridStack in practice.
-        if (
-            ds &&
-            this.gridStack &&
-            this.viewData.dataSources[ds.name]?.layout === "gridstack"
-        ) {
+        if (ds && this.gridStack && this.viewData.dataSources[ds.name]?.layout === "gridstack") {
             this.gridStack.manageChart(chart, ds, this._inInit);
             return;
         }

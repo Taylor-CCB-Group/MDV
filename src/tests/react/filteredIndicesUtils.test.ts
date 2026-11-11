@@ -1,5 +1,5 @@
-import { shouldRefreshFilteredIndices } from "@/react/filteredIndicesUtils";
 import { describe, expect, test } from "vitest";
+import { shouldRefreshFilteredIndices } from "@/react/filteredIndicesUtils";
 
 describe("shouldRefreshFilteredIndices", () => {
     test("refreshes for datastore events that invalidate filtered indices", () => {

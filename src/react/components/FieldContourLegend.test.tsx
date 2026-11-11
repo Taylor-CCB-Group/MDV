@@ -5,7 +5,14 @@ import FieldContourLegend, { type CategoryLegendItem, type FieldLegendItem } fro
 const fields: FieldLegendItem[] = [{ name: "CD3", field: "cd3", color: [10, 20, 30] }];
 const categories: CategoryLegendItem[] = [
     { id: "contour1", name: "T cell", colors: [[255, 0, 0]] },
-    { id: "contour2", name: "B cell, NK", colors: [[0, 0, 0], [255, 255, 255]] },
+    {
+        id: "contour2",
+        name: "B cell, NK",
+        colors: [
+            [0, 0, 0],
+            [255, 255, 255],
+        ],
+    },
 ];
 
 describe("FieldContourLegend", () => {

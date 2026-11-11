@@ -5,15 +5,8 @@ type RemarkNode = {
     value?: string;
 };
 
-function isHeadingNode(
-    node: RemarkNode | undefined,
-): node is RemarkNode & { depth: number; children: RemarkNode[] } {
-    return Boolean(
-        node &&
-            node.type === "heading" &&
-            typeof node.depth === "number" &&
-            Array.isArray(node.children),
-    );
+function isHeadingNode(node: RemarkNode | undefined): node is RemarkNode & { depth: number; children: RemarkNode[] } {
+    return Boolean(node && node.type === "heading" && typeof node.depth === "number" && Array.isArray(node.children));
 }
 
 function htmlNode(value: string): RemarkNode {
@@ -64,20 +57,12 @@ export function transformNodesForCollapsibleHeadings(nodes: RemarkNode[]) {
 
         const sectionEnd = findSectionEnd(nodes, index + 1, node.depth);
         const summaryText = textFromNode(node).trim() || `Section ${index + 1}`;
-        const sectionChildren = transformNodesForCollapsibleHeadings(
-            nodes.slice(index + 1, sectionEnd),
-        );
+        const sectionChildren = transformNodesForCollapsibleHeadings(nodes.slice(index + 1, sectionEnd));
 
         transformed.push(
-            htmlNode(
-                `<details open class="mdv-textbox-section mdv-textbox-section-depth-${node.depth}">`,
-            ),
+            htmlNode(`<details open class="mdv-textbox-section mdv-textbox-section-depth-${node.depth}">`),
         );
-        transformed.push(
-            htmlNode(
-                `<summary class="mdv-textbox-summary">${escapeHtml(summaryText)}</summary>`,
-            ),
-        );
+        transformed.push(htmlNode(`<summary class="mdv-textbox-summary">${escapeHtml(summaryText)}</summary>`));
         transformed.push(...sectionChildren);
         transformed.push(htmlNode("</details>"));
 

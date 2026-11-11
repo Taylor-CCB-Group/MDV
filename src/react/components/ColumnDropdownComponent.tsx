@@ -1,17 +1,17 @@
-import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
-import { useDataStore } from "../context";
-import type { DataColumn, DataType } from "@/charts/charts";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { observer } from "mobx-react-lite";
-import { Autocomplete, Box, Button, Checkbox, Chip, Divider, Paper, type PaperProps } from "@mui/material";
-import { isArray } from "@/lib/utils";
-import { TextFieldExtended } from "./TextFieldExtended";
-import Grid from '@mui/material/Grid2';
-import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
+import { Autocomplete, Box, Button, Checkbox, Chip, Divider, Paper, type PaperProps } from "@mui/material";
+import Grid from "@mui/material/Grid2";
+import { observer } from "mobx-react-lite";
+import { useCallback, useMemo, useRef, useState } from "react";
+import type { DataColumn, DataType } from "@/charts/charts";
+import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
+import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
+import { isArray } from "@/lib/utils";
+import { useDataStore } from "../context";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { getSelectableColumns } from "./columnDropdownUtils";
+import { TextFieldExtended } from "./TextFieldExtended";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -28,27 +28,15 @@ function isMultiColProp<T extends CTypes, M extends boolean>(p: ColumnSelectionP
 }
 
 const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: ColumnSelectionProps<T, M>) => {
-
     const props = inferGenericColumnSelectionProps(gProps);
-    const {
-        setSelectedColumn,
-        clearSelectedColumn,
-        placeholder,
-        type,
-        current_value,
-        optional,
-    } = props;
-    
+    const { setSelectedColumn, clearSelectedColumn, placeholder, type, current_value, optional } = props;
+
     const isMultiType = isMultiColProp(props);
-    // are we sure that props.dataStore will be right 
+    // are we sure that props.dataStore will be right
     // - are there any inconsistencies between this and the current DataStoreContext?
     const dataStore = useDataStore(props.dataStore);
     // todo column groups
-    const columns: DataColumn<DataType>[] = getSelectableColumns(
-        dataStore.columns,
-        type,
-        props.exclude,
-    );
+    const columns: DataColumn<DataType>[] = getSelectableColumns(dataStore.columns, type, props.exclude);
 
     // todo allow "None" if optional
 
@@ -59,9 +47,9 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
                 console.error("Expected array - this should be unreachable (minor)");
                 return [];
             }
-            return columns.filter(c => current_value.includes(c.field));
+            return columns.filter((c) => current_value.includes(c.field));
         } else {
-            return columns.find(c => c.field === current_value) ?? null;
+            return columns.find((c) => c.field === current_value) ?? null;
         }
     }, [current_value, columns, isMultiType]);
 
@@ -70,34 +58,32 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
             return (v: DataColumn<DataType>[]) => {
                 if (!isArray(v)) throw new Error("Expected array - this should be unreachable");
                 //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
-                setSelectedColumn(v.map(c => c.field));
-            }
+                setSelectedColumn(v.map((c) => c.field));
+            };
         } else {
             return (v: DataColumn<DataType>) => {
                 if (isMultiType) throw new Error("Unexpected single column value for multi column dropdown");
                 //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
                 setSelectedColumn(v.field);
-            }
+            };
         }
     }, [setSelectedColumn, isMultiType]);
 
-    const clearValue =
-        optional && !isMultiType && clearSelectedColumn
-            ? clearSelectedColumn
-            : undefined;
+    const clearValue = optional && !isMultiType && clearSelectedColumn ? clearSelectedColumn : undefined;
 
-    return {placeholder, type, isMultiType, columns, value, setValue, clearValue};
-
+    return { placeholder, type, isMultiType, columns, value, setValue, clearValue };
 };
 
 /**
  * A component for selecting columns from the data store.
  * Depending on the type, this may be a single column or multiple columns, but for the purposes of this component,
- * it will only need to understand columns originating from 
+ * it will only need to understand columns originating from
  */
 const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(gProps: ColumnSelectionProps<T, M>) => {
     const { placeholder, isMultiType, columns, value, setValue, clearValue } = useColumnDropdownValue(gProps);
-    const [selectAll, setSelectAll] = useState(isMultiType && isArray(value) ? columns.length === value?.length : false);
+    const [selectAll, setSelectAll] = useState(
+        isMultiType && isArray(value) ? columns.length === value?.length : false,
+    );
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
 
@@ -125,16 +111,19 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
         }
     }, [selectAll, setValue, columns, isMultiType]);
 
-    const handleValueChange = useCallback((newValue: DataColumn<DataType> | DataColumn<DataType>[] | null) => {
-        if (!newValue) {
-            return;
-        }
-        if (isMultiType) {
-            (setValue as (v: DataColumn<DataType>[]) => void)(newValue as DataColumn<DataType>[]);
-        } else {
-            (setValue as (v: DataColumn<DataType>) => void)(newValue as DataColumn<DataType>)
-        }
-    }, [isMultiType, setValue]);
+    const handleValueChange = useCallback(
+        (newValue: DataColumn<DataType> | DataColumn<DataType>[] | null) => {
+            if (!newValue) {
+                return;
+            }
+            if (isMultiType) {
+                (setValue as (v: DataColumn<DataType>[]) => void)(newValue as DataColumn<DataType>[]);
+            } else {
+                (setValue as (v: DataColumn<DataType>) => void)(newValue as DataColumn<DataType>);
+            }
+        },
+        [isMultiType, setValue],
+    );
 
     // Paste handler
     const handlePaste = usePasteHandler({
@@ -145,12 +134,12 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
         getLabel: (column: DataColumn<DataType>) => column.name,
         getValue: (column: DataColumn<DataType>) => column,
     });
-    
+
     return (
         <Grid className="w-full items-center" container>
             <Grid className={"grow"}>
                 <Autocomplete
-                    //! A future use-case can be that the columns will be added at runtime, but MUI's autocomplete has an existing issue. Refer: https://github.com/mui/material-ui/issues/29508 
+                    //! A future use-case can be that the columns will be added at runtime, but MUI's autocomplete has an existing issue. Refer: https://github.com/mui/material-ui/issues/29508
                     className="w-full"
                     options={columns}
                     multiple={isMultiType}
@@ -188,13 +177,12 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                                 slotProps={{
                                     input: {
                                         ...InputProps,
-                                        
+
                                         onPaste: handlePaste,
-                                    }
+                                    },
                                 }}
                             />
                         );
-                        
                     }}
                     renderTags={(value, getTagProps) => {
                         // custom logic to limit the tags, this is required because we are overriding the way tags are rendered
@@ -212,13 +200,8 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                             >
                                 {displayed.map((option, index) => {
                                     const { key, ...tagProps } = getTagProps({ index });
-                                    return (
-                                    <Chip
-                                        key={key}
-                                        label={option.name}
-                                        {...tagProps}
-                                    />
-                                )})}
+                                    return <Chip key={key} label={option.name} {...tagProps} />;
+                                })}
                                 {remaining > 0 && <Chip label={`+${remaining}`} />}
                             </Box>
                         );
@@ -244,13 +227,15 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                                     {column.name}
                                     <em className="opacity-40 ml-2">({datatype})</em>
                                 </li>
-                            );    
+                            );
                         }
                         return (
-                            <li key={key} {...p}
-                            onClick={(e) => {
-                                p.onClick?.(e);
-                            }}
+                            <li
+                                key={key}
+                                {...p}
+                                onClick={(e) => {
+                                    p.onClick?.(e);
+                                }}
                             >
                                 {column.name}
                                 <em className="opacity-40 ml-2">({datatype})</em>
@@ -258,27 +243,27 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                         );
                     }}
                     // biome-ignore lint/correctness/useExhaustiveDependencies: not including handleSelectAll because it rerenders the paper component
-                    PaperComponent={useMemo(() => (paperProps: PaperProps) => {
-                        const { children, ...restPaperProps } = paperProps;
-                        return (
-                          <Paper {...restPaperProps}>
-                            {isMultiType &&
-                            (<>
-                                <Box
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    py={1}
-                                    px={2}
-                                >
-                                    <Button onClick={handleSelectAll} color="inherit" fullWidth>
-                                        {selectAll ? "Unselect All" : "Select All"}
-                                    </Button>
-                                </Box>
-                                <Divider />
-                            </>)}
-                            {children}
-                          </Paper>
-                        );
-                      }, [isMultiType, selectAll])}
+                    PaperComponent={useMemo(
+                        () => (paperProps: PaperProps) => {
+                            const { children, ...restPaperProps } = paperProps;
+                            return (
+                                <Paper {...restPaperProps}>
+                                    {isMultiType && (
+                                        <>
+                                            <Box onMouseDown={(e) => e.preventDefault()} py={1} px={2}>
+                                                <Button onClick={handleSelectAll} color="inherit" fullWidth>
+                                                    {selectAll ? "Unselect All" : "Select All"}
+                                                </Button>
+                                            </Box>
+                                            <Divider />
+                                        </>
+                                    )}
+                                    {children}
+                                </Paper>
+                            );
+                        },
+                        [isMultiType, selectAll],
+                    )}
                 />
             </Grid>
         </Grid>

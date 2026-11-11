@@ -2,8 +2,8 @@ import { createRoot } from "react-dom/client";
 import Dashboard from "./Dashboard";
 import "./catalog_index.css";
 import { CustomThemeProvider } from "@/ThemeProvider";
-import { PermissionsProvider } from "./PermissionsContext";
 import { offerOwnTabIfFramed } from "@/utils/ownTabNotice";
+import { PermissionsProvider } from "./PermissionsContext";
 
 offerOwnTabIfFramed();
 

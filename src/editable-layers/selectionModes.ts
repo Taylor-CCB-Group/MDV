@@ -1,17 +1,20 @@
 import {
+    type ClickEvent,
+    CompositeMode,
+    DrawPolygonByDraggingMode,
     DrawPolygonMode,
+    type EditAction,
+    type Feature,
+    type FeatureCollection,
+    type GeoJsonEditMode,
+    getPickedEditHandle,
+    type ModeProps,
     ModifyMode,
+    type SimpleFeature,
+    type SimpleFeatureCollection,
     // DrawRectangleMode,
     // TransformMode,
     TranslateMode,
-    CompositeMode,
-    DrawPolygonByDraggingMode,
-    getPickedEditHandle,
-    type ClickEvent,
-    type FeatureCollection,
-    type GeoJsonEditMode,
-    type ModeProps,
-    type SimpleFeatureCollection,
 } from "@deck.gl-community/editable-layers";
 import { DrawRectangleByDraggingMode } from "./deck-community-ish/draw-rectangle-by-dragging-mode";
 
@@ -64,10 +67,7 @@ class DrawSelectionPolygonMode extends DrawPolygonMode {
 
 export class EditMode extends CompositeMode {
     constructor() {
-        super(compositeModes([
-            new TranslateMode(),
-            new ModifyMode(),
-        ]));
+        super(compositeModes([new TranslateMode(), new ModifyMode()]));
     }
 
     /**
@@ -81,31 +81,61 @@ export class EditMode extends CompositeMode {
 
 export class RectangleMode extends SelectionCompositeMode {
     constructor() {
-        super(compositeModes([
-            // we pass in modeProps to the layer, not the edit mode.
-            // new DrawRectangleMode(), //with modeConfig: { dragToDraw: true }
-            //our version, which we shouldn't need but looks/works a bit different as of now
-            new DrawRectangleByDraggingMode(),
-            new TranslateMode(),
-        ]));
+        super(
+            compositeModes([
+                // we pass in modeProps to the layer, not the edit mode.
+                // new DrawRectangleMode(), //with modeConfig: { dragToDraw: true }
+                //our version, which we shouldn't need but looks/works a bit different as of now
+                new DrawRectangleByDraggingMode(),
+                new TranslateMode(),
+            ]),
+        );
     }
 }
 
 export class PolygonMode extends SelectionCompositeMode {
     constructor() {
-        super(compositeModes([
-            new DrawSelectionPolygonMode(),
-            new TranslateMode(),
-        ]));
+        super(compositeModes([new DrawSelectionPolygonMode(), new TranslateMode()]));
     }
 }
 
 // todo - figure out weird conflict behaviour with this mode...
 export class FreehandMode extends SelectionCompositeMode {
     constructor() {
-        super(compositeModes([
-            new DrawPolygonByDraggingMode(),
-            new TranslateMode(),
-        ]));
+        super(compositeModes([new DrawPolygonByDraggingMode(), new TranslateMode()]));
     }
+}
+
+/**
+ * Edits that editable-layers emits with `updatedData: props.data`: they only change the drawing in
+ * progress, which the layer keeps in its mode and redraws itself (`setNeedsUpdate`).
+ *
+ * They must not be written back as the selection. The layer is given a new selection only when
+ * React re-renders, so `props.data` can still be the previous selection - a hover move straight
+ * after finishing a shape (`updateTentativeFeature` fires on every pointer move) would put it back.
+ */
+const NON_DATA_EDIT_TYPES: ReadonlySet<string> = new Set([
+    "updateTentativeFeature",
+    "addTentativePosition",
+    "cancelFeature",
+    "invalidPolygon",
+    "invalidHole",
+]);
+
+function isSimpleFeature(feature: Feature | undefined): feature is SimpleFeature {
+    // GeoJSON allows a null geometry, which a persisted selection could carry
+    return feature?.geometry != null && feature.geometry.type !== "GeometryCollection";
+}
+
+/**
+ * The selection an edit from the selection layer leaves, or `null` if it doesn't change it.
+ * The selection holds one shape: the last feature of the edited collection.
+ */
+export function selectionFromEdit({
+    editType,
+    updatedData,
+}: EditAction<FeatureCollection>): SimpleFeatureCollection | null {
+    if (NON_DATA_EDIT_TYPES.has(editType)) return null;
+    const feature = updatedData.features.at(-1);
+    return { ...updatedData, features: isSimpleFeature(feature) ? [feature] : [] };
 }

@@ -1,9 +1,4 @@
-export type DeckOverlayId =
-    | "grey_scatter"
-    | "scatter"
-    | "gate_display"
-    | "selection"
-    | "gate_labels";
+export type DeckOverlayId = "grey_scatter" | "scatter" | "gate_display" | "selection" | "gate_labels";
 
 export const DECK_OVERLAY_IDS: DeckOverlayId[] = [
     "grey_scatter",

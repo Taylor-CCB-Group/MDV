@@ -1,15 +1,17 @@
 import { observer } from "mobx-react-lite";
-import { BaseDialog } from "../../utilities/Dialog";
-import type { VivMDVReact } from "./VivMDVReact";
-import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
-import Gui from "./ColorChannelComponents";
+import { BaseDialog } from "../../utilities/Dialog";
+import { createEl } from "../../utilities/ElementsTyped";
 import { ChartProvider } from "../context";
 import type { VivContextType } from "./avivatorish/state";
+import Gui from "./ColorChannelComponents";
+import type { VivMDVReact } from "./VivMDVReact";
 
 const ColorChannelDialogReact = observer(function ColorChannelDialogReact({
     vivStores,
-}: { vivStores: VivContextType }) {
+}: {
+    vivStores: VivContextType;
+}) {
     return <Gui vivStores={vivStores} />;
 });
 
@@ -24,10 +26,7 @@ class ColorDialogReactWrapper extends BaseDialog {
         this._root = v;
     }
     constructor(parent: VivMDVReact) {
-        if (parent.__doc__ !== document)
-            console.warn(
-                "ColorDialogReactWrapper may have styling issues in popouts...",
-            );
+        if (parent.__doc__ !== document) console.warn("ColorDialogReactWrapper may have styling issues in popouts...");
         const config = {
             width: 500,
             title: `Color Channels (${parent.config.title})`,
@@ -56,10 +55,7 @@ class ColorDialogReactWrapper extends BaseDialog {
         // I don't think there's any 'this' weirdness going on here...
         // some kind of react voodoo?
         if (this.root) this.root.unmount();
-        else
-            console.warn(
-                "not unmounting react root for dialog because of weirdness",
-            );
+        else console.warn("not unmounting react root for dialog because of weirdness");
     }
 }
 

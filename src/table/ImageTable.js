@@ -27,13 +27,12 @@ class ImageTable {
         //and is not just the folder- need to remove trailing slash
         //Although clunky this allows integer columns to represent the img
         //eg. 1 becomes /images/im1.png
-        
-        this.base_url = getProjectURL(config.base_url)
+
+        this.base_url = getProjectURL(config.base_url);
         if (!config.base_url.endsWith("/")) {
             this.base_url = this.base_url.replace(/\/+$/, "");
         }
-        
-      
+
         this.parent = parent_div;
         this.selected_tiles = {};
 
@@ -107,9 +106,7 @@ class ImageTable {
             this.preferred_height = this.img_height = im.height;
             if (config.initial_image_width) {
                 this.preferred_width = config.initial_image_width;
-                this.preferred_height = Math.round(
-                    (this.preferred_width / this.img_width) * this.img_height,
-                );
+                this.preferred_height = Math.round((this.preferred_width / this.img_width) * this.img_height);
             }
             this._resize();
         };
@@ -203,19 +200,12 @@ class ImageTable {
 
     keyPressed(e) {
         if (e.which === 39 || e.which === 40) {
-            if (
-                this.last_index_clicked ===
-                this.data_view.getFilteredItems().length - 1
-            ) {
+            if (this.last_index_clicked === this.data_view.getFilteredItems().length - 1) {
                 return;
             }
             if (this.last_index_clicked || this.last_index_clicked === 0) {
                 this.last_index_clicked++;
-                this.setSelectedTiles(
-                    [this.data_view.getItem(this.last_index_clicked).id],
-                    false,
-                    true,
-                );
+                this.setSelectedTiles([this.data_view.getItem(this.last_index_clicked).id], false, true);
                 if (this.last_index_clicked > this.getLastTileInView()) {
                     this.show(this.last_index_clicked);
                 }
@@ -226,11 +216,7 @@ class ImageTable {
             }
             if (this.last_index_clicked) {
                 this.last_index_clicked--;
-                this.setSelectedTiles(
-                    [this.data_view.getItem(this.last_index_clicked).id],
-                    false,
-                    true,
-                );
+                this.setSelectedTiles([this.data_view.getItem(this.last_index_clicked).id], false, true);
                 if (this.last_index_clicked < this.getFirstTileInView()) {
                     this.show(this.last_index_clicked);
                 }
@@ -259,10 +245,7 @@ class ImageTable {
     }
 
     setImageWidth(width, redraw) {
-        this.setImageDimensions(
-            [width, Math.round((width / this.img_width) * this.img_height)],
-            redraw,
-        );
+        this.setImageDimensions([width, Math.round((width / this.img_width) * this.img_height)], redraw);
     }
 
     setImageLabel(col) {
@@ -288,40 +271,27 @@ class ImageTable {
             this.preferred_height = dim[1];
         }
 
-        if (
-            this.width < this.preferred_width + this.lrm * 2 &&
-            this.width !== 0
-        ) {
+        if (this.width < this.preferred_width + this.lrm * 2 && this.width !== 0) {
             dim[0] = this.width - this.lrm * 3;
             this.num_per_row = 1;
         } else {
-            this.num_per_row = Math.ceil(
-                (this.width - this.lrm) / (this.preferred_width + this.lrm),
-            );
-            dim[0] =
-                Math.floor((this.width - 2 * this.lrm) / this.num_per_row) -
-                this.lrm;
+            this.num_per_row = Math.ceil((this.width - this.lrm) / (this.preferred_width + this.lrm));
+            dim[0] = Math.floor((this.width - 2 * this.lrm) / this.num_per_row) - this.lrm;
         }
-        dim[1] = Math.round(
-            (dim[0] / this.preferred_width) * this.preferred_height,
-        );
+        dim[1] = Math.round((dim[0] / this.preferred_width) * this.preferred_height);
 
         if (this.config.image_label) {
             this.label_size = Math.round(dim[1] / 12);
             this.label_size = Math.max(this.label_size, 12);
             //need to fit label in
-            this.tbm =
-                this.tbm < this.label_size + 4 ? this.label_size + 4 : this.tbm;
+            this.tbm = this.tbm < this.label_size + 4 ? this.label_size + 4 : this.tbm;
         }
 
         this.tile_width = Number.parseInt(dim[0]) + this.lrm;
         this.tile_height = Number.parseInt(dim[1]) + this.tbm;
         this.t_width = Number.parseInt(dim[0]);
         this.t_height = Number.parseInt(dim[1]);
-        const end_row = Math.floor(
-            (this.height + this.cache_size * this.tile_height) /
-                this.tile_height,
-        );
+        const end_row = Math.floor((this.height + this.cache_size * this.tile_height) / this.tile_height);
         this.max_difference = end_row + this.cache_size;
         if (redraw) {
             this.show(ft);
@@ -358,37 +328,24 @@ class ImageTable {
     }
 
     _setCanvasHeight() {
-        const h =
-            Math.ceil(this.data_view.getLength() / this.num_per_row) *
-                this.tile_height +
-            this.tbm;
+        const h = Math.ceil(this.data_view.getLength() / this.num_per_row) * this.tile_height + this.tbm;
         this.canvas.style.height = `${h}px`;
     }
 
     _hasScrolled() {
         clearTimeout(this.scroll_timeout);
         const s_top = this.view_port.scrollTop;
-        let begin_row = Math.floor(
-            (s_top - this.cache_size * this.tile_height) / this.tile_height,
-        );
-        const end_row = Math.floor(
-            (s_top + this.height + this.cache_size * this.tile_height) /
-                this.tile_height,
-        );
+        let begin_row = Math.floor((s_top - this.cache_size * this.tile_height) / this.tile_height);
+        const end_row = Math.floor((s_top + this.height + this.cache_size * this.tile_height) / this.tile_height);
         if (begin_row < 0) {
             begin_row = 0;
         }
         let elapse = 10;
-        if (
-            Math.abs(begin_row - this.row_displayed_first) > this.max_difference
-        ) {
+        if (Math.abs(begin_row - this.row_displayed_first) > this.max_difference) {
             elapse = 50;
         }
         this.scroll_timeout = setTimeout(() => {
-            if (
-                Math.abs(begin_row - this.row_displayed_first) >
-                this.max_difference
-            ) {
+            if (Math.abs(begin_row - this.row_displayed_first) > this.max_difference) {
                 this.render(begin_row, end_row, true);
             } else {
                 this.render(begin_row, end_row);
@@ -454,21 +411,14 @@ class ImageTable {
         }
         let s_top = 0;
         if (first_tile_index || first_tile_index === 0) {
-            s_top =
-                Math.floor(first_tile_index / this.num_per_row) *
-                this.tile_height;
+            s_top = Math.floor(first_tile_index / this.num_per_row) * this.tile_height;
         } else {
             s_top = this.view_port.scrollTop;
         }
         const bb = this.view_port.getBoundingClientRect();
         const height = bb.height;
-        let begin_row = Math.floor(
-            (s_top - this.cache_size * this.tile_height) / this.tile_height,
-        );
-        const end_row = Math.floor(
-            (s_top + height + this.cache_size * this.tile_height) /
-                this.tile_height,
-        );
+        let begin_row = Math.floor((s_top - this.cache_size * this.tile_height) / this.tile_height);
+        const end_row = Math.floor((s_top + height + this.cache_size * this.tile_height) / this.tile_height);
         if (begin_row < 0) {
             begin_row = 0;
         }
@@ -481,9 +431,7 @@ class ImageTable {
     setSelectedTiles(ids, append, propagate) {
         if (!append) {
             for (const id in this.selected_tiles) {
-                const t = this.__doc__.getElementById(
-                    `mlvtile-${this.domId}-${id}`,
-                );
+                const t = this.__doc__.getElementById(`mlvtile-${this.domId}-${id}`);
                 if (t) {
                     t.style.border = this.selected_tiles[id];
                 }
@@ -491,9 +439,7 @@ class ImageTable {
             this.selected_tiles = {};
         }
         for (const id of ids) {
-            const tile = this.__doc__.getElementById(
-                `mlvtile-${this.domId}-${id}`,
-            );
+            const tile = this.__doc__.getElementById(`mlvtile-${this.domId}-${id}`);
             if (tile) {
                 this.selected_tiles[id] = tile.style.border;
                 tile.style.border = "4px solid goldenrod";
@@ -510,9 +456,7 @@ class ImageTable {
     scrollToTile(index, select) {
         const pos = this.data_view.data.indexOf(index);
         const obj = this._calculateTopBottomRow(pos);
-        if (
-            Math.abs(obj.top - this.row_displayed_first) > this.max_difference
-        ) {
+        if (Math.abs(obj.top - this.row_displayed_first) > this.max_difference) {
             this.render(obj.top, obj.bottom, true);
         } else {
             this.render(obj.top, obj.bottom);
@@ -560,17 +504,14 @@ class ImageTable {
         const type = this.config.image_type;
         // looking for something to provide a default name; "Gene" is ok for ytrap...
         const titleColumn = this.config.image_title || "Gene";
-        const hasTitleColumn =
-            this.data_view.dataStore.columnIndex[titleColumn] !== undefined;
+        const hasTitleColumn = this.data_view.dataStore.columnIndex[titleColumn] !== undefined;
         for (let i = st; i < en; i++) {
             const id = this.data_view.getId(i);
             if (id == null) {
                 return;
             }
             const image = this.data_view.getItemField(i, this.config.image_key);
-            const text = hasTitleColumn
-                ? `${titleColumn} '${this.data_view.getItemField(i, titleColumn)}'`
-                : image;
+            const text = hasTitleColumn ? `${titleColumn} '${this.data_view.getItemField(i, titleColumn)}'` : image;
             const missing = image === "missing";
             const left = x * this.tile_width + this.lrm;
             x++;
@@ -592,11 +533,7 @@ class ImageTable {
                                 backgroundColor: color,
                                 opacity: this.color_overlay,
                             },
-                            classes: [
-                                "mlv-tile",
-                                `mlv-tile-overlay-${this.domId}`,
-                                `mlv-tile-${this.domId}-${row}`,
-                            ], //this class used to remove rows no longer in view
+                            classes: ["mlv-tile", `mlv-tile-overlay-${this.domId}`, `mlv-tile-${this.domId}-${row}`], //this class used to remove rows no longer in view
                         },
                         this.canvas,
                     );
@@ -624,11 +561,9 @@ class ImageTable {
                     alt: text,
                     title: text,
                     crossorigin: "",
-                    classes: [
-                        "mlv-tile",
-                        `mlv-tile-${this.domId}`,
-                        `mlv-tile-${this.domId}-${row}`,
-                    ].concat(extra_classes),
+                    classes: ["mlv-tile", `mlv-tile-${this.domId}`, `mlv-tile-${this.domId}-${row}`].concat(
+                        extra_classes,
+                    ),
                 },
                 this.canvas,
             );

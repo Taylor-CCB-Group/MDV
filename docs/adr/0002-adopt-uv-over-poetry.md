@@ -50,6 +50,6 @@ ourselves.
 - **`ruff` is a runtime dependency, not dev-only** (see ADR-0001 / proposal §4): the chat
   feature shells out to `ruff check` to lint generated code, so it lives in the `app` extra
   **and** the `dev` group (the latter for `make lint`/`make format`).
-- The `[tool.uv] required-version` is an **exact** pin (`==`), which makes every small uv
-  drift fail `uv lock`/`uv sync`. Flagged as a follow-up (consider `>=x,<y`); not changed
-  here since it came in with #472.
+- The `[tool.uv] required-version` was originally an **exact** pin (`==`), which made every
+  small uv drift fail `uv lock`/`uv sync`. It is now a minimum (`>=`); CI and Docker install
+  the latest uv.

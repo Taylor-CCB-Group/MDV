@@ -1,14 +1,14 @@
+import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { LoadedDataColumn } from "@/charts/charts";
+import { truncateWithEllipsis } from "@/utilities/Utilities";
+import { getVivId } from "../components/avivatorish/MDVivViewer";
+import type { DeckScatterConfigWithRegion } from "../components/DeckScatterReactWrapper";
+import { computeCentroid, DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
 import { useGateManager } from "../gates/useGateManager";
 import { useChartID, useConfig, useParamColumns } from "../hooks";
-import type { LoadedDataColumn } from "@/charts/charts";
-import { computeCentroid, DEFAULT_GATE_COLOR, getRelevantGates } from "../gates/gateUtils";
-import type { DeckScatterConfigWithRegion } from "../components/DeckScatterReactWrapper";
-import { GeoJsonLayer, TextLayer } from "deck.gl";
-import { getVivId } from "../components/avivatorish/MDVivViewer";
 import { useSpatialLayers } from "../spatial_context";
 import useGateActions from "./useGateActions";
-import { truncateWithEllipsis } from "@/utilities/Utilities";
 
 const MAX_LABEL_LENGTH = 18;
 
@@ -130,7 +130,7 @@ const useGateLayers = () => {
                 // Set teh dragging id and drag position state
                 draggingIdRef.current = pickingInfo.object.gateId;
                 setDraggingId(pickingInfo.object.gateId);
-                const startPos: [number, number] = [pickingInfo.coordinate[0], pickingInfo.coordinate[1]]
+                const startPos: [number, number] = [pickingInfo.coordinate[0], pickingInfo.coordinate[1]];
                 dragPosRef.current = startPos;
                 setDragPos(startPos);
                 return true;

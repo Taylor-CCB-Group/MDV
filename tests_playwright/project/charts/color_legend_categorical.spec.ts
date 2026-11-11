@@ -15,8 +15,8 @@ import {
 } from "../../utils/helpers";
 import {
     createTemporaryProjectViaSyntheticAnndata,
-    waitForProjectReady,
     type SyntheticAnndataTemporaryProjectHandle,
+    waitForProjectReady,
 } from "../../utils/projectFixtures";
 
 async function clickColorLegendItem(page: Page, chartTitle: string, label: string) {
@@ -24,12 +24,7 @@ async function clickColorLegendItem(page: Page, chartTitle: string, label: strin
     await legend.locator("svg g").filter({ hasText: label }).first().click();
 }
 
-async function getColorLegendFilterRuntimeState(
-    page: Page,
-    chartTitle: string,
-    column: string,
-    value: string,
-) {
+async function getColorLegendFilterRuntimeState(page: Page, chartTitle: string, column: string, value: string) {
     return await page.evaluate(
         ({ title, columnName, categoryValue }) => {
             const chartManager = (window as any).mdv?.chartManager;
@@ -73,9 +68,7 @@ test.describe("Color legend categorical", () => {
         );
     });
 
-    test("categorical legend visibility, labels, drag, and persistence after save reload", async ({
-        page,
-    }) => {
+    test("categorical legend visibility, labels, drag, and persistence after save reload", async ({ page }) => {
         const scatterTitle = `Scatter Color Legend ${Date.now()}`;
 
         let handle: SyntheticAnndataTemporaryProjectHandle | undefined;

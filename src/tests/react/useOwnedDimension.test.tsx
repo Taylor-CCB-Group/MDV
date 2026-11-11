@@ -1,8 +1,8 @@
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import DataStore from "@/datastore/DataStore";
 import RangeDimension from "@/datastore/RangeDimension";
 import { useRangeDimension2D } from "@/react/hooks";
-import { act, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const mockUseDataStore = vi.fn();
 

@@ -1,14 +1,14 @@
 import * as d3 from "d3";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTheme } from "../hooks";
+import { formatDateDays } from "@/lib/dateFormat";
 import {
-    createBrushScale,
-    useBrushX,
     type BrushXConfig,
     type BrushXScaleType,
+    createBrushScale,
     type Range,
+    useBrushX,
 } from "@/react/components/histogram/useBrushX";
-import { formatDateDays } from "@/lib/dateFormat";
+import { useTheme } from "../hooks";
 
 export type HistogramScaleType = BrushXScaleType;
 export type HistogramBrushConfig = BrushXConfig;
@@ -58,11 +58,7 @@ type HistogramWidgetProps = {
 const formatNumericBrushValue = d3.format(".4~g");
 
 /** Brush chip text for a numeric or calendar-date histogram range. */
-export function formatHistogramBrushRange(
-    start: number,
-    end: number,
-    isDate = false,
-): string {
+export function formatHistogramBrushRange(start: number, end: number, isDate = false): string {
     const lo = start <= end ? start : end;
     const hi = start <= end ? end : start;
     if (isDate) {
@@ -89,9 +85,7 @@ export default function HistogramWidget({
     const containerRef = useRef<HTMLDivElement>(null);
     const ref = useRef<SVGSVGElement>(null);
     const dark = useTheme() === "dark";
-    const [isVisible, setIsVisible] = useState(
-        typeof IntersectionObserver === "undefined",
-    );
+    const [isVisible, setIsVisible] = useState(typeof IntersectionObserver === "undefined");
     const [hasTriggeredCallback, setHasTriggeredCallback] = useState(false);
 
     useEffect(() => {
@@ -110,11 +104,14 @@ export default function HistogramWidget({
             onVisibleOnce();
             return;
         }
-        const observer = new IntersectionObserver((entries) => {
-            if (!entries[0]?.isIntersecting || hasTriggeredCallback) return;
-            setHasTriggeredCallback(true);
-            onVisibleOnce();
-        }, { rootMargin });
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (!entries[0]?.isIntersecting || hasTriggeredCallback) return;
+                setHasTriggeredCallback(true);
+                onVisibleOnce();
+            },
+            { rootMargin },
+        );
         observer.observe(containerRef.current);
         return () => observer.disconnect();
     }, [onVisibleOnce, hasTriggeredCallback, rootMargin]);
@@ -126,15 +123,9 @@ export default function HistogramWidget({
             y: -2,
         },
         style: {
-            selectionFill: dark
-                ? "rgba(255, 255, 255, 0.08)"
-                : "rgba(15, 23, 42, 0.08)",
-            selectionStroke: dark
-                ? "rgba(229, 231, 235, 0.95)"
-                : "rgba(15, 23, 42, 0.7)",
-            handleFill: dark
-                ? "rgba(229, 231, 235, 0.92)"
-                : "rgba(15, 23, 42, 0.88)",
+            selectionFill: dark ? "rgba(255, 255, 255, 0.08)" : "rgba(15, 23, 42, 0.08)",
+            selectionStroke: dark ? "rgba(229, 231, 235, 0.95)" : "rgba(15, 23, 42, 0.7)",
+            handleFill: dark ? "rgba(229, 231, 235, 0.92)" : "rgba(15, 23, 42, 0.88)",
         },
     });
 
@@ -145,16 +136,9 @@ export default function HistogramWidget({
     );
     const maxValue = Math.max(1, ...visibleLayers.flatMap((layer) => layer.data));
     const xDomain = brush?.minMax ?? ([0, bins] as Range);
-    const xScale = useMemo(
-        () => createBrushScale(xScaleType, xDomain, [0, width]),
-        [width, xDomain, xScaleType],
-    );
+    const xScale = useMemo(() => createBrushScale(xScaleType, xDomain, [0, width]), [width, xDomain, xScaleType]);
     const yScale = useMemo(
-        () =>
-            createBrushScale(yScaleType, [0, maxValue], [
-                height - padding,
-                padding,
-            ]),
+        () => createBrushScale(yScaleType, [0, maxValue], [height - padding, padding]),
         [height, maxValue, yScaleType],
     );
 
@@ -163,24 +147,26 @@ export default function HistogramWidget({
         if (binEdges && binEdges.length === bins + 1) {
             return binEdges;
         }
-        return Array.from({ length: bins + 1 }, (_, index) =>
-            xDomain[0] + ((xDomain[1] - xDomain[0]) * index) / bins,
-        );
+        return Array.from({ length: bins + 1 }, (_, index) => xDomain[0] + ((xDomain[1] - xDomain[0]) * index) / bins);
     }, [binEdges, bins, isVisible, xDomain]);
 
-    const createBars = useCallback((data: number[]) => data.map((count, index) => {
-        const startValue = resolvedBinEdges[index];
-        const endValue = resolvedBinEdges[index + 1];
-        const x0 = xScale(startValue);
-        const x1 = xScale(endValue);
-        const y = yScale(count);
-        return {
-            x: Math.min(x0, x1),
-            y,
-            width: Math.max(0.5, Math.abs(x1 - x0)),
-            height: Math.max(0, height - padding - y),
-        };
-    }), [height, resolvedBinEdges, xScale, yScale]);
+    const createBars = useCallback(
+        (data: number[]) =>
+            data.map((count, index) => {
+                const startValue = resolvedBinEdges[index];
+                const endValue = resolvedBinEdges[index + 1];
+                const x0 = xScale(startValue);
+                const x1 = xScale(endValue);
+                const y = yScale(count);
+                return {
+                    x: Math.min(x0, x1),
+                    y,
+                    width: Math.max(0.5, Math.abs(x1 - x0)),
+                    height: Math.max(0, height - padding - y),
+                };
+            }),
+        [height, resolvedBinEdges, xScale, yScale],
+    );
 
     const brushValueLabel = useMemo(() => {
         if (!brush?.value) return null;
@@ -254,8 +240,9 @@ export default function HistogramWidget({
                         }
                         if (layer.variant === "line") {
                             const points = bars
-                                .map((bar, index) =>
-                                    `${bar.x + bar.width / 2},${layer.data[index] === 0 ? height - padding : bar.y}`,
+                                .map(
+                                    (bar, index) =>
+                                        `${bar.x + bar.width / 2},${layer.data[index] === 0 ? height - padding : bar.y}`,
                                 )
                                 .join(" ");
                             return (

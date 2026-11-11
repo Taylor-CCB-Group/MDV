@@ -1,6 +1,6 @@
-import { type BrowserSetting, browserSettings } from "@/lib/browserSettings";
 import { FormControl, FormHelperText, InputLabel, MenuItem, Select, Typography } from "@mui/material";
 import { observer } from "mobx-react-lite";
+import { type BrowserSetting, browserSettings } from "@/lib/browserSettings";
 
 const ChoiceSettingControl = observer(function ChoiceSettingControl({ setting }: { setting: BrowserSetting }) {
     const labelId = `browser-setting-${setting.key}`;

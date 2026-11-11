@@ -27,11 +27,7 @@ describe("orderSerializedTableParams", () => {
             initialize: async () => undefined,
         };
 
-        const result = orderSerializedTableParams(
-            [runtimeQuery, "age"],
-            [serializedQuery, "age"],
-            ["age"],
-        );
+        const result = orderSerializedTableParams([runtimeQuery, "age"], [serializedQuery, "age"], ["age"]);
 
         expect(result).toEqual([serializedQuery, "age"]);
     });

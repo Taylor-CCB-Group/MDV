@@ -1,12 +1,12 @@
-import { fetchJsonConfig } from "@/dataloaders/DataLoaderUtil";
-import { useProject } from "@/modules/ProjectContext";
-import { Autocomplete, IconButton, TextField } from "@mui/material";
 import { PriorityHigh as PriorityHighIcon } from "@mui/icons-material";
+import { Autocomplete, IconButton, TextField } from "@mui/material";
 import { observer } from "mobx-react-lite";
 import { useEffect, useState } from "react";
-import { useChartManager, useViewManager } from "../hooks";
 import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import { fetchJsonConfig } from "@/dataloaders/DataLoaderUtil";
+import { useProject } from "@/modules/ProjectContext";
+import { useChartManager, useViewManager } from "../hooks";
 
 export type DropdownType = {
     options: string[];
@@ -73,7 +73,7 @@ const ViewSelectorDropdown = observer(() => {
 
     const options = viewManager.all_views;
     const [dirty, setDirty] = useState(false);
-    const [error, setError] = useState<DebugErrorComponentProps['error']>();
+    const [error, setError] = useState<DebugErrorComponentProps["error"]>();
     const [openError, setOpenError] = useState(false);
 
     // todo: uncomment when we fix state issues

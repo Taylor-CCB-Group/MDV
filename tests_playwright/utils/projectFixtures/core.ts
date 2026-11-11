@@ -1,7 +1,7 @@
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import fs from "node:fs/promises";
+import { type APIRequestContext, expect, type Page } from "@playwright/test";
 
 const DELETE_PROJECT_RETRIES = 3;
 const DELETE_PROJECT_BACKOFF_MS = 1_000;

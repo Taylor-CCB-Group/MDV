@@ -1,11 +1,6 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { isWorktreeFrontendForPlaywright } from "../utils/helpers";
-import {
-    gotoPath,
-    mockApiRoot,
-    mockExtensionConfig,
-    mockProjects,
-} from "../utils/routes";
+import { gotoPath, mockApiRoot, mockExtensionConfig, mockProjects } from "../utils/routes";
 
 test("create project navigates to project view", async ({ page }) => {
     test.skip(
@@ -17,18 +12,10 @@ test("create project navigates to project view", async ({ page }) => {
     await mockExtensionConfig(page);
     await mockProjects(page, []);
 
-    await page.route("**/create_project", (route) =>
-        route.fulfill({ json: { id: "123", name: "New Project" } }),
-    );
-    await page.route("**/project/123/datasources.json", (route) =>
-        route.fulfill({ json: [] }),
-    );
-    await page.route("**/project/123/state.json", (route) =>
-        route.fulfill({ json: { all_views: [] } }),
-    );
-    await page.route("**/project/123/views.json", (route) =>
-        route.fulfill({ json: {} }),
-    );
+    await page.route("**/create_project", (route) => route.fulfill({ json: { id: "123", name: "New Project" } }));
+    await page.route("**/project/123/datasources.json", (route) => route.fulfill({ json: [] }));
+    await page.route("**/project/123/state.json", (route) => route.fulfill({ json: { all_views: [] } }));
+    await page.route("**/project/123/views.json", (route) => route.fulfill({ json: {} }));
 
     await gotoPath(page);
 

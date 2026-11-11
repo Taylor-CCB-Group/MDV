@@ -1,9 +1,8 @@
+import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
 import { autorun, runInAction, untracked } from "mobx";
 import { useEffect } from "react";
-
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { flattenFields } from "@/lib/columnTypeHelpers";
-import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
 
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "../components/SpatialDataMDVReact";
 

@@ -1,7 +1,7 @@
-import type { EventManager } from 'mjolnir.js';
-import { Deck } from '@deck.gl/core';
-import { EditableGeoJsonLayer } from '@deck.gl-community/editable-layers';
-import { cpuEditablePicks } from '@/editable-layers/cpuPicks';
+import { Deck } from "@deck.gl/core";
+import { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
+import type { EventManager } from "mjolnir.js";
+import { cpuEditablePicks } from "@/editable-layers/cpuPicks";
 
 // we aren't really using this as an actual subclass, just declaring things as public so we can access them.
 //! we don't want to keep this around for future maintenance, hopefully deck can be patched so this is less necessary
@@ -47,10 +47,14 @@ export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
 
 /** Deck's own (private) helpers, so the replacement manager is configured exactly as deck would. */
 function getDeckPrivates(deck: MonkeyPatchDeck) {
-    const createEventManager: unknown = Reflect.get(deck, '_createEventManager');
-    const getEventRoot: unknown = Reflect.get(deck, '_getEventRoot');
-    const isMultiCanvasMode: unknown = Reflect.get(deck, '_isMultiCanvasMode');
-    if (typeof createEventManager !== 'function' || typeof getEventRoot !== 'function' || typeof isMultiCanvasMode !== 'function') {
+    const createEventManager: unknown = Reflect.get(deck, "_createEventManager");
+    const getEventRoot: unknown = Reflect.get(deck, "_getEventRoot");
+    const isMultiCanvasMode: unknown = Reflect.get(deck, "_isMultiCanvasMode");
+    if (
+        typeof createEventManager !== "function" ||
+        typeof getEventRoot !== "function" ||
+        typeof isMultiCanvasMode !== "function"
+    ) {
         return null;
     }
     return {
@@ -91,11 +95,14 @@ export function rebindMouseEvents(deckO: Deck<any>) {
     const eventManager = privates.createEventManager(privates.getEventRoot(deck.canvas));
     deck.eventManager = eventManager;
     deck.eventManagers = Object.fromEntries(
-        Object.entries(deck.eventManagers).map(([canvasId, em]) => [canvasId, em === oldEventManager ? eventManager : em]),
+        Object.entries(deck.eventManagers).map(([canvasId, em]) => [
+            canvasId,
+            em === oldEventManager ? eventManager : em,
+        ]),
     );
     // the view manager prefers `eventManagers[canvasId]`, falling back to its own `_eventManager`;
     // with a new manager it finalizes the old controllers and builds new ones on the next update.
-    Reflect.set(deck.viewManager, '_eventManager', eventManager);
+    Reflect.set(deck.viewManager, "_eventManager", eventManager);
     deck.viewManager.setProps({ eventManagers: deck.eventManagers });
 
     // Editable layers subscribe to the event manager once, in initializeState, so the ones already

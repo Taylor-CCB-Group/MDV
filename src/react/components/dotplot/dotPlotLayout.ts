@@ -1,4 +1,4 @@
-import { type MeasureText, type XLabelLayout, layoutFixedXLabels, layoutXLabels } from "@/charts/dotplot/xAxisLabels";
+import { layoutFixedXLabels, layoutXLabels, type MeasureText, type XLabelLayout } from "@/charts/dotplot/xAxisLabels";
 import type { DotPlotXAxisConfig } from "./dotPlotConfig";
 import type { DotPlotGroup } from "./dotPlotStats";
 

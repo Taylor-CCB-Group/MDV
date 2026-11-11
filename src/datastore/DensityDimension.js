@@ -1,16 +1,14 @@
-import RangeDimension from "./RangeDimension.js";
 import Dimension from "./Dimension";
+import RangeDimension from "./RangeDimension.js";
+
 class DensityDimension extends RangeDimension {
     constructor(parent) {
         super(parent);
         this.worker.terminate();
-        this.worker = new Worker(
-            new URL("./densityWorker.js?v=1", import.meta.url),
-            {
-                //fix 'Uncaught SyntaxError: Cannot use import statement outside a module' with vite
-                type: "module",
-            },
-        );
+        this.worker = new Worker(new URL("./densityWorker.js?v=1", import.meta.url), {
+            //fix 'Uncaught SyntaxError: Cannot use import statement outside a module' with vite
+            type: "module",
+        });
     }
 
     getDensityContours(callback, columns, config = {}) {

@@ -14,7 +14,7 @@ export type Param = DataType | "number" | MultiColumnPrefix;
 // up for review & documentation...
 export type FieldSpecs = (MultiColumnQuery | FieldName)[];
 //@ts-expect- error we need to be more basic & explicit about things that are and are not arrays (should have SingleColumnQuery)
-export type FieldSpec = FieldName | MultiColumnQuery;// | (FieldName | MultiColumnQuery)[];
+export type FieldSpec = FieldName | MultiColumnQuery; // | (FieldName | MultiColumnQuery)[];
 /**
  * Should the type of spec be more restricted...
  * @returns an array of strings representing 'field names' - column IDs.
@@ -25,39 +25,42 @@ export function flattenFields(spec: FieldSpec | FieldSpecs): FieldName[] {
 /** annotation of what kind of column type a given param will accept */
 export type CTypes = Param | Param[];
 // type MultiPrefix = `_multi_column:${string}`;
-export type IsMultiParam<T extends CTypes> = T extends Param[] ? true 
-: T extends MultiColumnPrefix ? true 
-: false;
+export type IsMultiParam<T extends CTypes> = T extends Param[] ? true : T extends MultiColumnPrefix ? true : false;
 
 /**
  * The properties that are used for the actual `ColumnSelectionComponent` - possibly as a result of some kind of transformation
  * from `GuiSpec<"column"> | GuiSpec<"multicolumn>"` or an entry in a `ChartType` object.
  * It can also be used where the component is being used more directly (e.g. `AddRowComponent` in Selection Dialog).
- * 
+ *
  * Generic arguments `T` and `M` are used to specify compatible column datatypes and whether multiple columns are being selected.
  * `V` is the type of value, which is inferred from the `multiple` property (most importantly, whether it is an array).
  * We may wish to group these generic arguments into a single entry if that can help to simplify the annotations needed when using this type.
  */
-export type ColumnSelectionProps<T extends CTypes, M extends boolean,
-    V = M extends true ? FieldSpecs : FieldName | MultiColumnQuery> = { //should we have a SingleColumnQuery?
-        type?: T; //wary of using 'type' as a name - not reserved, but could be confusing. also wary of optional type
-        multiple: M; //also interacts with type "_multi..."; in future, prefer separate props for multiple selection and type
-        setSelectedColumn: (column: V) => void;
-        clearSelectedColumn?: () => void;
-        current_value?: V;
-        placeholder?: string;
-        exclude?: string[];
-        dataStore?: DataStore;
-        optional?: boolean;
-    };
+export type ColumnSelectionProps<
+    T extends CTypes,
+    M extends boolean,
+    V = M extends true ? FieldSpecs : FieldName | MultiColumnQuery,
+> = {
+    //should we have a SingleColumnQuery?
+    type?: T; //wary of using 'type' as a name - not reserved, but could be confusing. also wary of optional type
+    multiple: M; //also interacts with type "_multi..."; in future, prefer separate props for multiple selection and type
+    setSelectedColumn: (column: V) => void;
+    clearSelectedColumn?: () => void;
+    current_value?: V;
+    placeholder?: string;
+    exclude?: string[];
+    dataStore?: DataStore;
+    optional?: boolean;
+};
 
-/** 
+/**
  * Given a `ColumnSelectionProps` object, this function should return the same object with the correct type annotations.
  */
-export function inferGenericColumnSelectionProps<T extends CTypes, M extends boolean,
-V = M extends true ? FieldSpecs : FieldName | MultiColumnQuery>(
-    props: ColumnSelectionProps<T, M, V>
-): ColumnSelectionProps<T, M, V> {
+export function inferGenericColumnSelectionProps<
+    T extends CTypes,
+    M extends boolean,
+    V = M extends true ? FieldSpecs : FieldName | MultiColumnQuery,
+>(props: ColumnSelectionProps<T, M, V>): ColumnSelectionProps<T, M, V> {
     return props;
 }
 
@@ -80,7 +83,7 @@ export function paramAcceptsNumeric<T extends CTypes>(param?: T): boolean {
  */
 export function columnMatchesType(column: DataColumn<DataType>, type?: Param | Param[]): boolean {
     if (type === undefined) return true;
-    if (Array.isArray(type)) return type.some(t => columnMatchesType(column, t));
+    if (Array.isArray(type)) return type.some((t) => columnMatchesType(column, t));
     if (type === "_multi_column:all") return true;
     // this was allowing a "text" column to be selected for "number" without the '!!'?
     // we should unit-test this function...
@@ -90,7 +93,7 @@ export function columnMatchesType(column: DataColumn<DataType>, type?: Param | P
     return column.datatype === type;
 }
 export function allNumeric(columns: DataColumn<DataType>[]): columns is DataColumn<NumberDataType>[] {
-    return columns.every(c => c.datatype.match(/double|float|int/));
+    return columns.every((c) => c.datatype.match(/double|float|int/));
 }
 /**
  * Checks whether @param column has a `datatype` precisely matching the given @param datatype
@@ -156,12 +159,7 @@ export function getSharedNumericColumnData(source: NumericColumnData): SharedNum
     const length = source.length;
     if (source.buffer instanceof SharedArrayBuffer) {
         return {
-            arrayType:
-                source instanceof Int32Array
-                    ? "int32"
-                    : source instanceof Uint32Array
-                      ? "uint32"
-                      : "float32",
+            arrayType: source instanceof Int32Array ? "int32" : source instanceof Uint32Array ? "uint32" : "float32",
             data: source.buffer,
             byteOffset,
             length,

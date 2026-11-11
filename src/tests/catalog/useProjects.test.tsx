@@ -62,3 +62,70 @@ describe("useProjects writability", () => {
         expect(result.current.rescanWarning).toContain("will open read-only");
     });
 });
+
+describe("useProjects restore", () => {
+    beforeEach(() => {
+        apiFetchMock.mockReset();
+    });
+
+    test("fetches only the restored project, not the whole list", async () => {
+        apiFetchMock
+            .mockResolvedValueOnce(jsonResponse([{ id: 1, name: "kept" }]))
+            .mockResolvedValueOnce(jsonResponse({ restoredProjectId: 5 }))
+            .mockResolvedValueOnce(jsonResponse({ id: 5, name: "restored", writable: true }));
+        const { result } = renderHook(() => useProjects());
+
+        await act(async () => {
+            await result.current.fetchProjects();
+        });
+        await act(async () => {
+            await result.current.restoreRecycledProject("5");
+        });
+
+        expect(apiFetchMock.mock.calls.map(([path]) => path)).toEqual([
+            "projects",
+            "projects/recycle-bin/5/restore",
+            "projects/5",
+        ]);
+        expect(result.current.projects.map((p) => p.name).sort()).toEqual(["kept", "restored"]);
+    });
+
+    test("falls back to the whole list if the restored project can't be fetched", async () => {
+        apiFetchMock
+            .mockResolvedValueOnce(jsonResponse({ restoredProjectId: 5 }))
+            .mockResolvedValueOnce(new Response("{}", { status: 404 }))
+            .mockResolvedValueOnce(jsonResponse([{ id: 5, name: "restored" }]));
+        const { result } = renderHook(() => useProjects());
+
+        await act(async () => {
+            await result.current.restoreRecycledProject("5");
+        });
+
+        expect(apiFetchMock.mock.calls.map(([path]) => path)).toEqual([
+            "projects/recycle-bin/5/restore",
+            "projects/5",
+            "projects",
+        ]);
+        expect(result.current.projects.map((p) => p.name)).toEqual(["restored"]);
+    });
+
+    test("falls back to the whole list if fetching the restored project throws", async () => {
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        apiFetchMock
+            .mockResolvedValueOnce(jsonResponse({ restoredProjectId: 5 }))
+            .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+            .mockResolvedValueOnce(jsonResponse([{ id: 5, name: "restored" }]));
+        const { result } = renderHook(() => useProjects());
+
+        try {
+            await act(async () => {
+                await result.current.restoreRecycledProject("5");
+            });
+        } finally {
+            consoleError.mockRestore();
+        }
+
+        expect(result.current.isErrorModalOpen).toBe(false);
+        expect(result.current.projects.map((p) => p.name)).toEqual(["restored"]);
+    });
+});

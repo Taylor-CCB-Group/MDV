@@ -1,20 +1,13 @@
-import {
-    useCallback,
-    useLayoutEffect,
-    useRef,
-    useState,
-} from "react";
-import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import LegendCategoricalSvg, {
     getCategoricalLabelMaxWidth,
     LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
     LEGEND_CATEGORICAL_WIDTH,
     legendCategoricalContainerHeight,
 } from "@/react/components/legend/LegendCategoricalSvg";
+import LegendContinuousSvg, { DEFAULT_CONTINUOUS_LEGEND_WIDTH } from "@/react/components/legend/LegendContinuousSvg";
+import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import { getContinuousLegendContainerHeight } from "@/react/legend/shared/legendUtils";
-import LegendContinuousSvg, {
-    DEFAULT_CONTINUOUS_LEGEND_WIDTH,
-} from "@/react/components/legend/LegendContinuousSvg";
 
 export type ColorLegendProps = {
     spec: ColorLegendSpec;
@@ -41,9 +34,7 @@ function ColorLegendCategorical({
     const titleRef = useRef<HTMLDivElement>(null);
     const bodyRef = useRef<HTMLDivElement>(null);
     const [showTitleTooltip, setShowTitleTooltip] = useState(false);
-    const [labelMaxWidth, setLabelMaxWidth] = useState(
-        LEGEND_CATEGORICAL_LABEL_MAX_WIDTH,
-    );
+    const [labelMaxWidth, setLabelMaxWidth] = useState(LEGEND_CATEGORICAL_LABEL_MAX_WIDTH);
     const svgItems = items.map((item) => ({
         key: item.value,
         color: item.color,

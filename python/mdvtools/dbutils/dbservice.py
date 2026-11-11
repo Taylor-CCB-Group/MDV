@@ -25,7 +25,7 @@ Example:
 
 from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject, UsageEvent
 from datetime import datetime
-from mdvtools.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject, forget_project_thumbnail, get_project_thumbnail
 from typing import Optional
 import os
 import shutil
@@ -76,7 +76,7 @@ class ProjectService:
                 - name (str): Project name
                 - path (str): Project directory path for internal server checks
                 - lastModified (str): Formatted update timestamp (YYYY-MM-DD HH:MM:SS)
-                - thumbnail (str|None): First available viewImage from project views
+                - thumbnail (str|None): Image of the first view (in all_views order) that has one
                 - readme (str|None): Project README content if available
         
         Raises:
@@ -91,43 +91,49 @@ class ProjectService:
         try:
             failed_project_ids = {f[0] for f in ProjectService.failed_projects}  
             projects = Project.query.filter(~Project.is_deleted).all()
-
-
-            # Convert to JSON-ready list of dictionaries
-            def get_project_thumbnail(project_path):
-                """Extract the first available viewImage from a project's views."""
-                try:
-                    mdv_project = MDVProject(project_path)
-                    return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
-                except Exception as e:
-                    logger.exception(f"Error extracting thumbnail for project at {project_path}: {e}")
-                    return None
-            
-            def get_readme_file(project_path):
-                try:
-                    mdv_project = MDVProject(project_path)
-                    readme_file = mdv_project.readme
-                    return readme_file
-                except Exception as e:
-                    logger.exception(f"Error getting readme file for project at {project_path}: {e}")
-                    return None
-
-            project_list = [
-                {
-                    "id": p.id,
-                    "name": p.name,
-                    "path": p.path,
-                    "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                    "thumbnail": get_project_thumbnail(p.path),
-                    "readme": get_readme_file(p.path),
-                }
+            return [
+                ProjectService._project_entry(p)
                 for p in projects if p.id not in failed_project_ids
             ]
-
-            return project_list
         except Exception as e:
             logger.exception(f"Error in dbservice: Error querying active projects: {e}")
             raise
+
+    @staticmethod
+    def get_active_project(project_id: int) -> Optional[dict]:
+        """
+        One active project, in the same shape as an entry of get_active_projects(),
+        or None if it doesn't exist, is deleted, or failed to load.
+
+        Note:
+            This method is used by the /projects/<id> API route.
+        """
+        try:
+            if project_id in {f[0] for f in ProjectService.failed_projects}:
+                return None
+            project = Project.query.filter(Project.id == project_id, ~Project.is_deleted).first()
+            return ProjectService._project_entry(project) if project else None
+        except Exception as e:
+            logger.exception(f"Error in dbservice: Error querying active project {project_id}: {e}")
+            raise
+
+    @staticmethod
+    def _project_entry(p: Project) -> dict:
+        def get_readme_file(project_path):
+            try:
+                return MDVProject(project_path).readme
+            except Exception as e:
+                logger.exception(f"Error getting readme file for project at {project_path}: {e}")
+                return None
+
+        return {
+            "id": p.id,
+            "name": p.name,
+            "path": p.path,
+            "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            "thumbnail": get_project_thumbnail(p.path),
+            "readme": get_readme_file(p.path),
+        }
 
     @staticmethod
     def add_new_project(path, name='unnamed_project'):
@@ -301,6 +307,8 @@ class ProjectService:
             if not project.path:
                 return False, "Project path is missing."
 
+            # read before the delete: the row's attributes may expire on commit
+            cached_path = project.path
             project_path = os.path.abspath(project.path)
             if project_path == os.path.abspath(os.sep):
                 return False, "Refusing to delete filesystem root."
@@ -360,6 +368,7 @@ class ProjectService:
             if filesystem_delete is not None:
                 filesystem_delete()
             db.session.commit()
+            forget_project_thumbnail(cached_path)
             return True, None
         except Exception as e:
             db.session.rollback()
