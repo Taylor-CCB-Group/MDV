@@ -8,9 +8,37 @@ import {
     type Feature,
     type ModeProps,
     type Polygon,
+    type Position,
     type SimpleFeatureCollection,
     type StopDraggingEvent,
 } from "@deck.gl-community/editable-layers";
+
+function rectangleFeature(p1: Position, p2: Position, properties: Record<string, unknown>): Feature<Polygon> {
+    const minX = Math.min(p1[0], p2[0]);
+    const minY = Math.min(p1[1], p2[1]);
+    const maxX = Math.max(p1[0], p2[0]);
+    const maxY = Math.max(p1[1], p2[1]);
+    return {
+        type: "Feature",
+        properties,
+        geometry: {
+            type: "Polygon",
+            coordinates: [
+                [
+                    [minX, minY],
+                    [maxX, minY],
+                    [maxX, maxY],
+                    [minX, maxY],
+                    [minX, minY],
+                ],
+            ],
+        },
+    };
+}
+
+function withoutTentativeRectangle(data: SimpleFeatureCollection): SimpleFeatureCollection["features"] {
+    return data.features.filter((feature) => !feature.properties?.tentativeRectangle);
+}
 
 /**
  * Draw a rectangle by dragging
@@ -19,12 +47,15 @@ import {
  * leaving this for now, for review later, as the other version isn't an immediate drop-in replacement.
  */
 export class DrawRectangleByDraggingMode extends DrawPolygonByDraggingMode {
+    /**
+     * Built from this event rather than from the tentative rectangle in `props.data`: the layer is
+     * only given that once React re-renders, so a quick drag could otherwise finish with the
+     * previous selection.
+     */
     handleStopDragging(event: StopDraggingEvent, props: ModeProps<SimpleFeatureCollection>) {
-        // I don't think we want the clickSequence stuff from DrawPolygonByDraggingMode
-        // we should be safe to assume here that the last feature is the one we're working on
-        props.data.features[props.data.features.length - 1].properties = {};
+        const rectangle = rectangleFeature(event.pointerDownMapCoords, event.mapCoords, {});
         props.onEdit({
-            updatedData: props.data,
+            updatedData: { ...props.data, features: [...withoutTentativeRectangle(props.data), rectangle] },
             editType: "finishDrawingRectangle",
             editContext: {
                 position: event.mapCoords,
@@ -33,36 +64,9 @@ export class DrawRectangleByDraggingMode extends DrawPolygonByDraggingMode {
     }
 
     handleDraggingAux(event: DraggingEvent, props: ModeProps<SimpleFeatureCollection>) {
-        const p1 = event.pointerDownMapCoords;
-        const p2 = event.mapCoords;
-        const minX = Math.min(p1[0], p2[0]);
-        const minY = Math.min(p1[1], p2[1]);
-        const maxX = Math.max(p1[0], p2[0]);
-        const maxY = Math.max(p1[1], p2[1]);
-        const start = [minX, minY];
-        const end = [maxX, maxY];
-        const feature: Feature<Polygon> = {
-            type: "Feature",
-            properties: {
-                tentativeRectangle: true,
-            },
-            geometry: {
-                type: "Polygon",
-                coordinates: [[start, [end[0], start[1]], end, [start[0], end[1]], start]],
-            },
-        };
-        const features = [...props.data.features];
-        if (features.length > 0 && features[features.length - 1].properties?.tentativeRectangle) {
-            features[features.length - 1] = feature;
-        } else {
-            features.push(feature);
-        }
-        const updatedData = {
-            ...props.data,
-            features,
-        };
+        const feature = rectangleFeature(event.pointerDownMapCoords, event.mapCoords, { tentativeRectangle: true });
         props.onEdit({
-            updatedData,
+            updatedData: { ...props.data, features: [...withoutTentativeRectangle(props.data), feature] },
             editType: "setTentativeRectangle",
             editContext: {
                 position: event.mapCoords,
