@@ -21,6 +21,7 @@ from mdvtools.auth.authutils import register_before_request_auth, get_auth_provi
 from mdvtools.dbutils.dbservice import ProjectService, FileService, UserProjectService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
+from mdvtools.telemetry import init_telemetry
 from mdvtools.dbutils.server_options import (
     get_server_options_for_db_projects,
     register_global_routes_for_extensions,
@@ -55,6 +56,12 @@ def create_flask_app(config_name=None):
         app.config['TESTING'] = True
         # Set a default for testing to avoid startup errors.
         app.config['DEFAULT_AUTH_METHOD'] = 'dummy'
+
+    # Before db.init_app, so the SQLAlchemy engine is instrumented.
+    try:
+        init_telemetry(app)
+    except Exception as e:
+        logger.exception(f"Telemetry could not start; continuing without it: {e}")
 
     mdv_socketio(app)
     # this was causing a number of issues with various routes, changing this here seems to be the best way to fix it

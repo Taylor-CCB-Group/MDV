@@ -20,6 +20,29 @@ You need Docker with Compose. Container CPU and memory figures need a Linux Dock
 
 To stop it, run `docker compose down`. Add `-v` to delete the stored data as well.
 
+## Connect an MDV deployment
+
+Container logs and CPU and memory figures need nothing from MDV. For MDV's traces and request metrics, start this stack first, because it creates the `mdv-telemetry` network. Then add the following to the MDV service in the deployment's Compose file and recreate that service:
+
+```yaml
+services:
+  mdv_app:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+      OTEL_SERVICE_NAME: <deployment name>
+    networks:
+      - default
+      - mdv-telemetry
+
+networks:
+  mdv-telemetry:
+    external: true
+```
+
+Give each deployment on a server its own `OTEL_SERVICE_NAME`, because Grafana uses it to tell deployments apart. Without `OTEL_EXPORTER_OTLP_ENDPOINT`, MDV sends nothing.
+
+MDV records every request by default. To keep a fraction of traces on a busy server, also set `OTEL_TRACES_SAMPLER=parentbased_traceidratio` and `OTEL_TRACES_SAMPLER_ARG=0.2` for 20%. Request duration metrics still count every request.
+
 ## Open Grafana on a server
 
 Grafana listens only on `127.0.0.1` on the server, so open an SSH tunnel from your own machine:
@@ -36,7 +59,8 @@ Use **Explore** in Grafana's menu:
 
 - Loki: container logs, labelled `compose_project`, `compose_service` and `container`. Browser data from Faro carries `source="faro"`, `app_name` and `kind`, such as `{source="faro", kind="exception"}`.
 - Prometheus: container figures come from cAdvisor, such as `container_memory_working_set_bytes`, labelled `container_label_com_docker_compose_project` and `container_label_com_docker_compose_service`. Server figures come from the unix exporter, such as `node_cpu_seconds_total` and `node_filesystem_avail_bytes`.
-- Tempo: traces from MDV servers.
+- Prometheus, from MDV: request durations in `http_server_request_duration_seconds`, labelled `job` (the deployment's `OTEL_SERVICE_NAME`), `http_route`, `http_request_method` and `http_response_status_code`. Process figures include `process_memory_usage_bytes` and `process_cpu_time_seconds_total`. Tempo adds `traces_spanmetrics_calls_total` and `traces_spanmetrics_latency_bucket`, labelled `service` and `span_name`.
+- Tempo: one trace for each request to MDV, with a span for each database query. Log lines written during a request end in `trace_id=...`, and Grafana links them to their trace.
 
 Dashboards in `grafana/dashboards/` load into the **MDV** folder when Grafana starts.
 
