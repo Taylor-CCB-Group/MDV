@@ -1,0 +1,100 @@
+# Observability stack for one server: Alloy collects, Loki stores logs,
+# Prometheus stores metrics, Tempo stores traces and Grafana shows them.
+# See README.md in this folder and docs/adr/0023-self-hosted-grafana-observability.md.
+#
+# Only Grafana and the Alloy UI are published, and only on 127.0.0.1.
+# MDV containers reach Alloy over the `mdv-telemetry` network.
+name: mdv-observability
+
+services:
+  alloy:
+    image: grafana/alloy:v1.21.3
+    # cAdvisor reads container cgroups from the host, which needs privileged mode.
+    privileged: true
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=0.0.0.0:12345
+    environment:
+      FARO_API_KEY: ${FARO_API_KEY:-}
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
+      # The Docker socket and containerd socket both live here.
+      - /var/run:/var/run:rw
+      - /:/rootfs:ro
+      - /proc:/rootproc:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "127.0.0.1:${ALLOY_UI_PORT:-12345}:12345"
+    depends_on:
+      - loki
+      - prometheus
+      - tempo
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.7.9
+    command: -config.file=/etc/loki/loki.yaml
+    volumes:
+      - ./loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:3.1.1
+    command: -target=all -config.file=/etc/tempo/tempo.yaml
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.3.1
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in observability/.env}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - loki
+      - prometheus
+      - tempo
+    restart: unless-stopped
+
+networks:
+  default:
+    # Fixed name so MDV's own Compose projects can join it as an external network.
+    name: mdv-telemetry
+
+volumes:
+  alloy-data:
+  loki-data:
+  prometheus-data:
+  tempo-data:
+  grafana-data:

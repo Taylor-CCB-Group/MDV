@@ -1,0 +1,39 @@
+# Monolithic Tempo on the local filesystem. Blocks are kept for Tempo's
+# default of 14 days (backend_worker.compaction.block_retention).
+stream_over_http_enabled: true
+
+server:
+  http_listen_port: 3200
+  log_level: warn
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+
+# Turns spans into request rate, error and duration metrics in Prometheus,
+# and draws the service graph.
+metrics_generator:
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: ["span-metrics", "service-graphs"]
+
+usage_report:
+  reporting_enabled: false
