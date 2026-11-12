@@ -407,3 +407,26 @@ def test_oauth_client_is_registered_with_a_timeout(provider):
     """Covers Authlib's own calls, including the token exchange after login."""
     client_kwargs = provider.oauth.register.call_args.kwargs["client_kwargs"]
     assert client_kwargs["default_timeout"] == AUTH0_TIMEOUT_SECONDS
+
+
+def test_logout_signs_out_of_the_provider_used_to_sign_in(tmp_path):
+    """A Shibboleth sign-in on a site whose default is Auth0 signs out of
+    Shibboleth: the provider is looked up before the session is cleared."""
+    providers = {"auth0": MagicMock(), "shibboleth": MagicMock()}
+    providers["shibboleth"].logout.return_value = "to Shibboleth logout"
+    (tmp_path / "login.html").write_text("the login page")
+    app = Flask("test_logout_provider", template_folder=str(tmp_path))
+    app.config.update(TESTING=True, ENABLE_AUTH=True, DEFAULT_AUTH_METHOD="auth0", LOGIN_REDIRECT_URL="/login")
+    app.secret_key = "test_secret"
+    register_auth_routes(app)
+    client = app.test_client()
+    with client.session_transaction() as browser_session:
+        browser_session["auth_method"] = "shibboleth"
+
+    with patch(
+        "mdvtools.auth.authutils.create_auth_provider", side_effect=lambda method, _app: providers[method]
+    ):
+        rv = client.get("/logout")
+
+    assert rv.get_data(as_text=True) == "to Shibboleth logout"
+    providers["auth0"].logout.assert_not_called()

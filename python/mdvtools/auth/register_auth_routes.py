@@ -81,15 +81,17 @@ def register_auth_routes(app):
                 auth_method = session.get("auth_method")
                 logger.info(f"Logout initiated for auth method: {auth_method}")
 
+                # Look the provider up before clearing the session, which holds
+                # auth_method. With none there, as when MDV cleared a Deactivated
+                # user's session or the cookie was lost, this is the site's default
+                # provider, so a refused person can still end their Auth0 session.
+                provider = get_auth_provider()
+
                 # Always attempt to clear the session early
                 session.clear()
                 session.modified = True
 
-                # Auth0 can still hold a session after ours is gone: MDV cleared it
-                # for a Deactivated user, or the cookie was lost. With no auth_method
-                # in the session this is the site's default provider, so a refused
-                # person can still end their Auth0 session and switch account.
-                return get_auth_provider().logout()
+                return provider.logout()
 
             except Exception as e:
                 logger.exception(f"In register_auth_routes: Error during logout: {e}")
