@@ -30,7 +30,10 @@
  * | `association.rows` | **absent** during a cosmetic edit or filter; once per geometry or key-column load | Feature ids are being re-resolved to DataStore rows (`table_rows.ts`). It depends only on geometry, table association and key-column loads — never on layer props. |
  * | `adapter.*` | one per viewer render | These are cheap; the `count` is the signal, and it tracks how often the adapter re-ran. |
  * | `render:spatial.viewer` / `.canvas` | one per interaction step, under ~16ms | More than one per step means something downstream is setting state during the render that follows an edit. |
+ * | `loaded:first` | one per chart opened | Time from opening the chart to the first frame with every layer fully loaded. Long means slow metadata, chunk fetches or decoding; check `raster_health.ts` issues for the image. |
+ * | `loaded:settle` | one per pan or zoom that needed new tiles | Time from the last view change to every visible tile loaded. Long with a high count usually means oversized chunks. |
  */
+import { recordBrowserTiming } from "@/utils/browserTelemetry";
 
 type Stat = { count: number; total: number; max: number };
 
@@ -118,6 +121,19 @@ export function measureSpatial<T>(label: string, fn: () => T): T {
     } finally {
         bump(label, performance.now() - t0);
     }
+}
+
+/**
+ * How long the canvas took to draw every layer fully loaded, from when the chart opened
+ * (`first`) or from the last pan or zoom that needed new tiles (`settle`). See
+ * `load_timing.ts` for how the end is found.
+ *
+ * Unlike the labels above, these also go to browser telemetry when the deployment has it
+ * on (ADR 0023), because they are what people wait for, rather than what the code does.
+ */
+export function recordSpatialLoaded(kind: "first" | "settle", ms: number, context: Record<string, string>) {
+    if (ENABLED) bump(`loaded:${kind}`, ms);
+    recordBrowserTiming(`mdv_spatial_${kind}_load`, { duration_ms: ms }, context);
 }
 
 /** React `<Profiler onRender>` adapter — records committed render duration per id. */

@@ -12,11 +12,22 @@
  * origin, such as a hosted preview pointed at a server with `?dir=`, never
  * starts it, because the server only accepts posts from its own pages.
  */
+import type { Faro } from "@grafana/faro-web-sdk";
 import { buildApiUrl } from "@/utils/mdvRouting";
 
 type TelemetryConfig = { enabled: false } | { enabled: true; app_name: string; sample_rate: number };
 
 let started = false;
+let faro: Faro | null = null;
+
+/**
+ * Send a named timing, such as how long the spatial canvas took to load, as a Faro
+ * measurement. Grafana finds it in Loki under `{source="faro", kind="measurement"}`
+ * with `type=<type>`. Does nothing while browser telemetry is off.
+ */
+export function recordBrowserTiming(type: string, values: Record<string, number>, context?: Record<string, string>) {
+    faro?.api.pushMeasurement({ type, values }, { context });
+}
 
 export async function startBrowserTelemetry() {
     if (started) return;
@@ -34,7 +45,7 @@ export async function startBrowserTelemetry() {
             import("@grafana/faro-web-sdk"),
             import("@grafana/faro-web-tracing"),
         ]);
-        initializeFaro({
+        faro = initializeFaro({
             url: collectUrl.toString(),
             app: {
                 name: config.app_name,

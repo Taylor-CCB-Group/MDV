@@ -27,6 +27,7 @@ import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
+import { useMarkSpatialChartOpened, useSpatialLoadTiming } from "@/react/spatialdata/load_timing";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
 import { createPointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import { describeGpu } from "@/react/spatialdata/render_report";
@@ -108,6 +109,13 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
 
     const deckRef = useRef<DeckGLRef | null>(null);
     useRebindDeckEvents(deckRef);
+
+    const describeLoad = useCallback(() => {
+        const entries = stack?.entries ?? [];
+        const images = entries.filter((entry) => entry.kind === "spatial" && entry.source.elementType === "image");
+        return { layers: String(entries.length), image_layers: String(images.length) };
+    }, [stack]);
+    const onAfterRenderTiming = useSpatialLoadTiming(deckRef, chart, describeLoad);
 
     const extensions = useMemo(() => [new ColorPaletteExtension(), new VivContrastExtension()], []);
 
@@ -233,8 +241,12 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
         () => ({
             ...deckProps,
             onHover: handleHover,
+            onAfterRender: (context: Parameters<NonNullable<DeckGLProps["onAfterRender"]>>[0]) => {
+                deckProps.onAfterRender?.(context);
+                onAfterRenderTiming();
+            },
         }),
-        [deckProps, handleHover],
+        [deckProps, handleHover, onAfterRenderTiming],
     );
 
     if (!stack?.entries.length) {
@@ -266,6 +278,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
 
 function SpatialDataChartRoot() {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    useMarkSpatialChartOpened(chart);
     const { vivStores } = chart;
     return (
         <VivProvider vivStores={vivStores}>
