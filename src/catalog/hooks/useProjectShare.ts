@@ -164,10 +164,12 @@ const useProjectShare = (projectId: string) => {
                 }));
                 if (res.status === 403) {
                     setError(errorData?.error || "Forbidden: You are not allowed to perform this action.");
-                } else {
+                } else if (res.status === 500) {
                     setError(errorData?.error || "Internal Server Error");
+                } else {
+                    // A refusal, such as removing an Admin, shows next to the form.
+                    setErrorMsg(errorData?.error || errorData?.message || "An error occurred. Please try again.");
                 }
-                setErrorMsg(errorData?.error || errorData?.message || "An error occurred. Please try again.");
             }
         } catch (error) {
             setErrorMsg("Error deleting user. Please try again.");
