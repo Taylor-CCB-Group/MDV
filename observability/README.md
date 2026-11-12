@@ -57,9 +57,19 @@ ssh -L 3000:127.0.0.1:3000 <server>
 
 Then open http://127.0.0.1:3000 on your machine. If port 3000 is busy on either side, set `GRAFANA_PORT` in `.env`, or tunnel from another local port, such as `-L 3001:127.0.0.1:3000`.
 
-## Find things in Grafana
+## Dashboards
 
-Use **Explore** in Grafana's menu:
+Grafana loads the dashboards in `grafana/dashboards/` into its **MDV** folder when it starts. Each one links to the others from its **MDV dashboards** menu:
+
+- MDV server: requests, errors and response times for each route, how long the event loop was blocked, MDV's own operations, and CPU, memory and disk for the MDV process, each container and the server. Pick deployments with **Deployment**.
+- MDV browser: Web Vitals, spatial chart load times, how long each kind of project request takes in the browser, and JavaScript errors. Pick deployments with **App**.
+- MDV logs: log volume by level, the event loop warnings, errors and warnings, and every log line, filtered by **Compose project**, **Service**, **Container** and **Search**. Use **Container** when two containers share a project and service, such as two runs of the same image.
+
+Grafana's UI cannot save changes to these dashboards. To change one, select **Make editable** and make the change. Then open the export icon in the right-hand bar, choose **Export as code** to copy the JSON, and replace the file in `grafana/dashboards/`.
+
+## Find more in Grafana
+
+For anything the dashboards do not show, use **Explore** in Grafana's menu:
 
 - Loki: container logs, labelled `compose_project`, `compose_service` and `container`. Browser data from Faro carries `source="faro"`, `app_name` and `kind`, such as `{source="faro", kind="exception"}`.
 - Loki, spatial chart load times: measurements with `type=mdv_spatial_first_load` give the time from opening a SpatialData chart to the first frame with every layer fully loaded, including every image tile in view. `type=mdv_spatial_settle_load` gives the time from the last pan or zoom to every new tile loaded, recorded only when the move needed new tiles. Both carry `duration_ms`, `context_layers` and `context_image_layers`, and you can query them with `{source="faro", kind="measurement"} |= "mdv_spatial_"`.
@@ -71,8 +81,6 @@ Use **Explore** in Grafana's menu:
   - `mdv.convert_anndata` and `mdv.convert_spatialdata`, which convert data into a project
 - Prometheus, the event loop: `mdv_event_loop_blocked_time_seconds_total` counts the time one request held up MDV's single gevent worker, in steps of `GEVENT_MAX_BLOCKING_TIME` (0.1 seconds unless set). Each step also logs a warning, `Event loop blocked for over 0.1s in ...`, that names the MDV functions that were running, innermost first.
 - Tempo: one trace for each request to MDV, with a span for each database query and each MDV operation. The `mdv.get_byte_data` span carries `mdv.datasource`, `mdv.columns` and `mdv.bytes`. Log lines written during a request end in `trace_id=...`, and Grafana links them to their trace.
-
-Dashboards in `grafana/dashboards/` load into the **MDV** folder when Grafana starts.
 
 ## Leave a container out
 
