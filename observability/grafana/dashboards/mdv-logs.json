@@ -44,7 +44,7 @@
           "type": "loki",
           "uid": "loki"
         },
-        "query": "label_values({compose_project=~\"$project\"}, compose_service)",
+        "query": "label_values({container=~\".+\", compose_project=~\"$project\"}, compose_service)",
         "refresh": 2,
         "includeAll": true,
         "multi": true,
