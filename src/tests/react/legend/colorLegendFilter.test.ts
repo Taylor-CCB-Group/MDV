@@ -3,18 +3,15 @@ import DataStore from "@/datastore/DataStore";
 import Dimension from "@/datastore/Dimension";
 import {
     applyColorLegendFilter,
+    type ColorLegendFilterChart,
     clearColorLegendFilter,
     getActiveCategoricalColorLegendValue,
     getActiveContinuousColorLegendRange,
     restoreColorLegendFilter,
     setContinuousColorLegendFilter,
     toggleCategoricalColorLegendFilter,
-    type ColorLegendFilterChart,
 } from "@/react/legend/color_legend/colorLegendFilter";
-import type {
-    ColorLegendCategoricalSpec,
-    ColorLegendContinuousSpec,
-} from "@/react/legend/color_legend/types";
+import type { ColorLegendCategoricalSpec, ColorLegendContinuousSpec } from "@/react/legend/color_legend/types";
 
 function createChart(): ColorLegendFilterChart {
     const dimension = createDimension();
@@ -45,9 +42,7 @@ function createChartWithDimensions(): ColorLegendFilterChart {
     const categoryDimension = createDimension();
     const rangeDimension = createDimension();
     const dataStore = Object.assign(Object.create(DataStore.prototype), {
-        getDimension: vi.fn((type: string) =>
-            type === "category_dimension" ? categoryDimension : rangeDimension,
-        ),
+        getDimension: vi.fn((type: string) => (type === "category_dimension" ? categoryDimension : rangeDimension)),
     });
 
     return {
@@ -117,9 +112,7 @@ describe("colorLegendFilter", () => {
         const chart = createChart();
 
         toggleCategoricalColorLegendFilter(chart, categoricalSpec, "T-cell");
-        expect(getActiveCategoricalColorLegendValue(chart, categoricalSpec)).toBe(
-            "T-cell",
-        );
+        expect(getActiveCategoricalColorLegendValue(chart, categoricalSpec)).toBe("T-cell");
 
         toggleCategoricalColorLegendFilter(chart, categoricalSpec, "T-cell");
         expect(chart.colorLegendFilter).toBeNull();
@@ -184,10 +177,7 @@ describe("colorLegendFilter", () => {
         const chart = createChart();
 
         setContinuousColorLegendFilter(chart, continuousSpec, [10, 50]);
-        expect(getActiveContinuousColorLegendRange(chart, continuousSpec)).toEqual([
-            10,
-            50,
-        ]);
+        expect(getActiveContinuousColorLegendRange(chart, continuousSpec)).toEqual([10, 50]);
         expect(chart.setColorLegend).not.toHaveBeenCalled();
 
         setContinuousColorLegendFilter(chart, continuousSpec, null);

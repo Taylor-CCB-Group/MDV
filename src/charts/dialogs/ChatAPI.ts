@@ -1,8 +1,8 @@
-import { useProject } from "@/modules/ProjectContext";
+import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import * as z from 'zod/v4';
-import { useQuery } from '@tanstack/react-query';
+import * as z from "zod/v4";
+import { useProject } from "@/modules/ProjectContext";
 import { useChartManager, useViewManager } from "@/react/hooks";
 
 type ParsedProviderError = {
@@ -44,10 +44,7 @@ function formatChatError(error: unknown): string {
     const rawMessage =
         (error instanceof Error && error.message) ||
         (typeof error === "string" ? error : undefined) ||
-        (typeof error === "object" &&
-            error !== null &&
-            "message" in error &&
-            typeof error.message === "string"
+        (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
             ? error.message
             : undefined) ||
         axiosMessage ||
@@ -56,8 +53,7 @@ function formatChatError(error: unknown): string {
     const cleaned = rawMessage.replace(/^ERROR:\s*/i, "").trim();
     const parsed = parseProviderError(cleaned);
     const friendlyReason =
-        parsed.providerMessage ??
-        (parsed.statusCode ? `Request failed with status ${parsed.statusCode}.` : cleaned);
+        parsed.providerMessage ?? (parsed.statusCode ? `Request failed with status ${parsed.statusCode}.` : cleaned);
     const recoveryHint = getRecoveryHint(parsed);
     const statusLine = parsed.statusCode ? `- **HTTP status:** ${parsed.statusCode}\n` : "";
     const typeLine = parsed.providerType ? `- **Type:** ${parsed.providerType}\n` : "";
@@ -72,9 +68,7 @@ function formatChatError(error: unknown): string {
         `- ${recoveryHint}`,
         "- Retry after resolving the issue above.",
         "",
-        ...(statusLine || typeLine || codeLine
-            ? ["Technical details:", statusLine + typeLine + codeLine]
-            : []),
+        ...(statusLine || typeLine || codeLine ? ["Technical details:", statusLine + typeLine + codeLine] : []),
         "<details><summary>Raw error details</summary>",
         "",
         "```",
@@ -87,10 +81,10 @@ function formatChatError(error: unknown): string {
 
 const completedChatResponseSchema = z.object({
     message: z.string(),
-    /** 
+    /**
      * This should be a string that identifies newly created views.
      */
-    view: z.optional(z.string()).describe('The name of the newly created view, if a view was created'),
+    view: z.optional(z.string()).describe("The name of the newly created view, if a view was created"),
     /** Provenance summary (technical; not duplicated in the view). */
     verification: z.string().optional().nullable(),
     /** Truncated stdout from executed script (tabular preview). */
@@ -106,23 +100,23 @@ const completedChatResponseSchema = z.object({
 const chatModelSchema = z.object({
     id: z.string(),
     label: z.string(),
-    provider: z.enum(['openai', 'ollama']),
+    provider: z.enum(["openai", "ollama"]),
     model: z.string(),
-    kind: z.enum(['chat', 'embedding']),
+    kind: z.enum(["chat", "embedding"]),
     available: z.boolean().optional(),
 });
 
 export type ChatModelOption = z.infer<typeof chatModelSchema>;
 
-const CHAT_MODEL_STORAGE_KEY = 'chatmdv-selected-model';
-const CHAT_DATASOURCE_STORAGE_KEY = 'chatmdv-selected-datasources';
-const CHAT_DATASOURCE_MODE_STORAGE_KEY = 'chatmdv-datasource-mode';
+const CHAT_MODEL_STORAGE_KEY = "chatmdv-selected-model";
+const CHAT_DATASOURCE_STORAGE_KEY = "chatmdv-selected-datasources";
+const CHAT_DATASOURCE_MODE_STORAGE_KEY = "chatmdv-datasource-mode";
 
-export type DatasourceMode = 'auto' | 'manual';
+export type DatasourceMode = "auto" | "manual";
 
 const chatDatasourceSchema = z.object({
     name: z.string(),
-    role: z.enum(['obs', 'expression', 'table']),
+    role: z.enum(["obs", "expression", "table"]),
     row_count: z.number().nullable().optional(),
 });
 
@@ -140,7 +134,7 @@ const chatInitResponseSchema = z.object({
 type ChatInitResponse = z.infer<typeof chatInitResponseSchema>;
 
 const chatProgressSchema = z.object({
-    id: z.string().describe('The ID of the message this progress is associated with'),
+    id: z.string().describe("The ID of the message this progress is associated with"),
     progress: z.number(),
     delta: z.number(),
     message: z.string(),
@@ -162,7 +156,7 @@ const chatLogItemSchema = z.object({
     // id: z.string(),
     //nullable as well as optional because of some data that had null during development...
     //the offending code was never merged so that is just for testing
-    //these fields are expected to always be present on actual 
+    //these fields are expected to always be present on actual
     conversation_id: z.string().optional().nullable(),
     timestamp: z.string().optional(),
     view_name: z.string().optional().nullable(),
@@ -198,18 +192,17 @@ export type ChatMessage = {
     datasource_mode?: DatasourceMode;
     /** Datasources inferred by the backend (auto mode). */
     resolved_datasource_names?: string[];
-    sender: 'user' | 'bot' | 'system';
+    sender: "user" | "bot" | "system";
     id: string;
     conversationId: string;
     error?: boolean;
 };
 
-
 export type ConversationLog = {
-    logText: string,
-    logLength: number,
-    messages: ChatMessage[],
-}
+    logText: string;
+    logLength: number;
+    messages: ChatMessage[];
+};
 
 export type ConversationMap = Record<string, ConversationLog>;
 
@@ -224,7 +217,7 @@ function generateConversationId() {
 /** viewName could be a prop of ProjectProvider, but currently not cleanly reactive */
 function getViewName(): string | null {
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('view');
+    return urlParams.get("view");
 }
 
 // this is now only used for the initial message, meaning that we can change the response format
@@ -244,7 +237,7 @@ const sendMessageSocket = async (
     conversationId: string,
     modelId?: string,
     time?: number,
-    datasourceMode: DatasourceMode = 'auto',
+    datasourceMode: DatasourceMode = "auto",
     datasourceNames?: string[],
 ) => {
     // consider refactoring to be a generator function, so that we can yield progress updates
@@ -252,15 +245,17 @@ const sendMessageSocket = async (
     if (!socket) return;
 
     const response = await new Promise<ChatResponse>((resolve, reject) => {
-        const timeout = time ? setTimeout(() => {
-            cleanup();
-            reject(new Error('Socket request timeout'));
-        }, time) : undefined;
+        const timeout = time
+            ? setTimeout(() => {
+                  cleanup();
+                  reject(new Error("Socket request timeout"));
+              }, time)
+            : undefined;
 
         const cleanup = () => {
             clearTimeout(timeout);
-            socket.off('chat_response', onChatResponse);
-            socket.off('chat_error', onError);
+            socket.off("chat_response", onChatResponse);
+            socket.off("chat_error", onError);
         };
 
         const onChatResponse = (data: any) => {
@@ -278,22 +273,22 @@ const sendMessageSocket = async (
             reject(error);
         };
 
-        socket.on('chat_response', onChatResponse);
-        socket.on('chat_error', onError);
-        socket.emit('chat_request', {
+        socket.on("chat_response", onChatResponse);
+        socket.on("chat_error", onError);
+        socket.emit("chat_request", {
             message,
             id,
             conversation_id: conversationId,
             ...(modelId ? { model_id: modelId } : {}),
             datasource_mode: datasourceMode,
-            ...(datasourceMode === 'manual' && datasourceNames && datasourceNames.length > 0
+            ...(datasourceMode === "manual" && datasourceNames && datasourceNames.length > 0
                 ? { datasource_names: datasourceNames }
                 : {}),
         });
     });
 
     return response;
-}
+};
 // Parsing view name from the message's code
 // todo: Get view name from chat_log.json or use some other logic
 const parseViewName = (message: string) => {
@@ -305,13 +300,9 @@ const parseViewName = (message: string) => {
 };
 
 // Create conversation entry
-const createConversation = (
-        convMap: ConversationMap, 
-        conversationId: string, 
-        query: string
-    ): ConversationLog => {
+const createConversation = (convMap: ConversationMap, conversationId: string, query: string): ConversationLog => {
     if (!convMap[conversationId]) {
-        const isLegacy = conversationId === 'legacy';
+        const isLegacy = conversationId === "legacy";
         convMap[conversationId] = {
             logText: isLegacy ? `(LEGACY) ${query}` : query,
             logLength: 0,
@@ -325,18 +316,18 @@ const createConversation = (
 const createMessagePair = (log: ChatLogItem, conversationId: string) => {
     const id = generateId();
     const viewName = log?.view_name || parseViewName(log.response);
-    
+
     const userMessage: ChatMessage = {
         conversationId,
         id,
-        sender: 'user',
+        sender: "user",
         text: log.query,
     };
-    
+
     const botMessage: ChatMessage = {
         conversationId,
         id,
-        sender: 'bot',
+        sender: "bot",
         text: log.response,
         view: viewName,
         verification: log?.verification,
@@ -344,7 +335,7 @@ const createMessagePair = (log: ChatLogItem, conversationId: string) => {
         guidance: log?.guidance,
         error: log?.error,
     };
-    
+
     return [userMessage, botMessage];
 };
 
@@ -352,7 +343,7 @@ const createMessagePair = (log: ChatLogItem, conversationId: string) => {
 const SUGGESTED_QUESTIONS = [
     // "What columns are available in this project?",
     "Show me a summary of the cell data.",
-    "Show me a scatterplot of the UMAP coordinates, colored by cluster."
+    "Show me a scatterplot of the UMAP coordinates, colored by cluster.",
     // "How many rows are in the dataset?",
     // "What is the distribution of ages?",
     // "List all unique values in the 'region' column."
@@ -366,8 +357,8 @@ const useChat = () => {
     // const route = `${projectApiRoute}chat`;
     const routeInit = `${projectApiRoute}chat_init`;
     //! still need to consider that some things really are routes while others are just names
-    const chatProgressEvent = 'chat_progress';
-    const chatlogEvent = 'chat';
+    const chatProgressEvent = "chat_progress";
+    const chatlogEvent = "chat";
     // use sessionStorage to remember things like whether the chat is open or closed... localStorage for preferences like theme,
     //! but this might not be such a good idea for things like chat logs with sensitive information
     // const [messages, setMessages] = useState<ChatMessage[]>(JSON.parse(sessionStorage.getItem('chatMessages') as any) || []);
@@ -385,10 +376,10 @@ const useChat = () => {
     const [chatLog, setChatLog] = useState<ChatLogItem[]>([]);
     const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
     const [availableModels, setAvailableModels] = useState<ChatModelOption[]>([]);
-    const [selectedModelId, setSelectedModelId] = useState<string>('');
+    const [selectedModelId, setSelectedModelId] = useState<string>("");
     const [availableDatasources, setAvailableDatasources] = useState<ChatDatasourceOption[]>([]);
     const [selectedDatasourceNames, setSelectedDatasourceNames] = useState<string[]>([]);
-    const [datasourceMode, setDatasourceMode] = useState<DatasourceMode>('auto');
+    const [datasourceMode, setDatasourceMode] = useState<DatasourceMode>("auto");
 
     const datasourceStorageKey = `${CHAT_DATASOURCE_STORAGE_KEY}:${projectName}`;
     const datasourceModeStorageKey = `${CHAT_DATASOURCE_MODE_STORAGE_KEY}:${projectName}`;
@@ -396,64 +387,70 @@ const useChat = () => {
     const applyDatasourceMode = useCallback(() => {
         try {
             const stored = sessionStorage.getItem(datasourceModeStorageKey);
-            if (stored === 'manual' || stored === 'auto') {
+            if (stored === "manual" || stored === "auto") {
                 setDatasourceMode(stored);
             } else {
-                setDatasourceMode('auto');
+                setDatasourceMode("auto");
             }
         } catch {
-            setDatasourceMode('auto');
+            setDatasourceMode("auto");
         }
     }, [datasourceModeStorageKey]);
 
-    const onDatasourceModeChange = useCallback((mode: DatasourceMode) => {
-        setDatasourceMode(mode);
-        sessionStorage.setItem(datasourceModeStorageKey, mode);
-    }, [datasourceModeStorageKey]);
+    const onDatasourceModeChange = useCallback(
+        (mode: DatasourceMode) => {
+            setDatasourceMode(mode);
+            sessionStorage.setItem(datasourceModeStorageKey, mode);
+        },
+        [datasourceModeStorageKey],
+    );
 
-    const applyDatasourceSelection = useCallback((
-        datasources: ChatDatasourceOption[],
-        defaultNames?: string[],
-    ) => {
-        setAvailableDatasources(datasources);
-        if (datasources.length <= 1) {
-            setSelectedDatasourceNames(datasources.map((d) => d.name));
-            return;
-        }
-        const validNames = new Set(datasources.map((d) => d.name));
-        let stored: string[] = [];
-        try {
-            const raw = sessionStorage.getItem(datasourceStorageKey);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed)) {
-                    stored = parsed.filter((n): n is string => typeof n === 'string' && validNames.has(n));
+    const applyDatasourceSelection = useCallback(
+        (datasources: ChatDatasourceOption[], defaultNames?: string[]) => {
+            setAvailableDatasources(datasources);
+            if (datasources.length <= 1) {
+                setSelectedDatasourceNames(datasources.map((d) => d.name));
+                return;
+            }
+            const validNames = new Set(datasources.map((d) => d.name));
+            let stored: string[] = [];
+            try {
+                const raw = sessionStorage.getItem(datasourceStorageKey);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) {
+                        stored = parsed.filter((n): n is string => typeof n === "string" && validNames.has(n));
+                    }
                 }
+            } catch {
+                stored = [];
             }
-        } catch {
-            stored = [];
-        }
-        const defaults = (defaultNames ?? []).filter((n) => validNames.has(n));
-        const next = stored.length > 0 ? stored : (defaults.length > 0 ? defaults : [datasources[0].name]);
-        setSelectedDatasourceNames(next);
-    }, [datasourceStorageKey]);
+            const defaults = (defaultNames ?? []).filter((n) => validNames.has(n));
+            const next = stored.length > 0 ? stored : defaults.length > 0 ? defaults : [datasources[0].name];
+            setSelectedDatasourceNames(next);
+        },
+        [datasourceStorageKey],
+    );
 
-    const onDatasourcesChange = useCallback((names: string[]) => {
-        if (names.length === 0) return;
-        setSelectedDatasourceNames(names);
-        sessionStorage.setItem(datasourceStorageKey, JSON.stringify(names));
-    }, [datasourceStorageKey]);
+    const onDatasourcesChange = useCallback(
+        (names: string[]) => {
+            if (names.length === 0) return;
+            setSelectedDatasourceNames(names);
+            sessionStorage.setItem(datasourceStorageKey, JSON.stringify(names));
+        },
+        [datasourceStorageKey],
+    );
 
     const applyModelSelection = useCallback((models: ChatModelOption[], defaultModelId?: string | null) => {
-        const chatModels = models.filter((m) => m.kind === 'chat');
+        const chatModels = models.filter((m) => m.kind === "chat");
         setAvailableModels(chatModels);
         const stored = localStorage.getItem(CHAT_MODEL_STORAGE_KEY);
         const storedValid = stored && chatModels.some((m) => m.id === stored);
         const nextId = storedValid
             ? stored
-            : (defaultModelId && chatModels.some((m) => m.id === defaultModelId)
-                ? defaultModelId
-                : chatModels[0]?.id ?? '');
+            : defaultModelId && chatModels.some((m) => m.id === defaultModelId)
+              ? defaultModelId
+              : (chatModels[0]?.id ?? "");
         setSelectedModelId(nextId);
     }, []);
 
@@ -468,8 +465,12 @@ const useChat = () => {
     }, [cm.ipc]);
 
     // Use React Query to manage chat logs
-    const { data: chatLogData = [], isLoading: isChatLogLoading, isSuccess } = useQuery({
-        queryKey: ['chatLog'],
+    const {
+        data: chatLogData = [],
+        isLoading: isChatLogLoading,
+        isSuccess,
+    } = useQuery({
+        queryKey: ["chatLog"],
         queryFn: async () => {
             try {
                 const response = await axios.get(`${projectApiRoute}chat_log.json`);
@@ -493,17 +494,17 @@ const useChat = () => {
     useEffect(() => {
         if (chatLog.length > 0) {
             const newConversationMap: ConversationMap = {};
-        
+
             // Process each log entry
             chatLog.forEach((log) => {
-                const conversationId = log.conversation_id || 'legacy';
+                const conversationId = log.conversation_id || "legacy";
                 const conversation = createConversation(newConversationMap, conversationId, log.query);
                 const messages = createMessagePair(log, conversationId);
-                
+
                 conversation.messages.push(...messages);
                 conversation.logLength++;
             });
-            
+
             setConversationMap(newConversationMap);
         }
     }, [chatLog]);
@@ -518,50 +519,55 @@ const useChat = () => {
     }, [conversationId]);
 
     // Progress Listener
-    const progressListener = useCallback((data: any) => {
-        try {
-            const parsed = chatProgressSchema.parse(data);
-            if (parsed.id === currentRequestId) {
-                setRequestProgress(parsed);
+    const progressListener = useCallback(
+        (data: any) => {
+            try {
+                const parsed = chatProgressSchema.parse(data);
+                if (parsed.id === currentRequestId) {
+                    setRequestProgress(parsed);
+                }
+            } catch (error) {
+                console.error("Error parsing chat progress", error);
+                setRequestProgress({
+                    id: currentRequestId,
+                    progress: 0,
+                    delta: 100,
+                    message: data,
+                });
             }
-        } catch (error) {
-            console.error('Error parsing chat progress', error);
-            setRequestProgress({
-                id: currentRequestId,
-                progress: 0,
-                delta: 100,
-                message: data,
-            });
-        }
-    }, [currentRequestId]);
+        },
+        [currentRequestId],
+    );
 
     // Verbose Progress
     const handleVerboseProgress = useCallback((msg: string) => {
-        setVerboseProgress(v => [...v, msg].slice(-5));
+        setVerboseProgress((v) => [...v, msg].slice(-5));
     }, []);
 
     // Initiate chat function
     const chatInit = useCallback(async () => {
         if (isSending || isInit || isChatLogLoading) return;
-        
+
         try {
             setIsSending(true);
             setIsLoadingInit(true);
             const id = generateId();
             setCurrentRequestId(id);
             //! todo - we might use socket here, in which case we need to have a different routeInit
-            const response = await sendChatInitHttp('', id, routeInit, conversationId);
+            const response = await sendChatInitHttp("", id, routeInit, conversationId);
             if (!response) return;
             if (response?.error) throw response.message;
-            
+
             // Only set initial message if we don't have any messages yet
             if (messages.length === 0) {
-                setMessages([{
-                    text: response.message,
-                    sender: 'system',
-                    id: generateId(),
-                    conversationId,
-                }]);
+                setMessages([
+                    {
+                        text: response.message,
+                        sender: "system",
+                        id: generateId(),
+                        conversationId,
+                    },
+                ]);
             }
             // todo: Update when the endpoint is ready
             // const suggestedQuestions = await axios.get("");
@@ -575,38 +581,50 @@ const useChat = () => {
             applyDatasourceMode();
         } catch (error: any) {
             const errorMessage = formatChatError(error);
-            console.error('Error sending welcome message: ', errorMessage);
+            console.error("Error sending welcome message: ", errorMessage);
             if (messages.length === 0) {
-                setMessages([{
-                    text: errorMessage,
-                    sender: 'system',
-                    id: generateId(),
-                    conversationId,
-                    error: true,
-                }]);
+                setMessages([
+                    {
+                        text: errorMessage,
+                        sender: "system",
+                        id: generateId(),
+                        conversationId,
+                        error: true,
+                    },
+                ]);
             }
         } finally {
             setIsSending(false);
-            setCurrentRequestId('');
+            setCurrentRequestId("");
             setIsInit(true);
             setIsLoadingInit(false);
         }
-    }, [isSending, isInit, routeInit, conversationId, messages.length, isChatLogLoading, applyModelSelection, applyDatasourceSelection, applyDatasourceMode]);
+    }, [
+        isSending,
+        isInit,
+        routeInit,
+        conversationId,
+        messages.length,
+        isChatLogLoading,
+        applyModelSelection,
+        applyDatasourceSelection,
+        applyDatasourceMode,
+    ]);
 
     // Socket connection and Init chat
     useEffect(() => {
         if (!socket) return;
         if (!socket.connected) {
-            console.log('Socket not connected, skipping listener registration');
+            console.log("Socket not connected, skipping listener registration");
             return;
         }
 
         // todo: Add proper error handling
         const handleSocketError = (error: any) => {
-            console.error('Socket error in chat:', error);
+            console.error("Socket error in chat:", error);
         };
-        
-        socket.on('error', handleSocketError);
+
+        socket.on("error", handleSocketError);
         socket.on(chatProgressEvent, progressListener);
         socket.on(chatlogEvent, handleVerboseProgress);
 
@@ -615,81 +633,92 @@ const useChat = () => {
         }
 
         return () => {
-            socket?.off('error', handleSocketError);
+            socket?.off("error", handleSocketError);
             socket?.off(chatProgressEvent, progressListener);
             socket?.off(chatlogEvent, handleVerboseProgress);
         };
     }, [socket, progressListener, handleVerboseProgress, chatInit, isInit, isSending]);
-    
+
     // Send Message API
-    const sendAPI = useCallback(async (input: string) => {
-        if (!input.trim()) return;
-        if (!socket) return;
-        const id = generateId();
-        const viewName = getViewName();
-        console.log(`sending chat '${input}' from '${viewName}'`);
+    const sendAPI = useCallback(
+        async (input: string) => {
+            if (!input.trim()) return;
+            if (!socket) return;
+            const id = generateId();
+            const viewName = getViewName();
+            console.log(`sending chat '${input}' from '${viewName}'`);
 
-        try {
-            setIsSending(true);
-            setCurrentRequestId(id);
-            setMessages(prev => [...prev, {
-                text: input,
-                sender: 'user',
-                id: generateId(),
-                conversationId,
-                datasource_mode: datasourceMode,
-                datasource_names: datasourceMode === 'manual' ? [...selectedDatasourceNames] : undefined,
-            }])
-            
-            const response = await sendMessageSocket(
-                input,
-                id,
-                "",
-                conversationId,
-                selectedModelId || undefined,
-                undefined,
-                datasourceMode,
-                selectedDatasourceNames,
-            );
+            try {
+                setIsSending(true);
+                setCurrentRequestId(id);
+                setMessages((prev) => [
+                    ...prev,
+                    {
+                        text: input,
+                        sender: "user",
+                        id: generateId(),
+                        conversationId,
+                        datasource_mode: datasourceMode,
+                        datasource_names: datasourceMode === "manual" ? [...selectedDatasourceNames] : undefined,
+                    },
+                ]);
 
-            if (response) {
-                const allViews = viewManager.all_views;
-                // Add new view if it doesn't exist
-                const viewName = response?.view ?? parseViewName(response.message);
-                if (viewName && !allViews.includes(viewName)) {
-                    viewManager.setAllViews([...allViews, viewName])
-                }
-                setMessages(prev => [...prev, {
-                    text: response.message,
-                    sender: 'bot',
-                    id: generateId(),
+                const response = await sendMessageSocket(
+                    input,
+                    id,
+                    "",
                     conversationId,
-                    view: response?.view,
-                    verification: response?.verification ?? undefined,
-                    data_preview: response?.data_preview ?? undefined,
-                    guidance: response?.guidance ?? undefined,
-                    needs_refresh: response?.needs_refresh ?? false,
-                    resolved_datasource_names: response?.resolved_datasource_names ?? undefined,
-                }])
-            }
-        } catch (error: any) {
-            const errorMessage = formatChatError(error);
-            setMessages(prev => [...prev, {
-                text: errorMessage,
-                sender: 'bot',
-                id: generateId(),
-                conversationId,
-                error: true,
-            }]);
-            console.error("Error sending message: ", errorMessage);
-        } finally {
-            // queryClient.invalidateQueries({ queryKey: ['chatLog'] });
-            setIsSending(false);
-            setCurrentRequestId('');
-            setRequestProgress(null);
-        }
-    }, [conversationId, socket, viewManager, selectedModelId, selectedDatasourceNames, datasourceMode]);
+                    selectedModelId || undefined,
+                    undefined,
+                    datasourceMode,
+                    selectedDatasourceNames,
+                );
 
+                if (response) {
+                    const allViews = viewManager.all_views;
+                    // Add new view if it doesn't exist
+                    const viewName = response?.view ?? parseViewName(response.message);
+                    if (viewName && !allViews.includes(viewName)) {
+                        viewManager.setAllViews([...allViews, viewName]);
+                    }
+                    setMessages((prev) => [
+                        ...prev,
+                        {
+                            text: response.message,
+                            sender: "bot",
+                            id: generateId(),
+                            conversationId,
+                            view: response?.view,
+                            verification: response?.verification ?? undefined,
+                            data_preview: response?.data_preview ?? undefined,
+                            guidance: response?.guidance ?? undefined,
+                            needs_refresh: response?.needs_refresh ?? false,
+                            resolved_datasource_names: response?.resolved_datasource_names ?? undefined,
+                        },
+                    ]);
+                }
+            } catch (error: any) {
+                const errorMessage = formatChatError(error);
+                setMessages((prev) => [
+                    ...prev,
+                    {
+                        text: errorMessage,
+                        sender: "bot",
+                        id: generateId(),
+                        conversationId,
+                        error: true,
+                    },
+                ]);
+                console.error("Error sending message: ", errorMessage);
+            } finally {
+                // queryClient.invalidateQueries({ queryKey: ['chatLog'] });
+                setIsSending(false);
+                setCurrentRequestId("");
+                setRequestProgress(null);
+            }
+        },
+        [conversationId, socket, viewManager, selectedModelId, selectedDatasourceNames, datasourceMode],
+    );
 
     // Start New Conversation
     const startNewConversation = useCallback(async () => {
@@ -700,17 +729,19 @@ const useChat = () => {
             setIsLoadingInit(true);
             setCurrentRequestId(id);
             setIsSending(true);
-            const response = await sendChatInitHttp('', id, routeInit, newConversationId);
+            const response = await sendChatInitHttp("", id, routeInit, newConversationId);
             if (!response) return;
 
             if (response?.error) throw response.message;
             // Only set initial message if we don't have any messages yet
-            setMessages([{
-                text: response.message,
-                sender: 'system',
-                id: generateId(),
-                conversationId: newConversationId
-            }]);
+            setMessages([
+                {
+                    text: response.message,
+                    sender: "system",
+                    id: generateId(),
+                    conversationId: newConversationId,
+                },
+            ]);
             if (response?.models) {
                 applyModelSelection(response.models, response.default_model_id);
             }
@@ -720,13 +751,15 @@ const useChat = () => {
             applyDatasourceMode();
         } catch (error: any) {
             const errorMessage = formatChatError(error);
-            setMessages([{
-                text: errorMessage,
-                sender: 'system',
-                id: generateId(),
-                conversationId: newConversationId,
-                error: true,
-            }]);
+            setMessages([
+                {
+                    text: errorMessage,
+                    sender: "system",
+                    id: generateId(),
+                    conversationId: newConversationId,
+                    error: true,
+                },
+            ]);
             console.error("Error starting new conversation: ", errorMessage);
         } finally {
             setIsLoadingInit(false);
@@ -770,12 +803,12 @@ const useChat = () => {
 
 /**
  * This function is used to navigate to a different view.
- * 
+ *
  * @param view - The name of the view to navigate to.
  * @param needsRefresh - Whether the page will need to be refreshed after navigating - for example,
  * if datasources have changed. We should be able to determine this automatically in the future
  * (and ideally not need to refresh the page).
- * 
+ *
  * ! doesn't belong in this file, I intend to refactor soon, but for quick prototyping it's here
  */
 export async function navigateToView(view: string, needsRefresh = false, callback?: () => void) {
@@ -784,11 +817,7 @@ export async function navigateToView(view: string, needsRefresh = false, callbac
     } else {
         const params = new URLSearchParams(window.location.search);
         params.set("view", view);
-        window.history.replaceState(
-            {},
-            "",
-            `${window.location.pathname}?${params}`,
-        );
+        window.history.replaceState({}, "", `${window.location.pathname}?${params}`);
         window.location.reload();
     }
     callback?.();

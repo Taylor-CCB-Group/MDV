@@ -1,9 +1,9 @@
-import DensityScatterPlot from "./DensityScatterPlot.js";
-import BaseChart from "./BaseChart";
-import { createEl } from "../utilities/Elements.js";
-import { BaseDialog } from "../utilities/Dialog.js";
 import noUiSlider from "nouislider";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";
+import { BaseDialog } from "../utilities/Dialog.js";
+import { createEl } from "../utilities/Elements.js";
+import BaseChart from "./BaseChart";
+import DensityScatterPlot from "./DensityScatterPlot.js";
 
 export class ColorChannelDialog extends BaseDialog {
     constructor(viv, doc, ds) {
@@ -80,8 +80,7 @@ export class ColorChannelDialog extends BaseDialog {
             },
             addDiv,
         ).addEventListener("click", () => {
-            contents.ds.regions.avivator.default_channels =
-                this.viv.getSelectedChannelsNice();
+            contents.ds.regions.avivator.default_channels = this.viv.getSelectedChannelsNice();
             contents.ds.dirtyMetadata.add("regions");
         });
     }
@@ -135,10 +134,7 @@ export class ColorChannelDialog extends BaseDialog {
             cont,
         );
         sl.noUiSlider.on("update", (values) => {
-            item.contrastLimits = [
-                Number.parseFloat(values[0]),
-                Number.parseFloat(values[1]),
-            ];
+            item.contrastLimits = [Number.parseFloat(values[0]), Number.parseFloat(values[1])];
             this.viv.setChannel(item);
         });
         const cc = createEl(
@@ -206,17 +202,9 @@ class VivScatterPlot extends DensityScatterPlot {
         }
         super(dataStore, div, config, { x: {}, y: {} });
         if (config.viv) {
-            this.addMenuIcon(
-                "fas fa-palette",
-                "Alter Channels",
-            ).addEventListener(
+            this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener(
                 "click",
-                (e) =>
-                    new ColorChannelDialog(
-                        this.viv,
-                        this.__doc__,
-                        this.dataStore,
-                    ),
+                (e) => new ColorChannelDialog(this.viv, this.__doc__, this.dataStore),
             );
         }
     }
@@ -241,11 +229,7 @@ class VivScatterPlot extends DensityScatterPlot {
     centerGraph() {
         super.centerGraph();
         if (this.viv) {
-            this.viv.setPanZoom(
-                this.app.offset,
-                this.app.x_scale,
-                this.app.y_scale,
-            );
+            this.viv.setPanZoom(this.app.offset, this.app.x_scale, this.app.y_scale);
         }
     }
 
@@ -286,47 +270,43 @@ class VivScatterPlot extends DensityScatterPlot {
             });
             this.graphDiv.prepend(this.vivCanvas);
 
-            import("../webgl/VivViewerMDV.js").then(
-                ({ default: VivViewerMDV }) => {
-                    //new config
-                    const r = this.dataStore.regions;
-                    const vc = Object.assign({}, c.viv);
-                    //local or remote url
-                    if (r) {
-                        const i = r.all_regions[c.region].viv_image;
-                        //c.viv.url = i.url ? i.url : getProjectURL(r.avivator.base_url) + i.file;
-                        let url = i.url
-                            ? i.url
-                            : getProjectURL(r.avivator.base_url) + i.file;
-                        //is specified by file and base
-                        if (!url) {
-                            //nb: I patched above to use getProjectURL, and this may be redundant
-                            let base = r.avivator.base_url;
-                            //has to be full url
-                            if (!base.startsWith("http")) {
-                                if (base.startsWith("/")) {
-                                    base = window.location.origin + base;
-                                } else {
-                                    if (base.startsWith("./")) {
-                                        base = base.substring(2);
-                                    }
-                                    base = `${window.location.href.split("?")[0]}/${base}`;
+            import("../webgl/VivViewerMDV.js").then(({ default: VivViewerMDV }) => {
+                //new config
+                const r = this.dataStore.regions;
+                const vc = Object.assign({}, c.viv);
+                //local or remote url
+                if (r) {
+                    const i = r.all_regions[c.region].viv_image;
+                    //c.viv.url = i.url ? i.url : getProjectURL(r.avivator.base_url) + i.file;
+                    let url = i.url ? i.url : getProjectURL(r.avivator.base_url) + i.file;
+                    //is specified by file and base
+                    if (!url) {
+                        //nb: I patched above to use getProjectURL, and this may be redundant
+                        let base = r.avivator.base_url;
+                        //has to be full url
+                        if (!base.startsWith("http")) {
+                            if (base.startsWith("/")) {
+                                base = window.location.origin + base;
+                            } else {
+                                if (base.startsWith("./")) {
+                                    base = base.substring(2);
                                 }
+                                base = `${window.location.href.split("?")[0]}/${base}`;
                             }
-                            url = base + i.file;
                         }
-                        vc.url = url;
+                        url = base + i.file;
                     }
-                    this.viv = new VivViewerMDV(this.vivCanvas, vc, this.app);
-                    this.app.addHandler(
-                        "pan_or_zoom",
-                        (offset, x_scale, y_scale) => {
-                            this.viv.setPanZoom(offset, x_scale, y_scale);
-                        },
-                        `${c.id}_viv`,
-                    );
-                },
-            );
+                    vc.url = url;
+                }
+                this.viv = new VivViewerMDV(this.vivCanvas, vc, this.app);
+                this.app.addHandler(
+                    "pan_or_zoom",
+                    (offset, x_scale, y_scale) => {
+                        this.viv.setPanZoom(offset, x_scale, y_scale);
+                    },
+                    `${c.id}_viv`,
+                );
+            });
         }
         return super.afterAppCreation();
     }

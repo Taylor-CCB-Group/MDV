@@ -65,12 +65,7 @@ function ColorFields({
     );
 }
 
-export default function ShapesLayerPanel({
-    config,
-    updateLayer,
-    association,
-    dataStore,
-}: Props) {
+export default function ShapesLayerPanel({ config, updateLayer, association, dataStore }: Props) {
     const fillColor = config.fillColor ?? [200, 200, 200, 120];
     const strokeColor = config.strokeColor ?? [255, 255, 255, 200];
     const tooltipFields = config.tooltipFields ?? [];
@@ -86,7 +81,7 @@ export default function ShapesLayerPanel({
                 onTooltipFieldsChange={(next, spec) =>
                     updateLayer({
                         tooltipFields: next,
-                        mdvFieldSpecs:{ ...specs, tooltipFields: spec },
+                        mdvFieldSpecs: { ...specs, tooltipFields: spec },
                     })
                 }
             />
@@ -98,7 +93,7 @@ export default function ShapesLayerPanel({
                 onChange={(next, spec) =>
                     updateLayer({
                         fillColorByColumn: next,
-                        mdvFieldSpecs:{ ...specs, fillColorByColumn: spec },
+                        mdvFieldSpecs: { ...specs, fillColorByColumn: spec },
                     })
                 }
             />
@@ -121,11 +116,7 @@ export default function ShapesLayerPanel({
                     }}
                 />
             </div>
-            <ColorFields
-                label="Fill color"
-                value={fillColor}
-                onChange={(next) => updateLayer({ fillColor: next })}
-            />
+            <ColorFields label="Fill color" value={fillColor} onChange={(next) => updateLayer({ fillColor: next })} />
             <ColorFields
                 label="Stroke color"
                 value={strokeColor}

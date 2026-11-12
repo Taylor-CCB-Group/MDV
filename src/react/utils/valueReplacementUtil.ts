@@ -1,9 +1,5 @@
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
-import {
-    formatDateDays,
-    isDateColumn,
-    parseDateDays,
-} from "@/lib/dateFormat";
+import { formatDateDays, isDateColumn, parseDateDays } from "@/lib/dateFormat";
 import {
     getMultitextCapacity,
     getMultitextDelimiter,
@@ -23,7 +19,7 @@ export const replaceValueInString = (findValue: string, replaceValue: string, ce
     if (!findValue || !cellValue) {
         return cellValue;
     }
-    
+
     // Escape special characters
     const escapedFind = findValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -282,7 +278,7 @@ export const setCellValueFromString = (
         const decodedValues = decodeCategoricalData(column);
         decodedValues[dataIndex] = newValue;
         rewriteCategoricalDataFromLabels(column, decodedValues, maxValues);
-        return; 
+        return;
     }
 
     // numeric
@@ -291,26 +287,20 @@ export const setCellValueFromString = (
         if (isDateColumn(column)) {
             // Prefer YYYY-MM-DD; otherwise accept a finite day-number string.
             // Avoid parseDateDays' Date.parse fallback, which treats "18262" as a year.
-            const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(newValue.trim())
-                ? parseDateDays(newValue)
-                : null;
+            const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(newValue.trim()) ? parseDateDays(newValue) : null;
             numValue = parsedDate ?? Number.parseFloat(newValue);
             if (!Number.isFinite(numValue)) {
-                throw new Error(
-                    `Invalid date value "${newValue}" for date column: ${column.field}`,
-                );
+                throw new Error(`Invalid date value "${newValue}" for date column: ${column.field}`);
             }
         } else {
             numValue = Number.parseFloat(newValue);
             if (!Number.isFinite(numValue)) {
-                throw new Error(
-                    `Invalid number value "${newValue}" for ${datatype} column: ${column.field}`,
-                );
+                throw new Error(`Invalid number value "${newValue}" for ${datatype} column: ${column.field}`);
             }
         }
 
         data[dataIndex] = numValue;
-        return; 
+        return;
     }
 
     // multitext
@@ -406,7 +396,9 @@ export const replaceMatches = (
     try {
         currentValue = getCellValueAsString(column, dataIndex);
     } catch (error) {
-        console.error(`Failed to get current cell value in column "${searchColumn}": ${error instanceof Error ? error.message : String(error)}`);
+        console.error(
+            `Failed to get current cell value in column "${searchColumn}": ${error instanceof Error ? error.message : String(error)}`,
+        );
         throw new Error(
             `Failed to get current cell value in column "${searchColumn}": ${error instanceof Error ? error.message : String(error)}`,
         );

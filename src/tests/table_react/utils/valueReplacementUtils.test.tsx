@@ -1,3 +1,4 @@
+import { describe, expect, test } from "vitest";
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import {
     getCellValueAsString,
@@ -5,7 +6,6 @@ import {
     replaceValueInString,
     setCellValueFromString,
 } from "@/react/utils/valueReplacementUtil";
-import { describe, expect, test } from "vitest";
 
 describe("valueReplacementUtils", () => {
     // replaceValueInString

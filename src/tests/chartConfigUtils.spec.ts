@@ -1,315 +1,312 @@
-import { describe, test, expect, vi, beforeEach, beforeAll } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 // Load link_utils before chartConfigUtils so Vitest uses Vite transform (not vi.importActual / Node strip-types).
-import { RowsAsColsQuery } from '@/links/link_utils';
-import {
-  deserialiseParam,
-  initialiseChartConfig,
-  getConcreteFieldNames
-} from '../charts/chartConfigUtils';
-import type DataStore from '../datastore/DataStore';
-import type BaseChartT from '../charts/BaseChart';
-import type { BaseConfig } from '../charts/BaseChart';
-type BaseChart = BaseChartT<BaseConfig>
+import { RowsAsColsQuery } from "@/links/link_utils";
+import type BaseChartT from "../charts/BaseChart";
+import type { BaseConfig } from "../charts/BaseChart";
+import { deserialiseParam, getConcreteFieldNames, initialiseChartConfig } from "../charts/chartConfigUtils";
+import type DataStore from "../datastore/DataStore";
+
+type BaseChart = BaseChartT<BaseConfig>;
 
 beforeAll(() => {
-  vi.spyOn(RowsAsColsQuery, 'fromSerialized');
+    vi.spyOn(RowsAsColsQuery, "fromSerialized");
 });
 
-describe('chartConfigUtils - deserialisation', () => {
-  let mockDataStore: any;
-  let mockChart: any;
+describe("chartConfigUtils - deserialisation", () => {
+    let mockDataStore: any;
+    let mockChart: any;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(RowsAsColsQuery.fromSerialized).mockReset();
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(RowsAsColsQuery.fromSerialized).mockReset();
 
-    mockDataStore = {
-      name: 'test-datastore',
-      columnIndex: {
-        'col1': { name: 'col1', datatype: 'double' },
-        'col2': { name: 'col2', datatype: 'text' },
-      },
-    };
-
-    mockChart = {
-      dataStore: mockDataStore,
-      deferredInit: vi.fn((fn) => fn()), // Execute immediately for tests
-      setTitle: vi.fn(),
-      colorByColumn: vi.fn(),
-      setToolTipColumn: vi.fn(),
-      mobxAutorun: vi.fn(),
-    };
-  });
-
-  describe('deserialiseParam', () => {
-    test('returns string unchanged', () => {
-      const result = deserialiseParam(mockDataStore as DataStore, 'col1');
-      expect(result).toBe('col1');
-    });
-
-    test('deserializes RowsAsColsQuery object', () => {
-      const mockQuery = {
-        linkedDsName: 'genes',
-        maxItems: 10,
-        type: 'RowsAsColsQuery' as const
-      };
-      const mockQueryInstance = {
-        linkedDsName: 'genes',
-        maxItems: 10,
-        fields: ['gene1', 'gene2'],
-      };
-
-      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
-
-      const result = deserialiseParam(mockDataStore as DataStore, mockQuery);
-
-      expect(RowsAsColsQuery.fromSerialized).toHaveBeenCalledWith(mockDataStore, mockQuery);
-      expect(result).toBe(mockQueryInstance);
-    });
-
-    test('throws on invalid param', () => {
-      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(null as any);
-
-      expect(() => {
-        deserialiseParam(mockDataStore as DataStore, { type: 'RowsAsColsQuery' } as any);
-      }).toThrow('Failed to deserialise param');
-    });
-  });
-
-  describe('getConcreteFieldNames', () => {
-    test('handles string input', () => {
-      expect(getConcreteFieldNames('col1')).toEqual(['col1']);
-    });
-
-    test('handles object with fields array', () => {
-      const fieldSpec = { fields: ['col1', 'col2'] };
-      expect(getConcreteFieldNames(fieldSpec as any)).toEqual(['col1', 'col2']);
-    });
-
-    test('handles array of strings', () => {
-      expect(getConcreteFieldNames(['col1', 'col2'])).toEqual(['col1', 'col2']);
-    });
-
-    test('handles array with mixed strings and objects', () => {
-      const fieldSpecs = ['col1', { fields: ['col2', 'col3'] }];
-      expect(getConcreteFieldNames(fieldSpecs as any)).toEqual(['col1', 'col2', 'col3']);
-    });
-  });
-
-  describe('initialiseChartConfig - recursive deserialization', () => {
-    test('deserializes primitives unchanged', () => {
-      const config = {
-        id: 'test-id',
-        title: 'Test Chart',
-        type: 'box_plot',
-        param: ['col1'],
-        size: [400, 300],
-      };
-
-      const result = initialiseChartConfig(config as any, mockChart as BaseChart);
-
-      expect(result.title).toBe('Test Chart');
-      expect(result.type).toBe('box_plot');
-      expect(result.param).toEqual(['col1']);
-    });
-
-    test('recursively deserializes nested RowsAsColsQuery in param array', () => {
-      const mockQuerySerialized = {
-        linkedDsName: 'genes',
-        maxItems: 5,
-        type: 'RowsAsColsQuery' as const,
-      };
-      const mockQueryInstance = {
-        linkedDsName: 'genes',
-        maxItems: 5,
-        fields: ['gene1', 'gene2'],
-      };
-
-      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
-
-      const config = {
-        id: 'test-id',
-        title: 'Test Chart',
-        type: 'box_plot',
-        param: ['col1', mockQuerySerialized],
-        size: [400, 300],
-      };
-
-      const result = initialiseChartConfig(config as any, mockChart as BaseChart);
-
-      expect(result.param).toHaveLength(2);
-      expect(result.param[0]).toBe('col1');
-      expect(result.param[1]).toBe(mockQueryInstance);
-      expect(RowsAsColsQuery.fromSerialized).toHaveBeenCalledWith(mockDataStore, mockQuerySerialized);
-    });
-
-    test('handles deeply nested RowsAsColsQuery objects', () => {
-      const mockQuerySerialized = {
-        linkedDsName: 'genes',
-        maxItems: 3,
-        type: 'RowsAsColsQuery' as const,
-      };
-      const mockQueryInstance = {
-        linkedDsName: 'genes',
-        maxItems: 3,
-        fields: ['gene1'],
-      };
-
-      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
-
-      const config = {
-        id: 'test-id',
-        title: 'Test Chart',
-        type: 'custom_chart',
-        nested: {
-          level1: {
-            level2: {
-              query: mockQuerySerialized,
+        mockDataStore = {
+            name: "test-datastore",
+            columnIndex: {
+                col1: { name: "col1", datatype: "double" },
+                col2: { name: "col2", datatype: "text" },
             },
-          },
-        },
-        param: [],
-        size: [400, 300],
-      };
+        };
 
-      const result = initialiseChartConfig(config as any, mockChart as BaseChart);
-
-      expect(result.nested.level1.level2.query).toBe(mockQueryInstance);
+        mockChart = {
+            dataStore: mockDataStore,
+            deferredInit: vi.fn((fn) => fn()), // Execute immediately for tests
+            setTitle: vi.fn(),
+            colorByColumn: vi.fn(),
+            setToolTipColumn: vi.fn(),
+            mobxAutorun: vi.fn(),
+        };
     });
 
-    test('handles color_by deserialization and calls colorByColumn', () => {
-      const mockQuerySerialized = {
-        linkedDsName: 'genes',
-        maxItems: 1,
-        type: 'RowsAsColsQuery' as const,
-      };
-      const mockQueryInstance = {
-        linkedDsName: 'genes',
-        maxItems: 1,
-        fields: ['gene1'],
-      };
+    describe("deserialiseParam", () => {
+        test("returns string unchanged", () => {
+            const result = deserialiseParam(mockDataStore as DataStore, "col1");
+            expect(result).toBe("col1");
+        });
 
-      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
+        test("deserializes RowsAsColsQuery object", () => {
+            const mockQuery = {
+                linkedDsName: "genes",
+                maxItems: 10,
+                type: "RowsAsColsQuery" as const,
+            };
+            const mockQueryInstance = {
+                linkedDsName: "genes",
+                maxItems: 10,
+                fields: ["gene1", "gene2"],
+            };
 
-      const config = {
-        id: 'test-id',
-        title: 'Test Chart',
-        type: 'scatter',
-        param: [],
-        color_by: mockQuerySerialized,
-        size: [400, 300],
-      };
+            vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
 
-      const result = initialiseChartConfig(config as any, mockChart as BaseChart);
+            const result = deserialiseParam(mockDataStore as DataStore, mockQuery);
 
-      expect(result.color_by).toBeUndefined();
-      expect(mockChart.deferredInit).toHaveBeenCalled();
-      expect(mockChart.colorByColumn).toHaveBeenCalledWith(mockQueryInstance);
+            expect(RowsAsColsQuery.fromSerialized).toHaveBeenCalledWith(mockDataStore, mockQuery);
+            expect(result).toBe(mockQueryInstance);
+        });
+
+        test("throws on invalid param", () => {
+            vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(null as any);
+
+            expect(() => {
+                deserialiseParam(mockDataStore as DataStore, { type: "RowsAsColsQuery" } as any);
+            }).toThrow("Failed to deserialise param");
+        });
     });
 
-    test('handles tooltip.column array deserialization', () => {
-      const mockQuerySerialized = {
-        linkedDsName: 'genes',
-        maxItems: 2,
-        type: 'RowsAsColsQuery' as const,
-      };
-      const mockQueryInstance = {
-        linkedDsName: 'genes',
-        maxItems: 2,
-        fields: ['gene1', 'gene2'],
-      };
+    describe("getConcreteFieldNames", () => {
+        test("handles string input", () => {
+            expect(getConcreteFieldNames("col1")).toEqual(["col1"]);
+        });
 
-      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
+        test("handles object with fields array", () => {
+            const fieldSpec = { fields: ["col1", "col2"] };
+            expect(getConcreteFieldNames(fieldSpec as any)).toEqual(["col1", "col2"]);
+        });
 
-      const config = {
-        id: 'test-id',
-        title: 'Test Chart',
-        type: 'scatter',
-        param: [],
-        tooltip: {
-          show: true,
-          column: [mockQuerySerialized],
-        },
-        size: [400, 300],
-      };
+        test("handles array of strings", () => {
+            expect(getConcreteFieldNames(["col1", "col2"])).toEqual(["col1", "col2"]);
+        });
 
-      const result = initialiseChartConfig(config as any, mockChart as BaseChart);
-
-      expect(result.tooltip.column).toEqual(['gene1', 'gene2']);
+        test("handles array with mixed strings and objects", () => {
+            const fieldSpecs = ["col1", { fields: ["col2", "col3"] }];
+            expect(getConcreteFieldNames(fieldSpecs as any)).toEqual(["col1", "col2", "col3"]);
+        });
     });
 
-    test('handles tooltip.column single value and calls setToolTipColumn', () => {
-      const mockQuerySerialized = {
-        linkedDsName: 'genes',
-        maxItems: 1,
-        type: 'RowsAsColsQuery' as const,
-      };
-      const mockQueryInstance = {
-        linkedDsName: 'genes',
-        maxItems: 1,
-        fields: ['gene1'],
-      };
+    describe("initialiseChartConfig - recursive deserialization", () => {
+        test("deserializes primitives unchanged", () => {
+            const config = {
+                id: "test-id",
+                title: "Test Chart",
+                type: "box_plot",
+                param: ["col1"],
+                size: [400, 300],
+            };
 
-      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
+            const result = initialiseChartConfig(config as any, mockChart as BaseChart);
 
-      const config = {
-        id: 'test-id',
-        title: 'Test Chart',
-        type: 'scatter',
-        param: [],
-        tooltip: {
-          show: true,
-          column: mockQuerySerialized,
-        },
-        size: [400, 300],
-      };
+            expect(result.title).toBe("Test Chart");
+            expect(result.type).toBe("box_plot");
+            expect(result.param).toEqual(["col1"]);
+        });
 
-      const result = initialiseChartConfig(config as any, mockChart as BaseChart);
+        test("recursively deserializes nested RowsAsColsQuery in param array", () => {
+            const mockQuerySerialized = {
+                linkedDsName: "genes",
+                maxItems: 5,
+                type: "RowsAsColsQuery" as const,
+            };
+            const mockQueryInstance = {
+                linkedDsName: "genes",
+                maxItems: 5,
+                fields: ["gene1", "gene2"],
+            };
 
-      expect(result.tooltip.column).toBe('gene1');
-      expect(mockChart.setToolTipColumn).toHaveBeenCalledWith(mockQueryInstance);
+            vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
+
+            const config = {
+                id: "test-id",
+                title: "Test Chart",
+                type: "box_plot",
+                param: ["col1", mockQuerySerialized],
+                size: [400, 300],
+            };
+
+            const result = initialiseChartConfig(config as any, mockChart as BaseChart);
+
+            expect(result.param).toHaveLength(2);
+            expect(result.param[0]).toBe("col1");
+            expect(result.param[1]).toBe(mockQueryInstance);
+            expect(RowsAsColsQuery.fromSerialized).toHaveBeenCalledWith(mockDataStore, mockQuerySerialized);
+        });
+
+        test("handles deeply nested RowsAsColsQuery objects", () => {
+            const mockQuerySerialized = {
+                linkedDsName: "genes",
+                maxItems: 3,
+                type: "RowsAsColsQuery" as const,
+            };
+            const mockQueryInstance = {
+                linkedDsName: "genes",
+                maxItems: 3,
+                fields: ["gene1"],
+            };
+
+            vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
+
+            const config = {
+                id: "test-id",
+                title: "Test Chart",
+                type: "custom_chart",
+                nested: {
+                    level1: {
+                        level2: {
+                            query: mockQuerySerialized,
+                        },
+                    },
+                },
+                param: [],
+                size: [400, 300],
+            };
+
+            const result = initialiseChartConfig(config as any, mockChart as BaseChart);
+
+            expect(result.nested.level1.level2.query).toBe(mockQueryInstance);
+        });
+
+        test("handles color_by deserialization and calls colorByColumn", () => {
+            const mockQuerySerialized = {
+                linkedDsName: "genes",
+                maxItems: 1,
+                type: "RowsAsColsQuery" as const,
+            };
+            const mockQueryInstance = {
+                linkedDsName: "genes",
+                maxItems: 1,
+                fields: ["gene1"],
+            };
+
+            vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
+
+            const config = {
+                id: "test-id",
+                title: "Test Chart",
+                type: "scatter",
+                param: [],
+                color_by: mockQuerySerialized,
+                size: [400, 300],
+            };
+
+            const result = initialiseChartConfig(config as any, mockChart as BaseChart);
+
+            expect(result.color_by).toBeUndefined();
+            expect(mockChart.deferredInit).toHaveBeenCalled();
+            expect(mockChart.colorByColumn).toHaveBeenCalledWith(mockQueryInstance);
+        });
+
+        test("handles tooltip.column array deserialization", () => {
+            const mockQuerySerialized = {
+                linkedDsName: "genes",
+                maxItems: 2,
+                type: "RowsAsColsQuery" as const,
+            };
+            const mockQueryInstance = {
+                linkedDsName: "genes",
+                maxItems: 2,
+                fields: ["gene1", "gene2"],
+            };
+
+            vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
+
+            const config = {
+                id: "test-id",
+                title: "Test Chart",
+                type: "scatter",
+                param: [],
+                tooltip: {
+                    show: true,
+                    column: [mockQuerySerialized],
+                },
+                size: [400, 300],
+            };
+
+            const result = initialiseChartConfig(config as any, mockChart as BaseChart);
+
+            expect(result.tooltip.column).toEqual(["gene1", "gene2"]);
+        });
+
+        test("handles tooltip.column single value and calls setToolTipColumn", () => {
+            const mockQuerySerialized = {
+                linkedDsName: "genes",
+                maxItems: 1,
+                type: "RowsAsColsQuery" as const,
+            };
+            const mockQueryInstance = {
+                linkedDsName: "genes",
+                maxItems: 1,
+                fields: ["gene1"],
+            };
+
+            vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
+
+            const config = {
+                id: "test-id",
+                title: "Test Chart",
+                type: "scatter",
+                param: [],
+                tooltip: {
+                    show: true,
+                    column: mockQuerySerialized,
+                },
+                size: [400, 300],
+            };
+
+            const result = initialiseChartConfig(config as any, mockChart as BaseChart);
+
+            expect(result.tooltip.column).toBe("gene1");
+            expect(mockChart.setToolTipColumn).toHaveBeenCalledWith(mockQueryInstance);
+        });
     });
-  });
 
-  describe('config round-trip serialization', () => {
-    test('config can be serialized and deserialized correctly', () => {
-      const mockQueryInstance = {
-        linkedDsName: 'genes',
-        maxItems: 5,
-        toJSON: () => ({
-          linkedDsName: 'genes',
-          maxItems: 5,
-          type: 'RowsAsColsQuery' as const,
-          subgroupName: 'gs',
-        }),
-        fields: ['gene1', 'gene2'],
-      };
+    describe("config round-trip serialization", () => {
+        test("config can be serialized and deserialized correctly", () => {
+            const mockQueryInstance = {
+                linkedDsName: "genes",
+                maxItems: 5,
+                toJSON: () => ({
+                    linkedDsName: "genes",
+                    maxItems: 5,
+                    type: "RowsAsColsQuery" as const,
+                    subgroupName: "gs",
+                }),
+                fields: ["gene1", "gene2"],
+            };
 
-      // Simulate serialization
-      const serializedConfig = JSON.stringify({
-        id: 'test-id',
-        title: 'Test Chart',
-        type: 'box_plot',
-        param: ['col1', mockQueryInstance],
-        size: [400, 300],
-      });
+            // Simulate serialization
+            const serializedConfig = JSON.stringify({
+                id: "test-id",
+                title: "Test Chart",
+                type: "box_plot",
+                param: ["col1", mockQueryInstance],
+                size: [400, 300],
+            });
 
-      const parsedConfig = JSON.parse(serializedConfig);
+            const parsedConfig = JSON.parse(serializedConfig);
 
-      // The serialized form should have the query in plain object form
-      expect(parsedConfig.param[1]).toEqual({
-        linkedDsName: 'genes',
-        maxItems: 5,
-        type: 'RowsAsColsQuery',
-        subgroupName: 'gs',
-      });
+            // The serialized form should have the query in plain object form
+            expect(parsedConfig.param[1]).toEqual({
+                linkedDsName: "genes",
+                maxItems: 5,
+                type: "RowsAsColsQuery",
+                subgroupName: "gs",
+            });
 
-      // Now deserialize it back
-      vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
+            // Now deserialize it back
+            vi.mocked(RowsAsColsQuery.fromSerialized).mockReturnValue(mockQueryInstance as any);
 
-      const result = initialiseChartConfig(parsedConfig, mockChart as BaseChart);
+            const result = initialiseChartConfig(parsedConfig, mockChart as BaseChart);
 
-      expect(result.param[1]).toBe(mockQueryInstance);
+            expect(result.param[1]).toBe(mockQueryInstance);
+        });
     });
-  });
 });

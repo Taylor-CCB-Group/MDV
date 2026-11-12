@@ -14,7 +14,8 @@ python/mdvtools/static
 .env
 
 # Editor and IDE files
-.claude
+.claude/
+**/.claude/
 # OS generated files
 .DS_Store
 .DS_Store?

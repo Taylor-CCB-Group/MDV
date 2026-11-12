@@ -1,14 +1,5 @@
 import { Close as CloseIcon } from "@mui/icons-material";
-import {
-    Box,
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    TextField,
-} from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField } from "@mui/material";
 import type React from "react";
 import { useCallback, useState } from "react";
 
@@ -25,7 +16,7 @@ export type DialogCloseIconButtonProps = {
     disabled?: boolean;
 };
 
-export const DialogCloseIconButton = ({onClose, disabled}: DialogCloseIconButtonProps) => {
+export const DialogCloseIconButton = ({ onClose, disabled }: DialogCloseIconButtonProps) => {
     return (
         <IconButton
             aria-label="close"
@@ -40,16 +31,10 @@ export const DialogCloseIconButton = ({onClose, disabled}: DialogCloseIconButton
         >
             <CloseIcon />
         </IconButton>
-    )
-}
+    );
+};
 
-const ProjectRenameModal: React.FC<ProjectRenameModalProps> = ({
-    id,
-    name,
-    open,
-    onRename,
-    onClose,
-}) => {
+const ProjectRenameModal: React.FC<ProjectRenameModalProps> = ({ id, name, open, onRename, onClose }) => {
     const [newName, setNewName] = useState(name);
     const handleSave = useCallback(() => {
         if (newName !== name) {

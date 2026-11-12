@@ -3,8 +3,8 @@ import {
     buildApiUrl,
     buildDashboardUrl,
     buildProjectUrl,
-    getAppMountPath,
     getApiRootFromDir,
+    getAppMountPath,
     getDashboardApiRoot,
     getProjectDirFromLocation,
     isDefaultPreviewApiRoot,
@@ -28,6 +28,14 @@ describe("mdvRouting", () => {
         expect(buildDashboardUrl("/")).toBe("/mdv/");
     });
 
+    test("detects app root from the refused-sign-in page at /login", () => {
+        setUrl("/login?denied=no_account");
+        expect(getAppMountPath()).toBe("/");
+
+        setUrl("/mdv/login?denied=no_account");
+        expect(getAppMountPath()).toBe("/mdv/");
+    });
+
     test("builds mounted project urls for same-origin deployments", () => {
         setUrl("/mdv/");
 
@@ -41,9 +49,7 @@ describe("mdvRouting", () => {
         expect(getAppMountPath()).toBe("/mdvmount/");
         expect(isProjectPath()).toBe(true);
         expect(shouldRenderDashboard()).toBe(false);
-        expect(getProjectDirFromLocation()).toBe(
-            `${window.location.origin}/mdvmount/project/174`,
-        );
+        expect(getProjectDirFromLocation()).toBe(`${window.location.origin}/mdvmount/project/174`);
         expect(buildApiUrl("projects", "/")).toBe("/mdvmount/projects");
         expect(buildProjectUrl("174", "/")).toBe("/mdvmount/project/174");
     });
@@ -69,9 +75,7 @@ describe("mdvRouting", () => {
 
         setUrl("/?dir=http://localhost:5055/project/174");
         expect(getDashboardApiRoot()).toBe("http://localhost:5055");
-        expect(getApiRootFromDir("http://localhost:5055/project/174")).toBe(
-            "http://localhost:5055",
-        );
+        expect(getApiRootFromDir("http://localhost:5055/project/174")).toBe("http://localhost:5055");
         expect(shouldRenderDashboard()).toBe(false);
     });
 

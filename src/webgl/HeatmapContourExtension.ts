@@ -1,15 +1,13 @@
-import { Layer } from "@deck.gl/core";
-import type { Buffer, Device, Texture } from '@luma.gl/core';
-import { Model } from '@luma.gl/engine';
-import { type LayerContext, project32 } from '@deck.gl/core';
-
+import { Layer, type LayerContext, project32 } from "@deck.gl/core";
+import type { Buffer, Device, Texture } from "@luma.gl/core";
+import { log } from "@luma.gl/core";
+import { Model } from "@luma.gl/engine";
 import heatmapPresentationFS from "./shaders/heatmap-presentation-layer-fragment.glsl";
 
-import { log } from '@luma.gl/core';
 // log.enable();
 log.level = 0;
 
-export type ExtraContourProps = { 
+export type ExtraContourProps = {
     contourOpacity: number;
     contourFill: number;
     fillOpacity: number;
@@ -48,7 +46,7 @@ const contourUniformCode = /*glsl*/ `uniform triangleUniforms {
     float contourFill;
     float fillOpacity;
 } triangle;
-`
+`;
 
 const triangleContourUniforms = {
     name: "triangle",
@@ -65,7 +63,6 @@ const triangleContourUniforms = {
     },
 };
 
-
 export type _TriangleLayerProps = {
     data: { attributes: { positions: Buffer; texCoords: Buffer } };
     colorDomain: number[];
@@ -79,7 +76,7 @@ export type _TriangleLayerProps = {
 };
 
 export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraContourProps> {
-    static layerName = 'TriangleLayerContours';
+    static layerName = "TriangleLayerContours";
 
     declare state: {
         model: Model;
@@ -88,10 +85,14 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
     };
 
     getShaders() {
-        // I see warnings about various moules not being found 
+        // I see warnings about various moules not being found
         // (picking - also layer, shadow, lighting, phongMaterial, gouraudMaterial), as well as
         // > Ignoring constant supplied for unknown attribute "instancePickingColors"
-        return super.getShaders({ vs: triangleVs, fs: heatmapPresentationFS, modules: [project32, triangleContourUniforms] });
+        return super.getShaders({
+            vs: triangleVs,
+            fs: heatmapPresentationFS,
+            modules: [project32, triangleContourUniforms],
+        });
     }
 
     initializeState({ device }: LayerContext): void {
@@ -106,16 +107,16 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
             id: this.props.id,
             attributes: data.attributes,
             bufferLayout: [
-                { name: 'positions', format: 'float32x3' },
-                { name: 'texCoords', format: 'float32x2' }
+                { name: "positions", format: "float32x3" },
+                { name: "texCoords", format: "float32x2" },
             ],
-            topology: 'triangle-strip',
+            topology: "triangle-strip",
             vertexCount,
-            
-            // if we include this, we get 
+
+            // if we include this, we get
             // """
-            // drawing TriangleLayerContours({id: 'scatter_-#srslt0detail-react#-contour1-triangle-layer'}) to screen: 
-            // Cannot read properties of undefined (reading 'setUniforms') 
+            // drawing TriangleLayerContours({id: 'scatter_-#srslt0detail-react#-contour1-triangle-layer'}) to screen:
+            // Cannot read properties of undefined (reading 'setUniforms')
             // TypeError: Cannot read properties of undefined (reading 'setUniforms')
             // """
             // indexBuffer: device.createBuffer(new Uint16Array([0, 1, 3, 1, 2, 3]))

@@ -1,29 +1,30 @@
+import { reaction, toJS } from "mobx";
+import { useEffect, useMemo, useState } from "react";
+import type { BaseConfig } from "@/charts/BaseChart";
 import type {
     AnyGuiSpec,
     CategoricalDataType,
     DataColumn,
+    DataType,
     Disposer,
-    LoadedDataColumn,
     FieldName,
+    LoadedDataColumn,
 } from "@/charts/charts";
-import { useEffect, useMemo, useState } from "react";
-import {
-    useCategoryFilterIndices,
-    useConfig,
-    useFilteredIndices,
-    useFieldSpec,
-    useParamColumns,
-    useFieldSpecs,
-} from "./hooks";
+import { type FieldSpec, type FieldSpecs, isColumnLoaded } from "@/lib/columnTypeHelpers";
+import { g, isArray } from "@/lib/utils";
+import type { CategoryLegendItem, FieldLegendItem } from "./components/FieldContourLegend";
 import { useDataStore } from "./context";
 // import { useDebounce } from "use-debounce";
 import { useViewState } from "./deck_state";
-import { g, isArray } from "@/lib/utils";
-import { reaction, toJS } from "mobx";
-import type { BaseConfig } from "@/charts/BaseChart";
-import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { getFieldColor } from "./fieldColorManager";
-import type { CategoryLegendItem, FieldLegendItem } from "./components/FieldContourLegend";
+import {
+    useCategoryFilterIndices,
+    useConfig,
+    useFieldSpec,
+    useFieldSpecs,
+    useFilteredIndices,
+    useParamColumns,
+} from "./hooks";
 // import { DataFilterExtension } from '@deck.gl/extensions';
 
 /** A contour drawn by `useLegacyDualContour`, as hovered in the density legend. */
@@ -59,13 +60,8 @@ export type FieldContourProps = {
     fillThreshold: number;
     fields?: LoadedDataColumn<"double">[];
     hoveredContour?: HoveredContour | null;
-}
-function rgb(
-    r: number,
-    g: number,
-    b: number,
-    a = 255,
-): [number, number, number, number] {
+};
+function rgb(r: number, g: number, b: number, a = 255): [number, number, number, number] {
     return [r, g, b, a];
 }
 // this is not the way to do it...
@@ -121,7 +117,6 @@ function useColorRange(
     return colorRange;
 }
 
-
 /**
  * Adjusts a contour's opacity or intensity for legend hover: the hovered contour is boosted
  * (clamped to 1.0), and every other contour is attenuated while anything is hovered.
@@ -140,23 +135,25 @@ function createBaseContourLayerProps(params: {
     cx: { data: ArrayLike<number> };
     cy: { data: ArrayLike<number> };
     radiusPixels: number;
+    /** The configured bandwidth, for layers that size their kernel in data units. */
+    bandwidth: number;
     fillOpacity: number;
     contourOpacity: number;
     contourFill: number;
     colorRange: readonly (readonly number[])[];
 }) {
-    const { id, data, cx, cy, radiusPixels, fillOpacity, contourOpacity, contourFill, colorRange } = params;
-    
+    const { id, data, cx, cy, radiusPixels, bandwidth, fillOpacity, contourOpacity, contourFill, colorRange } = params;
+
     return {
         id,
         data,
+        // the coordinate columns themselves, for layers that take arrays rather than accessors
+        x: cx.data,
+        y: cy.data,
         fillOpacity,
         contourOpacity,
         contourFill,
-        getPosition: (
-            i: number,
-            { target }: { target: number[] | Float32Array },
-        ) => {
+        getPosition: (i: number, { target }: { target: number[] | Float32Array }) => {
             target[0] = cx.data[i];
             target[1] = cy.data[i];
             target[2] = 0;
@@ -164,6 +161,7 @@ function createBaseContourLayerProps(params: {
         },
         colorRange,
         radiusPixels,
+        bandwidth,
         debounce: 1000,
         weightsTextureSize: 256, // Intermediate value for balanced performance and quality
         pickable: false,
@@ -171,8 +169,7 @@ function createBaseContourLayerProps(params: {
 }
 
 export function useCategoryContour(props: CategoryContourProps) {
-    const { id, parameter, category, fill, bandwidth, intensity, opacity, fillThreshold, hoveredContour } =
-        props;
+    const { id, parameter, category, fill, bandwidth, intensity, opacity, fillThreshold, hoveredContour } = props;
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
     const [cx, cy] = useParamColumns();
@@ -204,6 +201,7 @@ export function useCategoryContour(props: CategoryContourProps) {
             cx,
             cy,
             radiusPixels,
+            bandwidth,
             fillOpacity: getHoverEmphasis(intensity, isHovered, hoveredContour),
             contourOpacity: getHoverEmphasis(opacity, isHovered, hoveredContour),
             contourFill: fill ? fillThreshold : 10000,
@@ -228,9 +226,17 @@ export function useCategoryContour(props: CategoryContourProps) {
 }
 /** pending better definition */
 export type ContourLayerProps = ReturnType<typeof useCategoryContour>;
+/**
+ * A density field ready to weigh: numeric, with its data and range. A column whose load
+ * failed or is still under way is left out rather than read, as the weight cache reads
+ * `minMax` as soon as the layer props are built.
+ */
+function isLoadedDoubleColumn(column: DataColumn<DataType>): column is LoadedDataColumn<"double"> {
+    return column.datatype === "double" && isColumnLoaded(column) && column.minMax !== undefined;
+}
+
 export function useFieldContour(props: FieldContourProps) {
-    const { id, fill, bandwidth, intensity, opacity, fillThreshold, fields, hoveredContour } =
-        props;
+    const { id, fill, bandwidth, intensity, opacity, fillThreshold, fields, hoveredContour } = props;
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
     const [cx, cy] = useParamColumns();
@@ -267,17 +273,18 @@ export function useFieldContour(props: FieldContourProps) {
             const adjustedIntensity = getHoverEmphasis(intensity, isHovered, hoveredContour);
 
             const baseProps = createBaseContourLayerProps({
-                id: `${id}_${name}`,//if we base this id on index rather than name we might do some transitions
+                id: `${id}_${name}`, //if we base this id on index rather than name we might do some transitions
                 data, //todo filter sparse data
                 cx,
                 cy,
                 radiusPixels,
+                bandwidth,
                 fillOpacity: adjustedIntensity,
                 contourOpacity: adjustedOpacity,
                 contourFill: fill ? fillThreshold : 10000,
                 colorRange: [getFieldColor(fieldId)],
             });
-            
+
             return {
                 ...baseProps,
                 getWeight: (i: number) => {
@@ -295,6 +302,8 @@ export function useFieldContour(props: FieldContourProps) {
                     const normalizedValue = (value - min) / range;
                     return normalizedValue;
                 },
+                // what getWeight computes, so WebGPU's weight array survives a new closure
+                weightKey: [fieldData, minMax[0], minMax[1]] as const,
                 transitions: {
                     // nb - failed to get this working
                     // will need changes to the HeatmapContourExtension implementation
@@ -317,20 +326,7 @@ export function useFieldContour(props: FieldContourProps) {
                 // extensions: [new DataFilterExtension({filterSize: 1})]
             };
         });
-    }, [
-        id,
-        data,
-        intensity,
-        cx,
-        cy,
-        debounceZoom,
-        bandwidth,
-        fill,
-        opacity,
-        fillThreshold,
-        fields,
-        hoveredContour,
-    ]);
+    }, [id, data, intensity, cx, cy, debounceZoom, bandwidth, fill, opacity, fillThreshold, fields, hoveredContour]);
 }
 
 export type ContourVisualConfig = {
@@ -340,7 +336,7 @@ export type ContourVisualConfig = {
     contour_bandwidth: number;
     contour_intensity: number;
     contour_opacity: number;
-}
+};
 /** In future I think we want something more flexible & expressive,
  * but this should be somewhat compatible with the previous implementation
  */
@@ -582,7 +578,7 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
             continuous: true,
             label: "Fill Opacity",
             func(x) {
-                c.contour_intensity = x ** (1/3);
+                c.contour_intensity = x ** (1 / 3);
             },
         }),
         g({
@@ -593,10 +589,10 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
             continuous: false, //why so slow?
             label: "Contour Opacity",
             func(x) {
-                c.contour_opacity = x ** (1/3);
+                c.contour_opacity = x ** (1 / 3);
             },
         }),
-    ]
+    ];
 }
 
 /**
@@ -622,7 +618,7 @@ export function useLegacyDualContour(hoveredContour?: HoveredContour | null): Co
     const fieldContours = useFieldContour({
         ...commonProps,
         id: "fieldContours",
-        fields: fields.filter(field => field.datatype === "double") as LoadedDataColumn<"double">[],
+        fields: fields.filter(isLoadedDoubleColumn),
     });
     const contour1 = useCategoryContour({
         ...commonProps,
@@ -635,7 +631,7 @@ export function useLegacyDualContour(hoveredContour?: HoveredContour | null): Co
         category: category2,
     });
     const stableArray = useMemo(
-        () => [contour1, contour2, ...fieldContours].filter(v => v !== undefined),
+        () => [contour1, contour2, ...fieldContours].filter((v) => v !== undefined),
         [contour1, contour2, fieldContours],
     );
     return stableArray;
@@ -644,18 +640,18 @@ export function useLegacyDualContour(hoveredContour?: HoveredContour | null): Co
 /**
  * Hook that provides legend data for field contours.
  * Returns an array of field information with their stable colors for display in a legend.
- * 
+ *
  * @param densityFields - The densityFields config from DualContourLegacyConfig
  * @returns Array of FieldLegendItem objects with name, field identifier, and color
  */
 export function useFieldContourLegend(densityFields?: FieldSpecs): FieldLegendItem[] {
     const fields = useFieldSpecs(densityFields);
-    
+
     return useMemo(() => {
         // Filter to only double fields (matching the filter in useLegacyDualContour)
-        const doubleFields = fields.filter(field => field.datatype === "double");
-        
-        return doubleFields.map(field => ({
+        const doubleFields = fields.filter((field) => field.datatype === "double");
+
+        return doubleFields.map((field) => ({
             name: field.name,
             field: field.field,
             color: getFieldColor(field.field),

@@ -17,21 +17,14 @@ type TabHeaderProps<T extends string> = {
     indicatorTab?: T;
 };
 
-const TabHeader = <T extends string>({
-    activeTab,
-    setActiveTab,
-    tabs,
-    tabLabels,
-    indicatorTab,
-}: TabHeaderProps<T>) => {
+const TabHeader = <T extends string>({ activeTab, setActiveTab, tabs, tabLabels, indicatorTab }: TabHeaderProps<T>) => {
     const theme = useTheme();
     // TODO consider re-arranging this so we have more proper association with tab panels etc.
     return (
         <div className="w-full flex justify-around text-xs" role="tablist">
             {tabs.map((tab, i) => {
                 const selected = activeTab === tab;
-                const indicatorInList =
-                    indicatorTab !== undefined && tabs.includes(indicatorTab);
+                const indicatorInList = indicatorTab !== undefined && tabs.includes(indicatorTab);
                 const showCommitMark = indicatorInList && indicatorTab === tab;
                 const labelText = tabLabels?.[i] ?? tab;
                 const tabAccessibleName = showCommitMark ? `${labelText}, in active state` : labelText;
@@ -49,9 +42,7 @@ const TabHeader = <T extends string>({
                         )}
                         style={{
                             borderColor: selected ? theme.palette.primary.main : theme.palette.divider,
-                            color: selected
-                                ? theme.palette.primary.main
-                                : theme.palette.text.primary,
+                            color: selected ? theme.palette.primary.main : theme.palette.text.primary,
                         }}
                     >
                         <span className="inline-flex items-center justify-center gap-0.5 max-w-full">

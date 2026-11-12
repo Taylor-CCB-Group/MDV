@@ -1,5 +1,3 @@
-import { resolveAutoHistogramYScale } from "@/lib/utils";
-import { isArray } from "@/lib/utils";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 // some of this is quite bloated - could use dynamic imports for some of the more complex components
@@ -15,26 +13,27 @@ import {
     Select,
     Slider,
 } from "@mui/material";
+import { MAX_CHANNELS } from "@vivjs/constants";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { shallow } from "zustand/shallow";
+import { isArray, resolveAutoHistogramYScale } from "@/lib/utils";
 import { useTheme } from "../hooks";
-import { PopoverPicker } from "./ColorPicker";
-import HistogramWidget, { type HistogramLayer, type HistogramScaleType } from "./HistogramWidget";
+import { queryRasterHistogram, type RasterHistogram } from "../utils/rasterHistogram";
+import { COLOR_PALLETE } from "./avivatorish/constants";
 import {
-    type VivContextType,
-    VivProvider,
     useChannelsStore,
     useChannelsStoreApi,
     useLoader,
     useMetadata,
     useViewerStore,
     useViewerStoreApi,
+    type VivContextType,
+    VivProvider,
 } from "./avivatorish/state";
 import { getSingleSelectionStats } from "./avivatorish/utils";
-import { COLOR_PALLETE } from "./avivatorish/constants";
-import { MAX_CHANNELS } from "@vivjs/constants";
+import { PopoverPicker } from "./ColorPicker";
+import HistogramWidget, { type HistogramLayer, type HistogramScaleType } from "./HistogramWidget";
 import { useSpatialImagePanelContext } from "./spatialLayers/ImageLayerPanel";
-import { type RasterHistogram, queryRasterHistogram } from "../utils/rasterHistogram";
 
 const DEFAULT_BRIGHTNESS_CONTRAST = 0.5;
 
@@ -48,7 +47,7 @@ function createStableChannelId(layerId: string): string {
 
 function withChannelValue(values: number[], index: number, value: number) {
     return Array.from({ length: Math.max(values.length, index + 1) }, (_, i) =>
-        i === index ? value : values[i] ?? DEFAULT_BRIGHTNESS_CONTRAST,
+        i === index ? value : (values[i] ?? DEFAULT_BRIGHTNESS_CONTRAST),
     );
 }
 
@@ -239,9 +238,7 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     const spatialRef = useRef(spatial);
     spatialRef.current = spatial;
     const dark = useTheme() === "dark";
-    const limits = spatial
-        ? (spatial.contrastLimits[index] ?? domain)
-        : (contrastLimits[index] ?? domain);
+    const limits = spatial ? (spatial.contrastLimits[index] ?? domain) : (contrastLimits[index] ?? domain);
     const domainRef = useRef(domain);
     const limitsRef = useRef(limits);
     const [xScaleMode, setXScaleMode] = useState<ScaleMode>("auto");
@@ -301,9 +298,7 @@ const ChannelHistogram = ({ index }: { index: number }) => {
             limitsRef.current = nextValue;
             const panel = spatialRef.current;
             if (panel) {
-                const nextContrastLimits = panel.contrastLimits.map((limits, i) =>
-                    i === index ? nextValue : limits,
-                );
+                const nextContrastLimits = panel.contrastLimits.map((limits, i) => (i === index ? nextValue : limits));
                 panel.setChannels({ contrastLimits: nextContrastLimits });
                 return;
             }
@@ -369,6 +364,8 @@ const BrightnessContrast = ({ index }: { index: number }) => {
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     const contrastValue = contrast[index] ?? DEFAULT_BRIGHTNESS_CONTRAST;
     const brightnessValue = brightness[index] ?? DEFAULT_BRIGHTNESS_CONTRAST;
+    const toneUnavailable = spatial?.toneUnavailable ?? null;
+    const disabled = Boolean(isChannelLoading[index]) || toneUnavailable !== null;
     return (
         <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
             <div className="flex items-center gap-2">
@@ -377,7 +374,7 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                 </span>
                 <Slider
                     size="small"
-                    disabled={isChannelLoading[index]}
+                    disabled={disabled}
                     value={contrastValue}
                     min={0.1}
                     max={0.9}
@@ -409,7 +406,7 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                 </span>
                 <Slider
                     size="small"
-                    disabled={isChannelLoading[index]}
+                    disabled={disabled}
                     value={brightnessValue}
                     min={0.01}
                     max={0.99}
@@ -435,6 +432,9 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                     }}
                 />
             </div>
+            {toneUnavailable && (
+                <span className="text-[10px] text-[hsl(var(--muted-foreground))] sm:col-span-2">{toneUnavailable}</span>
+            )}
         </div>
     );
 };
@@ -610,7 +610,12 @@ const AddChannel = () => {
     const [isAddingChannel, setIsAddingChannel] = useState(false);
     // const { labels } = loader[0];
     // const channelsStore = useChannelsStoreApi();
-    const { selections, domains: channelDomains, contrastLimits: channelContrastLimits, setPropertiesForChannel } = useChannelsStore(
+    const {
+        selections,
+        domains: channelDomains,
+        contrastLimits: channelContrastLimits,
+        setPropertiesForChannel,
+    } = useChannelsStore(
         ({ selections, domains, contrastLimits, setPropertiesForChannel }) => ({
             selections,
             domains,
@@ -619,9 +624,7 @@ const AddChannel = () => {
         }),
         shallow,
     );
-    const canAddChannel = spatial
-        ? spatial.channelIds.length < MAX_CHANNELS
-        : selections.length < MAX_CHANNELS;
+    const canAddChannel = spatial ? spatial.channelIds.length < MAX_CHANNELS : selections.length < MAX_CHANNELS;
     const { addChannel, removeChannel } = useChannelsStore((state) => ({
         addChannel: state.addChannel,
         removeChannel: state.removeChannel,
@@ -679,15 +682,14 @@ const AddChannel = () => {
                         contrastLimits: channelContrastLimits[index] ?? channelContrastLimits[0] ?? [0, 255],
                     });
                     viewerStore.setState((state) => ({
-                        channelOptions: Array.from({ length: index + 1 }, (_, i) =>
-                            state.channelOptions[i] ?? `Channel ${i + 1}`,
+                        channelOptions: Array.from(
+                            { length: index + 1 },
+                            (_, i) => state.channelOptions[i] ?? `Channel ${i + 1}`,
                         ),
                         isChannelLoading: Array.from({ length: index + 1 }, (_, i) =>
                             i === index ? true : (state.isChannelLoading[i] ?? false),
                         ),
-                        pixelValues: Array.from({ length: index + 1 }, (_, i) =>
-                            state.pixelValues[i] ?? Number.NaN,
-                        ),
+                        pixelValues: Array.from({ length: index + 1 }, (_, i) => state.pixelValues[i] ?? Number.NaN),
                     }));
                     didAddChannel = true;
                     if (!canLoadStats) {

@@ -127,12 +127,7 @@ export default function FieldContourLegend({
     const renderRow = (row: LegendRow, y: number) => {
         if (row.type === "heading") {
             return (
-                <text
-                    key={row.key}
-                    y={y + 6 + 3}
-                    x={2}
-                    className="text-xs fill-current font-bold"
-                >
+                <text key={row.key} y={y + 6 + 3} x={2} className="text-xs fill-current font-bold">
                     {row.text}
                 </text>
             );
@@ -167,11 +162,7 @@ export default function FieldContourLegend({
                         fill={isGradient ? `url(#${gradientId})` : rgbToCss(item.colors[0])}
                         {...swatchProps}
                     />
-                    <text
-                        y={y + 6 + 3}
-                        x={14}
-                        className="text-xs fill-current"
-                    >
+                    <text y={y + 6 + 3} x={14} className="text-xs fill-current">
                         {item.name}
                     </text>
                 </g>
@@ -182,19 +173,8 @@ export default function FieldContourLegend({
         const { groupProps, swatchProps } = getHoverProps({ type: "field", field: field.field });
         return (
             <g key={row.key} {...groupProps}>
-                <rect
-                    y={y}
-                    x={2}
-                    height="10"
-                    width="10"
-                    fill={color}
-                    {...swatchProps}
-                />
-                <text
-                    y={y + 6 + 3}
-                    x={14}
-                    className="text-xs fill-current"
-                >
+                <rect y={y} x={2} height="10" width="10" fill={color} {...swatchProps} />
+                <text y={y + 6 + 3} x={14} className="text-xs fill-current">
                     {field.name === "" ? "none" : field.name}
                 </text>
             </g>
@@ -210,11 +190,7 @@ export default function FieldContourLegend({
                 height: `${containerHeight}px`,
             }}
         >
-            <div
-                className="legend-title h-5 whitespace-nowrap px-1 text-xs font-bold text-current"
-            >
-                {label}
-            </div>
+            <div className="legend-title h-5 whitespace-nowrap px-1 text-xs font-bold text-current">{label}</div>
             <div
                 ref={bodyRef}
                 className="legend-body overflow-y-auto overflow-x-hidden w-full"
@@ -222,14 +198,8 @@ export default function FieldContourLegend({
                     height: "calc(100% - 25px)",
                 }}
             >
-                <svg
-                    height={height}
-                    width={180}
-                    className="relative"
-                >
-                    <g>
-                        {rows.map((row, i) => renderRow(row, (i + 1) * 2 + i * h_fac))}
-                    </g>
+                <svg height={height} width={180} className="relative">
+                    <g>{rows.map((row, i) => renderRow(row, (i + 1) * 2 + i * h_fac))}</g>
                 </svg>
             </div>
         </div>

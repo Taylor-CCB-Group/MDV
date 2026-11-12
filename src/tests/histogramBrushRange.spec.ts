@@ -9,14 +9,10 @@ describe("formatHistogramBrushRange", () => {
 
     test("formats date day ranges as YYYY-MM-DD", () => {
         // 2025-02-28 and 2025-08-23 as days since Unix epoch
-        expect(formatHistogramBrushRange(20147, 20323, true)).toBe(
-            "2025-02-28 - 2025-08-23",
-        );
+        expect(formatHistogramBrushRange(20147, 20323, true)).toBe("2025-02-28 - 2025-08-23");
     });
 
     test("orders date range ends low-to-high", () => {
-        expect(formatHistogramBrushRange(20323, 20147, true)).toBe(
-            "2025-02-28 - 2025-08-23",
-        );
+        expect(formatHistogramBrushRange(20323, 20147, true)).toBe("2025-02-28 - 2025-08-23");
     });
 });

@@ -1,12 +1,12 @@
+import {
+    CssBaseline,
+    createTheme,
+    ThemeProvider as MuiThemeProvider,
+    type PaletteMode,
+    useMediaQuery,
+} from "@mui/material";
 import type React from "react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import {
-    ThemeProvider as MuiThemeProvider,
-    createTheme,
-    useMediaQuery,
-    type PaletteMode,
-    CssBaseline,
-} from "@mui/material";
 
 export type ColorMode = {
     toggleColorMode: () => void;
@@ -52,28 +52,23 @@ const getDesignTokens = (mode: PaletteMode) =>
             MuiPaper: {
                 styleOverrides: {
                     root: {
-                        boxShadow:
-                            "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)",
                     },
                 },
             },
             MuiDialog: {
                 styleOverrides: {
                     paper: {
-                        backgroundImage: 'none',
+                        backgroundImage: "none",
                     },
                 },
             },
         },
     });
 
-export const CustomThemeProvider: React.FC<{ children: React.ReactNode }> = ({
-    children,
-}) => {
+export const CustomThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
-    const [mode, setMode] = useState<PaletteMode>(
-        prefersDarkMode ? "dark" : "light",
-    );
+    const [mode, setMode] = useState<PaletteMode>(prefersDarkMode ? "dark" : "light");
 
     useEffect(() => {
         // Automatically update theme based on system preference
@@ -91,9 +86,7 @@ export const CustomThemeProvider: React.FC<{ children: React.ReactNode }> = ({
     const colorMode = useMemo(
         () => ({
             toggleColorMode: () => {
-                setMode((prevMode) =>
-                    prevMode === "light" ? "dark" : "light",
-                );
+                setMode((prevMode) => (prevMode === "light" ? "dark" : "light"));
             },
             mode,
         }),

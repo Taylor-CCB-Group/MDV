@@ -1,15 +1,13 @@
-import { fillColorSchemeFromDataStore } from "@/react/spatialdata/fill_color_scheme";
+import type { ShapesRenderData } from "@spatialdata/core";
+import { describe, expect, test } from "vitest";
 import {
-    type DataSourceAssociationCandidate,
     buildAssociatedFeatureStateFromRowMap,
+    type DataSourceAssociationCandidate,
     getShapesTableAssociation,
     obsColumnNamesForElement,
     resolveAssociatedElementTable,
     withPreservedFillColorsWhileLoading,
 } from "@/react/spatialdata/table_association";
-import type { ShapesRenderData } from "@spatialdata/core";
-import type { LayerConfig } from "@spatialdata/vis";
-import { describe, expect, test } from "vitest";
 
 type AssociatedTableElementMock = { getObsColumnNames?: () => string[] };
 

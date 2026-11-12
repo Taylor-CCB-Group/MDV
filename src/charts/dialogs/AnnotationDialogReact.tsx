@@ -1,6 +1,6 @@
+import { createMdvPortal } from "@/react/react_utils";
 import type DataStore from "../../datastore/DataStore.js";
 import { BaseDialog } from "../../utilities/Dialog.js";
-import { createMdvPortal } from "@/react/react_utils";
 import { AnnotationDialogComponent } from "./AnnotationDialogComponent";
 
 export {
@@ -21,11 +21,7 @@ class AnnotationDialogReact extends BaseDialog {
             },
             null,
         );
-        this.root = createMdvPortal(
-            <AnnotationDialogComponent dataStore={dataStore} />,
-            this.dialog,
-            this,
-        );
+        this.root = createMdvPortal(<AnnotationDialogComponent dataStore={dataStore} />, this.dialog, this);
     }
 
     close(): void {

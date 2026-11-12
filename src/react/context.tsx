@@ -1,10 +1,11 @@
 import { createContext, useContext } from "react";
+
 //import type { BaseReactChart } from "./components/BaseReactChart";
 
-import type DataStore from "../datastore/DataStore";
-import type { VivConfig } from "./components/avivatorish/state";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
+import type DataStore from "../datastore/DataStore";
+import type { VivConfig } from "./components/avivatorish/state";
 
 export const ChartContext = createContext<BaseChart<any>>(null as any);
 export const DataStoreContext = createContext<DataStore>(null as any);
@@ -16,16 +17,11 @@ export function ChartProvider<T extends BaseConfig>({
     //DataStoreContext.Provider would be applied at a wider scope if we had a global root & portals.
     return (
         <ChartContext.Provider value={chart}>
-            <DataStoreContext.Provider value={chart.dataStore}>
-                {children}
-            </DataStoreContext.Provider>
+            <DataStoreContext.Provider value={chart.dataStore}>{children}</DataStoreContext.Provider>
         </ChartContext.Provider>
     );
 }
-export function useChart<
-    T extends BaseConfig,
-    C extends BaseChart<T> = BaseChart<T>,
->(): C {
+export function useChart<T extends BaseConfig, C extends BaseChart<T> = BaseChart<T>>(): C {
     const chart = useContext(ChartContext);
     if (!chart) throw new Error("no chart context");
     return chart as C;

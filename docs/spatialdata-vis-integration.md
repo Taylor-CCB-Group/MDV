@@ -267,6 +267,86 @@ would replace that page-global backend without the cache.
 
 The pins in `package.json` are the enforcement; keep them at or above these.
 
+## WebGPU
+
+SpatialData.js 0.12 renders images, labels, shapes and points on WebGPU when the canvas
+is given `deckProps.deviceProps = { type: "webgpu", adapters: [webgpuAdapter] }`.
+**WebGPU is the default** for SpatialData charts wherever the browser has it. A chart can
+choose its own backend (`render_backend`, "Rendering backend" in its settings); charts
+left at the default follow the "Default rendering backend" browser setting in the Debug
+dialog (`src/lib/browserSettings.ts`, stored in localStorage; it replaced the old
+`MDV_WEBGPU` flag, which it still reads), and `?webgpu` / `?webgpu=0` overrides that for
+one page load — see `src/react/spatialdata/deck_backend.ts`. deck picks its device once,
+so changing the backend remounts the canvas.
+
+**Falling back to WebGL.** A chart moves to WebGL for the rest of its session, with the
+reason in its debug dialog's "Chart status", when:
+
+- the browser has no WebGPU, no adapter, or the adapter refuses the device deck will ask
+  for (probed once per page, `probeWebGPU`);
+- deck cannot create the device anyway (luma's device setup, or the canvas's WebGPU
+  context), or the device is lost later, e.g. a GPU process crash or reset;
+- it follows the default backend and a layer fails on WebGPU, or the canvas throws there.
+  The layer stays on, since it most likely works on WebGL; a failure on WebGL is reported
+  and the layer turned off as usual. A chart set to WebGPU explicitly stays on it, and the
+  failing layer is turned off and reported instead.
+
+Unattributed WebGPU validation errors are reported, not treated as a reason to fall back.
+Changing a chart's backend setting gives WebGPU another try.
+
+**Chart status.** A dot on a chart's "more" (☰) menu icon, and on its "debug / report
+chart" item, flags problems: red for render errors nobody has dismissed, yellow while
+layers stay off or image data is slow. The details are under "Chart status" in that
+debug dialog (`BaseChart.setMenuPip` / `getDebugPanel`; `SpatialStatusPanel`).
+
+**Diagnosing WebGPU errors.** A chart's "Chart status" has "Copy details": a plain-text
+report of the renderer, GPU, browser and each failure. Validation errors arrive
+asynchronously, so their own stack never shows the caller. For those, turn on "WebGPU call
+tracing" in the Debug dialog's browser settings and reload: `webgpu_trace.ts` then wraps
+the WebGPU encoder API before any device exists, reports a pass still open when its
+encoder is finished (with both stacks), logs the recent encoder calls before each
+uncaptured error, and adds both to "Copy details". Turn it off when done; it slows
+rendering a little.
+
+**Tested** (macOS, Apple silicon): Chrome (Dawn/Metal) end to end; Safari and Firefox by
+hand. Known issue: Firefox does not support the `float32-filterable` feature, which some
+WebGPU code paths need; there a failing layer moves default-following charts to WebGL.
+
+Host layers (MDV's scatter, grey-out, gate and selection overlays) go into the same Deck
+unadapted, so they must work on WebGPU themselves:
+
+- deck 9.4 has **no WGSL shader hooks**, so GLSL `inject`-based extensions cannot simply
+  carry over. `MdvScatterplotLayer` stands in for them: extensions implementing
+  `WGSLLayerExtension` (`src/webgl/wgslLayerExtension.ts`) edit deck's scatterplot WGSL at
+  exact anchors, which `src/tests/webgl/wgslLayerExtensions.test.ts` pins against the
+  installed deck. The square and gaussian point shapes work this way.
+- **`DataFilterExtension` is GLSL-only upstream.** `MdvDataFilterExtension` keeps
+  upstream's JS (attribute, uniforms) and supplies a WGSL `dataFilter` module plus a luma
+  `ShaderPlugin` vertex input, for the subset MDV uses (`filterSize: 1`, no categories,
+  soft range, fp64 or `countItems`). Retire both once deck has WGSL hooks and a WebGPU
+  data filter; luma 9.4.2's `filterShaderPlugin` targets a `FILTER_POSITION` hook that
+  deck's layers do not call yet, which is the likely shape of an upstream PR.
+- **Contours**: `TriangleLayerContours` is GLSL-only, so on WebGPU contours are drawn by
+  `@intraspatial/deck`'s `DensityLayer` (KDE splatting in data units, WGSL presentation
+  shader). `src/webgl/intraspatialDensity.ts` converts the heatmap props exactly: σ is
+  `5 · bandwidth` world units, and heatmap weight is `density · 12√π · σ²`, so MDV's fill
+  threshold and contour spacing carry over. For local IntraSpatial development,
+  `INTRASPATIAL_ROOT=… pnpm link:intraspatial` links a checkout (`pnpm unlink:intraspatial`
+  to undo).
+- **Synchronous picking throws on WebGPU** (`readPixelsToArrayWebGL: not implemented`).
+  editable-layers picks synchronously on every pointer event, which aborted clicks before
+  deck dispatched them to the scatter layer. On WebGPU, `MonkeyPatchEditableGeoJsonLayer`
+  computes the selection layer's picks on the CPU (`src/editable-layers/cpuPicks.ts`), and
+  the single selection shape is always selected, so translate, modify and draw do not race
+  async picks. This is a short-term workaround: GPU picking should be fixed upstream
+  (deck.gl, editable-layers) rather than worked around further in MDV.
+- Use luma's portable parameters (`depthCompare`, `depthWriteEnabled`), not WebGL ones
+  like `depthTest`, which WebGPU rejects.
+- SpatialData.js drops Viv image extensions on WebGPU, so `VivContrastExtension`'s tone
+  controls have no effect there. The layer dialog disables them while the chart draws with
+  WebGPU: the chart publishes its effective backend as `activeBackend` (after any fallback
+  to WebGL), and the image panel context passes `toneUnavailable` to `BrightnessContrast`.
+
 ## Avivatorish comparison
 
 MDV currently carries a local `src/react/components/avivatorish` implementation and also depends on `@spatialdata/avivatorish`. Treat the local copy as the integration shim for now, not as a desired long-term fork.

@@ -1,58 +1,70 @@
 import { ColorPaletteExtension } from "@hms-dbmi/viv";
+import { Button } from "@mui/material";
 import { viewStateFromBounds } from "@spatialdata/core";
-import { SpatialDataProvider, useSpatialData } from "@spatialdata/react";
+import type { RenderStackLayerInputs } from "@spatialdata/vis";
 import {
     type ViewState as SpatialCanvasViewState,
     type SpatialFeaturePickEvent,
     SpatialViewer,
+    useSpatialCanvasRendererFromLayerInputs,
     type VivImageLayerContext,
     type VivImagePropsResolver,
-    useSpatialCanvasRendererFromLayerInputs,
 } from "@spatialdata/vis";
 import type { DeckGLProps, DeckGLRef, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
-import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
-import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
-import RasterDataWarning, { rasterEntriesKey } from "./RasterDataWarning";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
+import {
+    type DeckErrorHandlers,
+    resolveDeckBackend,
+    useDeckDevice,
+    useDeckDeviceProps,
+} from "@/react/spatialdata/deck_backend";
 import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
+import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
 import { createPointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
+import { describeGpu } from "@/react/spatialdata/render_report";
 import {
-    type MdvDeckOverlayLayers,
     createMdvHostLayerResolver,
+    type MdvDeckOverlayLayers,
     useRenderStackAdapter,
 } from "@/react/spatialdata/render_stack_adapter";
 import { seedRenderStackFromSpatialData } from "@/react/spatialdata/render_stack_control";
+import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
+import { useChartSpatialData } from "@/react/spatialdata/shared_spatial_data";
+import type { SpatialDataState } from "@/react/spatialdata/spatial_data_reader";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
-import type { RenderStackLayerInputs } from "@spatialdata/vis";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
-import { useCategoryContourLegend, useFieldContourLegend } from "../contour_state";
 import type { DualContourLegacyConfig, HoveredContour } from "../contour_state";
+import { useCategoryContourLegend, useFieldContourLegend } from "../contour_state";
 import { useChartID, useChartSize, useConfig, useRegion } from "../hooks";
 import useGateLayers from "../hooks/useGateLayers";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import { useOuterContainer } from "../screen_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
+import { useViewerStore, useViewerStoreApi, VivProvider } from "./avivatorish/state";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import FieldContourLegend from "./FieldContourLegend";
+import { rasterEntriesKey, useRasterIssues } from "./RasterIssues";
 import SelectionOverlay from "./SelectionOverlay";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
-import { VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 
 type SpatialRegionMetadata = {
     spatial?: {
         file?: string;
+        /** Where the store is served from, when not the project's `spatial/<file>`. */
+        url?: string;
         coordinate_system?: string;
     };
 };
@@ -60,12 +72,6 @@ type SpatialRegionMetadata = {
 function getSpatialRegionMetadata(region: unknown): SpatialRegionMetadata | null {
     if (!region || typeof region !== "object") return null;
     return region;
-}
-
-function getSpatialDataUrl(region: SpatialRegionMetadata) {
-    const file = region.spatial?.file;
-    if (!file) return null;
-    return getProjectURL(`spatial/${file}`);
 }
 
 const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderStack({
@@ -82,7 +88,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     onFeatureHover,
     onFeatureHoverEnd,
 }: {
-    spatialData: NonNullable<ReturnType<typeof useSpatialData>["spatialData"]>;
+    spatialData: NonNullable<SpatialDataState["spatialData"]>;
     coordinateSystem: string;
     spatialViewState: ReturnType<typeof toSpatialViewState>;
     onSpatialViewStateChange: (next: SpatialCanvasViewState) => void;
@@ -268,41 +274,17 @@ function SpatialDataChartRoot() {
     );
 }
 
-function SpatialDataLink() {
-    const { spatialData } = useSpatialData();
-    const spatialDataUrl = spatialData?.url;
-    if (!spatialDataUrl) return null;
-    const demoUrl = `https://taylor-ccb-group.github.io/SpatialData.js/docs/demo/?url=${encodeURIComponent(spatialDataUrl)}`;
-    return (
-        <div className="legend-container pointer-events-auto absolute bottom-2 right-2 z-[4] rounded-tl border-[0.5px] border-current">
-            <a
-                href={demoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-current no-underline hover:underline whitespace-nowrap"
-            >
-                Open in spatialdata.js
-            </a>
-        </div>
-    );
-}
-
 const SpatialDataMainChart = observer(() => {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
-    const rawRegion = useRegion();
-    const region = getSpatialRegionMetadata(rawRegion);
-    const spatialDataUrl = region ? getSpatialDataUrl(region) : null;
     useEffect(() => {
         ensureParquetWorker();
     }, []);
 
     return (
-        <SpatialDataProvider source={spatialDataUrl ?? undefined}>
-            <SpatialAnnotationProvider chart={chart} hoveredContour={hoveredContour} setHoveredContour={setHoveredContour}>
-                <SpatialDataViewer setHoveredContour={setHoveredContour} />
-            </SpatialAnnotationProvider>
-        </SpatialDataProvider>
+        <SpatialAnnotationProvider chart={chart} hoveredContour={hoveredContour} setHoveredContour={setHoveredContour}>
+            <SpatialDataViewer setHoveredContour={setHoveredContour} />
+        </SpatialAnnotationProvider>
     );
 });
 
@@ -358,17 +340,13 @@ function summariseLayersForError(layers: RenderStackLayerInputs["layers"]) {
 }
 
 const SpatialDataViewer = observer(
-    ({
-        setHoveredContour,
-    }: {
-        setHoveredContour: (contour: HoveredContour | null) => void;
-    }) => {
+    ({ setHoveredContour }: { setHoveredContour: (contour: HoveredContour | null) => void }) => {
         const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
         const config = useConfig<SpatialDataMdvReactConfig>();
         const rawRegion = useRegion();
         const region = getSpatialRegionMetadata(rawRegion);
         const coordinateSystem = region?.spatial?.coordinate_system ?? null;
-        const { spatialData, loading, error } = useSpatialData();
+        const { spatialData, loading, error } = useChartSpatialData();
         const viewerStore = useViewerStoreApi();
         const viewState = useViewerStore((store) => store.viewState);
         const spatialViewState = toSpatialViewState(viewState);
@@ -383,6 +361,57 @@ const SpatialDataViewer = observer(
         const legendCategories = useCategoryContourLegend(contourConfig);
         const showLegend = contourConfig.field_legend.display;
         const legendPosition = { x: 10, y: 10 };
+        const { device: deckDevice, fallBack: fallBackToWebGL } = useDeckDevice(
+            resolveDeckBackend(config.render_backend),
+        );
+        const activeBackend = deckDevice.status === "ready" ? deckDevice.backend : null;
+        const fallbackReason = deckDevice.status === "ready" ? deckDevice.fallbackReason : undefined;
+        useEffect(() => {
+            chart.setActiveBackend(activeBackend, fallbackReason);
+            return () => chart.setActiveBackend(null);
+        }, [chart, activeBackend, fallbackReason]);
+        // Layer errors (deck's `onError`) and WebGPU device errors (luma's) otherwise only
+        // reach the console, and a device error repeats every frame. The tracker ties them
+        // to render-stack entries, which the chart turns off and reports.
+        //
+        // On WebGPU, a chart following the default backend instead moves to WebGL with the
+        // layer still on: the failure is most likely WebGPU's, and a failure on WebGL is
+        // reported as usual. A chart set to WebGPU explicitly stays on it.
+        const failureTracker = useMemo(
+            () =>
+                new LayerFailureTracker({
+                    entryIds: () => chart.config.renderStack?.entries.map((entry) => entry.id) ?? [],
+                    fail: (entryId, failure) => {
+                        const onWebGPU = failure.source === "webgpu" || chart.activeBackend === "webgpu";
+                        if (onWebGPU && chart.config.render_backend == null) {
+                            // after the switch, the old WebGPU device's errors are stale
+                            if (chart.activeBackend !== "webgpu") return;
+                            const entry = chart.config.renderStack?.entries.find((item) => item.id === entryId);
+                            const name = entry ? renderStackEntryDisplayName(entry) : entryId;
+                            console.error(`[MDV] ${name} failed on WebGPU; using WebGL:`, failure.reason);
+                            fallBackToWebGL(`${name} failed on WebGPU: ${failure.reason}`);
+                            return;
+                        }
+                        chart.recordLayerFailure(entryId, failure);
+                    },
+                    canvas: (message, stack) => chart.recordCanvasError(message, stack),
+                }),
+            [chart, fallBackToWebGL],
+        );
+        useEffect(() => () => failureTracker.dispose(), [failureTracker]);
+        const deckErrorHandlers = useMemo<DeckErrorHandlers>(
+            () => ({
+                device: (error) => failureTracker.device(error),
+                layer: (error, layerId) => failureTracker.layer(error, layerId),
+                initialized: (device) => chart.setGpuDescription(describeGpu(device.info)),
+            }),
+            [chart, failureTracker],
+        );
+        const {
+            deviceProps,
+            onDeviceInitialized,
+            onError: onDeckError,
+        } = useDeckDeviceProps(deckDevice, fallBackToWebGL, deckErrorHandlers);
 
         useViewStateLink();
 
@@ -407,6 +436,18 @@ const SpatialDataViewer = observer(
             if (loading || !spatialData || !coordinateSystem) return;
             seedRenderStackFromSpatialData(config, spatialData, coordinateSystem, chart);
         }, [chart, config, coordinateSystem, loading, spatialData]);
+
+        // For the chart's status (its menu pip and debug dialog), which live outside this tree.
+        const rasterIssues = useRasterIssues(spatialData, rasterEntriesKey(config.renderStack));
+        useEffect(() => {
+            chart.setRasterIssues(rasterIssues);
+            return () => chart.setRasterIssues([]);
+        }, [chart, rasterIssues]);
+        const storeUrl = spatialData?.url ?? null;
+        useEffect(() => {
+            chart.setSpatialDataUrl(storeUrl);
+            return () => chart.setSpatialDataUrl(null);
+        }, [chart, storeUrl]);
 
         useProjectMdvFieldSpecs(config, chart);
 
@@ -524,8 +565,11 @@ const SpatialDataViewer = observer(
                     doubleClickZoom: false,
                     dragPan: controllerOptions.dragPan,
                 },
+                ...(deviceProps && { deviceProps }),
+                onDeviceInitialized,
+                onError: onDeckError,
             }),
-            [id, getPortalTooltip, controllerOptions],
+            [id, getPortalTooltip, controllerOptions, deviceProps, onDeviceInitialized, onDeckError],
         );
 
         if (!coordinateSystem || !region?.spatial?.file) {
@@ -537,7 +581,14 @@ const SpatialDataViewer = observer(
         }
 
         if (error) {
-            return <div className="h-full w-full p-2">Failed to load SpatialData store: {error.message}</div>;
+            return (
+                <div className="h-full w-full p-2">
+                    Failed to load SpatialData store: {error.message}
+                    <Button size="small" onClick={() => chart.spatialDataReader.retry()}>
+                        Retry
+                    </Button>
+                </div>
+            );
         }
 
         if (loading || !spatialData) {
@@ -546,6 +597,10 @@ const SpatialDataViewer = observer(
 
         if (!config.renderStack?.entries.length) {
             return <div className="h-full w-full p-2">Preparing layer stack…</div>;
+        }
+
+        if (deckDevice.status === "pending") {
+            return <div className="h-full w-full p-2">Starting WebGPU…</div>;
         }
 
         return (
@@ -578,6 +633,16 @@ const SpatialDataViewer = observer(
                     <div style={{ width, height, position: "relative" }}>
                         <Profiler id="spatial.canvas" onRender={onSpatialProfilerRender}>
                             <ErrorBoundary
+                                // deck picks its device once, when created: remount on a backend change.
+                                key={deckDevice.backend}
+                                // On WebGPU, a chart following the default retries on WebGL before
+                                // showing the error; a failure there too is still reported.
+                                onError={(error) => {
+                                    if (deckDevice.status !== "ready" || deckDevice.backend !== "webgpu") return;
+                                    if (config.render_backend != null) return;
+                                    const message = error instanceof Error ? error.message : String(error);
+                                    fallBackToWebGL(`the canvas failed on WebGPU: ${message}`);
+                                }}
                                 fallbackRender={(props) => <SpatialCanvasErrorFallback {...props} layers={layers} />}
                                 // Retry when the layer set actually changes, so a canvas
                                 // felled by one bad layer recovers once it is removed or
@@ -605,8 +670,6 @@ const SpatialDataViewer = observer(
                         </Profiler>
                     </div>
                 </div>
-                <RasterDataWarning spatialData={spatialData} entriesKey={rasterEntriesKey(config.renderStack)} />
-                <SpatialDataLink />
                 {tooltipPortal}
                 {featureTooltipPortal}
             </Profiler>

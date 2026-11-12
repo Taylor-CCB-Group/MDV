@@ -20,7 +20,6 @@ All notable changes to `mdvtools` are documented here. The format is based on
 A feature release. SQLite is now the default database for new installs of the full application, a new `SpatialData` chart overlays spatial layers, new charts show genomic data, and MDV works behind proxies that strip a path prefix, such as Verily Workbench. `pip install mdvtools` still installs the slim core.
 
 ### Added
-- Python 3.13 support. `mdvtools` now installs on Python 3.11 to 3.13.
 - SQLite database backend for the full application, chosen with `DB_BACKEND` (`sqlite` or
   `postgres`). `deploy.sh`, `deploy.bat` and `deploy_gui.sh` now set up a local Docker deployment interactively (#435).
 - A SpatialData chart, built on SpatialData.js, that overlays shapes, labels, points and image
@@ -59,8 +58,34 @@ A feature release. SQLite is now the default database for new installs of the fu
 - When a CLI command fails unexpectedly it now prints an error report with the command line,
   traceback, and mdvtools/dependency versions, ready to paste into an issue, and exits with
   status 1 (#592).
+- A region's `spatial.url` in `datasources.json` tells the SpatialData.js viewer to load the
+  store from that URL instead of the project's `spatial/<file>`. `spatial.file` still names
+  the object, which is how its tables are matched (#624).
+- `mdvtools convert-spatial --spatial-url URL` sets each region's `spatial.url` to `URL` and
+  neither copies nor links the store into the project, for a store served from elsewhere.
+  It takes a single store, so it can't be combined with `--batch`, `--link` or browser store
+  rewrites (#624).
+- `mdvtools convert-spatial --browser-preset standard|compact|experimental` rewrites the
+  project's copy of each store for SpatialData.js: `standard` adds overview levels to images
+  and labels whose coarsest level is too large to load whole, stores table matrices as CSC
+  and Morton-sorts points, leaving a store any SpatialData reader can open; `compact` also
+  recompresses images as HTJ2K, which SpatialData.js reads and Python reads wherever
+  `spatialdata-js-util` is installed (as it is with mdvtools), but other readers can't;
+  `experimental` also adds a points-zarr copy beside each points element. `--pyramids`,
+  `--image-codec`, `--image-preset`, `--csc-tables`, `--morton-points` and `--points-zarr`
+  override the preset; `--pyramids` on its own adds levels with plain zarr codecs and
+  recompresses nothing. Images that browser codecs can't encode, stores without tables (for
+  CSC), points without a `feature_key` (for points-zarr) and points that are already
+  Morton-indexed are left as they are. The presets will change as the formats do, and none
+  of this works with `--link` (#609).
 
 ### Changed
+- `mdvtools` now installs on Python 3.12 and 3.13. Python 3.11 is no longer supported, so
+  pip on Python 3.11 keeps installing 1.3.0 (#609).
+- `mdvtools` now depends on `spatialdata-js-util` 0.2 (with its `write` extra), which needs
+  `zarr` 3.3 or later and `imagecodecs` 2026.6.26 or later (#609).
+- Upgraded `spatialdata` to 0.8 and `spatialdata-io` to 0.7.1 (from 0.7.2 and 0.6.0).
+  `spatialdata-io` 0.7.1 indexes Xenium shapes by `cell_id` (#609).
 - `mdvtools convert-spatial` default views now use the SpatialData.js viewer instead of the
   Viv image viewer (#591).
 - The SpatialData.js chart is now listed as "SpatialData.js viewer" in the add-chart menu
@@ -122,6 +147,9 @@ A feature release. SQLite is now the default database for new installs of the fu
   `mdvtools` is installed inside one (for example a virtualenv within your own project).
 - In the gridstack layout, hovering a chart no longer adds a scrollbar and resizes every chart
   (#594).
+- `add_datasource` accepts pandas `string` columns, such as the obs index of Atera stores
+  from `spatialdata-io`, which failed with `KeyError: 'string'`. `unique` columns with
+  non-ASCII values are now written instead of being dropped with a warning (#609).
 
 ## [1.3.0] - 2026-06-04
 

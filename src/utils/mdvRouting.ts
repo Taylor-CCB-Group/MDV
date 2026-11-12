@@ -66,7 +66,15 @@ export function getAppMountPath(pathname = window.location.pathname) {
         return ensureTrailingSlash(basePath || "/");
     }
 
-    for (const suffix of ["/login_dev", "/login_dev.html", "/catalog_dev", "/catalog_dev.html", "/index.html"]) {
+    // /login serves the login page when a sign-in was refused (?denied=).
+    for (const suffix of [
+        "/login_dev",
+        "/login_dev.html",
+        "/login",
+        "/catalog_dev",
+        "/catalog_dev.html",
+        "/index.html",
+    ]) {
         if (normalizedPath.endsWith(suffix)) {
             const basePath = normalizedPath.slice(0, -suffix.length);
             return ensureTrailingSlash(basePath || "/");
@@ -83,8 +91,7 @@ export function getAppMountPath(pathname = window.location.pathname) {
 export function getApiRootFromDir(dir: string) {
     const url = asUrl(dir);
     const projectMarker = url.pathname.lastIndexOf("/project/");
-    const apiPath =
-        projectMarker >= 0 ? url.pathname.slice(0, projectMarker) : url.pathname;
+    const apiPath = projectMarker >= 0 ? url.pathname.slice(0, projectMarker) : url.pathname;
 
     if (url.origin === window.location.origin) {
         return normalizeSameOriginPath(apiPath);

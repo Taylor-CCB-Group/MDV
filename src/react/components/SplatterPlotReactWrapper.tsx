@@ -1,18 +1,18 @@
-import DeckGL from "@deck.gl/react";
 import { OrthographicView } from "@deck.gl/core";
+import DeckGL from "@deck.gl/react";
 import { HeatmapLayer } from "deck.gl";
 import { observer } from "mobx-react-lite";
-import BaseChart from "../../charts/BaseChart";
-import { BaseReactChart } from "./BaseReactChart";
-import type { CategoricalDataType, LoadedDataColumn, NumberDataType } from "../../charts/charts";
+import { useCallback, useMemo, useState } from "react";
 import type DataStore from "@/datastore/DataStore";
 import { g } from "@/lib/utils";
-import { useChartSize, useConfig, useFieldSpec, useFieldSpecs, useFilteredIndices, useParamColumns } from "../hooks";
-import { getDensityVisualisationFolder } from "../contour_state";
-import { useCallback, useMemo, useState } from "react";
 import { TriangleLayerContours } from "@/webgl/HeatmapContourExtension";
+import BaseChart from "../../charts/BaseChart";
+import type { CategoricalDataType, LoadedDataColumn, NumberDataType } from "../../charts/charts";
+import { getDensityVisualisationFolder } from "../contour_state";
 import { getFieldColor } from "../fieldColorManager";
+import { useChartSize, useConfig, useFieldSpec, useFieldSpecs, useFilteredIndices, useParamColumns } from "../hooks";
 import { useHighlightCategoryRows } from "../selectionHooks";
+import { BaseReactChart } from "./BaseReactChart";
 import {
     adaptSplatterConfig,
     getSharedSplatterViewState,
@@ -120,10 +120,7 @@ const SplatterPlot = observer(function SplatterPlot() {
                         debounce: 250,
                         weightsTextureSize: 128,
                         pickable: false,
-                        getPosition: (
-                            rowIndex: number,
-                            { target }: { target: number[] | Float32Array },
-                        ) => {
+                        getPosition: (rowIndex: number, { target }: { target: number[] | Float32Array }) => {
                             target[0] = cx.data[rowIndex];
                             target[1] = cy.data[rowIndex];
                             target[2] = 0;
@@ -170,24 +167,27 @@ const SplatterPlot = observer(function SplatterPlot() {
             matchesSplatterView(layer.id, viewport.id),
         [],
     );
-    const updateHighlightedCells = useCallback((rowIndex: number, columnIndex: number, toggle = false) => {
-        const cellKey = getCellKey(rowIndex, columnIndex);
-        setHighlightedCells((current) => {
-            const next = toggle ? new Set(current) : new Set<string>();
-            if (toggle) {
-                if (next.has(cellKey)) next.delete(cellKey);
-                else next.add(cellKey);
-            } else {
-                next.add(cellKey);
-            }
+    const updateHighlightedCells = useCallback(
+        (rowIndex: number, columnIndex: number, toggle = false) => {
+            const cellKey = getCellKey(rowIndex, columnIndex);
+            setHighlightedCells((current) => {
+                const next = toggle ? new Set(current) : new Set<string>();
+                if (toggle) {
+                    if (next.has(cellKey)) next.delete(cellKey);
+                    else next.add(cellKey);
+                } else {
+                    next.add(cellKey);
+                }
 
-            const highlightedCategoryIndices = Array.from(next, (selectedCell) =>
-                Number.parseInt(selectedCell.split(":")[0] ?? "-1", 10),
-            ).filter((index) => index >= 0);
-            highlightCategoryRows(highlightedCategoryIndices);
-            return next;
-        });
-    }, [highlightCategoryRows]);
+                const highlightedCategoryIndices = Array.from(next, (selectedCell) =>
+                    Number.parseInt(selectedCell.split(":")[0] ?? "-1", 10),
+                ).filter((index) => index >= 0);
+                highlightCategoryRows(highlightedCategoryIndices);
+                return next;
+            });
+        },
+        [highlightCategoryRows],
+    );
     const clearHighlightedCells = useCallback(() => {
         setHighlightedCells((current) => (current.size === 0 ? current : new Set()));
         highlightCategoryRows([]);
@@ -201,18 +201,18 @@ const SplatterPlot = observer(function SplatterPlot() {
     const highlightedRowIndices = useMemo(
         () =>
             new Set(
-                Array.from(highlightedCells, (cellKey) =>
-                    Number.parseInt(cellKey.split(":")[0] ?? "-1", 10),
-                ).filter((index) => index >= 0),
+                Array.from(highlightedCells, (cellKey) => Number.parseInt(cellKey.split(":")[0] ?? "-1", 10)).filter(
+                    (index) => index >= 0,
+                ),
             ),
         [highlightedCells],
     );
     const highlightedColumnIndices = useMemo(
         () =>
             new Set(
-                Array.from(highlightedCells, (cellKey) =>
-                    Number.parseInt(cellKey.split(":")[1] ?? "-1", 10),
-                ).filter((index) => index >= 0),
+                Array.from(highlightedCells, (cellKey) => Number.parseInt(cellKey.split(":")[1] ?? "-1", 10)).filter(
+                    (index) => index >= 0,
+                ),
             ),
         [highlightedCells],
     );
@@ -221,7 +221,11 @@ const SplatterPlot = observer(function SplatterPlot() {
     const gridLineColor = "rgba(148, 163, 184, 0.16)";
 
     if (!config.category) {
-        return <div className="flex h-full items-center justify-center text-sm">Choose a category column to build the splatter plot.</div>;
+        return (
+            <div className="flex h-full items-center justify-center text-sm">
+                Choose a category column to build the splatter plot.
+            </div>
+        );
     }
     if (!categoryColumn) {
         return <div className="flex h-full items-center justify-center text-sm">Loading category data...</div>;
@@ -229,12 +233,18 @@ const SplatterPlot = observer(function SplatterPlot() {
     if (densityFields.length === 0) {
         return (
             <div className="flex h-full items-center justify-center text-sm">
-                {hasConfiguredDensityFields ? "Loading density fields..." : "Choose one or more density fields to build the splatter plot."}
+                {hasConfiguredDensityFields
+                    ? "Loading density fields..."
+                    : "Choose one or more density fields to build the splatter plot."}
             </div>
         );
     }
     if (visibleCategories.length === 0) {
-        return <div className="flex h-full items-center justify-center text-sm">No categories remain after the current filters.</div>;
+        return (
+            <div className="flex h-full items-center justify-center text-sm">
+                No categories remain after the current filters.
+            </div>
+        );
     }
 
     return (
@@ -276,8 +286,8 @@ const SplatterPlot = observer(function SplatterPlot() {
                                     hoveredCategory?.categoryIndex === category.categoryIndex
                                         ? "rgba(15, 23, 42, 0.78)"
                                         : highlightedRowIndices.has(rowIndex)
-                                        ? "rgba(15, 23, 42, 0.78)"
-                                        : "transparent",
+                                          ? "rgba(15, 23, 42, 0.78)"
+                                          : "transparent",
                                 color:
                                     hoveredCategory?.categoryIndex === category.categoryIndex ||
                                     highlightedRowIndices.has(rowIndex)
@@ -358,9 +368,7 @@ const SplatterPlot = observer(function SplatterPlot() {
                     getCursor={() => "default"}
                     useDevicePixels={true}
                 />
-                <div
-                    className="absolute inset-0 pointer-events-none"
-                >
+                <div className="absolute inset-0 pointer-events-none">
                     <div
                         className="absolute inset-0"
                         style={{
@@ -401,57 +409,55 @@ const SplatterPlot = observer(function SplatterPlot() {
                         densityFields.map((field, columnIndex) => {
                             const highlighted = isCellHighlighted(rowIndex, columnIndex);
                             return (
-                            <button
-                                key={`grid-${category.categoryIndex}-${field.field}`}
-                                type="button"
-                                onMouseEnter={() => {
-                                    setHoveredCell({ rowIndex, columnIndex });
-                                }}
-                                onMouseLeave={() => {
-                                    setHoveredCell((current) =>
-                                        current?.rowIndex === rowIndex && current?.columnIndex === columnIndex
-                                            ? null
-                                            : current,
-                                    );
-                                }}
-                                onClick={(event) => {
-                                    updateHighlightedCells(rowIndex, columnIndex, event.shiftKey);
-                                }}
-                                onKeyDown={(event) => {
-                                    if (event.key === "Escape") {
+                                <button
+                                    key={`grid-${category.categoryIndex}-${field.field}`}
+                                    type="button"
+                                    onMouseEnter={() => {
+                                        setHoveredCell({ rowIndex, columnIndex });
+                                    }}
+                                    onMouseLeave={() => {
+                                        setHoveredCell((current) =>
+                                            current?.rowIndex === rowIndex && current?.columnIndex === columnIndex
+                                                ? null
+                                                : current,
+                                        );
+                                    }}
+                                    onClick={(event) => {
+                                        updateHighlightedCells(rowIndex, columnIndex, event.shiftKey);
+                                    }}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Escape") {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            clearHighlightedCells();
+                                            return;
+                                        }
+                                        if (event.key !== "Enter" && event.key !== " ") return;
                                         event.preventDefault();
-                                        event.stopPropagation();
-                                        clearHighlightedCells();
-                                        return;
-                                    }
-                                    if (event.key !== "Enter" && event.key !== " ") return;
-                                    event.preventDefault();
-                                    updateHighlightedCells(rowIndex, columnIndex, event.shiftKey);
-                                }}
-                                aria-label={`${categoryColumn.name}: ${
-                                    category.label === "" ? "none" : category.label
-                                }, ${field.name === "" ? "none" : field.name}`}
-                                aria-pressed={highlighted}
-                                title={`${category.label === "" ? "none" : category.label} / ${field.name === "" ? "none" : field.name}`}
-                                className="m-0 appearance-none border-0 p-0"
-                                style={{
-                                    backgroundColor:
-                                        highlighted
+                                        updateHighlightedCells(rowIndex, columnIndex, event.shiftKey);
+                                    }}
+                                    aria-label={`${categoryColumn.name}: ${
+                                        category.label === "" ? "none" : category.label
+                                    }, ${field.name === "" ? "none" : field.name}`}
+                                    aria-pressed={highlighted}
+                                    title={`${category.label === "" ? "none" : category.label} / ${field.name === "" ? "none" : field.name}`}
+                                    className="m-0 appearance-none border-0 p-0"
+                                    style={{
+                                        backgroundColor: highlighted
                                             ? "rgba(255, 255, 255, 0.08)"
                                             : hoveredRowIndex === rowIndex && hoveredColumnIndex === columnIndex
-                                            ? "rgba(255, 255, 255, 0.04)"
-                                            : "transparent",
-                                    boxShadow:
-                                        highlighted
+                                              ? "rgba(255, 255, 255, 0.04)"
+                                              : "transparent",
+                                        boxShadow: highlighted
                                             ? "inset 0 0 0 1px rgba(255, 255, 255, 0.4)"
                                             : hoveredRowIndex === rowIndex && hoveredColumnIndex === columnIndex
-                                            ? "inset 0 0 0 1px rgba(255, 255, 255, 0.22)"
-                                            : "none",
-                                    cursor: "pointer",
-                                }}
-                            />
-                        );
-                    }),
+                                              ? "inset 0 0 0 1px rgba(255, 255, 255, 0.22)"
+                                              : "none",
+                                        cursor: "pointer",
+                                    }}
+                                />
+                            );
+                        }),
                     )}
                 </div>
                 {hoveredCategory && hoveredField ? (
@@ -468,9 +474,7 @@ const SplatterPlot = observer(function SplatterPlot() {
                             <strong>{categoryColumn.name}:</strong>{" "}
                             {hoveredCategory.label === "" ? "none" : hoveredCategory.label}
                         </div>
-                        <div className="break-words">
-                            {hoveredField.name === "" ? "none" : hoveredField.name}
-                        </div>
+                        <div className="break-words">{hoveredField.name === "" ? "none" : hoveredField.name}</div>
                     </div>
                 ) : null}
             </div>

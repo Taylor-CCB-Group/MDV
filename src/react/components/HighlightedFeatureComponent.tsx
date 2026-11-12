@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import { useChart, useDataStore } from "../context";
 import { observer } from "mobx-react-lite";
-// should maybe be FieldName rather than ColumnName here
-import type { DataColumn, ColumnName } from "../../charts/charts";
-import { useHighlightedIndex } from "../selectionHooks";
+import { useEffect, useState } from "react";
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
+// should maybe be FieldName rather than ColumnName here
+import type { ColumnName, DataColumn } from "../../charts/charts";
+import { useChart, useDataStore } from "../context";
+import { useHighlightedIndex } from "../selectionHooks";
 import type { HighlightedFeatureConfig } from "./HighlightedFeatureChart";
 
-/** 
+/**
  * @deprecated if we resurrect this chart, we should review which hook gets used - there should be something more general
  */
 function useColumnData(columnName: ColumnName, maxItems = 100) {
@@ -43,25 +43,14 @@ function useColumnData(columnName: ColumnName, maxItems = 100) {
             // may want to have a JS array of (index, value) tuples instead of two typed arrays...
             // we end up spreading the columnData at the moment, potentially multiple times...
             // and duplicate work in sorting the indices...
-            const sortedIndices = indices.sort(
-                (a, b) => column.data[b] - column.data[a],
-            );
+            const sortedIndices = indices.sort((a, b) => column.data[b] - column.data[a]);
             setIndices(sortedIndices.slice(0, maxItems));
-            setColumnData(
-                newColumnData.sort((a, b) => b - a).slice(0, maxItems),
-            );
+            setColumnData(newColumnData.sort((a, b) => b - a).slice(0, maxItems));
         });
         return () => {
             cancel = true;
         };
-    }, [
-        columnName,
-        ds._filteredIndicesPromise,
-        ds.name,
-        ds.columnIndex,
-        maxItems,
-        ds.getFilteredIndices,
-    ]);
+    }, [columnName, ds._filteredIndicesPromise, ds.name, ds.columnIndex, maxItems, ds.getFilteredIndices]);
     return { columnData, indices, column };
 }
 
@@ -69,11 +58,9 @@ function useMarkdownText(md: string) {
     const [renderTextFn, setRenderTextFn] = useState<(md: string) => string>();
     const [html, setHtml] = useState<string>("");
     useEffect(() => {
-        import("../../utilities/MarkdownText").then(
-            ({ default: renderTextFn }) => {
-                setRenderTextFn(() => renderTextFn);
-            },
-        );
+        import("../../utilities/MarkdownText").then(({ default: renderTextFn }) => {
+            setRenderTextFn(() => renderTextFn);
+        });
     }, []);
     useEffect(() => {
         if (!md) return setHtml("");
@@ -91,14 +78,10 @@ export const HighlightedFeatureComponent = observer(() => {
     //@ts-expect-error only understands string param, chart is unused & would need to be updated
     const param: string = chart.config.param[0];
     if (typeof param !== "string") throw "non-string param not supported";
-    const { columnData, indices, column } = useColumnData(
-        param,
-        8,
-    );
+    const { columnData, indices, column } = useColumnData(param, 8);
     const highlightedIndex = useHighlightedIndex();
     if (!indices) return <></>;
-    const highlightInRange =
-        indices && highlightedIndex >= 0 && indices.includes(highlightedIndex);
+    const highlightInRange = indices && highlightedIndex >= 0 && indices.includes(highlightedIndex);
     const highlightValue = column?.data[highlightedIndex];
     return (
         <div style={{ fontSize: "0.8rem" }}>
@@ -120,10 +103,7 @@ export const HighlightedFeatureComponent = observer(() => {
                             borderRadius: "0.5em",
                         }}
                         onClick={() => {
-                            chart.dataStore.dataHighlighted(
-                                [indices[i]],
-                                chart,
-                            );
+                            chart.dataStore.dataHighlighted([indices[i]], chart);
                         }}
                         key={indices[i]}
                     >

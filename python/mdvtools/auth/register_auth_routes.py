@@ -5,7 +5,7 @@ logger = get_logger(__name__)
 
 def register_auth_routes(app):
 
-    from flask import jsonify, request, redirect, url_for, session
+    from flask import jsonify, request, redirect, render_template, url_for, session
     from mdvtools.auth.authutils import get_auth_provider
     
     """
@@ -19,6 +19,11 @@ def register_auth_routes(app):
         @app.route('/login')
         def login():
             """Handles standard login (e.g., Auth0)."""
+            # A refused sign-in lands here when LOGIN_REDIRECT_URL is /login, the deploy
+            # scripts' Auth0 default. Starting Auth0 again would sign the same person
+            # straight back in and loop, so show the page that explains the refusal.
+            if request.args.get("denied"):
+                return render_template('login.html')
             try:
                 logger.info("Login initiated")
                 session.clear()
@@ -70,6 +75,10 @@ def register_auth_routes(app):
         def logout():
             try:
                 auth_method = session.get("auth_method")
+                # Auth0 can still hold a session after ours is gone (cookie lost or
+                # overwritten). Without ending it, a refused person cannot switch account.
+                if not auth_method and (app.config.get("DEFAULT_AUTH_METHOD") or "").lower() == "auth0":
+                    auth_method = "auth0"
                 logger.info(f"Logout initiated for auth method: {auth_method}")
 
                 # Always attempt to clear the session early

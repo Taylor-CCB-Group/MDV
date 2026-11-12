@@ -40,13 +40,7 @@ const formatDeletedAt = (deletedTimestamp?: string) => {
     });
 };
 
-const RecycleBinDialog = ({
-    open,
-    onClose,
-    fetchProjects,
-    onDeleteAll,
-    onRestore,
-}: RecycleBinDialogProps) => {
+const RecycleBinDialog = ({ open, onClose, fetchProjects, onDeleteAll, onRestore }: RecycleBinDialogProps) => {
     const theme = useTheme();
     const [projects, setProjects] = useState<RecycledProject[]>([]);
     const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
@@ -66,9 +60,7 @@ const RecycleBinDialog = ({
         try {
             const result = await onDeleteAll();
             const deletedIds = new Set(result.deletedProjectIds.map(String));
-            setProjects((currentProjects) =>
-                currentProjects.filter((project) => !deletedIds.has(project.id)),
-            );
+            setProjects((currentProjects) => currentProjects.filter((project) => !deletedIds.has(project.id)));
             setConfirmingDeleteAll(false);
         } catch {
             // The hook opens the shared error dialog.
@@ -81,9 +73,7 @@ const RecycleBinDialog = ({
         }
         try {
             await onRestore(projectToRestore.id);
-            setProjects((currentProjects) =>
-                currentProjects.filter((project) => project.id !== projectToRestore.id),
-            );
+            setProjects((currentProjects) => currentProjects.filter((project) => project.id !== projectToRestore.id));
             setProjectToRestore(null);
         } catch {
             // The hook opens the shared error dialog.
@@ -165,8 +155,8 @@ const RecycleBinDialog = ({
                                 Your recycle bin is empty
                             </Typography>
                             <Typography variant="body2" color="text.secondary" maxWidth={320}>
-                                Projects you move to the recycle bin from the catalog will appear here
-                                before they are permanently deleted.
+                                Projects you move to the recycle bin from the catalog will appear here before they are
+                                permanently deleted.
                             </Typography>
                         </Box>
                     ) : (
@@ -226,13 +216,8 @@ const RecycleBinDialog = ({
                     </Button>
                 </DialogActions>
             </Dialog>
-        
-            <Dialog
-                open={confirmingDeleteAll}
-                onClose={() => setConfirmingDeleteAll(false)}
-                maxWidth="sm"
-                fullWidth
-            >
+
+            <Dialog open={confirmingDeleteAll} onClose={() => setConfirmingDeleteAll(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>
                     Permanently delete recycled projects?
                     <DialogCloseIconButton onClose={() => setConfirmingDeleteAll(false)} />
@@ -240,8 +225,8 @@ const RecycleBinDialog = ({
                 <DialogContent dividers>
                     <Typography>
                         This permanently deletes every project in your recycle bin ({projects.length}{" "}
-                        {projects.length === 1 ? "project" : "projects"}). This action is irreversible
-                        and cannot be undone.
+                        {projects.length === 1 ? "project" : "projects"}). This action is irreversible and cannot be
+                        undone.
                     </Typography>
                 </DialogContent>
                 <DialogActions>
@@ -256,12 +241,7 @@ const RecycleBinDialog = ({
                     </Button>
                 </DialogActions>
             </Dialog>
-            <Dialog
-                open={projectToRestore !== null}
-                onClose={() => setProjectToRestore(null)}
-                maxWidth="sm"
-                fullWidth
-            >
+            <Dialog open={projectToRestore !== null} onClose={() => setProjectToRestore(null)} maxWidth="sm" fullWidth>
                 <DialogTitle>
                     Restore project?
                     <DialogCloseIconButton onClose={() => setProjectToRestore(null)} />

@@ -18,7 +18,7 @@ You need [pnpm](https://pnpm.io/installation) (see `packageManager` in the root 
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-CI and the dev container install uv from `tool.uv.required-version` in `pyproject.toml` (Docker uses `pip install uv==…` because `uv self update` does not apply to pip-installed binaries). Match that version locally if you need reproducible lockfile behaviour.
+`tool.uv.required-version` in `pyproject.toml` sets only a minimum uv version; any newer release works. CI and the dev container install the latest uv.
 
 Run Python tools with `uv run` from `python/` (no manual activation required), for example:
 

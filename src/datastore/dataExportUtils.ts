@@ -6,12 +6,7 @@ import type { DataModel } from "@/table/DataModel";
  * Wrap it in double quotes
  */
 function escapeField(value: string, delimiter: string) {
-    if (
-        value.includes(delimiter) ||
-        value.includes("\n") ||
-        value.includes("\r") ||
-        value.includes('"')
-    ) {
+    if (value.includes(delimiter) || value.includes("\n") || value.includes("\r") || value.includes('"')) {
         return `"${value.replace(/"/g, '""')}"`;
     }
     return value;
@@ -22,12 +17,7 @@ function escapeField(value: string, delimiter: string) {
  * selected in the dataModel.
  * @param includeIndex - prepend index column if true, else ignore it
  */
-export async function getExportCsvStream(
-    dataModel: DataModel,
-    delimiter = "\t",
-    newline = "\n",
-    includeIndex = true,
-) {
+export async function getExportCsvStream(dataModel: DataModel, delimiter = "\t", newline = "\n", includeIndex = true) {
     const columns: ColumnName[] = dataModel.columns;
     const dataStore = dataModel.dataStore;
     dataModel.updateModel(); // Side-effect: updates dataModel.data
@@ -42,9 +32,8 @@ export async function getExportCsvStream(
                 // Write the headers first
                 const headerParts = includeIndex ? ["index", ...columns] : columns;
                 // escape the header fields
-                const header = headerParts
-                    .map((name) => escapeField(String(name), delimiter))
-                    .join(delimiter) + newline;
+                const header =
+                    headerParts.map((name) => escapeField(String(name), delimiter)).join(delimiter) + newline;
                 controller.enqueue(encoder.encode(header)); // Add header to stream
 
                 // Write each row of data incrementally
@@ -52,12 +41,10 @@ export async function getExportCsvStream(
                     const index = indexes[i];
                     const o = dataStore.getRowAsObject(index, columns);
                     const rowValues = columns.map((x) => (o[x] ?? "").toString());
-                    const lineParts = includeIndex ? [index.toString(), ...rowValues] : rowValues
+                    const lineParts = includeIndex ? [index.toString(), ...rowValues] : rowValues;
                     // prepend index column if includeIndex is true
                     // escape the row fields
-                    const line = lineParts
-                        .map((val) => escapeField(val, delimiter))
-                        .join(delimiter) + newline;
+                    const line = lineParts.map((val) => escapeField(val, delimiter)).join(delimiter) + newline;
 
                     // Enqueue each encoded line to the stream
                     controller.enqueue(encoder.encode(line));
@@ -65,7 +52,7 @@ export async function getExportCsvStream(
                     // Optionally add a short delay (yield control) to avoid blocking the main thread
                     // todo: also update a progress bar here
                     if (i % 1e5 === 0) {
-                        await new Promise(resolve => setTimeout(resolve, 0));
+                        await new Promise((resolve) => setTimeout(resolve, 0));
                     }
                 }
 
@@ -74,10 +61,10 @@ export async function getExportCsvStream(
                 // commenting this as this blocks the UI (coderabbit)
                 // alert("Export complete");
             } catch (err) {
-                console.error('Stream writing failed:', err);
+                console.error("Stream writing failed:", err);
                 controller.error(err); // Signal an error in the stream
             }
-        }
+        },
     });
 
     return stream; // Return the ReadableStream
@@ -92,18 +79,10 @@ export type TableExportOptions = {
 /**
  * Export table data as a blob. Creates a temporary DataModel and uses includeIndex to include index column.
  */
-export async function getTableExportBlob(
-    dataModel: DataModel,
-    options: TableExportOptions = {}
-): Promise<Blob> {
+export async function getTableExportBlob(dataModel: DataModel, options: TableExportOptions = {}): Promise<Blob> {
     // Default includeIndex to true to keep it consistent in all places
     const { includeIndex = true, delimiter = "\t", newline = "\n" } = options;
-    const stream = await getExportCsvStream(
-        dataModel, 
-        delimiter, 
-        newline, 
-        includeIndex, 
-    );
+    const stream = await getExportCsvStream(dataModel, delimiter, newline, includeIndex);
     const response = new Response(stream);
     return response.blob();
 }

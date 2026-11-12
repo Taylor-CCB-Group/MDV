@@ -8,15 +8,21 @@ file serving helpers, and HTTP range request handling.
 import re
 import os
 import mimetypes
+from zlib import adler32
+from typing import BinaryIO
 from flask import request, send_file as sf, Response
+from werkzeug.exceptions import RequestedRangeNotSatisfiable
+from werkzeug.wrappers import Response as WerkzeugResponse
 
 
+# Entry files of builds that don't hash them (see entry_assets.py). Matched by suffix
+# because the static URL prefix varies: /static/ by default, /flask/ in the Docker app.
 UNCACHED_STATIC_ENTRY_PATHS = {
-    "/static/js/mdv.js",
-    "/static/js/catalog.js",
-    "/static/js/login.js",
-    "/static/assets/mdv.css",
-    "/static/assets/catalog.css",
+    "/js/mdv.js",
+    "/js/catalog.js",
+    "/js/login.js",
+    "/assets/mdv.css",
+    "/assets/catalog.css",
 }
 
 
@@ -73,6 +79,77 @@ def send_file(f):
     if not os.path.isabs(f):
         f = os.path.join(os.getcwd(), f)
     return sf(f)
+
+
+class _SeekableBlocks:
+    """A file that yields fixed-size blocks and can be seeked.
+
+    Werkzeug only seeks to the start of a range when the iterable reports `seekable()`.
+    The `wsgi.file_wrapper` that gunicorn supplies does not, so werkzeug reads and
+    discards everything before the range instead, which makes a request near the end
+    of a multi-GB zip take hundreds of milliseconds.
+    """
+
+    def __init__(self, file: BinaryIO, block_size: int = 64 * 1024) -> None:
+        self._file = file
+        self._block_size = block_size
+
+    def seekable(self) -> bool:
+        return True
+
+    def seek(self, offset: int) -> int:
+        return self._file.seek(offset)
+
+    def tell(self) -> int:
+        return self._file.tell()
+
+    def __iter__(self) -> "_SeekableBlocks":
+        return self
+
+    def __next__(self) -> bytes:
+        block = self._file.read(self._block_size)
+        if not block:
+            raise StopIteration
+        return block
+
+    def close(self) -> None:
+        self._file.close()
+
+
+def send_file_ranged(f: str) -> WerkzeugResponse:
+    """
+    Like send_file, but a Range request seeks straight to the requested bytes
+    under any WSGI server. Conditional (ETag / If-Range) handling is unchanged.
+    """
+    if "Range" not in request.headers:
+        return send_file(f)
+    path = os.path.abspath(f)
+    # One handle supplies the validators and the body, so a file replaced mid-request
+    # can't pair its old ETag and length with new bytes.
+    file = open(path, "rb")
+    try:
+        stat = os.fstat(file.fileno())
+        response = sf(
+            file,
+            download_name=os.path.basename(path),
+            # same value werkzeug derives from a path, so ETags agree with non-range responses
+            etag=f"{stat.st_mtime}-{stat.st_size}-{adler32(path.encode()) & 0xFFFFFFFF}",
+            last_modified=stat.st_mtime,
+            conditional=False,
+        )
+        response.content_length = stat.st_size
+        response.response = _SeekableBlocks(file)
+        response.make_conditional(
+            request.environ, accept_ranges=True, complete_length=stat.st_size
+        )
+    except RequestedRangeNotSatisfiable as e:
+        # returned rather than raised so the 416 survives the project router's catch-all
+        file.close()
+        return Response(status=416, headers={"Content-Range": f"bytes */{e.length}"})
+    except Exception:
+        file.close()
+        raise
+    return response
 
 
 def get_range(file_name, range_header):

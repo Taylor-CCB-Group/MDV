@@ -1,8 +1,8 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
+import { select } from "d3-selection";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
-import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
 class SingleHeatMapGroup extends SVGChart {
     constructor(dataStore, div, config) {
@@ -144,10 +144,7 @@ class SingleHeatMapGroup extends SVGChart {
     }
 
     drawChart(tTime = 300) {
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(tTime)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
         const yvals = this.dataStore.getColumnValues(this.config.param[0]);
         const xvals = this.dataStore.getColumnValues(this.config.param[1]);
         const zvals = this.dataStore.getColumnValues(this.config.param[3]);
@@ -206,11 +203,7 @@ class SingleHeatMapGroup extends SVGChart {
                 return zvals[i % zvals.length];
             })
             .style("text-anchor", "end")
-            .attr(
-                "transform",
-                (d, i) =>
-                    ` translate(${i * recWidth + recWidth / 2},${dim.top}) rotate(60)`,
-            );
+            .attr("transform", (d, i) => ` translate(${i * recWidth + recWidth / 2},${dim.top}) rotate(60)`);
     }
 
     setSize(x, y) {

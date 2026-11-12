@@ -1,4 +1,4 @@
-import { IconButton, type IconButtonProps, Tooltip, type TooltipProps } from "@mui/material";
+import { IconButton, type IconButtonProps, type TooltipProps } from "@mui/material";
 import type React from "react";
 import CustomTooltip from "./CustomTooltip";
 
@@ -20,10 +20,7 @@ const IconWithTooltip = ({
     iconButtonProps,
 }: IconWithTooltipProps) => {
     return (
-        <CustomTooltip
-            tooltipText={tooltipText}
-            {...tooltipProps}
-        >
+        <CustomTooltip tooltipText={tooltipText} {...tooltipProps}>
             {href ? (
                 <IconButton
                     color="inherit"

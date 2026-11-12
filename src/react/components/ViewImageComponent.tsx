@@ -1,6 +1,6 @@
+import ImageIcon from "@mui/icons-material/Image";
 import { Box } from "@mui/material";
 import { useEffect, useState } from "react";
-import ImageIcon from "@mui/icons-material/Image";
 
 export type ViewImageComponentProps = {
     imgSrc: string;

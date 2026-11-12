@@ -35,7 +35,16 @@ const PACKAGE_DIRS = {
  * separate copy of them, so it goes stale silently and unlink then writes a pin
  * nobody chose.
  *
- * 0.13.0 is what these pins ask for: it is the first release where an image layer
+ * 0.15.0 is what these pins ask for: it bounds the tiled points cache by the bytes its
+ * tiles hold instead of 16 tiles, so zooming back over levels already visited no longer
+ * refetches and rebuilds ~50 tile layers per sweep (SpatialData.js#269). 0.14.0 brought
+ * zarrextra 0.7.1, which builds the store tree from consolidated metadata in a few
+ * requests rather than one per node.
+ *
+ * 0.13.1 lays the points feature palette out in 2-D, so
+ * colour-by-feature works on panels wider than the GPU's maximum texture size (a
+ * 12,448-gene Xenium panel exceeded WebGPU's default 8192 and blanked the canvas).
+ * 0.13.0 is the first release where an image layer
  * draws reliably on a dev-server reload (StrictMode's double-mount could leave a loaded
  * image undrawn until a layer edit, MDV#580). Below that, 0.10.0 is the
  * release where the progressive points preload moved off
@@ -62,12 +71,12 @@ const PACKAGE_DIRS = {
  * the layer at runtime.
  */
 const PUBLISHED_RANGES = {
-    "@spatialdata/avivatorish": "^0.13.0",
-    "@spatialdata/core": "^0.13.0",
-    "@spatialdata/layers": "^0.13.0",
-    "@spatialdata/react": "^0.13.0",
-    "@spatialdata/vis": "^0.13.0",
-    zarrextra: "0.5.1",
+    "@spatialdata/avivatorish": "^0.15.0",
+    "@spatialdata/core": "^0.15.0",
+    "@spatialdata/layers": "^0.15.0",
+    "@spatialdata/react": "^0.15.0",
+    "@spatialdata/vis": "^0.15.0",
+    zarrextra: "0.7.1",
 };
 
 function expandHome(p) {

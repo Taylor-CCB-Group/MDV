@@ -11,6 +11,7 @@ from sqlalchemy import text, create_engine, make_url
 from sqlalchemy.exc import OperationalError
 from flask import Flask
 from mdvtools.server import add_safe_headers
+from mdvtools.entry_assets import register_entry_assets
 from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent
@@ -60,6 +61,7 @@ def create_flask_app(config_name=None):
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
     app.url_map.strict_slashes = False
     app.after_request(add_safe_headers)
+    register_entry_assets(app)
     
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,   # Prevent JavaScript from accessing cookies
@@ -752,6 +754,15 @@ if os.environ.get('MDV_SKIP_SERVER_STARTUP') != '1':
                 # filled before the scan ran, so they are rebuilt here.
                 if grant_admins_ownership_of_unowned_projects():
                     cache_user_projects()
+                # On a deployment nobody has signed in to yet, report every missing
+                # first-administrator setting now, rather than one per failed login.
+                if (app.config.get("DEFAULT_AUTH_METHOD") or "").lower() == "auth0":
+                    try:
+                        from mdvtools.auth.auth0_provider import check_first_admin_setup
+
+                        check_first_admin_setup(app)
+                    except Exception as e:
+                        logger.warning(f"Could not check the first administrator setup: {e}")
     except ExtensionError as e:
         logger.exception(f"Error during app initialization: {e}")
         raise

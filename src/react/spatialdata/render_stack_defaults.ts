@@ -1,3 +1,4 @@
+import type { LayerChannelConfig } from "@spatialdata/avivatorish";
 import type { SpatialData, SpatialElement } from "@spatialdata/core";
 import {
     RENDER_STACK_SCHEMA_VERSION,
@@ -8,24 +9,16 @@ import {
 
 import { getRandomString } from "@/utilities/Utilities";
 
-import {
-    DECK_OVERLAY_IDS,
-    deckHostLayerId,
-} from "./host_overlay_ids";
+import { DECK_OVERLAY_IDS, deckHostLayerId } from "./host_overlay_ids";
 
 function elementsForCoordinateSystem<T extends SpatialElement>(
     elements: Record<string, T> | undefined,
     coordinateSystem: string,
 ): Array<[string, T]> {
-    return Object.entries(elements ?? {}).filter(([, element]) =>
-        element.coordinateSystems.includes(coordinateSystem),
-    );
+    return Object.entries(elements ?? {}).filter(([, element]) => element.coordinateSystems.includes(coordinateSystem));
 }
 
-export function spatialEntryId(
-    elementType: RenderStackSpatialElementType,
-    elementKey: string,
-) {
+export function spatialEntryId(elementType: RenderStackSpatialElementType, elementKey: string) {
     // The same element can appear in multiple stack entries (different roles /
     // blend modes), so each entry needs its own id. The random suffix only has to
     // be unique within a single stack — a smaller scope than the project-wide
@@ -59,9 +52,7 @@ function hostEntry(deckId: (typeof DECK_OVERLAY_IDS)[number]): RenderStackEntry 
     };
 }
 
-export function defaultPropsForSpatialElement(
-    elementType: RenderStackSpatialElementType,
-): Record<string, unknown> {
+export function defaultPropsForSpatialElement(elementType: RenderStackSpatialElementType): Record<string, unknown> {
     switch (elementType) {
         case "shapes":
             return {
@@ -83,17 +74,12 @@ function addAvailableSpatialEntries<T extends SpatialElement>(
     coordinateSystem: string,
 ) {
     for (const [key] of elementsForCoordinateSystem(elements, coordinateSystem)) {
-        spatialEntries.push(
-            spatialEntry(elementType, key, defaultPropsForSpatialElement(elementType)),
-        );
+        spatialEntries.push(spatialEntry(elementType, key, defaultPropsForSpatialElement(elementType)));
     }
 }
 
 /** All spatial elements in the store — for dialog "insert layer" options only. */
-export function listAvailableSpatialEntries(
-    spatialData: SpatialData,
-    coordinateSystem: string,
-): RenderStackEntry[] {
+export function listAvailableSpatialEntries(spatialData: SpatialData, coordinateSystem: string): RenderStackEntry[] {
     const spatialEntries: RenderStackEntry[] = [];
     addAvailableSpatialEntries(spatialEntries, "image", spatialData.images, coordinateSystem);
     addAvailableSpatialEntries(spatialEntries, "shapes", spatialData.shapes, coordinateSystem);
@@ -103,14 +89,25 @@ export function listAvailableSpatialEntries(
     return spatialEntries;
 }
 
+/**
+ * Props for the image layer a chart adds when it starts without one, such as the channel settings
+ * of a Viv chart converted to the SpatialData.js viewer.
+ */
+export type DefaultImageLayerProps = {
+    channels?: LayerChannelConfig;
+    vivLayerProps?: Record<string, unknown>;
+};
+
 function firstImageSpatialEntry(
     spatialData: SpatialData,
     coordinateSystem: string,
+    props?: DefaultImageLayerProps,
 ): RenderStackEntry | null {
     const matching = elementsForCoordinateSystem(spatialData.images, coordinateSystem);
     const firstKey = matching[0]?.[0];
     if (!firstKey) return null;
-    return spatialEntry("image", firstKey);
+    // a copy, so that editing the layer does not edit `props`
+    return spatialEntry("image", firstKey, props ? structuredClone(props) : {});
 }
 
 export function createHostOnlyRenderStack(): RenderStack {
@@ -123,9 +120,10 @@ export function createHostOnlyRenderStack(): RenderStack {
 export function createDefaultRenderStack(
     spatialData: SpatialData,
     coordinateSystem: string,
+    imageProps?: DefaultImageLayerProps,
 ): RenderStack {
     const spatialEntries: RenderStackEntry[] = [];
-    const imageEntry = firstImageSpatialEntry(spatialData, coordinateSystem);
+    const imageEntry = firstImageSpatialEntry(spatialData, coordinateSystem, imageProps);
     if (imageEntry) {
         spatialEntries.push(imageEntry);
     }
@@ -141,13 +139,12 @@ export function insertDefaultImageLayer(
     stack: RenderStack,
     spatialData: SpatialData,
     coordinateSystem: string,
+    imageProps?: DefaultImageLayerProps,
 ): boolean {
-    const hasImage = stack.entries.some(
-        (entry) => entry.kind === "spatial" && entry.source.elementType === "image",
-    );
+    const hasImage = stack.entries.some((entry) => entry.kind === "spatial" && entry.source.elementType === "image");
     if (hasImage) return false;
 
-    const imageEntry = firstImageSpatialEntry(spatialData, coordinateSystem);
+    const imageEntry = firstImageSpatialEntry(spatialData, coordinateSystem, imageProps);
     if (!imageEntry) return false;
 
     const firstHostIndex = stack.entries.findIndex((entry) => entry.kind === "host");
@@ -204,9 +201,7 @@ export function mergeHostOverlayEntriesInPlace(stack: RenderStack): boolean {
     }
 
     const existingById = new Map(stack.entries.map((entry) => [entry.id, entry]));
-    const mergedEntries = normalized.entries.map(
-        (entry) => existingById.get(entry.id) ?? entry,
-    );
+    const mergedEntries = normalized.entries.map((entry) => existingById.get(entry.id) ?? entry);
     stack.schemaVersion = normalized.schemaVersion;
     stack.entries.splice(0, stack.entries.length, ...mergedEntries);
     return true;

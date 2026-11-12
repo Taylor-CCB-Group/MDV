@@ -103,12 +103,7 @@ describe("DebugJsonDialogComponent", () => {
     });
 
     test("renders the empty validation state", () => {
-        render(
-            <DebugJsonDialogComponent
-                json={{ chartTypes: [] }}
-                showValidationSection
-            />,
-        );
+        render(<DebugJsonDialogComponent json={{ chartTypes: [] }} showValidationSection />);
 
         expect(screen.getByText("No validation issues recorded.")).toBeTruthy();
     });
@@ -117,12 +112,7 @@ describe("DebugJsonDialogComponent", () => {
         const store = buildStoreWithFindings();
         mocks.chartManager.validationFindings = store;
 
-        render(
-            <DebugJsonDialogComponent
-                json={{ chartTypes: [] }}
-                showValidationSection
-            />,
-        );
+        render(<DebugJsonDialogComponent json={{ chartTypes: [] }} showValidationSection />);
 
         fireEvent.click(screen.getByRole("button", { name: "Clear" }));
 

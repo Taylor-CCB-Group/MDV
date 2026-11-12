@@ -3,7 +3,6 @@ import { useViewerStore } from "./components/avivatorish/state";
 import type { DeckScatterConfig } from "./components/DeckScatterReactWrapper";
 import { useConfig } from "./hooks";
 
-
 /**
  * we have different ways of managing view state in viv vs deck - should be unified...
  * this is an agnostic shim for mobx vs zustand pending refactor.
@@ -12,7 +11,7 @@ export function useViewState() {
     // we should do something nicer than try/catch here,
     // but longer term we'll probably have a single store/mobx state.
     try {
-        const vs = useViewerStore(state => state.viewState);
+        const vs = useViewerStore((state) => state.viewState);
         if (!vs) {
             // Return a default viewState when it hasn't been initialized yet
             // This can happen when a new chart is initialized before the image loader is ready
@@ -29,7 +28,8 @@ export function useViewState() {
     }
 }
 
-export const getEmptyFeatureCollection = () => ({
-    type: "FeatureCollection",
-    features: []
-} as SimpleFeatureCollection);
+export const getEmptyFeatureCollection = () =>
+    ({
+        type: "FeatureCollection",
+        features: [],
+    }) as SimpleFeatureCollection;

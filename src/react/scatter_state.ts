@@ -1,7 +1,25 @@
+import type { LayerExtension, OrbitViewState, OrthographicViewState, PickingInfo } from "@deck.gl/core";
+import type { SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
 import type { Matrix4 } from "@math.gl/core";
-import type { OrbitViewState, OrthographicViewState, PickingInfo } from "@deck.gl/core";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { BaseConfig } from "@/charts/BaseChart";
+import type { ColumnName, DataColumn, DataType } from "@/charts/charts";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import { isDatatypeCategorical } from "@/lib/utils";
+import { escapeHtml } from "@/utilities/Utilities";
+import { MdvDataFilterExtension } from "@/webgl/MdvDataFilterExtension";
+import { MdvScatterplotLayer } from "@/webgl/MdvScatterplotLayer";
+import SpatialLayer from "@/webgl/SpatialLayer";
+import { ScatterDensityExension, ScatterSquareExtension } from "../webgl/ScatterDeckExtension";
+import { type AxisScaling, radiusReferenceRange } from "./axisScaling";
+import { getVivId } from "./components/avivatorish/MDVivViewer";
+import { useMetadata } from "./components/avivatorish/state";
+import type { ViewState } from "./components/VivScatterComponent";
 import { useChart } from "./context";
+import { type DualContourLegacyConfig, type HoveredContour, useLegacyDualContour } from "./contour_state";
+import { getEmptyFeatureCollection } from "./deck_state";
 import {
+    type FilterOwner,
     useChartID,
     useChartSize,
     useConfig,
@@ -9,27 +27,8 @@ import {
     useFieldSpecs,
     useOwnedFilteredIndices,
     useParamColumns,
-    type FilterOwner,
 } from "./hooks";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-import { getVivId } from "./components/avivatorish/MDVivViewer";
-import { useMetadata } from "./components/avivatorish/state";
-import type { ViewState } from "./components/VivScatterComponent";
-import SpatialLayer from "@/webgl/SpatialLayer";
-import { ScatterSquareExtension, ScatterDensityExension } from "../webgl/ScatterDeckExtension";
-import type { LayerExtension } from "@deck.gl/core";
-import { ScatterplotLayer } from "@deck.gl/layers";
-import { DataFilterExtension } from "@deck.gl/extensions";
-import { isDatatypeCategorical } from "@/lib/utils";
 import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
-import { type DualContourLegacyConfig, type HoveredContour, useLegacyDualContour } from "./contour_state";
-import type { ColumnName, DataColumn, DataType } from "@/charts/charts";
-import type { SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
-import type { BaseConfig } from "@/charts/BaseChart";
-import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
-import { getEmptyFeatureCollection } from "./deck_state";
-import { escapeHtml } from "@/utilities/Utilities";
 
 //!!! temporary fix for tsgo preview compatibility
 // import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
@@ -63,6 +62,14 @@ export type CategoryFilter = {
     category: string | string[];
     // consider properties like 'invert' or 'exclude', or 'color'...
 };
+/**
+ * Hides rows outside `category` of `column` from this chart (`null` when unset).
+ * Read by `useChartScopeFilterPredicate`; it does not filter other charts.
+ */
+export type BackgroundFilter = {
+    column: ColumnName | null;
+    category: string | string[];
+};
 //viewState should be persisted... maybe a way of saving different snapshots?
 //now using MobX for this, in a way that's common to viv & non-viv charts
 export type ScatterPlotConfig = {
@@ -75,9 +82,12 @@ export type ScatterPlotConfig = {
     //     // todo: add more options here...
     // };
     category_filters: Array<CategoryFilter>;
+    background_filter?: BackgroundFilter | null;
     on_filter: "hide" | "grey"; //todo...
     zoom_on_filter: boolean;
     point_shape: "circle" | "square" | "gaussian";
+    /** 2D only; absent is `equal`. See `AxisScaling`. */
+    axis_scaling?: AxisScaling;
     dimension: "2d" | "3d";
     selectionFeatureCollection: SimpleFeatureCollection;
 } & TooltipConfig &
@@ -255,6 +265,13 @@ function useZoomOnFilter(modelMatrix: Matrix4, data: Uint32Array) {
 }
 
 /**
+ * A radius, so 0.5 keeps the smallest point about 1px across; antialiasing fades it below that.
+ * Suspect we could get away with reducing it further - on dense plots subpixel sizes can look much better.
+ * This is a conservatively high value for the time being.
+ */
+export const SCATTER_RADIUS_MIN_PIXELS = 0.5;
+
+/**
  * If we are in a 'region' then we might have some notion of physical size.
  * If we are rendering abstract data, then we should probably have a normalised size
  * with respect to the domain of the data.
@@ -264,9 +281,15 @@ function useZoomOnFilter(modelMatrix: Matrix4, data: Uint32Array) {
  *
  * Also note that we would like in future to be able to set the size of individual points
  * based on some property of the data - but for now we just return a number.
+ *
+ * The result is in data units, ~`radius * course_radius / 10000` of the data range, so on screen
+ * it scales with chart size and zoom: in a small chart even the largest slider value can be
+ * sub-pixel. Layers using it should also set `radiusMinPixels: SCATTER_RADIUS_MIN_PIXELS`.
  */
 export function useScatterRadius() {
-    const { radius, course_radius } = useConfig<ScatterPlotConfig>();
+    const { radius, course_radius, axis_scaling, dimension } = useConfig<ScatterPlotConfig>();
+    const [width, height] = useChartSize();
+    const scaling = dimension === "2d" ? (axis_scaling ?? "equal") : "equal";
     const params = useParamColumns();
     const [cx, cy] = params;
     const scale = useRegionScale();
@@ -285,11 +308,11 @@ export function useScatterRadius() {
             // how does this come to be? is it a spatial conversion thing?
             const xRange = Math.abs(cx.minMax[1] - cx.minMax[0]);
             const yRange = Math.abs(cy.minMax[1] - cy.minMax[0]);
-            const r = 10000 / Math.max(xRange, yRange);
+            const r = 10000 / radiusReferenceRange(xRange, yRange, { width, height }, scaling);
             return radiusScale / r;
         }
         return radiusScale;
-    }, [cx.minMax, cy.minMax, radiusScale, cx, cy]);
+    }, [cx.minMax, cy.minMax, radiusScale, cx, cy, width, height, scaling]);
 }
 
 // type Tooltip = (PickingInfo) => string;
@@ -349,11 +372,7 @@ export function useScatterplotLayer(
     const { opacity } = config;
     const radiusScale = useScatterRadius();
 
-    const {
-        aggregateFilteredRows,
-        ownerVisibleRows,
-        isExternallyFiltered,
-    } = useOwnedFilteredIndices(filterOwner);
+    const { aggregateFilteredRows, ownerVisibleRows, isExternallyFiltered } = useOwnedFilteredIndices(filterOwner);
     const data = ownerVisibleRows;
     const params = useParamColumns();
     const [cx, cy, cz] = params;
@@ -460,10 +479,10 @@ export function useScatterplotLayer(
             if (!tooltipCols) return null;
             // return tooltipCols.getValue(data[i]);
             return tooltipCols.map((col) => {
-                    // Sanitise the strings before passing
-                    const value = col.data ? col.getValue(rowIndex) : "loading...";
-                    const strValue = value === undefined || value === null ? "" : String(value);
-                    return `<strong>${escapeHtml(col.name)}:</strong> ${escapeHtml(strValue)}`;
+                // Sanitise the strings before passing
+                const value = col.data ? col.getValue(rowIndex) : "loading...";
+                const strValue = value === undefined || value === null ? "" : String(value);
+                return `<strong>${escapeHtml(col.name)}:</strong> ${escapeHtml(strValue)}`;
             });
         },
         [tooltipCols],
@@ -509,7 +528,7 @@ export function useScatterplotLayer(
         const exts: LayerExtension[] = [];
         if (point_shape === "gaussian") exts.push(new ScatterDensityExension());
         else if (point_shape !== "circle") exts.push(new ScatterSquareExtension());
-        exts.push(new DataFilterExtension({ filterSize: 1 }));
+        exts.push(new MdvDataFilterExtension({ filterSize: 1 }));
         return exts;
     }, [point_shape]);
     const scatterplotLayer = useMemo(() => {
@@ -521,6 +540,7 @@ export function useScatterplotLayer(
             data,
             opacity,
             radiusScale,
+            radiusMinPixels: SCATTER_RADIUS_MIN_PIXELS,
             billboard: true,
             // antialiasing has artefacts on edges in 3d.
             // may also consider option to turn off antialiasing for performance?
@@ -615,13 +635,14 @@ export function useScatterplotLayer(
     const greyData = useMemo(() => ({ length: rowCount }), [rowCount]);
     const greyScatterplotLayer = useMemo(
         () =>
-            new ScatterplotLayer({
+            new MdvScatterplotLayer({
                 id: `scatter-grey_${getVivId(`${id}detail-react`)}`,
                 data: greyData,
                 opacity,
                 stroked: false,
                 filled: true,
                 radiusScale,
+                radiusMinPixels: SCATTER_RADIUS_MIN_PIXELS,
                 getPosition: (_: unknown, { target, index }: { target: number[]; index: number }) => {
                     target[0] = cx.data[index];
                     target[1] = cy.data[index];
@@ -633,7 +654,9 @@ export function useScatterplotLayer(
                 billboard: true,
                 modelMatrix,
                 parameters: {
-                    depthTest: false,
+                    // portable form of WebGL's `depthTest: false`, which WebGPU rejects
+                    depthCompare: "always",
+                    depthWriteEnabled: false,
                 },
                 getFilterValue: (_: unknown, { index }: { index: number }) => {
                     if (!isExternallyFiltered(index)) return 0;
@@ -643,11 +666,17 @@ export function useScatterplotLayer(
                 updateTriggers: {
                     // a full pass over every row; only worth redoing while the layer is shown
                     getFilterValue: greyOnFilter
-                        ? [aggregateFilteredRows, isExternallyFiltered, colorColumn, shouldFilterMissing, fallbackOnZero]
+                        ? [
+                              aggregateFilteredRows,
+                              isExternallyFiltered,
+                              colorColumn,
+                              shouldFilterMissing,
+                              fallbackOnZero,
+                          ]
                         : false,
                     getPosition: [cx.data, cy.data, cz?.data],
                 },
-                extensions: [new DataFilterExtension()],
+                extensions: [new MdvDataFilterExtension()],
                 visible: greyOnFilter,
             }),
         [

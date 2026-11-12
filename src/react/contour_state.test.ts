@@ -1,47 +1,47 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
-import type { CategoricalDataType } from '@/charts/charts';
-import { autorun, makeAutoObservable, runInAction } from 'mobx';
+import { renderHook } from "@testing-library/react";
+import { autorun, makeAutoObservable, runInAction } from "mobx";
+import { beforeEach, describe, expect, test, vi } from "vitest";
+import type { BaseConfig } from "@/charts/BaseChart";
+import type { CategoricalDataType } from "@/charts/charts";
+import type { CategoryContourProps } from "./contour_state";
 import {
+    type DualContourLegacyConfig,
+    getContourVisualSettings,
+    getDensitySettings,
+    type HoveredContour,
     useCategoryContour,
     useCategoryContourLegend,
-    getDensitySettings,
-    getContourVisualSettings,
-    type DualContourLegacyConfig,
-    type HoveredContour,
-} from './contour_state';
-import type { CategoryContourProps } from './contour_state';
-import type { BaseConfig } from '@/charts/BaseChart';
-import { scatterDefaults } from './scatter_state';
+} from "./contour_state";
+import { scatterDefaults } from "./scatter_state";
 
 // Mock all the hooks and dependencies
-vi.mock('./hooks', () => ({
+vi.mock("./hooks", () => ({
     useFieldSpec: vi.fn(),
     useCategoryFilterIndices: vi.fn(),
     useParamColumns: vi.fn(),
 }));
 
-vi.mock('./context', () => ({
+vi.mock("./context", () => ({
     useDataStore: vi.fn(),
 }));
 
-vi.mock('./deck_state', () => ({
+vi.mock("./deck_state", () => ({
     useViewState: vi.fn(),
     getEmptyFeatureCollection: vi.fn(() => ({
-        type: 'FeatureCollection',
+        type: "FeatureCollection",
         features: [],
     })),
 }));
 
-vi.mock('use-debounce', () => ({
+vi.mock("use-debounce", () => ({
     useDebounce: vi.fn((value) => [value]),
 }));
 
-import { useFieldSpec, useCategoryFilterIndices, useParamColumns } from './hooks';
-import { useDataStore } from './context';
-import { useViewState } from './deck_state';
+import { useDataStore } from "./context";
+import { useViewState } from "./deck_state";
+import { useCategoryFilterIndices, useFieldSpec, useParamColumns } from "./hooks";
 
-describe('useCategoryContour', () => {
+describe("useCategoryContour", () => {
     const mockCx = {
         data: new Float32Array([0, 1, 2, 3, 4]),
     };
@@ -50,7 +50,7 @@ describe('useCategoryContour', () => {
     };
 
     const baseProps: CategoryContourProps = {
-        id: 'test-contour',
+        id: "test-contour",
         fill: true,
         bandwidth: 10,
         intensity: 0.5,
@@ -63,16 +63,20 @@ describe('useCategoryContour', () => {
         (useParamColumns as any).mockReturnValue([mockCx, mockCy]);
         (useViewState as any).mockReturnValue({ zoom: 1 });
         (useDataStore as any).mockReturnValue({
-            getColumnColors: vi.fn(() => [[255, 0, 0], [0, 255, 0], [0, 0, 255]]),
+            getColumnColors: vi.fn(() => [
+                [255, 0, 0],
+                [0, 255, 0],
+                [0, 0, 255],
+            ]),
         });
     });
 
-    test('returns undefined when category is not provided', () => {
+    test("returns undefined when category is not provided", () => {
         const mockContourParameter = {
-            field: 'test-field',
-            values: ['cat1', 'cat2', 'cat3'],
+            field: "test-field",
+            values: ["cat1", "cat2", "cat3"],
             data: new Uint8Array([0, 1, 2, 0, 1]),
-            datatype: 'text' as CategoricalDataType,
+            datatype: "text" as CategoricalDataType,
         };
 
         (useFieldSpec as any).mockReturnValue(mockContourParameter);
@@ -82,13 +86,13 @@ describe('useCategoryContour', () => {
             useCategoryContour({
                 ...baseProps,
                 category: undefined,
-            })
+            }),
         );
 
         expect(result.current).toBeUndefined();
     });
 
-    test('returns undefined when contourParameter is not provided', () => {
+    test("returns undefined when contourParameter is not provided", () => {
         (useFieldSpec as any).mockReturnValue(undefined);
         (useCategoryFilterIndices as any).mockReturnValue(new Uint32Array([]));
 
@@ -96,14 +100,14 @@ describe('useCategoryContour', () => {
             useCategoryContour({
                 ...baseProps,
                 parameter: undefined,
-                category: 'cat1',
-            })
+                category: "cat1",
+            }),
         );
 
         expect(result.current).toBeUndefined();
     });
 
-    test('returns undefined when both category and contourParameter are not provided', () => {
+    test("returns undefined when both category and contourParameter are not provided", () => {
         (useFieldSpec as any).mockReturnValue(undefined);
         (useCategoryFilterIndices as any).mockReturnValue(new Uint32Array([]));
 
@@ -112,18 +116,18 @@ describe('useCategoryContour', () => {
                 ...baseProps,
                 parameter: undefined,
                 category: undefined,
-            })
+            }),
         );
 
         expect(result.current).toBeUndefined();
     });
 
-    test('returns layer props when both category and contourParameter are provided', () => {
+    test("returns layer props when both category and contourParameter are provided", () => {
         const mockContourParameter = {
-            field: 'test-field',
-            values: ['cat1', 'cat2', 'cat3'],
+            field: "test-field",
+            values: ["cat1", "cat2", "cat3"],
             data: new Uint8Array([0, 1, 2, 0, 1]),
-            datatype: 'text' as CategoricalDataType,
+            datatype: "text" as CategoricalDataType,
         };
 
         const mockData = new Uint32Array([0, 1, 2]);
@@ -134,39 +138,39 @@ describe('useCategoryContour', () => {
         const { result } = renderHook(() =>
             useCategoryContour({
                 ...baseProps,
-                parameter: 'test-field',
-                category: 'cat1',
-            })
+                parameter: "test-field",
+                category: "cat1",
+            }),
         );
 
         expect(result.current).toBeDefined();
-        expect(result.current?.id).toBe('test-contour');
+        expect(result.current?.id).toBe("test-contour");
         expect(result.current?.data).toBe(mockData);
         expect(result.current?.fillOpacity).toBe(0.5);
         expect(result.current?.contourOpacity).toBe(0.8);
         expect(result.current?.contourFill).toBe(2);
         expect(result.current?.pickable).toBe(false);
-        expect(typeof result.current?.getPosition).toBe('function');
+        expect(typeof result.current?.getPosition).toBe("function");
     });
 
-    test('emphasises the contour hovered in the legend and attenuates it while another is hovered', () => {
+    test("emphasises the contour hovered in the legend and attenuates it while another is hovered", () => {
         (useFieldSpec as any).mockReturnValue({
-            field: 'test-field',
-            values: ['cat1'],
+            field: "test-field",
+            values: ["cat1"],
             data: new Uint8Array([0]),
-            datatype: 'text' as CategoricalDataType,
+            datatype: "text" as CategoricalDataType,
         });
         (useCategoryFilterIndices as any).mockReturnValue(new Uint32Array([0]));
 
         const { result, rerender } = renderHook(
             ({ hoveredContour }) =>
-                useCategoryContour({ ...baseProps, parameter: 'test-field', category: 'cat1', hoveredContour }),
-            { initialProps: { hoveredContour: { type: 'category', id: 'test-contour' } as HoveredContour | null } },
+                useCategoryContour({ ...baseProps, parameter: "test-field", category: "cat1", hoveredContour }),
+            { initialProps: { hoveredContour: { type: "category", id: "test-contour" } as HoveredContour | null } },
         );
         expect(result.current?.fillOpacity).toBeCloseTo(0.75);
         expect(result.current?.contourOpacity).toBe(1);
 
-        rerender({ hoveredContour: { type: 'field', field: 'some-field' } });
+        rerender({ hoveredContour: { type: "field", field: "some-field" } });
         expect(result.current?.fillOpacity).toBeCloseTo(0.4);
         expect(result.current?.contourOpacity).toBeCloseTo(0.64);
 
@@ -175,12 +179,12 @@ describe('useCategoryContour', () => {
         expect(result.current?.contourOpacity).toBe(0.8);
     });
 
-    test('recomputes contour colors when the active category column gains a new value in place', () => {
+    test("recomputes contour colors when the active category column gains a new value in place", () => {
         const mockContourParameter = {
-            field: 'test-field',
-            values: ['cat1'],
+            field: "test-field",
+            values: ["cat1"],
             data: new Uint8Array([0]),
-            datatype: 'multitext' as CategoricalDataType,
+            datatype: "multitext" as CategoricalDataType,
         };
 
         (useFieldSpec as any).mockReturnValue(mockContourParameter);
@@ -189,7 +193,10 @@ describe('useCategoryContour', () => {
             getColumnColors: vi.fn(() =>
                 mockContourParameter.values.length === 1
                     ? [[255, 0, 0]]
-                    : [[255, 0, 0], [0, 255, 0]],
+                    : [
+                          [255, 0, 0],
+                          [0, 255, 0],
+                      ],
             ),
         });
 
@@ -197,23 +204,23 @@ describe('useCategoryContour', () => {
             ({ category }) =>
                 useCategoryContour({
                     ...baseProps,
-                    parameter: 'test-field',
+                    parameter: "test-field",
                     category,
                 }),
             {
-                initialProps: { category: 'cat1' as string | string[] | undefined },
+                initialProps: { category: "cat1" as string | string[] | undefined },
             },
         );
 
         expect(result.current?.colorRange[0]).toEqual([255, 0, 0]);
 
-        mockContourParameter.values.push('cat2');
-        rerender({ category: 'cat2' });
+        mockContourParameter.values.push("cat2");
+        rerender({ category: "cat2" });
 
         expect(result.current?.colorRange[0]).toEqual([0, 255, 0]);
     });
 
-    test('handles empty data array when contourParameter is falsy but category is provided', () => {
+    test("handles empty data array when contourParameter is falsy but category is provided", () => {
         (useFieldSpec as any).mockReturnValue(undefined);
         (useCategoryFilterIndices as any).mockReturnValue(new Uint32Array([]));
 
@@ -221,20 +228,20 @@ describe('useCategoryContour', () => {
             useCategoryContour({
                 ...baseProps,
                 parameter: undefined,
-                category: 'cat1',
-            })
+                category: "cat1",
+            }),
         );
 
         // Should return undefined because contourParameter is falsy
         expect(result.current).toBeUndefined();
     });
 
-    test('getPosition function works correctly', () => {
+    test("getPosition function works correctly", () => {
         const mockContourParameter = {
-            field: 'test-field',
-            values: ['cat1', 'cat2'],
+            field: "test-field",
+            values: ["cat1", "cat2"],
             data: new Uint8Array([0, 1]),
-            datatype: 'text' as CategoricalDataType,
+            datatype: "text" as CategoricalDataType,
         };
 
         const mockData = new Uint32Array([0, 1]);
@@ -245,9 +252,9 @@ describe('useCategoryContour', () => {
         const { result } = renderHook(() =>
             useCategoryContour({
                 ...baseProps,
-                parameter: 'test-field',
-                category: 'cat1',
-            })
+                parameter: "test-field",
+                category: "cat1",
+            }),
         );
 
         const getPosition = result.current?.getPosition;
@@ -262,12 +269,12 @@ describe('useCategoryContour', () => {
         }
     });
 
-    test('contourFill is set to large value when fill is disabled', () => {
+    test("contourFill is set to large value when fill is disabled", () => {
         const mockContourParameter = {
-            field: 'test-field',
-            values: ['cat1'],
+            field: "test-field",
+            values: ["cat1"],
             data: new Uint8Array([0]),
-            datatype: 'text' as CategoricalDataType,
+            datatype: "text" as CategoricalDataType,
         };
 
         (useFieldSpec as any).mockReturnValue(mockContourParameter);
@@ -277,73 +284,73 @@ describe('useCategoryContour', () => {
             useCategoryContour({
                 ...baseProps,
                 fill: false,
-                parameter: 'test-field',
-                category: 'cat1',
-            })
+                parameter: "test-field",
+                category: "cat1",
+            }),
         );
 
         expect(result.current?.contourFill).toBe(10000);
     });
 });
 
-describe('useCategoryContourLegend', () => {
+describe("useCategoryContourLegend", () => {
     const mockContourParameter = {
-        field: 'cell_type',
-        name: 'Cell type',
-        values: ['T cell', 'B cell', 'NK'],
-        datatype: 'text' as CategoricalDataType,
+        field: "cell_type",
+        name: "Cell type",
+        values: ["T cell", "B cell", "NK"],
+        datatype: "text" as CategoricalDataType,
     };
 
     beforeEach(() => {
         vi.clearAllMocks();
         (useFieldSpec as any).mockReturnValue(mockContourParameter);
         (useDataStore as any).mockReturnValue({
-            getColumnColors: vi.fn(() => [[255, 0, 0], [0, 255, 0], [0, 0, 255]]),
+            getColumnColors: vi.fn(() => [
+                [255, 0, 0],
+                [0, 255, 0],
+                [0, 0, 255],
+            ]),
         });
     });
 
     const config = (category1: string[], category2: string[]) =>
-        ({ contourParameter: 'cell_type', category1, category2 }) as unknown as DualContourLegacyConfig;
+        ({ contourParameter: "cell_type", category1, category2 }) as unknown as DualContourLegacyConfig;
 
-    test('lists each non-empty category selection under the contour parameter name', () => {
-        const { result } = renderHook(() => useCategoryContourLegend(config(['B cell'], [])));
+    test("lists each non-empty category selection under the contour parameter name", () => {
+        const { result } = renderHook(() => useCategoryContourLegend(config(["B cell"], [])));
 
-        expect(result.current.label).toBe('Cell type');
-        expect(result.current.items).toEqual([
-            { id: 'contour1', name: 'B cell', colors: [[0, 255, 0]] },
-        ]);
+        expect(result.current.label).toBe("Cell type");
+        expect(result.current.items).toEqual([{ id: "contour1", name: "B cell", colors: [[0, 255, 0]] }]);
     });
 
-    test('uses the shared colour range for a contour over several categories', () => {
-        const { result } = renderHook(() =>
-            useCategoryContourLegend(config(['NK'], ['T cell', 'B cell'])),
-        );
+    test("uses the shared colour range for a contour over several categories", () => {
+        const { result } = renderHook(() => useCategoryContourLegend(config(["NK"], ["T cell", "B cell"])));
 
         const [first, second] = result.current.items;
-        expect(first).toEqual({ id: 'contour1', name: 'NK', colors: [[0, 0, 255]] });
-        expect(second.id).toBe('contour2');
-        expect(second.name).toBe('T cell, B cell');
+        expect(first).toEqual({ id: "contour1", name: "NK", colors: [[0, 0, 255]] });
+        expect(second.id).toBe("contour2");
+        expect(second.name).toBe("T cell, B cell");
         expect(second.colors.length).toBeGreaterThan(1);
     });
 
-    test('returns no items without a contour parameter', () => {
+    test("returns no items without a contour parameter", () => {
         (useFieldSpec as any).mockReturnValue(undefined);
-        const { result } = renderHook(() => useCategoryContourLegend(config(['NK'], [])));
+        const { result } = renderHook(() => useCategoryContourLegend(config(["NK"], [])));
 
         expect(result.current.items).toEqual([]);
     });
 });
 
-describe('getDensitySettings category selection wiring', () => {
-    test('scatter defaults seed density settings keys so later edits stay observable', () => {
+describe("getDensitySettings category selection wiring", () => {
+    test("scatter defaults seed density settings keys so later edits stay observable", () => {
         const config = makeAutoObservable({
             ...scatterDefaults,
-            id: 'test-chart',
+            id: "test-chart",
             size: [800, 600] as [number, number],
-            title: 'Test Chart',
-            legend: '',
-            type: 'scatter',
-            param: ['x', 'y'] as string[],
+            title: "Test Chart",
+            legend: "",
+            type: "scatter",
+            param: ["x", "y"] as string[],
         });
         const observed: Array<{ contourParameter: typeof config.contourParameter; category1: string[] }> = [];
         const dispose = autorun(() => {
@@ -354,91 +361,91 @@ describe('getDensitySettings category selection wiring', () => {
         });
 
         runInAction(() => {
-            config.contourParameter = 'test-field';
-            config.category1 = ['tag-a'];
+            config.contourParameter = "test-field";
+            config.category1 = ["tag-a"];
         });
         dispose();
 
         expect(observed).toEqual([
             { contourParameter: undefined, category1: [] },
-            { contourParameter: 'test-field', category1: ['tag-a'] },
+            { contourParameter: "test-field", category1: ["tag-a"] },
         ]);
     });
 
-    test('builds category selection controls that read from live config state', () => {
+    test("builds category selection controls that read from live config state", () => {
         const mockConfig: DualContourLegacyConfig & BaseConfig = {
             ...scatterDefaults,
-            id: 'test-chart',
+            id: "test-chart",
             size: [800, 600],
-            title: 'Test Chart',
-            legend: '',
-            type: 'scatter',
-            param: ['x', 'y', 'test-field'],
-            contourParameter: 'test-field',
-            category1: ['cat1'],
-            category2: ['cat2'],
+            title: "Test Chart",
+            legend: "",
+            type: "scatter",
+            param: ["x", "y", "test-field"],
+            contourParameter: "test-field",
+            category1: ["cat1"],
+            category2: ["cat2"],
         };
 
         const spec = getDensitySettings(mockConfig);
 
         expect(spec._disposers).toBeUndefined();
-        expect(spec.type).toBe('folder');
+        expect(spec.type).toBe("folder");
         const categoryFolder = spec.current_value[0];
-        if (categoryFolder.type !== 'folder') {
-            throw new Error('expected category selection folder');
+        if (categoryFolder.type !== "folder") {
+            throw new Error("expected category selection folder");
         }
         const [contourParameter, category1, category2] = categoryFolder.current_value;
-        if (contourParameter.type !== 'column') {
-            throw new Error('expected contour parameter column selector');
+        if (contourParameter.type !== "column") {
+            throw new Error("expected contour parameter column selector");
         }
-        if (category1.type !== 'category_selection' || category2.type !== 'category_selection') {
-            throw new Error('expected dedicated category selection specs');
+        if (category1.type !== "category_selection" || category2.type !== "category_selection") {
+            throw new Error("expected dedicated category selection specs");
         }
 
-        expect(contourParameter.columnType).toEqual(['text', 'text16', 'multitext']);
-        expect(category1.getCurrentValue?.()).toEqual(['cat1']);
-        expect(category2.getCurrentValue?.()).toEqual(['cat2']);
-        expect(category1.sourceColumn?.()).toBe('test-field');
-        expect(category2.sourceColumn?.()).toBe('test-field');
+        expect(contourParameter.columnType).toEqual(["text", "text16", "multitext"]);
+        expect(category1.getCurrentValue?.()).toEqual(["cat1"]);
+        expect(category2.getCurrentValue?.()).toEqual(["cat2"]);
+        expect(category1.sourceColumn?.()).toBe("test-field");
+        expect(category2.sourceColumn?.()).toBe("test-field");
     });
 
-    test('category selection getters follow source column and category changes', () => {
+    test("category selection getters follow source column and category changes", () => {
         const mockConfig: DualContourLegacyConfig & BaseConfig = {
             ...scatterDefaults,
-            id: 'test-chart',
+            id: "test-chart",
             size: [800, 600],
-            title: 'Test Chart',
-            legend: '',
-            type: 'scatter',
-            param: ['x', 'y', 'test-field'],
-            contourParameter: 'test-field',
-            category1: ['cat1'],
-            category2: ['cat2'],
+            title: "Test Chart",
+            legend: "",
+            type: "scatter",
+            param: ["x", "y", "test-field"],
+            contourParameter: "test-field",
+            category1: ["cat1"],
+            category2: ["cat2"],
         };
 
         const spec = getDensitySettings(mockConfig);
         const categoryFolder = spec.current_value[0];
-        if (categoryFolder.type !== 'folder') {
-            throw new Error('expected category selection folder');
+        if (categoryFolder.type !== "folder") {
+            throw new Error("expected category selection folder");
         }
         const [, category1, category2] = categoryFolder.current_value;
-        if (category1.type !== 'category_selection' || category2.type !== 'category_selection') {
-            throw new Error('expected dedicated category selection specs');
+        if (category1.type !== "category_selection" || category2.type !== "category_selection") {
+            throw new Error("expected dedicated category selection specs");
         }
 
-        mockConfig.contourParameter = 'new-field';
-        mockConfig.category1 = ['new1'];
+        mockConfig.contourParameter = "new-field";
+        mockConfig.category1 = ["new1"];
         mockConfig.category2 = [];
 
-        expect(category1.sourceColumn?.()).toBe('new-field');
-        expect(category2.sourceColumn?.()).toBe('new-field');
-        expect(category1.getCurrentValue?.()).toEqual(['new1']);
+        expect(category1.sourceColumn?.()).toBe("new-field");
+        expect(category2.sourceColumn?.()).toBe("new-field");
+        expect(category1.getCurrentValue?.()).toEqual(["new1"]);
         expect(category2.getCurrentValue?.()).toEqual([]);
     });
 });
 
-describe('getContourVisualSettings', () => {
-    test('maps KDE bandwidth through the slider spec without coupling to UI copy', () => {
+describe("getContourVisualSettings", () => {
+    test("maps KDE bandwidth through the slider spec without coupling to UI copy", () => {
         const config = {
             contour_fill: false,
             contour_fillThreshold: 2,
@@ -448,8 +455,8 @@ describe('getContourVisualSettings', () => {
         };
 
         const [bandwidthSetting] = getContourVisualSettings(config);
-        if (bandwidthSetting.type !== 'slider') {
-            throw new Error('expected first contour setting to be a slider');
+        if (bandwidthSetting.type !== "slider") {
+            throw new Error("expected first contour setting to be a slider");
         }
         const initialBandwidth = config.contour_bandwidth;
 
@@ -460,7 +467,7 @@ describe('getContourVisualSettings', () => {
         expect(config.contour_bandwidth).toBeCloseTo(initialBandwidth);
 
         if (bandwidthSetting.min === undefined || bandwidthSetting.max === undefined) {
-            throw new Error('bandwidth slider should define min/max');
+            throw new Error("bandwidth slider should define min/max");
         }
 
         bandwidthSetting.func?.(bandwidthSetting.min);

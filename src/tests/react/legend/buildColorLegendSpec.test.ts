@@ -2,9 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import DataStore from "@/datastore/DataStore";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
-function createStore(
-    columns: Record<string, Record<string, unknown>>,
-): DataStore {
+function createStore(columns: Record<string, Record<string, unknown>>): DataStore {
     return Object.assign(Object.create(DataStore.prototype), {
         columnIndex: columns,
         getColumnColors: vi.fn((column: string) => {

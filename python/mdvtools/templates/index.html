@@ -6,9 +6,12 @@
     <title>MDV Desktop Index</title>
     {# Relative to this page, so the assets still resolve behind a proxy that strips a path prefix. #}
     {% set static_root = '../' * (request.path.count('/') - 1) ~ url_for('static', filename='')[request.script_root|length + 1:] %}
-    <link rel="stylesheet" href="{{ static_root }}assets/catalog.css">
+    {% set catalog = entry_assets('catalog') %}
+    {% for css in catalog.css %}
+    <link rel="stylesheet" href="{{ static_root }}{{ css }}">
+    {% endfor %}
 </head>
 <body>
-    <script type="module" src="{{ static_root }}js/catalog.js"></script>
+    <script type="module" src="{{ static_root }}{{ catalog.js }}"></script>
 </body>
 </html>

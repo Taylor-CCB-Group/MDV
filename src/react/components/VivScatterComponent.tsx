@@ -1,26 +1,26 @@
-import { getDefaultInitialViewState, ColorPaletteExtension, DetailView } from "@hms-dbmi/viv";
-import { observer } from "mobx-react-lite";
-import { useMemo, useEffect, useRef, useState, useCallback } from "react";
-import { shallow } from "zustand/shallow";
-import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
-import SelectionOverlay from "./SelectionOverlay";
-import FieldContourLegend from "./FieldContourLegend";
-import { useCategoryContourLegend, useFieldContourLegend } from "../contour_state";
-import type { DualContourLegacyConfig, HoveredContour } from "../contour_state";
-import { useLoader, type OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
-import { useViewStateLink } from "../chartLinkHooks";
-import { useChart } from "../context";
-import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import { GeoJsonLayer } from "@deck.gl/layers";
-import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
-import type { VivRoiConfig } from "./VivMDVReact";
+import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
+import type { DeckGLProps, OrbitViewState, OrthographicViewState, PickingInfo } from "deck.gl";
+import { observer } from "mobx-react-lite";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { shallow } from "zustand/shallow";
+import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
-import { useOuterContainer } from "../screen_state";
-import type { DeckGLProps, OrbitViewState, OrthographicViewState, PickingInfo } from "deck.gl";
+import { useViewStateLink } from "../chartLinkHooks";
+import { useChart } from "../context";
+import type { DualContourLegacyConfig, HoveredContour } from "../contour_state";
+import { useCategoryContourLegend, useFieldContourLegend } from "../contour_state";
+import { useChartID, useChartSize, useConfig, useRegion } from "../hooks";
 import useGateLayers from "../hooks/useGateLayers";
-import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
+import { useOuterContainer } from "../screen_state";
+import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
+import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
+import { type OME_TIFF, useChannelsStore, useLoader, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
+import FieldContourLegend from "./FieldContourLegend";
+import SelectionOverlay from "./SelectionOverlay";
+import type { VivRoiConfig } from "./VivMDVReact";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -92,11 +92,7 @@ const Main = observer(
         // passing showJson from here to make use of this being `observer`
         const jsonLayer = useJsonLayer(showJson);
 
-        const {
-            gateLabelLayer,
-            gateDisplayLayer,
-            controllerOptions,
-        } = useGateLayers();
+        const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
 
         // Get field contour legend data
         const config = useConfig<DualContourLegacyConfig>();
@@ -169,28 +165,16 @@ const Main = observer(
                 brightness,
                 contrast,
             }),
-                [
-                ome,
-                selections,
-                contrastLimits,
-                extensions,
-                colors,
-                channelsVisible,
-                brightness,
-                contrast,
-            ],
+            [ome, selections, contrastLimits, extensions, colors, channelsVisible, brightness, contrast],
         );
 
         const getTooltipContent = useCallback(
             (info: PickingInfo) => {
-                return getCombinedScatterTooltip(
-                    info,
-                    {
-                        gateDisplayLayerId: gateDisplayLayer?.id,
-                        gateLabelLayerId: gateLabelLayer?.id,
-                        getPointTooltip: getTooltip,
-                    },
-                );
+                return getCombinedScatterTooltip(info, {
+                    gateDisplayLayerId: gateDisplayLayer?.id,
+                    gateLabelLayerId: gateLabelLayer?.id,
+                    getPointTooltip: getTooltip,
+                });
             },
             [gateDisplayLayer?.id, gateLabelLayer?.id, getTooltip],
         );
@@ -211,10 +195,10 @@ const Main = observer(
                     gateDisplayLayer,
                     selectionLayer,
                     gateLabelLayer,
-                ].filter(l => l !== null),
+                ].filter((l) => l !== null),
                 id: `${id}deck`,
                 // deviceProps: {
-                //     webgl: {                    
+                //     webgl: {
                 //         depth: true,
                 //         preserveDrawingBuffer: true,
                 //         antialias: true,
@@ -247,8 +231,8 @@ const Main = observer(
             <>
                 <SelectionOverlay />
                 {showLegend && (
-                    <FieldContourLegend 
-                        fields={legendFields} 
+                    <FieldContourLegend
+                        fields={legendFields}
                         categories={legendCategories.items}
                         categoryLabel={legendCategories.label}
                         position={legendPosition}
@@ -275,16 +259,12 @@ const Main = observer(
                         layerProps={[layerConfig]}
                         viewStates={[{ ...viewState, id: detailId }]}
                         // not really expecting OrbitViewState... yet... but we will for 3D.
-                        onViewStateChange={(e: {viewState: OrthographicViewState | OrbitViewState}) => {
+                        onViewStateChange={(e: { viewState: OrthographicViewState | OrbitViewState }) => {
                             viewerStore.setState({
                                 viewState: { ...e.viewState, id: detailId },
                             });
                             if (vsDebugDivRef.current)
-                                vsDebugDivRef.current.innerText = JSON.stringify(
-                                    e.viewState,
-                                    null,
-                                    2,
-                                );
+                                vsDebugDivRef.current.innerText = JSON.stringify(e.viewState, null, 2);
                         }}
                         deckProps={deckProps}
                     />
@@ -292,4 +272,5 @@ const Main = observer(
                 {tooltipPortal}
             </>
         );
-});
+    },
+);

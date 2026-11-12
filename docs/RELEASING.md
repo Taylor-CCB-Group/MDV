@@ -83,7 +83,7 @@ Use these steps when the workflows cannot run, such as when GitHub Actions is do
 
 - accounts on TestPyPI and PyPI, with access to the `mdvtools` project on each
 - an API token for each index, exported as `UV_PUBLISH_TOKEN` before you publish
-- `uv` at the version pinned in `[tool.uv] required-version`
+- `uv` at or above the minimum in `[tool.uv] required-version`
 - `pnpm` for the frontend build
 
 ### 1. Bump the version and date the changelog
@@ -170,9 +170,9 @@ stops the Release workflow from publishing it again.
 
 ## Notes
 
-- `[tool.uv] required-version` pins uv to one exact version, and any other version fails
-  `uv build`, `uv lock` and `uv sync`. Install the pinned version, or run it with
-  `uvx uv@<version>`.
+- `[tool.uv] required-version` sets the oldest uv that works, and an older uv fails
+  `uv build`, `uv lock` and `uv sync`. Upgrade it with `uv self update`, or `pip install -U uv`
+  for a pip install.
 - The PyPI page shows `python/PYPI_README.md`, not the developer `README.md`. Update its
   quickstart when the API changes. `CHANGELOG.md` appears on GitHub only.
 - `uv build` and `uv publish` do not read `uv.lock`. The lock matters for `uv sync` in

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type DataStore from "@/datastore/DataStore";
 import RangeDimension from "@/datastore/RangeDimension";
-import { evaluateFilterSpec, type FilterSpec, type NumericArray } from "@/datastore/rangeFilterEval";
 import { RangeFilterClient } from "@/datastore/rangeFilterClient";
+import { evaluateFilterSpec, type FilterSpec, type NumericArray } from "@/datastore/rangeFilterEval";
 import {
     assertConsistent,
     createStore,

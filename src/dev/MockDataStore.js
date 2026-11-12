@@ -130,4 +130,4 @@ export function mockDataSource(name, size) {
 //     });
 // }
 
-export { getRandomDataStore, mockDataLoader, getRandomData, mockColumns };
+export { getRandomData, getRandomDataStore, mockColumns, mockDataLoader };
