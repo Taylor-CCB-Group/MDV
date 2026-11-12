@@ -30,6 +30,8 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
       OTEL_SERVICE_NAME: <deployment name>
+      FARO_COLLECTOR_URL: http://alloy:12347/collect
+      FARO_API_KEY: <the FARO_API_KEY from this folder's .env>
     networks:
       - default
       - mdv-telemetry
@@ -42,6 +44,8 @@ networks:
 Give each deployment on a server its own `OTEL_SERVICE_NAME`, because Grafana uses it to tell deployments apart. Without `OTEL_EXPORTER_OTLP_ENDPOINT`, MDV sends nothing.
 
 MDV records every request by default. To keep a fraction of traces on a busy server, also set `OTEL_TRACES_SAMPLER=parentbased_traceidratio` and `OTEL_TRACES_SAMPLER_ARG=0.2` for 20%. Request duration metrics still count every request.
+
+`FARO_COLLECTOR_URL` switches on browser telemetry. MDV's pages then load Grafana Faro, which records page loads, Web Vitals, how long each request takes and uncaught errors. It does not record console messages. Faro posts to `telemetry/faro` on the same deployment, and MDV forwards each post to Alloy. MDV refuses posts from other sites, posts over 256 KiB and more than 10 posts a second from one address, with bursts of up to 100. With auth on, sign-in is needed too. Faro also adds a `traceparent` header to MDV's own requests, so a request's browser span and server spans share one trace. To record a fraction of browser sessions, set `FARO_SAMPLE_RATE`, such as `0.2` for 20%.
 
 ## Open Grafana on a server
 
