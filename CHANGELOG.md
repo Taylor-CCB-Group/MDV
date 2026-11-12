@@ -6,7 +6,7 @@ All notable changes to `mdvtools` are documented here. The format is based on
 
 ## [Unreleased]
 
-## [1.4.0] - 2026-10-21
+## [1.4.0] - 2026-11-12
 
 > ⚠️ Behaviour changes for the full application (`mdvtools[app]`): when `DB_BACKEND` is
 > unset, the server now uses SQLite unless it finds a PostgreSQL setting (`DB_HOST`,
