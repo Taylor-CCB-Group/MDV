@@ -1,7 +1,7 @@
 import os
 from typing import Any
 from mdvtools.logging_config import get_logger
-from mdvtools.mdvproject import get_unwritable_project_paths
+from mdvtools.mdvproject import get_project_thumbnail, get_unwritable_project_paths
 logger = get_logger(__name__)
 
 # Module-level constants and functions that can be imported
@@ -14,6 +14,14 @@ def register_routes(app, ENABLE_AUTH):
     from mdvtools.auth.authutils import active_projects_cache, user_project_cache, all_users_cache, cache_user_projects
     from mdvtools.dbutils.mdv_server_app import grant_admins_ownership_of_unowned_projects, serve_projects_from_filesystem
     from mdvtools.dbutils.dbservice import ProjectService
+
+    def current_thumbnail(project_data: dict[str, Any]) -> Any:
+        # The project cache is filled at startup, so read the thumbnail from disk
+        # (cached by file mtime) to pick up views saved, renamed or deleted since.
+        project_path = project_data.get("path")
+        if not project_path:
+            return project_data.get("thumbnail")
+        return get_project_thumbnail(project_path)
 
     def project_is_writable(project_data: dict[str, Any]) -> bool:
         project_path = project_data.get("path")
@@ -213,6 +221,28 @@ def register_routes(app, ENABLE_AUTH):
                         owners.append(user_data["email"])
             return sorted(owners)
 
+        def can_see(perms) -> bool:
+            return bool(perms) and bool(perms["can_read"] or perms["can_write"] or perms["is_owner"])
+
+        def project_response(p: dict[str, Any], permissions: Any = None) -> dict[str, Any]:
+            """One project as the catalog sees it. Shared by /projects and /projects/<id>."""
+            return {
+                "id": p["id"],
+                "name": p["name"],
+                "lastModified": p["lastModified"],
+                "thumbnail": current_thumbnail(p),
+                "permissions": permissions,
+                "owner": get_project_owners(p["id"]) if ENABLE_AUTH else [],
+                "readme": p.get("readme"),
+                "writable": project_is_writable(p),
+            }
+
+        def session_user_projects() -> dict:
+            user = session.get('user')
+            if not user:
+                raise ValueError("User not found in session.")
+            return user_project_cache.get(user["id"]) or {}
+
         @app.route('/projects')
         def get_projects():
             """
@@ -221,67 +251,48 @@ def register_routes(app, ENABLE_AUTH):
             logger.info(" /projects queried...")
 
             try:
-                # Step 1: Get projects directly from cache
                 if ENABLE_AUTH:
-                    active_projects = active_projects_cache
-                else:
-                    # If authentication is disabled, get all projects from the database
-                    active_projects = ProjectService.get_active_projects()
-
-                if ENABLE_AUTH:
-                    user = session.get('user')
-                    if not user:
-                        raise ValueError("User not found in session.")
-                    # Filter by user permissions if authentication is enabled
-                    user_id = user["id"]
-                    user_projects = user_project_cache.get(user_id)
-                    
-                    # If user has no projects assigned, return an empty list instead of error
-                    if not user_projects:
-                        return jsonify([])
-
-                    allowed_project_ids = {
-                        pid for pid, perms in user_projects.items()
-                        if perms["can_read"] or perms["can_write"] or perms["is_owner"]
-                    }
-
-                    filtered_projects = [
-                        {
-                            "id": p["id"],
-                            "name": p["name"],
-                            "lastModified": p["lastModified"],
-                            "thumbnail": p["thumbnail"],
-                            "permissions": user_projects[p["id"]],
-                            "owner": get_project_owners(p["id"]),
-                            "readme": p.get("readme"),
-                            "writable": project_is_writable(p),
-                        }
-                        for p in active_projects
-                        if p["id"] in allowed_project_ids
-                    ]
-                else:
-                    # No auth, return all
-                    filtered_projects = [
-                        {
-                            "id": p["id"],
-                            "name": p["name"],
-                            "lastModified": p["lastModified"],
-                            "thumbnail": p["thumbnail"],
-                            "permissions": None,
-                            "owner": [],
-                            "readme": p.get("readme"),
-                            "writable": project_is_writable(p),
-                        }
-                        for p in active_projects
-                    ]
-
-                return jsonify(filtered_projects)
+                    # Filter the cached projects by the user's permissions
+                    user_projects = session_user_projects()
+                    return jsonify([
+                        project_response(p, user_projects[p["id"]])
+                        for p in active_projects_cache
+                        if can_see(user_projects.get(p["id"]))
+                    ])
+                # No auth: every project, straight from the database
+                return jsonify([project_response(p) for p in ProjectService.get_active_projects()])
 
             except Exception as e:
                 logger.exception(f"Error retrieving projects: {e}")
                 return jsonify({"error": str(e)}), 500
 
         logger.info("Route registered: /projects")
+
+        @app.route('/projects/<int:project_id>')
+        def get_project(project_id: int):
+            """
+            One active project, in the same shape as an entry of /projects. 404 when it
+            doesn't exist, is deleted, or the user can't see it.
+            """
+            if ENABLE_AUTH and not session.get('user'):
+                return jsonify({"error": "Authentication required"}), 401
+            try:
+                if ENABLE_AUTH:
+                    perms = session_user_projects().get(project_id)
+                    project = next((p for p in active_projects_cache if p["id"] == project_id), None)
+                    if project is None or not can_see(perms):
+                        return jsonify({"error": "Project not found"}), 404
+                    return jsonify(project_response(project, perms))
+                project = ProjectService.get_active_project(project_id)
+                if project is None:
+                    return jsonify({"error": "Project not found"}), 404
+                return jsonify(project_response(project))
+
+            except Exception as e:
+                logger.exception(f"Error retrieving project {project_id}: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        logger.info("Route registered: /projects/<project_id>")
 
     except Exception as e:
         logger.exception(f"Error registering routes: {e}")

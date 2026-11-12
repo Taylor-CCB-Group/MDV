@@ -13,7 +13,7 @@ export default function popoutChart(chart: BaseChart<any>) {
     const l = Math.floor(left + wleft);
     const t = Math.floor(top + wtop);
     if (div.gridstackPopoutCallback) div.gridstackPopoutCallback();
-    //moved this to after the callback as this will ensure the 
+    //moved this to after the callback as this will ensure the
     //parent element is correct
     const originalParent = div.parentElement;
     if (!originalParent) throw "Chart div has no parent element";
@@ -32,21 +32,19 @@ export default function popoutChart(chart: BaseChart<any>) {
     const syncTheme = () => {
         popoutWindow.document.documentElement.className = document.documentElement.className;
     };
-  
+
     // Initial sync
     syncTheme();
-  
+
     // Set up a MutationObserver on the main window
     const themeObserver = new MutationObserver(syncTheme);
     themeObserver.observe(document.documentElement, {
         attributes: true,
-        attributeFilter: ['class'],
+        attributeFilter: ["class"],
     });
 
     // Function to add a stylesheet or style element to the popout window
-    const addStyleElement = (
-        styleElement: HTMLStyleElement | HTMLLinkElement,
-    ) => {
+    const addStyleElement = (styleElement: HTMLStyleElement | HTMLLinkElement) => {
         if (styleElement instanceof HTMLLinkElement) {
             const newLink = popoutWindow.document.createElement("link");
             newLink.rel = "stylesheet";
@@ -64,9 +62,7 @@ export default function popoutChart(chart: BaseChart<any>) {
     };
 
     // Initial copy of all existing styles
-    Array.from(
-        document.querySelectorAll('link[rel="stylesheet"], style'),
-    ).forEach((styleElement) => {
+    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach((styleElement) => {
         addStyleElement(styleElement as HTMLStyleElement | HTMLLinkElement);
     });
 
@@ -74,21 +70,15 @@ export default function popoutChart(chart: BaseChart<any>) {
     if (navigator.userAgent.indexOf("Firefox") !== -1) {
         const fontStyle = popoutWindow.document.createElement("style");
         fontStyle.textContent = preloadFonts();
-        popoutWindow.document.head.appendChild(fontStyle);        
+        popoutWindow.document.head.appendChild(fontStyle);
     }
 
     // Observe the main window's head for new stylesheets and style elements
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
-            if (
-                mutation.type === "childList" &&
-                mutation.addedNodes.length > 0
-            ) {
+            if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
                 mutation.addedNodes.forEach((node) => {
-                    if (
-                        node instanceof HTMLLinkElement ||
-                        node instanceof HTMLStyleElement
-                    ) {
+                    if (node instanceof HTMLLinkElement || node instanceof HTMLStyleElement) {
                         addStyleElement(node);
                     }
                 });
@@ -117,9 +107,9 @@ export default function popoutChart(chart: BaseChart<any>) {
     popoutWindow.addEventListener("beforeunload", () => {
         popStyles();
         originalParent.appendChild(div);
-        //this will enable the chart position, size to be manipulated 
+        //this will enable the chart position, size to be manipulated
         //in the current layout manager (absolute or gridstack)
-        chartManager._makeChartRD(chart,chart.dataSource);
+        chartManager._makeChartRD(chart, chart.dataSource);
         //@ts-ignore
         chartManager.charts[chart.config.id].win = mainWindow;
         chart.changeBaseDocument(document);
@@ -156,7 +146,7 @@ function pushSetStyles(chart: BaseChart<any>) {
 
 // Preload the font files for the Firefox browser for the icons to appear in popout window
 function preloadFonts() {
-        const preloadContent = `
+    const preloadContent = `
             @font-face {
             font-family: 'Font Awesome 5 Free';
             font-style: normal;
@@ -181,7 +171,7 @@ function preloadFonts() {
             src: url(${window.location.origin}/src/css/webfonts/fa-brands-400.woff2) format('woff2');
             }
         `;
-        return preloadContent;
+    return preloadContent;
 }
 
 function getStyleElementCssText(styleElement: HTMLStyleElement) {

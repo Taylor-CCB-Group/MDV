@@ -1,64 +1,65 @@
-import { useCloseOnIntersection, useConfig, useDimensionFilter, useOrderedParamColumns, useOwnedFilteredIndices, usePasteHandler } from "../hooks";
-import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
-import { type MouseEvent, useCallback, useEffect, useState, useMemo, useId, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import CachedIcon from '@mui/icons-material/Cached';
-import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
+import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import CachedIcon from "@mui/icons-material/Cached";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import HighlightOffIcon from '@mui/icons-material/HighlightOff';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
-import { observer } from "mobx-react-lite";
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
+    Autocomplete,
+    Box,
+    Button,
+    Checkbox,
+    Chip,
+    Divider,
+    IconButton,
+    Paper,
+    type PaperProps,
+    TextField,
+    Typography,
+} from "@mui/material";
+import { useQuery } from "@tanstack/react-query";
 import { action, runInAction } from "mobx";
-import { useChart, useDataStore } from "../context";
-import ColumnSelectionComponent from "./ColumnSelectionComponent";
-import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
+import { observer } from "mobx-react-lite";
+import { type MouseEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
-import { TextFieldExtended } from "./TextFieldExtended";
-import {
-    isArray,
-    resolveAutoHistogramXScaleFromHistogram,
-    resolveAutoHistogramYScale,
-} from "@/lib/utils";
-import { formatDateDays, isDateColumn, parseDateDays } from "@/lib/dateFormat";
-import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
-import {
-    DndContext,
-    closestCenter,
-    PointerSensor,
-    useSensor,
-    useSensors,
-    type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-    arrayMove,
-    SortableContext,
-    verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import {
-    useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { RowsAsColsQuery } from "@/links/link_utils";
-import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
-import { useHighlightedIndices } from "../selectionHooks";
-import HistogramWidget, {
-    type HistogramLayer,
-    type HistogramScaleType,
-} from "./HistogramWidget";
-import {
-    getNumericColumnData,
-    getSharedNumericColumnData,
-} from "@/lib/columnTypeHelpers";
-import { createHistogram, queryHistogramWorker } from "@/react/utils/histogram";
 import { useDebounce } from "use-debounce";
+import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
+import { getNumericColumnData, getSharedNumericColumnData } from "@/lib/columnTypeHelpers";
+import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
+import { formatDateDays, isDateColumn, parseDateDays } from "@/lib/dateFormat";
+import { isArray, resolveAutoHistogramXScaleFromHistogram, resolveAutoHistogramYScale } from "@/lib/utils";
+import { RowsAsColsQuery } from "@/links/link_utils";
+import { createHistogram, queryHistogramWorker } from "@/react/utils/histogram";
+import type { CategoricalDataType, DataColumn, DataType, NumberDataType } from "../../charts/charts";
+import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
+import { useChart, useDataStore } from "../context";
+import {
+    useCloseOnIntersection,
+    useConfig,
+    useDimensionFilter,
+    useOrderedParamColumns,
+    useOwnedFilteredIndices,
+    usePasteHandler,
+} from "../hooks";
+import { useHighlightedIndices } from "../selectionHooks";
+import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
-
-
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import HistogramWidget, { type HistogramLayer, type HistogramScaleType } from "./HistogramWidget";
+import type {
+    CategoryFilter,
+    MultiTextFilter,
+    RangeFilter,
+    SelectionDialogConfig,
+    UniqueFilter,
+} from "./SelectionDialogReact";
+import { TextFieldExtended } from "./TextFieldExtended";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -81,63 +82,73 @@ type Props<K extends DataType> = {
 function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
     const { datatype, field } = column;
     const filters = useConfig<SelectionDialogConfig>().filters;
-    const filter = filters[field] as (K extends "multitext" ? MultiTextFilter
-        : K extends "unique" ? UniqueFilter
-        : K extends CategoricalDataType ? CategoryFilter
-        : RangeFilter) | null;
+    const filter = filters[field] as
+        | (K extends "multitext"
+              ? MultiTextFilter
+              : K extends "unique"
+                ? UniqueFilter
+                : K extends CategoricalDataType
+                  ? CategoryFilter
+                  : RangeFilter)
+        | null;
     return filter;
 }
 
-const TextComponent = observer(({
-    column,
-}: Props<CategoricalDataType>) => {
+const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     const [open, setOpen] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
     const dim = useDimensionFilter(column);
+    const chart = useChart();
     const conf = useConfig<SelectionDialogConfig>();
     const values = useLiveCategorySelectionValues(column.field);
     const filter = useFilterConfig(column);
     const value = filter?.category || [];
-    const setValue = useCallback((newValue: string[]) => {
-        const newFilter =
-            filter ||
-            (column.datatype === "multitext"
-                ? { category: [], operand: "or" as const }
-                : { category: [] });
-        action(() => {
-            newFilter.category = newValue;
-            conf.filters[column.field] = newFilter;
-        })();
-    }, [conf.filters, column.field, filter]);
+    const setValue = useCallback(
+        (newValue: string[]) => {
+            const newFilter =
+                filter ||
+                (column.datatype === "multitext" ? { category: [], operand: "or" as const } : { category: [] });
+            action(() => {
+                newFilter.category = newValue;
+                conf.filters[column.field] = newFilter;
+            })();
+        },
+        [conf.filters, column.field, filter],
+    );
 
     useCloseOnIntersection(ref, () => setOpen(false));
 
-    useEffect(() =>{
+    useEffect(() => {
         // todo consider having ui for this state per-dimension rather than globally
         dim?.setNoClear(conf.noClearFilters);
-    },[dim, conf.noClearFilters]);
- 
+    }, [dim, conf.noClearFilters]);
+
     // react to changes in value and update the filter
     useEffect(() => {
         if (!dim) return;
         // filter could be undefined - but we previously checked for null causing component to crash
-        if ((!filter) || (filter.category.length === 0)) {
+        if (!filter || filter.category.length === 0) {
             dim.removeFilter();
+            chart.storedFilters.applied(column.field);
             return;
         }
         //probably there is better place to set this
-        
-        dim.filter("filterCategories", [column.field], value, true);
-    }, [dim, column.field, value, filter]);
 
-    const toggleOption = useCallback((option: string) => {
-        if (value.includes(option)) {
-            setValue(value.filter((v) => v !== option));
-            return;
-        }
-        setValue([...value, option]);
-    }, [setValue, value]);
+        // (reporting it lets a view that is loading know this dataSource has the filter saved with it)
+        chart.storedFilters.applied(column.field, dim.filter("filterCategories", [column.field], value, true));
+    }, [dim, column.field, value, filter, chart]);
+
+    const toggleOption = useCallback(
+        (option: string) => {
+            if (value.includes(option)) {
+                setValue(value.filter((v) => v !== option));
+                return;
+            }
+            setValue([...value, option]);
+        },
+        [setValue, value],
+    );
 
     const handleSelectAll = useCallback(() => {
         if (selectAll) {
@@ -149,15 +160,18 @@ const TextComponent = observer(({
         }
     }, [selectAll, setValue, values]);
 
-    const handleValueChange = useCallback((newValue: string | string[] | null) => {
-        // If newValue is null, set value to empty array
-        if (!newValue) {
-            setValue([]);
-        } else {
-            const valueArray = Array.isArray(newValue) ? newValue : [newValue];
-            setValue(valueArray);
-        }
-    }, [setValue]);
+    const handleValueChange = useCallback(
+        (newValue: string | string[] | null) => {
+            // If newValue is null, set value to empty array
+            if (!newValue) {
+                setValue([]);
+            } else {
+                const valueArray = Array.isArray(newValue) ? newValue : [newValue];
+                setValue(valueArray);
+            }
+        },
+        [setValue],
+    );
 
     const handlePaste = usePasteHandler({
         options: values,
@@ -177,10 +191,10 @@ const TextComponent = observer(({
                 const selected = values.filter((v) => selectedSet.has(v));
                 const unselected = values.filter((v) => !selectedSet.has(v));
                 return [...selected, ...unselected];
-              }, [values, value])}
+            }, [values, value])}
             value={value}
             onChange={(_, value) => {
-                if(isArray(value) && value.length === 0) {
+                if (isArray(value) && value.length === 0) {
                     setSelectAll(false);
                 }
                 setValue(value);
@@ -193,35 +207,33 @@ const TextComponent = observer(({
                 const { key, InputProps, ...p } = props as typeof props & {
                     key: string;
                 }; //questionable mui types?
-                return <>
-                    <TextFieldExtended
-                        key={key}
-                        {...p}
-                        placeholder={value.length === 0 ? "Type or paste to search and select": ""}
-                        slotProps={{
-                            input: {
-                                ...InputProps,
-                                onPaste: handlePaste,
-                                sx: {
-                                    '& .MuiInputBase-input::placeholder': {
-                                    fontSize: '0.75rem'
+                return (
+                    <>
+                        <TextFieldExtended
+                            key={key}
+                            {...p}
+                            placeholder={value.length === 0 ? "Type or paste to search and select" : ""}
+                            slotProps={{
+                                input: {
+                                    ...InputProps,
+                                    onPaste: handlePaste,
+                                    sx: {
+                                        "& .MuiInputBase-input::placeholder": {
+                                            fontSize: "0.75rem",
+                                        },
                                     },
                                 },
-                            },
-                        }}
-                    />
-                </>
+                            }}
+                        />
+                    </>
+                );
             }}
             renderOption={(props, option) => {
                 const { key, ...optionProps } = props as typeof props & {
                     key: string;
                 }; //questionable mui types?
                 return (
-                    <li
-                        key={key}
-                        {...optionProps}
-                        onClick={() => toggleOption(option)}
-                    >
+                    <li key={key} {...optionProps} onClick={() => toggleOption(option)}>
                         <Checkbox
                             icon={icon}
                             checkedIcon={checkedIcon}
@@ -239,16 +251,13 @@ const TextComponent = observer(({
                 if (value.length > AUTOCOMPLETE_TAGS_LIMIT) {
                     return (
                         <div>
-                            <Typography
-                                variant="button"
-                                color="textSecondary"
-                            >
+                            <Typography variant="button" color="textSecondary">
                                 {value.length} selected
                             </Typography>
                         </div>
-                    )
+                    );
                 }
-                
+
                 //seems to be a material-ui bug with not properly handling key / props...
                 //https://stackoverflow.com/questions/75818761/material-ui-autocomplete-warning-a-props-object-containing-a-key-prop-is-be
                 const chips = value.map((option, index) => {
@@ -264,45 +273,42 @@ const TextComponent = observer(({
                 return <div className="max-h-32 overflow-auto pr-3">{chips}</div>;
             }}
             // Getting warnings in console if slotProps is used for rendering Paper Component
-            PaperComponent={useMemo(() => (paperProps: PaperProps) => {
-                const { children, ...restPaperProps } = paperProps;
-                const showMessage = values.length > AUTOCOMPLETE_OPTIONS_LIMIT;
-                return (
-                  <Paper {...restPaperProps}>
-                    <Box
-                        onMouseDown={(e) => e.preventDefault()}
-                        py={1}
-                        px={2}
-                        sx={{textAlign: "center"}}
-                    >
-                        <Button onClick={handleSelectAll} color="inherit" fullWidth>
-                            {selectAll ? "Unselect All" : "Select All"}
-                        </Button>
-                    </Box>
-                    <Divider />
-                    {showMessage && (
-                        <>
-                            <Box 
-                                py={1}
-                                px={2}
-                                sx={{
-                                    textAlign: "center",
-                                    fontSize: "0.8rem",
-                                    color: "text.secondary",
-                                    backgroundColor: "var(--menu_bar_color)",
-                                    border: "2px solid var(--fade_background_color)"
-                                }}
-                            >
-                                Showing first {AUTOCOMPLETE_OPTIONS_LIMIT} of {values.length} options.
+            PaperComponent={useMemo(
+                () => (paperProps: PaperProps) => {
+                    const { children, ...restPaperProps } = paperProps;
+                    const showMessage = values.length > AUTOCOMPLETE_OPTIONS_LIMIT;
+                    return (
+                        <Paper {...restPaperProps}>
+                            <Box onMouseDown={(e) => e.preventDefault()} py={1} px={2} sx={{ textAlign: "center" }}>
+                                <Button onClick={handleSelectAll} color="inherit" fullWidth>
+                                    {selectAll ? "Unselect All" : "Select All"}
+                                </Button>
                             </Box>
                             <Divider />
-                        </>
-
-                    )}
-                    {children}
-                  </Paper>
-                );
-              }, [selectAll, handleSelectAll, values])}
+                            {showMessage && (
+                                <>
+                                    <Box
+                                        py={1}
+                                        px={2}
+                                        sx={{
+                                            textAlign: "center",
+                                            fontSize: "0.8rem",
+                                            color: "text.secondary",
+                                            backgroundColor: "var(--menu_bar_color)",
+                                            border: "2px solid var(--fade_background_color)",
+                                        }}
+                                    >
+                                        Showing first {AUTOCOMPLETE_OPTIONS_LIMIT} of {values.length} options.
+                                    </Box>
+                                    <Divider />
+                                </>
+                            )}
+                            {children}
+                        </Paper>
+                    );
+                },
+                [selectAll, handleSelectAll, values],
+            )}
         />
     );
 });
@@ -313,6 +319,7 @@ const MultiTextComponent = observer(({ column }: Props<"multitext">) => {
 
 const UniqueComponent = observer(({ column }: Props<"unique">) => {
     const dim = useDimensionFilter(column);
+    const chart = useChart();
     const filters = useConfig<SelectionDialogConfig>().filters;
     const filter = useFilterConfig(column);
     const [initialValue] = useState(filter);
@@ -320,20 +327,24 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
         if (!dim) return;
         if (filter === null) {
             dim.removeFilter();
+            chart.storedFilters.applied(column.field);
             return;
         }
-        dim.filter("filterUnique", [column.field], filter, true);
+        chart.storedFilters.applied(column.field, dim.filter("filterUnique", [column.field], filter, true));
         //return () => dim.removeFilter(); //handled by useDimensionFilter
-    }, [dim, column.field, filter]);
+    }, [dim, column.field, filter, chart]);
     const [localFilter, setLocalFilter] = useState(filter || "");
     return (
-        <TextField size="small" defaultValue={initialValue}
-        onChange={(e) => setLocalFilter(e.target.value)}
-        onKeyDown={(e) => {
-            if (e.key === "Enter") {
-                action(() => filters[column.field] = localFilter)();
-            }
-        }} />
+        <TextField
+            size="small"
+            defaultValue={initialValue}
+            onChange={(e) => setLocalFilter(e.target.value)}
+            onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                    action(() => (filters[column.field] = localFilter))();
+                }
+            }}
+        />
     );
 });
 
@@ -343,7 +354,8 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
  */
 function useRangeFilter(column: DataColumn<NumberDataType>) {
     const filter = useDimensionFilter(column);
-    const conf = useConfig<SelectionDialogConfig>()
+    const chart = useChart();
+    const conf = useConfig<SelectionDialogConfig>();
     //nb - we may want to allow value to be null, rather than defaulting to minMax
     //relates to e.g. clearBrush function
     // const value = (filters[column.field] || column.minMax) as [number, number];
@@ -359,23 +371,24 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         // not sure this is totally correct - but there was a problem with very small ranges
         // this should be better...
         const small = Math.abs(minMax[1] - minMax[0]);
-        return small < 0.001 ? small/1000 : 0.001;
+        return small < 0.001 ? small / 1000 : 0.001;
     }, [isInteger, minMax, column]);
     const [debouncedValue] = useDebounce(value, 10);
-     useEffect(() =>{
+    useEffect(() => {
         filter?.setNoClear(conf.noClearFilters);
-    },[filter, conf.noClearFilters]);
+    }, [filter, conf.noClearFilters]);
     // Effect to manage the filter state
     useEffect(() => {
         if (!filter) return;
         const value = debouncedValue;
         if (!value) {
             filter.removeFilter();
+            chart.storedFilters.applied(column.field);
             return;
         }
         const [min, max] = value;
-        filter.filter("filterRange", [column.field], { min, max }, true);
-    }, [column, filter, debouncedValue]);
+        chart.storedFilters.applied(column.field, filter.filter("filterRange", [column.field], { min, max }, true));
+    }, [column, filter, debouncedValue, chart]);
 
     const { ownerVisibleRows: filteredIndices } = useOwnedFilteredIndices(filter);
     const highlightedIndices = useHighlightedIndices();
@@ -391,15 +404,18 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         ],
         queryFn: ({ signal }) => {
             const { data, arrayType, byteOffset, length } = getSharedNumericColumnData(numericData);
-            return queryHistogramWorker({
-                data,
-                min: column.minMax[0],
-                max: column.minMax[1],
-                bins: HISTOGRAM_BINS,
-                arrayType,
-                byteOffset,
-                length,
-            }, signal);
+            return queryHistogramWorker(
+                {
+                    data,
+                    min: column.minMax[0],
+                    max: column.minMax[1],
+                    bins: HISTOGRAM_BINS,
+                    arrayType,
+                    byteOffset,
+                    length,
+                },
+                signal,
+            );
         },
         enabled: false,
         retry: false,
@@ -441,18 +457,15 @@ type Range = [number, number];
 type ScaleMode = "auto" | HistogramScaleType;
 type set2d = (v: Range | null) => void; //nb, setting undefined can actually be problematic
 type RangeProps = ReturnType<typeof useRangeFilter> & {
-    setValue: set2d,
-    minMax: Range,
+    setValue: set2d;
+    minMax: Range;
     // probably want to review how these are specified / controlled
-    histoWidth: number, //number of bins
-    histoHeight: number, //height of the histogram
+    histoWidth: number; //number of bins
+    histoHeight: number; //height of the histogram
     /** Calendar-date columns should stay on a linear day axis. */
-    isDate?: boolean,
+    isDate?: boolean;
 };
-const toggleScaleMode = (
-    mode: ScaleMode,
-    resolvedMode: HistogramScaleType,
-): ScaleMode => {
+const toggleScaleMode = (mode: ScaleMode, resolvedMode: HistogramScaleType): ScaleMode => {
     if (mode === "auto") {
         return resolvedMode === "log" ? "linear" : "log";
     }
@@ -472,15 +485,12 @@ const Histogram = observer((props: RangeProps) => {
     const backgroundData = overallHistogram.length > 0 ? overallHistogram : emptyHistogram;
     const filteredData = filteredHistogram.length > 0 ? filteredHistogram : emptyHistogram;
     const highlightedData = highlightedHistogram.length > 0 ? highlightedHistogram : emptyHistogram;
-    const resolvedXScale = useMemo(
-        () => {
-            if (props.isDate) return "linear";
-            return xScaleMode === "auto"
-                ? resolveAutoHistogramXScaleFromHistogram(props.minMax, backgroundData)
-                : xScaleMode;
-        },
-        [backgroundData, props.isDate, props.minMax, xScaleMode],
-    );
+    const resolvedXScale = useMemo(() => {
+        if (props.isDate) return "linear";
+        return xScaleMode === "auto"
+            ? resolveAutoHistogramXScaleFromHistogram(props.minMax, backgroundData)
+            : xScaleMode;
+    }, [backgroundData, props.isDate, props.minMax, xScaleMode]);
     const resolvedYScale = useMemo(
         () => (yScaleMode === "auto" ? resolveAutoHistogramYScale(backgroundData) : yScaleMode),
         [backgroundData, yScaleMode],
@@ -489,74 +499,78 @@ const Histogram = observer((props: RangeProps) => {
         if (!overallHistogramError) return;
         console.error("Failed to query overall histogram", overallHistogramError);
     }, [overallHistogramError]);
-    const layers = useMemo<HistogramLayer[]>(() => [
-        {
-            id: "overall",
-            data: backgroundData,
-            color: overallColor,
-            variant: "bars",
-            widthFactor: 0.8,
-        },
-        {
-            id: "filtered",
-            data: filteredData,
-            color: filteredColor,
-            variant: "bars",
-            inset: 0.15,
-            widthFactor: 0.7,
-            radius: 0.4,
-        },
-        {
-            id: "highlighted",
-            data: highlightedData,
-            color: highlightColor,
-            variant: "markers",
-            widthFactor: 0.35,
-        },
-    ], [backgroundData, filteredData, highlightedData, overallColor, filteredColor, highlightColor]);
-    const brush = useMemo(() => ({
-        value: props.value,
-        setValue: props.setValue,
-        minMax: props.minMax,
-    }), [props.value, props.setValue, props.minMax]);
+    const layers = useMemo<HistogramLayer[]>(
+        () => [
+            {
+                id: "overall",
+                data: backgroundData,
+                color: overallColor,
+                variant: "bars",
+                widthFactor: 0.8,
+            },
+            {
+                id: "filtered",
+                data: filteredData,
+                color: filteredColor,
+                variant: "bars",
+                inset: 0.15,
+                widthFactor: 0.7,
+                radius: 0.4,
+            },
+            {
+                id: "highlighted",
+                data: highlightedData,
+                color: highlightColor,
+                variant: "markers",
+                widthFactor: 0.35,
+            },
+        ],
+        [backgroundData, filteredData, highlightedData, overallColor, filteredColor, highlightColor],
+    );
+    const brush = useMemo(
+        () => ({
+            value: props.value,
+            setValue: props.setValue,
+            minMax: props.minMax,
+        }),
+        [props.value, props.setValue, props.minMax],
+    );
     const handleVisibleOnce = useCallback(() => {
         void queryHistogram();
     }, [queryHistogram]);
     return (
         <>
-        <HistogramWidget
-            layers={layers}
-            width={histoWidth}
-            height={histoHeight}
-            bins={HISTOGRAM_BINS}
-            xScaleType={resolvedXScale}
-            yScaleType={resolvedYScale}
-            brush={brush}
-            isDate={props.isDate}
-            scaleControls={{
-                xLabel: xScaleMode === "auto" ? resolvedXScale : xScaleMode,
-                yLabel: yScaleMode === "auto" ? resolvedYScale : yScaleMode,
-                onToggleX: () =>
-                    setXScaleMode((mode) => toggleScaleMode(mode, resolvedXScale)),
-                onToggleY: () =>
-                    setYScaleMode((mode) => toggleScaleMode(mode, resolvedYScale)),
-            }}
-            onVisibleOnce={handleVisibleOnce}
-        />
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] opacity-75">
-            <span className="inline-flex items-center gap-1">
-                <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: overallColor }} />
-                overall
-            </span>
-            <span className="inline-flex items-center gap-1">
-                <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: filteredColor }} />
-                filtered
-            </span>
-            <span className="inline-flex items-center gap-1">
-                <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: highlightColor }} />
-                highlighted
-            </span>
-        </div>
+            <HistogramWidget
+                layers={layers}
+                width={histoWidth}
+                height={histoHeight}
+                bins={HISTOGRAM_BINS}
+                xScaleType={resolvedXScale}
+                yScaleType={resolvedYScale}
+                brush={brush}
+                isDate={props.isDate}
+                scaleControls={{
+                    xLabel: xScaleMode === "auto" ? resolvedXScale : xScaleMode,
+                    yLabel: yScaleMode === "auto" ? resolvedYScale : yScaleMode,
+                    onToggleX: () => setXScaleMode((mode) => toggleScaleMode(mode, resolvedXScale)),
+                    onToggleY: () => setYScaleMode((mode) => toggleScaleMode(mode, resolvedYScale)),
+                }}
+                onVisibleOnce={handleVisibleOnce}
+            />
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] opacity-75">
+                <span className="inline-flex items-center gap-1">
+                    <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: overallColor }} />
+                    overall
+                </span>
+                <span className="inline-flex items-center gap-1">
+                    <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: filteredColor }} />
+                    filtered
+                </span>
+                <span className="inline-flex items-center gap-1">
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: highlightColor }} />
+                    highlighted
+                </span>
+            </div>
         </>
     );
 });
@@ -567,42 +581,59 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const { value, step } = rangeProps;
     const [min, max] = column.minMax;
     const dateMode = isDateColumn(column);
-    const setValue = useCallback<set2d>((newValue) => {
-        if (newValue) {
-            // constrain with min, max and step
-            newValue[0] = Math.round(newValue[0] / step) * step;
-            newValue[1] = Math.round(newValue[1] / step) * step;
-            if (newValue[0] < min) newValue[0] = min;
-            if (newValue[1] > max) newValue[1] = max;
-        }
-        action(() => filters[column.field] = newValue)();
-    }, [filters, column.field, min, max, step]);
+    const setValue = useCallback<set2d>(
+        (newValue) => {
+            if (newValue) {
+                // constrain with min, max and step
+                newValue[0] = Math.round(newValue[0] / step) * step;
+                newValue[1] = Math.round(newValue[1] / step) * step;
+                if (newValue[0] < min) newValue[0] = min;
+                if (newValue[1] > max) newValue[1] = max;
+            }
+            action(() => (filters[column.field] = newValue))();
+        },
+        [filters, column.field, min, max, step],
+    );
     const low = value ? value[0] : min;
     const high = value ? value[1] : max;
-    const onDateChange = useCallback((which: "low" | "high", text: string) => {
-        const parsed = parseDateDays(text);
-        if (parsed == null) {
-            return;
-        }
-        if (which === "low") {
-            setValue([parsed, high]);
-        } else {
-            setValue([low, parsed]);
-        }
-    }, [setValue, low, high]);
+    const onDateChange = useCallback(
+        (which: "low" | "high", text: string) => {
+            const parsed = parseDateDays(text);
+            if (parsed == null) {
+                return;
+            }
+            if (which === "low") {
+                setValue([parsed, high]);
+            } else {
+                setValue([low, parsed]);
+            }
+        },
+        [setValue, low, high],
+    );
     return (
         <div>
-            <Histogram {...rangeProps} setValue={setValue} minMax={column.minMax} histoWidth={99} histoHeight={100} isDate={dateMode} />
+            <Histogram
+                {...rangeProps}
+                setValue={setValue}
+                minMax={column.minMax}
+                histoWidth={99}
+                histoHeight={100}
+                isDate={dateMode}
+            />
             <div>
                 {dateMode ? (
                     <>
-                        <TextField size="small" className="max-w-28"
+                        <TextField
+                            size="small"
+                            className="max-w-28"
                             variant="standard"
                             type="date"
                             value={formatDateDays(low)}
                             onChange={(e) => onDateChange("low", e.target.value)}
                         />
-                        <TextField size="small" className="max-w-28 float-right"
+                        <TextField
+                            size="small"
+                            className="max-w-28 float-right"
                             variant="standard"
                             type="date"
                             value={formatDateDays(high)}
@@ -611,15 +642,21 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
                     </>
                 ) : (
                     <>
-                        <TextField size="small" className="max-w-20" type="number"
+                        <TextField
+                            size="small"
+                            className="max-w-20"
+                            type="number"
                             variant="standard"
                             value={low}
                             onChange={(e) => setValue([Number(e.target.value), high])}
                         />
-                        <TextField size="small" className="max-w-20 float-right" type="number"
+                        <TextField
+                            size="small"
+                            className="max-w-20 float-right"
+                            type="number"
                             variant="standard"
                             value={high}
-                            onChange={(e) => setValue([low, Number(e.target.value)])} 
+                            onChange={(e) => setValue([low, Number(e.target.value)])}
                         />
                     </>
                 )}
@@ -638,17 +675,10 @@ const Components: {
     text16: TextComponent,
     multitext: MultiTextComponent,
     unique: UniqueComponent,
-}
+};
 
 const AbstractComponent = observer(function AbstractComponent<K extends DataType>({ column }: Props<K>) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: column.field });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: column.field });
 
     const style = {
         transform: CSS.Translate.toString(transform),
@@ -662,7 +692,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
     const { filters } = config;
     const f = filters[column.field];
     // todo: what about category filters with empty array?
-    const hasFilter = (f !== null);
+    const hasFilter = f !== null;
     const [isHovered, setIsHovered] = useState(false);
     const clearFilter = useCallback(
         action((e: MouseEvent) => {
@@ -670,57 +700,59 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
             // what about clearing the brush on histogram?
             filters[column.field] = null;
         }),
-        []  //xxx: don't need deps here because the mobx references are stable?
+        [], //xxx: don't need deps here because the mobx references are stable?
     );
-    const deleteFilter = useCallback((e: MouseEvent) => {
-        e.stopPropagation();
-        runInAction(() => {
-            if (!isArray(config.param)) throw new Error("expected param array");
-            
-            // Filter the config.param by removing the column
-            const newParam = config.param.filter(p => {
-                if (typeof p === "string") {
-                    return p !== column.field;
+    const deleteFilter = useCallback(
+        (e: MouseEvent) => {
+            e.stopPropagation();
+            runInAction(() => {
+                if (!isArray(config.param)) throw new Error("expected param array");
+
+                // Filter the config.param by removing the column
+                const newParam = config.param.filter((p) => {
+                    if (typeof p === "string") {
+                        return p !== column.field;
+                    }
+                    if (p instanceof RowsAsColsQuery) {
+                        return false;
+                    }
+                    return true;
+                });
+
+                // Update the config.param with new array
+                config.param = newParam;
+
+                // Delete the column field in config.filters
+                delete config.filters[column.field];
+                if (config.order) {
+                    // Delete the column field in config.order
+                    delete config.order[column.field];
                 }
-                if (p instanceof RowsAsColsQuery) {
-                    return false;
-                }
-                return true;
             });
-            
-            // Update the config.param with new array
-            config.param = newParam;
-            
-            // Delete the column field in config.filters
-            delete config.filters[column.field];
-            if (config.order) {
-                // Delete the column field in config.order
-                delete config.order[column.field];
-            }
-        });
-    }, [config, column]);
+        },
+        [config, column],
+    );
     return (
-        <Accordion defaultExpanded={true}
+        <Accordion
+            defaultExpanded={true}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             style={style}
             ref={setNodeRef}
         >
-            <AccordionSummary
-                expandIcon={<ArrowDropDownIcon />}
-            >
+            <AccordionSummary expandIcon={<ArrowDropDownIcon />}>
                 <IconButton
                     onClick={deleteFilter}
                     aria-label="delete"
                     sx={{
-                        position: 'absolute',
-                        right: '-18px',
-                        top: '-18px',
+                        position: "absolute",
+                        right: "-18px",
+                        top: "-18px",
                         opacity: isHovered ? 1 : 0,
-                        visibility: isHovered ? 'visible' : 'hidden',
-                        transition: 'opacity 0.3s, visibility 0.3s',
-                        '&:focus': {
-                            visibility: 'visible',
+                        visibility: isHovered ? "visible" : "hidden",
+                        transition: "opacity 0.3s, visibility 0.3s",
+                        "&:focus": {
+                            visibility: "visible",
                             opacity: 1, // Ensure it's fully visible when focused
                         },
                     }}
@@ -734,30 +766,35 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
                         size="small"
                         sx={{
                             opacity: isHovered ? 0.7 : 0.3,
-                            transition: 'opacity 0.3s',
-                            cursor: 'grab',
-                            '&:active': {
-                                cursor: 'grabbing',
+                            transition: "opacity 0.3s",
+                            cursor: "grab",
+                            "&:active": {
+                                cursor: "grabbing",
                             },
-                            '&:hover': {
+                            "&:hover": {
                                 opacity: 1,
                             },
                         }}
                     >
                         <DragIndicatorIcon fontSize="small" />
                     </IconButton>
-                    <Typography variant="subtitle1">{column.name}
-                        {hasFilter && <IconButton onClick={clearFilter}>
-                            <CachedIcon fontSize="small" />
-                        </IconButton>}
+                    <Typography variant="subtitle1">
+                        {column.name}
+                        {hasFilter && (
+                            <IconButton onClick={clearFilter}>
+                                <CachedIcon fontSize="small" />
+                            </IconButton>
+                        )}
                         <em className="opacity-40 ml-1">({column.datatype})</em>
                     </Typography>
                 </div>
             </AccordionSummary>
             <AccordionDetails>
-                <ErrorBoundary FallbackComponent={
-                    ({ error }) => <DebugErrorComponent error={error} title="Unexpected Error: please report to developers." />
-                    }>
+                <ErrorBoundary
+                    FallbackComponent={({ error }) => (
+                        <DebugErrorComponent error={error} title="Unexpected Error: please report to developers." />
+                    )}
+                >
                     <Component column={column} />
                 </ErrorBoundary>
             </AccordionDetails>
@@ -771,15 +808,18 @@ const AddRowComponent = observer(() => {
     const config = useConfig<SelectionDialogConfig>();
     const { filters, param } = useConfig<SelectionDialogConfig>();
     if (!isArray(param)) throw new Error("expected param array");
-    const setSelectedColumn = useCallback((column: string) => {
-        if (!column) return;
-        if (param.includes(column)) return;
-        runInAction(() => {
-            // param.push(column); //doesn't trigger reactivity
-            config.param = [...param, column];
-            filters[column] = null;
-        });
-    }, [filters, param, config]);
+    const setSelectedColumn = useCallback(
+        (column: string) => {
+            if (!column) return;
+            if (param.includes(column)) return;
+            runInAction(() => {
+                // param.push(column); //doesn't trigger reactivity
+                config.param = [...param, column];
+                filters[column] = null;
+            });
+        },
+        [filters, param, config],
+    );
     return (
         <div className="p-5">
             <ColumnSelectionComponent
@@ -792,12 +832,12 @@ const AddRowComponent = observer(() => {
                 type={["text", "text16", "multitext", "unique", "integer", "double", "int32"]}
             />
         </div>
-    )
+    );
 });
 
 type RLink = ReturnType<typeof useRowsAsColumnsLinks>[0];
 
-const LinkComponent = observer(({ rlink, linkIndex }: { rlink: RLink, linkIndex: number }) => {
+const LinkComponent = observer(({ rlink, linkIndex }: { rlink: RLink; linkIndex: number }) => {
     const [filter, setFilter] = useState("");
     const [max, setMax] = useState(10);
     const [debouncedFilter] = useDebounce(filter, 300);
@@ -806,15 +846,23 @@ const LinkComponent = observer(({ rlink, linkIndex }: { rlink: RLink, linkIndex:
     const { linkedDs, link } = rlink;
     return (
         <div className="p-3">
-            <Typography variant="h6" sx={{ marginBottom: '0.5em' }}>Columns associated with selected '{linkedDs.name}':</Typography>
-            <TextField size="small" label="Filter" variant="outlined" onChange={e => setFilter(e.target.value)} />
-            <TextField size="small" className="max-w-20 float-right" type="number"
-            label="Max" variant="outlined"
+            <Typography variant="h6" sx={{ marginBottom: "0.5em" }}>
+                Columns associated with selected '{linkedDs.name}':
+            </Typography>
+            <TextField size="small" label="Filter" variant="outlined" onChange={(e) => setFilter(e.target.value)} />
+            <TextField
+                size="small"
+                className="max-w-20 float-right"
+                type="number"
+                label="Max"
+                variant="outlined"
                 value={max}
                 onChange={(e) => setMax(Number(e.target.value))}
             />
-    
-            {fcols.map(col => <AbstractComponent key={col.field} column={col} />)}
+
+            {fcols.map((col) => (
+                <AbstractComponent key={col.field} column={col} />
+            ))}
         </div>
     );
 });
@@ -823,9 +871,11 @@ const ForeignRows = observer(() => {
     const rlink = useRowsAsColumnsLinks();
     return (
         <>
-        {rlink.map((link, i) => <LinkComponent key={link.link.name} rlink={link} linkIndex={i} />)}
+            {rlink.map((link, i) => (
+                <LinkComponent key={link.link.name} rlink={link} linkIndex={i} />
+            ))}
         </>
-    )
+    );
 });
 
 /**
@@ -847,10 +897,10 @@ function useResetButton() {
         const k = `SelectionDialog-${id}`;
         const resetAll = (type: string, data: string) => {
             if (type !== "filtered" || data !== "all_removed") return;
-            //actually removeAllFilters already clears all the filters (if they are 
+            //actually removeAllFilters already clears all the filters (if they are
             //not tagged with noclear in single action for performance
             //filters will be cleared again here but it is not much of an issue
-            if (!conf.noClearFilters){
+            if (!conf.noClearFilters) {
                 runInAction(() => {
                     for (const key in conf.filters) {
                         delete conf.filters[key];
@@ -879,63 +929,66 @@ const SelectionDialogComponent = () => {
             activationConstraint: {
                 // Need 8px of movement to start dragging
                 distance: 8,
-            }
-        })
+            },
+        }),
     );
 
-    const onDragEnd = useCallback((event: DragEndEvent) => {
-        // active - dragged item, over - dropped item
-        const { active, over } = event;
+    const onDragEnd = useCallback(
+        (event: DragEndEvent) => {
+            // active - dragged item, over - dropped item
+            const { active, over } = event;
 
-        // Check if dragged and dropped item are different and other sanity checks
-        if (active && over && active.id !== over?.id) {
-            const oldIndex = orderedParams.findIndex(p => p.field === active.id);
-            const newIndex = orderedParams.findIndex(p => p.field === over.id);
+            // Check if dragged and dropped item are different and other sanity checks
+            if (active && over && active.id !== over?.id) {
+                const oldIndex = orderedParams.findIndex((p) => p.field === active.id);
+                const newIndex = orderedParams.findIndex((p) => p.field === over.id);
 
-            if (oldIndex !== -1 && newIndex !== -1) {
-                // Update the config.order with the new order
-                const newOrderedFields = arrayMove(orderedParams.map(p => p.field), oldIndex, newIndex);
-                const newOrder: Record<string, number> = {};
-                newOrderedFields.forEach((field, index) => {
-                    newOrder[field] = index;
-                });
-                
-                runInAction(() => {
-                    config.order = newOrder;
-                });
+                if (oldIndex !== -1 && newIndex !== -1) {
+                    // Update the config.order with the new order
+                    const newOrderedFields = arrayMove(
+                        orderedParams.map((p) => p.field),
+                        oldIndex,
+                        newIndex,
+                    );
+                    const newOrder: Record<string, number> = {};
+                    newOrderedFields.forEach((field, index) => {
+                        newOrder[field] = index;
+                    });
+
+                    runInAction(() => {
+                        config.order = newOrder;
+                    });
+                }
             }
-        }
-    }, [config, orderedParams]);
+        },
+        [config, orderedParams],
+    );
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
-            <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={onDragEnd}
-            >
-                <SortableContext 
-                    items={orderedParams.map(col => col.field)}
-                    strategy={verticalListSortingStrategy}
-                >
-                    {orderedParams.map((col) => <AbstractComponent key={col.field} column={col} />)}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                <SortableContext items={orderedParams.map((col) => col.field)} strategy={verticalListSortingStrategy}>
+                    {orderedParams.map((col) => (
+                        <AbstractComponent key={col.field} column={col} />
+                    ))}
                 </SortableContext>
             </DndContext>
-            {showAddRow && <ErrorBoundary FallbackComponent={
-                ({ error }) => 
-                    (
-                        <div className="col-span-3 w-full"> 
-                            <ErrorComponentReactWrapper 
-                                error={{message: error.message, stack: error.stack}} 
+            {showAddRow && (
+                <ErrorBoundary
+                    FallbackComponent={({ error }) => (
+                        <div className="col-span-3 w-full">
+                            <ErrorComponentReactWrapper
+                                error={{ message: error.message, stack: error.stack }}
                                 //todo assign proper meta data
-                                // extraMetaData={} 
+                                // extraMetaData={}
                                 title="Error displaying 'AddRowComponent'. Click to view details"
                             />
                         </div>
-                        )
-            }>
-                <AddRowComponent />
-                <ForeignRows />
-            </ErrorBoundary>}
+                    )}
+                >
+                    <AddRowComponent />
+                    <ForeignRows />
+                </ErrorBoundary>
+            )}
         </div>
     );
 };

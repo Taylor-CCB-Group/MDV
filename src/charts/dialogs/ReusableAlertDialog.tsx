@@ -1,11 +1,6 @@
-import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
-import {
-    Button,
-    Container,
-    Dialog,
-    DialogActions,
-} from "@mui/material";
+import { Button, Container, Dialog, DialogActions } from "@mui/material";
 import type { ReactElement } from "react";
+import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 
 export interface ReusableAlertDialogProps {
     open: boolean;

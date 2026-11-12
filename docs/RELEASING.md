@@ -16,7 +16,7 @@ How to build and publish the `mdvtools` package. One package, one version, one
   ```bash
   export UV_PUBLISH_TOKEN="pypi-…"     # the token for the index you're publishing to
   ```
-- `uv` on your PATH at the version pinned in `[tool.uv] required-version` (CI/Docker use it).
+- `uv` on your PATH, at least the minimum in `[tool.uv] required-version`.
 - `pnpm` for the frontend build.
 
 ## Steps
@@ -101,10 +101,9 @@ git tag -a v1.2.4 -m "mdvtools 1.2.4" && git push --tags
 
 ## Notes & gotchas
 
-- **`required-version` is an exact pin** (`[tool.uv] required-version = "0.11.14"`). Any other
-  uv version fails `uv build`/`uv lock`/`uv sync`. If you hit it, match the version
-  (`pip install 'uv==<pinned>'`) and run `hash -r` (bash caches the `uv` path). Relaxing this
-  to a range is a tracked follow-up.
+- **`required-version` is a minimum** (`[tool.uv] required-version = ">=0.11.14"`). If your uv is
+  older, upgrade it (`uv self update`, or `pip install -U uv` for pip installs) and run
+  `hash -r` (bash caches the `uv` path).
 - **The PyPI page renders `python/PYPI_README.md`** (`readme = "PYPI_README.md"`), not the
   dev-facing `README.md`. Update the quickstart there if the API changes.
 - `uv build`/`uv publish` do **not** need `uv.lock`; the lock matters for `uv sync`

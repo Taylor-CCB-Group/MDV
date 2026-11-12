@@ -1,8 +1,8 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
+import { select } from "d3-selection";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
-import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 
 class SingleHeatMap extends SVGChart {
     constructor(dataStore, div, config) {
@@ -164,10 +164,7 @@ class SingleHeatMap extends SVGChart {
 
     drawChart(tTime = 300) {
         this.updateAxis();
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(tTime)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
         const c = this.config;
         const p = c.param;
         const yvals = this.dataStore.getColumnValues(this.config.param[0]);
@@ -219,10 +216,7 @@ class SingleHeatMap extends SVGChart {
             .on("mouseover pointermove", (e, d) => {
                 const col = xvals[d[0]];
                 const row = yvals[d[1]];
-                this.showToolTip(
-                    e,
-                    `${col}<br>${row}<br>${d[2].toPrecision(3)}`,
-                );
+                this.showToolTip(e, `${col}<br>${row}<br>${d[2].toPrecision(3)}`);
             })
             .on("mouseleave", () => {
                 this.hideToolTip();
@@ -380,12 +374,7 @@ BaseChart.types["single_heat_map"] = {
     methodsUsingColumns: ["changeValues"],
     init: (config, dataSource, extraControls) => {
         const i = dataSource.interactions;
-        config.param = [
-            i.interaction_columns[0],
-            i.interaction_columns[1],
-            extraControls["value"],
-            i.pivot_column,
-        ];
+        config.param = [i.interaction_columns[0], i.interaction_columns[1], extraControls["value"], i.pivot_column];
         if (i.interaction_matrix?.groups) {
             config.param = config.param.concat(i.interaction_matrix.groups);
         }
@@ -399,9 +388,7 @@ BaseChart.types["single_heat_map"] = {
                 type: "dropdown",
                 name: "pivot",
                 label: dataSource.getColumnName(pc),
-                values: dataSource
-                    .getColumnValues(pc)
-                    .map((x) => ({ name: x, value: x })),
+                values: dataSource.getColumnValues(pc).map((x) => ({ name: x, value: x })),
             },
             {
                 type: "dropdown",

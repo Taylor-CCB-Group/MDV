@@ -1,8 +1,7 @@
 from functools import wraps
 
-from flask import abort, current_app, has_request_context, redirect, render_template, request, session
-
-from mdvtools.auth.auth_provider import NoAccess
+from flask import abort, current_app, has_request_context, redirect, request, session
+from mdvtools.auth.access_denied import access_denied_reason, deny_access, login_url_with_reason
 from mdvtools.logging_config import get_logger
 
 # Setup logging
@@ -95,8 +94,8 @@ def is_authenticated(project_id=None):
         enabled, requires the user to have read-level access to this project.
     :return: Tuple (success: bool, reason). When success is True, reason is None.
         When False, reason is a short message for logging (e.g. "Authentication
-        required.", "No access to this project."), or NoAccess for a person the
-        provider signed in who has no active User here.
+        required.", "No access to this project."). A refusal the login page
+        should explain is also recorded with deny_access.
     """
     ENABLE_AUTH = current_app.config.get("ENABLE_AUTH", False)
 
@@ -111,8 +110,6 @@ def is_authenticated(project_id=None):
             current_app.logger.error(f"Failed to get auth provider: {e}")
             return (False, "Authentication unavailable.")
         user, error_response = provider.validate_user()
-        if isinstance(error_response, NoAccess):
-            return (False, error_response)
         if user is None or error_response is not None:
             return (False, "Authentication required.")
 
@@ -146,8 +143,11 @@ def is_authenticated(project_id=None):
                 from mdvtools.dbutils.dbmodels import User
                 db_user = User.query.filter_by(auth_id=auth_id).first()
                 if db_user and not db_user.is_active:
+                    # Their open session ends on the same page a refused sign-in
+                    # gets, which does not show that their User still exists.
                     session.clear()
-                    return (False, NoAccess(email=db_user.email))
+                    deny_access("no_account", db_user.email)
+                    return (False, "No access to this deployment.")
                 if db_user:
                     local_user = {
                         "id": db_user.id,
@@ -192,9 +192,10 @@ def register_before_request_auth(app):
         '/login_dev',
         '/login_sso',
         '/login',
-        '/callback',
-        # The no-access page links here, and the hook would show that page again.
+        # Reachable without a session: someone turned away needs a way to end
+        # their identity-provider session and try another account.
         '/logout',
+        '/callback',
         '/favicon.ico',
         '/flask/js/',
         '/static',
@@ -213,19 +214,15 @@ def register_before_request_auth(app):
         if any(requested_path.startswith(route) for route in whitelist_routes):
             return None
 
-        ok, reason = is_authenticated()
-        if isinstance(reason, NoAccess):
-            # Sending them to sign in would loop: the provider still has them
-            # signed in, so it would hand them straight back here.
-            page = render_template(
-                "no_access.html",
-                email=reason.email,
-                sign_in_method=reason.sign_in_method,
-                contact=app.config.get("MDV_ACCESS_CONTACT"),
-            )
-            return page, 403
+        ok, _reason = is_authenticated()
         if not ok:
             redirect_uri = app.config.get("LOGIN_REDIRECT_URL", "/login_dev")
+            # Signed in at the identity provider but refused here: the login page
+            # must say why, or signing in again just repeats the refusal.
+            reason = access_denied_reason()
+            if reason is not None:
+                logger.info(f"Access to {requested_path} denied: {reason}.")
+                return redirect(login_url_with_reason(redirect_uri, reason))
             logger.info(f"Unauthorized access to {requested_path}. Redirecting.")
             return redirect(redirect_uri)
 

@@ -5,8 +5,12 @@ import os
 from os.path import exists, join, basename
 from .diagnostics import format_version_info, report_errors
 from .spatial.conversion_options import (
+    BROWSER_PRESET_CHOICES,
+    DEFAULT_BROWSER_PRESET,
     DEFAULT_POINT_TRANSFORM,
     DEFAULT_TABLE_HANDLING,
+    IMAGE_CODEC_CHOICES,
+    IMAGE_PRESET_CHOICES,
     POINT_TRANSFORM_CHOICES,
     TABLE_HANDLING_CHOICES,
 )
@@ -215,6 +219,14 @@ def patch_spatial_annotations(project_dir, annotation_csv, datasource, spatialda
 @click.option('--batch', is_flag=True, help='Convert all child SpatialData stores in the given directory.')
 @click.option('--preserve-existing', 'preserve_existing', is_flag=True, help='Preserve existing project data in the output folder instead of recreating it.')
 @click.option('--link', is_flag=True, help='Symlink the original SpatialData source into the project instead of copying it.')
+@click.option(
+    '--spatial-url',
+    default=None,
+    metavar='URL',
+    help='Read the store from URL instead of copying it into the project: each region\'s spatial.url is set to URL '
+    'and nothing is written under spatial/. Single store only; not compatible with --batch, --link or browser '
+    'store rewrites.',
+)
 @click.option('--output_geojson/--no-output_geojson', 'output_geojson', default=True, help='Write transformed GeoJSON region files into the project images directory.')
 @click.option('--density', is_flag=True, help='Include density fields for gene expression in the default spatial view.')
 @click.option('--serve', is_flag=True, help='Serve the generated project after conversion.')
@@ -242,11 +254,55 @@ def patch_spatial_annotations(project_dir, annotation_csv, datasource, spatialda
     show_default=True,
     help='Strategy for transforming table point coordinates to image coordinates.',
 )
+@click.option(
+    '--browser-preset',
+    type=click.Choice(BROWSER_PRESET_CHOICES),
+    default=DEFAULT_BROWSER_PRESET,
+    show_default=True,
+    help='Rewrite the copied store for SpatialData.js. "standard": pyramids, CSC tables, Morton-sorted points, '
+    'all readable by any SpatialData reader. "compact": standard plus HTJ2K images (balanced), which '
+    'Python readers can only decode with spatialdata-js-util installed. "experimental": compact plus points-zarr copies. '
+    'The options below override the preset. Not compatible with --link or --spatial-url.',
+)
+@click.option('--pyramids/--no-pyramids', 'pyramids', default=None, help='Add overview levels to images and labels whose coarsest level is too large to load whole.')
+@click.option('--image-codec', type=click.Choice(IMAGE_CODEC_CHOICES), default=None, help='Recompress images with this codec ("none" to keep them as written). Either needs spatialdata-js-util to read back in Python.')
+@click.option('--image-preset', type=click.Choice(IMAGE_PRESET_CHOICES), default=None, help='Quality preset for --image-codec.')
+@click.option('--csc-tables/--no-csc-tables', 'csc_tables', default=None, help='Store table matrices in CSC layout for per-gene reads.')
+@click.option('--morton-points/--no-morton-points', 'morton_points', default=None, help='Morton-sort points for viewport reads.')
+@click.option('--points-zarr/--no-points-zarr', 'points_zarr', default=None, help='Add an experimental points-zarr copy beside each points element.')
 @click.option('--verbose', is_flag=True, help='Show detailed per-dataset conversion output, transform decisions, and merged summaries.')
-def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, output_geojson, density, serve, obs_datasource_name, var_datasource_name, link_name_column, compute_x_umap, leiden_resolution, table_handling, point_transform, verbose):
+def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, link, spatial_url, output_geojson, density, serve, obs_datasource_name, var_datasource_name, link_name_column, compute_x_umap, leiden_resolution, table_handling, point_transform, browser_preset, pyramids, image_codec, image_preset, csc_tables, morton_points, points_zarr, verbose):
     """Convert one SpatialData store to MDV format, or use --batch for a directory of stores."""
     import tempfile
+    from .spatial.browser_store import resolve_browser_store_options
     from .spatial.conversion import convert_spatialdata_to_mdv, SpatialDataConversionArgs
+
+    browser_store = resolve_browser_store_options(
+        browser_preset,
+        pyramids=pyramids,
+        image_codec=image_codec,
+        image_preset=image_preset,
+        csc_tables=csc_tables,
+        morton_points=morton_points,
+        points_zarr=points_zarr,
+    )
+    if link and browser_store.enabled:
+        raise click.UsageError(
+            f"Browser store rewrites ({browser_store.describe()}) apply to the project's copy of the "
+            "store and cannot be combined with --link."
+        )
+    if spatial_url is not None:
+        if not spatial_url.strip():
+            raise click.UsageError("--spatial-url must not be empty.")
+        if batch:
+            raise click.UsageError("--spatial-url applies to a single store and cannot be combined with --batch.")
+        if link:
+            raise click.UsageError("--spatial-url and --link cannot be combined.")
+        if browser_store.enabled:
+            raise click.UsageError(
+                f"Browser store rewrites ({browser_store.describe()}) apply to the project's copy of the "
+                "store and cannot be combined with --spatial-url."
+            )
 
     with tempfile.TemporaryDirectory() as temp_folder:
         args = SpatialDataConversionArgs(
@@ -256,6 +312,7 @@ def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, l
             preserve_existing=preserve_existing,
             temp_folder=temp_folder,
             link=link,
+            spatial_url=spatial_url,
             output_geojson=output_geojson,
             density=density,
             serve=serve,
@@ -267,6 +324,7 @@ def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, l
             leiden_resolution=leiden_resolution,
             table_handling=table_handling,
             point_transform=point_transform,
+            browser_store=browser_store,
         )
         convert_spatialdata_to_mdv(args)
 

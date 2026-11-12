@@ -1,8 +1,8 @@
+import { easeLinear } from "d3-ease";
+import { select } from "d3-selection";
+import { defaultPalette } from "../datastore/DataStore.js";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart";
-import { defaultPalette } from "../datastore/DataStore.js";
-import { select } from "d3-selection";
-import { easeLinear } from "d3-ease";
 
 class MultiBoxPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -33,10 +33,7 @@ class MultiBoxPlot extends SVGChart {
             const col = this.dataStore.columnIndex[p[x]];
             const [min, max] = this.dataStore.getMinMaxForColumn(col);
             const quantile = q && col.quantiles && col.quantiles !== "NA" && col.quantiles[q];
-            config.scaleVals.push([
-                quantile ? quantile[0] : min,
-                quantile ? quantile[1] : max,
-            ]);
+            config.scaleVals.push([quantile ? quantile[0] : min, quantile ? quantile[1] : max]);
         }
         this.dim.getMultiBoxPlotData(
             (data) => {
@@ -87,10 +84,7 @@ class MultiBoxPlot extends SVGChart {
     drawChart() {
         this.y_scale.domain([this.data.max, this.data.min]);
         this.updateAxis();
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(400)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(400).ease(easeLinear);
         const yscale = this.y_scale;
         const cdim = this._getContentDimensions();
         const vWidth = cdim.width / (this.config.param.length - 1);

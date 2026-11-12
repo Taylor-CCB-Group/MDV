@@ -1,7 +1,7 @@
 import { createMdvPortal } from "@/react/react_utils";
-import type { ChartManager } from "../ChartManager.js";
 import type DataStore from "../../datastore/DataStore.js";
 import { BaseDialog } from "../../utilities/Dialog.js";
+import type { ChartManager } from "../ChartManager.js";
 import ColorPaletteComponent from "./ColorPaletteComponent";
 
 type ColorPaletteChartManager = Pick<ChartManager, "_sync_colors" | "dataSources" | "getDataSource">;

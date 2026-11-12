@@ -1,10 +1,10 @@
+import { act, renderHook } from "@testing-library/react";
+import type { OnBeforeEditCellEventArgs, OnCellChangeEventArgs } from "slickgrid-react";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
-import useEditCell from "@/react/hooks/useEditCell";
 import type { FeedbackAlert } from "@/react/components/FeedbackAlertComponent";
-import { renderHook, act } from "@testing-library/react";
-import { describe, test, expect, beforeEach, vi } from "vitest";
-import type { OnBeforeEditCellEventArgs, OnCellChangeEventArgs } from "slickgrid-react";
+import useEditCell from "@/react/hooks/useEditCell";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 describe("useEditCell", () => {
@@ -43,7 +43,7 @@ describe("useEditCell", () => {
                 data: [],
                 values: [],
                 editable: false,
-            }
+            },
         ] as any;
 
         sortedIndices = new Uint32Array([0, 1, 2]);
@@ -60,18 +60,11 @@ describe("useEditCell", () => {
 
     test("should handle null grid reference gracefully", () => {
         const gridRefWithNull = { current: null } as any;
-        
+
         const { result } = renderHook(() =>
-            useEditCell(
-                orderedParamColumnsRef,
-                sortedIndicesRef,
-                dataStore,
-                gridRefWithNull,
-                setFeedbackAlert,
-                true,
-            ),
+            useEditCell(orderedParamColumnsRef, sortedIndicesRef, dataStore, gridRefWithNull, setFeedbackAlert, true),
         );
-    
+
         // Should not crash when grid is null
         expect(result.current.handleBeforeEditCell).toBeDefined();
         expect(result.current.handleCellChange).toBeDefined();
@@ -80,14 +73,7 @@ describe("useEditCell", () => {
     describe("handleBeforeEditCell", () => {
         test("should store old cell value", () => {
             const { result } = renderHook(() =>
-                useEditCell(
-                    orderedParamColumnsRef,
-                    sortedIndicesRef,
-                    dataStore,
-                    gridRef,
-                    setFeedbackAlert,
-                    true,
-                ),
+                useEditCell(orderedParamColumnsRef, sortedIndicesRef, dataStore, gridRef, setFeedbackAlert, true),
             );
 
             const mockEvent = new CustomEvent("beforeEditCell", {
@@ -109,14 +95,7 @@ describe("useEditCell", () => {
     describe("handleCellChange", () => {
         test("should handle successful cell edit", () => {
             const { result } = renderHook(() =>
-                useEditCell(
-                    orderedParamColumnsRef,
-                    sortedIndicesRef,
-                    dataStore,
-                    gridRef,
-                    setFeedbackAlert,
-                    true,
-                ),
+                useEditCell(orderedParamColumnsRef, sortedIndicesRef, dataStore, gridRef, setFeedbackAlert, true),
             );
 
             // Storing old cell value
@@ -156,14 +135,7 @@ describe("useEditCell", () => {
 
         test("should show error when column not found", () => {
             const { result } = renderHook(() =>
-                useEditCell(
-                    orderedParamColumnsRef,
-                    sortedIndicesRef,
-                    dataStore,
-                    gridRef,
-                    setFeedbackAlert,
-                    true,
-                ),
+                useEditCell(orderedParamColumnsRef, sortedIndicesRef, dataStore, gridRef, setFeedbackAlert, true),
             );
 
             const changeEvent = new CustomEvent("cellChange", {
@@ -192,14 +164,7 @@ describe("useEditCell", () => {
 
         test("should show error when permission is not editable", () => {
             const { result } = renderHook(() =>
-                useEditCell(
-                    orderedParamColumnsRef,
-                    sortedIndicesRef,
-                    dataStore,
-                    gridRef,
-                    setFeedbackAlert,
-                    false,
-                ),
+                useEditCell(orderedParamColumnsRef, sortedIndicesRef, dataStore, gridRef, setFeedbackAlert, false),
             );
 
             const changeEvent = new CustomEvent("cellChange", {
@@ -228,14 +193,7 @@ describe("useEditCell", () => {
 
         test("should show error when column is not editable", () => {
             const { result } = renderHook(() =>
-                useEditCell(
-                    orderedParamColumnsRef,
-                    sortedIndicesRef,
-                    dataStore,
-                    gridRef,
-                    setFeedbackAlert,
-                    true,
-                ),
+                useEditCell(orderedParamColumnsRef, sortedIndicesRef, dataStore, gridRef, setFeedbackAlert, true),
             );
 
             const changeEvent = new CustomEvent("cellChange", {
@@ -263,4 +221,3 @@ describe("useEditCell", () => {
         });
     });
 });
-

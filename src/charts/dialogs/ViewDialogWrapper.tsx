@@ -1,12 +1,12 @@
-import { createMdvPortal } from "@/react/react_utils";
-import { BaseDialog } from "@/utilities/Dialog";
 import { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import DebugErrorComponent from "./DebugErrorComponent";
+import { createMdvPortal } from "@/react/react_utils";
+import { BaseDialog } from "@/utilities/Dialog";
 import AddViewDialogComponent from "./AddViewDialog";
-import SaveViewDialogComponent from "./SaveViewDialog";
+import DebugErrorComponent from "./DebugErrorComponent";
 import DeleteViewDialogComponent from "./DeleteViewDialog";
 import SaveAsViewDialogComponent from "./SaveAsViewDialog";
+import SaveViewDialogComponent from "./SaveViewDialog";
 
 const Wrapper = (props: {
     onDone: () => void;

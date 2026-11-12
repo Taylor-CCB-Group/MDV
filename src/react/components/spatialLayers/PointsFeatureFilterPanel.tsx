@@ -3,7 +3,7 @@ import { featureNamesForCodes, isParquetWorkerEnabled, resolveFeatureSelectionCo
 import { featureCodeToRgb } from "@spatialdata/layers";
 import { describeFeatureRowState, featureRowOpacity, usePointsFeatureState } from "@spatialdata/vis";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { type ReactNode, memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import {
     type PointsFeatureFilterConfig,

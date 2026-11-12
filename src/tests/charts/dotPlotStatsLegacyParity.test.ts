@@ -1,5 +1,5 @@
-import { computeDotPlotStats } from "@/react/components/dotplot/dotPlotStats";
 import { describe, expect, it, vi } from "vitest";
+import { computeDotPlotStats } from "@/react/components/dotplot/dotPlotStats";
 
 type LegacyItem = { mean: number; frac: number };
 type LegacyResult = { data: { count: number; values: LegacyItem[] }[]; frac_range: [number, number] };

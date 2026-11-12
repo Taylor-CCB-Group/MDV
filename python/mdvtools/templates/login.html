@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Login</title>
+    {# The account a refused sign-in was for (see auth/access_denied.py), so the page can name it. #}
+    <meta name="mdv-denied-account" content="{{ session.get('access_denied_email', '') }}">
+    {# How that sign-in came, and who to ask for access (ADR 0019). #}
+    <meta name="mdv-denied-sign-in-method" content="{{ session.get('access_denied_sign_in_method', '') }}">
+    <meta name="mdv-access-contact" content="{{ config.get('MDV_ACCESS_CONTACT') or '' }}">
     {# Relative to this page, so the assets still resolve behind a proxy that strips a path prefix. #}
     {% set static_root = '../' * (request.path.count('/') - 1) ~ url_for('static', filename='')[request.script_root|length + 1:] %}
     {% set login = entry_assets('login') %}

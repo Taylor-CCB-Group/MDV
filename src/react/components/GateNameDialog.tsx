@@ -1,16 +1,7 @@
-import {
-    Alert,
-    Box,
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    TextField,
-} from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from "@mui/material";
 import { useEffect, useState } from "react";
-import { DEFAULT_GATE_COLOR } from "../gates/gateUtils";
 import { hexToRgb, rgbToHex } from "@/utilities/Utilities";
+import { DEFAULT_GATE_COLOR } from "../gates/gateUtils";
 
 export type GateNameDialogType = {
     open: boolean;
@@ -90,8 +81,7 @@ const GateNameDialog = ({ open, onClose, onSaveGate, name, isEditName }: GateNam
                             }}
                             aria-label="Gate color"
                         />
-                        ): null
-                    }  
+                    ) : null}
                 </Box>
 
                 {error && (

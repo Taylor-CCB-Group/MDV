@@ -7,10 +7,6 @@
  */
 import test, { expect } from "@playwright/test";
 import {
-    createTemporaryProjectViaSyntheticAnndata,
-    waitForProjectReady,
-} from "../../utils/projectFixtures";
-import {
     addDotPlotChartViaApi,
     closeTopDialog,
     expectChartPanelHasNoError,
@@ -18,15 +14,16 @@ import {
     getFirstLinkedGeneLabel,
     getLinkColumnSettingRow,
     getRowsAsColumnsSubgroupKeys,
+    isWorktreeFrontendForPlaywright,
     openChartSettingsDialog,
     saveCurrentView,
     searchChartSettings,
     selectLinkedGeneInChartSettings,
     setDotPlotXAxisLinkField,
-    isWorktreeFrontendForPlaywright,
     waitForChartByTitle,
     waitForViewUnsavedState,
 } from "../../utils/helpers";
+import { createTemporaryProjectViaSyntheticAnndata, waitForProjectReady } from "../../utils/projectFixtures";
 
 const MULTILAYER_SYNTHETIC = {
     profile: "minimal" as const,
@@ -57,9 +54,7 @@ test.describe("Link subgroup column selection", () => {
         }
     });
 
-    test("shows subgroup layer tabs in the link column picker when the worktree UI is served", async ({
-        page,
-    }) => {
+    test("shows subgroup layer tabs in the link column picker when the worktree UI is served", async ({ page }) => {
         const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
             synthetic: MULTILAYER_SYNTHETIC,
         });

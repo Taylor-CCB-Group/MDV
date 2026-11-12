@@ -24,8 +24,8 @@ export default function getTooltipSettings(config: ScatterPlotConfig, callback?:
                 func: async (x) => {
                     config.tooltip.column = x;
                     callback?.();
-                }
+                },
             }),
-        ]
+        ],
     });
 }

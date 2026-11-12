@@ -1,16 +1,13 @@
-import { WGL2DI } from "../webgl/WGL2DI.js";
-import WGLChart from "./WGLChart.js";
-import BaseChart from "./BaseChart";
+import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil.ts";
 import { BaseDialog } from "../utilities/Dialog.js";
 import { createEl } from "../utilities/Elements.js";
-import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil.ts";
+import { WGL2DI } from "../webgl/WGL2DI.js";
+import BaseChart from "./BaseChart";
+import WGLChart from "./WGLChart.js";
 
 class OffsetDialog extends BaseDialog {
     constructor(scatterPlot) {
-        super(
-            { title: "Alter Position", width: 300, doc: scatterPlot.__doc__ },
-            scatterPlot,
-        );
+        super({ title: "Alter Position", width: 300, doc: scatterPlot.__doc__ }, scatterPlot);
     }
 
     init(scatterPlot) {
@@ -57,17 +54,9 @@ class OffsetDialog extends BaseDialog {
         const cname = this.ds.columnIndex[this.ds.offsets.groups].name;
         createEl("div", { text: cname }, dd);
         this.groupSelect = createEl("select", {}, dd);
-        const bb = createEl(
-            "button",
-            { classes: ["ciview-button-sm"], text: "Reset" },
-            dd,
-        );
+        const bb = createEl("button", { classes: ["ciview-button-sm"], text: "Reset" }, dd);
         bb.addEventListener("click", (e) => {
-            this.ds.resetColumnOffsets(
-                this.filter,
-                this.groupSelect.value,
-                true,
-            );
+            this.ds.resetColumnOffsets(this.filter, this.groupSelect.value, true);
             this._showOffsets(this.groupSelect.value);
         });
         const vals = this.ds.columnIndex[this.ds.offsets.groups].values;
@@ -81,9 +70,7 @@ class OffsetDialog extends BaseDialog {
                 this.groupSelect,
             );
         }
-        this.filter = this.plot.config.background_filter
-            ? this.plot.config.background_filter.category
-            : null;
+        this.filter = this.plot.config.background_filter ? this.plot.config.background_filter.category : null;
 
         this.groupSelect.addEventListener("change", () => {
             this._showOffsets(this.groupSelect.value);
@@ -105,10 +92,7 @@ class OffsetDialog extends BaseDialog {
         y += dir === "up" ? am : 0;
         y -= dir === "down" ? am : 0;
         const gr = this.groupSelect.value;
-        ds.setColumnOffset(
-            { group: gr, offsets: [x, y], filter: this.filter },
-            true,
-        );
+        ds.setColumnOffset({ group: gr, offsets: [x, y], filter: this.filter }, true);
         this._showOffsets(gr);
     }
 
@@ -269,7 +253,7 @@ class WGLScatterPlot extends WGLChart {
         this.y = this.config.param[1];
         this._applyDateAxisDefaults();
         this.dim = this.getDimension();
-       
+
         void this.setBackgroundFilter();
         this.minMaxX = this.dataStore.getMinMaxForColumn(this.x);
         this.minMaxY = this.dataStore.getMinMaxForColumn(this.y);
@@ -282,9 +266,7 @@ class WGLScatterPlot extends WGLChart {
         this.app = new WGL2DI(this.graphDiv, appConf);
 
         this.app.addHandler("zoom_stopped", (data) => this.handlePanZoom(data));
-        this.app.addHandler("panning_stopped", (data) =>
-            this.handlePanZoom(data),
-        );
+        this.app.addHandler("panning_stopped", (data) => this.handlePanZoom(data));
 
         this.centerGraph();
 
@@ -327,7 +309,7 @@ class WGLScatterPlot extends WGLChart {
 
         this.onDataFiltered();
     }
-    
+
     drawChart() {
         const { config } = this;
         const x_name = this.dataStore.getColumnName(config.param[0]);
@@ -352,7 +334,6 @@ class WGLScatterPlot extends WGLChart {
             globalFilter: this.dataStore.getFilter(),
             colorFunc: colorFunc,
         });
-
 
         this.onDataFiltered();
         this.updateAxis();
@@ -424,12 +405,7 @@ class WGLScatterPlot extends WGLChart {
         const categories = Array.isArray(bf?.categories)
             ? bf.categories.filter((x) => x !== undefined && x !== null)
             : [];
-        if (
-            !bf ||
-            !bf.column ||
-            bf.column === "__none__" ||
-            categories.length === 0
-        ) {
+        if (!bf || !bf.column || bf.column === "__none__" || categories.length === 0) {
             this.dim.clearBackgroundFilter();
         } else {
             await loadColumn(this.dataStore.name, bf.column);
@@ -465,10 +441,7 @@ class WGLScatterPlot extends WGLChart {
                 inf[5] = i.position[1];
             }
             if (this.dataStore.regions) {
-                const im =
-                    this.dataStore.regions.all_regions[c.region].images[
-                        c.background_image.name
-                    ];
+                const im = this.dataStore.regions.all_regions[c.region].images[c.background_image.name];
                 im.position = i.position;
                 im.height = i.height;
                 im.width = i.width;
@@ -493,9 +466,7 @@ class WGLScatterPlot extends WGLChart {
         im.crossOrigin = "anonymous";
         const c = this.config;
         c.image_opacity = c.image_opacity || 1;
-        im.src = ic.url
-            ? ic.url
-            : getProjectURL(this.dataStore.regions.base_url) + ic.file;
+        im.src = ic.url ? ic.url : getProjectURL(this.dataStore.regions.base_url) + ic.file;
         im.onload = () => {
             if (change) {
                 this.app.changeImage(im, ic, 0);
@@ -546,14 +517,8 @@ class WGLScatterPlot extends WGLChart {
 
     _calculateRadius() {
         // const width = this.width?this.width:1;
-        let max_x =
-            this.config.max_x || this.config.max_x === 0
-                ? this.config.max_x
-                : this.minMaxX[1];
-        let min_x =
-            this.config.min_x || this.config.min_x === 0
-                ? this.config.min_x
-                : this.minMaxX[0];
+        let max_x = this.config.max_x || this.config.max_x === 0 ? this.config.max_x : this.minMaxX[1];
+        let min_x = this.config.min_x || this.config.min_x === 0 ? this.config.min_x : this.minMaxX[0];
         if (this.config.axis.x_log_scale) {
             max_x = this._getLogValue(max_x);
             min_x = this._getLogValue(min_x);
@@ -657,10 +622,7 @@ class WGLScatterPlot extends WGLChart {
             const n = d.getColumnName(o.groups);
             //check to see if plot has correct x,y and background filter for altering offsets
             if (o.param[0] === c.param[0] && o.param[1] === c.param[1]) {
-                if (
-                    !o.background_filter ||
-                    o.background_filter === c?.background_filter?.column
-                ) {
+                if (!o.background_filter || o.background_filter === c?.background_filter?.column) {
                     m.push({
                         text: `Adjust ${n} position`,
                         icon: "fas fa-arrows-alt",
@@ -707,16 +669,14 @@ class WGLScatterPlot extends WGLChart {
         } else if (c.background_filter.column === "__none__") {
             c.background_filter.column = null;
         } else if (!c.background_filter.categories) {
-            c.background_filter.categories = c.background_filter.category
-                ? [c.background_filter.category]
-                : [];
+            c.background_filter.categories = c.background_filter.category ? [c.background_filter.category] : [];
         }
         const textColumns = this.dataStore.getColumnList("string");
         const textColumnsWithNone = textColumns.slice(0);
         textColumnsWithNone.push({ name: "None", field: null });
         const bfColumn = c.background_filter.column || null;
-        const bgCurrentCats = c.background_filter.categories
-            || (c.background_filter.category ? [c.background_filter.category] : []);
+        const bgCurrentCats =
+            c.background_filter.categories || (c.background_filter.category ? [c.background_filter.category] : []);
         //this is legacy and probably not used anymore
         if (c.image_choices) {
             const ic = c.image_choices.slice(0);
@@ -757,11 +717,11 @@ class WGLScatterPlot extends WGLChart {
                 },
             });
         }
-        //the choice of images should be in the datastore 
+        //the choice of images should be in the datastore
         const rs = this.dataStore.regions;
         if (c.region && rs && !c.viv) {
             const ic = rs.all_regions[c.region].images;
-            const vals = [{"name":"None", "field":"__none__"}];
+            const vals = [{ name: "None", field: "__none__" }];
             for (const n in ic) {
                 vals.push({ name: n, field: n });
             }
@@ -808,12 +768,8 @@ class WGLScatterPlot extends WGLChart {
                 c.background_filter = {
                     ...c.background_filter,
                     column: x,
-                    categories:
-                        x == null ? [] : c.background_filter.categories,
-                    category:
-                        x == null
-                            ? undefined
-                            : c.background_filter.category,
+                    categories: x == null ? [] : c.background_filter.categories,
+                    category: x == null ? undefined : c.background_filter.category,
                 };
                 void this.setBackgroundFilter();
             },
@@ -877,6 +833,7 @@ class WGLScatterPlot extends WGLChart {
 BaseChart.types["wgl_scatter_plot"] = {
     name: "2D Scatter Plot (Classic)",
     class: WGLScatterPlot,
+    legacy: true,
     params: [
         {
             type: "number",

@@ -1,7 +1,7 @@
-import ProjectShareModal from "@/catalog/ProjectShareModal";
-import type { RegisteredUser, SharedUser } from "@/catalog/hooks/useProjectShare";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import type { RegisteredUser, SharedUser } from "@/catalog/hooks/useProjectShare";
+import ProjectShareModal from "@/catalog/ProjectShareModal";
 
 // An Admin is Owner of every project, so the server refuses to change or
 // remove their role, and adds them only as Owner (ADR 0019).

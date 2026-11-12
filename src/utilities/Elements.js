@@ -412,13 +412,14 @@ class MDVProgress {
  * @param {HTMLElement} el - the element to be made draggable
  * @param {object} config
  * @param {HTMLElement | string} [config.handle] - the element (or selector string) that will be used to drag the main element
- * @param {HTMLElement} [config.contain] - the element that will contain the draggable element
+ * @param {HTMLElement | "topleft" | boolean} [config.contain] - keep the element inside its parent while
+ * dragging; a drag past an edge stops at that edge. "topleft" only stops it at the top and left edges.
  * @param {string} [config.y_axis] - if set, the element will only be draggable on the y-axis
  * @param {function} [config.ondragstart] - a function that is called when dragging starts
  * @param {function} [config.ondragend] - a function that is called when dragging ends
  * @param {Document} [config.doc] - the document object to which the event listeners
  * will be added. This is useful when the draggable element is in a different window
- * @param {boolean} [config.snapback] - if set, if the drag is released with the element off 
+ * @param {boolean} [config.snapback] - if set, if the drag is released with the element off
  * the side of its container, it will snap back to the edge. This has known issues and is
  * currently only being used for Dialogs.
  * @param {boolean|object} [config.stack] - promote on drag start; object may set container, group, baseZ
@@ -487,15 +488,16 @@ function makeDraggable(el, config = {}) {
         pos3 = e.clientX;
         pos4 = e.clientY;
         // set the element's new position:
-        const nt = el.offsetTop - pos2;
-        const nl = el.offsetLeft - pos1;
+        let nt = el.offsetTop - pos2;
+        let nl = el.offsetLeft - pos1;
         if (cont) {
-            if (nt < 0 || (nt + cont.c_bb.height > cont.p_bb.height && cont.dir !== "topleft")) {
-                return;
-            }
-            if (nl < 0 || (nl + cont.c_bb.width > cont.p_bb.width && cont.dir !== "topleft")) {
-                return;
-            }
+            // Clamp to the container rather than ignoring the move, so an element
+            // that starts partly outside (e.g. after the chart shrank) can still be
+            // dragged back in.
+            const maxTop = cont.dir === "topleft" ? Number.POSITIVE_INFINITY : cont.p_bb.height - cont.c_bb.height;
+            const maxLeft = cont.dir === "topleft" ? Number.POSITIVE_INFINITY : cont.p_bb.width - cont.c_bb.width;
+            nt = Math.max(0, Math.min(nt, maxTop));
+            nl = Math.max(0, Math.min(nl, maxLeft));
         }
 
         if (!config.y_axis) {
@@ -520,15 +522,15 @@ function makeDraggable(el, config = {}) {
             if (right < 100) {
                 el.style.left = `${100 - el.offsetWidth}px`;
             }
-            if (top > (parentBB.height - 100)) {
+            if (top > parentBB.height - 100) {
                 el.style.top = `${parentBB.height - 100}px`;
             }
-            if (left > (parentBB.width - 100)) {
+            if (left > parentBB.width - 100) {
                 el.style.left = `${parentBB.width - 100}px`;
             }
             // if it is going out of the window at the top, bring the top to 0
             if (top < 0) {
-                el.style.top = '0px';
+                el.style.top = "0px";
             }
         }
 
@@ -567,17 +569,17 @@ function getElDim(el) {
 }
 
 export {
-    createEl,
-    createSVGEl,
-    addResizeListener,
-    makeDraggable,
     addElProps,
-    makeResizable,
-    removeDraggable,
-    removeResizable,
+    addResizeListener,
+    createEl,
     createMenuIcon,
-    makeSortable,
-    splitPane,
+    createSVGEl,
     getElDim,
     MDVProgress,
+    makeDraggable,
+    makeResizable,
+    makeSortable,
+    removeDraggable,
+    removeResizable,
+    splitPane,
 };

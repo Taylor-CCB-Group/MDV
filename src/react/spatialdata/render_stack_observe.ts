@@ -1,5 +1,5 @@
-import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
 import type { LayerChannelConfig } from "@spatialdata/avivatorish";
+import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
 
 function channelStateKey(channels: LayerChannelConfig): string {
     return JSON.stringify({

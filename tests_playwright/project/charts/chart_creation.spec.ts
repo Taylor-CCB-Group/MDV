@@ -1,15 +1,12 @@
 import test, { expect } from "@playwright/test";
 import {
-    createSharedSyntheticAnndataSuite,
-    type SharedSyntheticAnndataSuiteHandle,
-} from "../../utils/projectFixtures";
-import {
     addChartViaUi,
     getAvailableAddableChartTypes,
     getChartSummaries,
     waitForChartByTitle,
     waitForViewUnsavedState,
 } from "../../utils/helpers";
+import { createSharedSyntheticAnndataSuite, type SharedSyntheticAnndataSuiteHandle } from "../../utils/projectFixtures";
 
 test.describe("Chart Creation", () => {
     test.describe.configure({ mode: "serial" });
@@ -56,9 +53,7 @@ test.describe("Chart Creation", () => {
 
                 const chartsAfter = await getChartSummaries(page);
                 const createdChart = chartsAfter.find(
-                    (chart) =>
-                        chart.title === title &&
-                        !chartsBefore.some((before) => before.id === chart.id),
+                    (chart) => chart.title === title && !chartsBefore.some((before) => before.id === chart.id),
                 );
 
                 expect(createdChart).toBeTruthy();

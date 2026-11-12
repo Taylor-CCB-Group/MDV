@@ -21,12 +21,7 @@ type Props = {
     dataStore: DataStore;
 };
 
-export default function LabelsLayerPanel({
-    config,
-    updateLayer,
-    association,
-    dataStore,
-}: Props) {
+export default function LabelsLayerPanel({ config, updateLayer, association, dataStore }: Props) {
     const specs = mdvFieldSpecsOf(config);
 
     return (

@@ -1,6 +1,6 @@
 import { WGL2DI } from "../webgl/WGL2DI.js";
-import WGLChart from "./WGLChart.js";
 import BaseChart from "./BaseChart";
+import WGLChart from "./WGLChart.js";
 
 class WGL3DScatterPlot extends WGLChart {
     constructor(dataStore, div, config) {
@@ -66,11 +66,7 @@ class WGL3DScatterPlot extends WGLChart {
         const c = this.config;
         this.config.axis_scales[index] = val;
         c.center = this._calculateCenter();
-        this.app.setCameraProperty("center", [
-            -c.center[0] * 2,
-            c.center[1] * 2,
-            -c.center[2] * 2,
-        ]);
+        this.app.setCameraProperty("center", [-c.center[0] * 2, c.center[1] * 2, -c.center[2] * 2]);
         this.app.refresh();
     }
 
@@ -121,11 +117,7 @@ class WGL3DScatterPlot extends WGLChart {
         } else {
             const c = this.config;
             c.center = this._calculateCenter();
-            this.app.setCameraProperty("center", [
-                -c.center[0] * 2,
-                c.center[1] * 2,
-                -c.center[2] * 2,
-            ]);
+            this.app.setCameraProperty("center", [-c.center[0] * 2, c.center[1] * 2, -c.center[2] * 2]);
             this.app.setCamera(this.defaultCDistance, -1.038, 0.261);
             this.app.removeAllLines();
             this.addAxis();
@@ -134,14 +126,9 @@ class WGL3DScatterPlot extends WGLChart {
 
     _calculateCenter() {
         //const p = this.config.param;
-        const ranges = this.config.param.map((x) =>
-            this.dataStore.getMinMaxForColumn(x),
-        );
+        const ranges = this.config.param.map((x) => this.dataStore.getMinMaxForColumn(x));
         const s = this.config.axis_scales;
-        const scaledRanges = ranges.map((range, i) => [
-            range[0] * 1,
-            range[1] * 1,
-        ]);
+        const scaledRanges = ranges.map((range, i) => [range[0] * 1, range[1] * 1]);
         const c = scaledRanges.map((x, i) => x[0] + (x[1] - x[0]) / 2);
         return c.map((x, i) => x * s[i]);
     }
@@ -170,9 +157,7 @@ class WGL3DScatterPlot extends WGLChart {
         const c = this.config.center;
         const s = this.config.axis_scales;
         for (let index = 0; index < 3; index++) {
-            const mm = this.dataStore.getMinMaxForColumn(
-                this.config.param[index],
-            );
+            const mm = this.dataStore.getMinMaxForColumn(this.config.param[index]);
             const color = [0, 0, 0];
             color[index] = 255;
             const from = c.map((x, i) => (i === index ? mm[0] : x / s[i]));

@@ -5,7 +5,7 @@ logger = get_logger(__name__)
 
 def register_auth_routes(app):
 
-    from flask import jsonify, request, redirect, url_for, session
+    from flask import jsonify, request, redirect, render_template, url_for, session
     from mdvtools.auth.authutils import get_auth_provider
     
     """
@@ -19,6 +19,11 @@ def register_auth_routes(app):
         @app.route('/login')
         def login():
             """Handles standard login (e.g., Auth0)."""
+            # A refused sign-in lands here when LOGIN_REDIRECT_URL is /login, the deploy
+            # scripts' Auth0 default. Starting Auth0 again would sign the same person
+            # straight back in and loop, so show the page that explains the refusal.
+            if request.args.get("denied"):
+                return render_template('login.html')
             try:
                 logger.info("Login initiated")
                 session.clear()
@@ -69,8 +74,8 @@ def register_auth_routes(app):
         def logout():
             """Clear the session and sign out through the provider used to sign in.
 
-            The no-access page links here, so it works for someone MDV gives no
-            access to, as well as for a signed-in User.
+            The page for a refused sign-in links here, so it works for someone
+            MDV gives no access to, as well as for a signed-in User.
             """
             try:
                 auth_method = session.get("auth_method")
@@ -80,8 +85,10 @@ def register_auth_routes(app):
                 session.clear()
                 session.modified = True
 
-                # With no auth_method in the session, as for a Deactivated user whose
-                # session MDV has already cleared, this is the site's default provider.
+                # Auth0 can still hold a session after ours is gone: MDV cleared it
+                # for a Deactivated user, or the cookie was lost. With no auth_method
+                # in the session this is the site's default provider, so a refused
+                # person can still end their Auth0 session and switch account.
                 return get_auth_provider().logout()
 
             except Exception as e:

@@ -7,10 +7,11 @@ import threading
 from datetime import datetime
 from authlib.integrations.flask_client import OAuth
 from flask import jsonify, session, redirect
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 # from flask import Response
 from flask.typing import ResponseReturnValue
-from mdvtools.auth.auth_provider import AuthProvider, NoAccess
+from mdvtools.auth.auth_provider import AuthProvider
+from mdvtools.auth.access_denied import AccessDeniedReason, deny_access
 from mdvtools.logging_config import get_logger
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
@@ -25,6 +26,9 @@ JWKS_CACHE_DURATION = 3600  # Cache for 1 hour
 
 # Prefix of the claims the post-login Action adds (docs/auth0/add-sign-in-claims.js).
 CLAIM_NAMESPACE = "https://mdv/"
+# Applied to every call this module makes to Auth0. Long enough for a slow
+# network; short enough that a hung call fails instead of holding a worker.
+AUTH0_TIMEOUT_SECONDS = 15
 
 class Auth0Provider(AuthProvider):
     def __init__(self, app, oauth: OAuth, client_id: str, client_secret: str, domain: str):
@@ -62,7 +66,7 @@ class Auth0Provider(AuthProvider):
             server_metadata_url = f'https://{self.domain}/.well-known/openid-configuration'
 
             # Attempt to fetch metadata to ensure it's accessible
-            response = requests.get(server_metadata_url)
+            response = requests.get(server_metadata_url, timeout=AUTH0_TIMEOUT_SECONDS)
             if response.status_code != 200:
                 logger.error(f"Failed to fetch OpenID configuration from {server_metadata_url}: {response.text}")
                 raise RuntimeError(f"Unable to fetch OpenID Connect metadata from {server_metadata_url}")
@@ -81,7 +85,9 @@ class Auth0Provider(AuthProvider):
                 client_id=self.client_id,
                 client_secret=self.client_secret,
                 server_metadata_url=server_metadata_url,
-                client_kwargs={'scope': 'openid profile email'},
+                # default_timeout covers Authlib's own calls: the metadata it
+                # loads and the token exchange after login.
+                client_kwargs={'scope': 'openid profile email', 'default_timeout': AUTH0_TIMEOUT_SECONDS},
             )
             logger.info("Auth0 OAuth provider registered successfully with OpenID Connect metadata.")
         except Exception as e:
@@ -161,7 +167,7 @@ class Auth0Provider(AuthProvider):
             headers = {"Authorization": f"Bearer {access_token}"}
 
             user_info_url = f"https://{self.domain}/userinfo"
-            response = requests.get(user_info_url, headers=headers)
+            response = requests.get(user_info_url, headers=headers, timeout=AUTH0_TIMEOUT_SECONDS)
 
             if response.status_code == 200:
                 logger.debug("User information retrieved successfully.")
@@ -299,7 +305,7 @@ class Auth0Provider(AuthProvider):
                     if needs_refresh:
                         response = requests.get(
                             url=self.app.config['AUTH0_PUBLIC_KEY_URI'],
-                            timeout=10
+                            timeout=AUTH0_TIMEOUT_SECONDS
                         )
                         if response.status_code != 200:
                             logger.error(f"Failed to fetch JWKS: {response.status_code}")
@@ -381,6 +387,8 @@ class Auth0Provider(AuthProvider):
             # Retrieve user info from Auth0
             user_info = self.get_user({"access_token": token})
             if not user_info:
+                # Auth0's userinfo failed or timed out. Signing in again would loop.
+                deny_access("unavailable")
                 return None, (jsonify({"error": "User not found"}), 404)
 
             # Get Auth0 user ID
@@ -390,22 +398,37 @@ class Auth0Provider(AuthProvider):
             # Query the user from the database if not in cache
             user = User.query.filter_by(auth_id=auth0_id).first()
 
+            sign_in_method = user_info.get("connection")
             if user is None:
+                # No User for this account yet. An open Invitation makes one
+                # (ADR 0021). Otherwise this is the first Admin, or a refusal.
+                user = self._accept_invitation(user_info) if auth0_id else None
+            if user is None:
+                # Signed in at Auth0 but unknown here. Each way out records why,
+                # so the person gets a page saying so rather than a redirect to a
+                # login that Auth0 completes silently, straight back to here.
+                refusal = self._bootstrap_refusal(user_info, auth0_id, email)
+                if refusal is not None or not auth0_id:
+                    deny_access(refusal or "no_account", email, sign_in_method)
+                    return None, (jsonify({"error": "User not found"}), 404)
                 try:
-                    user = self._try_bootstrap_first_admin(user_info, auth0_id, email)
+                    user = self._create_first_admin(auth0_id, email)
                 except Exception as e:
                     logger.exception(f"Bootstrap administrator creation failed: {e}")
+                    deny_access("setup_failed", email)
                     return None, (jsonify({"error": "Administrator bootstrap failed"}), 500)
                 if user is None:
-                    user = self._accept_invitation(user_info)
-                if user is None:
-                    return None, NoAccess(email=email, sign_in_method=user_info.get("connection"))
+                    deny_access("no_account", email, sign_in_method)
+                    return None, (jsonify({"error": "User not found"}), 404)
             elif not user.is_active:
                 # A Deactivated user. Signing in reactivates them only by
                 # accepting an Invitation an Admin sent them (ADRs 0020, 0021).
+                # They get the same page as someone with no User, so it does not
+                # show that this deployment still holds theirs.
                 user = self._accept_invitation(user_info)
                 if user is None:
-                    return None, NoAccess(email=email, sign_in_method=user_info.get("connection"))
+                    deny_access("no_account", email, sign_in_method)
+                    return None, (jsonify({"error": "User not found"}), 404)
             else:
                 # An active User can still hold an Invitation that names them, for
                 # example when an Admin reactivated them before they signed in. Their
@@ -423,6 +446,9 @@ class Auth0Provider(AuthProvider):
 
         except Exception as e:
             logger.exception(f"Error in validate_user: {e}")
+            # Most likely the database. Without this the failure is a redirect to
+            # login, which Auth0 completes at once - a loop for as long as it lasts.
+            deny_access("unavailable")
             return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
 
     def _accept_invitation(self, user_info: Dict[str, Any]):
@@ -437,32 +463,55 @@ class Auth0Provider(AuthProvider):
             cache_user_projects()
         return user
 
-    def _try_bootstrap_first_admin(self, user_info: Dict[str, Any], auth0_id: Optional[str], email: str):
-        """
-        Create the first local administrator, but only while the local database has zero
-        users and the verified Auth0 identity matches MDV_BOOTSTRAP_ADMIN_EMAIL. Returns
-        None (bootstrap not applicable) rather than creating anything if any check fails.
+    def _bootstrap_refusal(
+        self, user_info: Dict[str, Any], auth0_id: Optional[str], email: str
+    ) -> Optional[AccessDeniedReason]:
+        """Why this identity cannot become the first administrator, or None if it can.
 
-        This path only ever runs once per deployment: as soon as any local user exists,
-        User.query.count() > 0 and this method always returns None.
+        Bootstrap applies only while the local database has zero users, and only to
+        a verified Auth0 identity matching MDV_BOOTSTRAP_ADMIN_EMAIL. Every refusal
+        is logged: two of them used to return silently, which left an operator with
+        a login loop and nothing in the log to explain it.
+
+        The address is compared before verification is checked, so only the
+        intended administrator is ever told to verify - telling anyone else would
+        send them off to do something that cannot help.
         """
-        from mdvtools.dbutils.dbmodels import User, db
-        from sqlalchemy.exc import IntegrityError
+        from mdvtools.dbutils.dbmodels import User
 
         if not auth0_id:
-            return None
+            logger.warning("Sign-in rejected: Auth0 returned no user id.")
+            return "no_account"
+        if User.query.count() > 0:
+            logger.info(f"Signed in at Auth0 as {auth0_id}, which has no account in this deployment.")
+            return "no_account"
 
         bootstrap_email = (self.app.config.get("MDV_BOOTSTRAP_ADMIN_EMAIL") or "").strip().lower()
         if not bootstrap_email:
-            return None
-        if User.query.count() > 0:
-            return None
-        if not user_info.get("email_verified"):
-            logger.warning("Bootstrap admin login rejected: Auth0 email is not verified.")
-            return None
+            logger.warning(
+                "Sign-in refused: the users table is empty and MDV_BOOTSTRAP_ADMIN_EMAIL is not set, "
+                "so nobody can become the first administrator. Set it, then recreate the container - "
+                "a restart does not apply environment changes."
+            )
+            return "not_set_up"
         if not email or email != bootstrap_email:
             logger.warning("Bootstrap admin login rejected: email does not match MDV_BOOTSTRAP_ADMIN_EMAIL.")
-            return None
+            return "not_set_up"
+        if not user_info.get("email_verified"):
+            logger.warning("Bootstrap admin login rejected: Auth0 email is not verified.")
+            return "email_unverified"
+        return None
+
+    def _create_first_admin(self, auth0_id: str, email: str):
+        """
+        Create the first local administrator. Callers must have had None from
+        _bootstrap_refusal first: this method does no eligibility checks of its own.
+
+        This path only ever runs once per deployment: as soon as any local user exists,
+        _bootstrap_refusal refuses everyone.
+        """
+        from mdvtools.dbutils.dbmodels import User, db
+        from sqlalchemy.exc import IntegrityError
 
         user = User(
             email=email,
@@ -511,3 +560,34 @@ class Auth0Provider(AuthProvider):
 
         logger.info(f"Bootstrapped first administrator: {email}")
         return user
+
+def check_first_admin_setup(app) -> List[str]:
+    """Check at startup what the first Admin's sign-in needs.
+
+    Runs only for Auth0 and only while the users table is empty, a deployment
+    nobody has signed in to yet. Admin rights live only in MDV (ADR 0019), so the
+    first Admin needs MDV_BOOTSTRAP_ADMIN_EMAIL and nothing in Auth0 beyond a
+    verified account. Logs and returns the problems found, and never raises.
+    """
+    from mdvtools.dbutils.dbmodels import User
+
+    if (app.config.get("DEFAULT_AUTH_METHOD") or "").lower() != "auth0":
+        return []
+    if User.query.count() > 0:
+        return []
+
+    problems: List[str] = []
+    if not (app.config.get("MDV_BOOTSTRAP_ADMIN_EMAIL") or "").strip():
+        problems.append(
+            "MDV_BOOTSTRAP_ADMIN_EMAIL is not set, so nobody can become the first administrator. "
+            "Set it, then recreate the container - a restart does not apply environment changes."
+        )
+
+    for problem in problems:
+        logger.error(f"First administrator setup: {problem}")
+    if not problems:
+        logger.info(
+            "First administrator setup is ready: the first verified sign-in by "
+            "MDV_BOOTSTRAP_ADMIN_EMAIL will become the administrator."
+        )
+    return problems

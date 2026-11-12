@@ -1,5 +1,5 @@
-import { type TableRowSource, getTableRowResolver, planTableRows } from "@/react/spatialdata/table_rows";
 import { describe, expect, test } from "vitest";
+import { getTableRowResolver, planTableRows, type TableRowSource } from "@/react/spatialdata/table_rows";
 
 type Row = Record<string, string | number>;
 

@@ -1,6 +1,6 @@
-import type { ContourLayerProps } from "@/react/contour_state";
 import type { DensityLayerProps } from "@intraspatial/deck";
 import type { Matrix4 } from "@math.gl/core";
+import type { ContourLayerProps } from "@/react/contour_state";
 
 /**
  * Map MDV's heatmap contour props onto @intraspatial/deck's `DensityLayer`, which draws
@@ -105,7 +105,8 @@ export function contourToDensityProps(
         modelMatrix?: Matrix4 | null;
     },
 ): DensityLayerProps {
-    const { id, x, y, data, getWeight, weightKey, bandwidth, fillOpacity, contourOpacity, contourFill, colorRange } = props;
+    const { id, x, y, data, getWeight, weightKey, bandwidth, fillOpacity, contourOpacity, contourFill, colorRange } =
+        props;
     // radiusPixels / 6 screen pixels, and `radiusPixels = 30 · bandwidth · 2^zoom`: 5 · bandwidth world units.
     const sigma = (5 * bandwidth) / modelMatrixScale(props.modelMatrix);
     const perDensity = HEATMAP_WEIGHT_PER_DENSITY * sigma * sigma;

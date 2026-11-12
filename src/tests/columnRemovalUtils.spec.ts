@@ -1,11 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import type { BaseConfig } from "@/charts/BaseChart";
+import { analyzeChartColumnImpact, analyzeColumnRemoval, getReferencedFields } from "@/charts/columnRemovalUtils";
 import type { MultiColumnQuery } from "@/links/link_utils";
-import {
-    analyzeChartColumnImpact,
-    analyzeColumnRemoval,
-    getReferencedFields,
-} from "@/charts/columnRemovalUtils";
 
 type TestChartConfig = BaseConfig & Record<string, unknown>;
 
@@ -113,22 +109,11 @@ describe("columnRemovalUtils", () => {
     test("extracts referenced fields from nested field and fields objects", () => {
         const extracted = getReferencedFields({
             field: { field: "gene" },
-            fields: [
-                "age",
-                { field: "cluster" },
-                { fields: [{ field: "donor" }] },
-                123,
-            ],
+            fields: ["age", { field: "cluster" }, { fields: [{ field: "donor" }] }, 123],
             columnId: "sample_id",
         });
 
-        expect(extracted).toEqual([
-            "gene",
-            "age",
-            "cluster",
-            "donor",
-            "sample_id",
-        ]);
+        expect(extracted).toEqual(["gene", "age", "cluster", "donor", "sample_id"]);
     });
 
     test("detects nested config field references in analyzeChartColumnImpact", () => {
@@ -251,8 +236,6 @@ describe("columnRemovalUtils", () => {
                     throw new Error("load failed");
                 }),
             }),
-        ).rejects.toThrow(
-            "Failed to check column usage in saved views: Broken View",
-        );
+        ).rejects.toThrow("Failed to check column usage in saved views: Broken View");
     });
 });

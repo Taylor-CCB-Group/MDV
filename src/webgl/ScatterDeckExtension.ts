@@ -83,17 +83,19 @@ export class ScatterDensityExension extends LayerExtension implements WGSLLayerE
             };
             return { modules: [module] };
         }
-        return { ...super.getShaders(extension), modules: [
-            {
-                name: "ScatterDensityExension",
-                uniformTypes: {
-                    opacity: "f32",
-                },
-                inject: {
-                    // todo - add a uniform for ~kernelSigma, use UBO for uniforms (previous version is broken).
-                    // todo - change picking behavior
-                    "fs:#decl": "uniform ScatterDensityExensionUniforms { float opacity; } scatterDensity;",
-                    "fs:#main-end": `
+        return {
+            ...super.getShaders(extension),
+            modules: [
+                {
+                    name: "ScatterDensityExension",
+                    uniformTypes: {
+                        opacity: "f32",
+                    },
+                    inject: {
+                        // todo - add a uniform for ~kernelSigma, use UBO for uniforms (previous version is broken).
+                        // todo - change picking behavior
+                        "fs:#decl": "uniform ScatterDensityExensionUniforms { float opacity; } scatterDensity;",
+                        "fs:#main-end": `
                     //---- ScatterDensityExension
                     const float e = 2.718281828459045;
                     float d = length(unitPosition);
@@ -108,9 +110,10 @@ export class ScatterDensityExension extends LayerExtension implements WGSLLayerE
                     //---- end ScatterDensityExension
                     ////                    
                     `,
+                    },
                 },
-            },
-        ]};
+            ],
+        };
     }
     /**
      * On WebGPU, replace the colour's alpha with the gaussian kernel just before deck
@@ -133,7 +136,7 @@ export class ScatterDensityExension extends LayerExtension implements WGSLLayerE
         const { opacity } = props;
         for (const model of this.getModels()) {
             model.shaderInputs.setProps({
-                "ScatterDensityExension": {
+                ScatterDensityExension: {
                     opacity,
                 },
             });

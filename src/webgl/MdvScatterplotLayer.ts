@@ -1,6 +1,6 @@
 import { ScatterplotLayer } from "@deck.gl/layers";
 import type { ShaderPlugin } from "@luma.gl/shadertools";
-import { isWGSLLayerExtension, isWebGPULayer } from "./wgslLayerExtension";
+import { isWebGPULayer, isWGSLLayerExtension } from "./wgslLayerExtension";
 
 /**
  * deck's ScatterplotLayer, plus WGSL edits from our extensions when on WebGPU.

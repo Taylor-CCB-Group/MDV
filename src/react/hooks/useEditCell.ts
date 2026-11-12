@@ -1,9 +1,9 @@
-import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { useCallback, useRef } from "react";
 import type { OnBeforeEditCellEventArgs, OnCellChangeEventArgs, SlickgridReactInstance } from "slickgrid-react";
-import { setCellValueFromString } from "../utils/valueReplacementUtil";
+import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
+import { setCellValueFromString } from "../utils/valueReplacementUtil";
 
 /**
  *
@@ -12,13 +12,13 @@ import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
  * Uses refs, not values, for orderedParamColumns and sortedFilteredIndices
  * because SlickGrid stores callback references internally. Using refs
  * ensures the callbacks always access the current data avoiding stale closures.
- * 
+ *
  * - Stores the old value for comparison when applying edit
  * - Uses the util function setCellValueFromString for editing
  * - Calls dataStore.dataChanged for dimension filter to refilter
  * - Rerender the grid after updation
- * 
-*/
+ *
+ */
 const useEditCell = (
     orderedParamColumnsRef: React.MutableRefObject<LoadedDataColumn<DataType>[]>,
     sortedFilteredIndicesRef: React.MutableRefObject<Uint32Array>,

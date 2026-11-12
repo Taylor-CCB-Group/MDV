@@ -163,9 +163,14 @@ def test_new_person_with_a_password_invitation_opens_the_invited_project(app, pr
     assert Invitation.open_for_email("ann@example.org") == []
 
 
+def assert_no_access(response):
+    """The sign-in was refused, and the login page will say this account has no access."""
+    assert response.status_code == 302, response.get_data(as_text=True)
+    assert response.headers["Location"] == "/login_dev?denied=no_account"
+
+
 def assert_refused(response, invitation):
-    assert response.status_code == 403
-    assert "No access to this MDV site" in response.get_data(as_text=True)
+    assert_no_access(response)
     db.session.expire_all()
     assert invitation.is_open()
 
@@ -278,7 +283,7 @@ def test_invitation_naming_a_user_moves_them_to_the_new_sign_in_method(
     assert get_as(app, provider, f"/projects/{second_project.id}/open", new_account).status_code == 200
 
     old_account = password_sign_in("auth0|bo", "bo@old.example")
-    assert get_as(app, provider, f"/projects/{project.id}/open", old_account).status_code == 403
+    assert_no_access(get_as(app, provider, f"/projects/{project.id}/open", old_account))
 
 
 def test_deactivated_user_with_an_invitation_is_reactivated_with_its_roles(
@@ -458,7 +463,10 @@ def test_second_acceptance_after_first_commits(app, provider, admin, project, wi
     with patch.object(InvitationService, "_sign_in_matches", staticmethod(accepted_once_matched)):
         response = get_as(app, provider, f"/projects/{project.id}/open", sign_in)
 
-    assert response.status_code == (200 if winner_active and same_account else 403)
+    if winner_active and same_account:
+        assert response.status_code == 200, response.get_data(as_text=True)
+    else:
+        assert_no_access(response)
     db.session.expire_all()
     assert invitation.accepted_at is not None
     assert invitation.accepted_user_id == winners[0]
@@ -489,7 +497,7 @@ def test_invitation_revoked_while_its_sign_in_is_accepted_grants_nothing(app, pr
             app, provider, f"/projects/{project.id}/open", password_sign_in("auth0|jo", "jo@example.org")
         )
 
-    assert response.status_code == 403
+    assert_no_access(response)
     db.session.expire_all()
     assert User.query.filter_by(email="jo@example.org").first() is None
     assert UserProject.query.filter_by(project_id=project.id).count() == 0

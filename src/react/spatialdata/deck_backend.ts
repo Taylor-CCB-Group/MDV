@@ -1,6 +1,6 @@
-import { type RenderBackend, renderBackendSetting } from "@/lib/browserSettings";
 import type { CreateDeviceProps, Device } from "@luma.gl/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type RenderBackend, renderBackendSetting } from "@/lib/browserSettings";
 // Side effect: when "WebGPU call tracing" is on, wrap the WebGPU API before any device exists.
 import "./webgpu_trace";
 
@@ -190,7 +190,12 @@ export function useDeckDeviceProps(
     );
     const onError = useCallback(
         (error: Error, layer?: { id: string } | null) => {
-            if (!layer && device.status === "ready" && device.backend === "webgpu" && initializedBackend.current !== "webgpu") {
+            if (
+                !layer &&
+                device.status === "ready" &&
+                device.backend === "webgpu" &&
+                initializedBackend.current !== "webgpu"
+            ) {
                 // deck has no device, so nothing will draw: retry this chart on WebGL
                 console.error(error);
                 fallBack(`creating the WebGPU device failed: ${error.message}`);

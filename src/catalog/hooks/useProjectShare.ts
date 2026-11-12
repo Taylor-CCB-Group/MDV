@@ -44,7 +44,6 @@ const useProjectShare = (projectId: string) => {
                 },
             });
 
-
             if (res.ok) {
                 const data = await res.json();
                 if (data?.all_users) setUserList(data.all_users);
@@ -52,8 +51,8 @@ const useProjectShare = (projectId: string) => {
                 return;
             } else {
                 const errorData = await res.json().catch(() => ({
-                    error: "An error occurred. Please try again."
-                }))
+                    error: "An error occurred. Please try again.",
+                }));
                 if (res.status === 403) {
                     setError(errorData?.error || "Forbidden: You are not allowed to perform this action.");
                 } else if (res.status === 500) {
@@ -62,7 +61,6 @@ const useProjectShare = (projectId: string) => {
                     setError(errorData?.error || "An error occurred. Please try again.");
                 }
             }
-
         } catch (error) {
             setError("Error fetching user data. Please try again.");
         } finally {
@@ -84,15 +82,14 @@ const useProjectShare = (projectId: string) => {
                 },
             });
 
-
             if (res.ok) {
                 const data = await res.json();
                 await getAllUsers();
                 return;
             } else {
                 const errorData = await res.json().catch(() => ({
-                    error: "An error occurred. Please try again."
-                }))
+                    error: "An error occurred. Please try again.",
+                }));
                 if (res.status === 403) {
                     setError(errorData?.error || "Forbidden: You are not allowed to perform this action.");
                 } else if (res.status === 500) {
@@ -101,7 +98,6 @@ const useProjectShare = (projectId: string) => {
                     setErrorMsg(errorData?.error || errorData?.message || "An error occurred. Please try again.");
                 }
             }
-
         } catch (error) {
             setErrorMsg("Error adding new user. Please try again.");
         } finally {
@@ -123,15 +119,14 @@ const useProjectShare = (projectId: string) => {
                 },
             });
 
-
             if (res.ok) {
                 const data = await res.json();
                 await getAllUsers();
                 return;
             } else {
                 const errorData = await res.json().catch(() => ({
-                    error: "An error occurred. Please try again."
-                }))
+                    error: "An error occurred. Please try again.",
+                }));
                 if (res.status === 403) {
                     setError(errorData?.error || "Forbidden: You are not allowed to perform this action.");
                 } else if (res.status === 500) {
@@ -140,7 +135,6 @@ const useProjectShare = (projectId: string) => {
                     setErrorMsg(errorData?.error || errorData?.message || "An error occurred. Please try again.");
                 }
             }
-
         } catch (error) {
             setErrorMsg("Error fetching user data. Please try again.");
         } finally {
@@ -160,15 +154,14 @@ const useProjectShare = (projectId: string) => {
                 },
             });
 
-
             if (res.ok) {
                 const data = await res.json();
                 await getAllUsers();
                 return;
             } else {
                 const errorData = await res.json().catch(() => ({
-                    error: "An error occurred. Please try again."
-                }))
+                    error: "An error occurred. Please try again.",
+                }));
                 if (res.status === 403) {
                     setError(errorData?.error || "Forbidden: You are not allowed to perform this action.");
                 } else {
@@ -176,7 +169,6 @@ const useProjectShare = (projectId: string) => {
                 }
                 setErrorMsg(errorData?.error || errorData?.message || "An error occurred. Please try again.");
             }
-
         } catch (error) {
             setErrorMsg("Error deleting user. Please try again.");
         } finally {

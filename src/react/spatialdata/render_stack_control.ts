@@ -1,25 +1,13 @@
 import type { LayerChannelConfig } from "@spatialdata/avivatorish";
-import type {
-    RenderStack,
-    RenderStackEntry,
-    RenderStackSpatialElementType,
-} from "@spatialdata/layers";
+import type { SpatialData } from "@spatialdata/core";
+import type { RenderStack, RenderStackEntry, RenderStackSpatialElementType } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { isObservable, runInAction, set } from "mobx";
 import { useCallback } from "react";
-
-import type {
-    SpatialDataMdvReact,
-    SpatialDataMdvReactConfig,
-} from "@/react/components/SpatialDataMDVReact";
+import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "@/react/components/SpatialDataMDVReact";
 import { useChart } from "@/react/context";
 import { useConfig } from "@/react/hooks";
-import type { SpatialData } from "@spatialdata/core";
-import {
-    deckHostLayerId,
-    deckIdFromHostLayerId,
-    type DeckOverlayId,
-} from "./host_overlay_ids";
+import { type DeckOverlayId, deckHostLayerId, deckIdFromHostLayerId } from "./host_overlay_ids";
 import { spatialEntryAsLayerConfig } from "./render_stack_adapter";
 import {
     createDefaultRenderStack,
@@ -38,10 +26,7 @@ const CHANNEL_CONFIG_KEYS = [
     "selections",
 ] as const satisfies readonly (keyof LayerChannelConfig)[];
 
-function patchRecordInPlace(
-    existing: Record<string, unknown>,
-    next: Record<string, unknown>,
-): void {
+function patchRecordInPlace(existing: Record<string, unknown>, next: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(next)) {
         if (isObservable(existing)) {
             set(existing, key, value);
@@ -51,10 +36,7 @@ function patchRecordInPlace(
     }
 }
 
-function patchChannelsInPlace(
-    existing: Record<string, unknown>,
-    next: LayerChannelConfig,
-): void {
+function patchChannelsInPlace(existing: Record<string, unknown>, next: LayerChannelConfig): void {
     for (const key of CHANNEL_CONFIG_KEYS) {
         const value = next[key];
         if (value === undefined) continue;
@@ -78,10 +60,7 @@ export function patchRenderStackEntryPropsInPlace(
             props.channels &&
             typeof props.channels === "object"
         ) {
-            patchChannelsInPlace(
-                props.channels as Record<string, unknown>,
-                value as LayerChannelConfig,
-            );
+            patchChannelsInPlace(props.channels as Record<string, unknown>, value as LayerChannelConfig);
             continue;
         }
         if (
@@ -91,10 +70,7 @@ export function patchRenderStackEntryPropsInPlace(
             props.vivLayerProps &&
             typeof props.vivLayerProps === "object"
         ) {
-            patchRecordInPlace(
-                props.vivLayerProps as Record<string, unknown>,
-                value as Record<string, unknown>,
-            );
+            patchRecordInPlace(props.vivLayerProps as Record<string, unknown>, value as Record<string, unknown>);
             continue;
         }
         if (isObservable(props)) {
@@ -105,11 +81,7 @@ export function patchRenderStackEntryPropsInPlace(
     }
 }
 
-export function reorderRenderStackEntries(
-    stack: RenderStack,
-    fromIndex: number,
-    toIndex: number,
-): void {
+export function reorderRenderStackEntries(stack: RenderStack, fromIndex: number, toIndex: number): void {
     const [moved] = stack.entries.splice(fromIndex, 1);
     if (!moved) return;
     stack.entries.splice(toIndex, 0, moved);
@@ -162,10 +134,7 @@ export function insertSpatialRenderStackEntry(
     return true;
 }
 
-export function insertHostRenderStackEntry(
-    stack: RenderStack,
-    deckId: DeckOverlayId,
-): boolean {
+export function insertHostRenderStackEntry(stack: RenderStack, deckId: DeckOverlayId): boolean {
     const id = deckHostLayerId(deckId);
     if (stack.entries.some((entry) => entry.id === id)) {
         return false;
@@ -203,7 +172,7 @@ export function seedRenderStackFromSpatialData(
     if (!config.renderStack) {
         runInAction(() => {
             config.renderStack = chart?.seedDefaultSpatialLayers
-                ? createDefaultRenderStack(spatialData, coordinateSystem)
+                ? createDefaultRenderStack(spatialData, coordinateSystem, chart.defaultImageLayerProps)
                 : createHostOnlyRenderStack();
             chart?.finishDefaultSpatialLayerSeed();
             chart?.bumpRenderStackGeneration();
@@ -214,7 +183,7 @@ export function seedRenderStackFromSpatialData(
     runInAction(() => {
         let changed = false;
         if (!config.renderStack) {
-            throw new Error(`Unexpected config with no renderStack ${config }`);
+            throw new Error(`Unexpected config with no renderStack ${config}`);
         }
         if (chart?.seedDefaultSpatialLayers) {
             changed =
@@ -222,6 +191,7 @@ export function seedRenderStackFromSpatialData(
                     config.renderStack,
                     spatialData,
                     coordinateSystem,
+                    chart.defaultImageLayerProps,
                 ) || changed;
             chart.finishDefaultSpatialLayerSeed();
         }
@@ -317,8 +287,7 @@ export function useRenderStackEntry(entryId: string) {
         [patchEntry],
     );
 
-    const layer =
-        entry?.kind === "spatial" ? spatialEntryAsLayerConfig(entry) : null;
+    const layer = entry?.kind === "spatial" ? spatialEntryAsLayerConfig(entry) : null;
 
     return {
         entry,

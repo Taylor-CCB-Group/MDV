@@ -53,22 +53,13 @@ describe("remarkCollapsibleHeadings", () => {
         expect(transformed[0]).toMatchObject({ type: "heading", depth: 1 });
 
         const sectionASummaryIndex = transformed.findIndex(
-            (node) =>
-                node.type === "html" &&
-                typeof node.value === "string" &&
-                node.value.includes("Section A"),
+            (node) => node.type === "html" && typeof node.value === "string" && node.value.includes("Section A"),
         );
         const sectionBSummaryIndex = transformed.findIndex(
-            (node) =>
-                node.type === "html" &&
-                typeof node.value === "string" &&
-                node.value.includes("Section B"),
+            (node) => node.type === "html" && typeof node.value === "string" && node.value.includes("Section B"),
         );
         const nestedSummaryIndex = transformed.findIndex(
-            (node) =>
-                node.type === "html" &&
-                typeof node.value === "string" &&
-                node.value.includes("Nested A"),
+            (node) => node.type === "html" && typeof node.value === "string" && node.value.includes("Nested A"),
         );
 
         expect(sectionASummaryIndex).toBeGreaterThan(-1);
@@ -83,10 +74,7 @@ describe("remarkCollapsibleHeadings", () => {
                 node.value.includes("<details open") &&
                 node.value.includes("depth-2"),
         );
-        const sectionACloseIndex = matchingDetailsCloseIndex(
-            transformed,
-            sectionAOpenIndex,
-        );
+        const sectionACloseIndex = matchingDetailsCloseIndex(transformed, sectionAOpenIndex);
 
         expect(sectionAOpenIndex).toBeGreaterThan(-1);
         expect(sectionACloseIndex).toBeGreaterThan(sectionAOpenIndex);

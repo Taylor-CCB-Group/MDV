@@ -7,11 +7,12 @@ import "../table/css/slickgrid.css";
 import "../browser/css/browser.css";
 import ChartManager from "../charts/ChartManager.js";
 import {
+    decompressData,
     getArrayBufferDataLoader,
     getLocalCompressedBinaryDataLoader,
     processArrayBuffer,
-    decompressData,
 } from "../dataloaders/DataLoaders";
+
 window.mdv = {
     ChartManager,
     getArrayBufferDataLoader,

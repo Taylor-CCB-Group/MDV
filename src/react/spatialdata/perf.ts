@@ -63,10 +63,7 @@ function scheduleFlush() {
     if (flushTimer) return;
     flushTimer = setTimeout(() => {
         flushTimer = null;
-        const table: Record<
-            string,
-            { count: number; avgMs: number; maxMs: number; totalMs: number }
-        > = {};
+        const table: Record<string, { count: number; avgMs: number; maxMs: number; totalMs: number }> = {};
         for (const [label, s] of stats) {
             table[label] = {
                 count: s.count,
@@ -124,11 +121,7 @@ export function measureSpatial<T>(label: string, fn: () => T): T {
 }
 
 /** React `<Profiler onRender>` adapter — records committed render duration per id. */
-export function onSpatialProfilerRender(
-    id: string,
-    _phase: unknown,
-    actualDuration: number,
-) {
+export function onSpatialProfilerRender(id: string, _phase: unknown, actualDuration: number) {
     if (!ENABLED) return;
     bump(`render:${id}`, actualDuration);
 }

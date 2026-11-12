@@ -52,7 +52,13 @@ export function formatRenderReport(input: RenderReportInput): string {
         lines.push("", `Rendering error (×${error.count}):`, indent(error.message));
         if (error.stack) lines.push("  Stack:", indent(error.stack));
     }
-    if (input.failures.length === 0 && input.canvasErrors.length === 0) lines.push("", "No rendering problems recorded.");
-    lines.push("", input.trace ? `WebGPU call trace:\n${indent(input.trace)}` : "WebGPU call tracing: off (Debug dialog > Browser settings)");
+    if (input.failures.length === 0 && input.canvasErrors.length === 0)
+        lines.push("", "No rendering problems recorded.");
+    lines.push(
+        "",
+        input.trace
+            ? `WebGPU call trace:\n${indent(input.trace)}`
+            : "WebGPU call tracing: off (Debug dialog > Browser settings)",
+    );
     return `${lines.join("\n")}\n`;
 }

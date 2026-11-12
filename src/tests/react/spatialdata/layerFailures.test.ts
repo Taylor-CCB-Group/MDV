@@ -1,10 +1,10 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     CAUSE_WINDOW_MS,
+    entryForLabel,
     type LayerFailureSink,
     LayerFailureTracker,
-    entryForLabel,
 } from "@/react/spatialdata/layer_failures";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Messages as luma reports them for a points layer whose palette texture is too wide.
 const POINTS = "spatialdata-points-transcripts-#L1Htwz";
@@ -87,7 +87,11 @@ describe("LayerFailureTracker", () => {
     it("attributes deck layer errors by layer id, or to the canvas, keeping their stacks", () => {
         const shaderError = new Error("shader failed");
         tracker.layer(shaderError, `${POINTS}-#spatial-detail-x#-scatter`);
-        expect(fail).toHaveBeenCalledWith(POINTS, { reason: "shader failed", source: "deck", stack: shaderError.stack });
+        expect(fail).toHaveBeenCalledWith(POINTS, {
+            reason: "shader failed",
+            source: "deck",
+            stack: shaderError.stack,
+        });
         const unattributed = new Error("no layer");
         tracker.layer(unattributed, undefined);
         expect(canvas).toHaveBeenCalledWith("no layer", unattributed.stack);

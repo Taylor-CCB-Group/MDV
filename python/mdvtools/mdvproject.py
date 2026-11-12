@@ -59,6 +59,62 @@ def get_unwritable_project_paths(project_dir: str) -> list[str]:
     return unwritable
 
 
+def pick_thumbnail(state: dict, views: dict) -> Optional[str]:
+    """The image of the first view, in the order the project lists its views.
+
+    Views without an image are skipped. Views missing from ``all_views`` come last.
+    """
+    listed = [v for v in state.get("all_views") or [] if v in views]
+    unlisted = [v for v in views if v not in listed]
+    for name in listed + unlisted:
+        view = views.get(name)
+        image = view.get("viewImage") if isinstance(view, dict) else None
+        if image:
+            return image
+    return None
+
+
+# project_dir -> ((state mtime_ns, state size, views mtime_ns, views size), thumbnail)
+_thumbnail_cache: dict[str, tuple[tuple[int, int, int, int], Optional[str]]] = {}
+
+
+def _file_signature(path: str) -> tuple[int, int]:
+    # Size as well as mtime, so two writes inside one mtime tick (coarse on some
+    # mounted filesystems) still miss the cache unless they are the same length.
+    st = os.stat(path)
+    return st.st_mtime_ns, st.st_size
+
+
+def get_project_thumbnail(project_dir: str) -> Optional[str]:
+    """Thumbnail for the project catalog, re-read whenever state.json or views.json changes.
+
+    The cache is keyed on file metadata rather than contents: comparing contents
+    would mean reading views.json, which holds every view's image, on each request.
+    """
+    statefile = join(project_dir, "state.json")
+    viewsfile = join(project_dir, "views.json")
+    try:
+        key = _file_signature(statefile) + _file_signature(viewsfile)
+        cached = _thumbnail_cache.get(project_dir)
+        if cached and cached[0] == key:
+            return cached[1]
+        with open(statefile) as f:
+            state = json.load(f)
+        with open(viewsfile) as f:
+            views = json.load(f)
+        thumbnail = pick_thumbnail(state, views)
+        _thumbnail_cache[project_dir] = (key, thumbnail)
+        return thumbnail
+    except Exception as e:
+        logger.exception(f"Error extracting thumbnail for project at {project_dir}: {e}")
+        return None
+
+
+def forget_project_thumbnail(project_dir: str) -> None:
+    """Drop a project's cached thumbnail, e.g. once it has been purged."""
+    _thumbnail_cache.pop(project_dir, None)
+
+
 def _agent_debug_log(
     run_id: str,
     hypothesis_id: str,
@@ -101,6 +157,8 @@ datatype_mappings = {
     "float32": "double",
     "object": "text",
     "str":"text",
+    # pandas' nullable StringDtype, e.g. an anndata `nullable-string-array`
+    "string": "text",
     "category": "text",
     "bool": "text",
     "int32": "double",
@@ -2967,14 +3025,16 @@ def add_column_to_group(
             col["values"] = [str(x) for x in col["values"]]
 
         else:
-            # unique: ensure string (e.g. CSV-inferred int cell_id)
-            if pandas.api.types.is_numeric_dtype(data):
-                data = data.astype(str)
-            max_len = max(data.str.len())
-            utf8_type = h5py.string_dtype("utf-8", int(max_len))
+            # unique: astype(str) covers non-string input (e.g. CSV-inferred int cell_id).
+            # Encoded here because h5py writes str to a fixed-length dataset as ASCII, and
+            # because stringLength is bytes per value for the frontend, not characters.
+            encoded = data.astype(str).str.encode("utf-8")
+            # int(): pandas measures lengths as numpy ints, which json can't write.
+            max_len = int(encoded.str.len().max())
+            utf8_type = h5py.string_dtype("utf-8", max_len)
             col["datatype"] = "unique"
             col["stringLength"] = max_len
-            group.create_dataset(col["field"], length, data=data, dtype=utf8_type)
+            group.create_dataset(col["field"], length, data=encoded.to_numpy(dtype=f"S{max_len}").astype(utf8_type))
 
     elif col["datatype"] == "multitext":
         delim = col.get("delimiter", ",")

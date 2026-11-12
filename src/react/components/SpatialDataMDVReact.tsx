@@ -1,36 +1,28 @@
 import type { RenderStack } from "@spatialdata/layers";
 import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
-
-import BaseChart, { type MenuPip } from "../../charts/BaseChart";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
-import {
-    type CategoryFilter,
-    type ScatterPlotConfig,
-    scatterDefaults,
-} from "../scatter_state";
-import { BaseReactChart } from "./BaseReactChart";
-import {
-    type VivContextType,
-    createVivStores,
-} from "./avivatorish/state";
-import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
+import type { DeckBackend } from "@/react/spatialdata/deck_backend";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
-import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
-import { createHostOnlyRenderStack } from "@/react/spatialdata/render_stack_defaults";
+import { createHostOnlyRenderStack, type DefaultImageLayerProps } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
-import type { ElementIssues } from "./RasterIssues";
-import SpatialStatusPanel from "./SpatialStatusPanel";
-import type { DeckBackend } from "@/react/spatialdata/deck_backend";
-import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
-import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
+import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import {
     type SpatialDataSerializableViewState,
     toSerializableSpatialDataViewState,
 } from "@/react/spatialdata/spatialdata_config";
+import BaseChart, { type MenuPip } from "../../charts/BaseChart";
+import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
+import { createVivStores, type VivContextType } from "./avivatorish/state";
+import { BaseReactChart } from "./BaseReactChart";
+import type { ElementIssues } from "./RasterIssues";
+import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
+import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
+import SpatialStatusPanel from "./SpatialStatusPanel";
+import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 
 export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     type: "SpatialDataMdvRegionReact";
@@ -40,12 +32,14 @@ export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     viewState?: SpatialDataSerializableViewState | null;
     /** Experimental; null (or absent) follows the browser's default (see `deck_backend.ts`). */
     render_backend?: DeckBackend | null;
+    /**
+     * Props for the image layer added when the chart has no render stack; read when the chart is
+     * created and not kept in its config. Set when a Viv chart is converted, for its channel settings.
+     */
+    defaultImageLayer?: DefaultImageLayerProps;
 };
 
-function adaptSpatialDataConfig(
-    originalConfig: SpatialDataMdvReactConfig,
-    dataStore: DataStore,
-) {
+function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataStore: DataStore) {
     const config = { ...scatterDefaults, ...originalConfig };
     if (!dataStore.regions) {
         throw new Error("unexpected attempt to load spatial chart with no regions in datasource");
@@ -85,6 +79,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     renderStackPropsGeneration = 0;
     /** True only until the first default image layer seed runs for a brand-new chart. */
     seedDefaultSpatialLayers: boolean;
+    /** Props for that default image layer, from the config's `defaultImageLayer`. */
+    readonly defaultImageLayerProps?: DefaultImageLayerProps;
 
     get viewerStore() {
         return this.vivStores?.viewerStore;
@@ -227,15 +223,14 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         this.canvasErrors = [];
     }
 
-    constructor(
-        dataStore: DataStore,
-        div: HTMLDivElement,
-        originalConfig: SpatialDataMdvReactConfig,
-    ) {
+    constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: SpatialDataMdvReactConfig) {
         const seedDefaultSpatialLayers = originalConfig.renderStack === undefined;
         const config = adaptSpatialDataConfig(originalConfig, dataStore);
+        const { defaultImageLayer } = config;
+        config.defaultImageLayer = undefined;
         super(dataStore, div, config, SpatialDataChartRoot);
         this.seedDefaultSpatialLayers = seedDefaultSpatialLayers;
+        if (seedDefaultSpatialLayers) this.defaultImageLayerProps = defaultImageLayer;
         this.colorByColumn(config.color_by);
         makeObservable(this, {
             colorBy: observable,
@@ -280,10 +275,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             ),
         );
         this.vivStores = createVivStores();
-        this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener(
-            "click",
-            () => this.openLayerDialog(),
-        );
+        this.addMenuIcon("fas fa-layer-group", "Manage Layers").addEventListener("click", () => this.openLayerDialog());
     }
 
     openLayerDialog() {
@@ -402,8 +394,7 @@ BaseChart.types.SpatialDataMdvRegionReact = {
         if (!regions) {
             throw new Error("unexpected attempt to initialise spatialdata chart with no regions in datasource");
         }
-        const regionKey =
-            extraConfig.region ?? spatialRegionOptions(dataStore)[0]?.value;
+        const regionKey = extraConfig.region ?? spatialRegionOptions(dataStore)[0]?.value;
         if (!regionKey) {
             throw new Error("unexpected attempt to initialise spatialdata chart with no spatial regions in datasource");
         }

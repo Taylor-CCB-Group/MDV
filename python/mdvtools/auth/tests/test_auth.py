@@ -6,7 +6,7 @@ from mdvtools.auth.authutils import get_auth_provider
 from mdvtools.auth.dummy_provider import DummyAuthProvider
 from mdvtools.auth.shibboleth_provider import ShibbolethProvider
 from mdvtools.auth.auth0_provider import Auth0Provider
-from mdvtools.auth.auth_provider import NoAccess
+from mdvtools.auth.access_denied import access_denied_reason
 
 @pytest.fixture
 def app():
@@ -134,6 +134,8 @@ class TestValidateUserBootstrapAndRefusal:
 
             with bootstrap_app.test_request_context('/'):
                 result, error = provider.validate_user()
+                # Why the login page will say they were refused, if they were.
+                self.denied = access_denied_reason()
 
         return result, error, mock_user_class, mock_db, new_user
 
@@ -188,7 +190,8 @@ class TestValidateUserBootstrapAndRefusal:
         )
 
         assert result is None
-        assert error == NoAccess(email="someone@else.com")
+        assert error is not None
+        assert self.denied == "not_set_up"
         mock_db.session.add.assert_not_called()
 
     def test_bootstrap_rejects_unverified_email(self, bootstrap_app, provider):
@@ -199,7 +202,8 @@ class TestValidateUserBootstrapAndRefusal:
         )
 
         assert result is None
-        assert error == NoAccess(email="admin@example.com")
+        assert error is not None
+        assert self.denied == "email_unverified"
         mock_db.session.add.assert_not_called()
 
     def test_bootstrap_noop_when_users_already_exist(self, bootstrap_app, provider):
@@ -219,9 +223,11 @@ class TestValidateUserBootstrapAndRefusal:
 
             with bootstrap_app.test_request_context('/'):
                 result, error = provider.validate_user()
+                denied = access_denied_reason()
 
         assert result is None
-        assert error == NoAccess(email="admin@example.com")
+        assert error is not None
+        assert denied == "no_account"
         mock_db.session.add.assert_not_called()
 
     def test_bootstrap_concurrent_race_logs_in_the_winner(self, bootstrap_app, provider):

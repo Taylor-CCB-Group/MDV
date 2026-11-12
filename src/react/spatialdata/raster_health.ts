@@ -120,7 +120,8 @@ export function parseArrayMetadata(path: string, meta: unknown): RasterLevelInfo
     // v3
     if (typeof meta.data_type !== "string") return null;
     const bytesPerElement = V3_DTYPE_BYTES[meta.data_type];
-    const grid = isRecord(meta.chunk_grid) && isRecord(meta.chunk_grid.configuration) ? meta.chunk_grid.configuration : null;
+    const grid =
+        isRecord(meta.chunk_grid) && isRecord(meta.chunk_grid.configuration) ? meta.chunk_grid.configuration : null;
     if (!bytesPerElement || !grid || !isNumberArray(grid.chunk_shape)) return null;
     let chunks = grid.chunk_shape;
     // A sharded array's grid chunk is the shard; the inner chunk is what gets decoded.
