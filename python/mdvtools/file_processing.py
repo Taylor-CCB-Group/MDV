@@ -4,6 +4,7 @@ import json
 import uuid
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
+from mdvtools.telemetry import traced
 
 # Validate against a bounded sample so large uploads still flow through the
 # existing lazy Polars ingestion path without loading the entire file into memory.
@@ -173,6 +174,7 @@ def _validate_tabular_structure(filepath: str, original_filename: str, delimiter
         )
 
 
+@traced("mdv.upload.datasource")
 def datasource_processing(project, filepath, original_filename, view, replace, supplied_only, resume=False):
     """
     Enhanced datasource processing with resumption capability.
@@ -243,6 +245,7 @@ def datasource_processing(project, filepath, original_filename, view, replace, s
         print(f"Error in datasource_processing: {str(e)}")
         raise ValidationError(str(e), status_code=400)
 
+@traced("mdv.upload.anndata")
 def anndata_processing(project, filepath, original_filename):
     """
     Process an AnnData file (.h5ad) for the project.
@@ -286,6 +289,7 @@ def anndata_processing(project, filepath, original_filename):
         print(f"Error in anndata_processing: {str(e)}")
         raise ValidationError(str(e), status_code=400) from e
 
+@traced("mdv.upload.project")
 def mdv_project_processing(app, projects_base_dir, filepath, original_filename, project_name=None):
     """
     Process a zip file containing an MDV project.

@@ -20,15 +20,30 @@ so Grafana can link the line to its trace.
 from Grafana Faro on to Alloy. It has its own switch, ``FARO_COLLECTOR_URL``.
 """
 
+import functools
 import logging
 import os
+import re
 import time
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
+from typing import ParamSpec, TypeVar
 
 from flask import Flask, Response, request
 
 from mdvtools.logging_config import get_logger
 
+try:
+    from opentelemetry import metrics as otel_metrics
+    from opentelemetry import trace as otel_trace
+except ImportError:  # a slim install of mdvtools, without the app extra
+    otel_metrics = None
+    otel_trace = None
+
 logger = get_logger(__name__)
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 # Host and container figures come from Alloy (cAdvisor and the unix exporter),
 # so the server only reports on its own process.
@@ -93,6 +108,7 @@ def init_telemetry(app: Flask) -> bool:
         SQLAlchemyInstrumentor().instrument()
         SystemMetricsInstrumentor(config=_PROCESS_METRICS).instrument()
         _add_trace_ids_to_log_records()
+        _watch_event_loop()
         _initialised = True
 
     FlaskInstrumentor().instrument_app(app, excluded_urls=_EXCLUDED_URLS)
@@ -103,6 +119,176 @@ def init_telemetry(app: Flask) -> bool:
         os.getenv("OTEL_SERVICE_NAME", "unknown_service"),
     )
     return True
+
+
+# ---------------------------------------------------------------------------
+# MDV's own operations
+# ---------------------------------------------------------------------------
+
+_DURATION_BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300, 600]
+_MEMORY_BUCKETS = [mb * 1024 * 1024 for mb in (1, 10, 50, 100, 250, 500, 1024, 2048, 4096, 8192)]
+
+
+@functools.cache
+def _operation_histograms():
+    assert otel_metrics is not None
+    meter = otel_metrics.get_meter("mdvtools")
+    duration = meter.create_histogram(
+        "mdv.operation.duration",
+        unit="s",
+        description="How long each MDV operation took",
+        explicit_bucket_boundaries_advisory=_DURATION_BUCKETS,
+    )
+    memory_growth = meter.create_histogram(
+        "mdv.operation.memory_growth",
+        unit="By",
+        description="How much the process's resident memory grew during each MDV operation",
+        explicit_bucket_boundaries_advisory=_MEMORY_BUCKETS,
+    )
+    return duration, memory_growth
+
+
+def _resident_memory() -> int | None:
+    try:
+        import psutil
+    except ImportError:
+        return None
+    return psutil.Process().memory_info().rss
+
+
+def _ignore(**attributes) -> None:
+    pass
+
+
+@contextmanager
+def operation(name: str, **attributes: str | int | float | bool) -> Iterator[Callable[..., None]]:
+    """Record one MDV operation as a span, with its duration and memory growth.
+
+    The duration goes to ``mdv.operation.duration`` and the growth in the
+    process's resident memory to ``mdv.operation.memory_growth``, both labelled
+    ``mdv.operation`` and ``outcome``. The span also carries the signed change
+    in ``process.memory.change``.
+
+    Yields a function that adds attributes to the span, for values only known
+    at the end, such as the number of bytes returned. Does nothing while
+    telemetry is off or without the app extra.
+    """
+    if otel_trace is None or not telemetry_enabled():
+        yield _ignore
+        return
+
+    memory_before = _resident_memory()
+    start = time.perf_counter()
+    outcome = "error"
+    with otel_trace.get_tracer("mdvtools").start_as_current_span(name, attributes=attributes) as span:
+        try:
+            yield lambda **more: span.set_attributes(more)
+            outcome = "ok"
+        finally:
+            duration, memory_growth = _operation_histograms()
+            labels = {"mdv.operation": name, "outcome": outcome}
+            duration.record(time.perf_counter() - start, labels)
+            memory_after = _resident_memory()
+            if memory_before is not None and memory_after is not None:
+                change = memory_after - memory_before
+                span.set_attribute("process.memory.change", change)
+                memory_growth.record(max(change, 0), labels)
+
+
+def traced(name: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Decorator form of ``operation`` for a whole function."""
+
+    def decorate(function: Callable[P, R]) -> Callable[P, R]:
+        @functools.wraps(function)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            with operation(name):
+                return function(*args, **kwargs)
+
+        return wrapper
+
+    return decorate
+
+
+# ---------------------------------------------------------------------------
+# The gevent event loop
+# ---------------------------------------------------------------------------
+
+
+def _watch_event_loop() -> None:
+    """Report whenever one request holds up the gevent event loop.
+
+    MDV serves every request from one gevent worker, so CPU-bound work, such
+    as reading columns from an h5 file, stalls every other user until it
+    finishes. gevent's monitor thread notices when the loop has not switched
+    for ``GEVENT_MAX_BLOCKING_TIME`` seconds (gevent's default is 0.1) and
+    reports again for each further period it stays blocked. Each report
+    adds that period to ``mdv.event_loop.blocked_time`` and logs one warning
+    naming the MDV code that was running.
+    """
+    try:
+        from gevent import monkey
+    except ImportError:
+        return
+    if not monkey.is_module_patched("socket"):
+        return
+
+    import gevent
+    from gevent.events import EventLoopBlocked
+    from opentelemetry import metrics
+    from zope.event import subscribers
+
+    hub = gevent.get_hub()
+    gevent.config.monitor_thread = True
+    monitor = hub.start_periodic_monitoring_thread()
+    # Only this hub is watched. Hubs that start later in other threads, such as
+    # gevent's thread pool, would otherwise each start a monitor of their own.
+    gevent.config.monitor_thread = False
+    if monitor is None:
+        return
+    # gevent also prints every greenlet and thread to stderr for each report,
+    # about 40 lines. The one-line warning below replaces it.
+    setattr(monitor, "_show_blocking_report", lambda *args: None)
+
+    blocked_time = metrics.get_meter("mdvtools").create_counter(
+        "mdv.event_loop.blocked_time",
+        unit="s",
+        description="Time the gevent event loop spent blocked, in steps of GEVENT_MAX_BLOCKING_TIME",
+    )
+
+    def report(blocking_time: float, info: list[str]) -> None:
+        blocked_time.add(blocking_time)
+        logger.warning("Event loop blocked for over %ss in %s", blocking_time, _blocked_frames(info))
+
+    def on_event(event) -> None:
+        # This runs in gevent's monitor thread. Logging there would take
+        # monkey-patched locks and start a second hub in that thread, so the
+        # report waits for the main loop, which runs it once it is free again.
+        if isinstance(event, EventLoopBlocked) and event.hub is hub:
+            hub.loop.run_callback_threadsafe(report, event.blocking_time, list(event.info))
+
+    subscribers.append(on_event)
+
+
+_FRAME = re.compile(r'File "([^"]+)", line (\d+), in (\S+)')
+
+
+def _blocked_frames(report: Sequence[str]) -> str:
+    """The blocked greenlet's stack from a gevent report, innermost first.
+
+    Keeps MDV's own frames when there are any, because the library frames
+    under them rarely say which request was slow.
+    """
+    frames: list[tuple[str, str, str]] = []
+    in_stack = False
+    for line in report:
+        if line.startswith("Blocked Stack"):
+            in_stack = True
+        elif in_stack and line.startswith("Info:"):
+            break
+        elif in_stack:
+            frames.extend(_FRAME.findall(line))
+    ours = [f for f in frames if "/mdvtools/" in f[0]] or frames[-3:]
+    return " < ".join(f"{os.path.basename(path)}:{lineno} {func}" for path, lineno, func in reversed(ours[-6:])) or "unknown code"
 
 
 def _name_span_after_project_route(response: Response) -> Response:

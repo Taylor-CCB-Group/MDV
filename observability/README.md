@@ -64,7 +64,12 @@ Use **Explore** in Grafana's menu:
 - Loki: container logs, labelled `compose_project`, `compose_service` and `container`. Browser data from Faro carries `source="faro"`, `app_name` and `kind`, such as `{source="faro", kind="exception"}`.
 - Prometheus: container figures come from cAdvisor, such as `container_memory_working_set_bytes`, labelled `container_label_com_docker_compose_project` and `container_label_com_docker_compose_service`. Server figures come from the unix exporter, such as `node_cpu_seconds_total` and `node_filesystem_avail_bytes`.
 - Prometheus, from MDV: request durations in `http_server_request_duration_seconds`, labelled `job` (the deployment's `OTEL_SERVICE_NAME`), `http_route`, `http_request_method` and `http_response_status_code`. Process figures include `process_memory_usage_bytes` and `process_cpu_time_seconds_total`. Tempo adds `traces_spanmetrics_calls_total` and `traces_spanmetrics_latency_bucket`, labelled `service` and `span_name`.
-- Tempo: one trace for each request to MDV, with a span for each database query. Log lines written during a request end in `trace_id=...`, and Grafana links them to their trace.
+- Prometheus, MDV's own operations: `mdv_operation_duration_seconds` and `mdv_operation_memory_growth_bytes`, labelled `mdv_operation` and `outcome` (`ok` or `error`). The operations are:
+  - `mdv.get_byte_data`, which reads columns from the h5 file for `get_data`
+  - `mdv.upload.datasource`, `mdv.upload.anndata` and `mdv.upload.project`, which process uploaded files
+  - `mdv.convert_anndata` and `mdv.convert_spatialdata`, which convert data into a project
+- Prometheus, the event loop: `mdv_event_loop_blocked_time_seconds_total` counts the time one request held up MDV's single gevent worker, in steps of `GEVENT_MAX_BLOCKING_TIME` (0.1 seconds unless set). Each step also logs a warning, `Event loop blocked for over 0.1s in ...`, that names the MDV functions that were running, innermost first.
+- Tempo: one trace for each request to MDV, with a span for each database query and each MDV operation. The `mdv.get_byte_data` span carries `mdv.datasource`, `mdv.columns` and `mdv.bytes`. Log lines written during a request end in `trace_id=...`, and Grafana links them to their trace.
 
 Dashboards in `grafana/dashboards/` load into the **MDV** folder when Grafana starts.
 

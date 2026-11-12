@@ -18,6 +18,7 @@ from typing import Dict, List, Tuple, Any, Optional
 from werkzeug.utils import secure_filename
 import numpy as np
 from .mdvproject import MDVProject,create_bed_gz_file
+from .telemetry import traced
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,7 @@ def _prepare_x_umap_and_leiden(
     return scanpy_object
 
 
+@traced("mdv.convert_anndata")
 def convert_scanpy_to_mdv(
     folder: str, 
     scanpy_object: AnnData, 

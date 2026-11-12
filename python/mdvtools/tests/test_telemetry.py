@@ -154,3 +154,93 @@ def test_one_address_cannot_post_beyond_its_burst(browser_app, monkeypatch):
     assert statuses[:100] == [202] * 100
     assert statuses[100] == 429
     assert other.status_code == 202
+
+
+def test_operations_run_untouched_while_telemetry_is_off(monkeypatch):
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+
+    @telemetry.traced("mdv.test")
+    def double(x):
+        """Doubles x."""
+        return x * 2
+
+    with telemetry.operation("mdv.test", **{"mdv.columns": 1}) as note:
+        note(**{"mdv.bytes": 3})
+
+    assert double(4) == 8
+    assert double.__doc__ == "Doubles x."
+
+
+class _Histogram:
+    def __init__(self):
+        self.records = []
+
+    def record(self, value, attributes):
+        self.records.append((value, attributes))
+
+
+@pytest.fixture
+def recorded(monkeypatch):
+    """Telemetry on, with spans and histogram records kept in memory."""
+    pytest.importorskip("opentelemetry.sdk")
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://alloy:4318")
+    spans = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(spans))
+    monkeypatch.setattr(telemetry, "otel_trace", SimpleNamespace(get_tracer=provider.get_tracer))
+    duration, memory_growth = _Histogram(), _Histogram()
+    monkeypatch.setattr(telemetry, "_operation_histograms", lambda: (duration, memory_growth))
+    return spans, duration, memory_growth
+
+
+def test_an_operation_records_a_span_its_duration_and_memory_growth(recorded):
+    spans, duration, memory_growth = recorded
+
+    with telemetry.operation("mdv.get_byte_data", **{"mdv.columns": 2}) as note:
+        note(**{"mdv.bytes": 16})
+
+    [span] = spans.get_finished_spans()
+    assert span.name == "mdv.get_byte_data"
+    assert span.attributes is not None
+    assert span.attributes["mdv.columns"] == 2
+    assert span.attributes["mdv.bytes"] == 16
+    assert "process.memory.change" in span.attributes
+    labels = {"mdv.operation": "mdv.get_byte_data", "outcome": "ok"}
+    assert [attributes for _, attributes in duration.records] == [labels]
+    assert [attributes for _, attributes in memory_growth.records] == [labels]
+    assert memory_growth.records[0][0] >= 0
+
+
+def test_a_failed_operation_is_recorded_as_an_error_and_still_raises(recorded):
+    spans, duration, _ = recorded
+
+    @telemetry.traced("mdv.upload.anndata")
+    def fail():
+        raise ValueError("bad file")
+
+    with pytest.raises(ValueError):
+        fail()
+
+    [span] = spans.get_finished_spans()
+    assert not span.status.is_ok
+    assert duration.records[0][1] == {"mdv.operation": "mdv.upload.anndata", "outcome": "error"}
+
+
+def test_a_blocking_report_names_the_mdv_code_innermost_first():
+    report = [
+        "=" * 80,
+        "\n2026-11-12T14:29:13Z : Greenlet <Greenlet: get_data> appears to be blocked",
+        "Blocked Stack (for thread id 0x1):",
+        '  File "/app/.venv/lib/python3.12/site-packages/flask/app.py", line 880, in full_dispatch_request\n    rv = self.dispatch_request()\n',
+        '  File "/app/python/mdvtools/server.py", line 362, in get_data\n    bytes_ = project.get_byte_data(...)\n',
+        '  File "/app/python/mdvtools/mdvproject.py", line 2575, in get_byte_data\n    byte_list.append(...)\n',
+        '  File "/app/.venv/lib/python3.12/site-packages/h5py/_hl/dataset.py", line 1100, in __array__\n    self.read_direct(arr)\n',
+        "Info:",
+        '  File "/app/python/mdvtools/other.py", line 1, in not_in_the_blocked_stack\n',
+    ]
+
+    assert telemetry._blocked_frames(report) == "mdvproject.py:2575 get_byte_data < server.py:362 get_data"
