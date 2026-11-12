@@ -34,8 +34,7 @@ A feature release. SQLite is now the default database for new installs of the fu
   folders. `pip install mdvtools` now installs `pysam` and `pyranges` for these (#470).
 - A date column type. Datetimes from pandas and polars show as `YYYY-MM-DD` in tables,
   tooltips, axes, legends and filters, and still sort and filter in date order (#527).
-- Legend filtering: click a category in a colour legend to filter by it, or drag across a
-  continuous legend to filter a numeric range (#482, #493).
+- Legend filtering: click a category in a colour legend to filter by it (#482, #493).
 - ChatMDV can use a local model through Ollama or a choice of remote models, and you can pick
   which datasources a query uses (#513, #521).
 - `mdvtools create-default-views` generates template views for a project (#548).
@@ -78,6 +77,24 @@ A feature release. SQLite is now the default database for new installs of the fu
   CSC), points without a `feature_key` (for points-zarr) and points that are already
   Morton-indexed are left as they are. The presets will change as the formats do, and none
   of this works with `--link` (#609).
+- A compound dot plot, with optional panels split by category, shared colour scales, colour
+  and fraction legends, and SVG or PNG export. Selecting a dot filters to its data (#574,
+  #634).
+- The SpatialData chart and the 2D and 3D deck scatter plots render with WebGPU where the
+  browser supports it. Each chart has a Rendering backend setting, the Debug dialog's Browser
+  settings section sets the default, and charts left at the default fall back to WebGL when
+  WebGPU is unavailable or fails (#597, #607).
+- A "Legacy charts" browser setting shows the classic scatter plot, Density Scatter Plot,
+  Table (Classic) and the Viv image viewer in Add Chart, which now hides them. An experimental
+  "Convert legacy charts" setting converts them when a view loads (#614). Viv charts on a
+  region that has a SpatialData store convert to the SpatialData.js viewer, keeping their
+  view position, image channels and filters, and the chart menu can convert one by hand
+  (#638).
+- The deck scatter plot has an Axis scaling setting (Equal or Fit, with Fit the default for new
+  charts) and a background filter of its own (#614).
+- When project code or data fails to load, the error panel fetches the failed file again and
+  explains the result, such as a proxy error or a missing file. It has a Copy details button
+  for bug reports (#650).
 
 ### Changed
 - `mdvtools` now installs on Python 3.12 and 3.13. Python 3.11 is no longer supported, so
@@ -105,8 +122,18 @@ A feature release. SQLite is now the default database for new installs of the fu
 - The fraction legend is now a React component (#503).
 - `sync_users_to_db` fetches the Auth0 admin role members once, instead of once per user
   (#526).
-- Dependency updates: `@spatialdata/*` 0.13.0, deck.gl and luma.gl 9.4, viv 0.23 (#529, #541,
-  #561, #588).
+- Dependency updates: `@spatialdata/*` 0.15.1, deck.gl and luma.gl 9.4, viv 0.23 (#529, #541,
+  #561, #588, #626, #630).
+- "2D Scatter Plot" in Add Chart now creates the deck scatter plot with density (#614).
+- Catalog cards show long project names over up to 3 lines, and in full on hover. The cards
+  no longer show the last-modified date (#641).
+- The project page shows the project name in the menu bar, and project thumbnails come from
+  the first view. Text in a text box chart can be selected (#622).
+- The chart settings search box has focus when the dialog opens (#628).
+- Colour legends can be resized, and their size is saved with the chart (#633).
+- The browser reuses spatial files for an hour instead of asking the server again for each
+  chunk (#617).
+- Only admins see the Rescan Projects button (#604).
 
 ### Fixed
 - `pip install mdvtools` now installs `leidenalg` and `igraph`, so `--compute-x-umap` and
@@ -150,6 +177,29 @@ A feature release. SQLite is now the default database for new installs of the fu
 - `add_datasource` accepts pandas `string` columns, such as the obs index of Atera stores
   from `spatialdata-io`, which failed with `KeyError: 'string'`. `unique` columns with
   non-ASCII values are now written instead of being dropped with a warning (#609).
+- Someone who signs in but is not allowed into the deployment sees why, with Try again and
+  Sign out buttons. They used to loop back to the login page (#567).
+- Freehand and polygon selections keep their shape when the mouse moves just after you
+  finish drawing (#648).
+- Charts that use an active link wait for the columns it resolves to before they are built,
+  so a view that is still applying its filters cannot give them a column that was never
+  loaded (#635).
+- The settings dialog shows an active link in Color By and Tooltip value, and the colour
+  toggles keep the link instead of replacing it with a fixed column (#627).
+- A dot plot no longer takes its colour range from averages computed for genes it has
+  stopped showing (#598).
+- Deck scatter plot points are drawn at least 1 pixel wide, so they cannot vanish (#605).
+- A legend that overflows its chart moves back inside on load, and can be dragged back from
+  the edge (#633).
+- Range requests for spatial zips served by gunicorn seek to the requested offset instead of
+  reading the file from the start, so they no longer slow down further into a large zip
+  (#619).
+- Opening the SpatialData layers dialog reuses the chart's read of the store instead of
+  reading it again (#611).
+- Built page scripts and styles have hashed filenames, so a cached page cannot load chunks
+  from an older build (#601).
+- A genome browser with `sync_with_datastores` set no longer fails when the chart is set up
+  (#608).
 
 ## [1.3.0] - 2026-06-04
 
