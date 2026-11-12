@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { ACCESS_DENIED_MESSAGES, GENERIC_DENIAL, getAccessDenial } from "@/login/accessDenial";
+import { ACCESS_DENIED_MESSAGES, GENERIC_DENIAL, getAccessDenial, getDeniedAccount } from "@/login/accessDenial";
 
 describe("getAccessDenial", () => {
     test("shows sign-in when the server sent no reason", () => {
@@ -28,5 +28,43 @@ describe("getAccessDenial", () => {
     test("does not treat inherited object keys as reasons", () => {
         expect(getAccessDenial("?denied=toString")).toBe(GENERIC_DENIAL);
         expect(getAccessDenial("?denied=__proto__")).toBe(GENERIC_DENIAL);
+    });
+});
+
+describe("refusal actions", () => {
+    test("every refusal offers a retry", () => {
+        for (const denial of [...Object.values(ACCESS_DENIED_MESSAGES), GENERIC_DENIAL]) {
+            expect(denial.actions.some((action) => action.kind === "retry")).toBe(true);
+        }
+    });
+
+    test("an account with no access is pointed at switching account first", () => {
+        expect(ACCESS_DENIED_MESSAGES.no_account.actions[0].kind).toBe("switch_account");
+    });
+
+    test("an outage offers only a retry, since another account would fail too", () => {
+        expect(ACCESS_DENIED_MESSAGES.unavailable.actions.map((action) => action.kind)).toEqual(["retry"]);
+    });
+});
+
+describe("getDeniedAccount", () => {
+    function pageWithAccount(content: string | null): Document {
+        const doc = document.implementation.createHTMLDocument("login");
+        if (content !== null) {
+            const meta = doc.createElement("meta");
+            meta.name = "mdv-denied-account";
+            meta.content = content;
+            doc.head.appendChild(meta);
+        }
+        return doc;
+    }
+
+    test("reads the account the server wrote into the page", () => {
+        expect(getDeniedAccount(pageWithAccount("jane@example.com"))).toBe("jane@example.com");
+    });
+
+    test("is null when the server did not know the account", () => {
+        expect(getDeniedAccount(pageWithAccount(""))).toBeNull();
+        expect(getDeniedAccount(pageWithAccount(null))).toBeNull();
     });
 });

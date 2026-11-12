@@ -14,19 +14,27 @@ src/login/accessDenial.ts; only the reason code travels.
 
 from typing import Literal, Optional
 
-from flask import g
+from flask import g, session
 
 AccessDeniedReason = Literal["email_unverified", "not_set_up", "no_account", "setup_failed", "unavailable"]
 
+# Read by templates/login.html, which names the refused account on the page.
+DENIED_ACCOUNT_SESSION_KEY = "access_denied_email"
 
-def deny_access(reason: AccessDeniedReason) -> None:
+
+def deny_access(reason: AccessDeniedReason, email: Optional[str] = None) -> None:
     """Record why this request's signed-in user was refused.
 
-    Stored on flask.g, which lasts for one request only, so the next sign-in
-    attempt is judged afresh - that is what makes "verify your email, then try
-    again" work.
+    The reason is stored on flask.g, which lasts for one request only, so the
+    next sign-in attempt is judged afresh - that is what makes "verify your
+    email, then try again" work. The email, when known, goes in the session
+    rather than the URL, so the login page can say which account was refused.
     """
     g.access_denied_reason = reason
+    if email:
+        session[DENIED_ACCOUNT_SESSION_KEY] = email
+    else:
+        session.pop(DENIED_ACCOUNT_SESSION_KEY, None)
 
 
 def access_denied_reason() -> Optional[AccessDeniedReason]:

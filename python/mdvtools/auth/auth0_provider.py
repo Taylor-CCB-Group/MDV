@@ -388,6 +388,8 @@ class Auth0Provider(AuthProvider):
             # Retrieve user info from Auth0
             user_info = self.get_user({"access_token": token})
             if not user_info:
+                # Auth0's userinfo failed or timed out. Signing in again would loop.
+                deny_access("unavailable")
                 return None, (jsonify({"error": "User not found"}), 404)
 
             # Get Auth0 user ID
@@ -403,16 +405,16 @@ class Auth0Provider(AuthProvider):
                 # login that Auth0 completes silently, straight back to here.
                 refusal = self._bootstrap_refusal(user_info, auth0_id, email)
                 if refusal is not None or not auth0_id:
-                    deny_access(refusal or "no_account")
+                    deny_access(refusal or "no_account", email)
                     return None, (jsonify({"error": "User not found"}), 404)
                 try:
                     user = self._create_first_admin(auth0_id, email)
                 except Exception as e:
                     logger.exception(f"Bootstrap administrator creation failed: {e}")
-                    deny_access("setup_failed")
+                    deny_access("setup_failed", email)
                     return None, (jsonify({"error": "Administrator bootstrap failed"}), 500)
                 if user is None:
-                    deny_access("no_account")
+                    deny_access("no_account", email)
                     return None, (jsonify({"error": "User not found"}), 404)
             elif not user.is_active:
                 # First successful login for a pending (admin-invited) user: activate them.

@@ -6,14 +6,21 @@ tests pin the reasons, the page, and the startup check that reports missing
 first-administrator setup before anyone tries to sign in.
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from flask import Flask
+from flask import Flask, render_template, session
 
-from mdvtools.auth.access_denied import access_denied_reason, deny_access, login_url_with_reason
+from mdvtools.auth.access_denied import (
+    DENIED_ACCOUNT_SESSION_KEY,
+    access_denied_reason,
+    deny_access,
+    login_url_with_reason,
+)
 from mdvtools.auth.auth0_provider import AUTH0_TIMEOUT_SECONDS, Auth0Provider, check_first_admin_setup
 from mdvtools.auth.authutils import register_before_request_auth
+from mdvtools.auth.register_auth_routes import register_auth_routes
 
 
 # --- Reasons recorded by validate_user --------------------------------------
@@ -47,8 +54,9 @@ def provider(bootstrap_app):
         )
 
 
-def _denial_after_validate(bootstrap_app, provider, user_info, user_count=0):
-    """Run validate_user for an identity with no local row; return what it denied."""
+def _refusal_after_validate(bootstrap_app, provider, user_info, user_count=0, stale_account=None):
+    """Run validate_user for an identity with no local row; return the reason it
+    denied and the account it kept in the session for the login page."""
     with patch.object(provider, "get_token", return_value="dummy-token"), \
          patch.object(provider, "is_token_valid", return_value=True), \
          patch.object(provider, "get_user", return_value=user_info), \
@@ -59,12 +67,56 @@ def _denial_after_validate(bootstrap_app, provider, user_info, user_count=0):
         mock_user_class.query.count.return_value = user_count
 
         with bootstrap_app.test_request_context("/"):
+            if stale_account is not None:
+                session[DENIED_ACCOUNT_SESSION_KEY] = stale_account
             result, error = provider.validate_user()
             reason = access_denied_reason()
+            account = session.get(DENIED_ACCOUNT_SESSION_KEY)
 
     assert result is None
     assert error is not None
-    return reason
+    return reason, account
+
+
+def _denial_after_validate(bootstrap_app, provider, user_info, user_count=0):
+    return _refusal_after_validate(bootstrap_app, provider, user_info, user_count)[0]
+
+
+def test_refused_account_is_kept_for_the_login_page(bootstrap_app, provider):
+    """The page names the account, so "use a different account" has a referent.
+    It travels in the session, not the URL."""
+    reason, account = _refusal_after_validate(
+        bootstrap_app, provider,
+        {"sub": "auth0|stranger", "email": "someone@else.com", "email_verified": True},
+        user_count=4,
+    )
+
+    assert reason == "no_account"
+    assert account == "someone@else.com"
+
+
+def test_refusal_without_a_known_account_drops_a_stale_one(bootstrap_app, provider):
+    reason, account = _refusal_after_validate(
+        bootstrap_app, provider, None, stale_account="earlier@example.com"
+    )
+
+    assert reason == "unavailable"
+    assert account is None
+
+
+def test_login_page_names_the_refused_account_escaped():
+    """The real template: the email is written into the page, HTML-escaped."""
+    templates = Path(__file__).resolve().parents[2] / "templates"
+    app = Flask("test_login_template", template_folder=str(templates))
+    app.secret_key = "test_secret"
+    app.jinja_env.globals["entry_assets"] = lambda _name: {"css": [], "js": "login.js"}
+
+    with app.test_request_context("/login?denied=no_account"):
+        session[DENIED_ACCOUNT_SESSION_KEY] = 'jane"><script>@example.com'
+        html = render_template("login.html")
+
+    assert 'content="jane&#34;&gt;&lt;script&gt;@example.com"' in html
+    assert "<script>@example.com" not in html
 
 
 def test_unverified_bootstrap_address_is_told_to_verify(bootstrap_app, provider):
@@ -112,6 +164,14 @@ def test_unknown_user_on_established_deployment_is_logged_and_explained(bootstra
     assert reason == "no_account"
     assert "auth0|stranger" in caplog.text
     assert "has no account in this deployment" in caplog.text
+
+
+def test_failed_userinfo_is_explained(bootstrap_app, provider):
+    """get_user returns None when Auth0's userinfo fails or times out; without a
+    reason this was a plain redirect to sign-in, which loops while Auth0 is down."""
+    reason = _denial_after_validate(bootstrap_app, provider, None)
+
+    assert reason == "unavailable"
 
 
 def test_failed_bootstrap_is_explained(bootstrap_app, provider):
@@ -213,6 +273,78 @@ def test_logout_is_reachable_without_a_session(hooked_app):
     assert rv.status_code == 200
     assert rv.get_data(as_text=True) == "signed out"
     mock_provider.assert_not_called()
+
+
+def _app_with_login_route(tmp_path):
+    """LOGIN_REDIRECT_URL=/login, as deploy.sh sets it for Auth0, with the real routes.
+
+    Build it while get_auth_provider is patched: the routes bind it at registration.
+    """
+    (tmp_path / "login.html").write_text("the login page")
+    app = Flask("test_access_denied_login_route", template_folder=str(tmp_path))
+    app.config.update(
+        TESTING=True,
+        ENABLE_AUTH=True,
+        DEFAULT_AUTH_METHOD="auth0",
+        LOGIN_REDIRECT_URL="/login",
+    )
+    app.secret_key = "test_secret"
+    register_before_request_auth(app)
+    register_auth_routes(app)
+
+    @app.route("/")
+    def index():
+        return "the app"
+
+    return app
+
+
+def test_denial_at_login_route_shows_the_page_instead_of_signing_in_again(tmp_path):
+    """/login used to ignore ?denied= and start Auth0, which signed the same person
+    straight back in - the loop, on every deployment set up by deploy.sh."""
+    provider = _provider_that("no_account")
+    with patch("mdvtools.auth.authutils.get_auth_provider", return_value=provider):
+        client = _app_with_login_route(tmp_path).test_client()
+        denied = client.get("/", headers={"Accept": "text/html"})
+        page = client.get(denied.headers["Location"])
+
+    assert denied.headers["Location"] == "/login?denied=no_account"
+    assert page.status_code == 200
+    assert page.get_data(as_text=True) == "the login page"
+    provider.login.assert_not_called()
+
+
+def test_logout_without_a_session_still_ends_the_auth0_session(tmp_path):
+    """With no local session, /logout used to clear nothing and stop, leaving Auth0
+    signed in - so the refusal page's Sign out could not switch account."""
+    provider = _provider_that()
+    provider.logout.return_value = "to Auth0 logout"
+    with patch("mdvtools.auth.authutils.get_auth_provider", return_value=provider):
+        rv = _app_with_login_route(tmp_path).test_client().get("/logout")
+
+    assert rv.get_data(as_text=True) == "to Auth0 logout"
+    provider.logout.assert_called_once()
+
+
+def test_logout_without_a_session_is_unchanged_for_other_auth_methods(tmp_path):
+    provider = _provider_that()
+    with patch("mdvtools.auth.authutils.get_auth_provider", return_value=provider):
+        app = _app_with_login_route(tmp_path)
+        app.config["DEFAULT_AUTH_METHOD"] = "shibboleth"
+        rv = app.test_client().get("/logout")
+
+    assert rv.get_json() == {"message": "Session cleared, but auth method unknown."}
+    provider.logout.assert_not_called()
+
+
+def test_login_route_without_a_reason_still_starts_sign_in(tmp_path):
+    provider = _provider_that()
+    provider.login.return_value = "to Auth0"
+    with patch("mdvtools.auth.authutils.get_auth_provider", return_value=provider):
+        rv = _app_with_login_route(tmp_path).test_client().get("/login")
+
+    assert rv.get_data(as_text=True) == "to Auth0"
+    provider.login.assert_called_once()
 
 
 # --- Startup check ------------------------------------------------------------
