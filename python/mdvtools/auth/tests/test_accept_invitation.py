@@ -385,13 +385,17 @@ def test_active_user_signing_in_leaves_an_invitation_that_does_not_name_them(
 
 
 def test_deactivated_admin_accepting_an_invitation_is_reactivated_without_admin_rights(
-    app, provider, admin, project
+    app, provider, admin, project, second_project
 ):
-    # Deactivating an Admin leaves is_admin set. An Invitation grants its
-    # projects, so Admin rights come back only through an Admin's choice.
+    # Deactivating an Admin leaves is_admin set, and their Owner role on every
+    # project. An Invitation grants only its projects, so Admin rights and the
+    # roles that came with them return only through an Admin's choice. MDV
+    # cannot tell those roles from others, so all go, as with Remove Admin.
     user = User(email="gil@example.org", auth_id="auth0|gil", is_active=False, is_admin=True)
     db.session.add(user)
     db.session.commit()
+    for each in (project, second_project):
+        UserProjectService.add_or_update_user_project(user.id, each.id, is_owner=True, can_write=True)
     invite(admin, "gil@example.org", PASSWORD, {project: "viewer"}, user_id=user.id)
 
     response = get_as(
@@ -401,13 +405,18 @@ def test_deactivated_admin_accepting_an_invitation_is_reactivated_without_admin_
     assert response.status_code == 200, response.get_data(as_text=True)
     db.session.expire_all()
     assert (user.is_active, user.is_admin) == (True, False)
+    roles = {row.project_id: (row.can_write, row.is_owner) for row in UserProject.query.filter_by(user_id=user.id)}
+    assert roles == {project.id: (False, False)}
 
 
 def test_admin_reactivated_before_signing_in_keeps_admin_rights(app, provider, admin, project):
     # Reactivating them was an Admin's choice, which includes their Admin rights.
+    # An Admin is Owner of every project, so a lower role in the Invitation
+    # leaves their Owner role as it is.
     user = User(email="hal@example.org", auth_id="auth0|hal", is_active=True, is_admin=True)
     db.session.add(user)
     db.session.commit()
+    UserProjectService.add_or_update_user_project(user.id, project.id, is_owner=True, can_write=True)
     invitation = invite(admin, "hal@example.org", PASSWORD, {project: "viewer"}, user_id=user.id)
 
     response = get_as(
@@ -418,6 +427,8 @@ def test_admin_reactivated_before_signing_in_keeps_admin_rights(app, provider, a
     db.session.expire_all()
     assert invitation.accepted_user_id == user.id
     assert user.is_admin is True
+    owner = {"can_read": True, "can_write": True, "is_owner": True}
+    assert UserProjectService.get_user_project_permissions(user.id, project.id) == owner
 
 
 def test_invitation_is_refused_while_another_user_holds_its_email_in_another_case(

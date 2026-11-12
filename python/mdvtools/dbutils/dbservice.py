@@ -1090,21 +1090,28 @@ class InvitationService:
                 user.auth_id = sign_in["sub"]
                 user.email = invitation.email
                 if not user.is_active:
-                    # Deactivating an Admin leaves is_admin set. The Invitation
-                    # grants only its projects, so Admin rights come back only
-                    # when an Admin gives them again.
+                    if user.is_admin:
+                        # Deactivating an Admin leaves is_admin set, and an Owner
+                        # role on every project. The Invitation grants only its
+                        # projects, so Admin rights come back only when an Admin
+                        # gives them again. MDV cannot tell the Owner roles that
+                        # came with Admin rights from others, so all go, as with
+                        # Admin's Remove Admin.
+                        UserProject.query.filter_by(user_id=user.id).delete()
+                        user.is_admin = False
                     user.is_active = True
-                    user.is_admin = False
             for grant in invitation.projects:
-                # The Invitation's role replaces any earlier role on the project.
+                # The Invitation's role replaces any earlier role on the project,
+                # except that an Admin stays Owner of every project.
+                role = "owner" if user.is_admin else grant.role
                 UserProject.query.filter_by(user_id=user.id, project_id=grant.project_id).delete()
                 db.session.add(
                     UserProject(
                         user_id=user.id,
                         project_id=grant.project_id,
-                        is_owner=grant.role == "owner",
+                        is_owner=role == "owner",
                         can_read=True,
-                        can_write=grant.role in ("editor", "owner"),
+                        can_write=role in ("editor", "owner"),
                     )
                 )
             invitation.accepted_at = now
