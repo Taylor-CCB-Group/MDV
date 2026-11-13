@@ -35,7 +35,10 @@ const PACKAGE_DIRS = {
  * separate copy of them, so it goes stale silently and unlink then writes a pin
  * nobody chose.
  *
- * 0.15.2 is what these pins ask for: it computes channel stats faster in avivatorish and
+ * 0.16.0 is what these pins ask for: feature pick events carry the `entryId` of the
+ * picked Render Stack entry (`resolvePickedEntryId`), which isolated groups need.
+ *
+ * 0.15.2 computed channel stats faster in avivatorish and
  * stops the `includeRaster` raster from being scrambled (SpatialData.js#290).
  *
  * 0.15.0 bounds the tiled points cache by the bytes its
@@ -74,11 +77,11 @@ const PACKAGE_DIRS = {
  * the layer at runtime.
  */
 const PUBLISHED_RANGES = {
-    "@spatialdata/avivatorish": "^0.15.2",
-    "@spatialdata/core": "^0.15.2",
-    "@spatialdata/layers": "^0.15.2",
-    "@spatialdata/react": "^0.15.2",
-    "@spatialdata/vis": "^0.15.2",
+    "@spatialdata/avivatorish": "^0.16.0",
+    "@spatialdata/core": "^0.16.0",
+    "@spatialdata/layers": "^0.16.0",
+    "@spatialdata/react": "^0.16.0",
+    "@spatialdata/vis": "^0.16.0",
     zarrextra: "0.7.1",
 };
 
