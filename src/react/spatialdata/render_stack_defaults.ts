@@ -169,10 +169,22 @@ export function normalizeRenderStack(stack: RenderStack | undefined): RenderStac
     for (const entry of stack.entries) {
         entriesById.set(entry.id, entry);
     }
+    const added = new Set<string>();
     for (const deckId of DECK_OVERLAY_IDS) {
         const id = deckHostLayerId(deckId);
         if (!entriesById.has(id)) {
             entriesById.set(id, hostEntry(deckId));
+            added.add(id);
+        }
+    }
+    // An added follower (e.g. the grey scatter in a stack saved before it existed) takes its
+    // leader's visibility, since the layer dialog offers no checkbox of its own for it.
+    for (const leaderId of DECK_OVERLAY_IDS) {
+        const leader = entriesById.get(deckHostLayerId(leaderId));
+        if (!leader) continue;
+        for (const followerId of DECK_OVERLAY_VISIBILITY_FOLLOWERS[leaderId] ?? []) {
+            const follower = entriesById.get(deckHostLayerId(followerId));
+            if (follower && added.has(follower.id)) follower.visible = leader.visible;
         }
     }
 
