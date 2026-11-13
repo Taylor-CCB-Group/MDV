@@ -6,18 +6,64 @@ All notable changes to `mdvtools` are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-12
+
+> ⚠️ Behaviour changes for the full application (`mdvtools[app]`): when `DB_BACKEND` is
+> unset, the server now uses SQLite unless it finds a PostgreSQL setting (`DB_HOST`,
+> `DB_USER`, `DB_PASSWORD`, `DB_NAME` or the `db_user` Docker secret). With one of those set,
+> it keeps using PostgreSQL and logs a warning asking you to set `DB_BACKEND=postgres`. SQLite
+> stores the database at `/app/mdv/mdv.sqlite3` unless you set `SQLITE_DB_PATH`. A
+> `DB_BACKEND` value other than `sqlite` or `postgres` stops the server from starting
+> (#435, #579). The server also records usage events, such as who opened which project and
+> view, in a new `usage_events` table. Set `ENABLE_USAGE_TRACKING=0` to turn this off (#540).
+
+A feature release. SQLite is now the default database for new installs of the full application, a new `SpatialData` chart overlays spatial layers, new charts show genomic data, and MDV works behind proxies that strip a path prefix, such as Verily Workbench. `pip install mdvtools` still installs the slim core.
+
 ### Added
+- SQLite database backend for the full application, chosen with `DB_BACKEND` (`sqlite` or
+  `postgres`). `deploy.sh`, `deploy.bat` and `deploy_gui.sh` now set up a local Docker deployment interactively (#435).
+- A SpatialData chart, built on SpatialData.js, that overlays shapes, labels, points and image
+  layers and has its own layers dialog (#514). Shapes, labels and points can be coloured and
+  filtered from their associated table, and points layers have a feature list with
+  per-feature selection and colour (#535, #551).
+- `mdvtools convert-spatial --table-handling` merges multimodal tables, groups them by region
+  or keeps them separate, and `--point-transform` sets how point coordinates are transformed
+  (#530).
+- Genome support: a `genome` datastore parameter, an SV Circos plot, a UCSC browser view, an
+  embedded IGV browser and a category heat map. `mdvtools serve --track-dir` adds extra track
+  folders. `pip install mdvtools` now installs `pysam` and `pyranges` for these (#470).
+- A date column type. Datetimes from pandas and polars show as `YYYY-MM-DD` in tables,
+  tooltips, axes, legends and filters, and still sort and filter in date order (#527).
+- Legend filtering: click a category in a colour legend to filter by it (#482, #493).
+- ChatMDV can use a local model through Ollama or a choice of remote models, and you can pick
+  which datasources a query uses (#513, #521).
+- `mdvtools create-default-views` generates template views for a project (#548).
+- `MDVProject.rename_column` and `MDVProject.soft_delete_column`, with matching project
+  routes, so scripts can rename and hide columns (#547).
+- Server extensions installed as separate Python packages, found through the
+  `mdv.extensions` entry point and enabled by name in config (#540).
+- Scripts in `mdvtools/scripts` for cleaning project data: `column_name_report.py` groups
+  field names that differ only by case or separator, and `project_json_history.py` snapshots
+  and restores `datasources.json`, `views.json` and `state.json` (#557, #593).
+- `VITE_SHOW_PROJECT_CREATION=true` at build time shows the new project and import project
+  cards in a production build (#570).
+- When a host frames MDV without cross-origin isolation, the catalog and project pages offer
+  to open MDV in a new tab, where data loading works (#573).
+- The debug dialog lists validation issues in a readable form (#491).
+- The density legend lists categorical contours as well as density fields, and hovering an
+  entry highlights its contour (#590).
+- `mdvtools --version` (`-V`) prints the mdvtools version, git commit, Python and platform
+  (#592).
+- When a CLI command fails unexpectedly it now prints an error report with the command line,
+  traceback, and mdvtools/dependency versions, ready to paste into an issue, and exits with
+  status 1 (#592).
 - A region's `spatial.url` in `datasources.json` tells the SpatialData.js viewer to load the
   store from that URL instead of the project's `spatial/<file>`. `spatial.file` still names
-  the object, which is how its tables are matched.
+  the object, which is how its tables are matched (#624).
 - `mdvtools convert-spatial --spatial-url URL` sets each region's `spatial.url` to `URL` and
   neither copies nor links the store into the project, for a store served from elsewhere.
   It takes a single store, so it can't be combined with `--batch`, `--link` or browser store
-  rewrites.
-- `mdvtools --version` (`-V`) prints the mdvtools version, git commit, Python and platform.
-- When a CLI command fails unexpectedly it now prints an error report with the command line,
-  traceback, and mdvtools/dependency versions, ready to paste into an issue, and exits with
-  status 1.
+  rewrites (#624).
 - `mdvtools convert-spatial --browser-preset standard|compact|experimental` rewrites the
   project's copy of each store for SpatialData.js: `standard` adds overview levels to images
   and labels whose coarsest level is too large to load whole, stores table matrices as CSC
@@ -30,31 +76,130 @@ All notable changes to `mdvtools` are documented here. The format is based on
   recompresses nothing. Images that browser codecs can't encode, stores without tables (for
   CSC), points without a `feature_key` (for points-zarr) and points that are already
   Morton-indexed are left as they are. The presets will change as the formats do, and none
-  of this works with `--link`.
+  of this works with `--link` (#609).
+- A compound dot plot, with optional panels split by category, shared colour scales, colour
+  and fraction legends, and SVG or PNG export. Selecting a dot filters to its data (#574,
+  #634).
+- The SpatialData chart and the 2D and 3D deck scatter plots render with WebGPU where the
+  browser supports it. Each chart has a Rendering backend setting, the Debug dialog's Browser
+  settings section sets the default, and charts left at the default fall back to WebGL when
+  WebGPU is unavailable or fails (#597, #607).
+- A "Legacy charts" browser setting shows the classic scatter plot, Density Scatter Plot,
+  Table (Classic) and the Viv image viewer in Add Chart, which now hides them. An experimental
+  "Convert legacy charts" setting converts them when a view loads (#614). Viv charts on a
+  region that has a SpatialData store convert to the SpatialData.js viewer, keeping their
+  view position, image channels and filters, and the chart menu can convert one by hand
+  (#638).
+- The deck scatter plot has an Axis scaling setting (Equal or Fit, with Fit the default for new
+  charts) and a background filter of its own (#614).
+- When project code or data fails to load, the error panel fetches the failed file again and
+  explains the result, such as a proxy error or a missing file. It has a Copy details button
+  for bug reports (#650).
 
 ### Changed
-- Supported Python is now `>=3.12,<3.13`; Python 3.11 is no longer supported.
+- `mdvtools` now installs on Python 3.12 and 3.13. Python 3.11 is no longer supported, so
+  pip on Python 3.11 keeps installing 1.3.0 (#609).
 - `mdvtools` now depends on `spatialdata-js-util` 0.2 (with its `write` extra), which needs
-  `zarr` 3.3 or later and `imagecodecs` 2026.6.26 or later.
+  `zarr` 3.3 or later and `imagecodecs` 2026.6.26 or later (#609).
 - Upgraded `spatialdata` to 0.8 and `spatialdata-io` to 0.7.1 (from 0.7.2 and 0.6.0).
-  `spatialdata-io` 0.7.1 indexes Xenium shapes by `cell_id`.
+  `spatialdata-io` 0.7.1 indexes Xenium shapes by `cell_id` (#609).
 - `mdvtools convert-spatial` default views now use the SpatialData.js viewer instead of the
-  Viv image viewer.
-- The SpatialData.js chart is now listed as "SpatialData.js viewer" in the add-chart menu.
+  Viv image viewer (#591).
+- The SpatialData.js chart is now listed as "SpatialData.js viewer" in the add-chart menu
+  (#591).
 - React Compiler is now enabled by default for Vite builds; set
-  `VITE_USE_REACT_COMPILER=0` or `VITE_USE_REACT_COMPILER=false` to opt out locally.
+  `VITE_USE_REACT_COMPILER=0` or `VITE_USE_REACT_COMPILER=false` to opt out locally (#502).
+- The database assigns Project IDs, and new project folders get a random `uuid4` name instead
+  of a name built from the ID. Projects copied into the projects folder get an owner, and
+  rescans grant new projects to every admin (#543, #546).
+- The server shows projects it cannot write as read-only in the interface. It used to serve
+  them read-only without saying so (#544).
+- Image layers support up to 10 channels after the viv update, and channel histograms are
+  computed in a worker. MDV warns when an image's data layout will load slowly (#490, #565).
+- Range, rectangle and polygon filters on datasources over 100,000 rows run on a worker, so
+  brushing stays responsive and shows results during a drag rather than when it pauses.
+  Editing a selection on a spatial scatter chart is also faster (#585).
+- The fraction legend is now a React component (#503).
+- `sync_users_to_db` fetches the Auth0 admin role members once, instead of once per user
+  (#526).
+- Dependency updates: `@spatialdata/*` 0.15.1, deck.gl and luma.gl 9.4, viv 0.23 (#529, #541,
+  #561, #588, #626, #630).
+- "2D Scatter Plot" in Add Chart now creates the deck scatter plot with density (#614).
+- Catalog cards show long project names over up to 3 lines, and in full on hover. The cards
+  no longer show the last-modified date (#641).
+- The project page shows the project name in the menu bar, and project thumbnails come from
+  the first view. Text in a text box chart can be selected (#622).
+- The chart settings search box has focus when the dialog opens (#628).
+- Colour legends can be resized, and their size is saved with the chart (#633).
+- The browser reuses spatial files for an hour instead of asking the server again for each
+  chunk (#617).
+- Only admins see the Rescan Projects button (#604).
 
 ### Fixed
 - `pip install mdvtools` now installs `leidenalg` and `igraph`, so `--compute-x-umap` and
   `convert_scanpy_to_mdv(compute_x_umap=True)` can compute Leiden clusters. They were only in
-  the `dev` dependency group before.
+  the `dev` dependency group before (#575).
+- A PostgreSQL deployment that passes its database settings as Docker secrets, or takes its
+  host from `config.json`, now starts. The startup database check used to read only the
+  `DB_*` environment variables (#586).
+- Polygon selections in scatter plots finish on a double-click, and a double-click no longer
+  zooms the scatter plot (#582).
+- Selection tools work in a popped-out SpatialData chart (#582).
+- Reset All Filters now clears the selection shape drawn on a chart (#583).
+- Reading a column from a project with no `datafile.h5` raises `FileNotFoundError` and leaves no file behind. It used to create an empty `datafile.h5` and then fail with a `KeyError` (#595).
+- A rescan of the projects folder no longer registers hidden folders, or folders that lack
+  `views.json`, `state.json` or `datasources.json`, such as one still being copied in. It used to turn them into empty projects (#596).
+- File upload, Socket.IO and page assets work behind a proxy that strips a path prefix
+  (#571, #572).
+- A user signed in to one deployment no longer carries their session into another
+  deployment on the same host (#549).
+- Spatial tables built by `by-region` or `merge` conversion colour and filter the right rows
+  (#551).
+- The points feature filter list stays responsive with thousands of features (#542).
+- SpatialData shapes load in production builds (#539).
+- Slow initial views no longer block the page behind a loading overlay (#519).
+- Moving or resizing a chart no longer reorders the other charts, and dialogs can come to
+  the front (#520).
+- Box plot and violin plot x-axis labels update when their parameters change (#511), and dot
+  plot x-axis labels fit the space available (#560).
+- The gates column loads lazily, which avoids an out-of-memory crash on large datasets
+  (#495).
+- Popout tables work for both table types (#534).
+- The user profile shows an error when it cannot load, instead of placeholder data (#489).
+- Uploading to a new project no longer fails the permission check before its data file
+  exists (#501).
+- The server sends the headers that range requests need over CORS (#528).
+- A rows-as-columns link can use a `unique` column as its name column (#533).
 - Build information no longer reports the commit of an unrelated git repository when
   `mdvtools` is installed inside one (for example a virtualenv within your own project).
 - In the gridstack layout, hovering a chart no longer adds a scrollbar and resizes every chart
   (#594).
 - `add_datasource` accepts pandas `string` columns, such as the obs index of Atera stores
   from `spatialdata-io`, which failed with `KeyError: 'string'`. `unique` columns with
-  non-ASCII values are now written instead of being dropped with a warning.
+  non-ASCII values are now written instead of being dropped with a warning (#609).
+- Someone who signs in but is not allowed into the deployment sees why, with Try again and
+  Sign out buttons. They used to loop back to the login page (#567).
+- Freehand and polygon selections keep their shape when the mouse moves just after you
+  finish drawing (#648).
+- Charts that use an active link wait for the columns it resolves to before they are built,
+  so a view that is still applying its filters cannot give them a column that was never
+  loaded (#635).
+- The settings dialog shows an active link in Color By and Tooltip value, and the colour
+  toggles keep the link instead of replacing it with a fixed column (#627).
+- A dot plot no longer takes its colour range from averages computed for genes it has
+  stopped showing (#598).
+- Deck scatter plot points are drawn at least 1 pixel wide, so they cannot vanish (#605).
+- A legend that overflows its chart moves back inside on load, and can be dragged back from
+  the edge (#633).
+- Range requests for spatial zips served by gunicorn seek to the requested offset instead of
+  reading the file from the start, so they no longer slow down further into a large zip
+  (#619).
+- Opening the SpatialData layers dialog reuses the chart's read of the store instead of
+  reading it again (#611).
+- Built page scripts and styles have hashed filenames, so a cached page cannot load chunks
+  from an older build (#601).
+- A genome browser with `sync_with_datastores` set no longer fails when the chart is set up
+  (#608).
 
 ## [1.3.0] - 2026-06-04
 
@@ -123,5 +268,6 @@ internally — the published `pip install mdvtools` is the same slim/lite core a
   search (#404).
 - Wider scatter brush handles so they no longer disappear and are easier to click (#411).
 
-[Unreleased]: https://github.com/Taylor-CCB-Group/MDV/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Taylor-CCB-Group/MDV/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Taylor-CCB-Group/MDV/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Taylor-CCB-Group/MDV/releases/tag/v1.3.0
