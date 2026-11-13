@@ -678,7 +678,8 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
                 if (props.func) props.func();
             }}
         >
-            {props.label}
+            {/* the button's own text when it has one, so it need not repeat the label beside it */}
+            {props.current_value || props.label}
         </Button>
     </>
 );
@@ -999,6 +1000,35 @@ export const AbstractComponent = observer(({ props }: { props: AnyGuiSpec | GuiS
         </div>
     );
 });
+
+/**
+ * Settings outside the settings dialog: renders `specs` with the same controls, with its
+ * own folder open/closed state, and disposes the specs' reactions when it unmounts.
+ * Build `specs` once per mount (e.g. `useMemo`): the controls write into those objects.
+ */
+export function SettingsGuiList({ specs }: { specs: AnyGuiSpec[] }) {
+    const [folderStates, setFolderStates] = useState<FolderStateById>({});
+    useEffect(() => {
+        const disposers = collectDisposers(specs);
+        return () => {
+            for (const disposer of disposers) {
+                try {
+                    disposer();
+                } catch (e) {
+                    console.error("Error disposing reaction:", e);
+                }
+            }
+        };
+    }, [specs]);
+    const items = useMemo(() => specs.map((setting) => ({ setting, id: uuid() })), [specs]);
+    return (
+        <SettingsFolderStateContext.Provider value={{ folderStates, setFolderStates }}>
+            {items.map(({ setting, id }) => (
+                <AbstractComponent key={id} props={setting} />
+            ))}
+        </SettingsFolderStateContext.Provider>
+    );
+}
 
 export default observer(<T extends BaseConfig>({ chart }: { chart: BaseChart<T> }) => {
     const [dialogState, setDialogState] = useState<SettingsDialogState>(() => getInitialSettingsDialogState(chart));

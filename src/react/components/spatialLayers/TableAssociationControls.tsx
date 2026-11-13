@@ -1,4 +1,4 @@
-import { TextField, Typography } from "@mui/material";
+import { Typography } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
 import type { ReactNode } from "react";
 
@@ -131,36 +131,29 @@ export function FillColorByColumnControl({
 }: FillColorByColumnProps) {
     const fillByColumn = fillColorByColumn?.columnName;
 
+    // Without a table there is no column to colour by: the layer's own colour controls apply.
+    if (association.status !== "resolved") return null;
     return (
         <div className="grid gap-2">
-            <LabeledControl label="Fill color">
-                {association.status === "resolved" ? (
-                    <ColumnSelectionComponent
-                        multiple={false}
-                        dataStore={dataStore}
-                        current_value={fillColorByColumnSpec ?? fillByColumn}
-                        placeholder="Select column"
-                        optional
-                        clearSelectedColumn={() => onChange(undefined, undefined)}
-                        setSelectedColumn={(selection) => {
-                            // Not necessarily a column name: the picker's "active link"
-                            // tab returns a query, whose column is whatever the linked
-                            // datasource has selected right now. `flattenFields` reads
-                            // both, and an empty result means the link has not finished
-                            // initialising — the spec is still stored, and the projection
-                            // fills the colour column in when it resolves.
-                            const columnName = flattenFields(selection)[0];
-                            onChange(columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined, selection);
-                        }}
-                    />
-                ) : (
-                    <TextField
-                        size="small"
-                        disabled
-                        value="Static fill color"
-                        slotProps={{ input: { readOnly: true } }}
-                    />
-                )}
+            <LabeledControl label="Colour by">
+                <ColumnSelectionComponent
+                    multiple={false}
+                    dataStore={dataStore}
+                    current_value={fillColorByColumnSpec ?? fillByColumn}
+                    placeholder="Select column"
+                    optional
+                    clearSelectedColumn={() => onChange(undefined, undefined)}
+                    setSelectedColumn={(selection) => {
+                        // Not necessarily a column name: the picker's "active link"
+                        // tab returns a query, whose column is whatever the linked
+                        // datasource has selected right now. `flattenFields` reads
+                        // both, and an empty result means the link has not finished
+                        // initialising — the spec is still stored, and the projection
+                        // fills the colour column in when it resolves.
+                        const columnName = flattenFields(selection)[0];
+                        onChange(columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined, selection);
+                    }}
+                />
             </LabeledControl>
         </div>
     );

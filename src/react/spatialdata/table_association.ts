@@ -1,7 +1,7 @@
 import type { ShapesRenderData, SpatialData } from "@spatialdata/core";
 import { loadAssociatedTableFeatureRows } from "@spatialdata/core";
-import type { LayerConfig, LayerType, RenderStackLayerInputs } from "@spatialdata/vis";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import type { LayerConfig, LayerType, RenderStackLayerInputs, SpatialFeatureTooltipItem } from "@spatialdata/vis";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import type DataStore from "@/datastore/DataStore";
 import { useChartManager, useDataSources } from "@/react/hooks";
@@ -298,6 +298,49 @@ function withoutViewerFillColorColumn<T extends LayerConfig>(layer: T): T {
 export function layerFillColorColumnName(layer: LayerConfig): string | undefined {
     if (!("fillColorByColumn" in layer)) return undefined;
     return layer.fillColorByColumn?.columnName;
+}
+
+/**
+ * Split a layer's tooltip fields along the same line as fill colour
+ * (`obsColumnNamesForElement`): fields in the table's obs go to the viewer, which
+ * reads them itself; the rest (gene scores, `mdv_cell_id`, anything computed here)
+ * are MDV's to fill in from the datasource row. Handing the viewer a field it cannot
+ * read gets no value for it.
+ *
+ * With no obs to go by (no table, or more than one), every field stays with the viewer.
+ */
+export function splitTooltipFields(
+    fields: readonly string[] | undefined,
+    obsColumnNames: Set<string> | undefined,
+): { viewer: string[]; mdv: string[] } {
+    if (!fields?.length) return { viewer: [], mdv: [] };
+    if (!obsColumnNames) return { viewer: [...fields], mdv: [] };
+    const viewer: string[] = [];
+    const mdv: string[] = [];
+    for (const field of fields) (obsColumnNames.has(field) ? viewer : mdv).push(field);
+    return { viewer, mdv };
+}
+
+function layerTooltipFields(layer: LayerConfig): string[] | undefined {
+    return "tooltipFields" in layer ? layer.tooltipFields : undefined;
+}
+
+/** Tooltip items for fields MDV fills in, from a feature's datasource row. */
+export function tooltipItemsFromDataStore(
+    dataStore: {
+        columnIndex: Record<string, { name?: string; data?: unknown; getValue: (row: number) => unknown } | undefined>;
+    },
+    row: number,
+    fields: readonly string[],
+): SpatialFeatureTooltipItem[] {
+    return fields.map((field) => {
+        const column = dataStore.columnIndex[field];
+        if (!column) return { label: field, value: "" };
+        // loaded on demand when the field is chosen; until then there is nothing to read
+        if (!column.data) return { label: column.name ?? field, value: "loading…" };
+        const value = column.getValue(row);
+        return { label: column.name ?? field, value: value === undefined || value === null ? "" : String(value) };
+    });
 }
 
 /**
@@ -660,11 +703,20 @@ function getRowKeyColumnsByDataSource(
  * it (`region.spatial.file`). A datasource merged from several objects may hold a
  * same-named table from each; this says which one this canvas is showing.
  */
+export type AssociatedLayerInputs = RenderStackLayerInputs & {
+    /**
+     * Tooltip items MDV supplies for a hovered feature: its layer's tooltip fields that
+     * are not in the table's obs (see `splitTooltipFields`). Stable identity; reads the
+     * latest state when called.
+     */
+    mdvTooltipItems: (layerId: string, featureId: string) => SpatialFeatureTooltipItem[];
+};
+
 export function useAssociatedShapesLayerInputs(
     spatialData: SpatialData | undefined,
     layerInputs: RenderStackLayerInputs,
     spatialDataName?: string,
-): RenderStackLayerInputs {
+): AssociatedLayerInputs {
     const dataSources = useDataSources();
     // Stable by value, not by identity: which elements are on the canvas changes far
     // less often than the layer record does. See `useElementKeys`.
@@ -777,6 +829,42 @@ export function useAssociatedShapesLayerInputs(
         [layerInputs.layers, layerInputs.layerOrder, tableByAssociationKey],
     );
     const loadedColorColumnVersion = useLoadedColumnsVersion(fillColumnsByDataSource);
+    // MDV's share of each layer's tooltip fields, by layer id; the viewer gets the rest.
+    const mdvTooltipFieldsByLayerId = useMemo(() => {
+        const byLayerId: Record<string, string[]> = {};
+        for (const layerId of layerInputs.layerOrder) {
+            const layer = layerInputs.layers[layerId];
+            if (!isFillColorAssociableLayer(layer)) continue;
+            const associationKey = `${layer.type}:${layer.elementKey}`;
+            const { mdv } = splitTooltipFields(
+                layerTooltipFields(layer),
+                obsColumnNamesByAssociationKey[associationKey],
+            );
+            if (mdv.length > 0) byLayerId[layerId] = mdv;
+        }
+        return byLayerId;
+    }, [layerInputs.layers, layerInputs.layerOrder, obsColumnNamesByAssociationKey]);
+    const tooltipColumnsByDataSource = useMemo(() => {
+        const columnsByDataSource: Record<string, Set<string>> = {};
+        for (const [layerId, fields] of Object.entries(mdvTooltipFieldsByLayerId)) {
+            const layer = layerInputs.layers[layerId];
+            if (!layer) continue;
+            const table = tableByAssociationKey[`${layer.type}:${layer.elementKey}`];
+            if (table?.status !== "resolved") continue;
+            columnsByDataSource[table.dataSourceName] ??= new Set();
+            for (const field of fields) columnsByDataSource[table.dataSourceName]?.add(field);
+        }
+        return Object.fromEntries(
+            Object.entries(columnsByDataSource).map(([name, columns]) => [name, Array.from(columns).sort()]),
+        );
+    }, [mdvTooltipFieldsByLayerId, layerInputs.layers, tableByAssociationKey]);
+    // Stable by value, like the element keys: the layer record changes on every cosmetic edit.
+    const tooltipColumnsKey = JSON.stringify(tooltipColumnsByDataSource);
+    const stableTooltipColumnsByDataSource = useMemo(() => {
+        const parsed: Record<string, string[]> = JSON.parse(tooltipColumnsKey);
+        return parsed;
+    }, [tooltipColumnsKey]);
+    useLoadedColumnsVersion(stableTooltipColumnsByDataSource);
     const associatedDataStores = useMemo(() => {
         const storesByName = new Map<string, DataStore>();
         for (const table of Object.values(tableByAssociationKey)) {
@@ -828,6 +916,11 @@ export function useAssociatedShapesLayerInputs(
                     const associationKey = `${layer.type}:${layer.elementKey}`;
                     const table = tableByAssociationKey[associationKey];
                     if (table?.status !== "resolved") continue;
+
+                    const tooltipFields = layerTooltipFields(layer);
+                    const viewerTooltipFields = mdvTooltipFieldsByLayerId[layerId]
+                        ? splitTooltipFields(tooltipFields, obsColumnNamesByAssociationKey[associationKey]).viewer
+                        : undefined;
 
                     const fillColumnName = layerFillColorColumnName(layer);
                     // Two routes, decided by whether the viewer can read the column at all.
@@ -916,12 +1009,15 @@ export function useAssociatedShapesLayerInputs(
                         lastFillColorsRef.current[layerId] = featureState.fillColorByFeatureId;
                     }
 
-                    if (!featureState && !viewerFillColor) continue;
+                    if (!featureState && !viewerFillColor && !viewerTooltipFields) continue;
 
                     const projected = viewerFillColor
                         ? { ...layer, fillColorByColumn: viewerFillColor }
                         : withoutViewerFillColorColumn(layer);
-                    nextLayers[layerId] = featureState ? { ...projected, featureState } : projected;
+                    const withTooltip = viewerTooltipFields
+                        ? { ...projected, tooltipFields: viewerTooltipFields }
+                        : projected;
+                    nextLayers[layerId] = featureState ? { ...withTooltip, featureState } : withTooltip;
                     changed = true;
                 }
 
@@ -941,14 +1037,44 @@ export function useAssociatedShapesLayerInputs(
             obsColumnNamesByAssociationKey,
             visibleRowsByDataSource,
             colorFunctionByDataSource,
+            mdvTooltipFieldsByLayerId,
         ],
     );
+
+    // Read at hover time, so a ref rather than a dependency: a fresh function per
+    // cosmetic edit would re-create the canvas's hover handler with it.
+    const tooltipStateRef = useRef({
+        layers: layerInputs.layers,
+        mdvTooltipFieldsByLayerId,
+        tableByAssociationKey,
+        rowIndexByFeatureIdByAssociationKey,
+    });
+    useEffect(() => {
+        tooltipStateRef.current = {
+            layers: layerInputs.layers,
+            mdvTooltipFieldsByLayerId,
+            tableByAssociationKey,
+            rowIndexByFeatureIdByAssociationKey,
+        };
+    }, [layerInputs.layers, mdvTooltipFieldsByLayerId, tableByAssociationKey, rowIndexByFeatureIdByAssociationKey]);
+    const mdvTooltipItems = useCallback((layerId: string, featureId: string): SpatialFeatureTooltipItem[] => {
+        const state = tooltipStateRef.current;
+        const fields = state.mdvTooltipFieldsByLayerId[layerId];
+        const layer = state.layers[layerId];
+        if (!fields || !layer) return [];
+        const associationKey = `${layer.type}:${layer.elementKey}`;
+        const table = state.tableByAssociationKey[associationKey];
+        const row = state.rowIndexByFeatureIdByAssociationKey[associationKey]?.get(featureId);
+        if (table?.status !== "resolved" || row === undefined || row < 0) return [];
+        return tooltipItemsFromDataStore(table.dataStore, row, fields);
+    }, []);
 
     return useMemo(
         () => ({
             layers,
             layerOrder: layerInputs.layerOrder,
+            mdvTooltipItems,
         }),
-        [layers, layerInputs.layerOrder],
+        [layers, layerInputs.layerOrder, mdvTooltipItems],
     );
 }

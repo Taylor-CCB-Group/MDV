@@ -1,6 +1,11 @@
 import type { LayerChannelConfig } from "@spatialdata/avivatorish";
 import type { SpatialData } from "@spatialdata/core";
-import type { RenderStack, RenderStackEntry, RenderStackSpatialElementType } from "@spatialdata/layers";
+import type {
+    LabelsChannelProps,
+    RenderStack,
+    RenderStackEntry,
+    RenderStackSpatialElementType,
+} from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { isObservable, runInAction, set } from "mobx";
 import { useCallback } from "react";
@@ -18,13 +23,27 @@ import {
 } from "./render_stack_defaults";
 import { touchRenderStackEntry } from "./render_stack_observe";
 
-const CHANNEL_CONFIG_KEYS = [
+/** The image channel fields, which `useLayerChannelState` writes. */
+const IMAGE_CHANNEL_CONFIG_KEYS = [
     "channelIds",
     "colors",
     "contrastLimits",
     "channelsVisible",
     "selections",
 ] as const satisfies readonly (keyof LayerChannelConfig)[];
+
+/** A labels layer's per-channel appearance, which shares the `channels` prop with image layers. */
+const LABELS_CHANNEL_CONFIG_KEYS = [
+    "channelOpacities",
+    "channelOutlineOpacities",
+    "channelsFilled",
+    "channelStrokeWidths",
+] as const satisfies readonly (keyof LabelsChannelProps)[];
+
+const CHANNEL_CONFIG_KEYS = [...IMAGE_CHANNEL_CONFIG_KEYS, ...LABELS_CHANNEL_CONFIG_KEYS];
+
+type ChannelConfigPatch = LayerChannelConfig &
+    Partial<Pick<LabelsChannelProps, (typeof LABELS_CHANNEL_CONFIG_KEYS)[number]>>;
 
 function patchRecordInPlace(existing: Record<string, unknown>, next: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(next)) {
@@ -36,7 +55,7 @@ function patchRecordInPlace(existing: Record<string, unknown>, next: Record<stri
     }
 }
 
-function patchChannelsInPlace(existing: Record<string, unknown>, next: LayerChannelConfig): void {
+function patchChannelsInPlace(existing: Record<string, unknown>, next: ChannelConfigPatch): void {
     for (const key of CHANNEL_CONFIG_KEYS) {
         const value = next[key];
         if (value === undefined) continue;
@@ -60,7 +79,7 @@ export function patchRenderStackEntryPropsInPlace(
             props.channels &&
             typeof props.channels === "object"
         ) {
-            patchChannelsInPlace(props.channels as Record<string, unknown>, value as LayerChannelConfig);
+            patchChannelsInPlace(props.channels as Record<string, unknown>, value as ChannelConfigPatch);
             continue;
         }
         if (
