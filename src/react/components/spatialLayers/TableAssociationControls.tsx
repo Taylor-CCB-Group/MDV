@@ -1,4 +1,4 @@
-import { TextField, Typography } from "@mui/material";
+import { Typography } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
 import type { ReactNode } from "react";
 
@@ -78,26 +78,29 @@ export default function TableAssociationControls({
             )}
             {association.status === "ambiguous" && (
                 <Typography variant="caption" color="warning.main">
-                    Table association is ambiguous. Choose columns manually.
+                    More than one table annotates this element, so there are no columns to show or colour by.
                 </Typography>
             )}
             {association.status === "none" && (
                 <Typography variant="caption" color="text.secondary">
-                    No associated table inferred.
+                    No table annotates this element: tooltips show the feature id only.
                 </Typography>
             )}
-            <LabeledControl label="Tooltip fields">
-                <ColumnSelectionComponent
-                    multiple
-                    dataStore={dataStore}
-                    // The spec when there is one: it is what the picker gave us, so it
-                    // is what the picker can read back — an active link shown as an
-                    // active link rather than as the columns it happens to resolve to.
-                    current_value={tooltipFieldsSpec ?? tooltipFields}
-                    placeholder="Select columns"
-                    setSelectedColumn={(next) => onTooltipFieldsChange(flattenFields(next), next)}
-                />
-            </LabeledControl>
+            {/* Fields come from the annotating table's datasource; without one there is nothing to read. */}
+            {association.status === "resolved" && (
+                <LabeledControl label="Tooltip fields">
+                    <ColumnSelectionComponent
+                        multiple
+                        dataStore={dataStore}
+                        // The spec when there is one: it is what the picker gave us, so it
+                        // is what the picker can read back — an active link shown as an
+                        // active link rather than as the columns it happens to resolve to.
+                        current_value={tooltipFieldsSpec ?? tooltipFields}
+                        placeholder="Select columns"
+                        setSelectedColumn={(next) => onTooltipFieldsChange(flattenFields(next), next)}
+                    />
+                </LabeledControl>
+            )}
         </div>
     );
 }
@@ -131,36 +134,29 @@ export function FillColorByColumnControl({
 }: FillColorByColumnProps) {
     const fillByColumn = fillColorByColumn?.columnName;
 
+    // Without a table there is no column to colour by: the layer's own colour controls apply.
+    if (association.status !== "resolved") return null;
     return (
         <div className="grid gap-2">
-            <LabeledControl label="Fill color">
-                {association.status === "resolved" ? (
-                    <ColumnSelectionComponent
-                        multiple={false}
-                        dataStore={dataStore}
-                        current_value={fillColorByColumnSpec ?? fillByColumn}
-                        placeholder="Select column"
-                        optional
-                        clearSelectedColumn={() => onChange(undefined, undefined)}
-                        setSelectedColumn={(selection) => {
-                            // Not necessarily a column name: the picker's "active link"
-                            // tab returns a query, whose column is whatever the linked
-                            // datasource has selected right now. `flattenFields` reads
-                            // both, and an empty result means the link has not finished
-                            // initialising — the spec is still stored, and the projection
-                            // fills the colour column in when it resolves.
-                            const columnName = flattenFields(selection)[0];
-                            onChange(columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined, selection);
-                        }}
-                    />
-                ) : (
-                    <TextField
-                        size="small"
-                        disabled
-                        value="Static fill color"
-                        slotProps={{ input: { readOnly: true } }}
-                    />
-                )}
+            <LabeledControl label="Colour by">
+                <ColumnSelectionComponent
+                    multiple={false}
+                    dataStore={dataStore}
+                    current_value={fillColorByColumnSpec ?? fillByColumn}
+                    placeholder="Select column"
+                    optional
+                    clearSelectedColumn={() => onChange(undefined, undefined)}
+                    setSelectedColumn={(selection) => {
+                        // Not necessarily a column name: the picker's "active link"
+                        // tab returns a query, whose column is whatever the linked
+                        // datasource has selected right now. `flattenFields` reads
+                        // both, and an empty result means the link has not finished
+                        // initialising — the spec is still stored, and the projection
+                        // fills the colour column in when it resolves.
+                        const columnName = flattenFields(selection)[0];
+                        onChange(columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined, selection);
+                    }}
+                />
             </LabeledControl>
         </div>
     );

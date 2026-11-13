@@ -232,14 +232,6 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
         [coordinateSystem, onFeatureHover, onFeatureHoverEnd, renderer, spatialData],
     );
 
-    const mergedDeckProps = useMemo(
-        () => ({
-            ...deckProps,
-            onHover: handleHover,
-        }),
-        [deckProps, handleHover],
-    );
-
     if (!stack?.entries.length) {
         return <div className="h-full w-full p-2">Preparing layer stack…</div>;
     }
@@ -261,7 +253,11 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
             layers={renderer.deckLayers}
             layerOrder={renderer.layerOrder}
             vivLayerProps={renderer.vivLayerProps.length > 0 ? renderer.vivLayerProps : undefined}
-            deckProps={mergedDeckProps}
+            // A prop, not part of `deckProps`: `SpatialViewer` spreads `deckProps` and then
+            // sets `onHover` from this prop, so one passed inside `deckProps` is overwritten
+            // with `undefined` and feature tooltips never appear.
+            onHover={handleHover}
+            deckProps={deckProps}
             deckRef={deckRef}
         />
     );
@@ -390,7 +386,7 @@ const SpatialDataViewer = observer(
                             // after the switch, the old WebGPU device's errors are stale
                             if (chart.activeBackend !== "webgpu") return;
                             const entry = chart.config.renderStack?.entries.find((item) => item.id === entryId);
-                            const name = entry ? renderStackEntryDisplayName(entry) : entryId;
+                            const name = entry ? renderStackEntryDisplayName(entry, chart.config.renderStack) : entryId;
                             console.error(`[MDV] ${name} failed on WebGPU; using WebGL:`, failure.reason);
                             fallBackToWebGL(`${name} failed on WebGPU: ${failure.reason}`);
                             return;
@@ -477,7 +473,7 @@ const SpatialDataViewer = observer(
             propsGeneration: chart.renderStackPropsGeneration,
             hostLayerResolver,
         });
-        const { layers, layerOrder } = useAssociatedShapesLayerInputs(
+        const { layers, layerOrder, mdvTooltipItems } = useAssociatedShapesLayerInputs(
             spatialData ?? undefined,
             { layers: baseLayers, layerOrder: baseLayerOrder },
             region?.spatial?.file,
@@ -516,21 +512,35 @@ const SpatialDataViewer = observer(
             y: number;
         } | null>(null);
 
-        const onFeatureHover = useCallback((event: SpatialFeaturePickEvent) => {
-            const info = event.pickInfo;
-            if (!event.tooltip || !Number.isFinite(info.x) || !Number.isFinite(info.y)) {
-                setFeatureTooltip(null);
-                return;
-            }
-            const anchor = deckContainerRef.current;
-            if (!anchor) return;
-            const rect = anchor.getBoundingClientRect();
-            setFeatureTooltip({
-                html: formatSpatialFeatureTooltipHtml(event.tooltip),
-                x: rect.left + info.x,
-                y: rect.top + info.y,
-            });
-        }, []);
+        const onFeatureHover = useCallback(
+            (event: SpatialFeaturePickEvent) => {
+                const info = event.pickInfo;
+                // The viewer fills in the fields it can read from the table's obs; MDV adds
+                // the rest from the datasource row (see `splitTooltipFields`).
+                const extra =
+                    event.featureId === undefined ? [] : mdvTooltipItems(event.entryId, String(event.featureId));
+                const tooltip =
+                    extra.length === 0
+                        ? event.tooltip
+                        : {
+                              ...(event.tooltip ?? { title: String(event.featureId) }),
+                              items: [...(event.tooltip?.items ?? []), ...extra],
+                          };
+                if (!tooltip || !Number.isFinite(info.x) || !Number.isFinite(info.y)) {
+                    setFeatureTooltip(null);
+                    return;
+                }
+                const anchor = deckContainerRef.current;
+                if (!anchor) return;
+                const rect = anchor.getBoundingClientRect();
+                setFeatureTooltip({
+                    html: formatSpatialFeatureTooltipHtml(tooltip),
+                    x: rect.left + info.x,
+                    y: rect.top + info.y,
+                });
+            },
+            [mdvTooltipItems],
+        );
 
         /** Deck reports moving off a feature as an unpicked hover, not as an event. */
         const onFeatureHoverEnd = useCallback(() => setFeatureTooltip(null), []);

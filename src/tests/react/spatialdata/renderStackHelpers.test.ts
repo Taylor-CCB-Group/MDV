@@ -33,10 +33,21 @@ import {
 } from "@/react/spatialdata/render_stack_adapter";
 import {
     patchRenderStackEntry,
+    patchRenderStackEntryPropsInPlace,
     removeRenderStackEntry,
     seedRenderStackFromSpatialData,
 } from "@/react/spatialdata/render_stack_control";
-import { createHostOnlyRenderStack, normalizeRenderStack } from "@/react/spatialdata/render_stack_defaults";
+import {
+    createHostOnlyRenderStack,
+    mergeHostOverlayEntriesInPlace,
+    normalizeRenderStack,
+    syncOverlayFollowerVisibility,
+} from "@/react/spatialdata/render_stack_defaults";
+import {
+    customDisplayName,
+    numberedDefaultName,
+    renderStackEntryDisplayName,
+} from "@/react/spatialdata/render_stack_display";
 import { renderStackSpatialRevision, touchRenderStackEntry } from "@/react/spatialdata/render_stack_observe";
 
 type SpatialEntry = Extract<RenderStackEntry, { kind: "spatial" }>;
@@ -308,9 +319,96 @@ describe("render stack control", () => {
         expect(imageA.props.opacity).toBe(0.5);
         expect(imageB.props.opacity).toBe(1);
     });
+
+    test("merges labels channel appearance into saved channels", () => {
+        const props: Record<string, unknown> = { channels: { colors: [[255, 0, 0]], channelOpacities: [0.2] } };
+        patchRenderStackEntryPropsInPlace(props, {
+            channels: { channelsFilled: [false], channelStrokeWidths: [3] },
+        });
+        expect(props.channels).toEqual({
+            colors: [[255, 0, 0]],
+            channelOpacities: [0.2],
+            channelsFilled: [false],
+            channelStrokeWidths: [3],
+        });
+    });
+});
+
+describe("render stack display names", () => {
+    test("a user-chosen name wins; blank names fall back to the element", () => {
+        const named = spatialEntry({
+            id: "a",
+            elementKey: "cells",
+            elementType: "shapes",
+            props: { displayName: " Nuclei " },
+        });
+        const blank = spatialEntry({
+            id: "b",
+            elementKey: "cells",
+            elementType: "shapes",
+            props: { displayName: "  " },
+        });
+        expect(renderStackEntryDisplayName(named)).toBe("Nuclei");
+        expect(customDisplayName(blank)).toBeUndefined();
+        expect(renderStackEntryDisplayName(blank)).toBe("shapes: cells");
+    });
+
+    test("unnamed entries of the same element are numbered in stack order", () => {
+        const first = spatialEntry({ id: "a", elementKey: "cells", elementType: "shapes" });
+        const second = spatialEntry({ id: "b", elementKey: "cells", elementType: "shapes" });
+        const other = spatialEntry({ id: "c", elementKey: "imageA" });
+        const stack = renderStack([first, other, second]);
+        expect(renderStackEntryDisplayName(first, stack)).toBe("shapes: cells (1)");
+        expect(renderStackEntryDisplayName(second, stack)).toBe("shapes: cells (2)");
+        expect(renderStackEntryDisplayName(other, stack)).toBe("image: imageA");
+
+        second.props.displayName = "Outlines";
+        expect(renderStackEntryDisplayName(second, stack)).toBe("Outlines");
+        // the default stays numbered, e.g. as the placeholder of a named entry
+        expect(numberedDefaultName(second, stack)).toBe("shapes: cells (2)");
+    });
+
+    test("the name does not reach the viewer's layer config", () => {
+        const entry = spatialEntry({ id: "a", elementKey: "imageA", props: { displayName: "DAPI" } });
+        const inputs = syncRenderStackLayerInputs(renderStack([entry]), createRenderStackLayerInputsCache());
+        expect(inputs.layers.a).toBeDefined();
+        expect("displayName" in (inputs.layers.a ?? {})).toBe(false);
+    });
 });
 
 describe("render stack defaults", () => {
+    test("a restored stack's grey scatter follows the data points' visibility", () => {
+        const scatter = hostEntry(deckHostLayerId("scatter"), false);
+        const grey = hostEntry(deckHostLayerId("grey_scatter"), true);
+        const gates = hostEntry(deckHostLayerId("gate_display"), false);
+        syncOverlayFollowerVisibility(renderStack([grey, scatter, gates]));
+        expect(grey.visible).toBe(false);
+        expect(gates.visible).toBe(false);
+        scatter.visible = true;
+        syncOverlayFollowerVisibility(renderStack([grey, scatter, gates]));
+        expect(grey.visible).toBe(true);
+        expect(gates.visible).toBe(false);
+    });
+
+    test("a grey scatter added to a saved stack follows the data points' visibility", () => {
+        const scatter = hostEntry(deckHostLayerId("scatter"), false);
+        const stack = renderStack([scatter]);
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        const grey = stack.entries.find((entry) => entry.id === deckHostLayerId("grey_scatter"));
+        expect(grey?.visible).toBe(false);
+        // Other added overlays keep their default.
+        const gates = stack.entries.find((entry) => entry.id === deckHostLayerId("gate_display"));
+        expect(gates?.visible).toBe(true);
+    });
+
+    test("an existing grey scatter keeps its saved visibility when merging", () => {
+        const scatter = hostEntry(deckHostLayerId("scatter"), false);
+        const grey = hostEntry(deckHostLayerId("grey_scatter"), true);
+        const stack = renderStack([grey, scatter]);
+        mergeHostOverlayEntriesInPlace(stack);
+        expect(grey.visible).toBe(true);
+    });
+
     test("createHostOnlyRenderStack seeds host overlay entries", () => {
         const stack = createHostOnlyRenderStack();
         expect(stack.entries.length).toBeGreaterThan(0);

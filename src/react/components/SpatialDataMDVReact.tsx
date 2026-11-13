@@ -7,7 +7,11 @@ import type { DeckBackend } from "@/react/spatialdata/deck_backend";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
-import { createHostOnlyRenderStack, type DefaultImageLayerProps } from "@/react/spatialdata/render_stack_defaults";
+import {
+    createHostOnlyRenderStack,
+    type DefaultImageLayerProps,
+    syncOverlayFollowerVisibility,
+} from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import {
@@ -48,6 +52,8 @@ function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataS
     // entry edits stay reactive. Only synthesise a stack when the config never had one.
     if (config.renderStack === undefined) {
         config.renderStack = createHostOnlyRenderStack();
+    } else {
+        syncOverlayFollowerVisibility(config.renderStack);
     }
     // Must exist before makeAutoObservable(config) for later changes to be observed, and
     // survive initialiseChartConfig's JSON copy, so null rather than undefined.
@@ -191,7 +197,11 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         const entries = this.config.renderStack?.entries ?? [];
         const failures = [...this.layerFailures].map(([entryId, failure]) => {
             const entry = entries.find((item) => item.id === entryId);
-            return { entryId, failure, name: entry ? renderStackEntryDisplayName(entry) : entryId };
+            return {
+                entryId,
+                failure,
+                name: entry ? renderStackEntryDisplayName(entry, this.config.renderStack) : entryId,
+            };
         });
         const errorCount = failures.filter((item) => !item.failure.dismissed).length + this.canvasErrors.length;
         const summary = [
@@ -305,9 +315,43 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         };
     }
 
+    /**
+     * Chart-wide settings only. What the MDV data points look like (colour, tooltip, point
+     * size, filtering, density) belongs to their layer, and is edited with every other layer
+     * in the layer dialog (`getDataLayerSettings`), so the two are not split across dialogs.
+     */
     getSettings() {
         const config = this.config;
-        const settings = super.getSettings();
+        const dataStore = this.dataStore;
+        const images = spatialRegionOptions(dataStore);
+
+        return this.getGeneralSettings().concat([
+            g({
+                type: "button",
+                label: "Layers",
+                current_value: "Edit layers and data display…",
+                func: () => this.openLayerDialog(),
+            }),
+            g({
+                type: "dropdown",
+                label: `SpatialData (${dataStore.getColumnName(dataStore.regions?.region_field)})`,
+                current_value: config.region,
+                values: [images, "name", "value"],
+                func(value) {
+                    if (config.title === config.region) {
+                        config.title = value;
+                    }
+                    config.region = value;
+                    config.background_filter.category = value;
+                },
+            }),
+            ...getRenderBackendSettings(config),
+        ]);
+    }
+
+    /** Settings for the MDV data points layer (the `deck:scatter` overlay), shown in the layer dialog. */
+    getDataLayerSettings() {
+        const config = this.config;
         const filters = config.category_filters.map((filter) => {
             const values = this.dataStore.columnIndex[filter.column]?.values?.slice();
             if (!values) throw `failed assertion that we should have a categorical '${filter.column}' here`;
@@ -323,23 +367,10 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 },
             });
         });
-        const dataStore = this.dataStore;
-        const images = spatialRegionOptions(dataStore);
+        const colorSettings = this.getColorSettingsFolder();
 
-        return settings.concat([
-            g({
-                type: "dropdown",
-                label: `SpatialData (${dataStore.getColumnName(dataStore.regions?.region_field)})`,
-                current_value: config.region,
-                values: [images, "name", "value"],
-                func(value) {
-                    if (config.title === config.region) {
-                        config.title = value;
-                    }
-                    config.region = value;
-                    config.background_filter.category = value;
-                },
-            }),
+        return [
+            ...(colorSettings ? [colorSettings] : []),
             ...getSharedScatterSettings(config, {
                 chart: this,
                 includeDensitySettings: true,
@@ -350,8 +381,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 label: "Category Filters",
                 current_value: filters,
             }),
-            ...getRenderBackendSettings(config),
-        ]);
+        ];
     }
 
     getConfig() {

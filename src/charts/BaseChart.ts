@@ -916,6 +916,14 @@ class BaseChart<T extends BaseConfig> {
      * @returns an array of objects describing tweakable parameters
      */
     getSettings() {
+        const settings = this.getGeneralSettings();
+        const colorSettings = this.getColorSettingsFolder();
+        if (colorSettings) settings.push(colorSettings);
+        return settings;
+    }
+
+    /** Name, legend and parameter settings: everything `getSettings` returns but colour. */
+    getGeneralSettings() {
         const c = this.config;
         const settings: GuiSpecs = [
             {
@@ -940,6 +948,12 @@ class BaseChart<T extends BaseConfig> {
         if (paramsSettings) {
             settings.push(paramsSettings);
         }
+        return settings;
+    }
+
+    /** The "Color Settings" folder, for charts whose `getColorOptions` allows colouring by a column. */
+    getColorSettingsFolder() {
+        const c = this.config;
         const colorOptions = this.getColorOptions();
 
         if (colorOptions.colorby) {
@@ -950,13 +964,11 @@ class BaseChart<T extends BaseConfig> {
                     : colorOptions.colorby;
 
             const colorSettings: GuiSpecs = [];
-            settings.push(
-                g({
-                    type: "folder",
-                    label: "Color Settings",
-                    current_value: colorSettings,
-                }),
-            );
+            const folder = g({
+                type: "folder",
+                label: "Color Settings",
+                current_value: colorSettings,
+            });
 
             // change this to use setting with type: "column" - so it should understand "filter" in a similar way
             colorSettings.push(
@@ -1064,9 +1076,9 @@ class BaseChart<T extends BaseConfig> {
                     }
                 },
             });
+            return folder;
         }
-
-        return settings;
+        return undefined;
     }
 
     unpinIcon?: HTMLElement;
