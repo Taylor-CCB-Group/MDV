@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = "==3.12.*"
 
 [[package]]
@@ -2046,7 +2046,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.11.3,<2" },
     { name = "spatialdata", specifier = ">=0.8.0,<0.9" },
     { name = "spatialdata-io", specifier = ">=0.7.1,<0.8" },
-    { name = "spatialdata-js-util", extras = ["write"], specifier = ">=0.2.0,<0.3" },
+    { name = "spatialdata-js-util", extras = ["write"], specifier = ">=0.3.1,<0.4" },
     { name = "tabulate", marker = "extra == 'app'", specifier = ">=0.9.0,<0.10" },
     { name = "werkzeug", specifier = ">=3.0.2,<4" },
 ]
@@ -3763,7 +3763,7 @@ wheels = [
 
 [[package]]
 name = "spatialdata-js-util"
-version = "0.2.0"
+version = "0.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "imagecodecs" },
@@ -3773,9 +3773,9 @@ dependencies = [
     { name = "pyarrow" },
     { name = "zarr" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7e/5a/f02212482c97ad26a34b1663088a9914c1da40466393f351558d02d701e0/spatialdata_js_util-0.2.0.tar.gz", hash = "sha256:3beeef13fc7e02b47ac583b5def6389b50810252fede022bdcf09609852fda7f", size = 312810, upload-time = "2026-11-03T10:49:16.288Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/32/bc/ece710b063b25b2470af64323b4b646bb16f664ca4759a7de49042e85edb/spatialdata_js_util-0.3.1.tar.gz", hash = "sha256:cc67a2e3e69fcbcb723dc0b73078d46ed4f9beec8446ae4282a87e86d7283e99", size = 335276, upload-time = "2026-11-13T11:13:16.951Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/1c/6dcc3ec6f522916f0ae407e57e15d54f54040557048ca3ed46bef094c391/spatialdata_js_util-0.2.0-py3-none-any.whl", hash = "sha256:393839701716df75912e2b79b4f588b7c74138857090d3881c181b0421e73405", size = 281078, upload-time = "2026-11-03T10:49:14.674Z" },
+    { url = "https://files.pythonhosted.org/packages/33/ff/cc05a7b6f20326fd3aafa263a20ac8cd34a47a5ec023d751ac65f4d128e9/spatialdata_js_util-0.3.1-py3-none-any.whl", hash = "sha256:2b8e129236fec96dd7243163070c96c8d7192854e4238e6778ce774e2d6c8e37", size = 298967, upload-time = "2026-11-13T11:13:14.856Z" },
 ]
 
 [package.optional-dependencies]
