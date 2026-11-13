@@ -2,7 +2,6 @@ import {
     CompositeMode,
     type GeoJsonEditMode,
     type Position,
-    type SimpleFeature,
     type SimpleFeatureCollection,
     type SimpleGeometry,
 } from "@deck.gl-community/editable-layers";
@@ -13,7 +12,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
-import { SELECTION_COORDINATE_SYSTEM } from "@/editable-layers/selectionModes";
+import { SELECTION_COORDINATE_SYSTEM, selectionFromEdit } from "@/editable-layers/selectionModes";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import type RangeDimension from "../datastore/RangeDimension";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
@@ -79,18 +78,6 @@ function useSelectionCoords(selection: SimpleFeatureCollection) {
         return toJS(raw[0]);
     }, [feature]);
     return coords as [number, number][];
-}
-
-function isSimpleFeature(feature: unknown): feature is SimpleFeature {
-    return (
-        typeof feature === "object" &&
-        feature !== null &&
-        "geometry" in feature &&
-        typeof feature.geometry === "object" &&
-        feature.geometry !== null &&
-        "type" in feature.geometry &&
-        feature.geometry.type !== "GeometryCollection"
-    );
 }
 
 /**
@@ -243,14 +230,9 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             },
             selectedFeatureIndexes,
             // adding `action` here gets rid of warnings but doesn't help with performance.
-            onEdit: action(({ updatedData }) => {
-                // console.log("onEdit", editType, updatedData);
-                const feature = updatedData.features.at(-1);
-                // updatedData.features = [feature];
-                setSelectionFeatureCollection({
-                    ...updatedData,
-                    features: isSimpleFeature(feature) ? [feature] : [],
-                });
+            onEdit: action((edit) => {
+                const selection = selectionFromEdit(edit);
+                if (selection) setSelectionFeatureCollection(selection);
             }),
             modeConfig: {
                 // dragToDraw: true,

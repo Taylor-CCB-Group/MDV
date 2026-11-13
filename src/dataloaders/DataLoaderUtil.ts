@@ -3,6 +3,7 @@ import type { DataColumn, DataSource, DataType, LoadedDataColumn } from "@/chart
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import { createMdvPortal } from "@/react/react_utils";
+import { describeAnswer, htmlTitle } from "@/utils/importFailure";
 import { decompressData, getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader } from "./DataLoaders";
 
 let projectRoot = "";
@@ -12,7 +13,19 @@ let projectRoot = "";
 export async function fetchJsonConfig<T = any>(url: string, root: string, createErrorComponent = false): Promise<T> {
     try {
         const resp = await fetch(url);
-        const config = await resp.json();
+        const text = await resp.text();
+        let config: unknown;
+        try {
+            config = JSON.parse(text);
+        } catch {
+            // Usually an HTML error page from a proxy; the bare parse error ("Unexpected token
+            // '<'") says neither which file nor what came back instead.
+            const contentType = resp.headers.get("content-type")?.split(";")[0] || "no content type";
+            throw new Error(
+                `Could not load ${url}: the server answered ${describeAnswer(resp.status, htmlTitle(text))} ` +
+                    `with ${contentType} instead of JSON.`,
+            );
+        }
         if (!resp.ok) {
             throw new Error(JSON.stringify(config, null, 2));
         }
@@ -50,9 +63,9 @@ export function buildPath(...args: string[]) {
     return args
         .map((part, i) => {
             if (i === 0) {
-                return part.trim().replace(/[\/]*$/g, "");
+                return part.trim().replace(/[/]*$/g, "");
             }
-            return part.trim().replace(/(^[\/]*|[\/]*$)/g, "");
+            return part.trim().replace(/(^[/]*|[/]*$)/g, "");
         })
         .filter((x) => x.length)
         .join("/");
