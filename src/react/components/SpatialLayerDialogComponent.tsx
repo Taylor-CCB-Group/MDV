@@ -309,10 +309,11 @@ const LayerTreeRow = observer(function LayerTreeRow({
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => {
                     const visible = e.target.checked;
+                    const targets = visibilityTargets(entryId);
                     // turning a failed layer back on is a retry: forget the failure so it can be reported again
-                    if (visible) chart.clearLayerFailure(entryId);
+                    if (visible) for (const id of targets) chart.clearLayerFailure(id);
                     mutateStack((stack) => {
-                        for (const id of visibilityTargets(entryId)) patchRenderStackEntry(stack, id, { visible });
+                        for (const id of targets) patchRenderStackEntry(stack, id, { visible });
                     });
                 }}
                 sx={{ p: 0.25, flexShrink: 0 }}
@@ -326,8 +327,22 @@ const LayerTreeRow = observer(function LayerTreeRow({
             ) : (
                 <Typography
                     variant="body2"
-                    className="grow truncate select-none"
-                    title="Double-click to rename"
+                    className="grow truncate select-none rounded focus-visible:outline focus-visible:outline-2"
+                    title="Double-click (or F2) to rename"
+                    // the keyboard path to selecting a row; the row's own click is for the mouse
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selected}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onSelect(entryId);
+                        } else if (e.key === "F2") {
+                            e.preventDefault();
+                            onSelect(entryId);
+                            setRenaming(true);
+                        }
+                    }}
                     onDoubleClick={(e) => {
                         e.stopPropagation();
                         onSelect(entryId);

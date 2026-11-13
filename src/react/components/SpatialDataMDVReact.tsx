@@ -7,7 +7,11 @@ import type { DeckBackend } from "@/react/spatialdata/deck_backend";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
-import { createHostOnlyRenderStack, type DefaultImageLayerProps } from "@/react/spatialdata/render_stack_defaults";
+import {
+    createHostOnlyRenderStack,
+    type DefaultImageLayerProps,
+    syncOverlayFollowerVisibility,
+} from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import {
@@ -48,6 +52,8 @@ function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataS
     // entry edits stay reactive. Only synthesise a stack when the config never had one.
     if (config.renderStack === undefined) {
         config.renderStack = createHostOnlyRenderStack();
+    } else {
+        syncOverlayFollowerVisibility(config.renderStack);
     }
     // Must exist before makeAutoObservable(config) for later changes to be observed, and
     // survive initialiseChartConfig's JSON copy, so null rather than undefined.

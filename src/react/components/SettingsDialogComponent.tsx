@@ -1020,7 +1020,13 @@ export function SettingsGuiList({ specs }: { specs: AnyGuiSpec[] }) {
             }
         };
     }, [specs]);
-    const items = useMemo(() => specs.map((setting) => ({ setting, id: uuid() })), [specs]);
+    // Observable, as `useFilteredGroupedSettings` makes them for the settings dialog: the
+    // controls write `current_value` and re-render by observing it.
+    const items = useMemo(() => {
+        const wrap = { items: specs.map((setting) => ({ setting, id: uuid() })) };
+        makeAutoObservable(wrap);
+        return wrap.items;
+    }, [specs]);
     return (
         <SettingsFolderStateContext.Provider value={{ folderStates, setFolderStates }}>
             {items.map(({ setting, id }) => (

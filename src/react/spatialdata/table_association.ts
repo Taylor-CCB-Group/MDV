@@ -852,7 +852,12 @@ export function useAssociatedShapesLayerInputs(
             const table = tableByAssociationKey[`${layer.type}:${layer.elementKey}`];
             if (table?.status !== "resolved") continue;
             columnsByDataSource[table.dataSourceName] ??= new Set();
-            for (const field of fields) columnsByDataSource[table.dataSourceName]?.add(field);
+            for (const field of fields) {
+                // a field the datasource does not have (e.g. a column since removed) has
+                // nothing to load, and `loadColumnSet` throws on it; its tooltip value is blank
+                if (!table.dataStore.columnIndex[field]) continue;
+                columnsByDataSource[table.dataSourceName]?.add(field);
+            }
         }
         return Object.fromEntries(
             Object.entries(columnsByDataSource).map(([name, columns]) => [name, Array.from(columns).sort()]),

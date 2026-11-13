@@ -37,7 +37,11 @@ import {
     removeRenderStackEntry,
     seedRenderStackFromSpatialData,
 } from "@/react/spatialdata/render_stack_control";
-import { createHostOnlyRenderStack, normalizeRenderStack } from "@/react/spatialdata/render_stack_defaults";
+import {
+    createHostOnlyRenderStack,
+    normalizeRenderStack,
+    syncOverlayFollowerVisibility,
+} from "@/react/spatialdata/render_stack_defaults";
 import {
     customDisplayName,
     numberedDefaultName,
@@ -372,6 +376,19 @@ describe("render stack display names", () => {
 });
 
 describe("render stack defaults", () => {
+    test("a restored stack's grey scatter follows the data points' visibility", () => {
+        const scatter = hostEntry(deckHostLayerId("scatter"), false);
+        const grey = hostEntry(deckHostLayerId("grey_scatter"), true);
+        const gates = hostEntry(deckHostLayerId("gate_display"), false);
+        syncOverlayFollowerVisibility(renderStack([grey, scatter, gates]));
+        expect(grey.visible).toBe(false);
+        expect(gates.visible).toBe(false);
+        scatter.visible = true;
+        syncOverlayFollowerVisibility(renderStack([grey, scatter, gates]));
+        expect(grey.visible).toBe(true);
+        expect(gates.visible).toBe(false);
+    });
+
     test("createHostOnlyRenderStack seeds host overlay entries", () => {
         const stack = createHostOnlyRenderStack();
         expect(stack.entries.length).toBeGreaterThan(0);
