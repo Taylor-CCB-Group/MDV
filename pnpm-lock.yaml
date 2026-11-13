@@ -80,8 +80,8 @@ importers:
         specifier: 0.23.0
         version: 0.23.0(ed0d233fb9efaa5b1ba8511931f32921)
       '@intraspatial/deck':
-        specifier: ^0.1.0
-        version: 0.1.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))))(@luma.gl/core@9.4.2)(@luma.gl/engine@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))(typegpu@0.11.9)
+        specifier: ^0.1.2
+        version: 0.1.2(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))))(@luma.gl/core@9.4.2)(@luma.gl/engine@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))(typegpu@0.11.9)
       '@luma.gl/constants':
         specifier: 9.4.2
         version: 9.4.2
@@ -1336,8 +1336,8 @@ packages:
   '@interactjs/types@1.10.27':
     resolution: {integrity: sha512-BUdv0cvs4H5ODuwft2Xp4eL8Vmi3LcihK42z0Ft/FbVJZoRioBsxH+LlsBdK4tAie7PqlKGy+1oyOncu1nQ6eA==}
 
-  '@intraspatial/deck@0.1.0':
-    resolution: {integrity: sha512-zcsH64t7G3JQ/Ln1yVUIn4vkTXv1Rvqxsc4K5oqqBqUaRDFAyCjCvQtQl5bLG0hTTPfcfVnmI3CFjXhlEQXKFA==}
+  '@intraspatial/deck@0.1.2':
+    resolution: {integrity: sha512-IOGh32Ve5ci5icSPbne3fsMU4HbDNbTesyd6Gw49xkWjODqO793k8twPgDFKEaA8ZwHWRwv63DNzoFWl0+gp9A==}
     peerDependencies:
       '@deck.gl/core': ~9.4.0
       '@luma.gl/core': ~9.4.2
@@ -4623,8 +4623,8 @@ packages:
     resolution: {integrity: sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==}
     engines: {node: '>=12'}
 
-  intraspatial@0.1.0:
-    resolution: {integrity: sha512-LgC1EOB60rZ/dcLjXgM5cvrslkeffpfFrqu5KctzxYzsw6FLYh+1/cwCSGBMZy5nC1334F0DoduejbINhQQAyg==}
+  intraspatial@0.2.0:
+    resolution: {integrity: sha512-kvaVo8yCsCl/0E7oam4+qIOIQyLiNFngX/ByhgQfLl9qvughttVflUNBOrxHrdiMt72jSPPLSO8DNIwCASnJ+Q==}
     engines: {node: '>=20.11'}
     peerDependencies:
       typegpu: ^0.11.9
@@ -7562,13 +7562,13 @@ snapshots:
 
   '@interactjs/types@1.10.27': {}
 
-  '@intraspatial/deck@0.1.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))))(@luma.gl/core@9.4.2)(@luma.gl/engine@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))(typegpu@0.11.9)':
+  '@intraspatial/deck@0.1.2(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))))(@luma.gl/core@9.4.2)(@luma.gl/engine@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))(typegpu@0.11.9)':
     dependencies:
       '@deck.gl/core': 9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))
       '@luma.gl/core': 9.4.2
       '@luma.gl/engine': 9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))
       '@luma.gl/shadertools': 9.4.2(@luma.gl/core@9.4.2)
-      intraspatial: 0.1.0(typegpu@0.11.9)
+      intraspatial: 0.2.0(typegpu@0.11.9)
       typegpu: 0.11.9
     transitivePeerDependencies:
       - webgpu
@@ -11606,7 +11606,7 @@ snapshots:
 
   internmap@2.0.3: {}
 
-  intraspatial@0.1.0(typegpu@0.11.9):
+  intraspatial@0.2.0(typegpu@0.11.9):
     dependencies:
       '@zarrita/storage': 0.2.0
       geotiff: 3.0.5
