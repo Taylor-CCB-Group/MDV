@@ -35,7 +35,10 @@ const PACKAGE_DIRS = {
  * separate copy of them, so it goes stale silently and unlink then writes a pin
  * nobody chose.
  *
- * 0.15.0 is what these pins ask for: it bounds the tiled points cache by the bytes its
+ * 0.15.2 is what these pins ask for: it computes channel stats faster in avivatorish and
+ * stops the `includeRaster` raster from being scrambled (SpatialData.js#290).
+ *
+ * 0.15.0 bounds the tiled points cache by the bytes its
  * tiles hold instead of 16 tiles, so zooming back over levels already visited no longer
  * refetches and rebuilds ~50 tile layers per sweep (SpatialData.js#269). 0.14.0 brought
  * zarrextra 0.7.1, which builds the store tree from consolidated metadata in a few
@@ -71,11 +74,11 @@ const PACKAGE_DIRS = {
  * the layer at runtime.
  */
 const PUBLISHED_RANGES = {
-    "@spatialdata/avivatorish": "^0.15.0",
-    "@spatialdata/core": "^0.15.0",
-    "@spatialdata/layers": "^0.15.0",
-    "@spatialdata/react": "^0.15.0",
-    "@spatialdata/vis": "^0.15.0",
+    "@spatialdata/avivatorish": "^0.15.2",
+    "@spatialdata/core": "^0.15.2",
+    "@spatialdata/layers": "^0.15.2",
+    "@spatialdata/react": "^0.15.2",
+    "@spatialdata/vis": "^0.15.2",
     zarrextra: "0.7.1",
 };
 
