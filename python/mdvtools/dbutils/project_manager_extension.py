@@ -52,6 +52,13 @@ def is_owner_or_admin(user, permissions):
     return bool(user.get("is_admin", False))
 
 
+# An Admin is Owner of every project (ADR 0019), so their role on one project
+# changes only with their Admin rights.
+ADMIN_ROLE_LOCKED = (
+    "An Admin is Owner of every project. Remove their Admin rights to change their project roles."
+)
+
+
 def record_project_event(project_id, event_type, details=None):
     """Record one project-management usage event.
 
@@ -708,9 +715,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if not is_owner_or_admin(user, user_permissions):
                     return jsonify({"error": "Only the project owner or an administrator can share the project"}), 403
 
-                # Refresh cache to pick up permission changes from manage_project_permissions.py
-                # Note: sync_users_to_db is no longer called here - the manage_project_permissions.py
-                # script ensures the DB is up to date by syncing at the start of main()
+                # Refresh the cache so the dialog shows roles written outside this process.
                 try:
                     from mdvtools.auth.authutils import cache_user_projects
                     logger.info("Refreshing user and permission cache...")
@@ -728,7 +733,8 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 user_projects = UserProject.query.filter_by(project_id=project_id).all()
                 for up in user_projects:
                     user_obj = User.query.get(up.user_id)
-                    if not user_obj:
+                    # A Deactivated user keeps their roles but is not shown (ADR 0020).
+                    if not user_obj or not user_obj.is_active:
                         continue
 
                     shared_users_list.append({
@@ -736,15 +742,17 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         "email": user_obj.email,
                         "permission": (
                             "Owner" if up.is_owner else "Edit" if up.can_write else "View"
-                        )
+                        ),
+                        # So the dialog can lock an Admin's role.
+                        "is_admin": bool(user_obj.is_admin),
                     })
 
                 # Step 4: Get unshared users for dropdown
                 # Read from database to ensure we have all users (including newly synced ones)
-                all_db_users = User.query.all()
+                all_db_users = User.query.filter_by(is_active=True).all()
                 shared_user_ids = {u["id"] for u in shared_users_list}
                 all_users = [
-                    {"id": u.id, "email": u.email}
+                    {"id": u.id, "email": u.email, "is_admin": bool(u.is_admin)}
                     for u in all_db_users
                     if u.id not in shared_user_ids
                 ]
@@ -791,6 +799,12 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
                 if not target_user_id or permission not in ["view", "edit", "owner"]:
                     return jsonify({"error": "Invalid user or permission"}), 400
+
+                target_user = db.session.get(User, target_user_id)
+                if target_user is not None and not target_user.is_active:
+                    return jsonify({"error": "This user is deactivated, so the project cannot be shared with them"}), 400
+                if target_user is not None and target_user.is_admin and permission != "owner":
+                    return jsonify({"error": ADMIN_ROLE_LOCKED}), 400
 
                 # Step 4: Determine permission flags
                 is_owner = permission == "owner"
@@ -856,6 +870,12 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if new_permission not in ["view", "edit", "owner"]:
                     return jsonify({"error": "Invalid permission value"}), 400
 
+                target_user = db.session.get(User, user_id)
+                if target_user is not None and not target_user.is_active:
+                    return jsonify({"error": "This user is deactivated, so their project role cannot be changed"}), 400
+                if target_user is not None and target_user.is_admin:
+                    return jsonify({"error": ADMIN_ROLE_LOCKED}), 400
+
                 is_owner = new_permission == "owner"
                 can_write = new_permission in ["edit", "owner"]
                 can_read = True  # Always true for project access
@@ -910,6 +930,10 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
                 if not is_owner_or_admin(user, user_permissions):
                     return jsonify({"error": "Only the project owner or an administrator can remove users"}), 403
+
+                target_user = db.session.get(User, user_id)
+                if target_user is not None and target_user.is_admin:
+                    return jsonify({"error": ADMIN_ROLE_LOCKED}), 400
 
                 # Step 4: Remove the user from the project using the service method
                 UserProjectService.remove_user_from_project(user_id, project_id)

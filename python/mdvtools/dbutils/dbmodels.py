@@ -2,7 +2,8 @@ from mdvtools._optional import require_extra
 require_extra("app", "flask_sqlalchemy")
 
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from sqlalchemy.orm import validates
+from datetime import datetime, timedelta
 
 db = SQLAlchemy()
 
@@ -86,6 +87,96 @@ class UserProject(db.Model):
         else:
             self.can_write = can_write
             self.can_read = True if can_write else (can_read if can_read is not None else False)
+
+INVITATION_LIFETIME = timedelta(days=14)
+PROJECT_ROLES = ("viewer", "editor", "owner")
+
+
+def normalise_email(email):
+    """Invitations match emails ignoring case (ADR 0021), so they are stored lowercase."""
+    return email.strip().lower()
+
+class Invitation(db.Model):
+    """An Admin's offer of access to one email address (ADR 0019).
+
+    MDV-Admin writes these rows directly, and the sign-in callback reads them.
+    """
+    __tablename__ = 'invitations'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    email = db.Column(db.String(255), nullable=False, index=True)
+    # The Auth0 connection the person must sign in through: the Sign-in method.
+    connection = db.Column(db.String(255), nullable=False)
+    # Set when the Invitation moves an existing User to a new Sign-in method,
+    # and null when it is for someone with no User yet.
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    invited_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    sent_at = db.Column(db.DateTime, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    # Rows are kept once closed, so a User's history shows who invited them.
+    # Expiry is read from expires_at, so nothing has to update a row when it lapses.
+    accepted_at = db.Column(db.DateTime, nullable=True)
+    accepted_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    revoked_at = db.Column(db.DateTime, nullable=True)
+    projects = db.relationship(
+        'InvitationProject', backref='invitation', lazy=True, cascade='all, delete-orphan'
+    )
+
+    def __init__(self, **fields):
+        super().__init__(**fields)
+        self.resend(at=self.sent_at)
+
+    def resend(self, at=None):
+        """Start a new 14 days from now, or from at."""
+        self.sent_at = at or datetime.now()
+        self.expires_at = self.sent_at + INVITATION_LIFETIME
+
+    def is_open(self, at=None):
+        """Whether a sign-in can still accept it, at the given time or now.
+
+        An accepted, revoked or expired Invitation is closed.
+        """
+        if self.accepted_at is not None or self.revoked_at is not None:
+            return False
+        at = at or datetime.now()
+        return at < self.expires_at
+
+    @classmethod
+    def open_for_email(cls, email, at=None):
+        """The Invitations still open for this email, newest first."""
+        at = at or datetime.now()
+        return (
+            cls.query.filter(
+                cls.email == normalise_email(email),
+                cls.accepted_at.is_(None),
+                cls.revoked_at.is_(None),
+                cls.expires_at > at,
+            )
+            .order_by(cls.sent_at.desc())
+            .all()
+        )
+
+    @validates('email')
+    def _normalise_email(self, _key, email):
+        return normalise_email(email)
+
+class InvitationProject(db.Model):
+    """The Project role an Invitation grants on one project."""
+    __tablename__ = 'invitation_projects'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    invitation_id = db.Column(db.Integer, db.ForeignKey('invitations.id'), nullable=False, index=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False, index=True)
+    role = db.Column(db.String(16), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('invitation_id', 'project_id'),
+    )
+
+    @validates('role')
+    def _check_role(self, _key, role):
+        """Refuse any role but viewer, editor or owner, the Invitation vocabulary."""
+        if role not in PROJECT_ROLES:
+            raise ValueError(f"Project role must be one of {PROJECT_ROLES}, not {role!r}")
+        return role
 
 class UsageEvent(db.Model):
     """Append-only record of who used what, for the Admin usage page.

@@ -331,41 +331,6 @@ The tag moved but the containers did not. Check for a failed start with:
 fi
 info "every service is on ${loaded_id#sha256:}"
 
-# --- check the startup sync ------------------------------------------------
-
-# RUN_AUTH0_SYNC_ON_START going missing is silent: the container comes up fine
-# and the caches quietly go stale.
-info "checking the Auth0 startup sync"
-sync_report=$(remote bash -s -- "$COMPOSE_FILE" $services <<'REMOTE'
-set -euo pipefail
-compose=$1; shift
-cd "$(dirname "$compose")"
-for svc in "$@"; do
-    # || true because compose exits non-zero on an unknown service, and under
-    # set -e that would kill the block before the fallback below runs.
-    cid=$(docker compose -f "$compose" ps -q "$svc" 2>/dev/null | head -1 || true)
-    # Fall back to the container name, which is how the bia compose file names
-    # these, in case the compose project name is not derived from the directory.
-    [ -n "$cid" ] || cid=$(docker ps --filter "name=^${svc}$" --format '{{.ID}}' | head -1)
-    [ -n "$cid" ] || { echo "$svc: not running"; continue; }
-    flag=$(docker exec "$cid" printenv RUN_AUTH0_SYNC_ON_START 2>/dev/null || true)
-    line=$(docker logs "$cid" 2>&1 \
-        | grep -iE "sync on startup|syncing users|sync complete|sync failed" \
-        | tail -1 || true)
-    echo "$svc: RUN_AUTH0_SYNC_ON_START=${flag:-unset} ${line:+| $line}"
-done
-REMOTE
-) || warn "could not read the sync state"
-
-printf '%s\n' "$sync_report" | sed 's/^/    /'
-
-case "$sync_report" in
-    *"RUN_AUTH0_SYNC_ON_START=unset"*)
-        warn "the startup sync flag is not set on at least one service.
-It lives in the .env.sqlite_N files next to $COMPOSE_FILE. Without it the user
-caches go stale and new Auth0 users never appear." ;;
-esac
-
 # --- tidy up ---------------------------------------------------------------
 
 if [ "$keep" -eq 0 ]; then

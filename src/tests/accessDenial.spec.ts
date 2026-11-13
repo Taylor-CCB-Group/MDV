@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { ACCESS_DENIED_MESSAGES, GENERIC_DENIAL, getAccessDenial, getDeniedAccount } from "@/login/accessDenial";
+import {
+    ACCESS_DENIED_MESSAGES,
+    GENERIC_DENIAL,
+    getAccessContact,
+    getAccessDenial,
+    getDeniedAccount,
+    getDeniedSignInMethod,
+} from "@/login/accessDenial";
 
 describe("getAccessDenial", () => {
     test("shows sign-in when the server sent no reason", () => {
@@ -66,5 +73,34 @@ describe("getDeniedAccount", () => {
     test("is null when the server did not know the account", () => {
         expect(getDeniedAccount(pageWithAccount(""))).toBeNull();
         expect(getDeniedAccount(pageWithAccount(null))).toBeNull();
+    });
+});
+
+describe("what else the server wrote into the page", () => {
+    // ADR 0019: someone refused sees how they signed in and who to ask.
+    function pageWith(meta: Record<string, string>): Document {
+        const doc = document.implementation.createHTMLDocument("login");
+        for (const [name, content] of Object.entries(meta)) {
+            const tag = doc.createElement("meta");
+            tag.name = name;
+            tag.content = content;
+            doc.head.appendChild(tag);
+        }
+        return doc;
+    }
+
+    test("reads the Sign-in method and the site contact", () => {
+        const doc = pageWith({
+            "mdv-denied-sign-in-method": "acme-entra",
+            "mdv-access-contact": "MDV support, mdv-support@example.org",
+        });
+        expect(getDeniedSignInMethod(doc)).toBe("acme-entra");
+        expect(getAccessContact(doc)).toBe("MDV support, mdv-support@example.org");
+    });
+
+    test("is null for each when the server left it empty or out", () => {
+        const doc = pageWith({ "mdv-denied-sign-in-method": "" });
+        expect(getDeniedSignInMethod(doc)).toBeNull();
+        expect(getAccessContact(doc)).toBeNull();
     });
 });

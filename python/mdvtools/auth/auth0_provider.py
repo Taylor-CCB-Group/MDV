@@ -7,10 +7,7 @@ import threading
 from datetime import datetime
 from authlib.integrations.flask_client import OAuth
 from flask import jsonify, session, redirect
-from typing import Optional, Dict, List, Any, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from mdvtools.dbutils.dbmodels import Project
+from typing import Optional, Dict, Any, List
 # from flask import Response
 from flask.typing import ResponseReturnValue
 from mdvtools.auth.auth_provider import AuthProvider
@@ -18,10 +15,6 @@ from mdvtools.auth.access_denied import AccessDeniedReason, deny_access
 from mdvtools.logging_config import get_logger
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
-from auth0.management import Auth0
-from auth0.authentication import GetToken
-from auth0.rest import RestClientOptions
-from auth0.exceptions import RateLimitError
 
 logger = get_logger(__name__)
 
@@ -31,6 +24,8 @@ _jwks_cache_expiry = None
 _jwks_cache_lock = threading.Lock()  # Lock to protect cache access
 JWKS_CACHE_DURATION = 3600  # Cache for 1 hour
 
+# Prefix of the claims the post-login Action adds (docs/auth0/add-sign-in-claims.js).
+CLAIM_NAMESPACE = "https://mdv/"
 # Applied to every call this module makes to Auth0. Long enough for a slow
 # network; short enough that a hung call fails instead of holding a worker.
 AUTH0_TIMEOUT_SECONDS = 15
@@ -187,6 +182,10 @@ class Auth0Provider(AuthProvider):
                     "last_name": user_metadata.get("last_name", "Unknown"),
                     "email": raw_data.get("email", ""),
                     "email_verified": bool(raw_data.get("email_verified", False)),
+                    # Added by the post-login Action, for accepting an Invitation (ADR 0021).
+                    "connection": raw_data.get(f"{CLAIM_NAMESPACE}connection"),
+                    "connection_strategy": raw_data.get(f"{CLAIM_NAMESPACE}connection_strategy"),
+                    "xms_edov": raw_data.get(f"{CLAIM_NAMESPACE}xms_edov") is True,
                     "association": user_metadata.get("association", "Unknown Organization"),
                     "avatarUrl": raw_data.get("picture", ""),
                 }
@@ -369,7 +368,7 @@ class Auth0Provider(AuthProvider):
     def validate_user(self):
         """Validate the user using Auth0."""
 
-        from mdvtools.dbutils.dbmodels import User, db
+        from mdvtools.dbutils.dbmodels import User
 
         try:
             # Check if user information is already cached in session
@@ -399,13 +398,18 @@ class Auth0Provider(AuthProvider):
             # Query the user from the database if not in cache
             user = User.query.filter_by(auth_id=auth0_id).first()
 
+            sign_in_method = user_info.get("connection")
+            if user is None:
+                # No User for this account yet. An open Invitation makes one
+                # (ADR 0021). Otherwise this is the first Admin, or a refusal.
+                user = self._accept_invitation(user_info) if auth0_id else None
             if user is None:
                 # Signed in at Auth0 but unknown here. Each way out records why,
                 # so the person gets a page saying so rather than a redirect to a
                 # login that Auth0 completes silently, straight back to here.
                 refusal = self._bootstrap_refusal(user_info, auth0_id, email)
                 if refusal is not None or not auth0_id:
-                    deny_access(refusal or "no_account", email)
+                    deny_access(refusal or "no_account", email, sign_in_method)
                     return None, (jsonify({"error": "User not found"}), 404)
                 try:
                     user = self._create_first_admin(auth0_id, email)
@@ -414,13 +418,22 @@ class Auth0Provider(AuthProvider):
                     deny_access("setup_failed", email)
                     return None, (jsonify({"error": "Administrator bootstrap failed"}), 500)
                 if user is None:
-                    deny_access("no_account", email)
+                    deny_access("no_account", email, sign_in_method)
                     return None, (jsonify({"error": "User not found"}), 404)
             elif not user.is_active:
-                # First successful login for a pending (admin-invited) user: activate them.
-                user.is_active = True
-                user.confirmed_at = datetime.now()
-                db.session.commit()
+                # A Deactivated user. Signing in reactivates them only by
+                # accepting an Invitation an Admin sent them (ADRs 0020, 0021).
+                # They get the same page as someone with no User, so it does not
+                # show that this deployment still holds theirs.
+                user = self._accept_invitation(user_info)
+                if user is None:
+                    deny_access("no_account", email, sign_in_method)
+                    return None, (jsonify({"error": "User not found"}), 404)
+            else:
+                # An active User can still hold an Invitation that names them, for
+                # example when an Admin reactivated them before they signed in. Their
+                # account belongs to them, so no other Invitation can match.
+                user = self._accept_invitation(user_info) or user
 
             # Add the user to the in-memory cache
             user_data = {"id": user.id, "auth_id": user.auth_id, "email": user.email, "is_admin": user.is_admin}
@@ -437,6 +450,18 @@ class Auth0Provider(AuthProvider):
             # login, which Auth0 completes at once - a loop for as long as it lasts.
             deny_access("unavailable")
             return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
+
+    def _accept_invitation(self, user_info: Dict[str, Any]):
+        """The User made or moved by accepting an open Invitation, or None."""
+        from mdvtools.dbutils.dbservice import InvitationService
+        from mdvtools.auth.authutils import cache_user_projects
+
+        user = InvitationService.accept_for_sign_in(user_info)
+        if user is not None:
+            # Project routes read grants from the cache, so the new User would
+            # otherwise see no projects until something else refreshed it.
+            cache_user_projects()
+        return user
 
     def _bootstrap_refusal(
         self, user_info: Dict[str, Any], auth0_id: Optional[str], email: str
@@ -498,14 +523,7 @@ class Auth0Provider(AuthProvider):
             password="",
         )
         db.session.add(user)
-        # Flushed, not committed: the row has to exist for the database to enforce
-        # its unique constraints, but it must not become visible to anything else
-        # until the Auth0 role is in place. Committing first would publish a
-        # working local administrator that Auth0 does not know is one, and undoing
-        # that afterwards is not reliably possible - usage_events.user_id is a
-        # non-nullable foreign key with no cascade, so a concurrent login writing
-        # its login event is enough to block the delete and strand the half-made
-        # administrator. Ordering it this way means there is nothing to undo.
+        # Admin rights live only in MDV (ADR 0019), so no Auth0 role is assigned.
         try:
             db.session.flush()
         except IntegrityError:
@@ -516,28 +534,14 @@ class Auth0Provider(AuthProvider):
             return User.query.filter_by(auth_id=auth0_id).first()
 
         try:
-            self._assign_admin_role(auth0_id)
-        except Exception:
-            logger.exception(
-                "Failed to assign the Auth0 'admin' role to the bootstrap administrator; "
-                "discarding the uncommitted administrator."
-            )
-            # Nothing was ever committed, so this discards the row rather than
-            # deleting a published one. The deployment is left exactly as it was
-            # before the attempt, which is what the old cleanup path was trying
-            # and failing to achieve.
-            db.session.rollback()
-            raise
-
-        try:
             db.session.commit()
         except IntegrityError:
             db.session.rollback()
             # The same race, seen at commit instead of at flush.
             return User.query.filter_by(auth_id=auth0_id).first()
 
-        # Administrators own every project, but only the Auth0 sync and a project
-        # rescan write those grants, and neither has run on a fresh deployment.
+        # Administrators own every project, but only Admin's Make Admin and a
+        # project rescan write those grants, and neither has run on a fresh deployment.
         # Without this the first administrator logs in to an empty project list.
         try:
             from mdvtools.dbutils.dbservice import UserProjectService
@@ -557,428 +561,13 @@ class Auth0Provider(AuthProvider):
         logger.info(f"Bootstrapped first administrator: {email}")
         return user
 
-    def _assign_admin_role(self, auth0_id: str) -> None:
-        """Assign the Auth0 tenant's 'admin' role to auth0_id via the Management API."""
-        auth0, _scopes = _management_client(self.domain, self.client_id, self.client_secret)
-        role_id = _find_admin_role_id(auth0)
-        if not role_id:
-            raise RuntimeError("Auth0 tenant has no role named 'admin'.")
-
-        auth0.users.add_roles(auth0_id, [role_id])
-    
-    class SyncContext:
-        """Context object for user sync operations."""
-        def __init__(
-            self,
-            auth0: Auth0,
-            all_projects: List['Project'],
-            page: int,
-            processed_users: int = 0,
-            new_users: int = 0,
-            updated_users: int = 0,
-            admin_users_synced: int = 0,
-            pagination_rate_limit_count: int = 0,
-            max_pagination_rate_limit_retries: int = 5,
-            pagination_retry_delay: float = 2.0,
-            per_page: int = 50,
-            admin_auth_ids: Optional[set] = None
-        ):
-            self.auth0 = auth0
-            self.all_projects = all_projects
-            self.page = page
-            self.processed_users = processed_users
-            self.new_users = new_users
-            self.updated_users = updated_users
-            self.admin_users_synced = admin_users_synced
-            self.pagination_rate_limit_count = pagination_rate_limit_count
-            self.max_pagination_rate_limit_retries = max_pagination_rate_limit_retries
-            self.pagination_retry_delay = pagination_retry_delay
-            self.per_page = per_page
-            # auth0 user_ids holding the 'admin' role, fetched once per sync
-            self.admin_auth_ids = admin_auth_ids if admin_auth_ids is not None else set()
-
-        def to_dict(self) -> Dict[str, int]:
-            """Convert context stats to dictionary."""
-            return {
-                'processed_users': self.processed_users,
-                'new_users': self.new_users,
-                'updated_users': self.updated_users,
-                'admin_users_synced': self.admin_users_synced
-            }
-        
-        def reset_pagination_rate_limit(self) -> None:
-            """Reset pagination rate limit counters after successful request."""
-            self.pagination_rate_limit_count = 0
-            self.pagination_retry_delay = 2.0
-    
-    def _fetch_admin_auth_ids(
-        self,
-        auth0: Auth0,
-        context: 'SyncContext'
-    ) -> set:
-        """
-        Fetch the Auth0 user_ids of every member of the 'admin' role, once.
-
-        Replaces the previous per-user ``users.list_roles()`` call (an N+1 that
-        made one Management-API request per user) with ~2 requests total: one to
-        resolve the 'admin' role id, then paged requests for its members.
-
-        Args:
-            auth0: Auth0 Management API client
-            context: SyncContext (used for rate-limit retry configuration)
-
-        Returns:
-            set: auth0 user_ids holding the 'admin' role (empty if none / on error).
-        """
-        # 1. Resolve the 'admin' role id.
-        try:
-            roles_resp = auth0.roles.list(name_filter='admin')
-            roles_list = roles_resp.get('roles', []) if isinstance(roles_resp, dict) else []
-            admin_role = next((r for r in roles_list if r.get('name') == 'admin'), None)
-        except Exception as e:
-            logger.error(f"Failed to resolve Auth0 'admin' role: {e}")
-            return set()
-
-        if not admin_role:
-            logger.warning("No 'admin' role found in Auth0; no users will be marked admin.")
-            return set()
-
-        # 2. Page through the role's members, collecting user_ids.
-        admin_ids: set = set()
-        page = 0
-        retry_delay = 2.0
-        rate_limit_retries = 0
-        while True:
-            try:
-                members = auth0.roles.list_users(admin_role['id'], page=page, per_page=100)
-                rate_limit_retries = 0
-            except RateLimitError:
-                rate_limit_retries += 1
-                if rate_limit_retries > context.max_pagination_rate_limit_retries:
-                    logger.error(
-                        f"Too many rate-limit retries listing admin members (page {page}); "
-                        f"proceeding with {len(admin_ids)} collected so far."
-                    )
-                    break
-                logger.warning(
-                    f"Rate limit listing admin members (page {page}). "
-                    f"Retrying in {retry_delay:.1f}s... (attempt {rate_limit_retries})"
-                )
-                time.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, 60.0)
-                continue
-            except Exception as e:
-                logger.error(f"Failed to list admin role members (page {page}): {e}")
-                break
-
-            users = members.get('users', []) if isinstance(members, dict) else []
-            for u in users:
-                uid = u.get('user_id')
-                if uid:
-                    admin_ids.add(uid)
-
-            if len(users) < 100:
-                break
-            page += 1
-            time.sleep(1)  # gentle pacing between member pages
-
-        logger.info(f"Fetched {len(admin_ids)} admin member(s) from Auth0.")
-        return admin_ids
-    
-    def _process_single_user(
-        self, 
-        user: Dict[str, Any], 
-        context: 'SyncContext'
-    ) -> bool:
-        """
-        Process a single user: sync to DB, fetch roles, update admin status, assign projects.
-        
-        Args:
-            user: User dict from Auth0 API
-            context: SyncContext object containing auth0 client, projects, page, and stats
-            
-        Returns:
-            bool: True if user was successfully processed, False otherwise
-        """
-        from mdvtools.dbutils.dbservice import UserService, UserProjectService
-        from mdvtools.dbutils.dbmodels import db, User
-        
-        email = user.get('email', '')
-        auth0_id = user.get('user_id')
-        if not auth0_id:
-            logger.error(f"User '{email}' has no user_id, skipping")
-            return False
-        
-        # Check if user already exists to track new vs updated
-        existing_user = User.query.filter_by(auth_id=auth0_id).first()
-        is_new_user = existing_user is None
-        
-        # Use UserService to add or update user
-        db_user = UserService.add_or_update_user(
-            email=email,
-            auth_id=auth0_id
-        )
-                
-        # Admin status comes from the pre-fetched admin role members (no per-user API call)
-        is_admin = auth0_id in context.admin_auth_ids
-
-        # Update admin status
-        was_admin = db_user.is_admin
-        db_user.is_admin = is_admin
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error updating user {auth0_id} admin status: {e}")
-            return False
-                
-        if is_admin:
-            # Assign all projects to this user as owner via UserProjectService
-            for project in context.all_projects:
-                try:
-                    UserProjectService.add_or_update_user_project(
-                        user_id=db_user.id,
-                        project_id=project.id,
-                        is_owner=True
-                    )
-                except Exception as e:
-                    logger.error(f"Error assigning project {project.name} to user {auth0_id}: {e}")
-                    return False
-        # Update context stats
-        if is_admin and not was_admin:
-            context.admin_users_synced += 1
-        if is_new_user:
-            context.new_users += 1
-        else:
-            context.updated_users += 1        
-        context.processed_users += 1
-        return True
-    
-    def _handle_pagination_rate_limit(
-        self, 
-        e: RateLimitError,
-        context: 'SyncContext'
-    ) -> None:
-        """
-        Handle rate limit error during pagination. Updates context in place.
-        
-        Args:
-            e: RateLimitError exception
-            context: SyncContext object containing pagination state
-            
-        Raises:
-            RuntimeError: If max retries exceeded
-        """
-        context.pagination_rate_limit_count += 1
-        new_count = context.pagination_rate_limit_count
-        
-        # Collect all available error information
-        error_info = {
-            'page': context.page,
-            'processed': context.processed_users,
-            'consecutive_errors': new_count,
-            'retry_delay': context.pagination_retry_delay,
-            'status': getattr(e, 'status_code', None),
-            'code': getattr(e, 'error_code', None),
-            'message': getattr(e, 'message', str(e)),
-            'reset_at': getattr(e, 'reset_at', None),
-            'remaining': getattr(e, 'remaining', None),
-            'limit': getattr(e, 'limit', None),
-        }
-        # Filter out None values for cleaner output
-        error_info = {k: v for k, v in error_info.items() if v is not None}
-        
-        logger.error(f"Rate limit during pagination: {error_info}")
-        
-        # Check if we've exceeded max retries
-        if new_count >= context.max_pagination_rate_limit_retries:
-            logger.error(
-                f"Aborting: {new_count} consecutive rate limit errors "
-                f"(max: {context.max_pagination_rate_limit_retries}). Processed {context.processed_users} users."
-            )
-            raise RuntimeError(
-                f"Too many consecutive rate limit errors. Check: function call frequency, "
-                f"concurrent execution, or insufficient delays between requests."
-            ) from e
-        
-        logger.warning(
-            f"Rate limit hit ({new_count}/{context.max_pagination_rate_limit_retries}). "
-            f"Possible issues: frequent calls, concurrent execution, batch size ({context.per_page}), "
-            f"or insufficient delays (1s between pages). Retrying in {context.pagination_retry_delay}s..."
-        )
-    
-    def _log_sync_statistics(self, initial_user_count: int, initial_admin_count: int) -> None:
-        """
-        Log initial and final database statistics for user sync.
-        
-        Args:
-            initial_user_count: User count at start of sync
-            initial_admin_count: Admin user count at start of sync
-        """
-        from mdvtools.dbutils.dbmodels import User
-        
-        final_user_count = User.query.count()
-        final_admin_count = User.query.filter_by(is_admin=True).count()
-        
-        logger.info(
-            f"User sync completed. Database: {final_user_count} total users "
-            f"({final_user_count - initial_user_count:+d}), "
-            f"{final_admin_count} admin users ({final_admin_count - initial_admin_count:+d})"
-        )
-        
-    def sync_users_to_db(self) -> None:
-        """
-        Syncs users from Auth0 to the application's database using UserService and UserProjectService.
-        Implements rate limiting and retry logic for Auth0 API calls.
-
-        WARNING: This function makes many Auth0 Management API calls and should be called manually only.
-        This function should only be called from manage_project_permissions.py script.
-
-        Design concerns:
-        - Auth0 Management API has strict rate limits (typically 2 req/sec for free tier)
-        - This function makes ~ceil(N/per_page) + ~ceil(A/per_page) API calls, where N = total
-          users and A = admin-role members (admins are fetched once, not once per user)
-        - If called frequently it still adds load; prefer event-driven sync (see issue #515)
-        """
-        from mdvtools.dbutils.dbmodels import Project
-        
-        try:
-            # Load Auth0 config from app
-            auth0_domain = self.app.config['AUTH0_DOMAIN']
-            client_id = self.app.config['AUTH0_CLIENT_ID']
-            client_secret = self.app.config['AUTH0_CLIENT_SECRET']
-            auth0_db_connection = self.app.config['AUTH0_DB_CONNECTION']
-
-            auth0, _scopes = _management_client(auth0_domain, client_id, client_secret)
-
-            # Get initial database statistics
-            from mdvtools.dbutils.dbmodels import User
-            initial_user_count = User.query.count()
-            initial_admin_count = User.query.filter_by(is_admin=True).count()
-            logger.info(
-                f"Starting user sync. Database stats: {initial_user_count} total users, "
-                f"{initial_admin_count} admin users"
-            )
-            
-            # Initialize sync context
-            all_projects = Project.query.all()
-            sync_context = self.SyncContext(
-                auth0=auth0,
-                all_projects=all_projects,
-                page=0
-            )
-
-            # Fetch all 'admin' role members once, up front. Replaces the old
-            # per-user list_roles() call (N+1) with ~2 calls total.
-            sync_context.admin_auth_ids = self._fetch_admin_auth_ids(auth0, sync_context)
-
-            # Fetch users from Auth0 connection with pagination
-            while True:
-                try:
-                    users = auth0.users.list(
-                        q=f'identities.connection:"{auth0_db_connection}"',
-                        page=sync_context.page,
-                        per_page=sync_context.per_page
-                    )
-                    
-                    # Reset rate limit counter on successful request
-                    sync_context.reset_pagination_rate_limit()
-                    
-                    # Check if we've reached the end of pagination
-                    # Auth0 returns an empty list when there are no more users to fetch
-                    user_list = users.get('users', [])
-                    if not user_list:
-                        logger.info(f"Reached end of pagination at page {sync_context.page} (empty user list returned)")
-                        break
-                    
-                    # Process users on this page
-                    for user in user_list:
-                        success = False
-                        try:
-                            success = self._process_single_user(user, sync_context)
-                        except Exception as e:
-                            logger.error(f"Error processing user '{user.get('email', '')}': {e}")
-                        
-                        if success:
-                            # Log progress every 10 users
-                            if sync_context.processed_users % 10 == 0:
-                                logger.info(
-                                    f"Progress: {sync_context.processed_users} processed "
-                                    f"({sync_context.new_users} new, {sync_context.updated_users} updated, "
-                                    f"{sync_context.admin_users_synced} admins)"
-                                )
-                    
-                    # Check if we got fewer users than requested (indicates last page)
-                    if len(user_list) < sync_context.per_page:
-                        logger.info(
-                            f"Reached end of pagination at page {sync_context.page} "
-                            f"(got {len(user_list)} users, less than requested {sync_context.per_page})"
-                        )
-                        break
-                    
-                    # Continue to next page
-                    sync_context.page += 1
-                    time.sleep(1)  # Add delay between pagination requests
-                    
-                except RateLimitError as e:
-                    self._handle_pagination_rate_limit(e, sync_context)
-                    time.sleep(sync_context.pagination_retry_delay)
-                    # Update retry delay with exponential backoff, max 60s
-                    sync_context.pagination_retry_delay = min(sync_context.pagination_retry_delay * 2, 60.0)
-                    continue
-                
-            # Log final statistics
-            logger.info(
-                f"User sync completed. Stats: {sync_context.processed_users} processed "
-                f"({sync_context.new_users} new, {sync_context.updated_users} updated, "
-                f"{sync_context.admin_users_synced} admins synced)."
-            )
-            self._log_sync_statistics(initial_user_count, initial_admin_count)
-
-        except Exception as e:
-            logger.exception(f"In sync_users_to_db: An unexpected error occurred: {e}")
-            raise
-
-# The Management API scopes the first administrator's sign-in needs: finding the
-# 'admin' role, and assigning it.
-FIRST_ADMIN_SCOPES = ("read:roles", "update:users")
-
-
-def _management_client(domain: str, client_id: str, client_secret: str) -> tuple[Auth0, Optional[set[str]]]:
-    """A Management API client, and the scopes its token was granted.
-
-    The scopes come from the token response itself, which is what lets the
-    startup check see a missing grant without having to try the operation. None
-    when Auth0 did not report them, so a caller can tell "none" from "unknown".
-    """
-    get_token = GetToken(
-        domain=domain, client_id=client_id, client_secret=client_secret, timeout=AUTH0_TIMEOUT_SECONDS
-    )
-    response = get_token.client_credentials(audience=f"https://{domain}/api/v2/")
-    scope = response.get("scope")
-    scopes = set(scope.split()) if isinstance(scope, str) else None
-    client = Auth0(domain, response["access_token"], rest_options=RestClientOptions(timeout=AUTH0_TIMEOUT_SECONDS))
-    return client, scopes
-
-
-def _find_admin_role_id(auth0: Auth0) -> Optional[str]:
-    """The id of the tenant's role named exactly 'admin', or None if it has none."""
-    roles_response = auth0.roles.list(name_filter="admin")
-    roles = roles_response.get("roles", []) if isinstance(roles_response, dict) else []
-    return next((role["id"] for role in roles if role.get("name") == "admin"), None)
-
-
 def check_first_admin_setup(app) -> List[str]:
-    """Check at startup everything the first administrator's sign-in will need.
+    """Check at startup what the first Admin's sign-in needs.
 
-    Runs only for Auth0 and only while the users table is empty - a deployment
-    nobody has signed in to yet. Each problem it looks for has otherwise surfaced
-    one at a time, as a login loop on someone's first attempt to sign in, with the
-    cause found by reading logs after the fact. Here they are all reported, in the
-    startup log, before anyone tries.
-
-    Logs and returns the problems found; never raises, so a check that cannot
-    reach Auth0 cannot stop the server starting.
+    Runs only for Auth0 and only while the users table is empty, a deployment
+    nobody has signed in to yet. Admin rights live only in MDV (ADR 0019), so the
+    first Admin needs MDV_BOOTSTRAP_ADMIN_EMAIL and nothing in Auth0 beyond a
+    verified account. Logs and returns the problems found, and never raises.
     """
     from mdvtools.dbutils.dbmodels import User
 
@@ -993,37 +582,6 @@ def check_first_admin_setup(app) -> List[str]:
             "MDV_BOOTSTRAP_ADMIN_EMAIL is not set, so nobody can become the first administrator. "
             "Set it, then recreate the container - a restart does not apply environment changes."
         )
-
-    try:
-        auth0, scopes = _management_client(
-            str(app.config.get("AUTH0_DOMAIN") or ""),
-            str(app.config.get("AUTH0_CLIENT_ID") or ""),
-            str(app.config.get("AUTH0_CLIENT_SECRET") or ""),
-        )
-    except Exception as e:
-        problems.append(
-            f"Could not get an Auth0 Management API token ({e}). In Auth0, set this application's "
-            "Token Endpoint Authentication Method to Client Secret (Post), tick the Client Credentials "
-            "grant, and authorise the application for the Auth0 Management API."
-        )
-    else:
-        missing = [scope for scope in FIRST_ADMIN_SCOPES if scopes is not None and scope not in scopes]
-        if missing:
-            problems.append(
-                f"The Auth0 Management API grant is missing {', '.join(missing)}, which assigning the "
-                "first administrator's role needs. Add them under Applications > APIs > "
-                "Auth0 Management API > Machine to Machine Applications."
-            )
-        # Roles can only be looked at with permission to read them.
-        if "read:roles" not in missing:
-            try:
-                if _find_admin_role_id(auth0) is None:
-                    problems.append(
-                        "This Auth0 tenant has no role named exactly 'admin'. "
-                        "Create it under User Management > Roles."
-                    )
-            except Exception as e:
-                problems.append(f"Could not read this Auth0 tenant's roles ({e}).")
 
     for problem in problems:
         logger.error(f"First administrator setup: {problem}")

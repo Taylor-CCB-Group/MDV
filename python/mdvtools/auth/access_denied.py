@@ -20,21 +20,28 @@ AccessDeniedReason = Literal["email_unverified", "not_set_up", "no_account", "se
 
 # Read by templates/login.html, which names the refused account on the page.
 DENIED_ACCOUNT_SESSION_KEY = "access_denied_email"
+# The Auth0 connection the refused sign-in came through, so someone who used the
+# wrong Sign-in method can see that they did (ADR 0019).
+DENIED_SIGN_IN_METHOD_SESSION_KEY = "access_denied_sign_in_method"
 
 
-def deny_access(reason: AccessDeniedReason, email: Optional[str] = None) -> None:
+def deny_access(
+    reason: AccessDeniedReason, email: Optional[str] = None, sign_in_method: Optional[str] = None
+) -> None:
     """Record why this request's signed-in user was refused.
 
     The reason is stored on flask.g, which lasts for one request only, so the
     next sign-in attempt is judged afresh - that is what makes "verify your
-    email, then try again" work. The email, when known, goes in the session
-    rather than the URL, so the login page can say which account was refused.
+    email, then try again" work. The email and Sign-in method, when known, go
+    in the session rather than the URL, so the login page can say which account
+    was refused and how it signed in.
     """
     g.access_denied_reason = reason
-    if email:
-        session[DENIED_ACCOUNT_SESSION_KEY] = email
-    else:
-        session.pop(DENIED_ACCOUNT_SESSION_KEY, None)
+    for key, value in ((DENIED_ACCOUNT_SESSION_KEY, email), (DENIED_SIGN_IN_METHOD_SESSION_KEY, sign_in_method)):
+        if value:
+            session[key] = value
+        else:
+            session.pop(key, None)
 
 
 def access_denied_reason() -> Optional[AccessDeniedReason]:

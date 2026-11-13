@@ -69,8 +69,26 @@ export const GENERIC_DENIAL: AccessDenial = {
  * the URL. Null when the server did not know it.
  */
 export function getDeniedAccount(doc: Document = document): string | null {
-    const account = doc.querySelector('meta[name="mdv-denied-account"]')?.getAttribute("content");
-    return account ? account : null;
+    return readMeta(doc, "mdv-denied-account");
+}
+
+/**
+ * The Auth0 connection the refused sign-in came through, so someone who used
+ * the wrong Sign-in method can see that they did. Null when the server did not
+ * know it.
+ */
+export function getDeniedSignInMethod(doc: Document = document): string | null {
+    return readMeta(doc, "mdv-denied-sign-in-method");
+}
+
+/** Who this deployment says to ask for access, or null when it names nobody. */
+export function getAccessContact(doc: Document = document): string | null {
+    return readMeta(doc, "mdv-access-contact");
+}
+
+function readMeta(doc: Document, name: string): string | null {
+    const content = doc.querySelector(`meta[name="${name}"]`)?.getAttribute("content");
+    return content ? content : null;
 }
 
 function isAccessDeniedReason(value: string): value is AccessDeniedReason {

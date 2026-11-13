@@ -55,11 +55,13 @@ def provider(bootstrap_app):
 
 
 def _refusal_after_validate(bootstrap_app, provider, user_info, user_count=0, stale_account=None):
-    """Run validate_user for an identity with no local row; return the reason it
-    denied and the account it kept in the session for the login page."""
+    """Run validate_user for an identity with no local row and no Invitation;
+    return the reason it denied and the account it kept in the session for the
+    login page."""
     with patch.object(provider, "get_token", return_value="dummy-token"), \
          patch.object(provider, "is_token_valid", return_value=True), \
          patch.object(provider, "get_user", return_value=user_info), \
+         patch.object(provider, "_accept_invitation", return_value=None), \
          patch("mdvtools.dbutils.dbmodels.User") as mock_user_class, \
          patch("mdvtools.dbutils.dbmodels.db") as mock_db:
         mock_db.session = MagicMock()
@@ -175,11 +177,7 @@ def test_failed_userinfo_is_explained(bootstrap_app, provider):
 
 
 def test_failed_bootstrap_is_explained(bootstrap_app, provider):
-    with patch("mdvtools.auth.auth0_provider.GetToken") as mock_get_token, \
-         patch("mdvtools.auth.auth0_provider.Auth0") as mock_auth0_class:
-        mock_get_token.return_value.client_credentials.return_value = {"access_token": "mgmt-token"}
-        mock_auth0_class.return_value.roles.list.return_value = {"roles": []}
-
+    with patch.object(provider, "_create_first_admin", side_effect=RuntimeError("database is locked")):
         reason = _denial_after_validate(
             bootstrap_app, provider,
             {"sub": "auth0|new", "email": "admin@example.com", "email_verified": True},
@@ -326,15 +324,16 @@ def test_logout_without_a_session_still_ends_the_auth0_session(tmp_path):
     provider.logout.assert_called_once()
 
 
-def test_logout_without_a_session_is_unchanged_for_other_auth_methods(tmp_path):
+def test_logout_without_a_session_signs_out_of_the_default_provider_for_other_auth_methods(tmp_path):
     provider = _provider_that()
+    provider.logout.return_value = "to the provider's logout"
     with patch("mdvtools.auth.authutils.get_auth_provider", return_value=provider):
         app = _app_with_login_route(tmp_path)
         app.config["DEFAULT_AUTH_METHOD"] = "shibboleth"
         rv = app.test_client().get("/logout")
 
-    assert rv.get_json() == {"message": "Session cleared, but auth method unknown."}
-    provider.logout.assert_not_called()
+    assert rv.get_data(as_text=True) == "to the provider's logout"
+    provider.logout.assert_called_once()
 
 
 def test_login_route_without_a_reason_still_starts_sign_in(tmp_path):
@@ -348,28 +347,14 @@ def test_login_route_without_a_reason_still_starts_sign_in(tmp_path):
 
 
 # --- Startup check ------------------------------------------------------------
+# Admin rights live only in MDV (ADR 0019), so the first Admin needs only
+# MDV_BOOTSTRAP_ADMIN_EMAIL: the check does not call Auth0.
 
 
-def _check(app, user_count=0, scope="read:roles update:users read:users", roles=None, token_error=None):
-    with patch("mdvtools.dbutils.dbmodels.User") as mock_user_class, \
-         patch("mdvtools.auth.auth0_provider.GetToken") as mock_get_token, \
-         patch("mdvtools.auth.auth0_provider.Auth0") as mock_auth0_class:
+def _check(app, user_count=0):
+    with patch("mdvtools.dbutils.dbmodels.User") as mock_user_class:
         mock_user_class.query.count.return_value = user_count
-        token_response = {"access_token": "mgmt-token"}
-        if scope is not None:
-            token_response["scope"] = scope
-        if token_error is not None:
-            mock_get_token.return_value.client_credentials.side_effect = token_error
-        else:
-            mock_get_token.return_value.client_credentials.return_value = token_response
-        mock_auth0 = mock_auth0_class.return_value
-        mock_auth0.roles.list.return_value = {
-            "roles": roles if roles is not None else [{"id": "rol_admin", "name": "admin"}]
-        }
-
-        problems = check_first_admin_setup(app)
-
-    return problems, mock_get_token, mock_auth0
+        return check_first_admin_setup(app)
 
 
 @pytest.fixture
@@ -379,78 +364,29 @@ def startup_app(bootstrap_app):
 
 
 def test_startup_check_passes_a_complete_setup(startup_app):
-    problems, _get_token, _auth0 = _check(startup_app)
-
-    assert problems == []
+    assert _check(startup_app) == []
 
 
 def test_startup_check_skips_a_deployment_with_users(startup_app):
-    problems, mock_get_token, _auth0 = _check(startup_app, user_count=3)
+    startup_app.config["MDV_BOOTSTRAP_ADMIN_EMAIL"] = ""
 
-    assert problems == []
-    mock_get_token.assert_not_called()
+    assert _check(startup_app, user_count=3) == []
 
 
 def test_startup_check_skips_other_auth_methods(startup_app):
     startup_app.config["DEFAULT_AUTH_METHOD"] = "shibboleth"
+    startup_app.config["MDV_BOOTSTRAP_ADMIN_EMAIL"] = ""
 
-    problems, mock_get_token, _auth0 = _check(startup_app)
-
-    assert problems == []
-    mock_get_token.assert_not_called()
+    assert _check(startup_app) == []
 
 
 def test_startup_check_reports_a_missing_bootstrap_address(startup_app):
     startup_app.config["MDV_BOOTSTRAP_ADMIN_EMAIL"] = ""
 
-    problems, _get_token, _auth0 = _check(startup_app)
+    problems = _check(startup_app)
 
     assert len(problems) == 1
     assert "MDV_BOOTSTRAP_ADMIN_EMAIL is not set" in problems[0]
-
-
-def test_startup_check_reports_a_blocked_management_grant(startup_app):
-    """The Token Endpoint Authentication Method = None case, which looked like a
-    session problem on a real server."""
-    problems, _get_token, _auth0 = _check(
-        startup_app, token_error=Exception("Grant type 'client_credentials' not allowed for the client.")
-    )
-
-    assert len(problems) == 1
-    assert "Client Secret (Post)" in problems[0]
-    assert "not allowed for the client" in problems[0]
-
-
-def test_startup_check_reports_missing_scopes(startup_app):
-    problems, _get_token, mock_auth0 = _check(startup_app, scope="read:roles read:users")
-
-    assert len(problems) == 1
-    assert "update:users" in problems[0]
-    # read:roles is granted, so the role is still checked.
-    mock_auth0.roles.list.assert_called_once()
-
-
-def test_startup_check_does_not_read_roles_without_permission(startup_app):
-    problems, _get_token, mock_auth0 = _check(startup_app, scope="update:users")
-
-    assert len(problems) == 1
-    assert "read:roles" in problems[0]
-    mock_auth0.roles.list.assert_not_called()
-
-
-def test_startup_check_reports_a_tenant_with_no_admin_role(startup_app):
-    problems, _get_token, _auth0 = _check(startup_app, roles=[{"id": "rol_viewer", "name": "viewer"}])
-
-    assert len(problems) == 1
-    assert "no role named exactly 'admin'" in problems[0]
-
-
-def test_startup_check_trusts_a_token_that_does_not_report_scopes(startup_app):
-    """No scope field means unknown, not none - reporting every scope missing
-    would send an operator chasing a grant that is already there."""
-    problems, _get_token, _auth0 = _check(startup_app, scope=None)
-
-    assert problems == []
 
 
 # --- Timeouts -----------------------------------------------------------------
@@ -473,22 +409,24 @@ def test_oauth_client_is_registered_with_a_timeout(provider):
     assert client_kwargs["default_timeout"] == AUTH0_TIMEOUT_SECONDS
 
 
-def test_management_api_calls_have_a_timeout(startup_app):
-    """The bootstrap's role assignment failed at the library's default of 5
-    seconds on a network where every TLS handshake took 5.06."""
-    _problems, mock_get_token, _auth0 = _check(startup_app)
+def test_logout_signs_out_of_the_provider_used_to_sign_in(tmp_path):
+    """A Shibboleth sign-in on a site whose default is Auth0 signs out of
+    Shibboleth: the provider is looked up before the session is cleared."""
+    providers = {"auth0": MagicMock(), "shibboleth": MagicMock()}
+    providers["shibboleth"].logout.return_value = "to Shibboleth logout"
+    (tmp_path / "login.html").write_text("the login page")
+    app = Flask("test_logout_provider", template_folder=str(tmp_path))
+    app.config.update(TESTING=True, ENABLE_AUTH=True, DEFAULT_AUTH_METHOD="auth0", LOGIN_REDIRECT_URL="/login")
+    app.secret_key = "test_secret"
+    register_auth_routes(app)
+    client = app.test_client()
+    with client.session_transaction() as browser_session:
+        browser_session["auth_method"] = "shibboleth"
 
-    assert mock_get_token.call_args.kwargs["timeout"] == AUTH0_TIMEOUT_SECONDS
+    with patch(
+        "mdvtools.auth.authutils.create_auth_provider", side_effect=lambda method, _app: providers[method]
+    ):
+        rv = client.get("/logout")
 
-
-def test_management_client_is_built_with_a_timeout(startup_app):
-    with patch("mdvtools.dbutils.dbmodels.User") as mock_user_class, \
-         patch("mdvtools.auth.auth0_provider.GetToken") as mock_get_token, \
-         patch("mdvtools.auth.auth0_provider.Auth0") as mock_auth0_class:
-        mock_user_class.query.count.return_value = 0
-        mock_get_token.return_value.client_credentials.return_value = {"access_token": "mgmt-token"}
-        mock_auth0_class.return_value.roles.list.return_value = {"roles": [{"id": "rol_admin", "name": "admin"}]}
-
-        check_first_admin_setup(startup_app)
-
-    assert mock_auth0_class.call_args.kwargs["rest_options"].timeout == AUTH0_TIMEOUT_SECONDS
+    assert rv.get_data(as_text=True) == "to Shibboleth logout"
+    providers["auth0"].logout.assert_not_called()

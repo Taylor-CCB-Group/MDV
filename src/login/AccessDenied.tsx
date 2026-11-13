@@ -35,7 +35,16 @@ const otherButton = {
  * replaces. A retry is offered only as the step after fixing something, and
  * switching account goes through /logout, which ends the Auth0 session first.
  */
-const AccessDenied: React.FC<{ denial: AccessDenial; account: string | null }> = ({ denial, account }) => {
+export type AccessDeniedProps = {
+    denial: AccessDenial;
+    account: string | null;
+    /** The Auth0 connection they signed in through (ADR 0019). */
+    signInMethod: string | null;
+    /** Who this deployment says to ask for access. */
+    contact: string | null;
+};
+
+const AccessDenied: React.FC<AccessDeniedProps> = ({ denial, account, signInMethod, contact }) => {
     const mountPath = getAppMountPath();
     const hrefFor = (action: DenialAction) => `${mountPath}${action.kind === "retry" ? "login" : "logout"}`;
 
@@ -56,7 +65,14 @@ const AccessDenied: React.FC<{ denial: AccessDenial; account: string | null }> =
 
             {account ? (
                 <Typography sx={{ mb: 1.5, color: "#202124", fontSize: "16px", textAlign: "center" }}>
-                    You signed in as <strong>{account}</strong>.
+                    You signed in as <strong>{account}</strong>
+                    {signInMethod ? (
+                        <>
+                            {" "}
+                            through <strong>{signInMethod}</strong>
+                        </>
+                    ) : null}
+                    .
                 </Typography>
             ) : null}
 
@@ -70,6 +86,12 @@ const AccessDenied: React.FC<{ denial: AccessDenial; account: string | null }> =
             >
                 {denial.detail}
             </Typography>
+
+            {contact ? (
+                <Typography sx={{ mt: -2.5, mb: 4, color: "#202124", fontSize: "16px", textAlign: "center" }}>
+                    If you think you should have access, contact {contact}.
+                </Typography>
+            ) : null}
 
             <Stack spacing={1.5} sx={{ width: "100%", maxWidth: 280 }}>
                 {denial.actions.map((action, index) => (
