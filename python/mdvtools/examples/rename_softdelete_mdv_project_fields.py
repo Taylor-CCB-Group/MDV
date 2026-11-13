@@ -133,7 +133,14 @@ def read_rows_from_excel(
     return sheet_name, df, project_header, datasource_header
 
 
-def resolve_datasources(project_dir: Path, excel_path: Path, project_name: str) -> list[str]:
+def resolve_datasources(
+    project_dir: Path, excel_path: Path, project_name: str
+) -> tuple[list[str], list[str]]:
+    """Datasources in both the sheet and the project, plus sheet names the project lacks.
+
+    A sheet datasource that is not in the project is skipped. The run still fails when
+    none of the sheet's datasources are in the project.
+    """
     with (project_dir / "datasources.json").open("r", encoding="utf-8") as handle:
         project_datasources = json.load(handle)
     available = {
@@ -157,14 +164,14 @@ def resolve_datasources(project_dir: Path, excel_path: Path, project_name: str) 
         elif datasource not in requested:
             requested.append(datasource)
 
-    if missing:
+    skipped = sorted(missing)
+    if not requested:
         raise ValueError(
-            f"Datasource(s) {sorted(missing)} from the workbook are absent from {project_dir}. "
+            f"No datasource mappings found for project '{project_name}'. "
+            f"Sheet datasources absent from {project_dir}: {skipped}. "
             f"Available datasources: {sorted(available.values())}"
         )
-    if not requested:
-        raise ValueError(f"No datasource mappings found for project '{project_name}'.")
-    return requested
+    return requested, skipped
 
 
 def view_references(views: dict[str, Any], datasource: str, field: str) -> list[tuple[str, str]]:
@@ -709,7 +716,18 @@ def main() -> int:
     elif not project_dir.is_dir():
         raise FileNotFoundError(f"Project directory does not exist: {project_dir}")
 
-    datasources = [args.datasource] if args.datasource else resolve_datasources(project_dir, excel_path, args.project_name)
+    if args.datasource:
+        datasources = [args.datasource]
+        skipped_datasources: list[str] = []
+    else:
+        datasources, skipped_datasources = resolve_datasources(
+            project_dir, excel_path, args.project_name
+        )
+    if skipped_datasources:
+        print(
+            "Skipping datasources that are not in the project: "
+            + ", ".join(skipped_datasources)
+        )
     views = load_views(project_dir)
     outcomes: dict[str, list[dict[str, Any]]] = {}
     warnings_by_datasource: dict[str, list[str]] = {}

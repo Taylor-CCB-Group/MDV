@@ -61,7 +61,8 @@ def backup_file(path: Path) -> Path:
 def planned_datasources(project: Path, excel_path: Path, project_id: str) -> list[dict[str, Any]]:
     source = json.loads((project / "datasources.json").read_text(encoding="utf-8"))
     outcomes: dict[str, list[dict[str, Any]]] = {}
-    for datasource in resolve_datasources(project, excel_path, project_id):
+    datasources, _skipped = resolve_datasources(project, excel_path, project_id)
+    for datasource in datasources:
         plan, _warnings, _errors, _kept, _ambiguous = build_plan(
             project,
             datasource,

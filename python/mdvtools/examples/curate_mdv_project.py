@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -932,6 +933,17 @@ def backup_views(project: Path) -> Path:
     return backup_path
 
 
+def ignore_unreadable(directory: str, names: list[str]) -> list[str]:
+    """Names copytree should skip because this process cannot list the directory."""
+    skipped: list[str] = []
+    for name in names:
+        path = Path(directory) / name
+        if path.is_dir() and not os.access(path, os.R_OK | os.X_OK):
+            print(f"Skipping unreadable directory: {path}")
+            skipped.append(name)
+    return skipped
+
+
 def planned_backup_paths(output: Path) -> dict[str, str]:
     return {
         "views_backup": str(output / "views.json.bak.<timestamp>"),
@@ -963,7 +975,12 @@ def curate(
 
     dry_run = not write
     source_before = h5_stamp(project)
-    datasources = resolve_datasources(project, excel_path, project_id)
+    datasources, skipped_datasources = resolve_datasources(project, excel_path, project_id)
+    if skipped_datasources:
+        print(
+            "Skipping datasources that are not in the project: "
+            + ", ".join(skipped_datasources)
+        )
     views = load_views(project)
     warnings: dict[str, list[str]] = {}
     errors: dict[str, list[str]] = {}
@@ -1043,6 +1060,7 @@ def curate(
     report["dry_run"] = dry_run
     report["h5_bytes"] = source_before[0] if source_before else None
     report["h5_mtime_ns"] = source_before[1] if source_before else None
+    report["skipped_datasources"] = skipped_datasources
     report["question_views"] = question_plan["added"]
     report["skipped_questions"] = question_plan["skipped"]
     report["retitled_charts"] = retitled
@@ -1071,7 +1089,7 @@ def curate(
 
     if output.exists():
         raise FileExistsError(f"Output project already exists: {output}")
-    shutil.copytree(project, output)
+    shutil.copytree(project, output, symlinks=True, ignore=ignore_unreadable)
     output_before = h5_stamp(output)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     json_backup = output.parent / f"{output.name}_json_backup_{timestamp}"
