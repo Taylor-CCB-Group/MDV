@@ -99,8 +99,8 @@ A feature release. SQLite is now the default database for new installs of the fu
 ### Changed
 - `mdvtools` now installs on Python 3.12 and 3.13. Python 3.11 is no longer supported, so
   pip on Python 3.11 keeps installing 1.3.0 (#609).
-- `mdvtools` now depends on `spatialdata-js-util` 0.2 (with its `write` extra), which needs
-  `zarr` 3.3 or later and `imagecodecs` 2026.6.26 or later (#609).
+- `mdvtools` now depends on `spatialdata-js-util` 0.3.1 (with its `write` extra), which needs
+  `zarr` 3.3 or later and `imagecodecs` 2026.6.26 or later (#609, #653).
 - Upgraded `spatialdata` to 0.8 and `spatialdata-io` to 0.7.1 (from 0.7.2 and 0.6.0).
   `spatialdata-io` 0.7.1 indexes Xenium shapes by `cell_id` (#609).
 - `mdvtools convert-spatial` default views now use the SpatialData.js viewer instead of the
@@ -122,11 +122,14 @@ A feature release. SQLite is now the default database for new installs of the fu
 - The fraction legend is now a React component (#503).
 - `sync_users_to_db` fetches the Auth0 admin role members once, instead of once per user
   (#526).
-- Dependency updates: `@spatialdata/*` 0.15.1, deck.gl and luma.gl 9.4, viv 0.23 (#529, #541,
-  #561, #588, #626, #630).
+- Dependency updates: `@spatialdata/*` 0.16.0, deck.gl and luma.gl 9.4, viv 0.23 (#529, #541,
+  #561, #588, #626, #630, #654, #655).
 - "2D Scatter Plot" in Add Chart now creates the deck scatter plot with density (#614).
 - Catalog cards show long project names over up to 3 lines, and in full on hover. The cards
   no longer show the last-modified date (#641).
+- The catalog remembers its view mode, sort order and list columns in the browser. The list
+  view has a column chooser, project thumbnails and sortable Name and Last Modified headers,
+  and sorting by name starts from A to Z (#639).
 - The project page shows the project name in the menu bar, and project thumbnails come from
   the first view. Text in a text box chart can be selected (#622).
 - The chart settings search box has focus when the dialog opens (#628).

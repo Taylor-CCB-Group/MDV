@@ -3,6 +3,7 @@ import { Button } from "@mui/material";
 import { viewStateFromBounds } from "@spatialdata/core";
 import type { RenderStackLayerInputs } from "@spatialdata/vis";
 import {
+    resolvePickedEntryId,
     type ViewState as SpatialCanvasViewState,
     type SpatialFeaturePickEvent,
     SpatialViewer,
@@ -212,8 +213,9 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
                 onFeatureHoverEnd();
                 return;
             }
-            const layerId = (typeof info.layer?.id === "string" ? info.layer.id : "").replace(/-#.*#$/, "");
-            const event = renderer.getFeaturePickEvent(layerId, {
+            // Inside an isolated group `info.layer` names the group; this names the member.
+            const entryId = resolvePickedEntryId(info);
+            const event = renderer.getFeaturePickEvent(entryId, {
                 index: info.index,
                 object: info.object,
             });
@@ -222,6 +224,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
                     ...event,
                     coordinateSystem,
                     spatialData,
+                    entryId,
                     pickInfo: info,
                 });
             }
