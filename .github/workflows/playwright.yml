@@ -25,6 +25,9 @@ jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    env:
+      # The dev compose file defaults to SQLite; CI keeps testing against Postgres.
+      COMPOSE_PROFILES: postgres
     steps:
       - uses: actions/checkout@v5
 
