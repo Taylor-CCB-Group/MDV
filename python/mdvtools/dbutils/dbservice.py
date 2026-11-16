@@ -1060,7 +1060,7 @@ class InvitationService:
             # Claim the Invitation before writing anything else. An Admin can
             # revoke it after it was picked, and the database checks it is
             # still open when this update takes the row's write lock.
-            claim = db.session.execute(
+            claimed_expiry = db.session.execute(
                 update(Invitation)
                 .where(
                     Invitation.id == invitation.id,
@@ -1069,9 +1069,15 @@ class InvitationService:
                     Invitation.expires_at > now,
                 )
                 .values(accepted_at=now)
+                .returning(Invitation.expires_at)
                 .execution_options(synchronize_session=False)
-            )
-            if claim.rowcount != 1:
+            ).scalar_one_or_none()
+            # The update can wait for another request's lock, so check expiry
+            # again once it has the row. expires_at comes from the row itself,
+            # because a resend can extend it after the Invitation was picked.
+            if claimed_expiry is not None and datetime.now() >= claimed_expiry:
+                claimed_expiry = None
+            if claimed_expiry is None:
                 logger.info(f"Invitation {invitation.id} closed before its sign-in could accept it.")
                 db.session.rollback()
                 user = User.query.filter_by(auth_id=sign_in["sub"]).first()

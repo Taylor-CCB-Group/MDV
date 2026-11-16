@@ -10,13 +10,13 @@ Requests go through the real auth hook and Auth0Provider against an in-memory
 database. Only the calls that would reach Auth0 are stubbed.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from flask import Flask
-from sqlalchemy import update
+from sqlalchemy import event, update
 
 import mdvtools
 from mdvtools.auth.auth0_provider import Auth0Provider
@@ -513,3 +513,35 @@ def test_invitation_revoked_while_its_sign_in_is_accepted_grants_nothing(app, pr
     assert User.query.filter_by(email="jo@example.org").first() is None
     assert UserProject.query.filter_by(project_id=project.id).count() == 0
     assert (invitation.accepted_at, invitation.revoked_at is not None) == (None, True)
+
+
+def test_invitation_that_expires_while_its_claim_waits_grants_nothing(app, provider, admin, project):
+    # On Postgres the claim can wait for another request's lock, and the
+    # Invitation can expire meanwhile. The clock here moves past its expiry
+    # at the moment the claim runs.
+    invitation = invite(admin, "kim@example.org", PASSWORD, {project: "viewer"})
+    expired = invitation.expires_at + timedelta(seconds=1)
+    clock = {"now": datetime.now()}
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock["now"]
+
+    def expire_during_the_claim(_conn, _cursor, statement, *_args):
+        if statement.lstrip().upper().startswith("UPDATE INVITATIONS"):
+            clock["now"] = expired
+
+    event.listen(db.engine, "before_cursor_execute", expire_during_the_claim)
+    try:
+        with patch("mdvtools.dbutils.dbservice.datetime", Clock):
+            response = get_as(
+                app, provider, f"/projects/{project.id}/open", password_sign_in("auth0|kim", "kim@example.org")
+            )
+    finally:
+        event.remove(db.engine, "before_cursor_execute", expire_during_the_claim)
+
+    assert_no_access(response)
+    db.session.expire_all()
+    assert invitation.accepted_at is None
+    assert User.query.filter_by(email="kim@example.org").first() is None
