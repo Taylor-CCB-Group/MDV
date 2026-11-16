@@ -9,7 +9,7 @@ export {
     getEditableAnnotationColumnNames,
 } from "./AnnotationDialogComponent";
 
-class AnnotationDialogReact extends BaseDialog {
+export class AnnotationDialogReact extends BaseDialog {
     root: ReturnType<typeof createMdvPortal>;
 
     constructor(dataStore: DataStore) {

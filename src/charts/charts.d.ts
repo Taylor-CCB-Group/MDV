@@ -174,6 +174,8 @@ export type DataSource = {
     dataStore: DataStore;
     contentDiv: HTMLDivElement;
     menuBar: HTMLDivElement;
+    /** React root of the `DataSourceMenuBar` rendered inside `menuBar`. */
+    menuBarRoot?: import("react-dom/client").Root;
     images?: Record<string, any>;
     regions?: Record<string, any>;
     links?: DataSourceLinks;
