@@ -1,5 +1,14 @@
 import { findRenderStackEntry, type RenderStack, type RenderStackGroupBlendMode } from "@spatialdata/layers";
-import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
+import {
+    action,
+    comparer,
+    computed,
+    makeAutoObservable,
+    makeObservable,
+    observable,
+    reaction,
+    runInAction,
+} from "mobx";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
@@ -402,9 +411,22 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             blendMode: group?.props.blendMode ?? "pass-through",
             isolate: group?.props.isolate ?? true,
         };
+        // Observable, so the checkbox follows when another control turns the group on. The
+        // settings panel copies plain specs into observables of its own, but keeps this one.
+        const enabledSpec = makeAutoObservable(
+            g({
+                type: "check",
+                label: "group grey scatter + scatter",
+                current_value: !!group,
+                func: (value) => apply(value),
+            }),
+        );
         // Any group control turns the group on: on its own it would have nothing to act on.
         const apply = (enabled: boolean, patch: Partial<DevScatterGroupProps> = {}) => {
             if (!this.config.renderStack) return;
+            runInAction(() => {
+                enabledSpec.current_value = enabled;
+            });
             Object.assign(current, patch);
             const structural = setDevScatterGroup(this.config.renderStack, enabled ? { ...current } : null);
             if (structural) this.bumpRenderStackGeneration();
@@ -423,12 +445,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             type: "folder",
             label: "Layer group (dev)",
             current_value: [
-                g({
-                    type: "check",
-                    label: "group grey scatter + scatter",
-                    current_value: !!group,
-                    func: (value) => apply(value),
-                }),
+                enabledSpec,
                 g({
                     type: "check",
                     label: "isolate",

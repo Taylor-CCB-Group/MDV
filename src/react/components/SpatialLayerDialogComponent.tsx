@@ -17,7 +17,7 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import { findRenderStackEntry, type RenderStackSpatialElementType } from "@spatialdata/layers";
+import { findRenderStackEntry, type RenderStackSpatialElementType, walkRenderStackEntries } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { observer } from "mobx-react-lite";
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -28,6 +28,7 @@ import {
     type DeckOverlayId,
     deckHostLayerId,
     deckIdFromHostLayerId,
+    isDeckHostLayerId,
     LISTED_DECK_OVERLAYS,
 } from "@/react/spatialdata/host_overlay_ids";
 import {
@@ -585,11 +586,18 @@ const SpatialLayerDialogComponent = observer(() => {
         );
     }
 
-    const entryIds = renderStackEntryIds(stack);
-    const spatialEntryIds = entryIds.filter((id) => !id.startsWith("deck:"));
+    // Top-level entries other than MDV overlays, and groups of nothing but MDV overlays
+    // (the dev scatter group): those are listed with the overlays they hold.
+    const spatialEntryIds = stack.entries
+        .filter((entry) =>
+            entry.kind === "group"
+                ? Array.from(walkRenderStackEntries(entry.children)).some((child) => child.kind === "spatial")
+                : !isDeckHostLayerId(entry.id),
+        )
+        .map((entry) => entry.id);
     // MDV overlays always draw above SpatialData layers, so they are listed apart, in a fixed
-    // order, and cannot be dragged among them.
-    const hasEntry = (deckId: DeckOverlayId) => entryIds.includes(deckHostLayerId(deckId));
+    // order, and cannot be dragged among them. They may sit inside a group.
+    const hasEntry = (deckId: DeckOverlayId) => findRenderStackEntry(stack, deckHostLayerId(deckId)) !== undefined;
     const listedOverlays = LISTED_DECK_OVERLAYS.filter((row) =>
         row.kind === "overlay" ? hasEntry(row.deckId) : row.children.some(hasEntry),
     );
