@@ -11,6 +11,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import AddIcon from "@mui/icons-material/Add";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -20,10 +21,13 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
     Alert,
     AlertTitle,
-    Autocomplete,
     Checkbox,
     Collapse,
+    Divider,
     IconButton,
+    ListSubheader,
+    Menu,
+    MenuItem,
     Slider,
     TextField,
     Typography,
@@ -81,7 +85,7 @@ type InsertOption =
     | { kind: "spatial"; type: RenderStackSpatialElementType; elementKey: string; label: string }
     | { kind: "group"; label: string };
 
-const GROUP_INSERT_OPTION: InsertOption = { kind: "group", label: "Group (drag layers into it)" };
+const GROUP_INSERT_OPTION: InsertOption = { kind: "group", label: "Group" };
 
 /** How far each level of the layer tree is indented, and how far a drag must go sideways to change level. */
 const TREE_INDENT_PX = 20;
@@ -305,6 +309,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
     depth = 0,
     expander,
     onUngroup,
+    onAddInto,
 }: {
     entryId: string;
     selected: boolean;
@@ -321,6 +326,8 @@ const LayerTreeRow = observer(function LayerTreeRow({
     /** For a layer group's row: whether its children are shown. */
     expander?: { expanded: boolean; onToggle: () => void };
     onUngroup?: (entryId: string) => void;
+    /** For a layer group's row: open the add-layer menu, adding into this group. */
+    onAddInto?: (groupId: string, anchor: HTMLElement) => void;
 }) {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const config = useConfig<SpatialDataMdvReactConfig>();
@@ -426,6 +433,20 @@ const LayerTreeRow = observer(function LayerTreeRow({
                     />
                 </div>
             )}
+            {entry.kind === "group" && onAddInto && (
+                <IconButton
+                    size="small"
+                    sx={{ flexShrink: 0 }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onAddInto(entryId, e.currentTarget);
+                    }}
+                    aria-label={`add a layer to ${name}`}
+                    title="Add a layer to this group"
+                >
+                    <AddIcon fontSize="small" />
+                </IconButton>
+            )}
             {entry.kind === "group" && onUngroup && (
                 <IconButton
                     size="small"
@@ -530,6 +551,7 @@ function SortableLayerTreeRow(props: {
     depth: number;
     expander?: { expanded: boolean; onToggle: () => void };
     onUngroup?: (entryId: string) => void;
+    onAddInto?: (groupId: string, anchor: HTMLElement) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: props.entryId,
@@ -556,6 +578,8 @@ const SpatialLayerDialogComponent = observer(() => {
     const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(() => new Set());
     // The row being dragged, the row it is over, and how many levels it has been dragged sideways.
     const [drag, setDrag] = useState<{ activeId: string; overId: string; depthOffset: number } | null>(null);
+    // The open add-layer menu: where it hangs, and the group it adds into (null: the top level).
+    const [addMenu, setAddMenu] = useState<{ anchor: HTMLElement; parentId: string | null } | null>(null);
     const [deckCollapsed, setDeckCollapsed] = useState(false);
     const coordinateSystem = //todo datasources schema including spatial regions when referring to dataStore here.
         (chart.dataStore.regions?.all_regions[config.region] as { spatial?: { coordinate_system?: string } })?.spatial
@@ -636,27 +660,36 @@ const SpatialLayerDialogComponent = observer(() => {
     );
 
     const onInsert = useCallback(
-        (option: InsertOption | null) => {
-            if (!option) return;
-            if (option.kind === "group") {
-                let id: string | null = null;
-                mutateStack((current) => {
-                    id = insertRenderStackGroup(current);
-                });
-                if (id) setSelectedEntryId(id);
-                return;
-            }
+        (option: InsertOption, parentId: string | null) => {
+            let id: string | null = null;
             mutateStack((current) => {
-                insertSpatialRenderStackEntry(
-                    current,
-                    option.type,
-                    option.elementKey,
-                    defaultPropsForSpatialElement(option.type),
-                );
+                id =
+                    option.kind === "group"
+                        ? insertRenderStackGroup(current, parentId)
+                        : insertSpatialRenderStackEntry(
+                              current,
+                              option.type,
+                              option.elementKey,
+                              defaultPropsForSpatialElement(option.type),
+                              parentId,
+                          );
             });
+            if (parentId) {
+                // show what was just added to it
+                setCollapsedGroups((current) => {
+                    if (!current.has(parentId)) return current;
+                    const next = new Set(current);
+                    next.delete(parentId);
+                    return next;
+                });
+            }
+            if (id) setSelectedEntryId(id);
         },
         [mutateStack],
     );
+    const onAddInto = useCallback((groupId: string, anchor: HTMLElement) => {
+        setAddMenu({ anchor, parentId: groupId });
+    }, []);
 
     const onRemove = useCallback(
         (id: string) => {
@@ -715,11 +748,11 @@ const SpatialLayerDialogComponent = observer(() => {
                 className="flex-none overflow-y-auto border-b border-gray-200 dark:border-gray-700"
                 style={{ maxHeight: "40%" }}
             >
-                {spatialEntries.length > 0 && (
-                    <>
+                <>
+                    <div className="flex items-center pr-1">
                         <button
                             type="button"
-                            className="flex w-full items-center gap-1 px-1 py-0.5 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                            className="flex grow items-center gap-1 px-1 py-0.5 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
                             onClick={() => setSpatialCollapsed((c) => !c)}
                         >
                             {spatialCollapsed ? (
@@ -735,44 +768,58 @@ const SpatialLayerDialogComponent = observer(() => {
                                 Spatial elements
                             </Typography>
                         </button>
-                        <Collapse in={!spatialCollapsed}>
-                            <DndContext
-                                sensors={sensors}
-                                collisionDetection={closestCenter}
-                                onDragStart={onDragStart}
-                                onDragMove={onDragMove}
-                                onDragOver={onDragOver}
-                                onDragEnd={onDragEnd}
-                                onDragCancel={onDragCancel}
+                        <IconButton
+                            size="small"
+                            onClick={(e) => setAddMenu({ anchor: e.currentTarget, parentId: null })}
+                            aria-label="add a layer"
+                            title="Add a layer or group"
+                        >
+                            <AddIcon fontSize="small" />
+                        </IconButton>
+                    </div>
+                    <Collapse in={!spatialCollapsed}>
+                        {spatialEntries.length === 0 && (
+                            <Typography variant="body2" color="text.secondary" className="px-3 py-1">
+                                No SpatialData layers. Add one with +.
+                            </Typography>
+                        )}
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragStart={onDragStart}
+                            onDragMove={onDragMove}
+                            onDragOver={onDragOver}
+                            onDragEnd={onDragEnd}
+                            onDragCancel={onDragCancel}
+                        >
+                            <SortableContext
+                                items={treeRows.map((row) => row.id)}
+                                strategy={verticalListSortingStrategy}
                             >
-                                <SortableContext
-                                    items={treeRows.map((row) => row.id)}
-                                    strategy={verticalListSortingStrategy}
-                                >
-                                    {treeRows.map((row) => (
-                                        <SortableLayerTreeRow
-                                            key={row.id}
-                                            entryId={row.id}
-                                            depth={row.id === drag?.activeId && projected ? projected.depth : row.depth}
-                                            selected={selectedEntryId === row.id}
-                                            onSelect={setSelectedEntryId}
-                                            onRemove={onRemove}
-                                            onUngroup={onUngroup}
-                                            expander={
-                                                row.isGroup
-                                                    ? {
-                                                          expanded: !collapsedGroups.has(row.id),
-                                                          onToggle: () => toggleGroup(row.id),
-                                                      }
-                                                    : undefined
-                                            }
-                                        />
-                                    ))}
-                                </SortableContext>
-                            </DndContext>
-                        </Collapse>
-                    </>
-                )}
+                                {treeRows.map((row) => (
+                                    <SortableLayerTreeRow
+                                        key={row.id}
+                                        entryId={row.id}
+                                        depth={row.id === drag?.activeId && projected ? projected.depth : row.depth}
+                                        selected={selectedEntryId === row.id}
+                                        onSelect={setSelectedEntryId}
+                                        onRemove={onRemove}
+                                        onUngroup={onUngroup}
+                                        onAddInto={onAddInto}
+                                        expander={
+                                            row.isGroup
+                                                ? {
+                                                      expanded: !collapsedGroups.has(row.id),
+                                                      onToggle: () => toggleGroup(row.id),
+                                                  }
+                                                : undefined
+                                        }
+                                    />
+                                ))}
+                            </SortableContext>
+                        </DndContext>
+                    </Collapse>
+                </>
                 {listedOverlays.length > 0 && (
                     <>
                         <button
@@ -844,18 +891,35 @@ const SpatialLayerDialogComponent = observer(() => {
                 )}
             </div>
 
-            {/* Insert layer */}
-            <div className="flex-none p-2 border-t border-gray-200 dark:border-gray-700">
-                <Autocomplete
-                    size="small"
-                    options={insertOptions}
-                    getOptionLabel={(option) => option.label}
-                    onChange={(_, value) => onInsert(value)}
-                    renderInput={(params) => (
-                        <TextField {...params} label="Insert layer" placeholder="Choose a layer to add" />
-                    )}
-                />
-            </div>
+            <Menu
+                anchorEl={addMenu?.anchor}
+                open={addMenu !== null}
+                onClose={() => setAddMenu(null)}
+                slotProps={{ paper: { sx: { maxHeight: 360 } } }}
+            >
+                {insertOptions.flatMap((option, index) => {
+                    const item = (
+                        <MenuItem
+                            key={option.label}
+                            dense
+                            onClick={() => {
+                                const parentId = addMenu?.parentId ?? null;
+                                setAddMenu(null);
+                                onInsert(option, parentId);
+                            }}
+                        >
+                            {option.kind === "group" ? "Group (drag layers into it)" : option.label}
+                        </MenuItem>
+                    );
+                    return index === 1
+                        ? [
+                              <Divider key="divider" />,
+                              <ListSubheader key="elements">SpatialData elements</ListSubheader>,
+                              item,
+                          ]
+                        : [item];
+                })}
+            </Menu>
         </div>
     );
 });

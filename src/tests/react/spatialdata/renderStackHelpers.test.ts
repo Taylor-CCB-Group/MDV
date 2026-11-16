@@ -28,6 +28,7 @@ import {
     DATA_POINTS_GROUP_ID,
     DEFAULT_COMPOSITING,
     insertRenderStackGroup,
+    insertSpatialRenderStackEntry,
     moveRenderStackEntry,
     patchRenderStackEntry,
     patchRenderStackEntryPropsInPlace,
@@ -650,6 +651,19 @@ describe("render stack groups", () => {
 
         expect(ungroupRenderStackEntry(stack, groupId)).toBe(true);
         expect(stack.entries.map((entry) => entry.id)).toEqual(["shapes-a", "deck:scatter"]);
+    });
+
+    test("new layers go on top of a group, or below the overlays and the data points' group", () => {
+        const stack = createHostOnlyRenderStack();
+        setDataPointsCompositing(stack, { ...DEFAULT_COMPOSITING, isolate: true });
+        const groupId = insertRenderStackGroup(stack);
+        expect(stack.entries.map((entry) => entry.id).slice(0, 2)).toEqual([groupId, DATA_POINTS_GROUP_ID]);
+
+        const imageId = insertSpatialRenderStackEntry(stack, "image", "imageA", {}, groupId);
+        const shapesId = insertSpatialRenderStackEntry(stack, "shapes", "cells", {}, groupId);
+        expect(getRenderStackEntryIds(stack).slice(0, 3)).toEqual([groupId, imageId, shapesId]);
+        const labelsId = insertSpatialRenderStackEntry(stack, "labels", "mask");
+        expect(stack.entries.map((entry) => entry.id).slice(0, 3)).toEqual([groupId, labelsId, DATA_POINTS_GROUP_ID]);
     });
 
     test("a dragged row lands at the depth the rows around it allow", () => {

@@ -138,6 +138,15 @@ export function createDefaultRenderStack(
     };
 }
 
+/**
+ * An MDV overlay, or a group holding them (the data points' group). Overlays always draw
+ * above SpatialData layers, so new spatial layers go below the first of these.
+ */
+export function isOverlayEntry(entry: RenderStackEntry): boolean {
+    if (entry.kind === "host") return true;
+    return entry.kind === "group" && Array.from(walkRenderStackEntries(entry.children)).some((e) => e.kind === "host");
+}
+
 /** Insert the first available image layer when the stack has no image entries yet. */
 export function insertDefaultImageLayer(
     stack: RenderStack,
@@ -153,12 +162,8 @@ export function insertDefaultImageLayer(
     const imageEntry = firstImageSpatialEntry(spatialData, coordinateSystem, imageProps);
     if (!imageEntry) return false;
 
-    const firstHostIndex = stack.entries.findIndex((entry) => entry.kind === "host");
-    if (firstHostIndex === -1) {
-        stack.entries.push(imageEntry);
-    } else {
-        stack.entries.splice(firstHostIndex, 0, imageEntry);
-    }
+    const firstOverlayIndex = stack.entries.findIndex(isOverlayEntry);
+    stack.entries.splice(firstOverlayIndex === -1 ? stack.entries.length : firstOverlayIndex, 0, imageEntry);
     return true;
 }
 

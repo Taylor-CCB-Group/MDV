@@ -25,6 +25,7 @@ import {
     createDefaultRenderStack,
     createHostOnlyRenderStack,
     insertDefaultImageLayer,
+    isOverlayEntry,
     mergeHostOverlayEntriesInPlace,
     spatialEntryId,
 } from "./render_stack_defaults";
@@ -131,33 +132,39 @@ export function patchRenderStackEntry(
     }
 }
 
+/**
+ * Add a new entry on top of `parentId`'s children, or, for null or a group that is not
+ * there, on top of the top-level entries below the MDV overlays: the overlays always
+ * draw above SpatialData layers.
+ */
+function insertNewEntry(stack: RenderStack, entry: RenderStackEntry, parentId: string | null): void {
+    const parent = parentId === null ? undefined : findRenderStackEntry(stack, parentId);
+    if (parent?.kind === "group") {
+        parent.children.push(entry);
+        return;
+    }
+    const firstOverlayIndex = stack.entries.findIndex(isOverlayEntry);
+    stack.entries.splice(firstOverlayIndex === -1 ? stack.entries.length : firstOverlayIndex, 0, entry);
+}
+
+/** Add a layer for a SpatialData element (see `insertNewEntry`). Returns its id. */
 export function insertSpatialRenderStackEntry(
     stack: RenderStack,
     elementType: RenderStackSpatialElementType,
     elementKey: string,
     props: Record<string, unknown> = {},
-): boolean {
+    parentId: string | null = null,
+): string | null {
     const id = spatialEntryId(elementType, elementKey);
     if (findRenderStackEntry(stack, id)) {
-        return false;
+        return null;
     }
-    const entry: RenderStackEntry = {
-        kind: "spatial",
-        id,
-        visible: true,
-        source: { elementType, elementKey },
-        props: { opacity: 1, ...props },
-    };
-    // Host overlays are excluded from ordering and always render on top, so a
-    // newly inserted spatial layer goes before the first host entry (matching
-    // insertDefaultImageLayer), not appended after them.
-    const firstHostIndex = stack.entries.findIndex((e) => e.kind === "host");
-    if (firstHostIndex === -1) {
-        stack.entries.push(entry);
-    } else {
-        stack.entries.splice(firstHostIndex, 0, entry);
-    }
-    return true;
+    insertNewEntry(
+        stack,
+        { kind: "spatial", id, visible: true, source: { elementType, elementKey }, props: { opacity: 1, ...props } },
+        parentId,
+    );
+    return id;
 }
 
 export function insertHostRenderStackEntry(stack: RenderStack, deckId: DeckOverlayId): boolean {
@@ -205,15 +212,10 @@ export function renderStackGroupId(): string {
     return `group-#${getRandomString()}`;
 }
 
-/**
- * Add an empty group just below the MDV overlays, where a new spatial layer goes.
- * Returns its id.
- */
-export function insertRenderStackGroup(stack: RenderStack): string {
+/** Add an empty group where a new layer goes (see `insertNewEntry`). Returns its id. */
+export function insertRenderStackGroup(stack: RenderStack, parentId: string | null = null): string {
     const id = renderStackGroupId();
-    const firstHostIndex = stack.entries.findIndex((e) => e.kind === "host");
-    const group: RenderStackGroupEntry = { kind: "group", id, visible: true, props: {}, children: [] };
-    stack.entries.splice(firstHostIndex === -1 ? stack.entries.length : firstHostIndex, 0, group);
+    insertNewEntry(stack, { kind: "group", id, visible: true, props: {}, children: [] }, parentId);
     return id;
 }
 
