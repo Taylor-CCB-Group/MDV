@@ -59,6 +59,12 @@ ds.menuBarRoot = createMdvPortal(createElement(DataSourceMenuBar, { dataSource: 
 `createMdvPortal` supplies the theme, the query client and the `ChartManager` context that
 hooks such as `useChartManager()` need. Keep the root it returns.
 
+A root renders on React's schedule, after the legacy code that mounted it has moved on. If that
+code goes on to measure layout that the piece affects, wrap the mount in `flushSync` so the
+piece is in the DOM first. The menu bar needs this: the charts added straight after it measure
+the space left below it (`GridstackManager.getGrid` caches `cellHeight` from that), and the
+bar's height depends on its contents, as it wraps in a narrow pane.
+
 Legacy code discards DOM by clearing it (`contentDiv.innerHTML = ""` on a view change), which
 does not unmount a React root: its effects never clean up and its listeners stay registered.
 Find where the piece's container is discarded and call `root.unmount()` there. For the menu bar

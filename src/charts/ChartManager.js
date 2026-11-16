@@ -22,6 +22,7 @@ import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts
 import "./registerChartModules";
 import { action, makeObservable, observable } from "mobx";
 import { createElement } from "react";
+import { flushSync } from "react-dom";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import DataSourceMenuBar from "@/react/components/DataSourceMenuBar";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
@@ -1483,12 +1484,17 @@ export class ChartManager {
     _setUpMenu(ds) {
         // React gets its own element, so that addMenuIcon can go on appending icons to ds.menuBar
         const container = createEl("span", { styles: { display: "contents" } }, ds.menuBar);
-        ds.menuBarRoot = createMdvPortal(
-            createElement(DataSourceMenuBar, { dataSource: ds }),
-            container,
-            undefined,
-            this,
-        );
+        // Render now rather than on React's schedule: the charts added next measure the space
+        // left under the bar (GridstackManager.getGrid caches cellHeight from it), and a bar
+        // that wraps onto a second line is taller than the empty one.
+        flushSync(() => {
+            ds.menuBarRoot = createMdvPortal(
+                createElement(DataSourceMenuBar, { dataSource: ds }),
+                container,
+                undefined,
+                this,
+            );
+        });
         // a datasource that has never had a menu bar does not pass on "filtered" events: see _addDSListeners
         this.dataSourcesShown.add(ds.name);
     }
