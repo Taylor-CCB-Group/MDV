@@ -409,6 +409,29 @@ describe("render stack defaults", () => {
         expect(grey.visible).toBe(true);
     });
 
+    test("a saved stack without density gets it just above the data points", () => {
+        // A stack saved before density was its own overlay: an image under the MDV overlays.
+        const image = {
+            kind: "spatial",
+            id: "image-1",
+            visible: true,
+            source: { elementType: "image", elementKey: "img" },
+            props: {},
+        } satisfies RenderStackEntry;
+        const saved = ["grey_scatter", "scatter", "gate_display", "selection", "gate_labels"] as const;
+        const stack = renderStack([image, ...saved.map((deckId) => hostEntry(deckHostLayerId(deckId)))]);
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        expect(stack.entries.map((entry) => entry.id)).toEqual([
+            "image-1",
+            "deck:grey_scatter",
+            "deck:scatter",
+            "deck:density",
+            "deck:gate_display",
+            "deck:selection",
+            "deck:gate_labels",
+        ]);
+    });
+
     test("createHostOnlyRenderStack seeds host overlay entries", () => {
         const stack = createHostOnlyRenderStack();
         expect(stack.entries.length).toBeGreaterThan(0);

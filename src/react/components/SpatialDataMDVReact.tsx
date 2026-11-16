@@ -19,6 +19,7 @@ import {
     toSerializableSpatialDataViewState,
 } from "@/react/spatialdata/spatialdata_config";
 import BaseChart, { type MenuPip } from "../../charts/BaseChart";
+import { getDensitySettings } from "../contour_state";
 import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
 import { createVivStores, type VivContextType } from "./avivatorish/state";
 import { BaseReactChart } from "./BaseReactChart";
@@ -316,9 +317,9 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     }
 
     /**
-     * Chart-wide settings only. What the MDV data points look like (colour, tooltip, point
-     * size, filtering, density) belongs to their layer, and is edited with every other layer
-     * in the layer dialog (`getDataLayerSettings`), so the two are not split across dialogs.
+     * Chart-wide settings only. What the MDV data points and their density look like belongs
+     * to their layers, and is edited with every other layer in the layer dialog
+     * (`getDataLayerSettings`, `getDensityLayerSettings`), so the two are not split across dialogs.
      */
     getSettings() {
         const config = this.config;
@@ -349,6 +350,11 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         ]);
     }
 
+    /** Settings for the density layer (the `deck:density` overlay), shown in the layer dialog. */
+    getDensityLayerSettings() {
+        return getDensitySettings(this.config).current_value;
+    }
+
     /** Settings for the MDV data points layer (the `deck:scatter` overlay), shown in the layer dialog. */
     getDataLayerSettings() {
         const config = this.config;
@@ -373,7 +379,6 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             ...(colorSettings ? [colorSettings] : []),
             ...getSharedScatterSettings(config, {
                 chart: this,
-                includeDensitySettings: true,
                 includePointShape: true,
             }),
             g({

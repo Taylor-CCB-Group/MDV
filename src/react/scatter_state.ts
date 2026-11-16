@@ -9,14 +9,19 @@ import { isDatatypeCategorical } from "@/lib/utils";
 import { escapeHtml } from "@/utilities/Utilities";
 import { MdvDataFilterExtension } from "@/webgl/MdvDataFilterExtension";
 import { MdvScatterplotLayer } from "@/webgl/MdvScatterplotLayer";
-import SpatialLayer from "@/webgl/SpatialLayer";
+import SpatialLayer, { DensityOverlayLayer } from "@/webgl/SpatialLayer";
 import { ScatterDensityExension, ScatterSquareExtension } from "../webgl/ScatterDeckExtension";
 import { type AxisScaling, radiusReferenceRange } from "./axisScaling";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import type { ViewState } from "./components/VivScatterComponent";
 import { useChart } from "./context";
-import { type DualContourLegacyConfig, type HoveredContour, useLegacyDualContour } from "./contour_state";
+import {
+    type ContourLayerProps,
+    type DualContourLegacyConfig,
+    type HoveredContour,
+    useLegacyDualContour,
+} from "./contour_state";
 import { getEmptyFeatureCollection } from "./deck_state";
 import {
     type FilterOwner,
@@ -352,6 +357,9 @@ export function getMissingColorFilterValue(
     return 1;
 }
 
+/** Stable, so a points layer drawn without density keeps one `contourLayers` identity. */
+const NO_CONTOURS: ContourLayerProps[] = [];
+
 /**
  * ! in its current form, this hook is only called by `useCreateSpatialAnnotationState`
  * in future we may want to be able to have different arrangement of layers & rework this.
@@ -363,6 +371,8 @@ export function useScatterplotLayer(
     modelMatrix: Matrix4,
     hoveredContour?: HoveredContour | null,
     filterOwner?: FilterOwner | null,
+    /** Draw density contours as `densityLayer`, apart from the points, rather than inside them. */
+    separateDensityLayer = false,
 ) {
     const id = useChartID();
     const chart = useChart();
@@ -599,7 +609,7 @@ export function useScatterplotLayer(
                 // },
             },
             // ...config, //make sure contour properties are passed through
-            contourLayers,
+            contourLayers: separateDensityLayer ? NO_CONTOURS : contourLayers,
             highlightedData,
             highlightLineWidth,
             highlightRadiusScale: radiusScale * 1.15,
@@ -617,6 +627,7 @@ export function useScatterplotLayer(
         modelMatrix,
         extensions,
         contourLayers,
+        separateDensityLayer,
         highlightedData,
         highlightLineWidth,
         config.dimension,
@@ -627,6 +638,20 @@ export function useScatterplotLayer(
         updateHighlightedRows,
         paintHoveredRow,
     ]);
+
+    const densityLayer = useMemo(
+        () =>
+            separateDensityLayer && contourLayers.length > 0
+                ? new DensityOverlayLayer({
+                      id: `density_${getVivId(`${id}detail-react`)}`,
+                      contourLayers,
+                      modelMatrix,
+                      // as when drawn inside the points layer, which is pickable
+                      pickable: true,
+                  })
+                : null,
+        [separateDensityLayer, contourLayers, modelMatrix, id],
+    );
 
     const greyOnFilter = config.on_filter === "grey";
     // deck.gl regenerates every attribute when `data` changes identity (and updates hidden
@@ -786,6 +811,7 @@ export function useScatterplotLayer(
         () => ({
             scatterplotLayer,
             greyScatterplotLayer,
+            densityLayer,
             getTooltip,
             modelMatrix,
             viewState,
@@ -795,6 +821,7 @@ export function useScatterplotLayer(
         [
             scatterplotLayer,
             greyScatterplotLayer,
+            densityLayer,
             getTooltip,
             modelMatrix,
             viewState,

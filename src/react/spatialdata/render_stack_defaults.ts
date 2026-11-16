@@ -188,13 +188,25 @@ export function normalizeRenderStack(stack: RenderStack | undefined): RenderStac
         }
     }
 
+    // A missing overlay goes just above the overlay it follows in drawing order, so one
+    // added to MDV later (e.g. density, above the data points) is not drawn over the rest.
     const order = stack.entries.map((entry) => entry.id);
-    for (const deckId of DECK_OVERLAY_IDS) {
+    DECK_OVERLAY_IDS.forEach((deckId, index) => {
         const id = deckHostLayerId(deckId);
-        if (!order.includes(id)) {
-            order.push(id);
+        if (order.includes(id)) return;
+        const below = DECK_OVERLAY_IDS.slice(0, index)
+            .map((previous) => order.indexOf(deckHostLayerId(previous)))
+            .filter((position) => position >= 0);
+        if (below.length > 0) {
+            order.splice(Math.max(...below) + 1, 0, id);
+            return;
         }
-    }
+        const above = DECK_OVERLAY_IDS.slice(index + 1)
+            .map((next) => order.indexOf(deckHostLayerId(next)))
+            .filter((position) => position >= 0);
+        if (above.length > 0) order.splice(Math.min(...above), 0, id);
+        else order.push(id);
+    });
 
     return {
         schemaVersion: RENDER_STACK_SCHEMA_VERSION,

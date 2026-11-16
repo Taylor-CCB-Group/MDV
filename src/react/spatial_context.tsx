@@ -272,13 +272,22 @@ function useCreateMeasure() {
     return { startPixels, setStart, endPixels, setEnd };
 }
 //add generic that extends SpatialConfig?
-function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredContour?: HoveredContour | null) {
+function useCreateSpatialAnnotationState(
+    chart: BaseChart<any>,
+    hoveredContour?: HoveredContour | null,
+    separateDensityLayer = false,
+) {
     // should we use zustand for this state?
     // doesn't matter too much as it's just used once by SpatialAnnotationProvider
     // consider for project-wide annotation stuff as opposed to ephemeral selections
     const rectRange = useCreateRange(chart);
     const measure = useCreateMeasure();
-    const scatterProps = useScatterplotLayer(rectRange.modelMatrix, hoveredContour, rectRange.rangeDimension);
+    const scatterProps = useScatterplotLayer(
+        rectRange.modelMatrix,
+        hoveredContour,
+        rectRange.rangeDimension,
+        separateDensityLayer,
+    );
     return { rectRange, measure, scatterProps };
 }
 
@@ -287,13 +296,16 @@ export const SpatialAnnotationProvider = observer(function SpatialAnnotationProv
     children,
     hoveredContour,
     setHoveredContour,
+    separateDensityLayer,
     //add generic that extends SpatialConfig?
 }: {
     chart: BaseChart<any>;
     hoveredContour?: HoveredContour | null;
     setHoveredContour?: (contour: HoveredContour | null) => void;
+    /** Give `scatterProps` a `densityLayer` and keep density out of the points layer. */
+    separateDensityLayer?: boolean;
 } & React.PropsWithChildren) {
-    const annotationState = useCreateSpatialAnnotationState(chart, hoveredContour);
+    const annotationState = useCreateSpatialAnnotationState(chart, hoveredContour, separateDensityLayer);
     const stateWithHover = { ...annotationState, hoveredContour, setHoveredContour };
     return <SpatialAnnotationState.Provider value={stateWithHover}>{children}</SpatialAnnotationState.Provider>;
 });

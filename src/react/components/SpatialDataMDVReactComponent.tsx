@@ -281,7 +281,12 @@ const SpatialDataMainChart = observer(() => {
     }, []);
 
     return (
-        <SpatialAnnotationProvider chart={chart} hoveredContour={hoveredContour} setHoveredContour={setHoveredContour}>
+        <SpatialAnnotationProvider
+            chart={chart}
+            hoveredContour={hoveredContour}
+            setHoveredContour={setHoveredContour}
+            separateDensityLayer
+        >
             <SpatialDataViewer setHoveredContour={setHoveredContour} />
         </SpatialAnnotationProvider>
     );
@@ -353,7 +358,8 @@ const SpatialDataViewer = observer(
         const id = useChartID();
         const deckContainerRef = useRef<HTMLDivElement | null>(null);
         const { scatterProps, selectionLayer } = useSpatialLayers();
-        const { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
+        const { scatterplotLayer, greyScatterplotLayer, densityLayer, getTooltip, setScatterKeyboardActive } =
+            scatterProps;
         const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
         const contourConfig = useConfig<DualContourLegacyConfig>();
         const legendFields = useFieldContourLegend(contourConfig.densityFields);
@@ -454,11 +460,12 @@ const SpatialDataViewer = observer(
             () => ({
                 grey_scatter: greyScatterplotLayer,
                 scatter: scatterplotLayer,
+                density: densityLayer,
                 gate_display: gateDisplayLayer,
                 selection: selectionLayer,
                 gate_labels: gateLabelLayer,
             }),
-            [gateLabelLayer, gateDisplayLayer, scatterplotLayer, greyScatterplotLayer, selectionLayer],
+            [gateLabelLayer, gateDisplayLayer, scatterplotLayer, greyScatterplotLayer, densityLayer, selectionLayer],
         );
 
         const hostLayerResolver = useMemo(() => createMdvHostLayerResolver(deckOverlaySources), [deckOverlaySources]);
