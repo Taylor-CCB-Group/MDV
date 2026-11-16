@@ -1,24 +1,29 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { DataSource } from "@/charts/charts";
 import DataStore from "@/datastore/DataStore";
 
-const { chartManager } = vi.hoisted(() => ({
+const { chartManager, renameDialogMock } = vi.hoisted(() => ({
     chartManager: {
+        config: { permission: "edit" },
         layoutMenus: { people: { show: vi.fn() } },
         createInfoAlert: vi.fn(),
     },
+    renameDialogMock: vi.fn(),
 }));
 
 vi.mock("@/react/hooks", () => ({ useChartManager: () => chartManager }));
 vi.mock("@/charts/dialogs/AddChartDialogReact", () => ({ default: vi.fn() }));
 vi.mock("@/charts/dialogs/AnnotationDialogReact", () => ({ AnnotationDialogReact: vi.fn() }));
 vi.mock("@/charts/dialogs/ColorPaletteWrapper", () => ({ default: vi.fn() }));
+vi.mock("@/charts/dialogs/RenameDatasourceDialog", () => ({ default: renameDialogMock }));
 
 import DataSourceMenuBar from "@/react/components/DataSourceMenuBar";
 
-function createDataSource(): DataSource {
+function createDataSource(displayName?: string): DataSource {
     const dataStore: DataStore = Object.assign(Object.create(DataStore.prototype), {
+        name: "people",
+        config: { name: "people", display_name: displayName },
         size: 6,
         filterSize: 6,
         listeners: {},
@@ -41,6 +46,10 @@ function setFilterSize(dataSource: DataSource, filterSize: number) {
         dataSource.dataStore._callListeners("filtered", null);
     });
 }
+
+beforeEach(() => {
+    chartManager.config.permission = "edit";
+});
 
 afterEach(() => {
     cleanup();
@@ -106,6 +115,31 @@ describe("DataSourceMenuBar", () => {
         render(<DataSourceMenuBar dataSource={createDataSource()} />);
 
         expect(screen.getByLabelText("people").textContent).toBe("people");
+    });
+
+    test("shows the datasource's display name in place of its identifier", () => {
+        render(<DataSourceMenuBar dataSource={createDataSource("Patients")} />);
+
+        expect(screen.getByLabelText("Patients").textContent).toBe("Patients");
+        expect(screen.queryByText("people")).toBeNull();
+    });
+
+    test("opens the rename dialog for its datastore from the pencil button, not the name", () => {
+        const dataSource = createDataSource();
+        render(<DataSourceMenuBar dataSource={dataSource} />);
+
+        expect(screen.getByText("people").closest("button")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Rename datasource" }));
+
+        expect(renameDialogMock).toHaveBeenCalledWith(dataSource.dataStore);
+    });
+
+    test("has no rename button when the project is view only", () => {
+        chartManager.config.permission = "view";
+        render(<DataSourceMenuBar dataSource={createDataSource("Patients")} />);
+
+        expect(screen.queryByRole("button", { name: "Rename datasource" })).toBeNull();
+        expect(screen.getByText("Patients")).toBeTruthy();
     });
 
     test("shows whether its pane is full screen", () => {
