@@ -545,3 +545,34 @@ def test_invitation_that_expires_while_its_claim_waits_grants_nothing(app, provi
     db.session.expire_all()
     assert invitation.accepted_at is None
     assert User.query.filter_by(email="kim@example.org").first() is None
+
+
+def test_admin_rights_removed_while_signing_in_are_not_used_for_the_role(app, provider, admin, project):
+    # Remove Admin commits from another request after this sign-in loaded the
+    # User. The plain SQL update changes the row but not the copy this sign-in
+    # holds, so the role must come from the row as it is now.
+    user = User(email="ida@example.org", auth_id="auth0|ida", is_active=True, is_admin=True)
+    db.session.add(user)
+    db.session.commit()
+    invite(admin, "ida@example.org", PASSWORD, {project: "viewer"}, user_id=user.id)
+    matches = InvitationService._sign_in_matches
+
+    def admin_removed_once_matched(candidate, sign_in):
+        matched = matches(candidate, sign_in)
+        if matched:
+            db.session.execute(
+                update(User)
+                .where(User.id == candidate.user_id)
+                .values(is_admin=False)
+                .execution_options(synchronize_session=False)
+            )
+        return matched
+
+    with patch.object(InvitationService, "_sign_in_matches", staticmethod(admin_removed_once_matched)):
+        response = get_as(
+            app, provider, f"/projects/{project.id}/open", password_sign_in("auth0|ida", "ida@example.org")
+        )
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    viewer = {"can_read": True, "can_write": False, "is_owner": False}
+    assert UserProjectService.get_user_project_permissions(user.id, project.id) == viewer

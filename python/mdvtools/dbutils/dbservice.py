@@ -1089,7 +1089,9 @@ class InvitationService:
             else:
                 # The Invitation moves an existing User to this Auth0 account, so the
                 # account they signed in with before no longer reaches them (ADR 0019).
-                user = db.session.get(User, invitation.user_id)
+                # Read the row as it is now, and lock it. This request may hold a
+                # copy loaded before the claim, and Remove Admin can commit since.
+                user = db.session.get(User, invitation.user_id, populate_existing=True, with_for_update=True)
                 if user is None:
                     db.session.rollback()
                     return None
