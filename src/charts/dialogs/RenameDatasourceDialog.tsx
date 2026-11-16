@@ -160,13 +160,23 @@ type ViewSaver = {
     getState(): { chartErrors?: unknown[] } | undefined;
 };
 
+const hasChartErrors = (cm: ViewSaver) => Boolean(cm.getState()?.chartErrors?.length);
+
+/**
+ * Whether to offer to save the view before renaming. hasUnsavedChanges reports false for a
+ * view with chart errors, so it cannot rule out changes the reload would lose.
+ */
+export function mayHaveUnsavedChanges(cm: ViewSaver): boolean {
+    return hasChartErrors(cm) || cm.viewManager.hasUnsavedChanges();
+}
+
 /** Saves the current view, and resolves to whether it was saved. */
 export async function saveCurrentView(cm: ViewSaver): Promise<boolean> {
     // saveView reports nothing and swallows its own errors, so check what it left behind
     await cm.viewManager.saveView();
     // saveView refuses to save a view with chart errors, and hasUnsavedChanges reports
     // false for one, so it cannot say whether the save happened
-    if (cm.getState()?.chartErrors?.length) return false;
+    if (hasChartErrors(cm)) return false;
     return !cm.viewManager.hasUnsavedChanges();
 }
 
@@ -215,7 +225,7 @@ class RenameDatasourceDialog extends BaseDialog {
                 <RenameDatasourceFlow
                     dataStore={dataStore}
                     allDataStores={allDataStores}
-                    hasUnsavedChanges={cm.viewManager.hasUnsavedChanges()}
+                    hasUnsavedChanges={mayHaveUnsavedChanges(cm)}
                     saveView={saveView}
                     onClose={() => this.close()}
                     // the new name is read when the page loads

@@ -20,7 +20,7 @@ from pathlib import Path
 import scipy.sparse
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
-from typing import Callable, Optional, NewType, List, Union, Any, cast
+from typing import Optional, NewType, List, Union, Any, cast
 from pandas.api.types import is_bool_dtype, is_datetime64_any_dtype
 import polars as pl
 # from mdvtools.charts.view import View 
@@ -412,15 +412,14 @@ class MDVProject:
         return col[0]
 
     def set_column_metadata(self, datasource, column, parameter, value):
-        def update(ds):
-            col_index = [c for c, x in enumerate(ds["columns"]) if x.get("field") == column]
-            if len(col_index) == 0:
-                raise AttributeError(
-                    f"column {column} not found in {datasource} datasource"
-                )
-            ds["columns"][col_index[0]][parameter] = value
-
-        self._update_datasource_metadata(datasource, update)
+        ds = self.get_datasource_metadata(datasource)
+        col_index = [c for c, x in enumerate(ds["columns"]) if x.get("field") == column]
+        if len(col_index) == 0:
+            raise AttributeError(
+                f"column {column} not found in {datasource} datasource"
+            )
+        ds["columns"][col_index[0]][parameter] = value
+        self.set_datasource_metadata(ds)
 
     def rename_column(self, datasource: str, field: str, new_name: str) -> bool:
         """Change a column's display name, leaving its `field` identifier untouched.
@@ -865,32 +864,13 @@ class MDVProject:
         return ds[0]
 
     def set_datasource_metadata(self, ds):
-        # The whole file is rewritten, so a concurrent write to another datasource
-        # would otherwise be lost.
-        with self.lock("write"):
-            mds = self.datasources
-            index = [c for c, x in enumerate(mds) if x["name"] == ds["name"]]
-            if len(index) == 0:
-                mds.append(ds)
-            else:
-                mds[index[0]] = ds
-            self.datasources = mds
-
-    def _update_datasource_metadata(self, name: str, update: Callable[[dict], None]):
-        """Apply `update` to a fresh read of one datasource's entry and save it.
-
-        The read happens under the write lock, so fields written meanwhile by another
-        request (e.g. a `display_name` from `rename_datasource`) are kept rather than
-        overwritten with an older copy of the entry. Must not be called while holding
-        the write lock: fasteners write locks do not nest.
-        """
-        with self.lock("write"):
-            mds = self.datasources
-            entry = next((x for x in mds if x.get("name") == name), None)
-            if entry is None:
-                raise AttributeError(f"{name} datasource not found")
-            update(entry)
-            self.datasources = mds
+        mds = self.datasources
+        index = [c for c, x in enumerate(mds) if x["name"] == ds["name"]]
+        if len(index) == 0:
+            mds.append(ds)
+        else:
+            mds[index[0]] = ds
+        self.datasources = mds
 
     def rename_datasource(self, datasource: str, new_name: str) -> bool:
         """Change the name a datasource is shown under, leaving its `name` untouched.
@@ -2427,7 +2407,10 @@ class MDVProject:
         md = state.get("metadata")
         if md:
             for ds in md:
-                self._update_datasource_metadata(ds, lambda entry, ds=ds: entry.update(md[ds]))
+                datasource = self.get_datasource_metadata(ds)
+                for param in md[ds]:
+                    datasource[param] = md[ds][param]
+                self.set_datasource_metadata(datasource)
 
     def add_image_set(self, datasource, setname, column, folder, type="png",large=False):
         """Adds a set of images to a datasource. The images should be in a folder, with the same name as the column

@@ -5,6 +5,7 @@ import DataStore from "@/datastore/DataStore";
 vi.mock("@/dataloaders/DataLoaderUtil", () => ({ getProjectRoot: () => "/project/p1" }));
 
 import {
+    mayHaveUnsavedChanges,
     RenameDatasourceDialogComponent,
     RenameDatasourceFlow,
     renameDatasource,
@@ -208,6 +209,16 @@ describe("saveCurrentView", () => {
 
         await expect(saveCurrentView(cm)).resolves.toBe(saved);
         expect(cm.viewManager.saveView).toHaveBeenCalledOnce();
+    });
+
+    test.each([
+        ["no changes", { unsaved: false }, false],
+        ["unsaved changes", { unsaved: true }, true],
+        // hasUnsavedChanges reports false for a view with chart errors, so changes may be hidden
+        ["chart errors", { unsaved: false, chartErrors: [{ error: "bad chart" }] }, true],
+        ["an empty error list", { unsaved: false, chartErrors: [] }, false],
+    ])("decides whether to offer a save for a view with %s", (_, state, offered) => {
+        expect(mayHaveUnsavedChanges(chartManager(state))).toBe(offered);
     });
 });
 
