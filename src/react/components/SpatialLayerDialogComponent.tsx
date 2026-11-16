@@ -418,6 +418,20 @@ const LayerTreeRow = observer(function LayerTreeRow({
                     {name}
                 </Typography>
             )}
+            {entry.kind === "group" && onAddInto && (
+                <IconButton
+                    size="small"
+                    sx={{ flexShrink: 0 }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onAddInto(entryId, e.currentTarget);
+                    }}
+                    aria-label={`add a layer to ${name}`}
+                    title="Add a layer to this group"
+                >
+                    <AddIcon fontSize="small" />
+                </IconButton>
+            )}
             {supportsOpacity && (
                 <div className="w-20 px-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <Slider
@@ -432,20 +446,6 @@ const LayerTreeRow = observer(function LayerTreeRow({
                         }}
                     />
                 </div>
-            )}
-            {entry.kind === "group" && onAddInto && (
-                <IconButton
-                    size="small"
-                    sx={{ flexShrink: 0 }}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onAddInto(entryId, e.currentTarget);
-                    }}
-                    aria-label={`add a layer to ${name}`}
-                    title="Add a layer to this group"
-                >
-                    <AddIcon fontSize="small" />
-                </IconButton>
             )}
             {entry.kind === "group" && onUngroup && (
                 <IconButton
