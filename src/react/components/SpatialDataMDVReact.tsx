@@ -1,14 +1,5 @@
-import { findRenderStackEntry, type RenderStack, type RenderStackGroupBlendMode } from "@spatialdata/layers";
-import {
-    action,
-    comparer,
-    computed,
-    makeAutoObservable,
-    makeObservable,
-    observable,
-    reaction,
-    runInAction,
-} from "mobx";
+import { findRenderStackEntry, type RenderStack } from "@spatialdata/layers";
+import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
@@ -16,11 +7,6 @@ import type { DeckBackend } from "@/react/spatialdata/deck_backend";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
-import {
-    type DevScatterGroupProps,
-    getDevScatterGroup,
-    setDevScatterGroup,
-} from "@/react/spatialdata/render_stack_control";
 import {
     createHostOnlyRenderStack,
     type DefaultImageLayerProps,
@@ -398,81 +384,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 label: "Category Filters",
                 current_value: filters,
             }),
-            ...(import.meta.env.DEV ? [this.devScatterGroupSettings()] : []),
         ];
-    }
-
-    /** Dev-only control for layer groups, until the layer dialog can make them. */
-    devScatterGroupSettings() {
-        const stack = this.config.renderStack;
-        const group = stack && getDevScatterGroup(stack);
-        const current: DevScatterGroupProps = {
-            opacity: group?.props.opacity ?? 1,
-            blendMode: group?.props.blendMode ?? "pass-through",
-            isolate: group?.props.isolate ?? true,
-        };
-        // Observable, so the checkbox follows when another control turns the group on. The
-        // settings panel copies plain specs into observables of its own, but keeps this one.
-        const enabledSpec = makeAutoObservable(
-            g({
-                type: "check",
-                label: "group grey scatter + scatter",
-                current_value: !!group,
-                func: (value) => apply(value),
-            }),
-        );
-        // Any group control turns the group on: on its own it would have nothing to act on.
-        const apply = (enabled: boolean, patch: Partial<DevScatterGroupProps> = {}) => {
-            if (!this.config.renderStack) return;
-            runInAction(() => {
-                enabledSpec.current_value = enabled;
-            });
-            Object.assign(current, patch);
-            const structural = setDevScatterGroup(this.config.renderStack, enabled ? { ...current } : null);
-            if (structural) this.bumpRenderStackGeneration();
-            else this.bumpRenderStackPropsGeneration();
-        };
-        const blendModes: RenderStackGroupBlendMode[] = [
-            "pass-through",
-            "normal",
-            "additive",
-            "multiply",
-            "screen",
-            "max",
-            "min",
-        ];
-        return g({
-            type: "folder",
-            label: "Layer group (dev)",
-            current_value: [
-                enabledSpec,
-                g({
-                    type: "check",
-                    label: "isolate",
-                    current_value: current.isolate,
-                    func: (value) => apply(true, { isolate: value }),
-                }),
-                g({
-                    type: "slider",
-                    label: "group opacity",
-                    current_value: current.opacity,
-                    min: 0,
-                    max: 1,
-                    continuous: true,
-                    func: (value) => apply(true, { opacity: value }),
-                }),
-                g({
-                    type: "dropdown",
-                    label: "group blend mode",
-                    current_value: current.blendMode,
-                    values: [blendModes.map((mode) => ({ name: mode, value: mode })), "name", "value"],
-                    func: (value) => {
-                        const blendMode = blendModes.find((mode) => mode === value);
-                        if (blendMode) apply(true, { blendMode });
-                    },
-                }),
-            ],
-        });
     }
 
     getConfig() {

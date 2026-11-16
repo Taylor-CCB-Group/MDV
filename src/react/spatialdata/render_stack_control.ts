@@ -15,7 +15,11 @@ import { useCallback } from "react";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "@/react/components/SpatialDataMDVReact";
 import { useChart } from "@/react/context";
 import { useConfig } from "@/react/hooks";
-import { type DeckOverlayId, deckHostLayerId, deckIdFromHostLayerId } from "./host_overlay_ids";
+import { getRandomString } from "@/utilities/Utilities";
+import { DATA_POINTS_GROUP_ID, type DeckOverlayId, deckHostLayerId, deckIdFromHostLayerId } from "./host_overlay_ids";
+
+export { DATA_POINTS_GROUP_ID };
+
 import { spatialEntryAsLayerConfig } from "./render_stack_adapter";
 import {
     createDefaultRenderStack,
@@ -134,7 +138,7 @@ export function insertSpatialRenderStackEntry(
     props: Record<string, unknown> = {},
 ): boolean {
     const id = spatialEntryId(elementType, elementKey);
-    if (stack.entries.some((entry) => entry.id === id)) {
+    if (findRenderStackEntry(stack, id)) {
         return false;
     }
     const entry: RenderStackEntry = {
@@ -171,10 +175,81 @@ export function insertHostRenderStackEntry(stack: RenderStack, deckId: DeckOverl
     return true;
 }
 
+/** Where an entry sits: the list holding it (the stack's top level or a group's children). */
+export function findRenderStackSiblings(
+    stack: RenderStack,
+    entryId: string,
+): { siblings: RenderStackEntry[]; index: number; parent: RenderStackGroupEntry | null } | undefined {
+    const search = (
+        siblings: RenderStackEntry[],
+        parent: RenderStackGroupEntry | null,
+    ): ReturnType<typeof findRenderStackSiblings> => {
+        const index = siblings.findIndex((entry) => entry.id === entryId);
+        if (index !== -1) return { siblings, index, parent };
+        for (const entry of siblings) {
+            if (entry.kind !== "group") continue;
+            const found = search(entry.children, entry);
+            if (found) return found;
+        }
+        return undefined;
+    };
+    return search(stack.entries, null);
+}
+
 export function removeRenderStackEntry(stack: RenderStack, entryId: string): void {
-    const index = stack.entries.findIndex((entry) => entry.id === entryId);
-    if (index === -1) return;
-    stack.entries.splice(index, 1);
+    const found = findRenderStackSiblings(stack, entryId);
+    found?.siblings.splice(found.index, 1);
+}
+
+export function renderStackGroupId(): string {
+    return `group-#${getRandomString()}`;
+}
+
+/**
+ * Add an empty group just below the MDV overlays, where a new spatial layer goes.
+ * Returns its id.
+ */
+export function insertRenderStackGroup(stack: RenderStack): string {
+    const id = renderStackGroupId();
+    const firstHostIndex = stack.entries.findIndex((e) => e.kind === "host");
+    const group: RenderStackGroupEntry = { kind: "group", id, visible: true, props: {}, children: [] };
+    stack.entries.splice(firstHostIndex === -1 ? stack.entries.length : firstHostIndex, 0, group);
+    return id;
+}
+
+/** Replace a group with its children, in its place. */
+export function ungroupRenderStackEntry(stack: RenderStack, groupId: string): boolean {
+    const found = findRenderStackSiblings(stack, groupId);
+    const group = found?.siblings[found.index];
+    if (!found || group?.kind !== "group") return false;
+    found.siblings.splice(found.index, 1, ...group.children);
+    return true;
+}
+
+/**
+ * Move an entry into `parentId` (a group, or the top level for null), just after
+ * `afterId` there, or first when `afterId` is null. Refuses to put a group inside itself.
+ */
+export function moveRenderStackEntry(
+    stack: RenderStack,
+    entryId: string,
+    parentId: string | null,
+    afterId: string | null,
+): boolean {
+    const from = findRenderStackSiblings(stack, entryId);
+    if (!from) return false;
+    const moved = from.siblings[from.index];
+    let target = stack.entries;
+    if (parentId !== null) {
+        const parent = findRenderStackEntry(stack, parentId);
+        if (parent?.kind !== "group") return false;
+        if (moved.kind === "group" && findRenderStackEntry({ ...stack, entries: [moved] }, parentId)) return false;
+        target = parent.children;
+    }
+    from.siblings.splice(from.index, 1);
+    const afterIndex = afterId === null ? -1 : target.findIndex((entry) => entry.id === afterId);
+    target.splice(afterIndex + 1, 0, moved);
+    return true;
 }
 
 export function renderStackEntryIds(stack: RenderStack): string[] {
@@ -226,30 +301,43 @@ export function seedRenderStackFromSpatialData(
     });
 }
 
-/** Dev-only group of the two scatter layers, until the layer dialog can make groups. */
-export const DEV_SCATTER_GROUP_ID = "group:dev-scatter";
-const DEV_SCATTER_GROUP_MEMBERS = [deckHostLayerId("grey_scatter"), deckHostLayerId("scatter")];
+/**
+ * The group the MDV data points (the grey and coloured scatter) are composited in. It
+ * exists only while their compositing differs from the default, so stacks that never
+ * use it carry no group and pay nothing for one.
+ */
+const DATA_POINTS_GROUP_MEMBERS = [deckHostLayerId("grey_scatter"), deckHostLayerId("scatter")];
 
-export type DevScatterGroupProps = {
+export type CompositingProps = {
     opacity: number;
     blendMode: RenderStackGroupBlendMode;
     isolate: boolean;
 };
 
-export function getDevScatterGroup(stack: RenderStack): RenderStackGroupEntry | undefined {
-    const entry = stack.entries.find((item) => item.id === DEV_SCATTER_GROUP_ID);
+export const DEFAULT_COMPOSITING: CompositingProps = { opacity: 1, blendMode: "pass-through", isolate: false };
+
+export function isDefaultCompositing(props: CompositingProps): boolean {
+    return (
+        props.opacity === DEFAULT_COMPOSITING.opacity &&
+        props.blendMode === DEFAULT_COMPOSITING.blendMode &&
+        props.isolate === DEFAULT_COMPOSITING.isolate
+    );
+}
+
+export function getDataPointsGroup(stack: RenderStack): RenderStackGroupEntry | undefined {
+    const entry = stack.entries.find((item) => item.id === DATA_POINTS_GROUP_ID);
     return entry?.kind === "group" ? entry : undefined;
 }
 
 /**
- * Dev-only: put `deck:grey_scatter` and `deck:scatter` in one top-level group, at the
- * lower one's place, or take them back out (`props` null). Only moves top-level
- * entries. Returns whether the stack's structure changed; a props-only edit to an
- * existing group is patched in place and returns false.
+ * Set how the data points are composited. Default compositing takes the scatter layers
+ * back out of their group; anything else puts them in it, at the lower one's place.
+ * Returns whether the stack's structure changed; editing an existing group's props
+ * patches it in place and returns false.
  */
-export function setDevScatterGroup(stack: RenderStack, props: DevScatterGroupProps | null): boolean {
-    const group = getDevScatterGroup(stack);
-    if (!props) {
+export function setDataPointsCompositing(stack: RenderStack, props: CompositingProps): boolean {
+    const group = getDataPointsGroup(stack);
+    if (isDefaultCompositing(props)) {
         if (!group) return false;
         stack.entries.splice(stack.entries.indexOf(group), 1, ...group.children);
         return true;
@@ -258,13 +346,13 @@ export function setDevScatterGroup(stack: RenderStack, props: DevScatterGroupPro
         Object.assign(group.props, props);
         return false;
     }
-    const members = stack.entries.filter((entry) => DEV_SCATTER_GROUP_MEMBERS.includes(entry.id));
+    const members = stack.entries.filter((entry) => DATA_POINTS_GROUP_MEMBERS.includes(entry.id));
     if (members.length === 0) return false;
     const at = stack.entries.indexOf(members[0]);
     for (const member of members) stack.entries.splice(stack.entries.indexOf(member), 1);
     stack.entries.splice(at, 0, {
         kind: "group",
-        id: DEV_SCATTER_GROUP_ID,
+        id: DATA_POINTS_GROUP_ID,
         visible: true,
         props: { ...props },
         children: members,

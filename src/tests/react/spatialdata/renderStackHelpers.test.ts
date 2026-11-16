@@ -18,18 +18,23 @@ vi.mock("@/react/hooks", () => ({
 }));
 
 import { DECK_OVERLAY_IDS, deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
+import { flattenLayerTree, projectLayerTreeDrop } from "@/react/spatialdata/layer_tree";
 import {
     createRenderStackLayerInputsCache,
     resolveCachedHostDeckLayers,
     syncRenderStackLayerInputs,
 } from "@/react/spatialdata/render_stack_adapter";
 import {
-    DEV_SCATTER_GROUP_ID,
+    DATA_POINTS_GROUP_ID,
+    DEFAULT_COMPOSITING,
+    insertRenderStackGroup,
+    moveRenderStackEntry,
     patchRenderStackEntry,
     patchRenderStackEntryPropsInPlace,
     removeRenderStackEntry,
     seedRenderStackFromSpatialData,
-    setDevScatterGroup,
+    setDataPointsCompositing,
+    ungroupRenderStackEntry,
 } from "@/react/spatialdata/render_stack_control";
 import {
     createHostOnlyRenderStack,
@@ -612,16 +617,65 @@ describe("render stack groups", () => {
         expect(resolveCachedHostDeckLayers(hidden, resolver).map((layer) => layer.id)).toEqual(hostIds.slice(2));
     });
 
-    test("the dev scatter group wraps both scatter entries in place, and unwraps them", () => {
+    test("the data points' group exists only while their compositing is not the default", () => {
         const stack = createHostOnlyRenderStack();
-        const props = { opacity: 0.5, blendMode: "pass-through" as const, isolate: true };
+        const isolated = { ...DEFAULT_COMPOSITING, opacity: 0.5, isolate: true };
 
-        expect(setDevScatterGroup(stack, props)).toBe(true);
-        expect(getRenderStackEntryIds(stack)).toEqual([DEV_SCATTER_GROUP_ID, ...hostIds]);
-        expect(setDevScatterGroup(stack, { ...props, blendMode: "multiply" })).toBe(false);
+        expect(setDataPointsCompositing(stack, isolated)).toBe(true);
+        expect(getRenderStackEntryIds(stack)).toEqual([DATA_POINTS_GROUP_ID, ...hostIds]);
+        expect(setDataPointsCompositing(stack, { ...isolated, blendMode: "multiply" })).toBe(false);
         expect(stack.entries[0]).toMatchObject({ props: { blendMode: "multiply" } });
 
-        expect(setDevScatterGroup(stack, null)).toBe(true);
+        expect(setDataPointsCompositing(stack, DEFAULT_COMPOSITING)).toBe(true);
         expect(getRenderStackEntryIds(stack)).toEqual(hostIds);
+        expect(setDataPointsCompositing(stack, DEFAULT_COMPOSITING)).toBe(false);
+    });
+
+    test("groups are inserted below the overlays, filled by moving entries in, and ungrouped in place", () => {
+        const stack = renderStack([
+            spatialEntry({ id: "image-a", elementKey: "imageA" }),
+            spatialEntry({ id: "shapes-a", elementKey: "cells", elementType: "shapes" }),
+            hostEntry(deckHostLayerId("scatter")),
+        ]);
+        const groupId = insertRenderStackGroup(stack);
+        expect(stack.entries.map((entry) => entry.id)).toEqual(["image-a", "shapes-a", groupId, "deck:scatter"]);
+
+        expect(moveRenderStackEntry(stack, "shapes-a", groupId, null)).toBe(true);
+        expect(moveRenderStackEntry(stack, "image-a", groupId, "shapes-a")).toBe(true);
+        expect(getRenderStackEntryIds(stack)).toEqual([groupId, "shapes-a", "image-a", "deck:scatter"]);
+        expect(moveRenderStackEntry(stack, groupId, groupId, null)).toBe(false);
+
+        removeRenderStackEntry(stack, "image-a");
+        expect(getRenderStackEntryIds(stack)).toEqual([groupId, "shapes-a", "deck:scatter"]);
+
+        expect(ungroupRenderStackEntry(stack, groupId)).toBe(true);
+        expect(stack.entries.map((entry) => entry.id)).toEqual(["shapes-a", "deck:scatter"]);
+    });
+
+    test("a dragged row lands at the depth the rows around it allow", () => {
+        const stack = renderStack([
+            spatialEntry({ id: "a", elementKey: "a" }),
+            {
+                kind: "group",
+                id: "g",
+                visible: true,
+                props: {},
+                children: [spatialEntry({ id: "b", elementKey: "b" })],
+            },
+            spatialEntry({ id: "c", elementKey: "c" }),
+        ]);
+        const rows = flattenLayerTree(stack.entries, new Set());
+        expect(rows.map((row) => `${row.id}@${row.depth}`)).toEqual(["a@0", "g@0", "b@1", "c@0"]);
+        expect(flattenLayerTree(stack.entries, new Set(["g"])).map((row) => row.id)).toEqual(["a", "g", "c"]);
+
+        // c dragged up over b takes its place: first in the group, before b
+        expect(projectLayerTreeDrop(rows, "c", "b", 0)).toEqual({ depth: 1, parentId: "g", afterId: null });
+        // b dragged left stays where it is but leaves the group, after it
+        expect(projectLayerTreeDrop(rows, "b", "b", -1)).toEqual({ depth: 0, parentId: null, afterId: "g" });
+        // a dragged down past the group's row lands first in the group: the row below it is the group's
+        expect(projectLayerTreeDrop(rows, "a", "g", 0)).toEqual({ depth: 1, parentId: "g", afterId: null });
+        // ...unless the group is collapsed, when it goes after the group
+        const collapsed = flattenLayerTree(stack.entries, new Set(["g"]));
+        expect(projectLayerTreeDrop(collapsed, "a", "g", 1)).toEqual({ depth: 0, parentId: null, afterId: "g" });
     });
 });
