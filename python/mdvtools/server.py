@@ -525,6 +525,10 @@ def create_app(
     @project_bp.route("/rename_datasource", access_level='editable', methods=["POST"])
     def rename_datasource():
         """Set the name a datasource is shown under; see MDVProject.rename_datasource."""
+        # access_level is only enforced by the catalog's auth hook; in single-project
+        # mode state.json is the only thing saying whether the project is editable.
+        if project.state.get("permission") != "edit":
+            return jsonify({"success": False, "error": "Project is read-only"}), 403
         data = request.get_json(silent=True)
         if not isinstance(data, dict) or not all(key in data for key in ("datasource", "name")):
             return jsonify({"success": False, "error": "Request must contain 'datasource' and 'name'"}), 400

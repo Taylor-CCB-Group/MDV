@@ -8,6 +8,7 @@ import {
     RenameDatasourceDialogComponent,
     RenameDatasourceFlow,
     renameDatasource,
+    saveCurrentView,
 } from "@/charts/dialogs/RenameDatasourceDialog";
 
 function createDataStore(name: string, displayName?: string): DataStore {
@@ -185,6 +186,28 @@ describe("RenameDatasourceFlow", () => {
         expect(onClose).toHaveBeenCalledOnce();
         expect(saveView).not.toHaveBeenCalled();
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+});
+
+describe("saveCurrentView", () => {
+    function chartManager({ unsaved, chartErrors }: { unsaved: boolean; chartErrors?: unknown[] }) {
+        return {
+            viewManager: { saveView: vi.fn(async () => {}), hasUnsavedChanges: () => unsaved },
+            getState: () => ({ chartErrors }),
+        };
+    }
+
+    test.each([
+        ["saved", { unsaved: false }, true],
+        ["still unsaved", { unsaved: true }, false],
+        // hasUnsavedChanges reports false for a view with chart errors, which saveView refuses to save
+        ["refused for chart errors", { unsaved: false, chartErrors: [{ error: "bad chart" }] }, false],
+        ["saved with an empty error list", { unsaved: false, chartErrors: [] }, true],
+    ])("reports a view that is %s", async (_, state, saved) => {
+        const cm = chartManager(state);
+
+        await expect(saveCurrentView(cm)).resolves.toBe(saved);
+        expect(cm.viewManager.saveView).toHaveBeenCalledOnce();
     });
 });
 

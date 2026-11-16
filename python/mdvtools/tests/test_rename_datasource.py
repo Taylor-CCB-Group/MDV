@@ -246,11 +246,83 @@ def test_a_corrupt_display_name_on_the_datasource_itself_can_be_replaced(project
     assert entry(project, UPLOAD)["display_name"] == "Samples"
 
 
+# --- other writers of datasources.json, which must not undo a rename ---
+
+
+@pytest.fixture
+def write_locks(project, monkeypatch):
+    """Records how deeply write locks are held each time one is taken."""
+    lock = project.lock
+    depth = 0
+    taken = []
+
+    class Tracked:
+        def __init__(self, inner):
+            self.inner = inner
+
+        def __enter__(self):
+            nonlocal depth
+            depth += 1
+            taken.append(depth)
+            return self.inner.__enter__()
+
+        def __exit__(self, *exc):
+            nonlocal depth
+            depth -= 1
+            return self.inner.__exit__(*exc)
+
+    def spy(type="read"):
+        return Tracked(lock(type)) if type == "write" else lock(type)
+
+    monkeypatch.setattr(project, "lock", spy)
+    return taken
+
+
+@pytest.mark.parametrize(
+    "write",
+    [
+        lambda p: p.save_state({"metadata": {UPLOAD: {"size": 3}}}),
+        lambda p: p.save_state(
+            {"updatedColumns": {UPLOAD: {"colors_changed": [{"column": "a", "colors": ["#fff"]}], "columns": [], "removed": []}}}
+        ),
+        lambda p: p.rename_column(UPLOAD, "a", "Alpha"),
+        lambda p: p.set_column_metadata(UPLOAD, "b", "name", "Beta"),
+    ],
+    ids=["save_state metadata", "save_state colors", "rename_column", "set_column_metadata"],
+)
+def test_other_writers_reread_under_one_write_lock_and_keep_the_display_name(project, write_locks, write):
+    project.rename_datasource(UPLOAD, "Samples")
+    write_locks.clear()
+
+    write(project)
+
+    # one lock, never nested: the entry is read and saved under it, so a rename made
+    # between another request's read and write can no longer be overwritten
+    assert write_locks == [1]
+    assert entry(project, UPLOAD)["display_name"] == "Samples"
+
+
+def test_save_state_metadata_applies_to_the_entry_as_it_is_on_disk(project):
+    project.save_state({"metadata": {UPLOAD: {"size": 3}}})
+    project.rename_datasource(UPLOAD, "Samples")
+    project.save_state({"metadata": {UPLOAD: {"size": 4}}, "updatedColumns": None})
+
+    upload = entry(project, UPLOAD)
+    assert upload["size"] == 4
+    assert upload["display_name"] == "Samples"
+
+
+def test_save_state_metadata_reports_an_unknown_datasource(project):
+    with pytest.raises(AttributeError, match="missing datasource not found"):
+        project.save_state({"metadata": {"missing": {"size": 3}}})
+
+
 # --- the route ---
 
 
 @pytest.fixture
 def client(project):
+    project.set_editable(True)
     app = Flask(__name__)
     mdv_socketio(app)
     ProjectBlueprint.register_app(app)
@@ -340,6 +412,17 @@ def test_route_requires_an_editable_project(client, project):
     options = [opts for rule, (_, opts) in routes.items() if rule.match("/rename_datasource")]
 
     assert options == [{"access_level": "editable", "methods": ["POST"]}]
+
+
+def test_route_refuses_a_read_only_project(client, project):
+    # single-project mode has no auth hook, so state.json is what makes a project read-only
+    project.set_editable(False)
+
+    response = post(client, url(project), json={"datasource": UPLOAD, "name": "Samples"})
+
+    assert response.status_code == 403
+    assert response.json == {"success": False, "error": "Project is read-only"}
+    assert "display_name" not in entry(project, UPLOAD)
 
 
 # --- uploads, which must not add a second datasource shown under the same name ---

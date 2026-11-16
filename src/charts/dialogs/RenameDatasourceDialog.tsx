@@ -155,6 +155,21 @@ export const SaveViewFirstDialogComponent = (props: {
     );
 };
 
+type ViewSaver = {
+    viewManager: { saveView(): Promise<void>; hasUnsavedChanges(): boolean };
+    getState(): { chartErrors?: unknown[] } | undefined;
+};
+
+/** Saves the current view, and resolves to whether it was saved. */
+export async function saveCurrentView(cm: ViewSaver): Promise<boolean> {
+    // saveView reports nothing and swallows its own errors, so check what it left behind
+    await cm.viewManager.saveView();
+    // saveView refuses to save a view with chart errors, and hasUnsavedChanges reports
+    // false for one, so it cannot say whether the save happened
+    if (cm.getState()?.chartErrors?.length) return false;
+    return !cm.viewManager.hasUnsavedChanges();
+}
+
 /** Offers to save the view if it has unsaved changes, then asks for the new name. */
 export const RenameDatasourceFlow = (props: {
     dataStore: DataStore;
@@ -190,11 +205,7 @@ class RenameDatasourceDialog extends BaseDialog {
         super({}, null);
         const cm = window.mdv.chartManager;
         const allDataStores = cm.dataSources.map((ds) => ds.dataStore);
-        const saveView = async () => {
-            // saveView reports nothing and swallows its own errors, so check what it left behind
-            await cm.viewManager.saveView();
-            return !cm.viewManager.hasUnsavedChanges();
-        };
+        const saveView = () => saveCurrentView(cm);
         this.root = createMdvPortal(
             <ErrorBoundary
                 FallbackComponent={({ error }) => (
