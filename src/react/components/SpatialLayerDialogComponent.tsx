@@ -416,7 +416,7 @@ const OverlayGroupRow = observer(function OverlayGroupRow({
 }) {
     const config = useConfig<SpatialDataMdvReactConfig>();
     const setEntriesVisible = useSetEntriesVisible();
-    const [collapsed, setCollapsed] = useState(false);
+    const [collapsed, setCollapsed] = useState(true);
     const entryIds = deckIds
         .map(deckHostLayerId)
         .filter((id) => config.renderStack?.entries.some((entry) => entry.id === id));
