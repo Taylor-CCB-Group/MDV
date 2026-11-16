@@ -192,7 +192,8 @@ const LayerNameField = observer(function LayerNameField({
     };
     const onKeyDown = (e: KeyboardEvent) => {
         e.stopPropagation();
-        if (e.key === "Enter") commit();
+        // Enter that confirms an IME composition (e.g. Japanese input) is not the end of the name
+        if (e.key === "Enter" && !e.nativeEvent.isComposing) commit();
         if (e.key === "Escape") {
             setEditing(false);
             setDraft(saved);
