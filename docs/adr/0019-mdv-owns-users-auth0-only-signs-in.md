@@ -44,7 +44,9 @@ out, so they can try another account.
 For password Invitations, MDV asks Auth0 to email the person a link to set their password. If
 they already have an account on that connection, MDV reuses it and sends no email. For those
 people and for Microsoft Invitations, the users page shows a message with the sign-in link
-for the Admin to send.
+for the Admin to send. If that existing account's email is unverified, the Admin resends the
+Invitation, which sends Auth0's password reset email, and completing the reset verifies the
+email (ADR 0021).
 
 An admin extension provides the users page, and MDV core keeps the sign-in checks (see
 ADR 0022).

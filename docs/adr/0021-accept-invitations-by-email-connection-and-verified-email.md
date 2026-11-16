@@ -34,8 +34,12 @@ MDV refuses a sign-in through a connection with any other strategy.
 MDV-Admin creates a password account marked as verified, with a random password that it
 discards. Only someone who can read that inbox can then set a password, through the reset
 email Auth0 sends there. MDV-Admin does not change an account that existed before the
-Invitation, so if that account's email is unverified, its owner has to verify it through
-Auth0 before the Invitation can be accepted.
+Invitation, so if that account's email is unverified, its owner has to verify it before the
+Invitation can be accepted. Resending a password Invitation sends Auth0's password reset email
+to that address, and Auth0's article
+[Resetting Password sets Email Verified to True](https://support.auth0.com/center/s/article/Reseting-Password-sets-Email-Verified-to-True-but-Does-Not-Send-a-Welcome-Email)
+says that "when an Auth0 user resets a password, Auth0 marks the email address as verified".
+Nobody has confirmed this on an MDV tenant yet.
 
 Each Microsoft connection accepts sign-ins from the client's own Entra tenant only. Together
 with `xms_edov`, this means only the client's tenant can produce a matching email, and only
