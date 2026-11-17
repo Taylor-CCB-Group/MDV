@@ -84,6 +84,40 @@ attribute it to. Startup and rescan give every administrator ownership of one, s
 project list only shows a user the projects they hold a permission row for.
 _Avoid_: orphan, public project, shared project
 
+## Project storage terms
+
+**Source store**:
+A zarr store a project reads bulk data from and never writes: a SpatialData store, AnnData zarr,
+or another zarr layout. May be copied into the project, linked, or remote.
+_Avoid_: original data, backing store, input zarr
+
+**Project repository**:
+The project's Icechunk repository, which holds everything MDV writes for the project and its
+history.
+_Avoid_: datafile, project store, h5 file
+
+**Project column**:
+A column whose values live in the Project repository: edits, annotations, job outputs, and every
+column of a project upgraded from h5.
+_Avoid_: editable column (editability is a permission, not a location), shadow column, h5 column
+
+**Source column**:
+A column whose values are read from a Source store.
+_Avoid_: zarr column, original column
+
+**Stored type**:
+The data type a column's values are kept in, at the precision they arrived with.
+_Avoid_: datatype (the legacy field, which mixes storage and treatment), original dtype
+
+**Column kind**:
+How charts and filters treat a column: numeric, categorical, unique or multi-valued. Follows from
+its Stored type and encoding.
+_Avoid_: datatype, column type
+
+**Legacy h5 project**:
+A project whose columns are in `datafile.h5`. Opened as before until it is upgraded.
+_Avoid_: old project, classic project
+
 ## Deployment terms
 
 **Deployable image**:

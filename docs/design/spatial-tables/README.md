@@ -13,6 +13,13 @@
 > phasing table in [00](00-table-element-association.md#phasing) for what is and is not
 > done. The strategic content still reads true; the "why nothing connects today"
 > descriptions do not.
+>
+> **Storage direction has since been decided** in
+> [ADR-0023](../../adr/0023-write-project-data-to-icechunk-and-retire-h5.md): writes go to a
+> per-project Icechunk repository and h5 is retired, so "writes always go to h5" below no longer
+> describes the plan. Column types: [ADR-0024](../../adr/0024-one-column-type-contract-built-on-zarr-data-types.md).
+> Theme 2 has largely landed (by-region grouping, table provenance columns), and theme 3 is
+> partly done: a chart now shares its store with its own layer dialog (#611), not across charts.
 
 ## The core deliverable
 
