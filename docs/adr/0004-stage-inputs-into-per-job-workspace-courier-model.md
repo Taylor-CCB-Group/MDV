@@ -2,6 +2,8 @@
 
 **Status:** accepted — POC design decision (DGE jobs framework).
 
+**Amended** by ADR-0023 (proposed, Taylor-CCB-Group/MDV#665): see *Amendment: Icechunk project storage* at the end.
+
 ## Context & decision
 
 A job's input data must be delivered to wherever the compute runs — a local subprocess
@@ -97,3 +99,28 @@ unchanged under a Slurm/HPC executor: swap *how* the process is launched, not *w
 Prior art: [Pulsar staging](https://pulsar.readthedocs.io/en/latest/galaxy_conf.html),
 [Airflow executors](https://www.astronomer.io/docs/learn/airflow-executors-explained/),
 [Bazel Remote Execution API](https://github.com/bazelbuild/remote-apis).
+
+## Amendment: Icechunk project storage (ADR-0023, proposed)
+
+ADR-0023 ([#665](https://github.com/Taylor-CCB-Group/MDV/pull/665)) retires `datafile.h5` for active
+projects: bulk data stays in read-only source stores, and everything MDV writes goes to the
+project's Icechunk repository. For this ADR:
+
+- **The tray format does not have to change.** The tray belongs to the tool and is scratch, never
+  project storage, so `.h5ad` and `.h5` trays stay valid. One of the two reasons for HDF5 goes:
+  it is no longer the format of MDV's store. The other stays: scanpy reads `.h5ad`. A tool may
+  choose zarr instead without touching the framework.
+- **Snapshot isolation comes from a pinned snapshot, not the read lock.** `submit` records the
+  repository snapshot that is current at submit time on the job record, and materialize reads that
+  snapshot through a read-only session. Source stores are immutable and need no pin. The tray is
+  then a snapshot of the project *as it was at submit*, which the read lock never actually gave:
+  it froze the data at materialize time. The materialize description in ADR-0006 ("under a read
+  lock") reads the same way.
+- **Decoding at the boundary stays.** Under ADR-0024 categorical columns are integer codes plus a
+  categories array in the store instead of `uint16` codes plus a `values` list in
+  `datasources.json`. The owner still resolves them to real values, and the worker still imports
+  nothing from MDV.
+- **"Worker reads the live store directly" stays rejected,** though one of its reasons changes. A
+  worker could open a pinned snapshot read-only, so snapshot isolation no longer argues against it.
+  The worker would still have to understand MDV's layout, and a remote worker with no shared
+  filesystem still cannot reach the store.

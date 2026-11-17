@@ -2,6 +2,8 @@
 
 **Status:** accepted — POC design decision (jobs framework, server integration).
 
+**Amended** by ADR-0023 (proposed, Taylor-CCB-Group/MDV#665): see *Amendment: Icechunk project storage* at the end.
+
 ## Context & decision
 
 The framework exposes two owner-side entry points: `JobManager.submit(tool_id, params)` and
@@ -350,3 +352,28 @@ Prior art:
 [crash-only software](https://en.wikipedia.org/wiki/Crash-only_software),
 [microreboot](https://en.wikipedia.org/wiki/Microreboot),
 [Airflow executors](https://www.astronomer.io/docs/learn/airflow-executors-explained/).
+
+## Amendment: Icechunk project storage (ADR-0023, proposed)
+
+ADR-0023 ([#665](https://github.com/Taylor-CCB-Group/MDV/pull/665)) moves everything MDV writes into
+a per-project Icechunk repository and retires `datafile.h5` for active projects. The driver, the
+loop and the recovery scan are unaffected. These parts change:
+
+- **Heavy work still stays off the hub.** Materialize and ingest become Icechunk, zarr and numpy work
+  instead of HDF5 work. That is still blocking native code with no gevent yield point, so the reason
+  for running them as owner steps (ADR-0014) stands.
+- **Concurrency and locking.** Ingest writes the output columns and their provenance pointers in
+  **one commit**, so a reader sees all of a job's columns or none of them. Under HDF5 a reader could
+  see some of them. Commits to a project are serialised: the ingest owner step holds
+  `project.lock("write")` across the commit, as it does today around the writes. The materialize
+  step takes no lock; it reads the snapshot pinned at submit (ADR-0004 amendment). HDF5 file locking
+  and the `_get_h5_handle` retry no longer mediate anything. A concurrent `/get_data` sees the
+  snapshot before the commit or the one after it.
+- **Known gap.** If column metadata is committed with the columns, the `datasources.json`
+  read-modify-write gap closes. ADR-0023 leaves open whether live project JSON moves into the
+  repository or only its history does, and until that is settled the gap stays as described.
+- **Failure handling.** A failed ingest leaves no partial columns, because nothing is visible until
+  the commit, so the bounded-retry hardening becomes safer. The transient case is a failed commit,
+  not h5 lock contention.
+
+Legacy h5 projects keep the behaviour described above until they are upgraded.
