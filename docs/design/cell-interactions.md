@@ -73,8 +73,8 @@ Three separable things, each persisted by label (never type id), as the chart do
    below is relative to one axis. A second axis (e.g. a niche column) is a second set, not a
    generalisation.
 
-2. **Interaction set** — the shared selection. Named, observable, owned by a per-datastore manager
-   in the GateManager mould (`InteractionManager`, `getOrCreateInteractionManager(dataStore)`):
+2. **Interaction set** — the shared selection: a plain, serialisable value. The model says nothing
+   about what holds it; that is a separate question ([Where a set lives](#where-a-set-lives)).
 
    ```ts
    type TypeTerm = string | { anyOf: string[] };      // a category, or a merged group (as category1 arrays today)
@@ -91,8 +91,8 @@ Three separable things, each persisted by label (never type id), as the chart do
    };
    ```
 
-   **Focus** (hover / emphasis) is transient, observable, on the manager, not persisted:
-   `{ setId, motif?, measure? }`. The chart's current `focus` / `rFocus` become this.
+   **Focus** (hover / emphasis) is a second, transient value that travels with a set, not persisted:
+   `{ motif?, measure? }`. The chart's current `focus` / `rFocus` become this.
 
 3. **Measures** — how two (or n) types relate, with parameters as data:
 
@@ -110,7 +110,41 @@ Three separable things, each persisted by label (never type id), as the chart do
 **Results** are a cache, not state: keyed by `(axis, domain, measure kind + compute params)`, values
 an open-axis tensor `[a][b][param]` (cross-PCF already returns `g[a·K·B + b·B + k]`). A consumer asks
 for `(motif, measure)` and gets a value, a curve, or a raster handle. This is where the current chart
-compute (worker, latest-wins, abort) moves to, so two charts on the same set don't compute twice.
+compute (worker, latest-wins, abort) moves to, so two charts asking the same question don't compute
+twice. The key is the *inputs*, never a set's identity or host: two sets in different places that
+ask the same thing share the result.
+
+### Where a set lives
+
+Three concerns that the first implementation will be tempted to merge, kept apart so the set can later
+be composed differently:
+
+- **Value** — the `InteractionSet` and its focus, as above. Pure data; no behaviour, no owner.
+- **Host** — where a value is stored and persisted. Interchangeable; candidates, roughly in the order
+  they're likely to appear:
+  - *datastore default*: one set per datastore, persisted in its config like gates
+    (`dataStore.config.gates`), shared by every chart that hasn't been told otherwise;
+  - *chart-local*: a chart's own unshared set, persisted in its config (what the chart does today, and
+    a legitimate choice, not just a legacy state);
+  - *view node*: a set belonging to a view's graph, so one view can hold several chart groups on
+    different sets;
+  - *derived*: not stored at all, computed from other values (a union of sets, "pairs with g > t at
+    r", a legacy row highlight read as a focus) — so read-only to consumers.
+- **Resolver** — turns a chart's binding into the value and, if the host allows it, a way to write
+  it back. The only thing consumers touch.
+
+**First cut:** the datastore-default host, implemented in the GateManager mould
+(`getOrCreateInteractionManager(dataStore)`), plus chart-local. The manager is an *implementation of
+the default host*, not the model: nothing but the resolver may import it. What keeps later
+composition open:
+
+- consumers depend on the resolver and the value types only;
+- a binding names *where* to find a set, so adding a host is a new binding kind, not a consumer change;
+- writes go through the resolver, which may say "read-only" (derived) — consumers must handle that;
+- focus belongs to the binding's channel, not to a global, so two chart groups have two foci;
+- the compute cache keys on inputs (above), so it doesn't care which host a set came from;
+- a set's axis names its datastore, so a host and a consumer needn't be on the same datastore (a set
+  on cells can be read by a chart on the legacy interactions datasource).
 
 ### Who reads and writes it
 
@@ -122,11 +156,19 @@ compute (worker, latest-wins, abort) moves to, so two charts on the same set don
 | TCM grid (chart array) | chosen pairs as cells | focus (hover a cell) |
 | Legacy interaction heatmap / network | focus | focus (adapter, below) |
 
-Charts hold a **binding**, not a copy and not a manager handle: `interactions: { channel: "default" }`
-resolves to the datasource-wide set; later `{ node: id }` resolves through a graph (next section).
+Charts hold a **binding**, not a copy and not a host handle:
+
+```ts
+type InteractionsBinding =
+    | { channel: "default" }      // the datastore-default host (first cut)
+    | { local: InteractionSet }   // chart-local
+    | { node: string };           // a view-graph node, source or derived (later)
+```
+
 Creating a cross-PCF chart binds it to the default channel, creating the set if none exists; a second
-chart on the same channel shares it. Today's chart config migrates by lifting `type_column`, `pairs`,
-`r_bins`, `domain_source` into the set.
+chart on the same channel shares it, and "detach" turns a binding into `local` with a copy. Today's
+chart config migrates by lifting `type_column`, `pairs`, `r_bins`, `domain_source` into a set — into
+the default host, or `local` if another chart already owns the default and the two differ.
 
 **Spatial layers bind to a set, not to categories.** A render-stack overlay entry gains a binding
 such as `{ interactionSet, role: "a" | "b" | "all", follow: "focus" | "chosen" }`. The density
@@ -148,9 +190,9 @@ interaction design should be the first tenant of that graph, not a parallel mech
 absorb.
 
 - **Signals, not stores.** An interaction set and its focus are *values on a channel*. The
-  datasource-wide `InteractionManager` is then just the default graph: one writable source node per
-  datastore, which every unbound chart reads. Nothing about a chart needs to know whether its channel
-  is that default or a node in a view-level graph.
+  datastore-default host is then just the default graph: one writable source node per datastore,
+  which every unbound chart reads; chart-local, view-node and derived hosts are other nodes. Nothing
+  about a chart needs to know which it is bound to.
 - **Node kinds** this design already implies:
   - *source* (writable state): an interaction set; focus.
   - *derived* (pure, cached): set → its types (for density); set ∪ set; "pairs with g > t at r";
@@ -173,10 +215,10 @@ absorb.
   (source) or `computed` (derived), with compute nodes as async computeds with abort, which the
   cross-PCF chart effect already is. No new reactive library needed to start.
 
-What this asks of step 1 is small: route every read/write through a channel resolver
-(`resolveInteractions(binding, dataStore)`) instead of `getOrCreateInteractionManager` directly, and
-make focus a value on that channel rather than per-chart React state. The graph itself — UI to see
-and wire it, more node kinds — can come later without migrating charts again.
+What this asks of step 1 is small: route every read/write through the resolver
+(`resolveInteractions(binding, dataStore)`), never the default host directly, and make focus a value
+on the binding's channel rather than per-chart React state. The graph itself — UI to see and wire it,
+more hosts and node kinds — can come later without migrating charts again.
 
 ### Legacy interop
 
@@ -216,10 +258,10 @@ For a TCM layer and a TCM grid, in order:
 
 Each step lands on its own and is usable.
 
-1. **InteractionManager + set model in MDV**, migrating the cross-PCF chart to it (no new behaviour;
-   two cross-PCF charts can now share a set). Move the compute + cache to the manager. All access
-   goes through a channel binding (default channel only), and focus moves onto the channel, so the
-   graph can slot in later.
+1. **Set model, resolver, and two hosts** — datastore default and chart-local — migrating the
+   cross-PCF chart (no new behaviour; two cross-PCF charts can now share a set, or not). Move the
+   compute + cache into a service keyed by inputs. Two hosts from the start keeps the resolver honest:
+   with only one, nothing would catch code that bypasses it.
 2. **Type-density binding on the SpatialData chart**: an overlay bound to a set draws one density per
    type of the focused / chosen motifs. Uses existing `DensityLayer`; no intraspatial change.
 3. **Legacy adapter**: legacy heatmap highlight ↔ focus; legacy stat columns as `column` measures.
