@@ -2,6 +2,7 @@ import { action } from "mobx";
 import type { SlickgridReactInstance } from "slickgrid-react";
 import type DataStore from "@/datastore/DataStore";
 import { getTableExportBlob } from "@/datastore/dataExportUtils";
+import { getDataSourceDisplayName } from "@/datastore/dataSourceDisplayName";
 import { type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
 import { g } from "@/lib/utils";
 import { DataModel } from "@/table/DataModel";
@@ -194,7 +195,7 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
             const save = createEl(
                 "a",
                 {
-                    download: `${this.dataStore.name}.txt`,
+                    download: `${getDataSourceDisplayName(this.dataStore)}.txt`,
                     target: "_blank",
                     href: url,
                 },

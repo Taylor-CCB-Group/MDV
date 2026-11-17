@@ -3,7 +3,9 @@ import type { DataSource } from "@/charts/charts";
 import AddChartDialogReact from "@/charts/dialogs/AddChartDialogReact";
 import { AnnotationDialogReact } from "@/charts/dialogs/AnnotationDialogReact";
 import ColorPaletteWrapper from "@/charts/dialogs/ColorPaletteWrapper";
+import RenameDatasourceDialog from "@/charts/dialogs/RenameDatasourceDialog";
 import type DataStore from "@/datastore/DataStore";
+import { getDataSourceDisplayName } from "@/datastore/dataSourceDisplayName";
 import { useChartManager } from "../hooks";
 import "./DataSourceMenuBar.css";
 
@@ -74,13 +76,16 @@ function useIsFullscreen(getElement: () => Element | null | undefined) {
 
 /**
  * The bar above a datasource's charts: add chart, reset filters, colours, layout, tagging and
- * full screen on the left; the datasource's name and filtered row count on the right.
+ * full screen on the left; the datasource's name (with a rename button when the project is
+ * editable) and filtered row count on the right.
  *
  * `ChartManager._setUpMenu` mounts this inside `dataSource.menuBar`, each time a view is built.
  */
 const DataSourceMenuBar = ({ dataSource }: { dataSource: DataSource }) => {
     const cm = useChartManager();
     const { name, dataStore } = dataSource;
+    const displayName = getDataSourceDisplayName(dataStore);
+    const isEditable = cm.config.permission === "edit";
 
     const size = dataStore.size;
     const filterSize = useFilterSize(dataStore);
@@ -127,11 +132,23 @@ const DataSourceMenuBar = ({ dataSource }: { dataSource: DataSource }) => {
                 onClick={() => new AnnotationDialogReact(dataStore)}
             />
             <div className="mdv-ds-menu-info">
-                <span className="mdv-ds-name">
+                <span className={isEditable ? "mdv-ds-name mdv-ds-name--editable" : "mdv-ds-name"}>
                     {/* the tooltip carries the full name, which is truncated when space is short */}
-                    <span className="mdv-ds-name-tooltip" {...tooltipProps(name, "medium")}>
-                        <span className="mdv-ds-name-text">{name}</span>
+                    <span className="mdv-ds-name-tooltip" {...tooltipProps(displayName, "medium")}>
+                        <span className="mdv-ds-name-text">{displayName}</span>
                     </span>
+                    {isEditable && (
+                        <span {...tooltipProps("Rename datasource")}>
+                            <button
+                                type="button"
+                                className="mdv-ds-rename"
+                                aria-label="Rename datasource"
+                                onClick={() => new RenameDatasourceDialog(dataStore)}
+                            >
+                                <i className="fas fa-pen" aria-hidden="true" />
+                            </button>
+                        </span>
+                    )}
                 </span>
                 <span {...tooltipProps(`${filterSize.toLocaleString()} of ${size.toLocaleString()} rows`)}>
                     <span className="mdv-ds-count">
