@@ -28,6 +28,7 @@ jobs:
     env:
       # The dev compose file defaults to SQLite; CI keeps testing against Postgres.
       COMPOSE_PROFILES: postgres
+      DB_BACKEND: postgres
     steps:
       - uses: actions/checkout@v5
 

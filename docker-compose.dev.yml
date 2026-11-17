@@ -42,9 +42,10 @@ services:
       - FLASK_ENV=production  # Set environment to production
       - PYTHONUNBUFFERED=1  
 
-      # Database: SQLite by default. Put COMPOSE_PROFILES=postgres in the root .env
-      # to start mdv_db and mdv_pgadmin as well, which also switches the app to postgres.
-      - DB_BACKEND=${COMPOSE_PROFILES:-sqlite}
+      # Database: SQLite by default. To use Postgres, put both DB_BACKEND=postgres and
+      # COMPOSE_PROFILES=postgres in the root .env. The profile starts mdv_db and
+      # mdv_pgadmin, and DB_BACKEND switches the app to them.
+      - DB_BACKEND=${DB_BACKEND:-sqlite}
       - SQLITE_DB_PATH=/app/dev-db/mdv.sqlite3
       # Postgres connection details, used when DB_BACKEND=postgres
       - DB_USER=my_db_user
