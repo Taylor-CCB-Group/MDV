@@ -63,24 +63,44 @@ a second one coexist in a view.
 
 ## Proposal
 
-### Two runtimes, one vocabulary
+### Evaluation: change propagates, work is on demand (runtime undecided)
 
-The intraspatial op graph is a **pull** runtime: ask for a sink, compute it once, memoise. A UI needs
-**push**: when a selection changes, every chart that shows something derived from it should update,
-without anyone asking. These are different evaluators, and trying to make one serve both is how the
-current mess started.
+Not decided yet. What is settled is the behaviour, which is neither pure push nor pure pull:
 
-- **Signal graph (MDV, host side).** Nodes are *values that change*: a selection, a category set, a
-  column set, an interaction set, a region, a focus, a scalar parameter. Evaluated reactively with
-  MobX — sources are observables, derived nodes are `computed`, async nodes are cancellable
-  latest-wins (as the cross-PCF chart's compute already is). Charts and layers are its consumers.
-- **Compute graph (intraspatial op graph).** Heavy derived values — `support` masks, densities, TCM
-  rasters, cross-PCF tensors, expression columns on the GPU — are signal-graph nodes whose evaluation
-  *lowers to* an op-graph pull. The memo gives cross-chart sharing for free.
+- **Change propagates.** When a source changes (a selection, a set, a parameter), everything derived
+  from it learns it is stale, without the consumer polling.
+- **Work happens on demand.** Nothing is computed unless something observing it needs it now. A TCM
+  grid with twenty chosen pairs computes the few cells on screen, not twenty, and an off-screen chart
+  computes nothing. This laziness, together with shared static layers drawn once into an offscreen
+  framebuffer, is much of what keeps such views interactive. TCM being cheap per pair does the rest.
+  Batching is an optimisation on top, not a requirement.
+- **Results are cached by their inputs**, so two consumers asking the same question share the work,
+  wherever they are in the graph.
 
-The shared part is the **vocabulary**: value types, port typing, serialisation shape, `ParamSpec`.
-Use intraspatial's where it exists rather than inventing MDV-local ones; add MDV value kinds
-(category set, column set) to the same typing scheme.
+Eager push, which recomputes every dependant on every change, gets the second point wrong. Bare pull,
+which recomputes only when asked, gets the first wrong. MobX already has this shape: observables
+invalidate, `computed`s are lazy and stay alive only while observed. The intraspatial op graph has the
+second and third points (pull a sink, content-addressed memo) but no change notification: re-pulling is
+the caller's job.
+
+Options for where the graph lives:
+
+- **A — two layers.** MDV holds a MobX signal layer for the values that change (selection, category
+  set, column set, interaction set, region, focus, parameters). Heavy nodes (`support` masks,
+  densities, TCM rasters, cross-PCF tensors, GPU expression columns) lower to op-graph pulls when
+  observed. This is the least new machinery, but it gives two graphs to serialise and inspect.
+- **B — one graph.** The intraspatial op graph gains subscriptions (mutable sources, observed sinks,
+  invalidation along edges), and MDV uses it for everything. There is one serialised form and the
+  composer can open a view's graph. But host-only values (category labels, column sets, focus) have to
+  become op-graph citizens, and MDV's reactivity would depend on intraspatial's runtime.
+- **C — no op graph in MDV.** MobX throughout, with compute nodes as async computeds calling
+  intraspatial functions directly (as the cross-PCF chart does now). This is the simplest, but it gives
+  up the memo's cross-consumer sharing unless MDV rebuilds it.
+
+Whichever is chosen, the shared part is the **vocabulary**: value types, port typing, serialisation
+shape, `ParamSpec`. Use intraspatial's where it exists rather than inventing MDV-local ones, and add
+MDV value kinds (category set, column set) to the same typing scheme. That keeps A → B open as a later
+move.
 
 ### Value kinds (port types)
 
@@ -150,9 +170,9 @@ No big bang; each step should be useful alone and falsifiable.
 
 ## Open questions
 
-- **Who owns which graph.** Proposed: MDV owns the signal graph, intraspatial owns compute; values
-  cross as GPU buffers / SAB-backed arrays (ADR-0005's zero-copy claim, still to test with one real
-  selection).
+- **Which runtime** (A / B / C above), and so who owns which graph. Values cross as GPU buffers or
+  SAB-backed arrays either way (ADR-0005's zero-copy claim, still to test with one real selection).
+  The first steps below don't depend on the answer: refs and resolvers sit in front of any of them.
 - **Authored vs inferred.** Most users never see a graph: wiring comes from chart menus ("follow…",
   "new from here", "use this gate as domain"). An explicit editor — the composer, or something
   biologist-shaped for gating trees — is later and is not the same artefact as a developer's node
