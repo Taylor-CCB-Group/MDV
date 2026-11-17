@@ -6,8 +6,8 @@
  *
  **/
 
-import type { TypedArrayConstructor } from "@luma.gl/core";
 import type { DataColumn, DataSource, DataSourceName, DataType, FieldName } from "@/charts/charts";
+import { getColumnByteLength, getValuesPerRow, viewColumnStorage } from "@/datastore/columnTypes";
 
 type Columns = DataColumn<DataType>[];
 
@@ -106,36 +106,6 @@ function processArrayBuffer(data: ArrayBufferLike, columns: Columns, size: numbe
     const dataList: LoadedColumn[] = [];
     let offset = 0;
     for (const column of columns) {
-        //default values for numbers
-        let arrayType: TypedArrayConstructor = column.datatype === "int32" ? Int32Array : Float32Array;
-        //the length of the typed array
-        let arr_len = size;
-        //the number of bytes for each item in the column's data
-        let bytes = 4;
-        //set the correct values for other datatypes
-        if (column.datatype === "unique" || column.datatype === "text") {
-            arrayType = Uint8Array;
-            bytes = 1;
-            if (column.datatype === "unique") {
-                bytes = column.stringLength;
-                arr_len = size * bytes;
-            }
-        } else if (column.datatype === "multitext") {
-            arrayType = Uint16Array;
-            if (!column.stringLength) {
-                // this seems to be the actual logic needed, at least for tag data saved by the client
-                bytes = 2;
-                arr_len = size;
-            } else {
-                // not sure if/when this applies...
-                bytes = column.stringLength * 2; //stringLength is 'undefined' when text16 version of multitext is saved by client. there is no 'values' key at all.
-                arr_len = size * column.stringLength;
-            }
-        } else if (column.datatype === "text16") {
-            arrayType = Uint16Array;
-            bytes = 2;
-            arr_len = size;
-        }
         //special way to deal with sparse data
         //assumes all sparse data is integer/double
         //the first 4 bytes specifies the number of values (n)
@@ -161,15 +131,12 @@ function processArrayBuffer(data: ArrayBufferLike, columns: Columns, size: numbe
             }
             dataList.push({ data: sab, field: column.field });
         } else {
-            const len = size * bytes;
-            //get the data from the arraybuffer into a SharedArrayBuffer
-            //unfortunately cannot be copied directly-  have to via a typed Array
-            //@ts-expect-error todo better TypedArrayConstructor typing
-            const arr = new arrayType(data, offset, arr_len);
+            // layout per datatype comes from the column-type contract (columnTypes.ts)
+            const len = getColumnByteLength(column, size);
+            const arr = viewColumnStorage(column.datatype, data, offset, size * getValuesPerRow(column));
             const sab = new SharedArrayBuffer(len);
-            //@ts-expect-error todo better TypedArrayConstructor typing
-            const new_arr = new arrayType(sab);
-            new_arr.set(arr, 0);
+            //copy via typed arrays: an ArrayBuffer cannot be copied into a SharedArrayBuffer directly
+            viewColumnStorage(column.datatype, sab).set(arr, 0);
             dataList.push({ data: sab, field: column.field });
             offset += len;
         }

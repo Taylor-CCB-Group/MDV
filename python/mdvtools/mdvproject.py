@@ -22,6 +22,8 @@ from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any, cast
 from pandas.api.types import is_bool_dtype, is_datetime64_any_dtype
+
+from mdvtools.column_types import NUMPY_STORAGE_DTYPES, infer_datatype
 import polars as pl
 # from mdvtools.charts.view import View 
 import time
@@ -146,56 +148,8 @@ ColumnName = str  # NewType("ColumnName", str)
 # List[ColumnName] gets tricky, `ColumnName | str` syntax needs python>=3.10
 Cols = Union[List[str], NewType("Params", List[ColumnName])]
 
-# Pandas to MDV datattypes
-datatype_mappings = {
-    # Exact legacy int32 storage; no missing values expected.
-    "int8": "int32",
-    "int16": "int32",
-    "int32": "int32",
-    "uint8": "int32",
-    "uint16": "int32",
-
-    # Pandas nullable integers; legacy integer storage is float32.
-    #could be loss of precision for int64, uint32, uint64, but MDV doesn't have a better option
-    # at the moment
-    "Int8": "integer",
-    "Int16": "integer",
-    "Int32": "integer",
-    "Int64": "integer",
-    "UInt8": "integer",
-    "UInt16": "integer",
-    "UInt32": "integer",
-    "UInt64": "integer",
-
-    # Native integers that may exceed exact float32 precision.
-    "int64": "integer",
-    "uint32": "integer",
-    "uint64": "integer",
-
-    # MDV double is historically float32-backed.
-    "float32": "double",
-    "float64": "double",
-
-    # Text-like and boolean values have no dedicated MDV boolean type.
-    "object": "text",
-    "str": "text",
-    # pandas' nullable StringDtype, e.g. an anndata `nullable-string-array`
-    "string": "text",
-    "category": "text",
-    "bool": "text",
-    "boolean": "text",
-}
-
-# underlying datatypes for each MDV datatype, used for reading/writing h5 files
-numpy_dtypes = {
-    "text": numpy.ubyte,
-    "text16": numpy.uint16,
-    "multitext": numpy.uint16,
-    "double": numpy.float32,
-    "integer": numpy.float32,
-    "int32": numpy.int32,
-    # unique created on the fly (depends on string length)
-}
+# kept for code that imports it from here; the contract lives in column_types
+numpy_dtypes = NUMPY_STORAGE_DTYPES
 
 _UNIX_EPOCH_UTC = pandas.Timestamp("1970-01-01", tz="UTC")
 _SECONDS_PER_DAY = 86400.0
@@ -1404,7 +1358,7 @@ class MDVProject:
         col_exists = len(ind) > 0
         li = pandas.Series(data)
         if not column.get("datatype"):
-            column["datatype"] = datatype_mappings.get(str(li.dtype), "text")
+            column["datatype"] = infer_datatype(li.dtype)
         h5 = self._get_h5_handle()
         gr = h5[datasource]
         if not isinstance(gr, h5py.Group):
@@ -3244,7 +3198,7 @@ def get_column_info(columns, dataframe, supplied_columns_only):
     if not supplied_columns_only:
         cols = [
             {
-                "datatype": datatype_mappings[d.name],
+                "datatype": infer_datatype(d),
                 "name": c,
                 "field": c,
                 "original_dtype": d.name,
@@ -3289,24 +3243,7 @@ def get_random_string(length=6):
 
 def map_polars_to_mdv_type(polars_dtype):
     """Map Polars data types to MDV project data types"""
-    import polars as pl
-    
-    # Map Polars types to our internal types
-    if polars_dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64]:
-        return "integer"
-    elif polars_dtype in [pl.Float32, pl.Float64]:
-        return "double"
-    elif polars_dtype == pl.Boolean:
-        return "text"  # Map boolean to text as per original mapping
-    elif polars_dtype == pl.Categorical:
-        return "text"
-    elif polars_dtype in [pl.Utf8, pl.String]:
-        return "text"  # Default to text, might change to unique based on cardinality
-    elif _is_polars_datetime_dtype(polars_dtype):
-        return "double"
-    else:
-        # Default to text for any other types
-        return "text"
+    return infer_datatype(polars_dtype)
 
 
 def _is_polars_datetime_dtype(polars_dtype) -> bool:
