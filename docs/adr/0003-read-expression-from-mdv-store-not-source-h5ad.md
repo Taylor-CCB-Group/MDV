@@ -4,6 +4,8 @@
 first tool is a trivial concat-columns job, which needs none of this (no expression matrix, no
 CSC read). Revisit when DGE work resumes. Prior art: PR #352.
 
+**Amended** by ADR-0023 (proposed, Taylor-CCB-Group/MDV#665): see *Amendment: Icechunk project storage* at the end.
+
 > Parked 2026-06-11: the jobs-framework POC pivoted away from DGE-first to build the framework
 > against a throwaway concat-columns tool. This decision — along with ADR-0006's DGE worked
 > example, the Stage-3 `contrasts`/matrix design, and OQ1 — is deferred with DGE, not discarded.
@@ -57,3 +59,21 @@ Do **not** reuse the per-gene path (`get_datasource_as_dataframe` →
   log-normalized input, so OQ1 is a correctness boundary, handled there (an expression-layer
   choice recorded in provenance — the validation guard was **dropped**; we trust the input),
   not here.
+
+## Amendment: Icechunk project storage (ADR-0023, proposed)
+
+ADR-0023 ([#665](https://github.com/Taylor-CCB-Group/MDV/pull/665)) retires `datafile.h5`. Bulk data
+stays in read-only **source stores**, and everything MDV writes goes to the project's **Icechunk
+repository**. When DGE resumes, this decision holds and its reader changes:
+
+- **"The store" is wherever the matrix lives.** For data imported from AnnData or SpatialData that is
+  `X` (or a layer) in the source store. For a project upgraded from h5 it is the repository. Either
+  way it is still MDV's data and never a separate `.h5ad`, so the no-drift argument is unchanged.
+- **The bulk reader reads the sparse layout the source wrote**, instead of MDV's gene-column CSC
+  subgroups. If the source is CSR (cells as rows, as AnnData usually writes it), selecting cells
+  becomes the cheap axis, and the full-`nnz` pressure point in *Consequences* goes away for those
+  stores.
+- **Labels are resolved the way `/get_data` resolves them.** An `obs` column may come from the source
+  store or be a project column holding the user's edits, and edits win. The materializer has to use
+  the same column routing as the rest of the server, or the no-drift guarantee breaks for edited
+  labels.

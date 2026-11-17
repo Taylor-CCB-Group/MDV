@@ -2,6 +2,8 @@
 
 **Status:** accepted (jobs framework, server integration).
 
+**Amended** by ADR-0023 (proposed, Taylor-CCB-Group/MDV#665): see *Amendment: Icechunk project storage* at the end.
+
 ## Context and decision
 
 The driver (ADR-0012) does two pieces of heavy owner-side work for each job: it materializes the
@@ -73,3 +75,33 @@ holds: only the owner writes the project store, and the worker never does.
 
 Prior art: Galaxy runs job handlers in processes separate from its web workers and sets dataset
 metadata outside the web server; Airflow runs its scheduler apart from the webserver.
+
+## Amendment: Icechunk project storage (ADR-0023, proposed)
+
+ADR-0023 ([#665](https://github.com/Taylor-CCB-Group/MDV/pull/665)) replaces `datafile.h5` with a
+per-project Icechunk repository. Of this ADR's two reasons, one goes and one stays:
+
+- **The HDF5 reason goes.** HDF5 refused to open a file for writing in a process that already had it
+  open for reading. Icechunk does not have that restriction: readers open snapshots, and a commit
+  does not disturb them.
+- **The gevent reason stays.** Materialize and ingest are still blocking native work with no gevent
+  yield point (ADR-0012 amendment), so on a greenlet they would still stall the hub. Owner steps stay
+  short-lived subprocesses, with the same interface.
+
+Further points:
+
+- **Commits from the server process need a thread lock as well.** `project.lock` is an fcntl lock,
+  which excludes other processes but not other threads or greenlets in the same process. Owner steps
+  commit from their own process, so the fcntl lock serialises them against each other and against
+  the server. Any commit made by a request handler inside the server process (a user edit, say) also
+  has to hold an in-process lock, or two handlers could commit at once. Running owner steps in a
+  subprocess is what keeps the jobs side of this simple.
+- **The server sees ingested columns by opening the latest snapshot**, not by holding a session open
+  across requests. That replaces "`MDVProject` reads `datasources.json` from disk on every access"
+  as the reason the server sees columns another process wrote.
+- **The "native thread" option is no longer blocked by HDF5,** but it would still need the in-process
+  lock above and would put commits back inside the server process. It stays rejected.
+
+The network-filesystem caveat in *Consequences* still applies, and more strongly. Icechunk's
+consistency guarantee depends on its storage supporting conditional writes, so check the storage
+before putting the repository on NFS or Azure Files over SMB.
