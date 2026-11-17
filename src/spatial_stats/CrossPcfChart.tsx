@@ -160,8 +160,9 @@ class CrossPcfChart extends BaseReactChart<CrossPcfConfig> {
 
 BaseChart.types["cross_pcf"] = {
     class: CrossPcfChart,
-    name: "Cross-PCF matrix (prototype)",
+    name: "Cross-PCF matrix",
     allow_user_add: true,
+    preview: true,
     params: [],
     extra_controls: (dataStore: DataStore) => {
         const values = dataStore
