@@ -99,10 +99,27 @@ ChatMDV's use of `.h5ad` and CSV files is out of scope and handled separately.
   on one machine. On network filesystems (NFS, Lustre, GPFS, SMB), which Icechunk's docs do not
   cover, both Icechunk and the fcntl lock need testing before a project lives there. Job workers
   never commit (ADR-0004), so on a cluster only the server's node writes.
-- **Shared projects need object storage.** Two independent deployments sharing a Project root by
-  mount or bucket sync could commit to the same repository through a filesystem, and one commit
-  could be lost. Such deployments put the repository on object storage with conditional writes
-  (S3, GCS, Azure, MinIO) instead.
+- **Several servers on one project.** Independent MDV deployments sharing a Project root put more
+  than one server on a project. So do Open OnDemand sessions
+  ([kir-rescomp/ood-app-mdv](https://github.com/kir-rescomp/ood-app-mdv)): each session runs its
+  own MDV container, with its own database, on its own compute node, against projects on GPFS.
+  This is already unsafe with h5, which has no safe concurrent-writer mode and whose project JSON
+  is last-writer-wins. With Icechunk:
+  - **Commits stay safe only if the project lock excludes every server.** GPFS keeps fcntl locks
+    coherent across nodes, but that has to be tested on the target filesystem, under contention.
+    Branches do not avoid the lock, because a v2 repository keeps every branch ref in its one
+    `repo` file. Bucket sync can never be made safe. Where the lock cannot be relied on, the
+    repository goes on object storage with conditional writes (S3, GCS, Azure, MinIO), or the
+    deployment runs one shared MDV service per group instead of one per user.
+  - **A server assumes others change the project.** It reads the latest snapshot on each request
+    and keeps no long-lived project caches. A commit takes the lock, rebases onto the latest
+    snapshot and commits; a conflict Icechunk detects is reported to the user, not overwritten.
+  - **Edits do not reach other sessions live,** since socket.io is per server. Polling for a new
+    snapshot is the cheap way to notice them.
+  - **Group-shared projects need group-writable files.** Each commit creates files owned by the
+    user who committed, so the project needs a umask of 002 and setgid directories.
+  - **Job drivers need a per-project lease,** so that only one server drives a project's jobs
+    (see the ADR-0012 amendment on `feature/dge_poc_local`).
 - The fcntl write lock stays, now serialising commits, alongside an in-process lock. HDF5's
   same-process restriction goes. The jobs ADRs on `feature/dge_poc_local` carry amendments for
   this: ADR-0014's gevent reason for running owner steps in a subprocess still holds and its HDF5
