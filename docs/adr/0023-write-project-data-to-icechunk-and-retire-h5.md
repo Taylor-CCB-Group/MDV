@@ -102,10 +102,9 @@ ChatMDV's use of `.h5ad` and CSV files is out of scope and handled separately.
 
 - Column metadata records where a column's values live (a source store and path, or the
   repository), and the deployment's `DataLoader` routes each column on it. This is the `backing`
-  hint from the design notes, generalised beyond h5 versus zarr. The loader contract (one
-  `{field, data}` per column) already allows this; its declared return type
-  (`Promise<ArrayBufferLike>`) is wrong and should be fixed before a second loader is written
-  against it.
+  hint from the design notes, generalised beyond h5 versus zarr. The loader contract already
+  allows this: `ColumnDataLoader` in `src/dataloaders/DataLoaders.ts` returns one `LoadedColumn`
+  (`{field, data}`) per column it loaded, and `ChartManager` retries any it left out.
 - A loader that reads zarr has to produce the typed arrays the DataStore expects, so it depends on
   the column-type contract (ADR-0024) rather than adding its own mapping.
 - `icechunk` becomes a Python dependency. zarr is already on v3.
