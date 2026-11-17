@@ -45,9 +45,11 @@ keeping every write in h5. This ADR replaces that split.
      prototyped, ahead of the upstream work it needs.
 3. **The server owns the repository.** For now browsers neither read nor write Icechunk. The
    server reads project columns from the repository and serves them through `/get_data`, and
-   every write goes through a server endpoint. This avoids the S3-compatible hosting that the
-   browser Icechunk libraries expect. The server serialises commits to a project's repository,
-   because Icechunk's local-filesystem storage has not guaranteed that concurrent commits are safe.
+   every write goes through a server endpoint, which is where permissions are checked. Keeping
+   reads there too means one reader to build first; browser reads are a later option (see
+   *Considered options*). The server serialises commits to a project's repository, because
+   Icechunk documents its local-filesystem storage as unsafe under concurrent commits: both can
+   report success while one is lost.
    The project write lock is an fcntl lock, which excludes other processes but not threads or
    greenlets in the same process, so commits made inside the server process also hold an
    in-process lock.
@@ -77,8 +79,11 @@ ChatMDV's use of `.h5ad` and CSV files is out of scope and handled separately.
   would need machinery of our own.
 - **Write into the source SpatialData store.** Source stores can be shared, linked (`--link`) or
   remote (`spatial.url`), and SpatialData has no mutation model yet.
-- **Icechunk in the browser through WASM.** Deferred rather than rejected: it needs S3-style
-  hosting, and the server should stay the only writer while permissions live there.
+- **Reading Icechunk in the browser.** Deferred rather than rejected. A v2 repository can be read
+  from a plain static file server without listing, and the community `icechunk-js` package
+  (read-only, built on zarrita) opens one from a URL, so MDV could later serve a repository the
+  way it serves source stores. The official `@earthmover/icechunk` package documents browser
+  access only for S3-compatible hosting. Writes stay on the server either way.
 
 ## Consequences
 
@@ -86,6 +91,18 @@ ChatMDV's use of `.h5ad` and CSV files is out of scope and handled separately.
   repository), and the DataLoader routes on it. This is the `backing` hint from the design notes,
   generalised beyond h5 versus zarr.
 - `icechunk` becomes a Python dependency. zarr is already on v3.
+- **Where a repository lives.** By default, local-filesystem storage in the project folder, which
+  needs no S3 and works on macOS, Linux, and Windows through Docker or WSL2 (MDV's documented
+  install). Icechunk's local-filesystem storage does not work on native Windows, so a native
+  Windows install of `mdvtools` cannot open a repository; the downgrade script is its fallback.
+- **Serialising commits depends on the lock reaching every committer.** That holds for one server
+  on one machine. On network filesystems (NFS, Lustre, GPFS, SMB), which Icechunk's docs do not
+  cover, both Icechunk and the fcntl lock need testing before a project lives there. Job workers
+  never commit (ADR-0004), so on a cluster only the server's node writes.
+- **Shared projects need object storage.** Two independent deployments sharing a Project root by
+  mount or bucket sync could commit to the same repository through a filesystem, and one commit
+  could be lost. Such deployments put the repository on object storage with conditional writes
+  (S3, GCS, Azure, MinIO) instead.
 - The fcntl write lock stays, now serialising commits, alongside an in-process lock. HDF5's
   same-process restriction goes. The jobs ADRs on `feature/dge_poc_local` carry amendments for
   this: ADR-0014's gevent reason for running owner steps in a subprocess still holds and its HDF5
