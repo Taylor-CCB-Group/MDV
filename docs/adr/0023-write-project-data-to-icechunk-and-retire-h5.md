@@ -46,9 +46,11 @@ keeping every write in h5. This ADR replaces that split.
 3. **The server owns the repository.** For now browsers neither read nor write Icechunk. The
    server reads project columns from the repository and serves them through `/get_data`, and
    every write goes through a server endpoint. This avoids the S3-compatible hosting that the
-   browser Icechunk libraries expect. The server serialises commits to a project's repository
-   under the project write lock, because Icechunk's local-filesystem storage has not guaranteed
-   that concurrent commits are safe.
+   browser Icechunk libraries expect. The server serialises commits to a project's repository,
+   because Icechunk's local-filesystem storage has not guaranteed that concurrent commits are safe.
+   The project write lock is an fcntl lock, which excludes other processes but not threads or
+   greenlets in the same process, so commits made inside the server process also hold an
+   in-process lock.
 4. **A datasource is one table.** Its columns load from wherever they live, a source store or the
    repository, and are not copied into a merged datasource. Similar tables are related through
    element relations (#555) and filtered across, not concatenated. `convert-spatial`'s by-region
@@ -84,8 +86,10 @@ ChatMDV's use of `.h5ad` and CSV files is out of scope and handled separately.
   repository), and the DataLoader routes on it. This is the `backing` hint from the design notes,
   generalised beyond h5 versus zarr.
 - `icechunk` becomes a Python dependency. zarr is already on v3.
-- The fcntl write lock stays, now serialising commits. HDF5's same-process restriction goes. When
-  the jobs ADRs are amended: ADR-0014's gevent reason for running owner steps in a subprocess
-  still holds, its HDF5 reason does not; ADR-0004's HDF5 tray needs a new format.
+- The fcntl write lock stays, now serialising commits, alongside an in-process lock. HDF5's
+  same-process restriction goes. The jobs ADRs on `feature/dge_poc_local` carry amendments for
+  this: ADR-0014's gevent reason for running owner steps in a subprocess still holds and its HDF5
+  reason does not; ADR-0004's trays can stay HDF5, since they are scratch, but materialize reads a
+  snapshot pinned at submit rather than taking the read lock.
 - Two project formats coexist until upgrades are done, so tests need fixtures of both.
 - Per-table datasources lean on cross-datasource views and filtering (design themes 4 and 5).
