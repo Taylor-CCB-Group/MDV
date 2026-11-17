@@ -356,8 +356,8 @@ Prior art:
 ## Amendment: Icechunk project storage (ADR-0023, proposed)
 
 ADR-0023 ([#665](https://github.com/Taylor-CCB-Group/MDV/pull/665)) moves everything MDV writes into
-a per-project Icechunk repository and retires `datafile.h5` for active projects. The driver, the
-loop and the recovery scan are unaffected. These parts change:
+a per-project Icechunk repository and retires `datafile.h5` for active projects. The driver and
+the loop are unaffected. These parts change:
 
 - **Heavy work still stays off the hub.** Materialize and ingest become Icechunk, zarr and numpy work
   instead of HDF5 work. That is still blocking native code with no gevent yield point, so the reason
