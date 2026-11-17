@@ -43,16 +43,25 @@ keeping every write in h5. This ADR replaces that split.
    - later, auxiliary spatial stores: shape and label annotations, and editable scenes that carry
      user-written coordinate-system transforms. These are where mutable SpatialData gets
      prototyped, ahead of the upstream work it needs.
-3. **The server owns the repository.** For now browsers neither read nor write Icechunk. The
-   server reads project columns from the repository and serves them through `/get_data`, and
-   every write goes through a server endpoint, which is where permissions are checked. Keeping
-   reads there too means one reader to build first; browser reads are a later option (see
-   *Considered options*). The server serialises commits to a project's repository, because
-   Icechunk documents its local-filesystem storage as unsafe under concurrent commits: both can
-   report success while one is lost.
-   The project write lock is an fcntl lock, which excludes other processes but not threads or
-   greenlets in the same process, so commits made inside the server process also hold an
-   in-process lock.
+3. **Reads go through a `DataLoader`; writes go through the server.** The front end was designed
+   so that whatever hosts it supplies the `DataLoader` (`ChartManager` takes one as a constructor
+   argument; see `docs/extradocs/dataloader.md`). The server and static builds already plug in
+   different ones. That seam stays the way the browser reaches storage. A loader may read a source
+   store or a project repository directly, or ask the server, and a deployment can mix them
+   column by column. Choosing a loader is a property of the deployment, not of the storage
+   format.
+   - **Reading zarr in the browser is near-term.** Static export (6) needs a loader that reads
+     plain zarr, and in server mode the same loader can read source columns directly rather than
+     having the server relay them through `/get_data`.
+   - **Project columns are read through the server first,** because that is one reader to build.
+     Reading the repository in the browser is a further loader, not a change to this decision: a
+     v2 repository can be read from a plain static file server (see *Considered options*).
+   - **Every write goes through a server endpoint,** which is where permissions are checked. The
+     server serialises commits to a project's repository, because Icechunk documents its
+     local-filesystem storage as unsafe under concurrent commits: both can report success while
+     one is lost. The project write lock is an fcntl lock, which excludes other processes but not
+     threads or greenlets in the same process, so commits made inside the server process also
+     hold an in-process lock.
 4. **A datasource is one table.** Its columns load from wherever they live, a source store or the
    repository, and are not copied into a merged datasource. Similar tables are related through
    element relations (#555) and filtered across, not concatenated. `convert-spatial`'s by-region
@@ -79,17 +88,26 @@ ChatMDV's use of `.h5ad` and CSV files is out of scope and handled separately.
   would need machinery of our own.
 - **Write into the source SpatialData store.** Source stores can be shared, linked (`--link`) or
   remote (`spatial.url`), and SpatialData has no mutation model yet.
-- **Reading Icechunk in the browser.** Deferred rather than rejected. A v2 repository can be read
-  from a plain static file server without listing, and the community `icechunk-js` package
-  (read-only, built on zarrita) opens one from a URL, so MDV could later serve a repository the
-  way it serves source stores. The official `@earthmover/icechunk` package documents browser
-  access only for S3-compatible hosting. Writes stay on the server either way.
+- **The server reads everything and the browser never touches zarr.** Rejected: static export needs
+  browser zarr reads anyway, and it would set aside the `DataLoader` seam the front end was built
+  around.
+- **A loader that reads the repository in the browser, now.** Deferred, not rejected; it is the
+  next loader after the plain-zarr one. A v2 repository can be read from a plain static file server
+  without listing, and the community `icechunk-js` package (read-only, built on zarrita) opens one
+  from a URL, so the server could serve a repository the way it serves source stores. The official
+  `@earthmover/icechunk` package documents browser access only for S3-compatible hosting. Writes
+  stay on the server either way.
 
 ## Consequences
 
 - Column metadata records where a column's values live (a source store and path, or the
-  repository), and the DataLoader routes on it. This is the `backing` hint from the design notes,
-  generalised beyond h5 versus zarr.
+  repository), and the deployment's `DataLoader` routes each column on it. This is the `backing`
+  hint from the design notes, generalised beyond h5 versus zarr. The loader contract (one
+  `{field, data}` per column) already allows this; its declared return type
+  (`Promise<ArrayBufferLike>`) is wrong and should be fixed before a second loader is written
+  against it.
+- A loader that reads zarr has to produce the typed arrays the DataStore expects, so it depends on
+  the column-type contract (ADR-0024) rather than adding its own mapping.
 - `icechunk` becomes a Python dependency. zarr is already on v3.
 - **Where a repository lives.** By default, local-filesystem storage in the project folder, which
   needs no S3 and works on macOS, Linux, and Windows through Docker or WSL2 (MDV's documented
