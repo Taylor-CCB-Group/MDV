@@ -376,4 +376,17 @@ loop and the recovery scan are unaffected. These parts change:
   the commit, so the bounded-retry hardening becomes safer. The transient case is a failed commit,
   not h5 lock contention.
 
+- **One driver per project, held by a lease.** This ADR assumes a project is served by one server.
+  ADR-0023 makes several servers on one project an explicit case: Open OnDemand sessions
+  (kir-rescomp/ood-app-mdv) each run their own MDV container, and so their own driver and boot
+  recovery scan, against projects on shared GPFS. Two sessions serving the same project could then
+  both reconcile, dispatch or ingest the same job record. Atomic record writes stop torn reads, not
+  duplicate transitions. And a session that reaches its walltime leaves its in-flight jobs until
+  some other session happens to recover them. So a server drives a project's jobs only while it
+  holds a **per-project lease**: a lease file under `jobs/` naming the holder and an expiry, renewed
+  by the driver loop and taken over by another server once it expires. A server without the lease
+  still accepts submits (writing the `QUEUED` record) but does not dispatch, poll or ingest. The
+  recovery scan becomes "take the lease, then reconcile". This holds for h5 projects too: it is a
+  consequence of running several servers, not of Icechunk.
+
 Legacy h5 projects keep the behaviour described above until they are upgraded.
