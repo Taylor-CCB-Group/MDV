@@ -38,7 +38,7 @@ All notable changes to `mdvtools` are documented here. The format is based on
 
 ### Changed
 - Supported Python is now `>=3.12,<3.13`; Python 3.11 is no longer supported.
-- `mdvtools` now depends on `spatialdata-js-util` 0.3.1 (with its `write` extra), which needs
+- `mdvtools` now depends on `spatialdata-js-util` 0.4 (with its `write` extra), which needs
   `zarr` 3.3 or later and `imagecodecs` 2026.6.26 or later.
 - Upgraded `spatialdata` to 0.8 and `spatialdata-io` to 0.7.1 (from 0.7.2 and 0.6.0).
   `spatialdata-io` 0.7.1 indexes Xenium shapes by `cell_id`.
@@ -53,6 +53,8 @@ All notable changes to `mdvtools` are documented here. The format is based on
   place. Chart settings keep chart-wide options and a button that opens the layer dialog.
 
 ### Fixed
+- SpatialData chart polygon shapes now draw their holes and every part of a MultiPolygon;
+  only the first part's exterior ring was drawn before, filled solid.
 - `pip install mdvtools` now installs `leidenalg` and `igraph`, so `--compute-x-umap` and
   `convert_scanpy_to_mdv(compute_x_umap=True)` can compute Leiden clusters. They were only in
   the `dev` dependency group before.
