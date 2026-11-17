@@ -122,9 +122,11 @@ compute (worker, latest-wins, abort) moves to, so two charts on the same set don
 | TCM grid (chart array) | chosen pairs as cells | focus (hover a cell) |
 | Legacy interaction heatmap / network | focus | focus (adapter, below) |
 
-Charts hold a **reference** (`interaction_set: id`), not a copy. Creating a cross-PCF chart creates
-a set if none exists; a second chart may join the same set. Today's chart config migrates by lifting
-`type_column`, `pairs`, `r_bins`, `domain_source` into a set.
+Charts hold a **binding**, not a copy and not a manager handle: `interactions: { channel: "default" }`
+resolves to the datasource-wide set; later `{ node: id }` resolves through a graph (next section).
+Creating a cross-PCF chart binds it to the default channel, creating the set if none exists; a second
+chart on the same channel shares it. Today's chart config migrates by lifting `type_column`, `pairs`,
+`r_bins`, `domain_source` into the set.
 
 **Spatial layers bind to a set, not to categories.** A render-stack overlay entry gains a binding
 such as `{ interactionSet, role: "a" | "b" | "all", follow: "focus" | "chosen" }`. The density
@@ -135,6 +137,44 @@ hyperion pattern of writing another chart's config.
 **Focus is not a filter.** Hovering a pair emphasises its types elsewhere (dim others, draw their
 densities); it doesn't filter the cells datasource. Filtering to a motif becomes an explicit action
 ("filter to these types"), unlike `_addInteractionLinks`, which filters on every highlight.
+
+### Toward a dataflow graph
+
+A longer-standing want: a dataflow graph carrying signals between charts — active interaction sets
+among them — so one view can hold several groups of charts, each following a different set. The
+interaction design should be the first tenant of that graph, not a parallel mechanism it later has to
+absorb.
+
+- **Signals, not stores.** An interaction set and its focus are *values on a channel*. The
+  datasource-wide `InteractionManager` is then just the default graph: one writable source node per
+  datastore, which every unbound chart reads. Nothing about a chart needs to know whether its channel
+  is that default or a node in a view-level graph.
+- **Node kinds** this design already implies:
+  - *source* (writable state): an interaction set; focus.
+  - *derived* (pure, cached): set → its types (for density); set ∪ set; "pairs with g > t at r";
+    legacy row highlight → focus.
+  - *compute* (async, cancellable): set + domain → cross-PCF tensor; pair + measure → TCM raster.
+    The result cache keys on the inputs, so two branches asking the same question share the work.
+- **Ports per consumer.** A chart declares typed inputs/outputs (the cross-PCF chart reads `set`,
+  `focus`, `pcfResult`; writes `set`, `focus`). A spatial overlay's binding (`role`, `follow`) is an
+  input port. Wiring a second chart group = creating a second source node and pointing their ports at
+  it.
+- **Existing edges this could subsume** (not in scope here, but the graph should be able to express
+  them): `viewData.links` `chart_columnval_link` (a highlight → another chart's param), datasource
+  `links` (`valueset`, `interactions`, `sync_column_colors`), `view_state` pan/zoom sync, gates and
+  domain sources as values. Filters and highlights are the obvious first-class signals after this.
+- **Persistence split.** Source *values* default to the datasource (like gates in
+  `dataStore.config.gates`) so they survive view switches; *topology* — extra nodes and which chart
+  binds to what — is per view, alongside `viewData.links`. A view with no graph behaves exactly as the
+  default.
+- **Reactivity substrate.** MobX is already how charts observe config; a node is a mobx observable
+  (source) or `computed` (derived), with compute nodes as async computeds with abort, which the
+  cross-PCF chart effect already is. No new reactive library needed to start.
+
+What this asks of step 1 is small: route every read/write through a channel resolver
+(`resolveInteractions(binding, dataStore)`) instead of `getOrCreateInteractionManager` directly, and
+make focus a value on that channel rather than per-chart React state. The graph itself — UI to see
+and wire it, more node kinds — can come later without migrating charts again.
 
 ### Legacy interop
 
@@ -175,20 +215,26 @@ For a TCM layer and a TCM grid, in order:
 Each step lands on its own and is usable.
 
 1. **InteractionManager + set model in MDV**, migrating the cross-PCF chart to it (no new behaviour;
-   two cross-PCF charts can now share a set). Move the compute + cache to the manager.
+   two cross-PCF charts can now share a set). Move the compute + cache to the manager. All access
+   goes through a channel binding (default channel only), and focus moves onto the channel, so the
+   graph can slot in later.
 2. **Type-density binding on the SpatialData chart**: an overlay bound to a set draws one density per
    type of the focused / chosen motifs. Uses existing `DensityLayer`; no intraspatial change.
 3. **Legacy adapter**: legacy heatmap highlight ↔ focus; legacy stat columns as `column` measures.
 4. **intraspatial TCM asks 1–3**, then a TCM overlay bound to a set (focused pair first).
 5. **TCM grid**: re-implement the chart-array idea on WebGPU (deck views per cell + shared static
    pass), cells = chosen pairs; needs ask 4 for speed. Coordinate with whoever picks up #476.
+6. **Dataflow graph, first cut**: per-view extra source nodes and chart bindings to them (two chart
+   groups in one view on different sets), then derived nodes. Its own design note; this one only
+   fixes the seam.
 
 ## Open questions
 
-- Where sets persist: datasource level (like gates, survive view switches) or view level (like
-  `viewData.links`)? Gates suggest datasource level, with views choosing which set is "active".
-- One active set per datastore, or many with per-chart choice? Many is the general case; the UI
-  should default to one.
+- Persistence is proposed as values at datasource level, topology per view (see the dataflow
+  section). Does a view-local set (one that should *not* leak to other views) need to exist, or is a
+  per-view node referencing a datasource-level value always enough?
+- How a user sees and edits wiring: implicit (chart menu "follow set…", "new set from here") before
+  any explicit graph UI?
 - Does focus carry a measure (r) as well as a motif? The chart already needs both (rFocus); the
   spatial TCM layer would follow it.
 - Do conditions (groups of ROIs) become a domain kind (union of regions, per-ROI averaged g), or stay
