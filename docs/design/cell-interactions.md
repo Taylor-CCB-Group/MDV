@@ -141,7 +141,9 @@ densities); it doesn't filter the cells datasource. Filtering to a motif becomes
 ### Toward a dataflow graph
 
 A longer-standing want: a dataflow graph carrying signals between charts — active interaction sets
-among them — so one view can hold several groups of charts, each following a different set. The
+among them, but also Dimension filters, region selection, columnar expressions, tagged gene sets — so
+one view can hold several groups of charts, each following different values. The general design is
+in [dataflow-graph.md](dataflow-graph.md); this section is what it means for interactions. The
 interaction design should be the first tenant of that graph, not a parallel mechanism it later has to
 absorb.
 
@@ -225,8 +227,8 @@ Each step lands on its own and is usable.
 5. **TCM grid**: re-implement the chart-array idea on WebGPU (deck views per cell + shared static
    pass), cells = chosen pairs; needs ask 4 for speed. Coordinate with whoever picks up #476.
 6. **Dataflow graph, first cut**: per-view extra source nodes and chart bindings to them (two chart
-   groups in one view on different sets), then derived nodes. Its own design note; this one only
-   fixes the seam.
+   groups in one view on different sets), then derived nodes. See
+   [dataflow-graph.md](dataflow-graph.md); this note only fixes the seam.
 
 ## Open questions
 
