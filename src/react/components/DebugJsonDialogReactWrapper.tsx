@@ -1,10 +1,11 @@
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { observer } from "mobx-react-lite";
+import type { ReactNode } from "react";
+import { createMdvPortal } from "@/react/react_utils";
+import type BaseChart from "../../charts/BaseChart";
 import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
-import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./DebugJsonDialogComponent";
-import type BaseChart from "../../charts/BaseChart";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 type DebugChartReactWrapperOptions = {
     showValidationSection?: boolean;
@@ -13,6 +14,7 @@ type DebugChartReactWrapperOptions = {
 type DebugDialogContent = {
     json: any;
     showValidationSection?: boolean;
+    chartPanel?: ReactNode;
 };
 
 const DebugChart = observer(
@@ -20,15 +22,22 @@ const DebugChart = observer(
         chart,
         header,
         showValidationSection = false,
+        chartPanel,
     }: {
         chart: any;
         header?: string;
         showValidationSection?: boolean;
+        chartPanel?: ReactNode;
     }) => {
         return (
             <>
-                <Gui json={chart} header={header} showValidationSection={showValidationSection} />
-                <ReactQueryDevtools initialIsOpen={false}  />
+                <Gui
+                    json={chart}
+                    header={header}
+                    showValidationSection={showValidationSection}
+                    chartPanel={chartPanel}
+                />
+                <ReactQueryDevtools initialIsOpen={false} />
             </>
         );
     },
@@ -45,9 +54,7 @@ class DebugChartReactWrapper extends BaseDialog {
         this._root = v;
     }
     constructor(json: any, chart?: BaseChart<any>, options: DebugChartReactWrapperOptions = {}) {
-        const name = chart
-            ? chart.config.title || `${chart.config.type} ${chart.config.id}`
-            : "";
+        const name = chart ? chart.config.title || `${chart.config.type} ${chart.config.id}` : "";
         const doc = chart ? chart.__doc__ : document;
         const config = {
             //TODO review popout behavior, use `__doc` or whatever here instead of `document` when appropriate
@@ -61,12 +68,17 @@ class DebugChartReactWrapper extends BaseDialog {
         super(config, {
             json,
             showValidationSection: options.showValidationSection,
+            chartPanel: chart?.getDebugPanel?.(),
         });
     }
     init(content: DebugDialogContent) {
         const div = createEl("div", {}, this.dialog);
         this.root = createMdvPortal(
-            <DebugChart chart={content.json} showValidationSection={content.showValidationSection} />,
+            <DebugChart
+                chart={content.json}
+                showValidationSection={content.showValidationSection}
+                chartPanel={content.chartPanel}
+            />,
             div,
             this,
         );
@@ -78,10 +90,7 @@ class DebugChartReactWrapper extends BaseDialog {
         // I don't think there's any 'this' weirdness going on here...
         // some kind of react voodoo?
         if (this.root) this.root.unmount();
-        else
-            console.warn(
-                "not unmounting react root for dialog because of weirdness",
-            );
+        else console.warn("not unmounting react root for dialog because of weirdness");
     }
 }
 

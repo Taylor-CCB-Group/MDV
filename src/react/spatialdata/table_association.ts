@@ -1,6 +1,1085 @@
+import type { ShapesRenderData, SpatialData } from "@spatialdata/core";
+import { loadAssociatedTableFeatureRows } from "@spatialdata/core";
+import type { LayerConfig, LayerType, RenderStackLayerInputs, SpatialFeatureTooltipItem } from "@spatialdata/vis";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+
+import type DataStore from "@/datastore/DataStore";
+import { useChartManager, useDataSources } from "@/react/hooks";
+import { fillColorSchemeFromDataStore } from "@/react/spatialdata/fill_color_scheme";
+import { measureSpatial, recordSpatialPerf } from "@/react/spatialdata/perf";
+import {
+    datasourceRowsByFeatureId,
+    getTableRowResolver,
+    planTableRows,
+    type TableRowPlan,
+} from "@/react/spatialdata/table_rows";
+
+type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
+type LabelsLayerConfig = Extract<LayerConfig, { type: "labels" }>;
+type ShapeFeatureState = NonNullable<ShapesLayerConfig["featureState"]>;
+type LabelFeatureState = NonNullable<LabelsLayerConfig["featureState"]>;
+type AssociatedFeatureState = ShapeFeatureState | LabelFeatureState;
+type RgbColor = [number, number, number];
+type RgbaColor = [number, number, number, number];
+type RowColorFunction = (rowIndex: number) => RgbColor | RgbaColor | undefined;
+type ShapesRenderDataEntry = [string, ShapesRenderData | undefined];
+type SpatialDataTableMetadata = { table_name?: unknown; table_id?: unknown };
+type SpatialDataTablesMetadata = { tables?: SpatialDataTableMetadata[] };
+type DataSourceColumnMetadata = {
+    field?: unknown;
+    name?: unknown;
+    values?: unknown;
+};
+type DataSourceAssociationConfig = {
+    columns?: DataSourceColumnMetadata[];
+    spatialdata_tables?: SpatialDataTablesMetadata;
+};
+type SpatialDataAssociationKind = "images" | "points" | "labels" | "shapes";
+export type AssociableSpatialElementType = Extract<LayerType, "image" | "points" | "labels" | "shapes">;
+type FillColorAssociableLayerType = Extract<AssociableSpatialElementType, "shapes" | "labels">;
+type AssociatedTableElement = { getObsColumnNames?: () => string[] };
+type SpatialDataAssociationSource = {
+    getAssociatedTables: (kind: SpatialDataAssociationKind, key: string) => Array<[string, AssociatedTableElement]>;
+};
+type SpatialDataAwareDataStore = DataStore & {
+    config: DataStore["config"] & { spatialdata_tables?: SpatialDataTablesMetadata };
+};
+export type DataSourceAssociationCandidate<TDataStore = Record<string, unknown>> = {
+    name: string;
+    dataStore: TDataStore & { config?: DataSourceAssociationConfig };
+};
+export type AssociatedDataSource = DataSourceAssociationCandidate<SpatialDataAwareDataStore>;
+type AssociatedElementTable<TDataStore = SpatialDataAwareDataStore> =
+    | { status: "none" }
+    | { status: "ambiguous"; tableNames: string[]; dataSourceNames?: string[] }
+    | {
+          status: "resolved";
+          tableName: string;
+          dataSourceName: string;
+          dataStore: TDataStore;
+      };
+
 export type TableAssociation =
     | { status: "none" }
+    | { status: "loading" }
     | { status: "ambiguous" }
-    | { status: "resolved"; tableName: string };
+    | {
+          status: "resolved";
+          tableName: string;
+          dataSourceName: string;
+          matchedFeatureCount?: number;
+          featureCount?: number;
+      };
 
 export const NO_TABLE_ASSOCIATION: TableAssociation = { status: "none" };
+
+function validAssociatedRow(rowIndex: number | undefined, rowCount: number): number | null {
+    if (rowIndex === undefined || rowIndex < 0 || rowIndex >= rowCount) return null;
+    return rowIndex;
+}
+
+export function getShapesTableAssociation(
+    renderData: ShapesRenderData | undefined,
+    rowCount: number,
+    tableName: string,
+    dataSourceName: string,
+): TableAssociation {
+    if (!renderData) return NO_TABLE_ASSOCIATION;
+
+    let matchedFeatureCount = 0;
+    for (const rowIndex of renderData.rowIndexByFeatureIndex) {
+        if (validAssociatedRow(rowIndex, rowCount) !== null) matchedFeatureCount++;
+    }
+
+    if (matchedFeatureCount === 0) return NO_TABLE_ASSOCIATION;
+    return {
+        status: "resolved",
+        tableName,
+        dataSourceName,
+        matchedFeatureCount,
+        featureCount: renderData.featureIds.length,
+    };
+}
+
+function associatedSpatialDataTableNames(
+    spatialData: SpatialDataAssociationSource | undefined,
+    elementType: AssociableSpatialElementType,
+    elementKey: string | undefined,
+): string[] {
+    if (!spatialData || !elementKey) return [];
+    return spatialData
+        .getAssociatedTables(spatialDataAssociationKind(elementType), elementKey)
+        .map(([tableName]) => tableName);
+}
+
+function spatialDataAssociationKind(elementType: AssociableSpatialElementType): SpatialDataAssociationKind {
+    switch (elementType) {
+        case "image":
+            return "images";
+        case "labels":
+            return "labels";
+        case "points":
+            return "points";
+        case "shapes":
+            return "shapes";
+    }
+}
+
+function columnId(column: DataSourceColumnMetadata): string | undefined {
+    if (typeof column.field === "string") return column.field;
+    if (typeof column.name === "string") return column.name;
+    return undefined;
+}
+
+function tableNamesForDataSource<TDataStore>(dataSource: DataSourceAssociationCandidate<TDataStore>): string[] {
+    const names = new Set<string>();
+    const columns = dataSource.dataStore.config?.columns;
+    // The converter writes the same provenance onto a group's var (genes) datasource,
+    // whose rows are genes, not the table's obs. Only an obs datasource carries the
+    // per-row `spatialdata_table_id` column alongside it.
+    const hasObsRows = Array.isArray(columns) && columns.some((column) => columnId(column) === "spatialdata_table_id");
+    const provenance = dataSource.dataStore.config?.spatialdata_tables;
+    const tables = hasObsRows && Array.isArray(provenance?.tables) ? provenance.tables : [];
+    for (const table of tables) {
+        if (typeof table.table_name === "string") names.add(table.table_name);
+        if (typeof table.table_id === "string") {
+            const tableIdLeaf = table.table_id.split("/").pop();
+            if (tableIdLeaf) names.add(tableIdLeaf);
+        }
+    }
+
+    if (Array.isArray(columns)) {
+        for (const column of columns) {
+            if (columnId(column) !== "table_name") continue;
+            if (!Array.isArray(column.values)) continue;
+            for (const value of column.values) {
+                if (typeof value === "string") names.add(value);
+            }
+        }
+    }
+
+    return Array.from(names);
+}
+
+export function resolveAssociatedElementTable<TDataStore>({
+    spatialData,
+    elementType,
+    elementKey,
+    dataSources,
+}: {
+    spatialData: SpatialDataAssociationSource | undefined;
+    elementType: AssociableSpatialElementType;
+    elementKey: string | undefined;
+    dataSources: DataSourceAssociationCandidate<TDataStore>[];
+}): AssociatedElementTable<TDataStore> {
+    const tableNames = associatedSpatialDataTableNames(spatialData, elementType, elementKey);
+    if (tableNames.length === 0) return { status: "none" };
+    if (tableNames.length > 1) return { status: "ambiguous", tableNames };
+
+    const tableName = tableNames[0];
+    const matchingDataSources = dataSources.filter((dataSource) => {
+        if (dataSource.name === tableName) return true;
+        return tableNamesForDataSource(dataSource).includes(tableName);
+    });
+
+    if (matchingDataSources.length === 0) return { status: "none" };
+    if (matchingDataSources.length > 1) {
+        return {
+            status: "ambiguous",
+            tableNames,
+            dataSourceNames: matchingDataSources.map((dataSource) => dataSource.name),
+        };
+    }
+
+    const dataSource = matchingDataSources[0];
+    return {
+        status: "resolved",
+        tableName,
+        dataSourceName: dataSource.name,
+        dataStore: dataSource.dataStore,
+    };
+}
+
+function toRgba(color: RgbColor | RgbaColor | undefined, alpha: number): RgbaColor | null {
+    if (!color) return null;
+    return [
+        Math.max(0, Math.min(255, color[0] ?? 0)),
+        Math.max(0, Math.min(255, color[1] ?? 0)),
+        Math.max(0, Math.min(255, color[2] ?? 0)),
+        Math.max(0, Math.min(255, color[3] ?? alpha)),
+    ];
+}
+
+export function buildAssociatedFeatureStateFromRowMap({
+    rowIndexByFeatureId,
+    visibleRows,
+    rowCount,
+    baseFeatureState,
+    colorForRow,
+    alpha,
+}: {
+    rowIndexByFeatureId: Map<string, number> | Iterable<[string, number]>;
+    visibleRows: ArrayLike<number>;
+    rowCount: number;
+    baseFeatureState?: AssociatedFeatureState;
+    colorForRow?: RowColorFunction;
+    alpha: number;
+}): AssociatedFeatureState | undefined {
+    const visibleRowSet = new Set(Array.from(visibleRows));
+    const hiddenFeatureIds = new Set(baseFeatureState?.hiddenFeatureIds ?? []);
+    const fillColorByFeatureId = {
+        ...(baseFeatureState?.fillColorByFeatureId ?? {}),
+    };
+    let hasTableState = false;
+
+    for (const [featureId, rawRowIndex] of rowIndexByFeatureId) {
+        const rowIndex = validAssociatedRow(rawRowIndex, rowCount);
+        if (rowIndex === null) continue;
+
+        hasTableState = true;
+        if (!visibleRowSet.has(rowIndex)) {
+            hiddenFeatureIds.add(featureId);
+        }
+
+        if (colorForRow) {
+            const color = toRgba(colorForRow(rowIndex), alpha);
+            if (color) fillColorByFeatureId[featureId] = color;
+        }
+    }
+
+    if (!hasTableState && !baseFeatureState) return undefined;
+
+    return {
+        ...baseFeatureState,
+        fillColorByFeatureId: Object.keys(fillColorByFeatureId).length > 0 ? fillColorByFeatureId : undefined,
+        hiddenFeatureIds: hiddenFeatureIds.size > 0 ? Array.from(hiddenFeatureIds) : undefined,
+    };
+}
+
+/**
+ * The obs columns of the table annotating an element — the exact set the viewer is
+ * able to colour by on its own.
+ *
+ * This is the line the fill-colour routing is drawn on. MDV's column picker offers
+ * everything in the DataStore, which is a SUPERSET of the table's obs: linked gene
+ * scores, `mdv_cell_id`, anything computed at runtime. The viewer cannot read those
+ * at all, so they stay on the per-feature path; everything in obs is handed over as
+ * `fillColorByColumn` instead, with MDV's palette attached.
+ *
+ * Synchronous: opening the store already reads every node's attributes, so this is
+ * a question we can answer before deciding how to colour, not after a load.
+ */
+export function obsColumnNamesForElement(
+    spatialData: SpatialDataAssociationSource | undefined,
+    elementType: AssociableSpatialElementType,
+    elementKey: string,
+): Set<string> | undefined {
+    if (!spatialData) return undefined;
+    const tables = spatialData.getAssociatedTables(spatialDataAssociationKind(elementType), elementKey);
+    const table = tables.length === 1 ? tables[0][1] : undefined;
+    const names = table?.getObsColumnNames?.();
+    return names ? new Set(names) : undefined;
+}
+
+/**
+ * Keep a column the viewer cannot read out of the viewer's inputs.
+ *
+ * Only for columns absent from the table's obs. Left in, the viewer would try to
+ * load a column that is not there — a failed resolution and a user-visible notice
+ * — and then be overruled by MDV's `featureState` colours anyway. Columns that ARE
+ * in obs are handed over deliberately; see `obsColumnNamesForElement`.
+ */
+function withoutViewerFillColorColumn<T extends LayerConfig>(layer: T): T {
+    if (!("fillColorByColumn" in layer)) return layer;
+    const { fillColorByColumn: _removed, ...rest } = layer;
+    return rest as T;
+}
+
+export function layerFillColorColumnName(layer: LayerConfig): string | undefined {
+    if (!("fillColorByColumn" in layer)) return undefined;
+    return layer.fillColorByColumn?.columnName;
+}
+
+/**
+ * Split a layer's tooltip fields along the same line as fill colour
+ * (`obsColumnNamesForElement`): fields in the table's obs go to the viewer, which
+ * reads them itself; the rest (gene scores, `mdv_cell_id`, anything computed here)
+ * are MDV's to fill in from the datasource row. Handing the viewer a field it cannot
+ * read gets no value for it.
+ *
+ * With no obs to go by (no table, or more than one), every field stays with the viewer.
+ */
+export function splitTooltipFields(
+    fields: readonly string[] | undefined,
+    obsColumnNames: Set<string> | undefined,
+): { viewer: string[]; mdv: string[] } {
+    if (!fields?.length) return { viewer: [], mdv: [] };
+    if (!obsColumnNames) return { viewer: [...fields], mdv: [] };
+    const viewer: string[] = [];
+    const mdv: string[] = [];
+    for (const field of fields) (obsColumnNames.has(field) ? viewer : mdv).push(field);
+    return { viewer, mdv };
+}
+
+function layerTooltipFields(layer: LayerConfig): string[] | undefined {
+    return "tooltipFields" in layer ? layer.tooltipFields : undefined;
+}
+
+/** Tooltip items for fields MDV fills in, from a feature's datasource row. */
+export function tooltipItemsFromDataStore(
+    dataStore: {
+        columnIndex: Record<string, { name?: string; data?: unknown; getValue: (row: number) => unknown } | undefined>;
+    },
+    row: number,
+    fields: readonly string[],
+): SpatialFeatureTooltipItem[] {
+    return fields.map((field) => {
+        const column = dataStore.columnIndex[field];
+        if (!column) return { label: field, value: "" };
+        // loaded on demand when the field is chosen; until then there is nothing to read
+        if (!column.data) return { label: column.name ?? field, value: "loading…" };
+        const value = column.getValue(row);
+        return { label: column.name ?? field, value: value === undefined || value === null ? "" : String(value) };
+    });
+}
+
+/**
+ * While a newly selected colour column is still loading, keep the previous feature colours
+ * so the canvas does not flash through an unannotated/default state.
+ *
+ * Only the per-feature path needs this. A column the viewer owns is covered by the
+ * viewer's own last-good retention, which holds the previous column's colours until
+ * the new column's rows land; this covers MDV's asynchronous `loadColumnSet`, which
+ * the viewer knows nothing about.
+ */
+export function withPreservedFillColorsWhileLoading({
+    featureState,
+    fillColumnName,
+    colorReady,
+    previousFillColorByFeatureId,
+}: {
+    featureState: AssociatedFeatureState | undefined;
+    fillColumnName: string | undefined;
+    colorReady: boolean;
+    previousFillColorByFeatureId?: Record<string, RgbaColor>;
+}): AssociatedFeatureState | undefined {
+    if (!fillColumnName || colorReady || !previousFillColorByFeatureId) {
+        return featureState;
+    }
+    return {
+        ...featureState,
+        fillColorByFeatureId: previousFillColorByFeatureId,
+    };
+}
+
+/**
+ * The inputs `featureState` is derived from, held alongside the result so a render
+ * that changed none of them can reuse it. Compared by identity throughout: every
+ * one of these is either a primitive or an object MDV keeps stable until its
+ * contents actually change.
+ */
+type FeatureStateCacheEntry = {
+    source: Map<string, number>;
+    visibleRows: Uint32Array | undefined;
+    rowCount: number;
+    baseFeatureState: AssociatedFeatureState | undefined;
+    colorForRow: RowColorFunction | undefined;
+    alpha: number;
+    featureState: AssociatedFeatureState | undefined;
+};
+
+/**
+ * The element keys, with an identity that survives everything except a change to
+ * the keys themselves.
+ *
+ * They are derived from `layerInputs.layers`, whose identity changes on every
+ * cosmetic prop edit — the adapter shallow-copies that record to invalidate an
+ * upstream Viv memo. Handing a fresh array to the render-data effect each time made
+ * dragging an opacity slider re-decode the shapes geometry once per increment:
+ * ~0.5s of parquet read and WKB decode per step, for a change that touches no
+ * geometry at all.
+ *
+ * Keyed on the joined string rather than held in a ref so the stability is React's
+ * to reason about — a ref read during render is the same pattern, but the compiler
+ * cannot see through it. `\0` cannot occur in a zarr element name.
+ */
+function useElementKeys(keys: string[]): string[] {
+    const joined = keys.join("\0");
+    return useMemo(() => (joined === "" ? [] : joined.split("\0")), [joined]);
+}
+
+function shapeElementKeys(layers: RenderStackLayerInputs["layers"], layerOrder: string[]) {
+    const keys = new Set<string>();
+    for (const layerId of layerOrder) {
+        const layer = layers[layerId];
+        if (layer?.type === "shapes") keys.add(layer.elementKey);
+    }
+    return Array.from(keys);
+}
+
+function labelElementKeys(layers: RenderStackLayerInputs["layers"], layerOrder: string[]) {
+    const keys = new Set<string>();
+    for (const layerId of layerOrder) {
+        const layer = layers[layerId];
+        if (layer?.type === "labels") keys.add(layer.elementKey);
+    }
+    return Array.from(keys);
+}
+
+export function useShapesRenderDataByElementKey(spatialData: SpatialData | undefined, elementKeys: string[]) {
+    const [renderDataByElementKey, setRenderDataByElementKey] = useState<Record<string, ShapesRenderData | undefined>>(
+        {},
+    );
+
+    useEffect(() => {
+        let cancelled = false;
+        if (!spatialData || elementKeys.length === 0) {
+            setRenderDataByElementKey({});
+            return;
+        }
+        Promise.all(
+            elementKeys.map(async (elementKey): Promise<ShapesRenderDataEntry> => {
+                const element = spatialData.shapes?.[elementKey];
+                if (!element) return [elementKey, undefined];
+                try {
+                    // The single most expensive thing this file can cause — a parquet
+                    // read plus a WKB decode of every polygon. A `count` above 1 per
+                    // element in a capture means something is re-entering this effect
+                    // that should not: geometry does not depend on how a layer looks.
+                    const startedAt = performance.now();
+                    const loaded = await element.loadRenderData();
+                    recordSpatialPerf("shapes.loadRenderData", performance.now() - startedAt);
+                    return [elementKey, loaded];
+                } catch (error) {
+                    console.warn(`Failed to load SpatialData shapes render data for ${elementKey}`, error);
+                    return [elementKey, undefined];
+                }
+            }),
+        ).then((entries) => {
+            if (cancelled) return;
+            setRenderDataByElementKey(Object.fromEntries(entries));
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [spatialData, elementKeys]);
+
+    return renderDataByElementKey;
+}
+
+function useLabelsRowIndexByFeatureId(spatialData: SpatialData | undefined, elementKeys: string[]) {
+    const [rowIndexByFeatureId, setRowIndexByFeatureId] = useState<Record<string, Map<string, number> | undefined>>({});
+
+    useEffect(() => {
+        let cancelled = false;
+        if (!spatialData || elementKeys.length === 0) {
+            setRowIndexByFeatureId({});
+            return;
+        }
+
+        Promise.all(
+            elementKeys.map(async (elementKey) => {
+                try {
+                    const rows = await loadAssociatedTableFeatureRows({
+                        spatialData,
+                        kind: "labels",
+                        key: elementKey,
+                    });
+                    return [elementKey, rows.rowIndexByFeatureId] as const;
+                } catch (error) {
+                    console.warn(`Failed to load SpatialData labels table association for ${elementKey}`, error);
+                    return [elementKey, undefined] as const;
+                }
+            }),
+        ).then((entries) => {
+            if (cancelled) return;
+            setRowIndexByFeatureId(Object.fromEntries(entries));
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [spatialData, elementKeys]);
+
+    return rowIndexByFeatureId;
+}
+
+export function useElementTableAssociation(
+    spatialData: SpatialData | undefined,
+    // `undefined` is a real answer, not a missing argument: a host entry in the layer
+    // stack is not a spatial element and has no type to associate against. Callers used
+    // to pass a placeholder `"shapes"` for that case, which read as a shapes lookup.
+    elementType: AssociableSpatialElementType | undefined,
+    elementKey: string | undefined,
+    dataSources: AssociatedDataSource[],
+): TableAssociation {
+    const elementKeys = useMemo(
+        () => (elementType === "shapes" && elementKey ? [elementKey] : []),
+        [elementType, elementKey],
+    );
+    const renderDataByElementKey = useShapesRenderDataByElementKey(spatialData, elementKeys);
+    if (!elementType || !elementKey || !spatialData) return NO_TABLE_ASSOCIATION;
+    const table = resolveAssociatedElementTable({
+        spatialData,
+        elementType,
+        elementKey,
+        dataSources,
+    });
+    if (table.status === "ambiguous") return { status: "ambiguous" };
+    if (table.status !== "resolved") return NO_TABLE_ASSOCIATION;
+    if (elementType !== "shapes") {
+        return {
+            status: "resolved",
+            tableName: table.tableName,
+            dataSourceName: table.dataSourceName,
+        };
+    }
+    const renderData = renderDataByElementKey[elementKey];
+    if (!renderData) return { status: "loading" };
+    return getShapesTableAssociation(renderData, table.dataStore.size, table.tableName, table.dataSourceName);
+}
+
+export function useShapesTableAssociation(
+    spatialData: SpatialData | undefined,
+    elementKey: string | undefined,
+    dataSources: AssociatedDataSource[],
+): TableAssociation {
+    return useElementTableAssociation(spatialData, "shapes", elementKey, dataSources);
+}
+
+function createColorFunctionByColumn(
+    dataStore: DataStore,
+    columnNames: string[],
+    loadedColumnNames: Set<string>,
+    colorOptions: {
+        log_color_scale?: boolean;
+        fallbackOnZero?: boolean;
+        hideMissing?: boolean;
+    },
+) {
+    const colorFunctionByColumn: Record<string, RowColorFunction | undefined> = {};
+    for (const columnName of columnNames) {
+        if (!loadedColumnNames.has(columnName)) continue;
+        colorFunctionByColumn[columnName] = dataStore.getColorFunction(columnName, {
+            asArray: true,
+            overideValues: {
+                colorLogScale: colorOptions.log_color_scale,
+                fallbackOnZero: colorOptions.fallbackOnZero,
+                hideMissing: colorOptions.hideMissing,
+            },
+        });
+    }
+    return colorFunctionByColumn;
+}
+
+function visibleRowsForDataStore(dataStore: DataStore): Uint32Array {
+    const visibleRows = new Uint32Array(dataStore.filterSize);
+    let index = 0;
+    for (let rowIndex = 0; rowIndex < dataStore.size; rowIndex++) {
+        if (dataStore.filterArray[rowIndex] !== 0) continue;
+        visibleRows[index++] = rowIndex;
+    }
+    return visibleRows;
+}
+
+function useDataStoreFilterVersion(dataStores: DataStore[]) {
+    const [version, setVersion] = useState(0);
+    // `DataStore.addListener` is keyed, and a duplicate key silently REPLACES the
+    // existing listener while cleanup deletes by that key. `useId` gives each hook
+    // instance a key React guarantees is distinct; a random suffix only made a
+    // collision unlikely.
+    const instanceId = useId();
+
+    useEffect(() => {
+        const listenerId = `spatial-table-association-${instanceId}`;
+        const listener = (type: string) => {
+            if (type === "filtered" || type === "data_added") {
+                setVersion((current) => current + 1);
+            }
+        };
+
+        for (const dataStore of dataStores) {
+            dataStore.addListener(listenerId, listener);
+        }
+        return () => {
+            for (const dataStore of dataStores) {
+                dataStore.removeListener(listenerId);
+            }
+        };
+    }, [dataStores, instanceId]);
+
+    return version;
+}
+
+/** Drop entries of a layer-id-keyed cache whose layer is no longer in the stack. */
+function pruneToKeys(cache: Record<string, unknown>, liveKeys: string[]) {
+    const live = new Set(liveKeys);
+    for (const key of Object.keys(cache)) {
+        if (!live.has(key)) delete cache[key];
+    }
+}
+
+function isFillColorAssociableLayer(
+    layer: LayerConfig | undefined,
+): layer is Extract<LayerConfig, { type: FillColorAssociableLayerType }> {
+    return layer?.type === "shapes" || layer?.type === "labels";
+}
+
+function getFillColumnsByDataSource(
+    layers: RenderStackLayerInputs["layers"],
+    layerOrder: string[],
+    tableByAssociationKey: Record<string, AssociatedElementTable>,
+) {
+    const columnsByDataSource: Record<string, Set<string>> = {};
+    for (const layerId of layerOrder) {
+        const layer = layers[layerId];
+        if (!isFillColorAssociableLayer(layer)) continue;
+        const columnName = layerFillColorColumnName(layer);
+        if (!columnName) continue;
+        const table = tableByAssociationKey[`${layer.type}:${layer.elementKey}`];
+        if (table?.status !== "resolved") continue;
+        columnsByDataSource[table.dataSourceName] ??= new Set();
+        columnsByDataSource[table.dataSourceName]?.add(columnName);
+    }
+    return Object.fromEntries(
+        Object.entries(columnsByDataSource).map(([dataSourceName, columns]) => [
+            dataSourceName,
+            Array.from(columns).sort(),
+        ]),
+    );
+}
+
+/** Load these columns of each datasource; the version bumps as each set lands. */
+function useLoadedColumnsVersion(columnsByDataSource: Record<string, string[]>) {
+    const chartManager = useChartManager();
+    const [version, setVersion] = useState(0);
+
+    useEffect(() => {
+        let cancelled = false;
+        for (const [dataSourceName, columns] of Object.entries(columnsByDataSource)) {
+            const dataStore = chartManager.getDataSource(dataSourceName);
+            const missing = columns.filter((columnName) => !dataStore.columnsWithData.includes(columnName));
+            if (missing.length === 0) continue;
+            chartManager.loadColumnSet(missing, dataSourceName, () => {
+                if (!cancelled) setVersion((current) => current + 1);
+            });
+        }
+        return () => {
+            cancelled = true;
+        };
+    }, [chartManager, columnsByDataSource]);
+
+    return version;
+}
+
+function layerFillAlpha(layer: LayerConfig): number {
+    if (layer.type === "shapes") return layer.fillColor?.[3] ?? 180;
+    return 255;
+}
+
+/** Datasource columns each value-join plan reads, so they can be loaded up front. */
+function getRowKeyColumnsByDataSource(
+    tableByAssociationKey: Record<string, AssociatedElementTable>,
+    rowPlanByAssociationKey: Record<string, TableRowPlan>,
+) {
+    const columnsByDataSource: Record<string, Set<string>> = {};
+    for (const [associationKey, plan] of Object.entries(rowPlanByAssociationKey)) {
+        const table = tableByAssociationKey[associationKey];
+        if (plan.kind !== "value" || table?.status !== "resolved") continue;
+        columnsByDataSource[table.dataSourceName] ??= new Set();
+        for (const column of plan.columns) columnsByDataSource[table.dataSourceName]?.add(column);
+    }
+    return Object.fromEntries(
+        Object.entries(columnsByDataSource).map(([dataSourceName, columns]) => [
+            dataSourceName,
+            Array.from(columns).sort(),
+        ]),
+    );
+}
+
+/**
+ * @param spatialDataName - the SpatialData object on this canvas, as the converter named
+ * it (`region.spatial.file`). A datasource merged from several objects may hold a
+ * same-named table from each; this says which one this canvas is showing.
+ */
+export type AssociatedLayerInputs = RenderStackLayerInputs & {
+    /**
+     * Tooltip items MDV supplies for a hovered feature: its layer's tooltip fields that
+     * are not in the table's obs (see `splitTooltipFields`). Stable identity; reads the
+     * latest state when called.
+     */
+    mdvTooltipItems: (layerId: string, featureId: string) => SpatialFeatureTooltipItem[];
+};
+
+export function useAssociatedShapesLayerInputs(
+    spatialData: SpatialData | undefined,
+    layerInputs: RenderStackLayerInputs,
+    spatialDataName?: string,
+): AssociatedLayerInputs {
+    const dataSources = useDataSources();
+    // Stable by value, not by identity: which elements are on the canvas changes far
+    // less often than the layer record does. See `useElementKeys`.
+    const shapeKeys = useElementKeys(shapeElementKeys(layerInputs.layers, layerInputs.layerOrder));
+    const labelKeys = useElementKeys(labelElementKeys(layerInputs.layers, layerInputs.layerOrder));
+    const renderDataByElementKey = useShapesRenderDataByElementKey(spatialData, shapeKeys);
+    const labelsRowIndexByFeatureId = useLabelsRowIndexByFeatureId(spatialData, labelKeys);
+    const tableByAssociationKey = useMemo(() => {
+        const entries: Array<[string, AssociatedElementTable]> = [];
+        for (const elementKey of shapeKeys) {
+            entries.push([
+                `shapes:${elementKey}`,
+                resolveAssociatedElementTable({
+                    spatialData,
+                    elementType: "shapes",
+                    elementKey,
+                    dataSources,
+                }),
+            ]);
+        }
+        for (const elementKey of labelKeys) {
+            entries.push([
+                `labels:${elementKey}`,
+                resolveAssociatedElementTable({
+                    spatialData,
+                    elementType: "labels",
+                    elementKey,
+                    dataSources,
+                }),
+            ]);
+        }
+        return Object.fromEntries(entries);
+    }, [spatialData, shapeKeys, labelKeys, dataSources]);
+    const rowPlanByAssociationKey = useMemo(() => {
+        const entries: Array<[string, TableRowPlan]> = [];
+        for (const [associationKey, table] of Object.entries(tableByAssociationKey)) {
+            if (table.status !== "resolved") continue;
+            const plan = planTableRows(table.dataStore.config.spatialdata_tables, table.tableName, spatialDataName);
+            if (plan.kind === "unresolved") {
+                console.warn(`No DataStore rows for ${associationKey} in '${table.dataSourceName}': ${plan.reason}`);
+            }
+            entries.push([associationKey, plan]);
+        }
+        return Object.fromEntries(entries);
+    }, [tableByAssociationKey, spatialDataName]);
+    const rowKeyColumnsByDataSource = useMemo(
+        () => getRowKeyColumnsByDataSource(tableByAssociationKey, rowPlanByAssociationKey),
+        [tableByAssociationKey, rowPlanByAssociationKey],
+    );
+    const loadedRowKeyColumnsVersion = useLoadedColumnsVersion(rowKeyColumnsByDataSource);
+    // Feature id → DataStore row, per element. Rows reported by `@spatialdata/core`
+    // index ONE zarr table; the datasource may hold several (see `table_rows.ts`).
+    // Depends on geometry, association and key columns only — never on layer props —
+    // so a cosmetic edit reuses these maps and the per-feature cache below holds.
+    const rowIndexByFeatureIdByAssociationKey = useMemo(() => {
+        loadedRowKeyColumnsVersion;
+        return measureSpatial("association.rows", () => {
+            const entries: Array<[string, Map<string, number>]> = [];
+            const add = (
+                associationKey: string,
+                elementKey: string,
+                featureIds: ArrayLike<string>,
+                tableRows: ArrayLike<number>,
+            ) => {
+                const table = tableByAssociationKey[associationKey];
+                const plan = rowPlanByAssociationKey[associationKey];
+                if (table?.status !== "resolved" || !plan) return;
+                const resolver = getTableRowResolver(table.dataStore, plan);
+                if (!resolver) return;
+                entries.push([associationKey, datasourceRowsByFeatureId(resolver, elementKey, featureIds, tableRows)]);
+            };
+            for (const elementKey of shapeKeys) {
+                const renderData = renderDataByElementKey[elementKey];
+                if (!renderData) continue;
+                add(`shapes:${elementKey}`, elementKey, renderData.featureIds, renderData.rowIndexByFeatureIndex);
+            }
+            for (const elementKey of labelKeys) {
+                const tableRowByFeatureId = labelsRowIndexByFeatureId[elementKey];
+                if (!tableRowByFeatureId) continue;
+                add(
+                    `labels:${elementKey}`,
+                    elementKey,
+                    Array.from(tableRowByFeatureId.keys()),
+                    Array.from(tableRowByFeatureId.values()),
+                );
+            }
+            return Object.fromEntries(entries);
+        });
+    }, [
+        loadedRowKeyColumnsVersion,
+        shapeKeys,
+        labelKeys,
+        renderDataByElementKey,
+        labelsRowIndexByFeatureId,
+        tableByAssociationKey,
+        rowPlanByAssociationKey,
+    ]);
+    const obsColumnNamesByAssociationKey = useMemo(() => {
+        const entries: Array<[string, Set<string> | undefined]> = [];
+        for (const elementKey of shapeKeys) {
+            entries.push([`shapes:${elementKey}`, obsColumnNamesForElement(spatialData, "shapes", elementKey)]);
+        }
+        for (const elementKey of labelKeys) {
+            entries.push([`labels:${elementKey}`, obsColumnNamesForElement(spatialData, "labels", elementKey)]);
+        }
+        return Object.fromEntries(entries);
+    }, [spatialData, shapeKeys, labelKeys]);
+    const fillColumnsByDataSource = useMemo(
+        () => getFillColumnsByDataSource(layerInputs.layers, layerInputs.layerOrder, tableByAssociationKey),
+        [layerInputs.layers, layerInputs.layerOrder, tableByAssociationKey],
+    );
+    const loadedColorColumnVersion = useLoadedColumnsVersion(fillColumnsByDataSource);
+    // MDV's share of each layer's tooltip fields, by layer id; the viewer gets the rest.
+    const mdvTooltipFieldsByLayerId = useMemo(() => {
+        const byLayerId: Record<string, string[]> = {};
+        for (const layerId of layerInputs.layerOrder) {
+            const layer = layerInputs.layers[layerId];
+            if (!isFillColorAssociableLayer(layer)) continue;
+            const associationKey = `${layer.type}:${layer.elementKey}`;
+            const { mdv } = splitTooltipFields(
+                layerTooltipFields(layer),
+                obsColumnNamesByAssociationKey[associationKey],
+            );
+            if (mdv.length > 0) byLayerId[layerId] = mdv;
+        }
+        return byLayerId;
+    }, [layerInputs.layers, layerInputs.layerOrder, obsColumnNamesByAssociationKey]);
+    const tooltipColumnsByDataSource = useMemo(() => {
+        const columnsByDataSource: Record<string, Set<string>> = {};
+        for (const [layerId, fields] of Object.entries(mdvTooltipFieldsByLayerId)) {
+            const layer = layerInputs.layers[layerId];
+            if (!layer) continue;
+            const table = tableByAssociationKey[`${layer.type}:${layer.elementKey}`];
+            if (table?.status !== "resolved") continue;
+            columnsByDataSource[table.dataSourceName] ??= new Set();
+            for (const field of fields) {
+                // a field the datasource does not have (e.g. a column since removed) has
+                // nothing to load, and `loadColumnSet` throws on it; its tooltip value is blank
+                if (!table.dataStore.columnIndex[field]) continue;
+                columnsByDataSource[table.dataSourceName]?.add(field);
+            }
+        }
+        return Object.fromEntries(
+            Object.entries(columnsByDataSource).map(([name, columns]) => [name, Array.from(columns).sort()]),
+        );
+    }, [mdvTooltipFieldsByLayerId, layerInputs.layers, tableByAssociationKey]);
+    // Stable by value, like the element keys: the layer record changes on every cosmetic edit.
+    const tooltipColumnsKey = JSON.stringify(tooltipColumnsByDataSource);
+    const stableTooltipColumnsByDataSource = useMemo(() => {
+        const parsed: Record<string, string[]> = JSON.parse(tooltipColumnsKey);
+        return parsed;
+    }, [tooltipColumnsKey]);
+    useLoadedColumnsVersion(stableTooltipColumnsByDataSource);
+    const associatedDataStores = useMemo(() => {
+        const storesByName = new Map<string, DataStore>();
+        for (const table of Object.values(tableByAssociationKey)) {
+            if (table.status === "resolved") storesByName.set(table.dataSourceName, table.dataStore);
+        }
+        return Array.from(storesByName.values());
+    }, [tableByAssociationKey]);
+    const filterVersion = useDataStoreFilterVersion(associatedDataStores);
+    const visibleRowsByDataSource = useMemo(() => {
+        filterVersion;
+        return Object.fromEntries(
+            associatedDataStores.map((dataStore) => [dataStore.name, visibleRowsForDataStore(dataStore)]),
+        );
+    }, [associatedDataStores, filterVersion]);
+    const colorFunctionByDataSource = useMemo(() => {
+        loadedColorColumnVersion;
+        return Object.fromEntries(
+            Object.entries(fillColumnsByDataSource).map(([dataSourceName, columnNames]) => {
+                const table = Object.values(tableByAssociationKey).find(
+                    (candidate) => candidate.status === "resolved" && candidate.dataSourceName === dataSourceName,
+                );
+                const loadedColumnNames =
+                    table?.status === "resolved" ? new Set(table.dataStore.columnsWithData) : new Set<string>();
+                return [
+                    dataSourceName,
+                    table?.status === "resolved"
+                        ? createColorFunctionByColumn(table.dataStore, columnNames, loadedColumnNames, {})
+                        : {},
+                ];
+            }),
+        );
+    }, [fillColumnsByDataSource, loadedColorColumnVersion, tableByAssociationKey]);
+    const lastFillColorsRef = useRef<Record<string, Record<string, RgbaColor>>>({});
+    const featureStateCacheRef = useRef<Record<string, FeatureStateCacheEntry>>({});
+
+    // `count` here is how many times the association projection ran during a capture;
+    // `avgMs` tells you whether the per-feature pass was cached or rebuilt. A cosmetic
+    // edit should show a high count and a near-zero average.
+    const layers = useMemo(
+        () =>
+            measureSpatial("association.project", () => {
+                let changed = false;
+                const nextLayers = { ...layerInputs.layers };
+
+                for (const layerId of layerInputs.layerOrder) {
+                    const layer = layerInputs.layers[layerId];
+                    if (!isFillColorAssociableLayer(layer)) continue;
+
+                    const associationKey = `${layer.type}:${layer.elementKey}`;
+                    const table = tableByAssociationKey[associationKey];
+                    if (table?.status !== "resolved") continue;
+
+                    const tooltipFields = layerTooltipFields(layer);
+                    const viewerTooltipFields = mdvTooltipFieldsByLayerId[layerId]
+                        ? splitTooltipFields(tooltipFields, obsColumnNamesByAssociationKey[associationKey]).viewer
+                        : undefined;
+
+                    const fillColumnName = layerFillColorColumnName(layer);
+                    // Two routes, decided by whether the viewer can read the column at all.
+                    // In obs: hand it over with MDV's palette, and let the viewer do the
+                    // reading, the encoding and the load-window retention. Not in obs (a
+                    // gene score, `mdv_cell_id`, anything computed here): MDV is the only
+                    // party that has the values, so it colours each feature itself.
+                    const viewerFillColor =
+                        fillColumnName && obsColumnNamesByAssociationKey[associationKey]?.has(fillColumnName)
+                            ? fillColorSchemeFromDataStore(table.dataStore, fillColumnName)
+                            : undefined;
+                    const colorForRow =
+                        fillColumnName && !viewerFillColor
+                            ? colorFunctionByDataSource[table.dataSourceName]?.[fillColumnName]
+                            : undefined;
+                    // A selected column whose data has not loaded yet has no colour function.
+                    const colorReady = !fillColumnName || !!viewerFillColor || colorForRow !== undefined;
+                    const visibleRows =
+                        visibleRowsByDataSource[table.dataSourceName] ?? visibleRowsForDataStore(table.dataStore);
+
+                    // Filtering rides `featureState` on both routes: cross-filtering is
+                    // MDV's, not the table's, and no column in obs can express it.
+                    //
+                    // This is the expensive step — one pass over every feature in the element
+                    // — and it is reached on every render of this memo, which includes the
+                    // cosmetic ones. The memo cannot simply skip those: it hands the canvas
+                    // COPIES of the layer configs, so it has to re-copy for an in-place
+                    // opacity edit to reach the canvas at all. Caching the featureState on
+                    // the inputs it actually reads separates the two: the copy stays cheap
+                    // and per-render, the per-feature pass runs only when something it
+                    // depends on moved.
+                    const source = rowIndexByFeatureIdByAssociationKey[associationKey];
+                    if (!source) continue;
+
+                    const rowCount = table.dataStore.size;
+                    const alpha = layerFillAlpha(layer);
+                    const baseFeatureState = layer.featureState;
+                    const cached = featureStateCacheRef.current[layerId];
+                    let featureState: AssociatedFeatureState | undefined;
+                    if (
+                        cached &&
+                        cached.source === source &&
+                        cached.visibleRows === visibleRows &&
+                        cached.rowCount === rowCount &&
+                        cached.baseFeatureState === baseFeatureState &&
+                        cached.colorForRow === colorForRow &&
+                        cached.alpha === alpha
+                    ) {
+                        featureState = cached.featureState;
+                    } else {
+                        featureState = buildAssociatedFeatureStateFromRowMap({
+                            rowIndexByFeatureId: source,
+                            visibleRows,
+                            rowCount,
+                            baseFeatureState,
+                            colorForRow,
+                            alpha,
+                        });
+                        featureStateCacheRef.current[layerId] = {
+                            source,
+                            visibleRows,
+                            rowCount,
+                            baseFeatureState,
+                            colorForRow,
+                            alpha,
+                            featureState,
+                        };
+                    }
+
+                    if (!viewerFillColor) {
+                        featureState = withPreservedFillColorsWhileLoading({
+                            featureState,
+                            fillColumnName,
+                            colorReady,
+                            previousFillColorByFeatureId: lastFillColorsRef.current[layerId],
+                        });
+                    }
+
+                    if (!fillColumnName || viewerFillColor) {
+                        // Nothing to preserve: either no column, or the viewer is holding
+                        // the last-good colours itself. Dropping the entry also stops a
+                        // previous MDV-drawn column bleeding into a later viewer-drawn one.
+                        const { [layerId]: _removed, ...remaining } = lastFillColorsRef.current;
+                        lastFillColorsRef.current = remaining;
+                    } else if (colorReady && featureState?.fillColorByFeatureId) {
+                        lastFillColorsRef.current[layerId] = featureState.fillColorByFeatureId;
+                    }
+
+                    if (!featureState && !viewerFillColor && !viewerTooltipFields) continue;
+
+                    const projected = viewerFillColor
+                        ? { ...layer, fillColorByColumn: viewerFillColor }
+                        : withoutViewerFillColorColumn(layer);
+                    const withTooltip = viewerTooltipFields
+                        ? { ...projected, tooltipFields: viewerTooltipFields }
+                        : projected;
+                    nextLayers[layerId] = featureState ? { ...withTooltip, featureState } : withTooltip;
+                    changed = true;
+                }
+
+                // Both caches are keyed by layer id and nothing else removes their entries, so
+                // a layer deleted from the stack would leave its featureState — one entry per
+                // feature of that element — reachable for the life of the chart.
+                pruneToKeys(featureStateCacheRef.current, layerInputs.layerOrder);
+                pruneToKeys(lastFillColorsRef.current, layerInputs.layerOrder);
+
+                return changed ? nextLayers : layerInputs.layers;
+            }),
+        [
+            layerInputs.layers,
+            layerInputs.layerOrder,
+            rowIndexByFeatureIdByAssociationKey,
+            tableByAssociationKey,
+            obsColumnNamesByAssociationKey,
+            visibleRowsByDataSource,
+            colorFunctionByDataSource,
+            mdvTooltipFieldsByLayerId,
+        ],
+    );
+
+    // Read at hover time, so a ref rather than a dependency: a fresh function per
+    // cosmetic edit would re-create the canvas's hover handler with it.
+    const tooltipStateRef = useRef({
+        layers: layerInputs.layers,
+        mdvTooltipFieldsByLayerId,
+        tableByAssociationKey,
+        rowIndexByFeatureIdByAssociationKey,
+    });
+    useEffect(() => {
+        tooltipStateRef.current = {
+            layers: layerInputs.layers,
+            mdvTooltipFieldsByLayerId,
+            tableByAssociationKey,
+            rowIndexByFeatureIdByAssociationKey,
+        };
+    }, [layerInputs.layers, mdvTooltipFieldsByLayerId, tableByAssociationKey, rowIndexByFeatureIdByAssociationKey]);
+    const mdvTooltipItems = useCallback((layerId: string, featureId: string): SpatialFeatureTooltipItem[] => {
+        const state = tooltipStateRef.current;
+        const fields = state.mdvTooltipFieldsByLayerId[layerId];
+        const layer = state.layers[layerId];
+        if (!fields || !layer) return [];
+        const associationKey = `${layer.type}:${layer.elementKey}`;
+        const table = state.tableByAssociationKey[associationKey];
+        const row = state.rowIndexByFeatureIdByAssociationKey[associationKey]?.get(featureId);
+        if (table?.status !== "resolved" || row === undefined || row < 0) return [];
+        return tooltipItemsFromDataStore(table.dataStore, row, fields);
+    }, []);
+
+    return useMemo(
+        () => ({
+            layers,
+            layerOrder: layerInputs.layerOrder,
+            mdvTooltipItems,
+        }),
+        [layers, layerInputs.layerOrder, mdvTooltipItems],
+    );
+}

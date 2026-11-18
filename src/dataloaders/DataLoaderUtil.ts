@@ -1,13 +1,10 @@
-import {
-    getArrayBufferDataLoader,
-    getLocalCompressedBinaryDataLoader,
-} from "./DataLoaders";
-import type { DataSource, DataColumn, DataType, LoadedDataColumn } from "@/charts/charts";
-import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { createElement } from "react";
-import { createMdvPortal } from "@/react/react_utils";
+import type { DataColumn, DataSource, DataType, LoadedDataColumn } from "@/charts/charts";
+import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
-import { decompressData } from "./DataLoaders";
+import { createMdvPortal } from "@/react/react_utils";
+import { describeAnswer, htmlTitle } from "@/utils/importFailure";
+import { decompressData, getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader } from "./DataLoaders";
 
 let projectRoot = "";
 /**
@@ -16,7 +13,19 @@ let projectRoot = "";
 export async function fetchJsonConfig<T = any>(url: string, root: string, createErrorComponent = false): Promise<T> {
     try {
         const resp = await fetch(url);
-        const config = await resp.json();
+        const text = await resp.text();
+        let config: unknown;
+        try {
+            config = JSON.parse(text);
+        } catch {
+            // Usually an HTML error page from a proxy; the bare parse error ("Unexpected token
+            // '<'") says neither which file nor what came back instead.
+            const contentType = resp.headers.get("content-type")?.split(";")[0] || "no content type";
+            throw new Error(
+                `Could not load ${url}: the server answered ${describeAnswer(resp.status, htmlTitle(text))} ` +
+                    `with ${contentType} instead of JSON.`,
+            );
+        }
         if (!resp.ok) {
             throw new Error(JSON.stringify(config, null, 2));
         }
@@ -28,7 +37,13 @@ export async function fetchJsonConfig<T = any>(url: string, root: string, create
             document.body.style.display = "flex";
             document.body.style.justifyContent = "center";
             document.body.style.alignItems = "center";
-            createMdvPortal(createElement(ErrorComponentReactWrapper, { error: {message: `Error fetching JSON '${url}'`}, extraMetaData: {message: `${error}`} }), document.body);
+            createMdvPortal(
+                createElement(ErrorComponentReactWrapper, {
+                    error: { message: `Error fetching JSON '${url}'` },
+                    extraMetaData: { message: `${error}` },
+                }),
+                document.body,
+            );
         }
         console.error(`Error fetching ${url}: ${error}`);
         throw error;
@@ -48,9 +63,9 @@ export function buildPath(...args: string[]) {
     return args
         .map((part, i) => {
             if (i === 0) {
-                return part.trim().replace(/[\/]*$/g, "");
+                return part.trim().replace(/[/]*$/g, "");
             }
-            return part.trim().replace(/(^[\/]*|[\/]*$)/g, "");
+            return part.trim().replace(/(^[/]*|[/]*$)/g, "");
         })
         .filter((x) => x.length)
         .join("/");
@@ -68,26 +83,19 @@ export function buildPath(...args: string[]) {
  */
 export function getProjectURL(url: string, trailingSlash = true) {
     if (url.startsWith(projectRoot)) return url; //<<--- review this, test calling it multiple times
-    const p =
-        buildPath(projectRoot, url).replace("./", "/") +
-        (trailingSlash ? "/" : "");
+    const p = buildPath(projectRoot, url).replace("./", "/") + (trailingSlash ? "/" : "");
     // https://github.com/hms-dbmi/viv/issues/756
     if (p.startsWith("/")) return new URL(p, window.location.href).href;
     return p;
 }
 export type DataLoader = {
-    function: (columns: DataColumn<any>[], dataSource: string, size: number) => Promise<ArrayBufferLike>,
-    viewLoader: (view: string) => Promise<any>,
-    rowDataLoader: (dataSource: string, index: string) => Promise<any>,
-    binaryDataLoader: (dataSource: string, name: string) => Promise<ArrayBufferLike>,
-}
+    function: (columns: DataColumn<any>[], dataSource: string, size: number) => Promise<ArrayBufferLike>;
+    viewLoader: (view: string) => Promise<any>;
+    rowDataLoader: (dataSource: string, index: string) => Promise<any>;
+    binaryDataLoader: (dataSource: string, name: string) => Promise<ArrayBufferLike>;
+};
 
-export function getDataLoader(
-    isStaticFolder: boolean,
-    datasources: DataSource[],
-    views: any,
-    url: string,
-) {
+export function getDataLoader(isStaticFolder: boolean, datasources: DataSource[], views: any, url: string) {
     const root = url.endsWith("/") ? url.substring(0, url.length - 1) : url;
     const loader = isStaticFolder
         ? {
@@ -115,7 +123,7 @@ export function getDataLoader(
     //load arbitrary data
     async function loadBinaryDataStatic(datasource: string, name: string) {
         const resp = await fetch(`${root}/binarydata/${datasource}/${name}.gz`);
-        const buff =  await resp.arrayBuffer();
+        const buff = await resp.arrayBuffer();
         return await decompressData(new Uint8Array(buff));
     }
 }
@@ -141,11 +149,7 @@ async function getView(view?: string) {
 }
 
 async function loadBinaryData(datasource: string, name: string) {
-    const data =  await getPostData(
-        `${projectRoot}/get_binary_data`,
-        { datasource, name },
-        "arraybuffer",
-    );
+    const data = await getPostData(`${projectRoot}/get_binary_data`, { datasource, name }, "arraybuffer");
 
     return await decompressData(data);
 }
@@ -171,7 +175,7 @@ export async function getPostData(url: string, args: any, return_type = "json") 
 
 /** Get a column with given name from the given dataSource, fetching from server if necessary.
  * Returns a Column object when the data is loaded.
- * 
+ *
  * todo - consider batching requests (add to queue, then load all at once in `setTimeout(...,0)`?)
  * better types - for `columnName` and return value generic(?)
  */
@@ -182,20 +186,20 @@ export async function loadColumn(datasourceName: string, columnName: string): Pr
             const column = ds.columnIndex[columnName];
             if (!column) throw `no columnIndex['${columnName}'] record`;
             if (ds.columnsWithData.includes(columnName)) {
-                if (!isColumnLoaded(column)) throw "assertion failed..."
+                if (!isColumnLoaded(column)) throw "assertion failed...";
                 resolve(column); //hopefully this is trustworthy
             } else {
                 window.mdv.chartManager.loadColumnSet(
                     [columnName],
                     datasourceName,
                     (failedColumns: DataColumn<any>[]) => {
-                        if (!isColumnLoaded(column)) throw "broken promise for loading column"
+                        if (!isColumnLoaded(column)) throw "broken promise for loading column";
                         if (failedColumns.length) {
                             // reject(new Error(`Failed to load column ${columnName}`));
                             console.error(`Failed to load column ${columnName}`);
                         }
                         return resolve(column);
-                    }
+                    },
                 );
             }
         } catch (e) {

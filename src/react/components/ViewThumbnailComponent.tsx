@@ -1,9 +1,9 @@
 import GridViewIcon from "@mui/icons-material/GridView";
 import { observer } from "mobx-react-lite";
 import { useEffect, useState } from "react";
-import ViewThumbnailDialog from "./ViewThumbnailDialog";
-import IconWithTooltip from "./IconWithTooltip";
 import { useChartManager } from "../hooks";
+import IconWithTooltip from "./IconWithTooltip";
+import ViewThumbnailDialog from "./ViewThumbnailDialog";
 
 const ViewThumbnailComponent = observer(() => {
     const cm = useChartManager();

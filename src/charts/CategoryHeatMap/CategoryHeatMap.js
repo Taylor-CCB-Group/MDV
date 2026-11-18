@@ -1,5 +1,5 @@
-import { BaseReactChart } from "../../react/components/BaseReactChart";
 import { g } from "../../lib/utils";
+import { BaseReactChart } from "../../react/components/BaseReactChart";
 import BaseChart from "../BaseChart";
 import CategoryHeatmapComponent from "./CategoryHeatmapComponent";
 
@@ -52,22 +52,14 @@ class CategoryHeatMap extends BaseReactChart {
             return;
         }
 
-        if (
-            this.cellFilter &&
-            this.cellFilter[0] === xCategory &&
-            this.cellFilter[1] === yCategory
-        ) {
+        if (this.cellFilter && this.cellFilter[0] === xCategory && this.cellFilter[1] === yCategory) {
             this.removeFilter();
             return;
         }
 
         this.cellFilter = [xCategory, yCategory];
         this.resetButton.style.display = "inline";
-        this.dim.filter(
-            "filterCategoryPair",
-            [xColumn, yColumn],
-            [xCategory, yCategory],
-        );
+        this.dim.filter("filterCategoryPair", [xColumn, yColumn], [xCategory, yCategory]);
     }
 
     removeFilter() {

@@ -1,12 +1,11 @@
 import Dimension from "./Dimension.js";
 import RangeDimension from "./RangeDimension.js";
+
 class CatRangeDimension extends RangeDimension {
     constructor(column, parent) {
         super(column, parent);
         this.worker.terminate();
-        this.worker = new Worker(
-            new URL("./boxPlotWorker.js?v=2", import.meta.url),
-        );
+        this.worker = new Worker(new URL("./boxPlotWorker.js?v=2", import.meta.url));
     }
 
     getKernalDensity(callback, columns, config = {}) {
@@ -22,9 +21,7 @@ class CatRangeDimension extends RangeDimension {
         }
         config.values = cat.values;
         const action = (e) => {
-            console.log(
-                `calculate violin ${cat.name} : ${performance.now() - t}`,
-            );
+            console.log(`calculate violin ${cat.name} : ${performance.now() - t}`);
             callback(e.data);
         };
         this.worker.onmessage = action;
@@ -41,29 +38,16 @@ class CatRangeDimension extends RangeDimension {
     getMultiBoxPlotData(callback, columns, config = {}) {
         const cIndex = this.parent.columnIndex;
         const t = performance.now();
-        const buffs = columns.map((x) => [
-            cIndex[x].buffer,
-            c.Index[x].datatype,
-        ]);
+        const buffs = columns.map((x) => [cIndex[x].buffer, c.Index[x].datatype]);
         config.analysis = "multi";
-        config.cat = this.parent
-            .getColumnValues(columns[0])
-            .indexOf(config.category);
+        config.cat = this.parent.getColumnValues(columns[0]).indexOf(config.category);
 
         const action = (e) => {
-            console.log(
-                `calculate multiboxplot cols:${columns.length} time: ${performance.now() - t}`,
-            );
+            console.log(`calculate multiboxplot cols:${columns.length} time: ${performance.now() - t}`);
             callback(e.data);
         };
         this.worker.onmessage = action;
-        this.worker.postMessage([
-            this.filterBuffer,
-            this.parent.filterBuffer,
-            buffs.slice(1),
-            buffs[0],
-            config,
-        ]);
+        this.worker.postMessage([this.filterBuffer, this.parent.filterBuffer, buffs.slice(1), buffs[0], config]);
     }
 
     getBoxPlotData(callback, columns, config = {}) {
@@ -75,9 +59,7 @@ class CatRangeDimension extends RangeDimension {
         config.values = cat.values;
 
         const action = (e) => {
-            console.log(
-                `calculate boxplot ${cat.name} : ${performance.now() - t}`,
-            );
+            console.log(`calculate boxplot ${cat.name} : ${performance.now() - t}`);
             callback(e.data);
         };
         this.worker.onmessage = action;

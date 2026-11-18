@@ -3,10 +3,10 @@ import {
     DriveFileRenameOutline,
     Image as ImageIcon,
     Info,
-    LockPerson,
     MoreVert,
-    Upload as UploadIcon,
-    Share as ShareIcon
+    Share as ShareIcon,
+    ViewColumn,
+    WarningAmber,
 } from "@mui/icons-material";
 import {
     Checkbox,
@@ -22,22 +22,29 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    TableSortLabel,
+    Tooltip,
     Typography,
     useTheme,
 } from "@mui/material";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
+import { buildProjectUrl } from "@/utils/mdvRouting";
+import usePermissions from "./PermissionsContext";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
-import type { Project } from "./utils/projectUtils";
-import type { ProjectAccessType } from "./utils/projectUtils";
 import ProjectShareModal from "./ProjectShareModal";
-import usePermissions from "./PermissionsContext";
-import { buildProjectUrl } from "@/utils/mdvRouting";
+import { LIST_COLUMNS, type ListColumn } from "./utils/catalogPreferences";
+import type { Project, ProjectAccessType, SortBy, SortOrder } from "./utils/projectUtils";
 
 export type Pvoid = Promise<void>;
 export type ProjectListViewProps = {
     projects: Project[];
+    columns: ListColumn[];
+    onColumnsChange: (columns: ListColumn[]) => void;
+    sortBy: SortBy;
+    sortOrder: SortOrder;
+    onSortChange: (sortBy: SortBy) => void;
     onDelete: (id: string) => Pvoid;
     onRename: (id: string, name: string) => Pvoid;
     onChangeType: (id: string, type: ProjectAccessType) => Pvoid;
@@ -47,7 +54,22 @@ export type ProjectListViewProps = {
     onSelectionChange: (id: string, selected: boolean) => void;
 };
 export type MouseEv = React.MouseEvent<HTMLElement>;
-const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType, selectionMode, selectedProjectIds, onSelectionChange }: ProjectListViewProps) => {
+const ProjectListView = ({
+    projects,
+    columns,
+    onColumnsChange,
+    sortBy,
+    sortOrder,
+    onSortChange,
+    onDelete,
+    onRename,
+    onExport,
+    onChangeType,
+    selectionMode,
+    selectedProjectIds,
+    onSelectionChange,
+}: ProjectListViewProps) => {
+    const [columnsAnchorEl, setColumnsAnchorEl] = useState<HTMLElement | null>(null);
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>();
     const [selectedProject, setSelectedProject] = useState<Project>();
 
@@ -68,37 +90,83 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
         setAnchorEl(null);
     }, []);
 
-    const handleRowClick = useCallback((projectId: Project['id']) => {
+    const handleRowClick = useCallback((projectId: Project["id"]) => {
         window.location.href = buildProjectUrl(projectId);
     }, []);
 
-    const handleModalOpen = useCallback((modalSetter: React.Dispatch<React.SetStateAction<boolean>>) => {
-        handleMenuClose();
-        modalSetter(true);
-    }, [handleMenuClose]);
+    const handleModalOpen = useCallback(
+        (modalSetter: React.Dispatch<React.SetStateAction<boolean>>) => {
+            handleMenuClose();
+            modalSetter(true);
+        },
+        [handleMenuClose],
+    );
+
+    const show = useCallback(
+        (col: ListColumn) =>
+            columns.includes(col) && !(isPublicPage && (col === "lastModified" || col === "filesystem")),
+        [columns, isPublicPage],
+    );
+
+    const ariaSort = (key: SortBy) => (sortBy === key ? (sortOrder === "asc" ? "ascending" : "descending") : "none");
 
     const hasReadme = useCallback((proj: Project) => !!proj.readme, []);
 
-    const hasPermissions = useCallback((proj: Project) => 
-        proj.permissions.edit && (operationPermissions.renameProject ||
-        operationPermissions.deleteProject ||
-        // operationPermissions.exportProject ||
-        operationPermissions.shareProject)
-        , [operationPermissions]);
+    const hasPermissions = useCallback(
+        (proj: Project) =>
+            proj.permissions.edit &&
+            (operationPermissions.renameProject ||
+                operationPermissions.deleteProject ||
+                // operationPermissions.exportProject ||
+                operationPermissions.shareProject),
+        [operationPermissions],
+    );
 
     // todo: Update this component for more cleaner code
     return (
         <>
             <TableContainer component={Paper}>
-                <Table>
+                <Table sx={{ "& td:not(.name-cell), & th:not(.name-cell)": { whiteSpace: "nowrap" } }}>
                     <TableHead>
                         <TableRow>
                             {selectionMode && <TableCell padding="checkbox" />}
-                            <TableCell>Name</TableCell>
-                            <TableCell>Owner</TableCell>
-                            {!isPublicPage && <TableCell>Last Modified</TableCell>}
-                            <TableCell>Type</TableCell>
-                            <TableCell align="right">Actions</TableCell>
+                            <TableCell className="name-cell" sx={{ width: "100%" }} aria-sort={ariaSort("name")}>
+                                <TableSortLabel
+                                    active={sortBy === "name"}
+                                    direction={sortBy === "name" ? sortOrder : "asc"}
+                                    onClick={() => onSortChange("name")}
+                                >
+                                    Name
+                                </TableSortLabel>
+                            </TableCell>
+                            {show("owner") && <TableCell>Owner</TableCell>}
+                            {show("lastModified") && (
+                                <TableCell aria-sort={ariaSort("lastModified")}>
+                                    <TableSortLabel
+                                        active={sortBy === "lastModified"}
+                                        direction={sortBy === "lastModified" ? sortOrder : "desc"}
+                                        onClick={() => onSortChange("lastModified")}
+                                    >
+                                        Last Modified
+                                    </TableSortLabel>
+                                </TableCell>
+                            )}
+                            {show("type") && <TableCell>Type</TableCell>}
+                            {show("filesystem") && <TableCell>Filesystem</TableCell>}
+                            <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                                Actions
+                                <Tooltip title="Choose columns">
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => setColumnsAnchorEl(e.currentTarget)}
+                                        aria-label="choose columns"
+                                        data-testid="choose_columns_button"
+                                        sx={{ ml: 0.5 }}
+                                    >
+                                        <ViewColumn fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                            </TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -114,40 +182,67 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                             >
                                 {selectionMode && (
                                     <TableCell padding="checkbox">
-                                        {operationPermissions.deleteProject && project.permissions.edit && project.permissions.owner && (
-                                            <Checkbox
-                                                checked={selectedProjectIds.has(project.id)}
-                                                onChange={(event) => onSelectionChange(project.id, event.target.checked)}
-                                                onClick={(event) => event.stopPropagation()}
-                                                inputProps={{ "aria-label": `select project ${project.name}` }}
-                                            />
-                                        )}
+                                        {operationPermissions.deleteProject &&
+                                            project.permissions.edit &&
+                                            project.permissions.owner && (
+                                                <Checkbox
+                                                    checked={selectedProjectIds.has(project.id)}
+                                                    onChange={(event) =>
+                                                        onSelectionChange(project.id, event.target.checked)
+                                                    }
+                                                    onClick={(event) => event.stopPropagation()}
+                                                    inputProps={{ "aria-label": `select project ${project.name}` }}
+                                                />
+                                            )}
                                     </TableCell>
                                 )}
-                                <TableCell>
+                                <TableCell className="name-cell">
                                     <div className="flex items-center gap-3">
-                                        <ImageIcon
-                                            sx={{ color: "text.secondary" }}
-                                        />
+                                        {project.thumbnail ? (
+                                            <img
+                                                src={project.thumbnail}
+                                                alt=""
+                                                style={{ width: 48, height: 32, objectFit: "contain", flexShrink: 0 }}
+                                            />
+                                        ) : (
+                                            <ImageIcon sx={{ width: 48, color: "text.secondary" }} />
+                                        )}
                                         <Typography>{project.name}</Typography>
                                     </div>
                                 </TableCell>
-                                <TableCell>{project.owner ? project.owner.join(', ') : ''}</TableCell>
-                                {!isPublicPage && <TableCell>{project.lastModified}</TableCell>}
-                                <TableCell>{project.type}</TableCell>
+                                {show("owner") && (
+                                    <TableCell>{project.owner ? project.owner.join(", ") : ""}</TableCell>
+                                )}
+                                {show("lastModified") && <TableCell>{project.lastModified}</TableCell>}
+                                {show("type") && <TableCell>{project.type}</TableCell>}
+                                {show("filesystem") && (
+                                    <TableCell>
+                                        {project.writable ? (
+                                            "Writable"
+                                        ) : (
+                                            <Tooltip title="The MDV server cannot write this project's files. It will open read-only.">
+                                                <Typography
+                                                    component="span"
+                                                    color="warning.main"
+                                                    sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
+                                                >
+                                                    <WarningAmber fontSize="small" />
+                                                    Server read-only
+                                                </Typography>
+                                            </Tooltip>
+                                        )}
+                                    </TableCell>
+                                )}
                                 <TableCell align="right">
-                                {(hasReadme(project) || hasPermissions(project)) && 
-                                    (
+                                    {(hasReadme(project) || hasPermissions(project)) && (
                                         <IconButton
-                                            onClick={(e) =>
-                                                handleMenuClick(e, project)
-                                            }
+                                            onClick={(e) => handleMenuClick(e, project)}
                                             size="small"
                                             data-testid={`project_menu_${project.id}`}
                                         >
                                             <MoreVert />
                                         </IconButton>
-                                )}
+                                    )}
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -155,13 +250,26 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                 </Table>
             </TableContainer>
 
+            <Menu anchorEl={columnsAnchorEl} open={Boolean(columnsAnchorEl)} onClose={() => setColumnsAnchorEl(null)}>
+                {LIST_COLUMNS.filter((c) => !(isPublicPage && c.hiddenOnPublicPage)).map((c) => (
+                    <MenuItem
+                        key={c.id}
+                        dense
+                        onClick={() =>
+                            onColumnsChange(
+                                columns.includes(c.id) ? columns.filter((x) => x !== c.id) : [...columns, c.id],
+                            )
+                        }
+                    >
+                        <Checkbox checked={columns.includes(c.id)} size="small" disableRipple />
+                        {c.label}
+                    </MenuItem>
+                ))}
+            </Menu>
+
             {selectedProject && (
                 <>
-                    <Menu
-                        anchorEl={anchorEl}
-                        open={Boolean(anchorEl)}
-                        onClose={handleMenuClose}
-                    >
+                    <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
                         {hasReadme(selectedProject) && (
                             <MenuItem onClick={() => handleModalOpen(setIsInfoModalOpen)}>
                                 <ListItemIcon>
@@ -171,7 +279,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                             </MenuItem>
                         )}
                         {operationPermissions.renameProject && (
-                            <MenuItem 
+                            <MenuItem
                                 onClick={() => handleModalOpen(setIsRenameModalOpen)}
                                 disabled={!selectedProject?.permissions.edit}
                             >
@@ -198,8 +306,8 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                             </MenuItem>
                         )} */}
                         {operationPermissions.shareProject && (
-                            <MenuItem 
-                                onClick={() => handleModalOpen(setIsShareModalOpen)} 
+                            <MenuItem
+                                onClick={() => handleModalOpen(setIsShareModalOpen)}
                                 disabled={!selectedProject?.permissions.edit}
                             >
                                 <ListItemIcon>
@@ -209,9 +317,9 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
                             </MenuItem>
                         )}
                         {operationPermissions.deleteProject && (
-                            <MenuItem 
-                                onClick={() => handleModalOpen(setIsDeleteModalOpen)} 
-                                sx={{color: theme.palette.error.main}}
+                            <MenuItem
+                                onClick={() => handleModalOpen(setIsDeleteModalOpen)}
+                                sx={{ color: theme.palette.error.main }}
                                 disabled={!selectedProject?.permissions.edit}
                             >
                                 <ListItemIcon>
@@ -224,34 +332,40 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType,
 
                     {hasReadme(selectedProject) && (
                         <ProjectInfoModal
-                        open={isInfoModalOpen}
-                        onClose={() => setIsInfoModalOpen(false)}
-                        readme={selectedProject.readme}
-                    />
+                            open={isInfoModalOpen}
+                            onClose={() => setIsInfoModalOpen(false)}
+                            readme={selectedProject.readme}
+                        />
                     )}
 
                     {selectedProject.permissions.edit && (
                         <>
-                            {operationPermissions.renameProject && <ProjectRenameModal
-                                id={selectedProject.id}
-                                name={selectedProject.name}
-                                open={isRenameModalOpen}
-                                onRename={onRename}
-                                onClose={() => setIsRenameModalOpen(false)}
-                            />}
+                            {operationPermissions.renameProject && (
+                                <ProjectRenameModal
+                                    id={selectedProject.id}
+                                    name={selectedProject.name}
+                                    open={isRenameModalOpen}
+                                    onRename={onRename}
+                                    onClose={() => setIsRenameModalOpen(false)}
+                                />
+                            )}
 
-                            {operationPermissions.shareProject && <ProjectShareModal
-                                open={isShareModalOpen}
-                                onClose={() => setIsShareModalOpen(false)}
-                                projectId={selectedProject.id}
-                            />}
+                            {operationPermissions.shareProject && (
+                                <ProjectShareModal
+                                    open={isShareModalOpen}
+                                    onClose={() => setIsShareModalOpen(false)}
+                                    projectId={selectedProject.id}
+                                />
+                            )}
 
-                            {operationPermissions.deleteProject && <ProjectDeleteModal
-                                id={selectedProject.id}
-                                open={isDeleteModalOpen}
-                                onDelete={onDelete}
-                                onClose={() => setIsDeleteModalOpen(false)}
-                            />}
+                            {operationPermissions.deleteProject && (
+                                <ProjectDeleteModal
+                                    id={selectedProject.id}
+                                    open={isDeleteModalOpen}
+                                    onDelete={onDelete}
+                                    onClose={() => setIsDeleteModalOpen(false)}
+                                />
+                            )}
                         </>
                     )}
                 </>

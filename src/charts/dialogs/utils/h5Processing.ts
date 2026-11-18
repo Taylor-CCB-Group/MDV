@@ -1,15 +1,6 @@
 import * as hdf5 from "h5wasm";
 
-type GroupName =
-    | "uns"
-    | "obs"
-    | "var"
-    | "X"
-    | "layers"
-    | "obsm"
-    | "varm"
-    | "obsp"
-    | "varp";
+type GroupName = "uns" | "obs" | "var" | "X" | "layers" | "obsm" | "varm" | "obsp" | "varp";
 type H5DataType = number | string | boolean;
 type DatasetValue = H5DataType[] | TypedArray | null;
 type MatrixValue = number[][] | TypedArray | Record<string, any> | null;
@@ -131,9 +122,7 @@ const detectCompression = async (
 };
 
 const isNonEmptyObject = (obj: unknown): obj is Record<string, unknown> => {
-    return (
-        typeof obj === "object" && obj !== null && Object.keys(obj).length > 0
-    );
+    return typeof obj === "object" && obj !== null && Object.keys(obj).length > 0;
 };
 
 const isNonEmptyMatrix = (matrix: MatrixValue): boolean => {
@@ -168,21 +157,14 @@ const validateAnnData = (metadata: H5Metadata): void => {
 const checkMemoryUsage = (threshold: number): void => {
     const performance = window.performance as ExtendedPerformance;
     if (performance?.memory) {
-        const usage =
-            performance.memory.usedJSHeapSize /
-            performance.memory.jsHeapSizeLimit;
+        const usage = performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit;
         if (usage > threshold) {
-            throw new Error(
-                `Memory usage exceeded threshold: ${Math.round(usage * 100)}%`,
-            );
+            throw new Error(`Memory usage exceeded threshold: ${Math.round(usage * 100)}%`);
         }
     }
 };
 
-const withErrorContext = <T>(
-    operation: () => Promise<T>,
-    context: string,
-): Promise<T> => {
+const withErrorContext = <T>(operation: () => Promise<T>, context: string): Promise<T> => {
     return operation().catch((error) => {
         throw new Error(`${context}: ${error.message}`);
     });
@@ -200,10 +182,10 @@ const isCloseable = (entity: unknown): entity is H5Entity => {
 // Helper function to convert any value to a number
 const toNumber = (value: any): number => {
     if (typeof value === "boolean") {
-      return value ? 1 : 0;
+        return value ? 1 : 0;
     }
     return Number(value);
-  };
+};
 
 // Optimized helper function to handle different TypedArray conversions
 const convertTypedArrayToNumbers = (value: TypedArray): number[] => {
@@ -240,11 +222,7 @@ const convertTypedArrayToNumbers = (value: TypedArray): number[] => {
     return result;
 };
 
-const readMatrix = async (
-    dataset: H5Dataset,
-    chunkSize: number,
-    tracker?: ProgressTracker,
-): Promise<MatrixValue> => {
+const readMatrix = async (dataset: H5Dataset, chunkSize: number, tracker?: ProgressTracker): Promise<MatrixValue> => {
     return withErrorContext(async () => {
         if (!dataset.shape || dataset.shape.length === 0) {
             return null;
@@ -334,11 +312,7 @@ const readMatrixGroup = async (
 
         if (groupName === "X") {
             if (!(group instanceof hdf5.Dataset)) return null;
-            return await readMatrix(
-                group as unknown as H5Dataset,
-                chunkSize,
-                tracker,
-            );
+            return await readMatrix(group as unknown as H5Dataset, chunkSize, tracker);
         }
 
         if (!(group instanceof hdf5.Group)) {
@@ -376,10 +350,7 @@ const readMatrixGroup = async (
                         const dim0 = dataItem.get("0");
                         const dim1 = dataItem.get("1");
 
-                        if (
-                            dim0 instanceof hdf5.Dataset &&
-                            dim1 instanceof hdf5.Dataset
-                        ) {
+                        if (dim0 instanceof hdf5.Dataset && dim1 instanceof hdf5.Dataset) {
                             if (isCloseable(dim0)) entities.push(dim0);
                             if (isCloseable(dim1)) entities.push(dim1);
 
@@ -396,19 +367,13 @@ const readMatrixGroup = async (
                             );
 
                             // Combine the coordinates into a matrix
-                            if (
-                                Array.isArray(values0) &&
-                                Array.isArray(values1)
-                            ) {
+                            if (Array.isArray(values0) && Array.isArray(values1)) {
                                 const rows = values0.length;
                                 const matrix: number[][] = new Array(rows);
 
                                 for (let i = 0; i < rows; i++) {
-                                    matrix[i] = [
-                                      toNumber(values0[i]),
-                                      toNumber(values1[i])
-                                    ];
-                                  }
+                                    matrix[i] = [toNumber(values0[i]), toNumber(values1[i])];
+                                }
 
                                 result[key] = matrix;
                             }
@@ -417,11 +382,7 @@ const readMatrixGroup = async (
                         // For other nested structures, flatten with compound keys
                         await Promise.all(
                             subKeys.map(async (subKey) => {
-                                if (
-                                    typeof subKey !== "string" ||
-                                    subKey === "_index"
-                                )
-                                    return;
+                                if (typeof subKey !== "string" || subKey === "_index") return;
 
                                 const subItem = dataItem.get(subKey);
                                 if (!subItem) return;
@@ -444,30 +405,20 @@ const readMatrixGroup = async (
                                     const deepKeys = Array.from(subItem.keys());
                                     await Promise.all(
                                         deepKeys.map(async (deepKey) => {
-                                            if (typeof deepKey !== "string")
-                                                return;
+                                            if (typeof deepKey !== "string") return;
 
-                                            const deepItem =
-                                                subItem.get(deepKey);
-                                            if (
-                                                !deepItem ||
-                                                !(
-                                                    deepItem instanceof
-                                                    hdf5.Dataset
-                                                )
-                                            )
-                                                return;
+                                            const deepItem = subItem.get(deepKey);
+                                            if (!deepItem || !(deepItem instanceof hdf5.Dataset)) return;
 
                                             if (isCloseable(deepItem)) {
                                                 entities.push(deepItem);
                                             }
                                             const deepCompoundKey = `${compoundKey}_${deepKey}`;
-                                            result[deepCompoundKey] =
-                                                await readMatrix(
-                                                    deepItem as unknown as H5Dataset,
-                                                    chunkSize,
-                                                    datasetTracker,
-                                                );
+                                            result[deepCompoundKey] = await readMatrix(
+                                                deepItem as unknown as H5Dataset,
+                                                chunkSize,
+                                                datasetTracker,
+                                            );
                                         }),
                                     );
                                 }
@@ -476,11 +427,7 @@ const readMatrixGroup = async (
                     }
                 } else if (dataItem instanceof hdf5.Dataset) {
                     // Handle regular datasets
-                    result[key] = await readMatrix(
-                        dataItem as unknown as H5Dataset,
-                        chunkSize,
-                        datasetTracker,
-                    );
+                    result[key] = await readMatrix(dataItem as unknown as H5Dataset, chunkSize, datasetTracker);
                 }
             }),
         );
@@ -521,20 +468,13 @@ const readDatasetChunked = async (
                     return result;
                 }
 
-                if (
-                    value instanceof Int16Array ||
-                    value instanceof Uint16Array
-                ) {
+                if (value instanceof Int16Array || value instanceof Uint16Array) {
                     const result = Array.from(value).map(Number);
                     tracker?.onProgress?.(1);
                     return result;
                 }
 
-                if (
-                    value instanceof Int32Array ||
-                    value instanceof Uint32Array ||
-                    value instanceof Float32Array
-                ) {
+                if (value instanceof Int32Array || value instanceof Uint32Array || value instanceof Float32Array) {
                     const result = Array.from(value).map(Number);
                     tracker?.onProgress?.(1);
                     return result;
@@ -558,23 +498,14 @@ const readDatasetChunked = async (
 function coerceToDatasetValue(value: unknown): DatasetValue {
     if (
         Array.isArray(value) &&
-        value.every(
-            (item) =>
-                typeof item === "number" ||
-                typeof item === "string" ||
-                typeof item === "boolean",
-        )
+        value.every((item) => typeof item === "number" || typeof item === "string" || typeof item === "boolean")
     ) {
         return value as DatasetValue;
     }
     return null;
 }
 
-const cleanup = async (
-    entities: H5Entity[],
-    virtualPath?: string,
-    FS?: typeof hdf5.FS,
-): Promise<void> => {
+const cleanup = async (entities: H5Entity[], virtualPath?: string, FS?: typeof hdf5.FS): Promise<void> => {
     return withErrorContext(async () => {
         const errors: Error[] = [];
 
@@ -590,9 +521,7 @@ const cleanup = async (
             try {
                 FS.unlink(virtualPath);
             } catch (error) {
-                errors.push(
-                    new Error(`Failed to clean up virtual file: ${error}`),
-                );
+                errors.push(new Error(`Failed to clean up virtual file: ${error}`));
             }
         }
 
@@ -602,10 +531,7 @@ const cleanup = async (
     }, "Cleanup failed");
 };
 
-const processH5File = async (
-    file: File,
-    options: ProcessOptions = {},
-): Promise<H5Metadata> => {
+const processH5File = async (file: File, options: ProcessOptions = {}): Promise<H5Metadata> => {
     const { onProgress, memoryThreshold = 0.8 } = options;
 
     const chunkSize = getOptimalChunkSize(file.size);
@@ -638,9 +564,7 @@ const processH5File = async (
                         compression.type,
                     );
                 }
-                console.log(
-                    `Found ${compression.type} compression in ${group} group`,
-                );
+                console.log(`Found ${compression.type} compression in ${group} group`);
             }
         }
 
@@ -708,8 +632,7 @@ const processH5File = async (
                         checkMemoryUsage(memoryThreshold);
 
                         const dataset = groupEntity.get(key);
-                        if (!dataset || !(dataset instanceof hdf5.Dataset))
-                            return;
+                        if (!dataset || !(dataset instanceof hdf5.Dataset)) return;
 
                         if (isCloseable(dataset)) {
                             entities.push(dataset);
@@ -738,48 +661,12 @@ const processH5File = async (
         ]);
 
         const matrixData = await Promise.all([
-            readMatrixGroup(
-                "X",
-                h5File,
-                entities,
-                chunkSize,
-                progressTrackers.X,
-            ),
-            readMatrixGroup(
-                "layers",
-                h5File,
-                entities,
-                chunkSize,
-                progressTrackers.layers,
-            ),
-            readMatrixGroup(
-                "obsm",
-                h5File,
-                entities,
-                chunkSize,
-                progressTrackers.obsm,
-            ),
-            readMatrixGroup(
-                "varm",
-                h5File,
-                entities,
-                chunkSize,
-                progressTrackers.varm,
-            ),
-            readMatrixGroup(
-                "obsp",
-                h5File,
-                entities,
-                chunkSize,
-                progressTrackers.obsp,
-            ),
-            readMatrixGroup(
-                "varp",
-                h5File,
-                entities,
-                chunkSize,
-                progressTrackers.varp,
-            ),
+            readMatrixGroup("X", h5File, entities, chunkSize, progressTrackers.X),
+            readMatrixGroup("layers", h5File, entities, chunkSize, progressTrackers.layers),
+            readMatrixGroup("obsm", h5File, entities, chunkSize, progressTrackers.obsm),
+            readMatrixGroup("varm", h5File, entities, chunkSize, progressTrackers.varm),
+            readMatrixGroup("obsp", h5File, entities, chunkSize, progressTrackers.obsp),
+            readMatrixGroup("varp", h5File, entities, chunkSize, progressTrackers.varp),
         ]);
 
         metadata.X = matrixData[0] as MatrixValue;
@@ -796,10 +683,7 @@ const processH5File = async (
         onProgress?.(1);
         return metadata;
     } catch (error) {
-        if (
-            error instanceof NonAnnDataError ||
-            error instanceof CompressionError
-        ) {
+        if (error instanceof NonAnnDataError || error instanceof CompressionError) {
             throw error;
         }
         throw new Error(`Failed to process H5 file: ${error}`);
@@ -808,13 +692,6 @@ const processH5File = async (
     }
 };
 
-export { NonAnnDataError, CompressionError };
-export type {
-    H5Metadata,
-    MatrixValue,
-    DatasetValue,
-    ProcessOptions,
-    H5DataType,
-    TypedArray,
-};
+export type { DatasetValue, H5DataType, H5Metadata, MatrixValue, ProcessOptions, TypedArray };
+export { CompressionError, NonAnnDataError };
 export default processH5File;

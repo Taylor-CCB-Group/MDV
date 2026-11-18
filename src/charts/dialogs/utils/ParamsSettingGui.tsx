@@ -17,9 +17,9 @@ function getCurrentParam<T extends BaseConfig>(chart: BaseChart<T>, i: number) {
     const isMultiType = isMultiColumn(params[i].type);
 
     // const currentParams = config.param;
-    const currentParams = chart.activeQueries.userValues['setParams'] || config.param;
+    const currentParams = chart.activeQueries.userValues["setParams"] || config.param;
     const n = currentParams.length;
-    const hasMulti = params.some(p => isMultiColumn(p.type));
+    const hasMulti = params.some((p) => isMultiColumn(p.type));
     if (isMultiType) {
         //! as far as we know, we only ever see params ordered like [_multi] or [single, _multi]
         const nOthers = params.length - 1;
@@ -81,16 +81,19 @@ function updateSingleParam<T extends BaseConfig>(chart: BaseChart<T>, i: number,
     const chartType = BaseChart.types[config.type];
     const { params } = chartType;
     if (!params) throw new Error("No params for chart type");
-    const hasMulti = params.some(p => isMultiColumn(p.type));
+    const hasMulti = params.some((p) => isMultiColumn(p.type));
     // there should be an obvious canonical way to get the active state of a chart's config
     // and use of chart.activeQueries - which is something of an internal monkeypatch - is something
     const currentParams = chart.activeQueries.activeParams(); //config.param;
     const n = currentParams.length;
     if (hasMulti) {
-        const multiIndex = params.findIndex(p => isMultiColumn(p.type));
+        const multiIndex = params.findIndex((p) => isMultiColumn(p.type));
         const nBefore = multiIndex < i ? multiIndex : multiIndex - 1;
         const nAfter = n - nBefore - 1;
-        const newParams = currentParams.slice(0, nBefore).concat(value).concat(currentParams.slice(n - nAfter));
+        const newParams = currentParams
+            .slice(0, nBefore)
+            .concat(value)
+            .concat(currentParams.slice(n - nAfter));
         chart.setParams(newParams);
         // config.param = newParams;
     } else {
@@ -102,7 +105,7 @@ function updateSingleParam<T extends BaseConfig>(chart: BaseChart<T>, i: number,
 /**
  * Generate a GUI spec folder for the parameters of a chart, based on the `params`
  * in the corresponding `BaseChart.types` entry.
- * 
+ *
  * There should be a good way to set the reaction to mutate the config object
  * in a way that will be understood by the chart (as well as triggering a redraw, and
  * also making sure that this stays in sync with other things that may cause it to change).
@@ -123,7 +126,7 @@ export default function getParamsGuiSpec<T extends BaseConfig>(chart: BaseChart<
             label: param.name,
             current_value,
             columnType: param.type,
-            func: v => {
+            func: (v) => {
                 // this check doesn't give an adequate type-guard
                 // if (isArray(v) !== isMultiType) throw new Error("Type mismatch");
                 // also the underlying functions will mutate the config object
@@ -143,12 +146,12 @@ export default function getParamsGuiSpec<T extends BaseConfig>(chart: BaseChart<
                 }
                 //! maybe if we had a `setParams` method, with the appropriate decorator,
                 // chart.drawChart();
-            }
+            },
         });
     });
     return g({
         type: "folder",
         label: "Parameters",
         current_value: p,
-    })
+    });
 }

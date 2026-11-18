@@ -1,13 +1,13 @@
-import { useCallback, useState } from "react";
-import { useChartManager } from "../hooks";
-import IconWithTooltip from "./IconWithTooltip";
 import { ChatBubble as ChatBubbleIcon } from "@mui/icons-material";
 import { CssBaseline, ThemeProvider, useTheme } from "@mui/material";
+import type React from "react";
+import { useCallback, useState } from "react";
 import useChat from "@/charts/dialogs/ChatAPI";
 import ChatDialog from "@/charts/dialogs/ChatDialog";
-import PopoutWindow from "./PopoutWindow";
 import { ProjectProvider } from "@/modules/ProjectContext";
-import type React from 'react';
+import { useChartManager } from "../hooks";
+import IconWithTooltip from "./IconWithTooltip";
+import PopoutWindow from "./PopoutWindow";
 
 interface ChatProviderProps {
     open: boolean;
@@ -18,14 +18,7 @@ interface ChatProviderProps {
     theme: any;
 }
 
-const ChatProvider: React.FC<ChatProviderProps> = ({
-    open,
-    popout,
-    onClose,
-    onPopout,
-    onPopoutClose,
-    theme
-}) => {
+const ChatProvider: React.FC<ChatProviderProps> = ({ open, popout, onClose, onPopout, onPopoutClose, theme }) => {
     // useChat is only called when this component is mounted (after first button click)
     const {
         messages,
@@ -95,8 +88,9 @@ const ChatProvider: React.FC<ChatProviderProps> = ({
                         </ThemeProvider>
                     </ProjectProvider>
                 </PopoutWindow>
-                ) : dialog
-            }
+            ) : (
+                dialog
+            )}
         </>
     );
 };

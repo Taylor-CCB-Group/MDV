@@ -1,37 +1,9 @@
-import { useEffect } from "react";
-import { observer } from "mobx-react-lite";
-import { SpatialDataProvider } from "@spatialdata/react";
+import { createMdvPortal } from "@/react/react_utils";
 import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
-import { createMdvPortal } from "@/react/react_utils";
-import { getProjectURL } from "@/dataloaders/DataLoaderUtil";
-import { ensureChunkWorker } from "@/react/spatialdata/ensureChunkWorker";
 import { ChartProvider } from "../context";
-import { useRegion } from "../hooks";
-import SpatialLayerDialogComponent from "./SpatialLayerDialogComponent";
 import type { SpatialDataMdvReact } from "./SpatialDataMDVReact";
-
-function getSpatialDataUrl(region: unknown): string | undefined {
-    if (!region || typeof region !== "object" || !("spatial" in region)) return undefined;
-    const spatial = region.spatial;
-    if (!spatial || typeof spatial !== "object" || !("file" in spatial)) return undefined;
-    const file = spatial.file;
-    if (typeof file !== "string" || !file) return undefined;
-    return getProjectURL(`spatial/${file}`);
-}
-
-const SpatialLayerDialogReact = observer(function SpatialLayerDialogReact() {
-    const rawRegion = useRegion();
-    const spatialDataUrl = getSpatialDataUrl(rawRegion);
-    useEffect(() => {
-        ensureChunkWorker();
-    }, []);
-    return (
-        <SpatialDataProvider source={spatialDataUrl}>
-            <SpatialLayerDialogComponent />
-        </SpatialDataProvider>
-    );
-});
+import SpatialLayerDialogComponent from "./SpatialLayerDialogComponent";
 
 class SpatialLayerDialogReactWrapper extends BaseDialog {
     _root?: ReturnType<typeof createMdvPortal>;
@@ -44,9 +16,7 @@ class SpatialLayerDialogReactWrapper extends BaseDialog {
 
     constructor(parent: SpatialDataMdvReact) {
         if (parent.__doc__ !== document) {
-            console.warn(
-                "SpatialLayerDialogReactWrapper may have styling issues in popouts...",
-            );
+            console.warn("SpatialLayerDialogReactWrapper may have styling issues in popouts...");
         }
         const config = {
             width: 560,
@@ -75,7 +45,7 @@ class SpatialLayerDialogReactWrapper extends BaseDialog {
         );
         this.root = createMdvPortal(
             <ChartProvider chart={parent}>
-                <SpatialLayerDialogReact />
+                <SpatialLayerDialogComponent />
             </ChartProvider>,
             div,
             this,

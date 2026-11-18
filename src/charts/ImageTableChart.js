@@ -1,6 +1,6 @@
 import { DataModel } from "../table/DataModel.js";
-import BaseChart from "./BaseChart";
 import ImageTable from "../table/ImageTable.js";
+import BaseChart from "./BaseChart";
 
 class ImageTableChart extends BaseChart {
     constructor(dataStore, div, config) {
@@ -77,10 +77,7 @@ class ImageTableChart extends BaseChart {
     }
 
     colorByColumn(column) {
-        this.grid.setColorBy(
-            this.getColorFunction(column, false),
-            this.config.color_overlay,
-        );
+        this.grid.setColorBy(this.getColorFunction(column, false), this.config.color_overlay);
         const ft = this.grid.getFirstTileInView();
         this.grid.show(ft);
     }
@@ -190,12 +187,8 @@ BaseChart.types["image_table_chart"] = {
         config.images = {
             image_set: extraControls.image_set,
         };
-        config.sortBy =
-            extraControls.sort_by === "__none__" ? null : extraControls.sort_by;
-        config.image_title =
-            extraControls.image_title === "__none__"
-                ? null
-                : extraControls.image_title;
+        config.sortBy = extraControls.sort_by === "__none__" ? null : extraControls.sort_by;
+        config.image_title = extraControls.image_title === "__none__" ? null : extraControls.image_title;
         //config.sortOrder = extraControls.sort_order;
     },
     extra_controls: (dataSource) => {
@@ -203,9 +196,7 @@ BaseChart.types["image_table_chart"] = {
         for (const iname in dataSource.images) {
             imageSets.push({ name: iname, value: iname });
         }
-        const sortableColumns = dataSource
-            .getColumnList()
-            .map((c) => ({ name: c.name, value: c.field }));
+        const sortableColumns = dataSource.getColumnList().map((c) => ({ name: c.name, value: c.field }));
         sortableColumns.unshift({ name: "None", value: "__none__" });
         return [
             //drop down of available image sets

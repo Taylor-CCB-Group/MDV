@@ -1,12 +1,7 @@
 import type { BaseConfig } from "../BaseChart";
 
 export type ColumnRemovalUsage = "param" | "settings";
-export type ColumnRemovalUsagePath =
-    | "param"
-    | "color_by"
-    | "tooltip"
-    | "background_filter"
-    | string;
+export type ColumnRemovalUsagePath = "param" | "color_by" | "tooltip" | "background_filter" | string;
 
 export type ChartColumnImpact = {
     chartId?: string;
@@ -34,9 +29,12 @@ export type CurrentChartInfo = {
     config: BaseConfig;
 };
 
-type LoadedViewData = {
-    initialCharts?: Record<string, BaseConfig[]>;
-} | null | undefined;
+type LoadedViewData =
+    | {
+          initialCharts?: Record<string, BaseConfig[]>;
+      }
+    | null
+    | undefined;
 
 export type ViewLoader = (viewName: string) => Promise<LoadedViewData>;
 

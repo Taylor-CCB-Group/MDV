@@ -2,10 +2,10 @@ import type { DataType, LoadedDataColumn } from "@/charts/charts";
 
 /**
  * Data Provider for the SlickGrid's DataView API
- * 
+ *
  * Maps the row indices to the data indices using the indices
  * array
- * 
+ *
  * sort(), reSort(), refresh() are no-ops because sorting is managed
  * externally via useSortedFilteredIndices hook.
  */
@@ -99,7 +99,7 @@ class SlickGridDataProvider {
     }
 
     // Avoid calling the default methods for sorting and filtering
-    // We do sorting separately with useSortedFilteredIndices, which observes config.sort/filter state 
+    // We do sorting separately with useSortedFilteredIndices, which observes config.sort/filter state
     // and returns array...
     // This circumvention of SlickGrid's own state does mean that we need to be careful to synchronise
     // for example, so that appropriate visual feedback appears when deserialising.

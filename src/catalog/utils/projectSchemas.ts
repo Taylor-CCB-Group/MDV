@@ -7,17 +7,23 @@ export const projectMutationResponseSchema = z.object({
 export const recycledProjectSchema = z.object({
     id: z.union([z.number(), z.string()]).transform(String),
     name: z.string(),
-    deletedTimestamp: z.string().nullable().optional().transform((value) => value ?? undefined),
+    deletedTimestamp: z
+        .string()
+        .nullable()
+        .optional()
+        .transform((value) => value ?? undefined),
 });
 
 export const recycleBinResponseSchema = z.array(recycledProjectSchema);
 
 export const purgeRecycleBinResponseSchema = z.object({
     deletedProjectIds: z.array(z.number()),
-    failures: z.array(z.object({
-        projectId: z.number(),
-        message: z.string(),
-    })),
+    failures: z.array(
+        z.object({
+            projectId: z.number(),
+            message: z.string(),
+        }),
+    ),
 });
 
 export const restoreRecycledProjectResponseSchema = z.object({

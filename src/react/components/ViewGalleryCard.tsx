@@ -1,18 +1,18 @@
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Check as CheckIcon, Clear as ClearIcon } from "@mui/icons-material";
 import {
     Box,
     Card,
     CardActionArea,
     Chip,
+    CircularProgress,
     Divider,
     Grid2,
     IconButton,
     TextField,
     Typography,
-    CircularProgress,
 } from "@mui/material";
-import { Check as CheckIcon, Clear as ClearIcon } from "@mui/icons-material";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import ViewImageComponent from "./ViewImageComponent";
 
 export type ViewGalleryCardView = { name: string; image: string };
@@ -50,14 +50,7 @@ export function ViewGalleryCard({
     onCommitRename,
     onCancelRename,
 }: ViewGalleryCardProps) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: view.name,
         // Disabled when filter is on or not in edit mode.
         disabled: !canReorder,

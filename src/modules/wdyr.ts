@@ -3,9 +3,7 @@ import React from "react";
 
 async function loadWdyr() {
     console.log("Development mode...");
-    const { default: whyDidYouRender } = await import(
-        "@welldone-software/why-did-you-render"
-    );
+    const { default: whyDidYouRender } = await import("@welldone-software/why-did-you-render");
     console.log("Enabling whyDidYouRender...");
     whyDidYouRender(React, {
         trackAllPureComponents: true,

@@ -1,5 +1,7 @@
 import type { LayerChannelConfig } from "@spatialdata/avivatorish";
+import type { SpatialData } from "@spatialdata/core";
 import type {
+    LabelsChannelProps,
     RenderStack,
     RenderStackEntry,
     RenderStackSpatialElementType,
@@ -7,19 +9,10 @@ import type {
 import type { LayerConfig } from "@spatialdata/vis";
 import { isObservable, runInAction, set } from "mobx";
 import { useCallback } from "react";
-
-import type {
-    SpatialDataMdvReact,
-    SpatialDataMdvReactConfig,
-} from "@/react/components/SpatialDataMDVReact";
+import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "@/react/components/SpatialDataMDVReact";
 import { useChart } from "@/react/context";
 import { useConfig } from "@/react/hooks";
-import type { SpatialData } from "@spatialdata/core";
-import {
-    deckHostLayerId,
-    deckIdFromHostLayerId,
-    type DeckOverlayId,
-} from "./host_overlay_ids";
+import { type DeckOverlayId, deckHostLayerId, deckIdFromHostLayerId } from "./host_overlay_ids";
 import { spatialEntryAsLayerConfig } from "./render_stack_adapter";
 import {
     createDefaultRenderStack,
@@ -30,7 +23,8 @@ import {
 } from "./render_stack_defaults";
 import { touchRenderStackEntry } from "./render_stack_observe";
 
-const CHANNEL_CONFIG_KEYS = [
+/** The image channel fields, which `useLayerChannelState` writes. */
+const IMAGE_CHANNEL_CONFIG_KEYS = [
     "channelIds",
     "colors",
     "contrastLimits",
@@ -38,10 +32,20 @@ const CHANNEL_CONFIG_KEYS = [
     "selections",
 ] as const satisfies readonly (keyof LayerChannelConfig)[];
 
-function patchRecordInPlace(
-    existing: Record<string, unknown>,
-    next: Record<string, unknown>,
-): void {
+/** A labels layer's per-channel appearance, which shares the `channels` prop with image layers. */
+const LABELS_CHANNEL_CONFIG_KEYS = [
+    "channelOpacities",
+    "channelOutlineOpacities",
+    "channelsFilled",
+    "channelStrokeWidths",
+] as const satisfies readonly (keyof LabelsChannelProps)[];
+
+const CHANNEL_CONFIG_KEYS = [...IMAGE_CHANNEL_CONFIG_KEYS, ...LABELS_CHANNEL_CONFIG_KEYS];
+
+type ChannelConfigPatch = LayerChannelConfig &
+    Partial<Pick<LabelsChannelProps, (typeof LABELS_CHANNEL_CONFIG_KEYS)[number]>>;
+
+function patchRecordInPlace(existing: Record<string, unknown>, next: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(next)) {
         if (isObservable(existing)) {
             set(existing, key, value);
@@ -51,10 +55,7 @@ function patchRecordInPlace(
     }
 }
 
-function patchChannelsInPlace(
-    existing: Record<string, unknown>,
-    next: LayerChannelConfig,
-): void {
+function patchChannelsInPlace(existing: Record<string, unknown>, next: ChannelConfigPatch): void {
     for (const key of CHANNEL_CONFIG_KEYS) {
         const value = next[key];
         if (value === undefined) continue;
@@ -71,7 +72,6 @@ export function patchRenderStackEntryPropsInPlace(
     patch: Record<string, unknown>,
 ): void {
     for (const [key, value] of Object.entries(patch)) {
-        if (value === undefined) continue;
         if (
             key === "channels" &&
             value &&
@@ -79,10 +79,7 @@ export function patchRenderStackEntryPropsInPlace(
             props.channels &&
             typeof props.channels === "object"
         ) {
-            patchChannelsInPlace(
-                props.channels as Record<string, unknown>,
-                value as LayerChannelConfig,
-            );
+            patchChannelsInPlace(props.channels as Record<string, unknown>, value as ChannelConfigPatch);
             continue;
         }
         if (
@@ -92,10 +89,7 @@ export function patchRenderStackEntryPropsInPlace(
             props.vivLayerProps &&
             typeof props.vivLayerProps === "object"
         ) {
-            patchRecordInPlace(
-                props.vivLayerProps as Record<string, unknown>,
-                value as Record<string, unknown>,
-            );
+            patchRecordInPlace(props.vivLayerProps as Record<string, unknown>, value as Record<string, unknown>);
             continue;
         }
         if (isObservable(props)) {
@@ -106,11 +100,7 @@ export function patchRenderStackEntryPropsInPlace(
     }
 }
 
-export function reorderRenderStackEntries(
-    stack: RenderStack,
-    fromIndex: number,
-    toIndex: number,
-): void {
+export function reorderRenderStackEntries(stack: RenderStack, fromIndex: number, toIndex: number): void {
     const [moved] = stack.entries.splice(fromIndex, 1);
     if (!moved) return;
     stack.entries.splice(toIndex, 0, moved);
@@ -163,10 +153,7 @@ export function insertSpatialRenderStackEntry(
     return true;
 }
 
-export function insertHostRenderStackEntry(
-    stack: RenderStack,
-    deckId: DeckOverlayId,
-): boolean {
+export function insertHostRenderStackEntry(stack: RenderStack, deckId: DeckOverlayId): boolean {
     const id = deckHostLayerId(deckId);
     if (stack.entries.some((entry) => entry.id === id)) {
         return false;
@@ -204,7 +191,7 @@ export function seedRenderStackFromSpatialData(
     if (!config.renderStack) {
         runInAction(() => {
             config.renderStack = chart?.seedDefaultSpatialLayers
-                ? createDefaultRenderStack(spatialData, coordinateSystem)
+                ? createDefaultRenderStack(spatialData, coordinateSystem, chart.defaultImageLayerProps)
                 : createHostOnlyRenderStack();
             chart?.finishDefaultSpatialLayerSeed();
             chart?.bumpRenderStackGeneration();
@@ -215,7 +202,7 @@ export function seedRenderStackFromSpatialData(
     runInAction(() => {
         let changed = false;
         if (!config.renderStack) {
-            throw new Error(`Unexpected config with no renderStack ${config }`);
+            throw new Error(`Unexpected config with no renderStack ${config}`);
         }
         if (chart?.seedDefaultSpatialLayers) {
             changed =
@@ -223,12 +210,15 @@ export function seedRenderStackFromSpatialData(
                     config.renderStack,
                     spatialData,
                     coordinateSystem,
+                    chart.defaultImageLayerProps,
                 ) || changed;
             chart.finishDefaultSpatialLayerSeed();
         }
         changed = mergeHostOverlayEntriesInPlace(config.renderStack) || changed;
         if (changed) {
             chart?.bumpRenderStackGeneration();
+        } else {
+            chart?.bumpRenderStackPropsGeneration();
         }
     });
 }
@@ -245,9 +235,9 @@ export function isRemovableRenderStackEntry(entry: RenderStackEntry): boolean {
  *
  * - `config.renderStack` stays a stable object; entries and props are patched in place.
  * - `chart.renderStackGeneration` bumps only for entry-level changes (e.g. visibility)
- *   that need a coarse canvas refresh. In-place `props` edits rely on MobX field
- *   observation (`touchRenderStackEntry` / `renderStackSpatialRevision`) so cosmetic
- *   channel/tone/opacity edits do not reset spatial renderer passthrough.
+ *   that need a coarse canvas refresh. In-place `props` edits bump
+ *   `renderStackPropsGeneration` so cosmetic channel/tone/opacity/annotation edits
+ *   refresh viewer inputs without resetting spatial renderer passthrough.
  * - UI rows use `useRenderStackEntry(entryId)` inside `observer` components so each row
  *   subscribes only to its own entry. Panels receive plain derived props at the boundary.
  *
@@ -281,7 +271,11 @@ export function useRenderStackEntry(entryId: string) {
                 if (!config.renderStack) return;
                 patchRenderStackEntry(config.renderStack, entryId, patch);
                 // Props-only in-place edits are observed via touchRenderStackEntry /
-                // renderStackSpatialRevision; avoid bumping generation or viv passthrough resets.
+                // renderStackSpatialRevision plus a lightweight prop token; avoid the
+                // coarse generation bump that recreates viv passthrough state.
+                if (patch.props) {
+                    chart.bumpRenderStackPropsGeneration();
+                }
                 if (patch.visible !== undefined) {
                     chart.bumpRenderStackGeneration();
                 }
@@ -312,8 +306,7 @@ export function useRenderStackEntry(entryId: string) {
         [patchEntry],
     );
 
-    const layer =
-        entry?.kind === "spatial" ? spatialEntryAsLayerConfig(entry) : null;
+    const layer = entry?.kind === "spatial" ? spatialEntryAsLayerConfig(entry) : null;
 
     return {
         entry,

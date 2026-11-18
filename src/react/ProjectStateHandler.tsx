@@ -1,8 +1,8 @@
-import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
-import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
-import { getPostData } from "@/dataloaders/DataLoaderUtil";
 import { useCallback, useEffect, useState } from "react";
+import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
+import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
 import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import { getPostData } from "@/dataloaders/DataLoaderUtil";
 import { useChartManager } from "./hooks";
 
 export type ProjectStateHandlerType = {
@@ -13,7 +13,7 @@ export type ProjectStateHandlerType = {
 };
 
 const ProjectStateHandler = ({ root, data, staticFolder, permission }: ProjectStateHandlerType) => {
-    const [error, setError] = useState<DebugErrorComponentProps['error'] | null>(null);
+    const [error, setError] = useState<DebugErrorComponentProps["error"] | null>(null);
     const [errorDialogOpen, setErrorDialogOpen] = useState(false);
     const [confirmSave, setConfirmSave] = useState(false);
     const [permissionDenied, setPermissionDenied] = useState(false);
@@ -30,13 +30,17 @@ const ProjectStateHandler = ({ root, data, staticFolder, permission }: ProjectSt
                 throw new Error("An error occurred while saving state. Please try again later.");
             }
         } catch (err) {
-            setError(err instanceof Error ? {
-                message: err.message,
-                stack: err?.stack,
-            } : {
-                message: "An error occurred while saving state. Please try again later.",
-                stack: `${err}`
-            });
+            setError(
+                err instanceof Error
+                    ? {
+                          message: err.message,
+                          stack: err?.stack,
+                      }
+                    : {
+                          message: "An error occurred while saving state. Please try again later.",
+                          stack: `${err}`,
+                      },
+            );
             setErrorDialogOpen(true);
         }
     }, [cm, staticFolder, data, root]);

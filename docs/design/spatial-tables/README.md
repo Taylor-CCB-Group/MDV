@@ -7,6 +7,12 @@
 > Written from a deep read of the codebase (frontend `src/`, backend `python/mdvtools/`) plus
 > the sibling libraries `SpatialData.ts`, `anndata.js`, and `codecs/tgpu-htj2k`. Every claim is
 > anchored to `file:line` so you can verify quickly.
+>
+> **Written before the association was built. Much of theme 00 has since landed** on
+> `feature/spatial_table_association` — see *Since this was written* below, and the
+> phasing table in [00](00-table-element-association.md#phasing) for what is and is not
+> done. The strategic content still reads true; the "why nothing connects today"
+> descriptions do not.
 
 ## The core deliverable
 
@@ -16,10 +22,31 @@ table columns, and filtering flows both ways between the geometry and every othe
 table.** This is the tangible user-facing win. → **[00-table-element-association.md](00-table-element-association.md)**
 
 MDV already does this for the **points** representation of a table (the region scatter shares one
-`DataStore` row-index space for filter + colour + highlight). The gap is that **shapes/labels
-geometry does not** — the association is a stub (`TableAssociation` type with no resolver), the
-`fillColorByColumn` UI is commented out, and shapes render with a static fill, ignore the filter,
-and are not picked into the DataStore.
+`DataStore` row-index space for filter + colour + highlight). When this was written, **shapes/labels
+geometry did not** — the association was a stub (`TableAssociation` type with no resolver), the
+`fillColorByColumn` UI was commented out, and shapes rendered with a static fill, ignored the
+filter, and were not picked into the DataStore. Colour, filter and tooltip have since been built;
+picking into the DataStore has not.
+
+## Since this was written
+
+Delivered on the **JS-read path**, which is the route this folder argued for — the association
+resolves against the untouched zarr store, so the converter gap (theme 2) was sidestepped rather
+than closed.
+
+| | State |
+|---|---|
+| Association resolver (`table_association.ts`) | **Done** — `resolveAssociatedElementTable` / `useElementTableAssociation` |
+| Colour shapes **and labels** by a table column | **Done**, with a routing split neither Option A nor B anticipated (see [00](00-table-element-association.md#what-is-wired-today)) |
+| Filter geometry by `ds.filterArray` | **Done** — `hiddenFeatureIds` |
+| Tooltip from MDV columns | **Done** — `tooltipFields` + `spatial_feature_tooltip.ts` |
+| Pick → `dataHighlighted` (shared highlight) | **Open** — no shapes pick is routed into the DataStore |
+| Geometry → table lasso | **Open** for shapes; the points path has it |
+| JS-read `DataLoader` (theme 1) | **Open** — the spatial chart reads the store directly; tables still load over h5 |
+| Project-scoped store cache (theme 3) | **Open** — `SpatialDataProvider` is still mounted per chart *and* per layer dialog |
+
+The two open items in theme 00 are the *shared-highlight* half of "first-class". Colour and filter
+flow table → geometry today; nothing flows geometry → table.
 
 The other themes below are **enablers or adjacent work** for that deliverable — most importantly,
 the clean association joins on `instance_key` against the **untouched zarr store**, which the

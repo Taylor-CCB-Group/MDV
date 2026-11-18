@@ -1,10 +1,7 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from "@mui/material";
 import { type FormEvent, useCallback, useState } from "react";
 
-const SaveAsViewDialogComponent = (props: {
-    open: boolean;
-    onClose: () => void;
-}) => {
+const SaveAsViewDialogComponent = (props: { open: boolean; onClose: () => void }) => {
     const { viewManager } = window.mdv.chartManager;
     const [viewName, setViewName] = useState("");
 

@@ -1,20 +1,15 @@
-import { action } from "mobx";
+import { g, isArray } from "@/lib/utils";
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import type DataStore from "../../datastore/DataStore";
 import { BaseReactChart } from "./BaseReactChart";
 import { HighlightedFeatureComponent } from "./HighlightedFeatureComponent";
-import { g, isArray } from "@/lib/utils";
 
 export type HighlightedFeatureConfig = {
     text: string;
 } & BaseConfig;
 
 class HighlightedFeatureChartWrapper extends BaseReactChart<HighlightedFeatureConfig> {
-    constructor(
-        dataStore: DataStore,
-        div: string | HTMLDivElement,
-        config: HighlightedFeatureConfig & BaseConfig,
-    ) {
+    constructor(dataStore: DataStore, div: string | HTMLDivElement, config: HighlightedFeatureConfig & BaseConfig) {
         if (!config.text) config.text = "";
         super(dataStore, div, config, HighlightedFeatureComponent);
     }

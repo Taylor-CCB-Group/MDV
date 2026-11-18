@@ -1,7 +1,8 @@
 import { io } from "socket.io-client";
+import { getProjectInfoBase } from "@/modules/ProjectContext";
+import { getSocketPath } from "@/utils/file_upload/fileUploadHelpers";
 import type ChartManager from "../charts/ChartManager";
 import { DataModel } from "../table/DataModel";
-import { getProjectInfoBase } from "@/modules/ProjectContext";
 
 type VuplexCallback = (event: { data: MDVMessage }) => void;
 
@@ -30,18 +31,12 @@ type ErrorMessage = {
 type PingMessage = {
     type: "ping";
     message?: string;
-}
-type ChartEventNames =
-    | "state_saved"
-    | "chart_added"
-    | "chart_removed"
-    | "view_loaded";
+};
+type ChartEventNames = "state_saved" | "chart_added" | "chart_removed" | "view_loaded";
 type Chart = unknown; //todo
 type ViewId = string;
 type ChartState = ReturnType<typeof ChartManager.prototype.getState>;
-type ChartMsgValue<T extends ChartEventNames> = T extends
-    | "chart_added"
-    | "chart_removed"
+type ChartMsgValue<T extends ChartEventNames> = T extends "chart_added" | "chart_removed"
     ? Chart
     : T extends "view_loaded"
       ? ViewId
@@ -60,35 +55,26 @@ type MDVMessage = PopoutMessage | FilterMessage | ErrorMessage | PingMessage;
  */
 export default async function connectIPC(cm: ChartManager) {
     let initialized = false;
-    cm.addListener(
-        "ipc",
-        <T extends ChartEventNames>(
-            name: T,
-            chartManager: ChartManager,
-            value: ChartMsgValue<T>,
-        ) => {
-            if (name === "view_loaded") {
-                //value type should be inferred as ViewId, but it's not?
-                //(in contrast to below, where `if (datatype === 'popout')` works as expected)
-                console.log(
-                    "view_loaded",
-                    value,
-                    Object.keys(chartManager.charts),
-                );
-                if (!initialized) {
-                    // setupVuplex();
-                    initialized = true;
-                }
+    cm.addListener("ipc", <T extends ChartEventNames>(name: T, chartManager: ChartManager, value: ChartMsgValue<T>) => {
+        if (name === "view_loaded") {
+            //value type should be inferred as ViewId, but it's not?
+            //(in contrast to below, where `if (datatype === 'popout')` works as expected)
+            console.log("view_loaded", value, Object.keys(chartManager.charts));
+            if (!initialized) {
+                // setupVuplex();
+                initialized = true;
             }
-        },
-    );
+        }
+    });
     const { projectName, mainApiRoute } = getProjectInfoBase();
     const apiRootUrl = new URL(mainApiRoute, window.location.origin);
     const projectOrigin = apiRootUrl.origin;
     const projectNamespace = `/project/${projectName}`;
-    const socketPath = `${apiRootUrl.pathname.replace(/\/$/, "")}/socket.io`;
+    const socketPath = getSocketPath(mainApiRoute);
 
-    console.log(`Attempting to connect to Socket.IO namespace: ${projectNamespace} at origin: ${projectOrigin} path: ${socketPath}`);
+    console.log(
+        `Attempting to connect to Socket.IO namespace: ${projectNamespace} at origin: ${projectOrigin} path: ${socketPath}`,
+    );
 
     const socket = io(`${projectOrigin}${projectNamespace}`, {
         path: socketPath,
@@ -110,7 +96,7 @@ export default async function connectIPC(cm: ChartManager) {
         socket.connect();
         socket.on("connect", () => {
             console.log("socket connected");
-            sendMessage({type: 'ping'});
+            sendMessage({ type: "ping" });
             // this is probably not the right design - what about disconnects?
             resolve();
         });
@@ -122,10 +108,7 @@ export default async function connectIPC(cm: ChartManager) {
         const chart = cm.charts[chartID];
         if (!chart) {
             console.error(`Chart ${chartID} not found`);
-            console.log(
-                "current chart keys: ",
-                Object.keys(cm.charts).join(", "),
-            );
+            console.log("current chart keys: ", Object.keys(cm.charts).join(", "));
             sendMessage({
                 type: "error",
                 message: `Popout failed: chart ${chartID} not found... trying again...`,
@@ -163,14 +146,15 @@ export default async function connectIPC(cm: ChartManager) {
         console.log("setupVuplex...");
         function addMessageListener() {
             if (!window.vuplex) {
-                console.log("vuplex not found, cannot add listener (this was only relevant to unity embedded prototype)");
+                console.log(
+                    "vuplex not found, cannot add listener (this was only relevant to unity embedded prototype)",
+                );
                 return;
             }
             window.vuplex.postMessage({ type: "vuplex_ready" });
             window.vuplex.addEventListener("message", (e) => {
                 let msg = e.data;
-                if (typeof msg === "string")
-                    msg = JSON.parse(msg) as MDVMessage;
+                if (typeof msg === "string") msg = JSON.parse(msg) as MDVMessage;
                 console.log("vuplex message", JSON.stringify(msg, null, 2));
                 // TOOD: Types, Zod?
                 try {

@@ -16,8 +16,7 @@ describe("legendUtils", () => {
     });
 
     test("truncates long labels and preserves full text for tooltips", () => {
-        const long =
-            "CD8-positive cytotoxic T lymphocyte population cluster";
+        const long = "CD8-positive cytotoxic T lymphocyte population cluster";
         const maxWidth = measureLegendLabelWidth("CD8-positive cy");
         const result = formatLegendLabel(long, maxWidth);
         expect(result.truncated).toBe(true);
@@ -38,13 +37,8 @@ describe("legendUtils", () => {
 
     test("continuous legend height grows for longer tick labels", () => {
         const options = { width: 180, hasLabel: true };
-        expect(
-            getContinuousLegendContainerHeight([0, 10], options),
-        ).toBeLessThan(
-            getContinuousLegendContainerHeight(
-                [-0.123456789, 123456789],
-                options,
-            ),
+        expect(getContinuousLegendContainerHeight([0, 10], options)).toBeLessThan(
+            getContinuousLegendContainerHeight([-0.123456789, 123456789], options),
         );
     });
 
@@ -55,9 +49,7 @@ describe("legendUtils", () => {
             hasLabel: true,
         });
 
-        expect(height).toBeGreaterThan(
-            layout.barY + layout.barHeight + 30,
-        );
+        expect(height).toBeGreaterThan(layout.barY + layout.barHeight + 30);
         expect(height).toBeGreaterThan(
             getContinuousLegendContainerHeight([0, 10], {
                 width: 180,

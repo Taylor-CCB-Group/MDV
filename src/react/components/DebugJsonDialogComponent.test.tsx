@@ -20,12 +20,6 @@ vi.mock("../hooks", () => ({
     useChartManager: () => mocks.chartManager,
 }));
 
-vi.mock("../viv_loader_cache", () => ({
-    vivLoaderCacheTelemetryObservable: {
-        snapshot: { cacheEntries: 3 },
-    },
-}));
-
 vi.mock("./CustomTooltip", () => ({
     default: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
@@ -104,18 +98,12 @@ describe("DebugJsonDialogComponent", () => {
         const topLevelJsonSource = mocks.jsonViewSources.at(-1);
         expect(topLevelJsonSource).toMatchObject({
             chartTypes: [],
-            vivLoaderCacheTelemetry: { cacheEntries: 3 },
         });
         expect(topLevelJsonSource).not.toHaveProperty("validationFindings");
     });
 
     test("renders the empty validation state", () => {
-        render(
-            <DebugJsonDialogComponent
-                json={{ chartTypes: [] }}
-                showValidationSection
-            />,
-        );
+        render(<DebugJsonDialogComponent json={{ chartTypes: [] }} showValidationSection />);
 
         expect(screen.getByText("No validation issues recorded.")).toBeTruthy();
     });
@@ -124,12 +112,7 @@ describe("DebugJsonDialogComponent", () => {
         const store = buildStoreWithFindings();
         mocks.chartManager.validationFindings = store;
 
-        render(
-            <DebugJsonDialogComponent
-                json={{ chartTypes: [] }}
-                showValidationSection
-            />,
-        );
+        render(<DebugJsonDialogComponent json={{ chartTypes: [] }} showValidationSection />);
 
         fireEvent.click(screen.getByRole("button", { name: "Clear" }));
 

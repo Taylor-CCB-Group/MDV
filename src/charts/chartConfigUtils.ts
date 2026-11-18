@@ -1,38 +1,37 @@
+import { action, makeAutoObservable, observable } from "mobx";
+import type DataStore from "@/datastore/DataStore";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import { isArray } from "@/lib/utils";
+import { logChartValidationError } from "@/lib/validationLogging";
+import { RowsAsColsQuery, type RowsAsColsQuerySerialized } from "@/links/link_utils";
+import type { TooltipConfig } from "@/react/scatter_state";
 import { getRandomString } from "@/utilities/Utilities";
 import type BaseChart from "./BaseChart";
-import { action, makeAutoObservable } from "mobx";
-import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
-import { RowsAsColsQuery, type RowsAsColsQuerySerialized } from "@/links/link_utils";
-import type { FieldName } from "./charts";
-import type DataStore from "@/datastore/DataStore";
-import { isArray } from "@/lib/utils";
 import type { BaseConfig } from "./BaseChart";
-import type { TooltipConfig } from "@/react/scatter_state";
+import type { FieldName } from "./charts";
 import { getChartConfigSchema } from "./schemas/ChartConfigRegistry";
 import { BaseConfigSchema, type ChartConfig } from "./schemas/ChartConfigSchema";
-import { logChartValidationError } from "@/lib/validationLogging";
 
 /**
  * This is a utility module for handling the serialisation and deserialisation of chart configurations.
- * 
+ *
  * In particular, with the introduction of dynamic column queries, we need to be able to represent these.
  * There are essentially three lifecycle stages for something that specifies a column in a chart configuration:
  * - A `string` representing a concrete column name (which may have special formatting to indicate it's a linked column)
  * - A live object representing a query that will return observable column (e.g. RowsAsColsQuery)
  * - A serialised object representing the query that can be stored in a JSON object.
- * 
- * A lot of existing charts expect strings, and we have mechanisms for instrumenting these to accept a query object - 
+ *
+ * A lot of existing charts expect strings, and we have mechanisms for instrumenting these to accept a query object -
  * but this requires manual adaptation of the code in a way that can be error-prone.
- * 
+ *
  * It is hoped that in most cases newer charts based on React will be able to handle the query objects directly,
  * as long as it is clear at what point the configuration object is serialised and deserialised, they should be able
  * to use simple hooks, which will transparently return appropriate column objects (as in, with actual column data)
  * without being too concerned about the serialisation format etc.
- * 
+ *
  * ! as well as RowsAsColsQuery, I may implement some synthetic mock column types that can be used for testing.
  * ^^ perhaps we could try to design the error-reporting mechanism to describe something that we could reproduce without the original data???
  */
-
 
 // const ParamSpec = {
 //     "linkedDsName": "genes",
@@ -42,7 +41,7 @@ import { logChartValidationError } from "@/lib/validationLogging";
 // consider having synthetic columns that can be used for testing...
 // possibly including things like multi-text columns that automatically mutate over time...
 // - maybe serialised if it's loaded from a file, but internally do we allow it to be a live RowAsColsQuery?
-type SerialisedColumnParam = (FieldName | RowsAsColsQuerySerialized);
+type SerialisedColumnParam = FieldName | RowsAsColsQuerySerialized;
 export type SerialisedParams = SerialisedColumnParam[];
 export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
     //! should we consider making this whole thing async so that we can know that whatever is needed is loaded?
@@ -58,13 +57,12 @@ export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
 export function getConcreteFieldNames(fieldSpec: FieldSpec | FieldSpecs) {
     if (isArray(fieldSpec)) {
         // throw new Error("Not implemented");
-        return fieldSpec.flatMap((f) => typeof f === "string" ? f : f.fields);
+        return fieldSpec.flatMap((f) => (typeof f === "string" ? f : f.fields));
     }
     //! nb, previously unused, now changing the signature to return string array
     //(I've had it with checking for array or string)
     return typeof fieldSpec === "string" ? [fieldSpec] : fieldSpec.fields;
 }
-
 
 /**
  * We use this only as an intermediate step in AddChartDialogReact, as of this writing.
@@ -74,7 +72,7 @@ export function serialiseConfig(config: any) {
     //the idea is that anywhere we previously had a column name, we can have a query object
     // Is this enough?
     // (as long as we don't have some vanilla chart with column query nonsense in it...)
-    // n.b. now using `toJSON()` in favour of `toString()` where possible - but there isn't a default `toJSON()` 
+    // n.b. now using `toJSON()` in favour of `toString()` where possible - but there isn't a default `toJSON()`
     // for arbitrary objects, so still using stringification here.
     const serialized = JSON.parse(JSON.stringify(config));
 
@@ -86,10 +84,10 @@ export function serialiseConfig(config: any) {
     return serialized;
 }
 /**
- * 
+ *
  * ! this may be precisely the kind of place where zod would be appropriate.
  * not currently used
- * 
+ *
  * @returns resulting `config` object if there were no errors, otherwise an object with
  *  the potentially compromised result, and a list of err
  */
@@ -101,22 +99,22 @@ function deserialiseValueRecursive(ds: DataStore, value: any): any {
     if (value == null) {
         return value;
     }
-    
+
     // Handle primitives (string, number, boolean)
-    if (typeof value !== 'object') {
+    if (typeof value !== "object") {
         return value;
     }
-    
+
     // Handle arrays - recursively deserialize each element
     if (isArray(value)) {
-        return value.map(item => deserialiseValueRecursive(ds, item));
+        return value.map((item) => deserialiseValueRecursive(ds, item));
     }
-    
+
     // Handle objects that should be deserialized (e.g., RowsAsColsQuery)
     if (value.type === "RowsAsColsQuery") {
         return deserialiseParam(ds, value);
     }
-    
+
     // Handle plain objects - recursively deserialize all properties
     const result: any = {};
     for (const key in value) {
@@ -129,19 +127,19 @@ function deserialiseValueRecursive(ds: DataStore, value: any): any {
 
 export function deserialiseConfig(ds: DataStore, serialConfig: any) {
     // we need to know which DataSource this is associated with to be able to deserialize
-    const exceptions: { error: Error | unknown, key: string, value: any }[] = [];
+    const exceptions: { error: Error | unknown; key: string; value: any }[] = [];
     const config = JSON.parse(serialConfig, (key, value) => {
         // not sure we can have a general purpose Serializable interface with a static factory method
         // but there should be something simple along those lines we could consider...
         // ... for now, we are looking specifically for RowsAsColumnsQuerySerialized
         if (value.type === "RowsAsColsQuery") {
             try {
-                return deserialiseParam(ds, value)
+                return deserialiseParam(ds, value);
             } catch (error) {
                 exceptions.push({
                     error,
                     key,
-                    value
+                    value,
                 });
                 return value;
             }
@@ -150,11 +148,10 @@ export function deserialiseConfig(ds: DataStore, serialConfig: any) {
     return exceptions.length ? { config, exceptions } : config;
 }
 
-
 /**
  * This will be called by the chart constructor to set up the config object, as well as properties on the chart object
  * for observing changes to the config object.
- * 
+ *
  * Implementation notes in progress:
  * - with the addition of zod schema passing in here, we should be associating the resulting return-type more formally
  *   with generic `C`
@@ -162,7 +159,7 @@ export function deserialiseConfig(ds: DataStore, serialConfig: any) {
  *   (in future we might not even need Chart objects, just config objects and components that can render them)
  * - is the config.set property safe?
  * - we should definitely have clearer expression of the notion of SerialisedConfig vs RuntimeConfig types.
- * 
+ *
  * @param originalConfig
  * @param chart
  */
@@ -175,7 +172,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     if (!result.success) {
         logChartValidationError(originalConfig as unknown as ChartConfig, result.error);
     }
-    
+
     let config: C = JSON.parse(JSON.stringify(originalConfig));
     normalizeLegacyColorLegendConfig(config);
     if (!config.id) {
@@ -185,21 +182,21 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
 
     // Recursively deserialize the entire config object
     config = deserialiseValueRecursive(chart.dataStore, config) as C;
-    
+
     // Handle special properties that need additional processing beyond deserialization
     if (originalConfig.color_by) {
         const colorBy = (config as any).color_by;
         (config as any).color_by = undefined;
         chart.deferredInit(() => {
             if (!chart.colorByColumn) {
-                console.error('chart does not have colorByColumn method, but had color_by in config');
+                console.error("chart does not have colorByColumn method, but had color_by in config");
                 return;
             }
             // The method itself takes a string - but our decorated version takes what we're giving it...
             (chart.colorByColumn as any)?.(colorBy);
-        })
+        });
     }
-    
+
     const configWithTooltip = config as unknown as TooltipConfig;
     const tooltipColumn = configWithTooltip.tooltip?.column;
     if (tooltipColumn) {
@@ -214,29 +211,31 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             });
         }
     }
-    
+
     // Handle queries - any methodsUsingColumns that don't have an associated ColumnQueryMapper methodToConfigMap
     // **we need better analysis of conditions under which this is still relevant.**
-    chart.deferredInit(action(() => {
-        const c = config as any;
-        const queries = c.queries;
-        if (!queries) return;
-        
-        for (const method in queries) {
-            const sq = queries[method];
-            if (!sq) {
-                continue;
+    chart.deferredInit(
+        action(() => {
+            const c = config as any;
+            const queries = c.queries;
+            if (!queries) return;
+
+            for (const method in queries) {
+                const sq = queries[method];
+                if (!sq) {
+                    continue;
+                }
+                try {
+                    //TODO- this may not be correct wrt to adapting to/from array...
+                    //BUT IT SEEMS LIKE WE MIGHT ACTUALLY FINALLY BE ABLE TO DROP THIS SECTION ENTIRELY???
+                    console.warn(`Applying serialized query '${sq}' via a method we hope to remove...`);
+                    (chart as any)[method](sq);
+                } catch (e) {
+                    console.error("failed to run query", method, config.type, sq, e);
+                }
             }
-            try {
-                //TODO- this may not be correct wrt to adapting to/from array...
-                //BUT IT SEEMS LIKE WE MIGHT ACTUALLY FINALLY BE ABLE TO DROP THIS SECTION ENTIRELY???
-                console.warn(`Applying serialized query '${sq}' via a method we hope to remove...`);
-                (chart as any)[method](sq);
-            } catch (e) {
-                console.error('failed to run query', method, config.type, sq, e);
-            }
-        }
-    }));
+        }),
+    );
 
     // makeAutoObservable(config);
     Object.defineProperty(chart, "config", {
@@ -250,7 +249,12 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             // current BaseChart.setParams() should probably be replaced.
             //! - maybe better to have separate methods given that we start need logic like update legend based on color/params
             // this should only happen with config objects that haven't been observed yet...
-            makeAutoObservable(config);
+            // the selection is replaced wholesale on every pointer move while it's edited; deep
+            // observability would convert it each time and put every deck.gl read of its
+            // coordinates behind a proxy
+            makeAutoObservable<typeof config, "selectionFeatureCollection">(config, {
+                selectionFeatureCollection: observable.ref,
+            });
         },
     });
 
@@ -271,7 +275,6 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     // What I have now done is change DataStore to be observable, and added a method for getting filtered indices
     // in a way that can be shared by different charts (react or otherwise).
 
-
     return config;
 }
 
@@ -291,4 +294,49 @@ function normalizeLegacyColorLegendConfig(config: LegacyColorLegendConfig) {
     if (colorLegend.display === undefined && typeof colorLegend.dsiplay === "boolean") {
         colorLegend.display = colorLegend.dsiplay;
     }
+}
+
+/**
+ * Runs `use` once every column a chart config refers to has loaded data, where the config may refer to columns
+ * through live queries. `use` is where the chart should be constructed.
+ *
+ * A {@link RowsAsColsQuery}'s `fields` follow the filter/highlight on the linked dataSource, which can settle
+ * (asynchronously, e.g. a filter applied by another chart as the view loads) while columns are being loaded. If the
+ * fields are read once before loading and again afterwards - as happens when the chart constructor resolves `param`,
+ * `tooltip.column` etc. - the second read can name a column that was never loaded. So we resolve every spec, load
+ * whatever is missing, and resolve again, until a pass in which nothing was missing.
+ *
+ * `use` is called in the same synchronous run as that final check, so no event (not even an already-queued promise
+ * reaction) can change the queries in between. That is why this takes a callback rather than resolving and leaving
+ * the caller to carry on: resuming from an `await` is already too late. `use` must not be async.
+ *
+ * @param getSpecs every column spec referred to by the config (strings and/or serialised/live queries) - called
+ * again on each attempt so that it reflects the current state of the config
+ * @param getMissing returns the subset of `fields` that doesn't have loaded data
+ * @param load loads data for the given specs (including initialising queries)
+ * @param maxLoads how many times to load before giving up; the columns are checked again after the last one
+ * @returns the result of `use`
+ */
+export async function withLoadedColumns<T>(
+    ds: DataStore,
+    getSpecs: () => SerialisedColumnParam[],
+    getMissing: (fields: string[]) => string[],
+    load: (specs: SerialisedColumnParam[]) => Promise<unknown>,
+    use: () => T,
+    maxLoads = 5,
+): Promise<T> {
+    for (let loads = 0; loads <= maxLoads; loads++) {
+        const specs = getSpecs();
+        const params = specs.map((p) => deserialiseParam(ds, p));
+        // `fields` of a query isn't valid until its link has initialised
+        await Promise.all(params.map((p) => (typeof p === "string" ? undefined : p.initialize())));
+        // nothing from here to the end of `use()` may be async
+        // `use` will read the config as it is now, so if that changed while we waited, start again with what it says
+        const current = getSpecs();
+        if (current.length !== specs.length || current.some((spec, i) => spec !== specs[i])) continue;
+        const fields = params.flatMap(getConcreteFieldNames);
+        if (getMissing(fields).length === 0) return use();
+        if (loads < maxLoads) await load(specs);
+    }
+    throw new Error("Column query kept changing while loading data for chart");
 }

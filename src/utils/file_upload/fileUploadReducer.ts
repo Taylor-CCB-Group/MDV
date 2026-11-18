@@ -46,10 +46,7 @@ export function createInitialUploadDialogState(): UploadDialogState {
     };
 }
 
-export function fileUploadReducer(
-    state: UploadDialogState,
-    action: UploadDialogAction,
-): UploadDialogState {
+export function fileUploadReducer(state: UploadDialogState, action: UploadDialogAction): UploadDialogState {
     switch (action.type) {
         case "SET_SELECTED_FILES":
             return { ...state, selectedFiles: action.payload };

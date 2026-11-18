@@ -1,5 +1,5 @@
-import { DataModel } from "@/table/DataModel";
 import { describe, expect, test, vi } from "vitest";
+import { DataModel } from "@/table/DataModel";
 
 describe("DataModel autoupdate filter listener", () => {
     test("two models on the same store each receive filtered updates", () => {

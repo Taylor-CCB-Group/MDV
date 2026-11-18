@@ -140,9 +140,7 @@ export function getChartPanelByTitle(page: Page, title: string) {
 export async function expectChartPanelHasNoError(page: Page, title: string) {
     const panel = getChartPanelByTitle(page, title);
     await expect(panel).toBeVisible();
-    await expect(panel.getByText(/Error Occurred|An error occurred while creating the chart/i)).toHaveCount(
-        0,
-    );
+    await expect(panel.getByText(/Error Occurred|An error occurred while creating the chart/i)).toHaveCount(0);
 }
 
 export async function expectChartCreationErrorVisible(page: Page, message?: RegExp | string) {
@@ -267,16 +265,9 @@ export async function getChartColorLegendState(page: Page, chartTitle: string): 
     }, chartTitle);
 }
 
-export async function dragChartColorLegend(
-    page: Page,
-    chartTitle: string,
-    deltaX: number,
-    deltaY: number,
-) {
+export async function dragChartColorLegend(page: Page, chartTitle: string, deltaX: number, deltaY: number) {
     const host = getChartColorLegendHost(page, chartTitle);
-    const dragHandle = host.locator(
-        ".legend-drag-handle, .legend-continuous-drag-handle",
-    );
+    const dragHandle = host.locator(".legend-drag-handle, .legend-continuous-drag-handle");
     let box = await dragHandle.boundingBox();
     if (!box) {
         box = await host.boundingBox();
@@ -292,12 +283,7 @@ export async function dragChartColorLegend(
     await page.mouse.up();
 }
 
-export async function resizeChartColorLegend(
-    page: Page,
-    chartTitle: string,
-    deltaX: number,
-    deltaY: number,
-) {
+export async function resizeChartColorLegend(page: Page, chartTitle: string, deltaX: number, deltaY: number) {
     const handle = getChartColorLegendHost(page, chartTitle).locator(".resizer-se");
     await expect(handle).toBeVisible();
     const box = await handle.boundingBox();
@@ -313,9 +299,7 @@ export async function resizeChartColorLegend(
 export async function getFirstNumericColorByColumn(page: Page): Promise<string> {
     return await page.evaluate(() => {
         const chartManager = (window as any).mdv?.chartManager;
-        const dataSourceName = chartManager?.dsIndex?.cells
-            ? "cells"
-            : Object.keys(chartManager?.dsIndex ?? {})[0];
+        const dataSourceName = chartManager?.dsIndex?.cells ? "cells" : Object.keys(chartManager?.dsIndex ?? {})[0];
         if (!dataSourceName) {
             throw new Error("No datasource found");
         }
@@ -501,10 +485,7 @@ export async function selectLinkedGeneInChartSettings(
     await combobox.fill(options.geneLabel);
     const listbox = page.getByRole("listbox");
     await expect(listbox).toBeVisible();
-    const option = listbox
-        .getByRole("option")
-        .filter({ hasText: options.geneLabel })
-        .first();
+    const option = listbox.getByRole("option").filter({ hasText: options.geneLabel }).first();
     await expect(option).toBeVisible();
     await option.click();
 }

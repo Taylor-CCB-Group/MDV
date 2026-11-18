@@ -2,9 +2,7 @@ import Dimension from "./Dimension.js";
 export default class SortableDimension extends Dimension {
     constructor(parent) {
         super(parent);
-        this.sortWorker = new Worker(
-            new URL("./sortWorker.js?v=1", import.meta.url),
-        );
+        this.sortWorker = new Worker(new URL("./sortWorker.js?v=1", import.meta.url));
         this.orderBuffer = new SharedArrayBuffer(this.parent.size * 4);
         this.order = new Uint32Array(this.orderBuffer);
         for (let i = 0; i < this.parent.size; i++) this.order[i] = i;

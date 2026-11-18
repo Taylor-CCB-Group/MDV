@@ -1,4 +1,4 @@
-import { makeAutoObservable, observable, type ObservableMap } from "mobx";
+import { makeAutoObservable, type ObservableMap, observable } from "mobx";
 
 export type ValidationContext = "datasource" | "chart";
 
@@ -29,9 +29,7 @@ function issueSignature(issues: ValidationIssue[]): string {
     // Stable-ish key for grouping repeated reports of the same underlying problem.
     // Prefer code+path+message where available. Join multiple issues so zod-style multi-issue
     // errors group together.
-    return issues
-        .map((i) => `${i.code ?? ""}|${i.path}|${i.message}`)
-        .join("\n");
+    return issues.map((i) => `${i.code ?? ""}|${i.path}|${i.message}`).join("\n");
 }
 
 type FindingMap = ObservableMap<string, ObservableMap<string, ValidationFinding>>;
@@ -140,4 +138,3 @@ export default class ValidationFindingsStore {
         });
     }
 }
-

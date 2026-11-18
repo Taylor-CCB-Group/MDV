@@ -1,6 +1,6 @@
+import { BaseDialog } from "../../utilities/Dialog.js";
 import { createEl, createFilterElement } from "../../utilities/Elements";
 import BaseChart from "../BaseChart";
-import { BaseDialog } from "../../utilities/Dialog.js";
 import { ChooseColumnDialog } from "./ChooseColumnDialog";
 
 /**
@@ -66,7 +66,7 @@ export class AddChartDialog extends BaseDialog {
                 text: "Chart Type", //a11y - should be a label
                 classes: ["ciview-title-div"],
             },
-            this.columns[0]
+            this.columns[0],
         );
 
         this.chartType = createEl(
@@ -76,7 +76,7 @@ export class AddChartDialog extends BaseDialog {
                     maxWidth: "200px",
                 },
             },
-            this.columns[0]
+            this.columns[0],
         );
         for (const item of types) {
             createEl(
@@ -85,7 +85,7 @@ export class AddChartDialog extends BaseDialog {
                     text: item.name,
                     value: item.type,
                 },
-                this.chartType
+                this.chartType,
             );
         }
         // createEl("div",{},this.columns[0]).append(this.chartType);
@@ -99,7 +99,7 @@ export class AddChartDialog extends BaseDialog {
                 text: "Title",
                 classes: ["ciview-title-div"],
             },
-            this.columns[0]
+            this.columns[0],
         );
 
         this.chartName = createEl("input", {}, this.columns[0]);
@@ -110,13 +110,9 @@ export class AddChartDialog extends BaseDialog {
                 text: "Description",
                 classes: ["ciview-title-div"],
             },
-            this.columns[0]
+            this.columns[0],
         );
-        this.chartDescription = createEl(
-            "textarea",
-            { styles: { height: "100px" } },
-            this.columns[0]
-        );
+        this.chartDescription = createEl("textarea", { styles: { height: "100px" } }, this.columns[0]);
 
         this.columnsHeading = createEl(
             "div",
@@ -124,7 +120,7 @@ export class AddChartDialog extends BaseDialog {
                 text: "Columns",
                 classes: ["ciview-title-div"],
             },
-            this.columns[1]
+            this.columns[1],
         );
         this.paramDiv = createEl("div", {}, this.columns[1]);
         this.setParamDiv(types[0].type, content.dataStore);
@@ -135,7 +131,7 @@ export class AddChartDialog extends BaseDialog {
                 text: "Add",
                 classes: ["ciview-button"],
             },
-            this.footer
+            this.footer,
         ).addEventListener("click", () => this.submit(content.callback));
     }
 
@@ -206,7 +202,7 @@ export class AddChartDialog extends BaseDialog {
                         dd.textContent = text;
                     }
                 },
-                filter
+                filter,
             );
         });
     }
@@ -218,11 +214,7 @@ export class AddChartDialog extends BaseDialog {
         this.columnsHeading.style.display = params?.length ? "" : "none";
         if (params) {
             for (const p of params) {
-                const d = createEl(
-                    "div",
-                    { styles: { padding: "4px" } },
-                    this.paramDiv
-                );
+                const d = createEl("div", { styles: { padding: "4px" } }, this.paramDiv);
                 const sp = createEl("div", { text: `${p.name}:` }, d);
                 const holder = createEl("div", {}, this.paramDiv);
                 if (!Array.isArray(p.type) && p.type.startsWith("_multi")) {
@@ -236,7 +228,7 @@ export class AddChartDialog extends BaseDialog {
                                 maxWidth: "200px",
                             },
                         },
-                        holder
+                        holder,
                     );
                     const ps = this.dataStore.getColumnList(p.type);
                     const sgs = {};
@@ -244,14 +236,8 @@ export class AddChartDialog extends BaseDialog {
                         sgs[ds] = createEl("optgroup", { label: ds });
                     }
                     for (const item of ps) {
-                        const ele = item.subgroup
-                            ? sgs[item.subgroup.dataSource]
-                            : dd;
-                        createEl(
-                            "option",
-                            { text: item.name, value: item.field },
-                            ele
-                        );
+                        const ele = item.subgroup ? sgs[item.subgroup.dataSource] : dd;
+                        createEl("option", { text: item.name, value: item.field }, ele);
                     }
                     for (const ds of this.dataStore.subgroupDataSources) {
                         dd.append(sgs[ds]);
@@ -273,7 +259,7 @@ export class AddChartDialog extends BaseDialog {
                         text: c.label,
                         classes: ["ciview-title-div"],
                     },
-                    parentDiv
+                    parentDiv,
                 );
                 // could this logic be shared with SettingsDialog? <<
                 if (c.type === "dropdown") {
@@ -284,42 +270,26 @@ export class AddChartDialog extends BaseDialog {
                                 maxWidth: "200px",
                             },
                         },
-                        parentDiv
+                        parentDiv,
                     );
                     createFilterElement(sel, parentDiv);
                     for (const item of c.values) {
-                        const option = createEl(
-                            "option",
-                            { text: item.name, value: item.value },
-                            sel
-                        );
+                        const option = createEl("option", { text: item.name, value: item.value }, sel);
                         if (item.value === c.defaultVal) {
                             option.selected = true;
                         }
                     }
                     this.extraControls[c.name] = sel;
                 } else if (c.type === "string") {
-                    const el = createEl(
-                        "input",
-                        { value: c.defaultVal },
-                        parentDiv
-                    );
+                    const el = createEl("input", { value: c.defaultVal }, parentDiv);
                     this.extraControls[c.name] = el;
                     //el.onchange // not using callback, value will be read on submit().
                 } else if (c.type === "textbox") {
-                    const el = createEl(
-                        "textarea",
-                        { value: c.defaultVal, styles: { height: "300px" } },
-                        parentDiv
-                    );
+                    const el = createEl("textarea", { value: c.defaultVal, styles: { height: "300px" } }, parentDiv);
                     this.extraControls[c.name] = el;
                     //el.onchange // not using callback, value will be read on submit().
                 } else if (c.type === "checkbox" || c.type === "check") {
-                    const el = createEl(
-                        "input",
-                        { type: "checkbox" },
-                        parentDiv
-                    );
+                    const el = createEl("input", { type: "checkbox" }, parentDiv);
                     el.checked = c.defaultVal;
                     this.extraControls[c.name] = el;
                     //el.onchange // not using callback, value will be read on submit().

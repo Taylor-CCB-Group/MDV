@@ -1,21 +1,18 @@
 import { describe, expect, test } from "vitest";
 
-import {
-    createInitialUploadDialogState,
-    fileUploadReducer,
-} from "@/utils/file_upload/fileUploadReducer";
+import { createInitialUploadDialogState, fileUploadReducer } from "@/utils/file_upload/fileUploadReducer";
 
 describe("fileUploadReducer", () => {
     test("tracks stage transitions explicitly", () => {
-        const validatingState = fileUploadReducer(
-            createInitialUploadDialogState(),
-            { type: "SET_STAGE", payload: { kind: "validating" } },
-        );
+        const validatingState = fileUploadReducer(createInitialUploadDialogState(), {
+            type: "SET_STAGE",
+            payload: { kind: "validating" },
+        });
 
-        const processingState = fileUploadReducer(
-            validatingState,
-            { type: "SET_STAGE", payload: { kind: "processing" } },
-        );
+        const processingState = fileUploadReducer(validatingState, {
+            type: "SET_STAGE",
+            payload: { kind: "processing" },
+        });
 
         expect(validatingState.stage).toEqual({ kind: "validating" });
         expect(processingState.stage).toEqual({ kind: "processing" });

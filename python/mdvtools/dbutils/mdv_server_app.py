@@ -6,20 +6,26 @@ import sys
 import time
 import json
 import logging
-from sqlalchemy import text, create_engine
+from urllib.parse import quote
+from sqlalchemy import text, create_engine, make_url
 from sqlalchemy.exc import OperationalError
 from flask import Flask
 from mdvtools.server import add_safe_headers
-from mdvtools.mdvproject import MDVProject
+from mdvtools.entry_assets import register_entry_assets
+from mdvtools.mdvproject import MDVProject, get_json
 from mdvtools.project_router import ProjectBlueprint
-from mdvtools.dbutils.dbmodels import db, Project
+from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent, Invitation, InvitationProject
 from mdvtools.dbutils.routes import register_routes
 from mdvtools.auth.register_auth_routes import register_auth_routes
-from mdvtools.auth.authutils import register_before_request_auth, get_auth_provider, cache_user_projects
-from mdvtools.dbutils.dbservice import ProjectService, FileService
+from mdvtools.auth.authutils import register_before_request_auth, cache_user_projects
+from mdvtools.dbutils.dbservice import ProjectService, FileService, UserProjectService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
-from mdvtools.dbutils.server_options import get_server_options_for_db_projects
+from mdvtools.dbutils.server_options import (
+    get_server_options_for_db_projects,
+    register_global_routes_for_extensions,
+)
+from mdvtools.server_extension import ExtensionError
 #this shouldn't be necessary in future
 from psycogreen.gevent import patch_psycopg
 patch_psycopg()
@@ -30,6 +36,7 @@ logger = get_logger(__name__)
 # Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 logger.info(f"Authentication enabled: {ENABLE_AUTH}")
+
 oauth = None
 if ENABLE_AUTH:
     
@@ -51,6 +58,7 @@ def create_flask_app(config_name=None):
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
     app.url_map.strict_slashes = False
     app.after_request(add_safe_headers)
+    register_entry_assets(app)
     
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,   # Prevent JavaScript from accessing cookies
@@ -82,20 +90,30 @@ def create_flask_app(config_name=None):
     try:
         logger.info("Creating tables")
         with app.app_context():
-            logger.info("Waiting for DB to set up")
-            if config_name != 'test':
+            db_backend = app.config.get('DB_BACKEND', 'sqlite')
+            if config_name != 'test' and db_backend == 'postgres':
+                logger.info("Waiting for PostgreSQL to set up")
                 wait_for_database(app)
+            elif config_name != 'test':
+                logger.info("SQLite backend selected; skipping PostgreSQL readiness checks")
             if not tables_exist():
                 logger.info("Creating database tables")
                 db.create_all()
                 logger.info("Created database tables")
             else:
                 logger.info("Database tables already exist")
+            warn_if_project_ids_can_be_reused()
+
+            # Own try/except: the enclosing handler re-raises, and telemetry
+            # must never be able to prevent the server from starting.
+            try:
+                ensure_usage_events_table()
+            except Exception as e:
+                logger.warning(f"Skipping usage_events table setup: {e}")
+            ensure_invitation_tables()
 
             if ENABLE_AUTH:
                 try:
-                    # Note: sync_users_to_db() is no longer called automatically on startup.
-                    # It should only be called manually from manage_project_permissions.py script.
                     logger.info("Caching user-projects data...")
                     cache_user_projects()  # Cache the user-project mappings into Redis only when Auth is enabled
 
@@ -139,16 +157,15 @@ def create_flask_app(config_name=None):
         logger.exception(f"Error registering routes: {e}")
         raise e
 
-    # Register global routes from extensions
+    # Resolve configured built-in and installed extensions once, then register
+    # their app-wide routes through the existing extension lifecycle.
     try:
         logger.info("Registering global routes from extensions")
-        from mdvtools.dbutils.server_options import get_server_options_for_db_projects
-        options = get_server_options_for_db_projects(app)
-        
-        for extension in options.extensions:
-            if hasattr(extension, 'register_global_routes'):
-                logger.info(f"Registering global routes for extension: {extension.__class__.__name__}")
-                extension.register_global_routes(app, app.config)
+        active_extensions = register_global_routes_for_extensions(app)
+        logger.info(
+            "Registered extensions: %s",
+            list(active_extensions),
+        )
     except Exception as e:
         logger.exception(f"Error registering global routes from extensions: {e}")
         raise e
@@ -160,31 +177,20 @@ def wait_for_database(app):
     """Wait for the database to be ready before proceeding."""
     max_retries = 30
     delay = 5  # seconds
-    db_name = os.getenv('DB_NAME')
-    
+    # Use the settings load_config resolved, which may have come from env, Docker secrets or config.json
+    target_url = make_url(app.config['SQLALCHEMY_DATABASE_URI'])
+    db_name = target_url.database
+
     if not db_name:
-        error_message = "Error: DB_NAME environment variable is not set"
+        error_message = "Error: the database URI has no database name"
         logger.error(error_message)
         raise ValueError(error_message)
 
     # First connect to postgres database to check/create our target database
-    postgres_uri = 'postgresql://{}:{}@{}/postgres'.format(
-        os.getenv('DB_USER'),
-        os.getenv('DB_PASSWORD'),
-        os.getenv('DB_HOST')
-    )
-    
-    # Construct target URI once since environment variables don't change
-    target_uri = 'postgresql://{}:{}@{}/{}'.format(
-        os.getenv('DB_USER'),
-        os.getenv('DB_PASSWORD'),
-        os.getenv('DB_HOST'),
-        db_name
-    )
-    
-    # Update the database URI in the app config (this is the same as the initial URI from load_config)
-    app.config['SQLALCHEMY_DATABASE_URI'] = target_uri
-    
+    postgres_uri = target_url.set(database='postgres').render_as_string(hide_password=False)
+    target_uri = target_url.render_as_string(hide_password=False)
+    db_schema = app.config.get('DB_SCHEMA', '')
+
     for attempt in range(max_retries):
         try:
             # First connect to postgres database
@@ -219,6 +225,17 @@ def wait_for_database(app):
             # The engine should already be valid since the URI hasn't changed
             test_connection = None
             try:
+                if db_schema:
+                    schema_engine = create_engine(target_uri, isolation_level="AUTOCOMMIT")
+                    schema_connection = None
+                    try:
+                        schema_connection = schema_engine.connect()
+                        schema_connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{db_schema}"'))
+                        logger.info(f"Ensured database schema exists: {db_schema}")
+                    finally:
+                        if schema_connection:
+                            schema_connection.close()
+                        schema_engine.dispose()
                 test_connection = db.engine.connect()
                 test_connection.execute(text('SELECT 1'))
                 logger.info("Successfully connected to target database")
@@ -300,18 +317,49 @@ def load_config(app, config_name=None, enable_auth=False):
         if config_name == 'test':
             app.config['PREFERRED_URL_SCHEME'] = 'http'
             app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+            app.config['DB_BACKEND'] = 'sqlite'
         else:
             app.config['PREFERRED_URL_SCHEME'] = 'https'
-            
-            db_user = os.getenv('DB_USER') or read_secret('db_user')
-            db_password = os.getenv('DB_PASSWORD') or read_secret('db_password')
-            db_name = os.getenv('DB_NAME') or read_secret('db_name')
-            db_host = os.getenv('DB_HOST') or app.config.get('db_host')
+            db_backend = (os.getenv('DB_BACKEND') or '').strip().lower()
+            if not db_backend:
+                # Configs written before DB_BACKEND existed always used postgres and set only
+                # DB_* values or Docker secrets. Defaulting those to sqlite would start the app
+                # on a new, empty database while the real one sits unused.
+                has_postgres_settings = any(
+                    os.getenv(name) for name in ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME']
+                ) or os.path.exists('/run/secrets/db_user')
+                if has_postgres_settings:
+                    logger.warning("DB_BACKEND is not set but postgres settings are present; using postgres. Set DB_BACKEND=postgres to remove this warning.")
+                    db_backend = 'postgres'
+                else:
+                    db_backend = 'sqlite'
+            elif db_backend not in ['sqlite', 'postgres']:
+                raise ValueError(f"Unknown DB_BACKEND '{db_backend}'; expected 'sqlite' or 'postgres'.")
 
-            if not all([db_user, db_password, db_name, db_host]):
-                raise ValueError("Error: One or more required secrets or configurations are missing.")
-            
-            app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+            app.config['DB_BACKEND'] = db_backend
+
+            if db_backend == 'sqlite':
+                sqlite_db_path = (os.getenv('SQLITE_DB_PATH') or '/app/mdv/mdv.sqlite3').strip()
+                app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{sqlite_db_path}'
+                logger.info(f"Database backend selected: sqlite (path: {sqlite_db_path})")
+            else:
+                db_user = os.getenv('DB_USER') or read_secret('db_user')
+                db_password = os.getenv('DB_PASSWORD') or read_secret('db_password')
+                db_name = os.getenv('DB_NAME') or read_secret('db_name')
+                db_host = os.getenv('DB_HOST') or app.config.get('db_host')
+                db_schema = (os.getenv('DB_SCHEMA') or '').strip()
+
+                if not all([db_user, db_password, db_name, db_host]):
+                    raise ValueError("Error: One or more required secrets or configurations are missing.")
+                
+                app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+                app.config['DB_SCHEMA'] = db_schema
+                if db_schema:
+                    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+                        'connect_args': {'options': f'-csearch_path={db_schema}'}
+                    }
+                    logger.info(f"Using database schema: {db_schema}")
+                logger.info(f"Database backend selected: postgres (host: {db_host}, db: {db_name})")
 
 
             # Only configure Auth0 if ENABLE_AUTH is True
@@ -319,6 +367,15 @@ def load_config(app, config_name=None, enable_auth=False):
                 app.config['ENABLE_AUTH'] = True
                 app.config["DEFAULT_AUTH_METHOD"] = os.getenv('DEFAULT_AUTH_METHOD') or config.get('DEFAULT_AUTH_METHOD')
                 app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
+                # Deployments served under different paths on one host share the browser's
+                # cookies. Scope the session cookie to this deployment's path, so the browser
+                # sends it only here, and name it after that path, so it never shares a name
+                # with another deployment's cookie or an older cookie at "/". Percent-encoding
+                # gives every path its own name using only characters valid in a cookie name.
+                api_root = (os.getenv('MDV_API_ROOT') or '/').strip('/')
+                if api_root:
+                    app.config['SESSION_COOKIE_NAME'] = 'mdv_session_' + quote(api_root, safe='')
+                    app.config['SESSION_COOKIE_PATH'] = '/' + api_root
                 
                 # Check if the authentication method is 'auth0'
                 if app.config["DEFAULT_AUTH_METHOD"] == "auth0":
@@ -336,7 +393,17 @@ def load_config(app, config_name=None, enable_auth=False):
                     app.config["AUTH0_PUBLIC_KEY_URI"] = os.getenv('AUTH0_PUBLIC_KEY_URI') or config.get('AUTH0_PUBLIC_KEY_URI')
                     app.config["AUTH0_AUDIENCE"] = os.getenv('AUTH0_AUDIENCE') or config.get('AUTH0_AUDIENCE')
                     app.config["AUTH0_DB_CONNECTION"] = os.getenv('AUTH0_DB_CONNECTION') or config.get('AUTH0_DB_CONNECTION')
-                
+                    # Optional: comma-separated names of the site's Microsoft connections,
+                    # which the admin extension offers as Sign-in methods for Invitations.
+                    app.config["AUTH0_MICROSOFT_CONNECTIONS"] = os.getenv('AUTH0_MICROSOFT_CONNECTIONS') or config.get('AUTH0_MICROSOFT_CONNECTIONS')
+                    # Optional: while the local database has zero users, a verified Auth0
+                    # identity matching this email may bootstrap as the first administrator.
+                    # Leave unset once bootstrap is no longer needed for this deployment.
+                    app.config["MDV_BOOTSTRAP_ADMIN_EMAIL"] = os.getenv('MDV_BOOTSTRAP_ADMIN_EMAIL') or config.get('MDV_BOOTSTRAP_ADMIN_EMAIL')
+                    # Optional: who the no-access page tells people to contact, such as
+                    # an email address or a team name. The page leaves it out when unset.
+                    app.config["MDV_ACCESS_CONTACT"] = os.getenv('MDV_ACCESS_CONTACT') or config.get('MDV_ACCESS_CONTACT')
+
                 app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
                 app.config["SHIBBOLETH_LOGIN_URL"] = os.getenv('SHIBBOLETH_LOGIN_URL') or config.get('SHIBBOLETH_LOGIN_URL')
                 app.config["SHIBBOLETH_LOGOUT_URL"] = os.getenv('SHIBBOLETH_LOGOUT_URL') or config.get('SHIBBOLETH_LOGOUT_URL')
@@ -365,6 +432,57 @@ def tables_exist():
         #print(inspector.get_table_names())
         return inspector.get_table_names()
 
+def ensure_usage_events_table():
+    """Create usage_events on an existing database, where create_all() never runs.
+
+    tables_exist() returns the table list, so on any established deployment the
+    create_all() branch above is skipped entirely and a newly added table would
+    never appear. This creates just that one table, and never raises: telemetry
+    must not be able to stop the server from booting.
+    """
+    try:
+        UsageEvent.__table__.create(bind=db.engine, checkfirst=True)
+    except Exception as e:
+        # checkfirst=True is check-then-act, so two workers racing can both pass
+        # the check. Gunicorn runs -w 1 today but will not forever.
+        logger.warning(f"Could not ensure the usage_events table exists: {e}")
+
+def ensure_invitation_tables():
+    """Create the Invitation tables on an existing database, where create_all() never runs.
+
+    Unlike usage_events, these hold access data, so a failure here is raised and
+    stops startup rather than leaving Admins unable to invite anyone.
+    """
+    Invitation.__table__.create(bind=db.engine, checkfirst=True)
+    InvitationProject.__table__.create(bind=db.engine, checkfirst=True)
+
+def warn_if_project_ids_can_be_reused():
+    """Log a warning when a SQLite projects table can give a purged project's ID to
+    the next project.
+
+    The models declare the table AUTOINCREMENT, but SQLite only reads that when the
+    table is created, so a database created before the declaration keeps reusing
+    IDs until migrate_projects_autoincrement.py rebuilds it. The check never stops
+    the app from starting.
+    """
+    try:
+        # PostgreSQL sequences never hand out an ID twice.
+        if db.engine.dialect.name != "sqlite":
+            return
+        with db.engine.connect() as connection:
+            projects_sql = connection.execute(
+                text("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projects'")
+            ).scalar()
+    except Exception:
+        logger.exception("Could not check whether the projects table can reuse Project IDs")
+        return
+    if projects_sql and "AUTOINCREMENT" not in projects_sql.upper():
+        logger.warning(
+            "The projects table is not declared AUTOINCREMENT, so SQLite can give a purged "
+            "project's ID to the next project. Stop the app and run "
+            "mdvtools/scripts/migrate_projects_autoincrement.py, whose --help gives the steps."
+        )
+
 def is_valid_mdv_project(path: str):
     if not os.path.isdir(path):
         return False
@@ -391,24 +509,36 @@ def serve_projects_from_db(app):
             if os.path.exists(project.path):
                 try:
                     p = MDVProject(dir=project.path, id=str(project.id), backend_db= True)
-                    # Sync DB access level from state.json if present, then serve with resulting editability
+                    # The row decides the access level. state.json is only consulted to
+                    # fill a row that has none, which legacy rows predating the column
+                    # can be. Serving then writes the resulting permission back to disk.
                     try:
-                        state = p.state or {}
-                        perm = (state.get('permission') or '').lower()
-                        desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
-                        if desired_level is not None and desired_level != getattr(project, 'access_level', None):
-                            ProjectService.change_project_access(project.id, desired_level)
-                            is_editable = (desired_level == 'editable')
-                        else:
-                            # Default to editable when access level is missing/unknown or non-string (e.g., MagicMock)
-                            access_level_val = getattr(project, 'access_level', None)
-                            is_editable = (access_level_val == 'editable') if isinstance(access_level_val, str) else True
+                        access_level_val = getattr(project, 'access_level', None)
+                        if not (isinstance(access_level_val, str) and access_level_val):
+                            state = p.state or {}
+                            perm = (state.get('permission') or '').lower()
+                            desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
+                            if desired_level is not None:
+                                ProjectService.change_project_access(project.id, desired_level)
+                                access_level_val = desired_level
+                        # Only 'read-only' locks a project. A missing or unrecognised
+                        # value leaves it editable rather than locking it on disk.
+                        is_editable = access_level_val != 'read-only'
                         # nb this will warn in log if the project isn't writable by current user
                         # avoiding touching other aspects of surrounding logic for now.
                         p.set_editable(is_editable)
                     except Exception:
                         # Favor editable by default on unexpected errors (see comment above on writable check)
                         p.set_editable(True)
+
+                    # Keep the name in the project directory current. Projects created
+                    # before that copy existed get it here, and a directory copied to
+                    # another deployment then carries the name this catalog has for it.
+                    try:
+                        p.set_display_name(project.name)
+                    except Exception:
+                        logger.exception(f"Could not write the display name for project {project.id}")
+
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(options=options)
                     logger.info(f"Serving project: {project.path}")
@@ -466,8 +596,9 @@ def serve_projects_from_filesystem(app, base_dir):
         projects_in_db = {project.path for project in Project.query.with_entities(Project.path).all()}
         logger.info(f"Project paths in DB: {projects_in_db}")
 
-        # Get all project directories in the filesystem
-        project_paths_in_fs = {os.path.join(base_dir, d) for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d)) and d != 'lost+found'}
+        # Get all project directories in the filesystem, leaving out hidden folders and
+        # folders that do not hold a whole project
+        project_paths_in_fs = {os.path.join(base_dir, d) for d in os.listdir(base_dir) if d != 'lost+found' and not d.startswith('.') and is_valid_mdv_project(os.path.join(base_dir, d))}
         logger.info(f"Project paths in filesystem: {project_paths_in_fs}")
 
         # Determine which project paths are in the filesystem but not in the database
@@ -480,79 +611,46 @@ def serve_projects_from_filesystem(app, base_dir):
             logger.info(f"Processing project path: {project_path}")
             
             if os.path.exists(project_path):
+                assigned_id = None
                 try:
-                    project_name = os.path.basename(project_path)
-
-                    # Get the next ID from the database
-                    next_id = db.session.query(db.func.max(Project.id)).scalar()
-                    if next_id is None:
-                        next_id = 1
-                    else:
-                        next_id += 1
-
-                    p = MDVProject(dir=project_path, id= str(next_id), backend_db= True)
-                    # Respect existing state.json permission if present; default to editable when unspecified
+                    # No row exists for this directory, so state.json is the only record
+                    # of the name and permission it was last served with. A directory
+                    # copied in from another deployment keeps both. Fall back to the
+                    # directory name, and to editable, when it says nothing.
                     try:
-                        state = p.state or {}
-                        perm = (state.get('permission') or '').lower()
-                        is_editable = True if perm == 'edit' else False if perm == 'view' else True
-                        p.set_editable(is_editable)
+                        state = get_json(os.path.join(project_path, "state.json")) or {}
                     except Exception:
-                        p.set_editable(True)
-                    p.serve(options=options) 
-                    logger.info(f"Serving project: {project_path}")
+                        state = {}
+                    project_name = state.get('name') or os.path.basename(project_path)
+                    perm = (state.get('permission') or '').lower()
+                    is_editable = False if perm == 'view' else True
 
-                    # Create a new Project record in the database with the default name
+                    # Create a new Project record in the database. The database assigns
+                    # the Project ID; the directory keeps the name it was discovered under.
                     new_project = ProjectService.add_new_project(name=project_name, path=project_path)
                     if new_project is None:
                         raise ValueError(f"Failed to add project '{project_name}' to the database.")
-                    
-                    logger.info(f"Added project to DB: {new_project}")
+                    new_project.access_level = 'editable' if is_editable else 'read-only'
+                    assigned_id = str(new_project.id)
+
+                    p = MDVProject(dir=project_path, id=str(new_project.id), backend_db= True)
+                    p.set_editable(is_editable)
+                    # Record the name even when it came from state.json, so a name
+                    # derived from the directory is only ever derived once.
+                    p.set_display_name(new_project.name)
+                    p.serve(options=options)
+                    logger.info(f"Serving project: {project_path}")
+
+                    db.session.commit()
+                    logger.info(f"Added project {new_project.id} to DB from {project_path}")
                     created_project_ids.append(new_project.id)
-                    # One-time sync: initialize DB access_level from state.json.permission
-                    try:
-                        state = p.state or {}
-                        perm = (state.get('permission') or '').lower()
-                        desired_level = 'editable' if perm == 'edit' else 'read-only' if perm == 'view' else None
-                        if desired_level is not None:
-                            ProjectService.change_project_access(new_project.id, desired_level)
-                    except Exception:
-                        pass
 
-                    # Rename directory to use project ID as folder name
-                    """
-                    project_id_str = str(new_project.id)
-                    desired_path = os.path.join(app.config["projects_base_dir"], project_id_str)
-
-                    if project_path != desired_path:
-                        try:
-                            # Rename the directory
-                            os.rename(project_path, desired_path)
-                            logger.info(f"Renamed project folder from {project_path} to {desired_path}")
-
-                            # Update project path in DB
-                            new_project.path = desired_path
-                            db.session.commit()
-                            logger.info(f"Updated project path in DB for project ID {new_project.id}")
-
-                            # Also update local reference for downstream operations (like file sync)
-                            project_path = desired_path
-
-                        except Exception as rename_error:
-                            logger.exception(f"Failed to rename project directory or update DB for project ID {new_project.id}: {rename_error}")
-                    """
                     # Auth-related setup
                     if ENABLE_AUTH:
                         try:
-                            # NOTE: skipping this as it seems highly redundant to do per project
-                            # and we were hitting rate limits with Auth0
-                            # auth_provider = get_auth_provider()
-                            # auth_provider.sync_users_to_db()  # Sync users and assign permissions
-                            # logger.info("Synced Auth users after adding project.")
-
                             cache_user_projects() #update the cache
                         except Exception as auth_e:
-                            logger.exception(f"Error syncing users or caching for {project_name}: {auth_e}")
+                            logger.exception(f"Error caching user projects for {project_name}: {auth_e}")
 
                     
                     # Optionally add files from the project directory to the database
@@ -572,6 +670,14 @@ def serve_projects_from_filesystem(app, base_dir):
                         logger.info("Skipping file sync for new project %s (ENABLE_FILE_SYNC disabled)", new_project.id)
                 except Exception as e:
                     logger.exception(f"In serve_projects_from_filesystem: Error creating/serving project at path '{project_path}': {e}")
+                    # Serving registers the route before the row is committed, so a
+                    # route can outlive the row it was registered for and answer for
+                    # a project the catalog does not hold.
+                    if assigned_id is not None:
+                        ProjectBlueprint.blueprints.pop(assigned_id, None)
+                    # Discard this project's pending row so the next iteration's
+                    # commit does not persist it.
+                    db.session.rollback()
                     failed_project_paths.append(project_path)
                     # continue to next project_path without raising
             else:
@@ -587,18 +693,75 @@ def serve_projects_from_filesystem(app, base_dir):
     return created_project_ids
 
 
+def grant_admins_ownership_of_unowned_projects():
+    """Make every administrator an owner of each active project that has no owner.
+
+    A scan has no user to attribute a project to, and the project list only shows
+    a user the projects they hold a permission row for, so a project that arrives
+    by file copy would otherwise be invisible to everyone. An owner assigned
+    afterwards through the sharing routes can remove the administrators.
+
+    Returns the Project IDs that were given owners.
+    """
+    owned_ids = {
+        row.project_id
+        for row in UserProject.query.filter_by(is_owner=True).with_entities(UserProject.project_id).all()
+    }
+    unowned_ids = [
+        row.id
+        for row in Project.query.filter_by(is_deleted=False).with_entities(Project.id).all()
+        if row.id not in owned_ids
+    ]
+    if not unowned_ids:
+        return []
+
+    admin_ids = [row.id for row in User.query.filter_by(is_admin=True).with_entities(User.id).all()]
+    if not admin_ids:
+        logger.info(f"Projects {unowned_ids} have no owner and there is no administrator to give them to")
+        return []
+
+    for project_id in unowned_ids:
+        for admin_id in admin_ids:
+            UserProjectService.add_or_update_user_project(user_id=admin_id, project_id=project_id, is_owner=True)
+    logger.info(f"Gave administrators {admin_ids} ownership of projects {unowned_ids}")
+    return unowned_ids
+
+
 # Create the app object at the module level
 app = None
-try:
-    app = create_flask_app()
-    
-    with app.app_context():
-        logger.info("Serving projects from database")
-        serve_projects_from_db(app)
-        logger.info("Starting - create_projects_from_filesystem")
-        serve_projects_from_filesystem(app, app.config['projects_base_dir'])
-except Exception as e:
-    logger.exception(f"Error during app initialization: {e}")
+# Importing this module starts the server: it builds the app, connects to the
+# database and registers a route for every project it finds, creating rows for
+# directories that have none. Anything that only needs a function from here sets
+# MDV_SKIP_SERVER_STARTUP=1 first.
+if os.environ.get('MDV_SKIP_SERVER_STARTUP') != '1':
+    try:
+        app = create_flask_app()
+
+        with app.app_context():
+            logger.info("Serving projects from database")
+            serve_projects_from_db(app)
+            logger.info("Starting - create_projects_from_filesystem")
+            serve_projects_from_filesystem(app, app.config['projects_base_dir'])
+            if ENABLE_AUTH:
+                # A directory copied into the Project root arrives with no owner,
+                # and startup has no user to attribute it to. The caches were
+                # filled before the scan ran, so they are rebuilt here.
+                if grant_admins_ownership_of_unowned_projects():
+                    cache_user_projects()
+                # On a deployment nobody has signed in to yet, report every missing
+                # first-administrator setting now, rather than one per failed login.
+                if (app.config.get("DEFAULT_AUTH_METHOD") or "").lower() == "auth0":
+                    try:
+                        from mdvtools.auth.auth0_provider import check_first_admin_setup
+
+                        check_first_admin_setup(app)
+                    except Exception as e:
+                        logger.warning(f"Could not check the first administrator setup: {e}")
+    except ExtensionError as e:
+        logger.exception(f"Error during app initialization: {e}")
+        raise
+    except Exception as e:
+        logger.exception(f"Error during app initialization: {e}")
 
 if __name__ == '__main__':
     logger.info("Inside main..")

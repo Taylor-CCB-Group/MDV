@@ -33,28 +33,25 @@ async function probe(url) {
         const t0 = Date.now();
         await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
         const tDom = Date.now();
-        await page.waitForFunction(
-            () => Boolean(window.mdv?.chartManager?.viewManager?.current_view),
-            null,
-            { timeout: 120_000 },
-        );
+        await page.waitForFunction(() => Boolean(window.mdv?.chartManager?.viewManager?.current_view), null, {
+            timeout: 120_000,
+        });
         const tCm = Date.now();
-        await page.waitForFunction(
-            () => Object.keys(window.mdv?.chartManager?.charts ?? {}).length > 0,
-            null,
-            { timeout: 120_000 },
-        );
+        await page.waitForFunction(() => Object.keys(window.mdv?.chartManager?.charts ?? {}).length > 0, null, {
+            timeout: 120_000,
+        });
         const tCharts = Date.now();
-        await page.evaluate(() =>
-            new Promise((r) => {
-                let n = 4;
-                const step = () => {
-                    n -= 1;
-                    if (n <= 0) r();
-                    else requestAnimationFrame(step);
-                };
-                requestAnimationFrame(step);
-            }),
+        await page.evaluate(
+            () =>
+                new Promise((r) => {
+                    let n = 4;
+                    const step = () => {
+                        n -= 1;
+                        if (n <= 0) r();
+                        else requestAnimationFrame(step);
+                    };
+                    requestAnimationFrame(step);
+                }),
         );
         const tSettled = Date.now();
 

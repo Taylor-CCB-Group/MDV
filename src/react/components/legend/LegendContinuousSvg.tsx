@@ -1,7 +1,7 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { axisBottom } from "d3";
 import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useBrushX } from "@/react/components/histogram/useBrushX";
 import {
     DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
@@ -50,9 +50,7 @@ export default function LegendContinuousSvg({
     const [observedWidth, setObservedWidth] = useState(width);
     const layout = getContinuousLegendLayout(observedWidth, Boolean(label));
     const colorStops = getGradientStops(colors);
-    const formattedLabel = label
-        ? formatLegendLabel(label, layout.labelMaxWidth)
-        : null;
+    const formattedLabel = label ? formatLegendLabel(label, layout.labelMaxWidth) : null;
     const brush = useMemo(
         () =>
             onRangeChange || activeRange
@@ -103,9 +101,7 @@ export default function LegendContinuousSvg({
         if (!axisG) {
             return;
         }
-        const scale = scaleLinear()
-            .domain([range[0], range[1]])
-            .range([0, layout.axisWidth]);
+        const scale = scaleLinear().domain([range[0], range[1]]).range([0, layout.axisWidth]);
         const axis = axisBottom(scale)
             .tickFormat((d) => formatContinuousTick(d, isDate))
             .ticks(layout.tickCount);
@@ -125,12 +121,7 @@ export default function LegendContinuousSvg({
     }, [layout.axisWidth, layout.tickCount, range, isDate]);
 
     return (
-        <svg
-            ref={svgRef}
-            height="100%"
-            width="100%"
-            className="relative overflow-hidden"
-        >
+        <svg ref={svgRef} height="100%" width="100%" className="relative overflow-hidden">
             <g>
                 {formattedLabel ? (
                     <g className="legend-continuous-drag-handle">
@@ -144,9 +135,7 @@ export default function LegendContinuousSvg({
                                 pointerEvents: "all",
                             }}
                         />
-                        {formattedLabel.truncated ? (
-                            <title>{formattedLabel.full}</title>
-                        ) : null}
+                        {formattedLabel.truncated ? <title>{formattedLabel.full}</title> : null}
                         <text
                             x={10}
                             y={3}
@@ -159,14 +148,7 @@ export default function LegendContinuousSvg({
                     </g>
                 ) : null}
                 <defs>
-                    <linearGradient
-                        id={gradientId}
-                        x1="0%"
-                        y1="0%"
-                        x2="100%"
-                        y2="0%"
-                        spreadMethod="pad"
-                    >
+                    <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%" spreadMethod="pad">
                         {colorStops.map((stop) => (
                             <stop
                                 key={`${stop.offset}-${stop.index}`}
@@ -184,10 +166,7 @@ export default function LegendContinuousSvg({
                     height={layout.barHeight}
                     fill={`url(#${gradientId})`}
                 />
-                <g
-                    ref={axisRef}
-                    transform={`translate(${layout.barX},${layout.barY + layout.barHeight})`}
-                />
+                <g ref={axisRef} transform={`translate(${layout.barX},${layout.barY + layout.barHeight})`} />
             </g>
         </svg>
     );

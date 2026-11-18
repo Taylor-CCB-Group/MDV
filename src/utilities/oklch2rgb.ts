@@ -1,6 +1,6 @@
 //from https://gist.github.com/dkaraush/65d19d61396f5f3cd8ba7d1b4b3c9432
 type Matrix = number[];
-type Vec3 = number[];//[number, number, number];
+type Vec3 = number[]; //[number, number, number];
 
 const multiplyMatrices = (A: Matrix, B: Matrix) => {
     return [
@@ -18,7 +18,9 @@ export const oklch2oklab = ([l, c, h]: Vec3) => [
 export const oklab2oklch = ([l, a, b]: Vec3) => [
     l,
     Math.sqrt(a ** 2 + b ** 2),
-    Math.abs(a) < 0.0002 && Math.abs(b) < 0.0002 ? Number.NaN : ((((Math.atan2(b, a) * 180) / Math.PI) % 360) + 360) % 360,
+    Math.abs(a) < 0.0002 && Math.abs(b) < 0.0002
+        ? Number.NaN
+        : ((((Math.atan2(b, a) * 180) / Math.PI) % 360) + 360) % 360,
 ];
 
 export const rgb2srgbLinear = (rgb: Vec3) =>

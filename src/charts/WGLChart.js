@@ -1,7 +1,8 @@
-import SVGChart from "./SVGChart.js";
-import { createEl } from "../utilities/Elements.js";
 import { hexToRGB } from "../datastore/DataStore.js";
+import { createEl } from "../utilities/Elements.js";
+import SVGChart from "./SVGChart.js";
 import "d3-transition";
+
 // import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class WGLChart extends SVGChart {
@@ -97,6 +98,13 @@ class WGLChart extends SVGChart {
     }
 
     showTooltip(e, index) {
+        const c = this.config.tooltip.column;
+        const column = this.dataStore.columnIndex[c];
+        // an active link may currently resolve to no column
+        if (!column) {
+            this.tooltip.style.display = "none";
+            return;
+        }
         const rect = this.graphDiv.getBoundingClientRect();
         const row = this.dataStore.getRowAsObject(index);
         const x = e.clientX - rect.left;
@@ -104,8 +112,6 @@ class WGLChart extends SVGChart {
         this.tooltip.style.display = "block";
         this.tooltip.style.left = `${x}px`;
         this.tooltip.style.top = `${y}px`;
-        const c = this.config.tooltip.column;
-        const column = this.dataStore.columnIndex[c];
         this.tooltip.textContent = `${column.name}: ${row[c]}`;
     }
 
@@ -290,16 +296,16 @@ class WGLChart extends SVGChart {
                 current_value: c.tooltip.show,
                 func: (x) => {
                     c.tooltip.show = x;
-                    // #297 degrades active link
-                    const cl = c.tooltip.column || cols[0].field;
+                    // keep an active link rather than degrading it to its concrete column #297
+                    const cl = this.activeQueries.activeValue("setToolTipColumn", c.tooltip.column) || cols[0].field;
                     this.setToolTipColumn(cl);
                 },
             },
             {
                 type: "column",
                 label: "Tooltip value",
-                // #297 degrades active link
-                current_value: c.tooltip.column || cols[0].field,
+                // use the active query (if any), not the concrete column name in the config #297
+                current_value: this.activeQueries.activeValue("setToolTipColumn", c.tooltip.column) || cols[0].field,
                 // values: [cols, "name", "field"],
                 func: (x) => {
                     // checkbox won't update as a result of this...

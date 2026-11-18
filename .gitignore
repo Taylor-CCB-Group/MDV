@@ -60,6 +60,8 @@ chat_debug.log
 
 # as seen inside devcontainer
 mdv/
+# dev container SQLite volume mount point; the database itself lives in the dev-db volume
+dev-db/
 logs/
 
 # Playwright
@@ -89,4 +91,9 @@ tests_playwright/test-data/temp/
 /python/mdvtools/llm/structured_schemas.py
 /scripts/python/mdvtools/llm/structured_schemas.py
 
+# Deployment-generated files
+.env.*
+.docker-deploy.*.override.yml
+
 .cursor/
+.venv/

@@ -1,61 +1,66 @@
-import { describe, test, expect, vi } from 'vitest';
-import { g } from '@/lib/utils';
-import type { AnyGuiSpec, Disposer } from '@/charts/charts';
-import { collectDisposers, createInitialFolderOpenState, getFolderOpenStateForSearchChange, resolveFolderOpenState } from './SettingsDialogComponent';
+import { describe, expect, test, vi } from "vitest";
+import type { AnyGuiSpec, Disposer } from "@/charts/charts";
+import { g } from "@/lib/utils";
+import {
+    collectDisposers,
+    createInitialFolderOpenState,
+    getFolderOpenStateForSearchChange,
+    resolveFolderOpenState,
+} from "./SettingsDialogComponent";
 
 // We need to export collectDisposers for testing
 // Since it's not exported, we'll test it indirectly through the component
 // or we can make it exported. For now, let's test the disposer collection logic directly.
 
-describe('Settings Dialog Disposer Management', () => {
-    test('collectDisposers collects disposers from flat specs', () => {
+describe("Settings Dialog Disposer Management", () => {
+    test("collectDisposers collects disposers from flat specs", () => {
         const disposer1 = vi.fn() as Disposer;
         const disposer2 = vi.fn() as Disposer;
-        
+
         const specs: AnyGuiSpec[] = [
             g({
-                type: 'slider',
-                label: 'Test Slider 1',
+                type: "slider",
+                label: "Test Slider 1",
                 current_value: 0.5,
                 _disposers: [disposer1],
             }),
             g({
-                type: 'slider',
-                label: 'Test Slider 2',
+                type: "slider",
+                label: "Test Slider 2",
                 current_value: 0.7,
                 _disposers: [disposer2],
             }),
         ];
-        
+
         const collected = collectDisposers(specs);
         expect(collected).toHaveLength(2);
         expect(collected).toContain(disposer1);
         expect(collected).toContain(disposer2);
     });
-    
-    test('collectDisposers collects disposers from nested folders', () => {
+
+    test("collectDisposers collects disposers from nested folders", () => {
         const disposer1 = vi.fn() as Disposer;
         const disposer2 = vi.fn() as Disposer;
         const disposer3 = vi.fn() as Disposer;
-        
+
         const specs: AnyGuiSpec[] = [
             g({
-                type: 'folder',
-                label: 'Outer Folder',
+                type: "folder",
+                label: "Outer Folder",
                 current_value: [
                     g({
-                        type: 'slider',
-                        label: 'Nested Slider',
+                        type: "slider",
+                        label: "Nested Slider",
                         current_value: 0.5,
                         _disposers: [disposer1],
                     }),
                     g({
-                        type: 'folder',
-                        label: 'Inner Folder',
+                        type: "folder",
+                        label: "Inner Folder",
                         current_value: [
                             g({
-                                type: 'slider',
-                                label: 'Deep Slider',
+                                type: "slider",
+                                label: "Deep Slider",
                                 current_value: 0.3,
                                 _disposers: [disposer2, disposer3],
                             }),
@@ -64,98 +69,98 @@ describe('Settings Dialog Disposer Management', () => {
                 ],
             }),
         ];
-        
+
         const collected = collectDisposers(specs);
         expect(collected).toHaveLength(3);
         expect(collected).toContain(disposer1);
         expect(collected).toContain(disposer2);
         expect(collected).toContain(disposer3);
     });
-    
-    test('collectDisposers handles specs without disposers', () => {
+
+    test("collectDisposers handles specs without disposers", () => {
         const disposer1 = vi.fn() as Disposer;
-        
+
         const specs: AnyGuiSpec[] = [
             g({
-                type: 'slider',
-                label: 'Slider with disposer',
+                type: "slider",
+                label: "Slider with disposer",
                 current_value: 0.5,
                 _disposers: [disposer1],
             }),
             g({
-                type: 'slider',
-                label: 'Slider without disposer',
+                type: "slider",
+                label: "Slider without disposer",
                 current_value: 0.7,
             }),
         ];
-        
+
         const collected = collectDisposers(specs);
         expect(collected).toHaveLength(1);
         expect(collected).toContain(disposer1);
     });
-    
-    test('collectDisposers handles empty specs array', () => {
+
+    test("collectDisposers handles empty specs array", () => {
         const specs: AnyGuiSpec[] = [];
         const collected = collectDisposers(specs);
         expect(collected).toHaveLength(0);
     });
-    
-    test('collectDisposers handles empty folders', () => {
+
+    test("collectDisposers handles empty folders", () => {
         const specs: AnyGuiSpec[] = [
             g({
-                type: 'folder',
-                label: 'Empty Folder',
+                type: "folder",
+                label: "Empty Folder",
                 current_value: [],
             }),
         ];
-        
+
         const collected = collectDisposers(specs);
         expect(collected).toHaveLength(0);
     });
-    
-    test('collectDisposers collects multiple disposers from same spec', () => {
+
+    test("collectDisposers collects multiple disposers from same spec", () => {
         const disposer1 = vi.fn() as Disposer;
         const disposer2 = vi.fn() as Disposer;
         const disposer3 = vi.fn() as Disposer;
-        
+
         const specs: AnyGuiSpec[] = [
             g({
-                type: 'slider',
-                label: 'Slider with multiple disposers',
+                type: "slider",
+                label: "Slider with multiple disposers",
                 current_value: 0.5,
                 _disposers: [disposer1, disposer2, disposer3],
             }),
         ];
-        
+
         const collected = collectDisposers(specs);
         expect(collected).toHaveLength(3);
         expect(collected).toContain(disposer1);
         expect(collected).toContain(disposer2);
         expect(collected).toContain(disposer3);
     });
-    
-    test('collectDisposers handles deeply nested folder structures', () => {
+
+    test("collectDisposers handles deeply nested folder structures", () => {
         const disposers: Disposer[] = [];
         for (let i = 0; i < 5; i++) {
             disposers.push(vi.fn() as Disposer);
         }
-        
+
         const specs: AnyGuiSpec[] = [
             g({
-                type: 'folder',
-                label: 'Level 1',
+                type: "folder",
+                label: "Level 1",
                 current_value: [
                     g({
-                        type: 'folder',
-                        label: 'Level 2',
+                        type: "folder",
+                        label: "Level 2",
                         current_value: [
                             g({
-                                type: 'folder',
-                                label: 'Level 3',
+                                type: "folder",
+                                label: "Level 3",
                                 current_value: [
                                     g({
-                                        type: 'slider',
-                                        label: 'Deep Slider',
+                                        type: "slider",
+                                        label: "Deep Slider",
                                         current_value: 0.5,
                                         _disposers: [disposers[0], disposers[1]],
                                     }),
@@ -169,7 +174,7 @@ describe('Settings Dialog Disposer Management', () => {
                 _disposers: [disposers[4]],
             }),
         ];
-        
+
         const collected = collectDisposers(specs);
         expect(collected).toHaveLength(5);
         disposers.forEach((disposer) => {
@@ -177,91 +182,103 @@ describe('Settings Dialog Disposer Management', () => {
         });
     });
 });
-describe('Settings dialog folder search state', () => {
-    test('opens a folder when it mounts during an active search', () => {
-        expect(createInitialFolderOpenState({
-            defaultOpen: false,
-            searchTerm: 'den',
-        })).toEqual({
+describe("Settings dialog folder search state", () => {
+    test("opens a folder when it mounts during an active search", () => {
+        expect(
+            createInitialFolderOpenState({
+                defaultOpen: false,
+                searchTerm: "den",
+            }),
+        ).toEqual({
             isOpen: true,
             isOpenBeforeSearch: false,
-            appliedSearchTerm: 'den',
+            appliedSearchTerm: "den",
         });
     });
 
-    test('opens a folder when search becomes active', () => {
-        expect(getFolderOpenStateForSearchChange({
-            currentSearchTerm: 'den',
-            folderState: {
-                isOpen: false,
-                isOpenBeforeSearch: false,
-                appliedSearchTerm: '',
-            },
-        })).toEqual({
+    test("opens a folder when search becomes active", () => {
+        expect(
+            getFolderOpenStateForSearchChange({
+                currentSearchTerm: "den",
+                folderState: {
+                    isOpen: false,
+                    isOpenBeforeSearch: false,
+                    appliedSearchTerm: "",
+                },
+            }),
+        ).toEqual({
             isOpen: true,
             isOpenBeforeSearch: false,
-            appliedSearchTerm: 'den',
+            appliedSearchTerm: "den",
         });
     });
 
-    test('keeps user-collapsed folder closed while search term is unchanged', () => {
-        expect(getFolderOpenStateForSearchChange({
-            currentSearchTerm: 'den',
-            folderState: {
-                isOpen: false,
-                isOpenBeforeSearch: true,
-                appliedSearchTerm: 'den',
-            },
-        })).toEqual({
+    test("keeps user-collapsed folder closed while search term is unchanged", () => {
+        expect(
+            getFolderOpenStateForSearchChange({
+                currentSearchTerm: "den",
+                folderState: {
+                    isOpen: false,
+                    isOpenBeforeSearch: true,
+                    appliedSearchTerm: "den",
+                },
+            }),
+        ).toEqual({
             isOpen: false,
             isOpenBeforeSearch: true,
-            appliedSearchTerm: 'den',
+            appliedSearchTerm: "den",
         });
     });
 
-    test('preserves a remembered child collapse state when remounted under the same search', () => {
-        expect(resolveFolderOpenState({
-            defaultOpen: false,
-            searchTerm: 'den',
-            folderState: {
-                isOpen: false,
-                isOpenBeforeSearch: false,
-                appliedSearchTerm: 'den',
-            },
-        })).toEqual({
+    test("preserves a remembered child collapse state when remounted under the same search", () => {
+        expect(
+            resolveFolderOpenState({
+                defaultOpen: false,
+                searchTerm: "den",
+                folderState: {
+                    isOpen: false,
+                    isOpenBeforeSearch: false,
+                    appliedSearchTerm: "den",
+                },
+            }),
+        ).toEqual({
             isOpen: false,
             isOpenBeforeSearch: false,
-            appliedSearchTerm: 'den',
+            appliedSearchTerm: "den",
         });
     });
 
-    test('reopens a folder when the active search term changes', () => {
-        expect(getFolderOpenStateForSearchChange({
-            currentSearchTerm: 'dens',
-            folderState: {
-                isOpen: false,
-                isOpenBeforeSearch: true,
-                appliedSearchTerm: 'den',
-            },
-        })).toEqual({
+    test("reopens a folder when the active search term changes", () => {
+        expect(
+            getFolderOpenStateForSearchChange({
+                currentSearchTerm: "dens",
+                folderState: {
+                    isOpen: false,
+                    isOpenBeforeSearch: true,
+                    appliedSearchTerm: "den",
+                },
+            }),
+        ).toEqual({
             isOpen: true,
             isOpenBeforeSearch: true,
-            appliedSearchTerm: 'dens',
+            appliedSearchTerm: "dens",
         });
     });
 
-    test('restores the pre-search open state when search is cleared', () => {
-        expect(getFolderOpenStateForSearchChange({
-            currentSearchTerm: '',
-            folderState: {
-                isOpen: true,
-                isOpenBeforeSearch: false,
-                appliedSearchTerm: 'den',
-            },
-        })).toEqual({
+    test("restores the pre-search open state when search is cleared", () => {
+        expect(
+            getFolderOpenStateForSearchChange({
+                currentSearchTerm: "",
+                folderState: {
+                    isOpen: true,
+                    isOpenBeforeSearch: false,
+                    appliedSearchTerm: "den",
+                },
+            }),
+        ).toEqual({
             isOpen: false,
             isOpenBeforeSearch: false,
-            appliedSearchTerm: '',
+            appliedSearchTerm: "",
         });
     });
 });

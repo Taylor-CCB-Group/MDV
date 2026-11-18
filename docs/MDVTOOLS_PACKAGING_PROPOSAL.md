@@ -165,7 +165,7 @@ llm     → auth    (chat_server_extension)      ┘
 
 ## 7. Open questions for standup
 
-1. **`required-version` exact pin** — #472 set `[tool.uv] required-version = "0.11.14"` (exact `==`), which fails on any uv drift (hit during this work). Consider relaxing to a range (e.g. `>=0.11.14,<0.12`).
+1. ~~**`required-version` exact pin**~~ — resolved: relaxed from the exact `0.11.14` pin (#472) to `>=0.11.14`.
 
 ---
 

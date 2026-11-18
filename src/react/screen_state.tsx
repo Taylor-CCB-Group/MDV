@@ -1,10 +1,10 @@
-import type BaseChart from "@/charts/BaseChart";
-import type { BaseDialog } from "@/utilities/Dialog";
-import { observer } from "mobx-react-lite";
-import { createContext, type ReactElement, useContext } from "react";
-import type { createMdvPortal } from "./react_utils";
 import createCache, { type EmotionCache } from "@emotion/cache";
 import { CacheProvider } from "@emotion/react";
+import { observer } from "mobx-react-lite";
+import { createContext, type ReactElement, useContext } from "react";
+import type BaseChart from "@/charts/BaseChart";
+import type { BaseDialog } from "@/utilities/Dialog";
+import type { createMdvPortal } from "./react_utils";
 
 /** All charts and dialogs have this as an `observable` property that can be passed to
  * {@link createMdvPortal} to allow access to the container they should render things like
@@ -19,17 +19,17 @@ let idCounter = 0;
 function numberToAlpha(n: number): string {
     let result = "";
     while (n > 0) {
-      const remainder = (n - 1) % 26;
-      result = String.fromCharCode(97 + remainder) + result;
-      n = Math.floor((n - 1) / 26);
+        const remainder = (n - 1) % 26;
+        result = String.fromCharCode(97 + remainder) + result;
+        n = Math.floor((n - 1) / 26);
     }
     return result;
 }
 
 // unique key generator
 export function generateCacheKey() {
-  idCounter++;
-  return `mui-${numberToAlpha(idCounter)}`;
+    idCounter++;
+    return `mui-${numberToAlpha(idCounter)}`;
 }
 
 // Cache map for storing EmotionCache for separate windows
@@ -55,9 +55,7 @@ export const OuterContainerProvider = observer(
         const cache = useEmotionCache(container);
         return (
             <OuterContainerContext.Provider value={container}>
-                <CacheProvider value={cache}>
-                    {children}
-                </CacheProvider>
+                <CacheProvider value={cache}>{children}</CacheProvider>
             </OuterContainerContext.Provider>
         );
     },

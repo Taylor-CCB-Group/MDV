@@ -1,13 +1,12 @@
-import * as React from "react";
 import DeckGL from "@deck.gl/react";
-import type { MjolnirEvent } from 'mjolnir.js';
+import { ScaleBarLayer } from "@hms-dbmi/viv";
+import type { DeckGLProps, OrbitViewState, OrthographicViewState, PickingInfo } from "deck.gl";
 // import { getVivId } from '@hms-dbmi/views';
 // No need to use the ES6 or React variants.
 import equal from "fast-deep-equal";
-import { ScaleBarLayer } from "@hms-dbmi/viv";
-import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } from "deck.gl";
+import type { MjolnirEvent } from "mjolnir.js";
+import * as React from "react";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
-import type { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 export function getVivId(id: string) {
     return `-#${id}#`;
@@ -15,7 +14,7 @@ export function getVivId(id: string) {
 export type ViewState = (OrthographicViewState | OrbitViewState) & { id: string }; //questionable
 // type ViewStates = { [id: string]: ViewState } & { find: any }; //highly questionable - should look at runtime/docs...
 export type ViewStates = ViewState[];
-export type View = {id: string} & any; //placeholder
+export type View = { id: string } & any; //placeholder
 export type VivPickInfo = PickingInfo<any, any> & { tile: any }; //placeholder
 const areViewStatesEqual = (viewState: ViewState, otherViewState?: ViewState) => {
     return (
@@ -75,7 +74,6 @@ export type VivViewerWrapperProps = {
     randomize?: boolean;
     useDevicePixels?: boolean;
     outerContainer?: HTMLElement;
-    selectionLayer?: EditableGeoJsonLayer;
 };
 export type VivViewerWrapperState = {
     viewStates: any;
@@ -90,14 +88,9 @@ export type VivViewerWrapperState = {
  * @property {HandleCoordinate} handleCoordinate
  * @ignore
  */
-class MDVivViewerWrapper extends React.PureComponent<
-    VivViewerWrapperProps,
-    VivViewerWrapperState
-> {
+class MDVivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivViewerWrapperState> {
     constructor(props: VivViewerWrapperProps) {
-        console.log(
-            "using custom VivViewerWrapper via MDVivViewer - now necessary for fixing mouse events on popouts",
-        );
+        console.log("using custom VivViewerWrapper via MDVivViewer - now necessary for fixing mouse events on popouts");
         super(props);
         this.state = {
             viewStates: {},
@@ -161,34 +154,20 @@ class MDVivViewerWrapper extends React.PureComponent<
         return viewState;
     }
 
-
-    /**
-     * prevent the deckMonkeypatch from double-binding etc.
-     * as of anything related to that, this is dubious and liable to need attention in the future.
-     */
-    _cleanupMouseEvents?: () => void;
     componentDidUpdate(prevProps: VivViewerWrapperProps) {
         const { props } = this;
-        const { views, outerContainer, selectionLayer } = props;
+        const { views, outerContainer } = props;
 
-        if (
-            outerContainer !== this.state.outerContainer &&
-            this.state.deckRef?.current
-        ) {
+        if (outerContainer !== this.state.outerContainer && this.state.deckRef?.current) {
             try {
                 this.setState({ outerContainer });
                 const deck = this.state.deckRef.current.deck;
-                this._cleanupMouseEvents?.();
-                //this should be common with DeckScatterComponent - make a helper/hook...
-                this._cleanupMouseEvents = rebindMouseEvents(deck, selectionLayer);
+                // class component, so it can't share useRebindDeckEvents
+                rebindMouseEvents(deck);
             } catch (e) {
-                console.error(
-                    "attempt to reset deck eventManager element failed",
-                    e,
-                );
+                console.error("attempt to reset deck eventManager element failed", e);
             }
         }
-        
 
         // Only update state if the previous viewState prop does not match the current one
         // so that people can update viewState
@@ -196,15 +175,11 @@ class MDVivViewerWrapper extends React.PureComponent<
         const viewStates = { ...this.state.viewStates };
         let anyChanged = false;
         views.forEach((view) => {
-            const currViewState = props.viewStates?.find(
-                (viewState) => viewState.id === view.id,
-            );
+            const currViewState = props.viewStates?.find((viewState) => viewState.id === view.id);
             if (!currViewState) {
                 return;
             }
-            const prevViewState = prevProps.viewStates?.find(
-                (viewState) => viewState.id === view.id,
-            );
+            const prevViewState = prevProps.viewStates?.find((viewState) => viewState.id === view.id);
             if (areViewStatesEqual(currViewState, prevViewState)) {
                 return;
             }
@@ -224,11 +199,6 @@ class MDVivViewerWrapper extends React.PureComponent<
             this.setState({ viewStates });
         }
     }
-    componentWillUnmount(): void {
-        this._cleanupMouseEvents?.();
-        this._cleanupMouseEvents = undefined;
-    }
-
     /**
      * This updates the viewStates' height and width with the newest height and
      * width on any call where the viewStates changes (i.e resize events),
@@ -252,8 +222,7 @@ class MDVivViewerWrapper extends React.PureComponent<
                 const currentViewState = prevState.viewStates[view.id];
                 viewStates[view.id] = view.filterViewState({
                     viewState: {
-                        ...(currentViewState ||
-                            viewStatesProps.find((v: any) => v.id === view.id)),
+                        ...(currentViewState || viewStatesProps.find((v: any) => v.id === view.id)),
                         height,
                         width,
                         id: view.id,
@@ -276,8 +245,7 @@ class MDVivViewerWrapper extends React.PureComponent<
             hoverHooks?.handleLeave?.();
             return null;
         }
-        const { handleValue = () => {}, handleCoordnate = () => {} } =
-            hoverHooks;
+        const { handleValue = () => {}, handleCoordnate = () => {} } = hoverHooks;
         let hoverData;
         // Tiled layer needs a custom layerZoomScale.
         if (layer.id.includes("Tiled")) {
@@ -355,13 +323,7 @@ class MDVivViewerWrapper extends React.PureComponent<
 
     render() {
         /* eslint-disable react/destructuring-assignment */
-        const {
-            views,
-            randomize,
-            useDevicePixels = true,
-            deckProps,
-            hoverHooks,
-        } = this.props;
+        const { views, randomize, useDevicePixels = true, deckProps, hoverHooks } = this.props;
         const { viewStates } = this.state;
         const deckGLViews = views.map((view) => view.getDeckGlView());
         // DeckGL seems to use the first view more than the second for updates
@@ -377,9 +339,7 @@ class MDVivViewerWrapper extends React.PureComponent<
             const holdFirstElement = deckGLViews[0];
             // weight has to go to 1.5 because we use Math.round().
             const randomWieghted = random * 1.49;
-            const randomizedIndex = Math.round(
-                randomWieghted * (views.length - 1),
-            );
+            const randomizedIndex = Math.round(randomWieghted * (views.length - 1));
             deckGLViews[0] = deckGLViews[randomizedIndex];
             deckGLViews[randomizedIndex] = holdFirstElement;
         }
@@ -388,9 +348,7 @@ class MDVivViewerWrapper extends React.PureComponent<
         const vivLayers = this._renderLayers()[0];
         const scaleBarLayer = vivLayers.find((layer: any) => layer instanceof ScaleBarLayer);
         const otherLayers = vivLayers.filter((layer: any) => layer !== scaleBarLayer);
-        const layers = deckProps?.layers === undefined
-            ? [vivLayers]
-            : [otherLayers, ...deckProps.layers];
+        const layers = deckProps?.layers === undefined ? [vivLayers] : [otherLayers, ...deckProps.layers];
         // XXX: including an undefined scaleBarLayer above causes some other layers to not render
         if (scaleBarLayer) {
             layers.push(scaleBarLayer);
@@ -400,18 +358,16 @@ class MDVivViewerWrapper extends React.PureComponent<
             ? {
                   ...deckProps,
                   getTooltip: (info: PickingInfo) => {
-                      const deckInstance = this.state.deckRef?.current && "deck" in this.state.deckRef.current
-                          ? this.state.deckRef.current.deck
-                          : null;
+                      const deckInstance =
+                          this.state.deckRef?.current && "deck" in this.state.deckRef.current
+                              ? this.state.deckRef.current.deck
+                              : null;
                       return getTooltip(getPickingInfoWithAlternates(info, deckInstance));
                   },
               }
             : deckProps;
         return (
-            <div
-                className="h-full w-full"
-                onMouseLeave={() => hoverHooks?.handleLeave?.()}
-            >
+            <div className="h-full w-full" onMouseLeave={() => hoverHooks?.handleLeave?.()}>
                 <DeckGL
                     // MDV: we mess with deck internals via ref to get eventManager to work in popouts
                     ref={this.state.deckRef}
@@ -438,6 +394,4 @@ class MDVivViewerWrapper extends React.PureComponent<
  * to fix issues with mouse events in popouts.
  * In future, we may handle more interesting things here to do with layer rendering.
  */
-export default (props: VivViewerWrapperProps) => (
-    <MDVivViewerWrapper {...props} />
-);
+export default (props: VivViewerWrapperProps) => <MDVivViewerWrapper {...props} />;

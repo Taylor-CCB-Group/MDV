@@ -1,8 +1,8 @@
+import { g, isArray } from "@/lib/utils";
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import type DataStore from "../../datastore/DataStore";
 import { BaseReactChart } from "./BaseReactChart";
 import { GeneNetworkChartComponent } from "./GeneNetworkChartComponent";
-import { g, isArray } from "@/lib/utils";
 
 export type GeneNetworkConfig = {
     /** Whether to auto-scroll to highlighted genes coming from external interactions. */
@@ -10,11 +10,7 @@ export type GeneNetworkConfig = {
 } & BaseConfig;
 
 class GeneNetworkChartWrapper extends BaseReactChart<GeneNetworkConfig> {
-    constructor(
-        dataStore: DataStore,
-        div: string | HTMLDivElement,
-        config: GeneNetworkConfig & BaseConfig,
-    ) {
+    constructor(dataStore: DataStore, div: string | HTMLDivElement, config: GeneNetworkConfig & BaseConfig) {
         if (config.autoScroll === undefined) config.autoScroll = true;
         super(dataStore, div, config, GeneNetworkChartComponent);
     }
@@ -60,5 +56,5 @@ BaseChart.types["geneNetwork"] = {
             type: ["text", "text16"],
             name: "Gene ID Column (text column containing gene identifiers)",
         },
-    ]
+    ],
 };

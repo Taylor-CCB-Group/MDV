@@ -1,7 +1,8 @@
+import { getDataSourceDisplayName } from "@/datastore/dataSourceDisplayName";
 import { createMdvPortal } from "@/react/react_utils";
-import type { ChartManager } from "../ChartManager.js";
 import type DataStore from "../../datastore/DataStore.js";
 import { BaseDialog } from "../../utilities/Dialog.js";
+import type { ChartManager } from "../ChartManager.js";
 import ColorPaletteComponent from "./ColorPaletteComponent";
 
 type ColorPaletteChartManager = Pick<ChartManager, "_sync_colors" | "dataSources" | "getDataSource">;
@@ -16,7 +17,7 @@ class ColorPaletteWrapper extends BaseDialog {
             {
                 width: 500,
                 height: 600,
-                title: `Color Palette for ${ds.name}`,
+                title: `Color Palette for ${getDataSourceDisplayName(ds.dataStore)}`,
             },
             null,
         );
@@ -39,7 +40,7 @@ class ColorPaletteWrapper extends BaseDialog {
         this.root = createMdvPortal(
             <ColorPaletteComponent
                 dataSource={this.dataSource}
-                dataSourceLabel={ds.name}
+                dataSourceLabel={getDataSourceDisplayName(ds.dataStore)}
                 onApply={(column, colors) => this.applyColors(column, colors)}
             />,
             container,

@@ -5,10 +5,15 @@ import logging
 import os
 import re
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 import numpy as np
 from ..serverlite import serve_project
+from .browser_store import (
+    BrowserStoreOptions,
+    check_browser_store_encoders,
+    write_spatialdata_store,
+)
 from .conversion_options import (
     DEFAULT_POINT_TRANSFORM,
     DEFAULT_TABLE_HANDLING,
@@ -45,6 +50,8 @@ class SpatialDataConversionArgs:
     compute_x_umap: bool = False
     leiden_resolution: float = 1.0
     table_handling: str = DEFAULT_TABLE_HANDLING
+    browser_store: BrowserStoreOptions = field(default_factory=BrowserStoreOptions)
+    spatial_url: str | None = None
 
 
 REGION_FIELD = "spatial_region"
@@ -164,6 +171,33 @@ def _is_single_spatialdata_source(spatialdata_path: str, sdata_paths: list[str])
     return len(sdata_paths) == 1 and os.path.abspath(sdata_paths[0]) == source_path
 
 
+def _validate_spatial_url(args: SpatialDataConversionArgs) -> None:
+    if args.spatial_url is None:
+        return
+    if not args.spatial_url.strip():
+        raise ValueError("--spatial-url must not be empty.")
+    if args.batch:
+        # A project referring to several objects needs a location per object; not supported yet.
+        raise ValueError("--spatial-url applies to a single store and cannot be combined with --batch.")
+    if args.link:
+        raise ValueError(
+            "--spatial-url and --link cannot be combined: with --spatial-url the store is "
+            "neither copied nor linked."
+        )
+    if args.browser_store.enabled:
+        raise ValueError(
+            f"Browser store rewrites ({args.browser_store.describe()}) apply to the project's "
+            "copy of the store and cannot be combined with --spatial-url."
+        )
+
+
+def _set_region_spatial_urls(regions: dict[str, dict], spatial_url: str) -> None:
+    """Point each region's `spatial.url` at where its (single) store is served from."""
+    for region in regions.values():
+        if "spatial" in region:
+            region["spatial"]["url"] = spatial_url
+
+
 @dataclass
 class ImageEntry:
     """
@@ -199,6 +233,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += f"- **Preserve existing**: {conversion_args.preserve_existing}\n"
         markdown += f"- **Output GeoJSON**: {conversion_args.output_geojson}\n"
         markdown += f"- **Link spatial data**: {conversion_args.link}\n"
+        markdown += f"- **Spatial store URL**: `{conversion_args.spatial_url}`\n"
         markdown += f"- **Batch mode**: {conversion_args.batch}\n"
         markdown += f"- **SpatialData source**: `{conversion_args.spatialdata_path}`\n"
         markdown += f"- **Obs datasource name**: `{conversion_args.obs_datasource_name}`\n"
@@ -207,6 +242,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += f"- **Compute X UMAP/Leiden**: {conversion_args.compute_x_umap}\n"
         markdown += f"- **Leiden resolution**: {conversion_args.leiden_resolution}\n"
         markdown += f"- **Table handling**: `{conversion_args.table_handling}`\n"
+        markdown += f"- **Browser store rewrites**: {conversion_args.browser_store.describe()}\n"
         markdown += "\n"
         if conversion_args.compute_x_umap:
             markdown += (
@@ -217,7 +253,10 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
     markdown += "## SpatialData objects:\n\n"
     spatial_dir = os.path.join(mdv.dir, "spatial")
 
-    if _try_read_zarr(spatial_dir, emit_warning=False) is not None:
+    if not os.path.isdir(spatial_dir):
+        # With --spatial-url the store is served from elsewhere and nothing is under spatial/.
+        sdata_candidates = []
+    elif _try_read_zarr(spatial_dir, emit_warning=False) is not None:
         sdata_candidates = [(os.path.basename(os.path.normpath(spatial_dir)), spatial_dir)]
     else:
         sdata_candidates = [
@@ -1399,7 +1438,12 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             - Original SpatialData files are NOT modified (symlinked)
             - Table modifications exist only in the merged AnnData object written to MDV
         
-        When args.link is False:
+        When args.spatial_url is set:
+            - SpatialData objects are neither copied nor linked; each region's
+              spatial.url says where the viewer loads its store from
+            - Table modifications exist only in the merged AnnData object written to MDV
+        
+        When args.link is False and args.spatial_url is not set:
             - SpatialData objects are copied and written with modified tables
             - The written SpatialData objects contain the modified tables
             - With compute_x_umap, copied tables also contain materialized
@@ -1425,6 +1469,14 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         date_str = build_info["git_commit_date"] or build_info["build_date"] or "unknown"
         _progress(f"MDV conversion (commit: {commit_short}, date: {date_str})")
     
+    if args.link and args.browser_store.enabled:
+        # Rewriting a linked store would modify the user's source data.
+        raise ValueError(
+            f"Browser store rewrites ({args.browser_store.describe()}) apply to the project's "
+            "copy of the store and cannot be combined with --link."
+        )
+    _validate_spatial_url(args)
+    check_browser_store_encoders(args.browser_store)
     sdata_paths = _discover_spatialdata_paths(args.spatialdata_path, batch=args.batch)
     single_source_input = _is_single_spatialdata_source(args.spatialdata_path, sdata_paths)
     _validate_table_handling(args.table_handling)
@@ -1582,6 +1634,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             _attach_table_group_metadata(mdv, group, args.table_handling)
 
             if group.regions:
+                if args.spatial_url is not None:
+                    _set_region_spatial_urls(group.regions, args.spatial_url)
                 obs_md = mdv.get_datasource_metadata(group.obs_datasource_name)
                 obs_md["regions"] = build_spatial_regions_metadata(group.regions, REGION_FIELD)
                 mdv.set_datasource_metadata(obs_md)
@@ -1608,6 +1662,12 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
             link_target,
             target_is_directory=True,
         )
+    elif args.spatial_url is not None:
+        _progress(f"Not copying the spatial input: the project reads it from '{args.spatial_url}'")
+        _emit(
+            "NOTE: The original SpatialData store is not modified. Table modifications exist only in the merged MDV project.",
+            verbose_only=True,
+        )
     else:
         _progress(f"Copying spatial inputs into '{mdv.dir}/spatial'")
         _emit(
@@ -1622,7 +1682,12 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         for sdata_path, sdata in sdata_objects.items():
             sdata_name = os.path.basename(sdata_path)
             # pay attention to format specifier here?
-            sdata.write(os.path.join(mdv.dir, "spatial", sdata_name))
+            write_spatialdata_store(
+                sdata,
+                os.path.join(mdv.dir, "spatial", sdata_name),
+                args.browser_store,
+                _progress,
+            )
     # move contents of temp_folder to output_folder/spatial
     # nb would probably rather avoid non spatialdata in spatial folder, 
     # especially if linking (should avoid side-effects in linked folder)
@@ -1650,6 +1715,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     # mdv.add_viv_images("cells", viv_data, link_images=False)
 
     if image_only_regions:
+        if args.spatial_url is not None:
+            _set_region_spatial_urls(image_only_regions, args.spatial_url)
         obs_md = mdv.get_datasource_metadata(primary_obs_datasource_name)
         obs_md["regions"] = build_spatial_regions_metadata(image_only_regions, REGION_FIELD)
         mdv.set_datasource_metadata(obs_md)
@@ -1697,6 +1764,8 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         compute_x_umap=args.compute_x_umap,
         leiden_resolution=args.leiden_resolution,
         table_handling=args.table_handling,
+        browser_store=args.browser_store,
+        spatial_url=args.spatial_url,
     )
     add_readme_to_project(mdv, primary_adata, readme_args)
     if args.serve:

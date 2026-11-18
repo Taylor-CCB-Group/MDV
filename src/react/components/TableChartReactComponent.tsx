@@ -1,25 +1,25 @@
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useState } from "react";
 import { SlickgridReact } from "slickgrid-react";
-import FindAndReplaceDialog from "./FindAndReplaceDialog";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import useEditCell from "../hooks/useEditCell";
 import useFindReplace from "../hooks/useFindReplace";
 import useSlickGridReact from "../hooks/useSlickGridReact";
-import useEditCell from "../hooks/useEditCell";
-import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
-import FeedbackAlertComponent, { type FeedbackAlert, isDebugError } from "./FeedbackAlertComponent";
 import AddTableColumnDialog from "./AddTableColumnDialog";
 import BulkEditColumnDialog from "./BulkEditColumnDialog";
 import ColumnRemovalImpactDialog from "./ColumnRemovalImpactDialog";
+import FeedbackAlertComponent, { type FeedbackAlert, isDebugError } from "./FeedbackAlertComponent";
+import FindAndReplaceDialog from "./FindAndReplaceDialog";
 import RenameTableColumnDialog from "./RenameTableColumnDialog";
 
 /**
  * Main component for the react table chart
- * 
+ *
  * Uses:
  * - useSlickGridReact: Core grid states, refs and events
  * - useFindReplace: Find and replace logic
  * - useEditCell: Cell editing logic
- * 
+ *
  * Wrapped in an observer to react to Mobx changes
  */
 // todo: add integration tests using playwright to test the working of this component
@@ -64,9 +64,12 @@ const TableChartReactComponent = observer(() => {
         openColumnRemovalView,
     } = useSlickGridReact();
 
-    const handleFeedbackAlert = useCallback((alert: FeedbackAlert) => {
-        setFeedbackAlert(alert);
-    }, [setFeedbackAlert]);
+    const handleFeedbackAlert = useCallback(
+        (alert: FeedbackAlert) => {
+            setFeedbackAlert(alert);
+        },
+        [setFeedbackAlert],
+    );
 
     useEffect(() => {
         setAlertDialogOpen(Boolean(feedbackAlert));
@@ -183,9 +186,7 @@ const TableChartReactComponent = observer(() => {
                         open={alertDialogOpen}
                         handleClose={onFeedbackDialogClose}
                         component={<FeedbackAlertComponent feedbackAlert={feedbackAlert} />}
-                        isAlertErrorComponent={
-                            !isDebugError(feedbackAlert)
-                        }
+                        isAlertErrorComponent={!isDebugError(feedbackAlert)}
                     />
                 </div>
             )}

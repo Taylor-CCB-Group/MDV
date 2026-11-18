@@ -1,10 +1,11 @@
-import { _allowStateChangesInsideComputed, action, makeAutoObservable } from "mobx";
+import { action, makeAutoObservable } from "mobx";
 import {
     createEl,
-    makeResizable,
     makeDraggable,
-    removeResizable,
+    makeResizable,
+    promoteIfStacked,
     removeDraggable,
+    removeResizable,
 } from "./Elements.js";
 
 class BaseDialog {
@@ -117,6 +118,7 @@ class BaseDialog {
         //may need to adjust its position depending on size
         //to avoid it being off screen
         this.getDialogContainer().append(this.outer);
+        promoteIfStacked(this.outer, stack);
 
         // Set the dialog position when constructor is called
         this._setDialogPosition();
@@ -124,7 +126,7 @@ class BaseDialog {
         this._resizeListener = () => this._setDialogPosition();
 
         // Add an event listener for resize event to resize and position the dialog
-        window.addEventListener('resize', this._resizeListener);
+        window.addEventListener("resize", this._resizeListener);
 
         // provide some observable mobx state for useOuterContainer()
         this.observable = makeAutoObservable({
@@ -145,10 +147,7 @@ class BaseDialog {
 
         //put it in the middle of the screen if no position specified
         if (!pos) {
-            pos = [
-                bbox.width / 2 - dbox.width / 2,
-                bbox.height / 2 - dbox.height / 2,
-            ];
+            pos = [bbox.width / 2 - dbox.width / 2, bbox.height / 2 - dbox.height / 2];
         }
 
         if (pos[0] + dbox.width > bbox.width) {
@@ -283,7 +282,7 @@ class BaseDialog {
 
         // remove resize event listener if it exists
         if (this._resizeListener) {
-            window.removeEventListener('resize', this._resizeListener);
+            window.removeEventListener("resize", this._resizeListener);
         }
 
         if (this.config.onclose) {

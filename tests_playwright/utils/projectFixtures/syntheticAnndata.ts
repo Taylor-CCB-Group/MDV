@@ -2,19 +2,20 @@
  * `generate_synthetic_anndata_project.py` → folder under `~/mdv` → `/rescan_projects` → registered project id.
  */
 
-import { expect, type Browser, type Page } from "@playwright/test";
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { type Browser, expect, type Page } from "@playwright/test";
 import { getProjectUrl } from "../projectUrl";
 import {
+    assertProjectPathUnregistered,
     deleteProjectViaApi,
     ensurePlaywrightMdvRoot,
+    generateProjectOffShare,
     listProjectsViaApi,
+    rescanUntilRegistered,
     shouldDeleteProjectOnCleanup,
-    triggerRescanProjects,
     waitForProjectReady,
 } from "./core";
 import { buildPythonPath, getPythonCandidates, REPO_ROOT } from "./pythonEnv";
@@ -67,10 +68,7 @@ export type SharedSyntheticAnndataSuiteHandle = SyntheticAnndataTemporaryProject
 /** @deprecated Use {@link SyntheticAnndataTemporaryProjectHandle}. */
 export type AnndataRescanTemporaryProjectHandle = SyntheticAnndataTemporaryProjectHandle;
 
-async function runSyntheticAnndataProjectCli(
-    projectPath: string,
-    synthetic: SyntheticAnndataGeneratorCliArgs,
-) {
+async function runSyntheticAnndataProjectCli(projectPath: string, synthetic: SyntheticAnndataGeneratorCliArgs) {
     const pythonProjectDir = path.join(REPO_ROOT, "python");
     const profile = synthetic.profile ?? "minimal";
     const nCells = synthetic.nCells ?? 1000;
@@ -129,9 +127,7 @@ async function runSyntheticAnndataProjectCli(
         }
     }
 
-    throw new Error(
-        `Unable to run mdvtools.tests.generate_synthetic_anndata_project.\n${errors.join("\n")}`,
-    );
+    throw new Error(`Unable to run mdvtools.tests.generate_synthetic_anndata_project.\n${errors.join("\n")}`);
 }
 
 export async function createTemporaryProjectViaSyntheticAnndata(
@@ -141,30 +137,24 @@ export async function createTemporaryProjectViaSyntheticAnndata(
     const deleteOnCleanup = shouldDeleteProjectOnCleanup(options.deleteOnCleanup);
     const mdvRoot = options.mdvRoot ?? (await ensurePlaywrightMdvRoot());
 
-    const nameSegment =
-        options.nameSegment ??
-        `synth-anndata--playwright-rescan--minimal--${Date.now()}`;
+    const nameSegment = options.nameSegment ?? `synth-anndata--playwright-rescan--minimal--${Date.now()}`;
     const projectPath = options.projectPath ?? path.join(mdvRoot, nameSegment);
+
+    // before `try`: its catch deletes projectPath, which must not touch an existing project
+    const projectsBefore = await listProjectsViaApi(page.request);
+    const projectIdsBefore = new Set(projectsBefore.map((project) => String(project.id)));
+    assertProjectPathUnregistered(projectsBefore, projectPath);
 
     let projectId: string | undefined;
 
     try {
-        const projectsBefore = await listProjectsViaApi(page.request);
-        const projectIdsBefore = new Set(projectsBefore.map((project) => String(project.id)));
-
-        await runSyntheticAnndataProjectCli(projectPath, options.synthetic ?? {});
-        await triggerRescanProjects(page.request);
-
-        const projectsAfter = await listProjectsViaApi(page.request);
-        const createdProject =
-            projectsAfter.find((project) => project.path === projectPath) ??
-            projectsAfter.find((project) => project.name === nameSegment) ??
-            projectsAfter.find((project) => !projectIdsBefore.has(String(project.id)));
+        await generateProjectOffShare(projectPath, (stagingPath) =>
+            runSyntheticAnndataProjectCli(stagingPath, options.synthetic ?? {}),
+        );
+        const createdProject = await rescanUntilRegistered(page.request, projectPath, projectIdsBefore);
         expect(createdProject).toBeTruthy();
         if (!createdProject) {
-            throw new Error(
-                "Synthetic AnnData project was generated but was not registered by /rescan_projects.",
-            );
+            throw new Error("Synthetic AnnData project was generated but was not registered by /rescan_projects.");
         }
         projectId = String(createdProject.id);
 

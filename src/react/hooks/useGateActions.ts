@@ -1,15 +1,15 @@
-import { useCallback } from "react";
-import { useGateManager } from "../gates/useGateManager";
-import { useParamColumns } from "../hooks";
-import type { Gate } from "../gates/types";
-import { computeCentroid, DEFAULT_GATE_COLOR, generateGateId } from "../gates/gateUtils";
-import { useSpatialLayers } from "../spatial_context";
+import type { GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import { action } from "mobx";
-import { getEmptyFeatureCollection } from "../deck_state";
-import { useChart } from "../context";
+import { useCallback } from "react";
 import type { DeckScatterConfig } from "../components/DeckScatterReactWrapper";
 import { Tools } from "../components/SelectionOverlay";
-import type { GeoJsonEditMode } from "@deck.gl-community/editable-layers";
+import { useChart } from "../context";
+import { getEmptyFeatureCollection } from "../deck_state";
+import { computeCentroid, DEFAULT_GATE_COLOR, generateGateId } from "../gates/gateUtils";
+import type { Gate } from "../gates/types";
+import { useGateManager } from "../gates/useGateManager";
+import { useParamColumns } from "../hooks";
+import { useSpatialLayers } from "../spatial_context";
 
 const useGateActions = () => {
     const gateManager = useGateManager();
@@ -23,7 +23,7 @@ const useGateActions = () => {
         setSelectionFeatureCollection,
         setSelectionMode,
     } = selectionProps;
-    const chart = useChart<DeckScatterConfig & {region?: string}>();
+    const chart = useChart<DeckScatterConfig & { region?: string }>();
 
     const clearSelection = useCallback(() => {
         action(() => {

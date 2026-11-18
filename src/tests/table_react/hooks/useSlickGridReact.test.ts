@@ -1,10 +1,10 @@
-import useSlickGridReact from "@/react/hooks/useSlickGridReact";
-import { renderHook, act } from "@testing-library/react";
-import { describe, test, expect, beforeEach, vi } from "vitest";
+import { act, renderHook } from "@testing-library/react";
 import { observable, runInAction } from "mobx";
-import type { TableChartReactConfig } from "@/react/components/TableChartReactWrapper";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
+import type { TableChartReactConfig } from "@/react/components/TableChartReactWrapper";
+import useSlickGridReact from "@/react/hooks/useSlickGridReact";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 // Mock all the context hooks
@@ -101,7 +101,7 @@ describe("useSlickGridReact", () => {
                 data: new Uint32Array([65, 66, 65, 0]),
                 stringLength: 2,
                 editable: true,
-            }
+            },
         ] as any;
 
         mockSortedIndices = new Uint32Array([0, 1, 2]);
@@ -162,9 +162,7 @@ describe("useSlickGridReact", () => {
             columns: mockOrderedParamColumns,
             size: 3,
             name: "test-ds",
-            columnIndex: Object.fromEntries(
-                mockOrderedParamColumns.map((column) => [column.field, column]),
-            ),
+            columnIndex: Object.fromEntries(mockOrderedParamColumns.map((column) => [column.field, column])),
         };
 
         mockChart = {
@@ -213,10 +211,11 @@ describe("useSlickGridReact", () => {
             expect(result.current.columnDefs[2].field).toBe("name");
         });
 
-        test("should include remove column in editable column header menu", () => {
+        test("should include curation and data commands for an editable column", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             const ageColumn = result.current.columnDefs.find((col) => col.field === "age");
+            // curation (rename, delete) is grouped before data (bulk edit)
             expect(ageColumn?.header?.menu?.commandItems).toEqual([
                 {
                     command: "find-replace",
@@ -229,21 +228,23 @@ describe("useSlickGridReact", () => {
                     iconCssClass: "mdi mdi-pencil",
                 },
                 {
+                    command: "remove-column",
+                    title: "Delete Column",
+                    iconCssClass: "mdi mdi-delete",
+                },
+                {
                     command: "bulk-edit",
                     title: "Bulk Edit",
                     iconCssClass: "mdi mdi-table-edit",
                 },
-                                    {
-                                        command: "remove-column",
-                                        title: "Delete Column",
-                                        iconCssClass: "mdi mdi-delete",
-                                    },
             ]);
         });
 
-        test("should not include remove column for non-editable column", () => {
+        test("should include curation but not bulk edit for a non-editable column", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
+            // `editable` governs overwriting values, not curation: a read-only column can
+            // still be renamed and hidden. See ADR-0003.
             const nameColumn = result.current.columnDefs.find((col) => col.field === "name");
             expect(nameColumn?.header?.menu?.commandItems).toEqual([
                 {
@@ -251,10 +252,20 @@ describe("useSlickGridReact", () => {
                     title: "Find",
                     iconCssClass: "mdi mdi-magnify",
                 },
+                {
+                    command: "rename-column",
+                    title: "Rename Column",
+                    iconCssClass: "mdi mdi-pencil",
+                },
+                {
+                    command: "remove-column",
+                    title: "Delete Column",
+                    iconCssClass: "mdi mdi-delete",
+                },
             ]);
         });
 
-        test("should not include rename for query-backed editable columns", () => {
+        test("should not include rename or delete for query-backed editable columns", () => {
             mockOrderedParamColumns = [
                 {
                     ...mockOrderedParamColumns[0],
@@ -266,6 +277,8 @@ describe("useSlickGridReact", () => {
             const { result } = renderHook(() => useSlickGridReact());
 
             const ageColumn = result.current.columnDefs.find((col) => col.field === "age");
+            // the structural predicate excludes spatial geometry columns from BOTH curation
+            // commands; bulk edit remains because the column is still editable
             expect(ageColumn?.header?.menu?.commandItems).toEqual([
                 {
                     command: "find-replace",
@@ -276,11 +289,6 @@ describe("useSlickGridReact", () => {
                     command: "bulk-edit",
                     title: "Bulk Edit",
                     iconCssClass: "mdi mdi-table-edit",
-                },
-                {
-                    command: "remove-column",
-                    title: "Delete Column",
-                    iconCssClass: "mdi mdi-delete",
                 },
             ]);
         });
@@ -457,17 +465,44 @@ describe("useSlickGridReact", () => {
                 message: "This column cannot be renamed.",
             });
         });
+
+        test("should block delete for query-backed columns", async () => {
+            mockOrderedParamColumns[0] = {
+                ...mockOrderedParamColumns[0],
+                sgtype: "query",
+            } as any;
+            mockDataStore.columnIndex.age = mockOrderedParamColumns[0];
+
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
+
+            await act(async () => {
+                headerMenuHandler({
+                    column: { field: "age" },
+                    command: "remove-column",
+                });
+                await Promise.resolve();
+            });
+
+            expect(analyzeColumnRemoval).not.toHaveBeenCalled();
+            expect(result.current.pendingColumnRemoval).toBeNull();
+            expect(result.current.feedbackAlert).toEqual({
+                type: "warning",
+                title: "Delete Column Warning",
+                message: "This column cannot be deleted.",
+            });
+        });
     });
 
     describe("rename column", () => {
-        test("should rename an editable column without changing the param config", () => {
+        test("should rename an editable column without changing the param config", async () => {
             const { result } = renderHook(() => useSlickGridReact());
             const { gridInstance } = setupGrid(result);
             const liveColumns = [{ field: "age", name: "Age" }];
             gridInstance.slickGrid.getColumns = vi.fn(() => liveColumns as any);
 
-            act(() => {
-                result.current.handleRenameColumn({
+            await act(async () => {
+                await result.current.handleRenameColumn({
                     columnField: "age",
                     newName: "Age label",
                 });
@@ -483,14 +518,14 @@ describe("useSlickGridReact", () => {
             expect(result.current.renameColumnState).toBeNull();
         });
 
-        test("should escape html when updating the column header", () => {
+        test("should escape html when updating the column header", async () => {
             const { result } = renderHook(() => useSlickGridReact());
             const { gridInstance } = setupGrid(result);
             const liveColumns = [{ field: "age", name: "Age" }];
             gridInstance.slickGrid.getColumns = vi.fn(() => liveColumns as any);
 
-            act(() => {
-                result.current.handleRenameColumn({
+            await act(async () => {
+                await result.current.handleRenameColumn({
                     columnField: "age",
                     newName: `<img src=x onerror=alert('xss')>`,
                 });
@@ -500,9 +535,7 @@ describe("useSlickGridReact", () => {
                 "age",
                 expect.stringContaining("&lt;img src=x onerror=alert(&#39;xss&#39;)&gt;"),
             );
-            expect(liveColumns[0].name).toContain(
-                "&lt;img src=x onerror=alert(&#39;xss&#39;)&gt;",
-            );
+            expect(liveColumns[0].name).toContain("&lt;img src=x onerror=alert(&#39;xss&#39;)&gt;");
         });
 
         test("should reject duplicate display names", () => {
@@ -539,6 +572,59 @@ describe("useSlickGridReact", () => {
                 title: "Rename Column Warning",
                 message: "Column name is required.",
             });
+        });
+
+        test("should save the view so the rename is not lost", async () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            setupGrid(result);
+
+            await act(async () => {
+                await result.current.handleRenameColumn({
+                    columnField: "age",
+                    newName: "Age label",
+                });
+            });
+
+            expect(mockChartManager.viewManager.saveView).toHaveBeenCalledTimes(1);
+            expect(result.current.feedbackAlert).toBeNull();
+        });
+
+        test("should not save when the name was already the same", async () => {
+            mockDataStore.renameColumnDisplayName = vi.fn(() => false);
+            const { result } = renderHook(() => useSlickGridReact());
+            setupGrid(result);
+
+            await act(async () => {
+                await result.current.handleRenameColumn({
+                    columnField: "age",
+                    newName: "Age label",
+                });
+            });
+
+            expect(mockChartManager.viewManager.saveView).not.toHaveBeenCalled();
+        });
+
+        test("should report when the rename applied but the view save failed", async () => {
+            // saveView() swallows its own errors, so hasUnsavedChanges is the only failure signal
+            mockChartManager.viewManager.hasUnsavedChanges = vi.fn(() => true);
+            const { result } = renderHook(() => useSlickGridReact());
+            setupGrid(result);
+
+            await act(async () => {
+                await result.current.handleRenameColumn({
+                    columnField: "age",
+                    newName: "Age label",
+                });
+            });
+
+            expect(mockDataStore.renameColumnDisplayName).toHaveBeenCalledWith("age", "Age label");
+            expect(result.current.feedbackAlert).toEqual(
+                expect.objectContaining({
+                    type: "error",
+                    title: "Rename Column Error",
+                    message: expect.stringContaining("saving the view failed"),
+                }),
+            );
         });
     });
 
@@ -915,11 +1001,14 @@ describe("useSlickGridReact", () => {
             const { result } = renderHook(() => useSlickGridReact());
             const { gridInstance } = setupGrid(result);
 
-            gridInstance.slickGrid.getColumns = vi.fn(() => [
-                { field: "id", width: 100 },
-                { field: "age", width: 100 },
-                { field: "name", width: 100 },
-            ] as any);
+            gridInstance.slickGrid.getColumns = vi.fn(
+                () =>
+                    [
+                        { field: "id", width: 100 },
+                        { field: "age", width: 100 },
+                        { field: "name", width: 100 },
+                    ] as any,
+            );
 
             act(() => {
                 result.current.handleAddColumn({
@@ -1183,11 +1272,7 @@ describe("useSlickGridReact", () => {
                 });
             });
 
-            expect(mockChartManager.loadColumnSet).toHaveBeenCalledWith(
-                ["surname"],
-                "test-ds",
-                expect.any(Function),
-            );
+            expect(mockChartManager.loadColumnSet).toHaveBeenCalledWith(["surname"], "test-ds", expect.any(Function));
             expect(mockDataStore.addColumn).toHaveBeenCalledTimes(1);
         });
 
@@ -1265,9 +1350,7 @@ describe("useSlickGridReact", () => {
 
         test("should reject duplicate column names when the field exists in active metadata", () => {
             mockDataStore.columnIndex = {};
-            mockDataStore.getAllColumnsMetadata.mockReturnValueOnce([
-                { field: "age", name: "Age", datatype: "text" },
-            ]);
+            mockDataStore.getAllColumnsMetadata.mockReturnValueOnce([{ field: "age", name: "Age", datatype: "text" }]);
             const { result } = renderHook(() => useSlickGridReact());
 
             act(() => {
@@ -1331,13 +1414,7 @@ describe("useSlickGridReact", () => {
         test("should drop stale deleted plain-string params before adding a brand-new column", () => {
             mockDataStore.columnIndex = {};
             mockConfig.param = ["age", "column 5", "column 6", "name", "id"] as typeof mockConfig.param;
-            mockChart.activeQueries.activeParams.mockReturnValue([
-                "age",
-                "column 5",
-                "column 6",
-                "name",
-                "id",
-            ]);
+            mockChart.activeQueries.activeParams.mockReturnValue(["age", "column 5", "column 6", "name", "id"]);
 
             const { result } = renderHook(() => useSlickGridReact());
 
@@ -1395,11 +1472,14 @@ describe("useSlickGridReact", () => {
             const { result } = renderHook(() => useSlickGridReact());
             const { columnsResizedHandler, gridInstance } = setupGrid(result);
 
-            gridInstance.slickGrid.getColumns = vi.fn(() => [
-                { field: "age", width: 180 },
-                { field: "name", width: 260 },
-                { field: "id", width: 100 },
-            ] as any);
+            gridInstance.slickGrid.getColumns = vi.fn(
+                () =>
+                    [
+                        { field: "age", width: 180 },
+                        { field: "name", width: 260 },
+                        { field: "id", width: 100 },
+                    ] as any,
+            );
 
             act(() => {
                 columnsResizedHandler?.({}, {});

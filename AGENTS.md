@@ -30,3 +30,21 @@ For the SpatialData chart image layer panel (`ImageLayerPanel`, `ColorChannelCom
 - Per-panel zustand (`VivProvider`) is a one-way UI projection only, not a second persistence path.
 - If controls lag or the histogram brush fights itself, fix state ownership/wiring (see `docs/spatialdata-vis-integration.md` § Image channel controls). Debouncing here masks design problems.
 - Do not bump `renderStackGeneration` on in-place `props` patches (channels, tone, opacity); that recreates `vivPassthrough` and stalls the spatial renderer.
+
+### Spatial performance
+
+- Measure before changing anything. `src/react/spatialdata/perf.ts` is the **only**
+  instrumentation mechanism for this path — add a label there rather than a second one.
+  It documents each label and what a healthy capture looks like.
+- Enable with `localStorage.MDV_SPATIAL_PERF = "1"` and a reload; disable with
+  `__disableSpatialPerf()` and a reload. **It is sticky** — it survives reloads and branch
+  switches, it warns loudly on every load while set, and a capture taken with a flag someone
+  else set last week is how you end up measuring the instrumentation. Turn it off when done.
+- A cosmetic prop edit (opacity, colour, stroke) must not reload geometry. If
+  `shapes.loadRenderData` appears more than once per element in a capture, something is
+  re-entering the render-data effect — usually a fresh array or object identity reaching its
+  deps, because the adapter shallow-copies the layer record on every props bump by design.
+- Layer configs are mutated **in place** for cosmetic props. Anything that derives from
+  `layerInputs.layers` therefore has to be keyed by value, not identity, or it will churn on
+  every edit; and anything that hands the canvas *copies* has to keep re-copying, so cache the
+  expensive work inside it rather than skipping the whole step.

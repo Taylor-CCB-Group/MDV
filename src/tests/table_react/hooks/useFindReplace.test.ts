@@ -1,9 +1,9 @@
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
-import useFindReplace from "@/react/hooks/useFindReplace";
 import type { FeedbackAlert } from "@/react/components/FeedbackAlertComponent";
-import { renderHook, act } from "@testing-library/react";
-import { describe, test, expect, beforeEach, vi } from "vitest";
+import useFindReplace from "@/react/hooks/useFindReplace";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 
 describe("useFindReplace", () => {
@@ -13,7 +13,7 @@ describe("useFindReplace", () => {
     let searchColumn: string | null;
     let config: { include_index?: boolean };
     let gridRef: React.MutableRefObject<any>;
-    let selectionSourceRef: React.MutableRefObject<'user' | 'programmatic' | null>;
+    let selectionSourceRef: React.MutableRefObject<"user" | "programmatic" | null>;
     let setFeedbackAlert: (alert: FeedbackAlert) => void;
     let mockGridInstance: ReturnType<typeof createSlickGridMock>;
 
@@ -31,7 +31,7 @@ describe("useFindReplace", () => {
                 editable: true,
                 getValue: vi.fn((dataIndex: number) => {
                     return orderedParamColumns[0].data[dataIndex];
-                })
+                }),
             },
             {
                 field: "cell_type",
@@ -43,7 +43,7 @@ describe("useFindReplace", () => {
                     const column = orderedParamColumns[1];
                     const valueIndex = column.data[dataIndex];
                     return column.values[valueIndex] || null;
-                })
+                }),
             },
         ] as any;
 
@@ -100,11 +100,11 @@ describe("useFindReplace", () => {
                     true,
                 ),
             );
-        
+
             act(() => {
-                result.current.handleFind("B CELLS");  // uppercase search
+                result.current.handleFind("B CELLS"); // uppercase search
             });
-        
+
             expect(result.current.foundMatches).toHaveLength(1);
             expect(result.current.foundMatches[0].value).toBe("B cells");
         });
@@ -361,13 +361,12 @@ describe("useFindReplace", () => {
                 expect.objectContaining({
                     type: "success",
                     title: "Replace Successful",
-                    message: expect.stringContaining(`Replaced T cells with T lymphocytes in column: ${searchColumn}`)
-                })
+                    message: expect.stringContaining(`Replaced T cells with T lymphocytes in column: ${searchColumn}`),
+                }),
             );
         });
 
         test("should show error if permission not editable", () => {
-
             const { result } = renderHook(() =>
                 useFindReplace(
                     orderedParamColumns,
@@ -485,8 +484,10 @@ describe("useFindReplace", () => {
                 expect.objectContaining({
                     type: "success",
                     title: "Replace All Successful",
-                    message: expect.stringContaining(`Replaced 3 occurrences of cells with lymphocytes in column: ${searchColumn}`)
-                })
+                    message: expect.stringContaining(
+                        `Replaced 3 occurrences of cells with lymphocytes in column: ${searchColumn}`,
+                    ),
+                }),
             );
         });
 

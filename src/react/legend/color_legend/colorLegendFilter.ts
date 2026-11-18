@@ -16,9 +16,7 @@ export type ColorLegendContinuousFilter = {
     range: [number, number];
 };
 
-export type ColorLegendFilter =
-    | ColorLegendCategoricalFilter
-    | ColorLegendContinuousFilter;
+export type ColorLegendFilter = ColorLegendCategoricalFilter | ColorLegendContinuousFilter;
 
 export type ColorLegendFilterChart = {
     config: {
@@ -35,14 +33,8 @@ export type ColorLegendFilterChart = {
     updateResetButtonVisibility(): void;
 };
 
-function getColorLegendFilterDimension(
-    chart: ColorLegendFilterChart,
-    filter: ColorLegendFilter,
-): Dimension {
-    if (
-        chart.colorLegendFilterDimension &&
-        chart.colorLegendFilterDimensionKind !== filter.kind
-    ) {
+function getColorLegendFilterDimension(chart: ColorLegendFilterChart, filter: ColorLegendFilter): Dimension {
+    if (chart.colorLegendFilterDimension && chart.colorLegendFilterDimensionKind !== filter.kind) {
         chart.colorLegendFilterDimension.destroy(false);
         chart.colorLegendFilterDimension = null;
         chart.colorLegendFilterDimensionKind = null;
@@ -50,12 +42,10 @@ function getColorLegendFilterDimension(
     if (!chart.colorLegendFilterDimension) {
         switch (filter.kind) {
             case "categorical":
-                chart.colorLegendFilterDimension =
-                    chart.dataStore.getDimension("category_dimension");
+                chart.colorLegendFilterDimension = chart.dataStore.getDimension("category_dimension");
                 break;
             case "continuous":
-                chart.colorLegendFilterDimension =
-                    chart.dataStore.getDimension("range_dimension");
+                chart.colorLegendFilterDimension = chart.dataStore.getDimension("range_dimension");
                 break;
         }
         chart.colorLegendFilterDimensionKind = filter.kind;
@@ -91,10 +81,7 @@ export function getActiveContinuousColorLegendRange(
     return chart.colorLegendFilter.range;
 }
 
-export function clearColorLegendFilter(
-    chart: ColorLegendFilterChart,
-    updateLegend = true,
-): void {
+export function clearColorLegendFilter(chart: ColorLegendFilterChart, updateLegend = true): void {
     if (!chart.colorLegendFilter && !chart.config.color_legend?.filter) {
         return;
     }
@@ -121,21 +108,12 @@ export function applyColorLegendFilter(
 
     switch (filter.kind) {
         case "categorical":
-            dimension.filter(
-                "filterCategories",
-                [filter.column],
-                filter.value,
-            );
+            dimension.filter("filterCategories", [filter.column], filter.value);
             break;
         case "continuous":
             // This mirrors SelectionDialog's numeric filter path:
             // RangeDimension.filterRange keeps rows where column is between min and max.
-            dimension.filter(
-                "filterRange",
-                [filter.column],
-                { min: filter.range[0], max: filter.range[1] },
-                true,
-            );
+            dimension.filter("filterRange", [filter.column], { min: filter.range[0], max: filter.range[1] }, true);
             break;
     }
     chart.updateResetButtonVisibility();
@@ -192,29 +170,19 @@ export function setContinuousColorLegendFilter(
     );
 }
 
-export function restoreColorLegendFilter(
-    chart: ColorLegendFilterChart,
-    spec: ColorLegendSpec,
-): void {
+export function restoreColorLegendFilter(chart: ColorLegendFilterChart, spec: ColorLegendSpec): void {
     if (chart.colorLegendFilter) {
         chart.updateResetButtonVisibility();
         return;
     }
     const savedFilter = chart.config.color_legend?.filter;
-    if (
-        !savedFilter ||
-        savedFilter.column !== spec.column ||
-        savedFilter.kind !== spec.kind
-    ) {
+    if (!savedFilter || savedFilter.column !== spec.column || savedFilter.kind !== spec.kind) {
         return;
     }
     applyColorLegendFilter(chart, savedFilter, false);
 }
 
-export function destroyColorLegendFilter(
-    chart: ColorLegendFilterChart,
-    notify?: boolean,
-): void {
+export function destroyColorLegendFilter(chart: ColorLegendFilterChart, notify?: boolean): void {
     chart.colorLegendFilterDimension?.destroy(notify);
     chart.colorLegendFilterDimension = null;
     chart.colorLegendFilterDimensionKind = null;

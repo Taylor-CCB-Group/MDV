@@ -1,10 +1,6 @@
-import { useColorMode } from "@/ThemeProvider";
 import {
     Add,
-    Check,
-    CheckBoxOutlined,
     Checklist,
-    Close,
     DeleteOutline,
     Done,
     Download as DownloadIcon,
@@ -17,8 +13,8 @@ import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
 import HelpIcon from "@mui/icons-material/Help";
 import {
-    AppBar,
     Alert,
+    AppBar,
     Backdrop,
     Box,
     Button,
@@ -26,7 +22,6 @@ import {
     CircularProgress,
     Container,
     Divider,
-    Grid2 as Grid,
     IconButton,
     InputBase,
     Menu,
@@ -37,39 +32,59 @@ import {
     Typography,
     useTheme,
 } from "@mui/material";
+import { RefreshCwIcon } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
+import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
+import ImportProjectDialog from "@/react/components/ImportProjectDialog";
+import { useColorMode } from "@/ThemeProvider";
+import { buildProjectUrl, shouldShowLocalBackendNotice } from "@/utils/mdvRouting";
+import mdvLogo from "./assets/mdv_logo.png";
+import BulkDeleteProjectsDialog from "./components/BulkDeleteProjectsDialog";
+import DashboardActionButton from "./components/DashboardActionButton";
+import ExtensionNavigation from "./components/ExtensionNavigation";
+import RecycleBinDialog from "./components/RecycleBinDialog";
+import HelpDialog from "./HelpDialog";
+import useAuthEnabled from "./hooks/useAuthEnabled";
+import useProjects from "./hooks/useProjects";
+import usePermissions from "./PermissionsContext";
 import ProjectCard from "./ProjectCard";
 import ProjectListView from "./ProjectListView";
 import UserProfile from "./UserProfile";
-import mdvLogo from "./assets/mdv_logo.png";
-import useProjects from "./hooks/useProjects";
 import {
-    type SortBy,
-    type SortOrder,
-    sortProjects,
-} from "./utils/projectUtils";
-import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
-import ImportProjectDialog from "@/react/components/ImportProjectDialog";
-import usePermissions from "./PermissionsContext";
-import useAuthEnabled from "./hooks/useAuthEnabled";
-import { RefreshCwIcon } from "lucide-react";
-import ReusableAlertDialog from "@/charts/dialogs/ReusableAlertDialog";
-import HelpDialog from "./HelpDialog";
-import { buildProjectUrl, shouldShowLocalBackendNotice } from "@/utils/mdvRouting";
-import BulkDeleteProjectsDialog from "./components/BulkDeleteProjectsDialog";
-import DashboardActionButton from "./components/DashboardActionButton";
-import RecycleBinDialog from "./components/RecycleBinDialog";
+    type CatalogPreferences,
+    hasStoredCatalogPreferences,
+    type ListColumn,
+    loadCatalogPreferences,
+    saveCatalogPreferences,
+    type ViewMode,
+} from "./utils/catalogPreferences";
+import { type SortBy, type SortOrder, sortProjects } from "./utils/projectUtils";
 
 // todo: Refactor the code into different components and hooks for cleaner and readable code
 // Maybe use a design pattern? As displaying certain components depend on some states
+/**
+ * Responsive grid: cards stay at least 300px wide. The container is capped at 1440px,
+ * which leaves room for four columns at most (about 324px each) on large displays.
+ */
+const projectGridSx = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+    gap: 4,
+} as const;
+
 const Dashboard: React.FC = () => {
-    const isProduction = import.meta.env.PROD;
+    // Production builds hide project creation and import unless the build sets
+    // VITE_SHOW_PROJECT_CREATION=true, as deployments where users make their own projects do.
+    const showProjectCreation = !import.meta.env.PROD || import.meta.env.VITE_SHOW_PROJECT_CREATION === "true";
     const {
         projects,
         isLoading: projectsLoading,
         error,
+        rescanWarning,
         isErrorModalOpen,
         closeErrorModal,
+        clearRescanWarning,
         fetchProjects,
         createProject,
         deleteProject,
@@ -83,14 +98,18 @@ const Dashboard: React.FC = () => {
         exportProject,
         rescanProjects,
     } = useProjects();
-    const { permissions, isLoading: permissionsLoading, isPublicPage } = usePermissions();
+    const { permissions, isLoading: permissionsLoading, isPublicPage, isAdmin } = usePermissions();
 
     // Check if auth is enabled
     const authEnabled = useAuthEnabled();
     const { mode, toggleColorMode } = useColorMode();
-    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-    const [sortBy, setSortBy] = useState<SortBy>("lastModified");
-    const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+    const [initialPrefs] = useState(loadCatalogPreferences);
+    const [viewMode, setViewMode] = useState<ViewMode>(initialPrefs.viewMode);
+    const [sortBy, setSortBy] = useState<SortBy>(initialPrefs.sortBy);
+    const [sortOrder, setSortOrder] = useState<SortOrder>(initialPrefs.sortOrder);
+    const [columns, setColumns] = useState<ListColumn[]>(initialPrefs.columns);
+    // Persist only on explicit user changes, so public-page fallbacks never overwrite stored choices.
+    const persist = useCallback((prefs: CatalogPreferences) => saveCatalogPreferences(prefs), []);
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [open, setOpen] = useState(false);
     const [helpDialogOpen, setHelpDialogOpen] = useState(false);
@@ -109,11 +128,12 @@ const Dashboard: React.FC = () => {
     }, [fetchProjects]);
 
     useEffect(() => {
-        if (!permissionsLoading && isPublicPage) {
+        // Public pages have no last-modified column: fall back to name sort (not persisted).
+        if (!permissionsLoading && isPublicPage && (!hasStoredCatalogPreferences() || sortBy === "lastModified")) {
             setSortBy("name");
             setSortOrder("asc");
         }
-    }, [isPublicPage, permissionsLoading]);
+    }, [isPublicPage, permissionsLoading, sortBy]);
 
     const handleCreateProject = async () => {
         try {
@@ -135,28 +155,25 @@ const Dashboard: React.FC = () => {
 
     const handleSort = useCallback(
         (newSortBy: SortBy) => {
-            if (newSortBy === sortBy) {
-                // Toggle sort order if clicking the same sort option
-                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-            } else {
-                // Set new sort type with default desc order for both cases
-                setSortBy(newSortBy);
-                setSortOrder("desc");
-            }
+            // Toggle order when re-selecting the same option
+            // Names start A to Z; dates start newest first.
+            const defaultOrder: SortOrder = newSortBy === "name" ? "asc" : "desc";
+            const nextOrder: SortOrder = newSortBy === sortBy ? (sortOrder === "asc" ? "desc" : "asc") : defaultOrder;
+            setSortBy(newSortBy);
+            setSortOrder(nextOrder);
+            persist({ viewMode, sortBy: newSortBy, sortOrder: nextOrder, columns });
             setAnchorEl(null);
         },
-        [sortBy, sortOrder],
+        [sortBy, sortOrder, viewMode, columns, persist],
     );
 
     const toggleDropdown = (event: React.MouseEvent<HTMLButtonElement>) => {
         setAnchorEl(event.currentTarget);
     };
 
-    const onRescanClick = useCallback(
-        async () => {
-            await rescanProjects();
-        }, [rescanProjects]
-    );
+    const onRescanClick = useCallback(async () => {
+        await rescanProjects();
+    }, [rescanProjects]);
 
     const handleSelectionChange = useCallback((id: string, selected: boolean) => {
         setSelectedProjectIds((currentIds) => {
@@ -217,6 +234,7 @@ const Dashboard: React.FC = () => {
                             src="secondary_logo"
                             onError={() => setCustomLogoVisible(false)}
                         />
+                        <ExtensionNavigation />
                         <Box sx={{ flexGrow: 1 }} />
                         <Paper
                             component="form"
@@ -234,11 +252,7 @@ const Dashboard: React.FC = () => {
                                 inputProps={{ "aria-label": "search projects" }}
                                 onChange={(e) => setFilter(e.target.value)}
                             />
-                            <IconButton
-                                type="submit"
-                                sx={{ p: "10px" }}
-                                aria-label="search"
-                            >
+                            <IconButton type="submit" sx={{ p: "10px" }} aria-label="search">
                                 <Search />
                             </IconButton>
                         </Paper>
@@ -251,11 +265,7 @@ const Dashboard: React.FC = () => {
                                 data-testid="theme_toggle_catalog"
                                 aria-label="Toggle theme"
                             >
-                                {mode === "dark" ? (
-                                    <Brightness4Icon />
-                                ) : (
-                                    <Brightness7Icon />
-                                )}
+                                {mode === "dark" ? <Brightness4Icon /> : <Brightness7Icon />}
                             </IconButton>
                         </Tooltip>
                         <Button
@@ -275,18 +285,24 @@ const Dashboard: React.FC = () => {
                     </Toolbar>
                 </AppBar>
 
-                <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+                <Container maxWidth={false} sx={{ mt: 4, mb: 4, maxWidth: 1440 }}>
                     {showLocalBackendNotice && (
                         <Alert severity="info" sx={{ mb: 3 }}>
-                            This preview build needs to talk to an MDV app running locally on <code>http://localhost:5055</code>.
-                            If your browser asks whether this site can communicate with local apps or devices, allow it for this preview:
-                            the Netlify page is only the frontend, and project lists plus <code>/project/:id</code> data are loaded from your local MDV container.
-                            No local data is sent to a remote server.
+                            This preview build needs to talk to an MDV app running locally on{" "}
+                            <code>http://localhost:5055</code>. If your browser asks whether this site can communicate
+                            with local apps or devices, allow it for this preview: the Netlify page is only the
+                            frontend, and project lists plus <code>/project/:id</code> data are loaded from your local
+                            MDV container. No local data is sent to a remote server.
                         </Alert>
                     )}
-                    <Grid container spacing={3} sx={{ mb: 4 }}>
-                        {!isProduction && permissions.createProject && (
-                            <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
+                    {rescanWarning && (
+                        <Alert severity="warning" onClose={clearRescanWarning} sx={{ mb: 3 }}>
+                            {rescanWarning}
+                        </Alert>
+                    )}
+                    <Box sx={{ ...projectGridSx, mb: 4 }}>
+                        {showProjectCreation && permissions.createProject && (
+                            <Box>
                                 <ButtonBase
                                     sx={{
                                         width: "100%",
@@ -315,10 +331,10 @@ const Dashboard: React.FC = () => {
                                         </Typography>
                                     </Paper>
                                 </ButtonBase>
-                            </Grid>
+                            </Box>
                         )}
-                        {!isProduction && permissions.importProject && (
-                            <Grid size={{xs: 12, sm: 6, md: 4, lg: 3}}>
+                        {showProjectCreation && permissions.importProject && (
+                            <Box>
                                 <ButtonBase
                                     sx={{
                                         width: "100%",
@@ -347,9 +363,9 @@ const Dashboard: React.FC = () => {
                                         </Typography>
                                     </Paper>
                                 </ButtonBase>
-                            </Grid>
+                            </Box>
                         )}
-                    </Grid>
+                    </Box>
 
                     <Box
                         sx={{
@@ -367,9 +383,7 @@ const Dashboard: React.FC = () => {
                                         active={selectionMode}
                                         icon={selectionMode ? <Done /> : <Checklist />}
                                         label={selectionMode ? "Done" : "Select"}
-                                        onClick={() =>
-                                            selectionMode ? exitSelectionMode() : setSelectionMode(true)
-                                        }
+                                        onClick={() => (selectionMode ? exitSelectionMode() : setSelectionMode(true))}
                                     />
                                     <DashboardActionButton
                                         icon={<DeleteOutline />}
@@ -378,8 +392,8 @@ const Dashboard: React.FC = () => {
                                     />
                                 </>
                             )}
-                            {/* Hide rescan projects on public page */}
-                            {!isPublicPage && (
+                            {/* Rescan is admin-only, and never shown on the public page */}
+                            {!isPublicPage && isAdmin && (
                                 <DashboardActionButton
                                     icon={<RefreshCwIcon />}
                                     label="Rescan Projects"
@@ -420,27 +434,21 @@ const Dashboard: React.FC = () => {
                                     >
                                         {/* Hide last modified on public page */}
                                         Sort by:{" "}
-                                        {!isPublicPage ?
-                                            sortBy === "lastModified"
+                                        {!isPublicPage
+                                            ? sortBy === "lastModified"
                                                 ? `Last modified (${sortOrder === "desc" ? "Newest first" : "Oldest first"})`
                                                 : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
-                                            :
-                                            `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
-                                        }
+                                            : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`}
                                     </Box>
                                 </Button>
                             </Paper>
-                            <Tooltip
-                                title={
-                                    viewMode === "grid" ? "List View" : "Grid View"
-                                }
-                            >
+                            <Tooltip title={viewMode === "grid" ? "List View" : "Grid View"}>
                                 <IconButton
-                                    onClick={() =>
-                                        setViewMode(
-                                            viewMode === "grid" ? "list" : "grid",
-                                        )
-                                    }
+                                    onClick={() => {
+                                        const next: ViewMode = viewMode === "grid" ? "list" : "grid";
+                                        setViewMode(next);
+                                        persist({ viewMode: next, sortBy, sortOrder, columns });
+                                    }}
                                     sx={{ ml: 2 }}
                                 >
                                     {viewMode === "grid" ? (
@@ -452,13 +460,9 @@ const Dashboard: React.FC = () => {
                             </Tooltip>
                         </Box>
 
-                        <Menu
-                            anchorEl={anchorEl}
-                            open={Boolean(anchorEl)}
-                            onClose={() => setAnchorEl(null)}
-                        >
-                            {!isPublicPage &&
-                                (<MenuItem
+                        <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
+                            {!isPublicPage && (
+                                <MenuItem
                                     onClick={() => handleSort("lastModified")}
                                     sx={{
                                         display: "flex",
@@ -469,15 +473,10 @@ const Dashboard: React.FC = () => {
                                 >
                                     <span>Last modified</span>
                                     {sortBy === "lastModified" && (
-                                        <span>
-                                            {sortOrder === "desc"
-                                                ? "(Oldest first)"
-                                                : "(Newest first)"
-                                            }
-                                        </span>
+                                        <span>{sortOrder === "desc" ? "(Oldest first)" : "(Newest first)"}</span>
                                     )}
-                                </MenuItem>)
-                            }
+                                </MenuItem>
+                            )}
                             <MenuItem
                                 onClick={() => handleSort("name")}
                                 sx={{
@@ -488,11 +487,7 @@ const Dashboard: React.FC = () => {
                                 }}
                             >
                                 <span>Name</span>
-                                {sortBy === "name" && (
-                                    <span>
-                                        {sortOrder === "desc" ? "A to Z" : "Z to A"}
-                                    </span>
-                                )}
+                                {sortBy === "name" && <span>{sortOrder === "desc" ? "A to Z" : "Z to A"}</span>}
                             </MenuItem>
                         </Menu>
                     </Box>
@@ -507,18 +502,10 @@ const Dashboard: React.FC = () => {
                                 mb: 2,
                             }}
                         >
-                            <Typography color="text.secondary">
-                                {selectedProjectIds.size} selected
-                            </Typography>
+                            <Typography color="text.secondary">{selectedProjectIds.size} selected</Typography>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                <Button onClick={() => setSelectedProjectIds(new Set())}>
-                                    Clear selection
-                                </Button>
-                                <Button
-                                    color="error"
-                                    variant="contained"
-                                    onClick={() => setIsBulkDeleteOpen(true)}
-                                >
+                                <Button onClick={() => setSelectedProjectIds(new Set())}>Clear selection</Button>
+                                <Button color="error" variant="contained" onClick={() => setIsBulkDeleteOpen(true)}>
                                     Delete selected
                                 </Button>
                             </Box>
@@ -528,17 +515,9 @@ const Dashboard: React.FC = () => {
                     <Divider sx={{ mb: 2 }} />
 
                     {viewMode === "grid" ? (
-                        <Grid container spacing={4}>
+                        <Box sx={projectGridSx}>
                             {sortedProjects.map((project) => (
-                                <Grid
-                                    key={project.id}
-                                    size={{
-                                        xs: 12,
-                                        sm: 6,
-                                        md: 4,
-                                        lg: 3
-                                    }}
-                                >
+                                <Box key={project.id}>
                                     <ProjectCard
                                         {...project}
                                         onDelete={deleteProject}
@@ -550,12 +529,20 @@ const Dashboard: React.FC = () => {
                                         selected={selectedProjectIds.has(project.id)}
                                         onSelectionChange={handleSelectionChange}
                                     />
-                                </Grid>
+                                </Box>
                             ))}
-                        </Grid>
+                        </Box>
                     ) : (
                         <ProjectListView
                             projects={sortedProjects}
+                            columns={columns}
+                            sortBy={sortBy}
+                            sortOrder={sortOrder}
+                            onSortChange={handleSort}
+                            onColumnsChange={(next) => {
+                                setColumns(next);
+                                persist({ viewMode, sortBy, sortOrder, columns: next });
+                            }}
                             onDelete={deleteProject}
                             onRename={renameProject}
                             onChangeType={changeProjectType}
@@ -571,22 +558,13 @@ const Dashboard: React.FC = () => {
                         open={isErrorModalOpen}
                         handleClose={closeErrorModal}
                         isAlertErrorComponent
-                        component={
-                            <AlertErrorComponent
-                                message={error as string}
-                            />
-                        }
+                        component={<AlertErrorComponent message={error as string} />}
                     />
                 )}
-                {open && !isProduction && permissions.importProject && (
+                {open && showProjectCreation && permissions.importProject && (
                     <ImportProjectDialog open={open} setOpen={setOpen} />
                 )}
-                {helpDialogOpen && (
-                    <HelpDialog
-                        open={helpDialogOpen}
-                        onClose={() => setHelpDialogOpen(false)}
-                    />
-                )}
+                {helpDialogOpen && <HelpDialog open={helpDialogOpen} onClose={() => setHelpDialogOpen(false)} />}
                 <BulkDeleteProjectsDialog
                     open={isBulkDeleteOpen}
                     selectedCount={selectedProjectIds.size}
@@ -602,10 +580,7 @@ const Dashboard: React.FC = () => {
                 />
             </Box>
             {isLoading && (
-                <Backdrop
-                    open={isLoading}
-                    sx={{ zIndex: theme.zIndex.modal + 1 }}
-                >
+                <Backdrop open={isLoading} sx={{ zIndex: theme.zIndex.modal + 1 }}>
                     <CircularProgress color="inherit" />
                 </Backdrop>
             )}

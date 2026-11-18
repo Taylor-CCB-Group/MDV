@@ -1,7 +1,6 @@
-import type { Param } from "@/charts/ChartTypes";
-import type { CategoricalDataType, DataColumn, DataType, GuiSpec, GuiSpecType, GuiValueTypes, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { CategoricalDataType, DataType, GuiSpec, GuiSpecType, NumberDataType } from "@/charts/charts";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -41,10 +40,10 @@ export function isDatatypeCategorical(t: DataType): t is CategoricalDataType {
 
 /** concise type-helper factory for making elements of Gui i.e. for settings
  * this will enable type-checking of the GuiSpec objects at the point of declaration.
- * 
+ *
  * As of now, this doesn't do anything at runtime - if we want to have some centralised processing of the GuiSpec objects,
  * we could consider adding that here, or may want to keep it separate.
- * 
+ *
  * Sometimes the error messages that it generates can be confusing - for example, if you specify
  * a `current_value` for a `"multidropdown"` that is not a `string[]` (which as of this writing is specified
  * as the legal data-type for `GuiSpec<"multidropdown">`), you may get an error message that
@@ -74,7 +73,7 @@ export function g<T extends GuiSpecType>(spec: GuiSpec<T>): GuiSpec<T> {
  * @returns `true` if every element of `substrings` is contained in `str`, `false` otherwise
  */
 export function stringContainsAll(substrings: string[], str: string) {
-    return !substrings.some(i => !str.includes(i));
+    return !substrings.some((i) => !str.includes(i));
 }
 
 /**
@@ -96,7 +95,7 @@ export function parseDelimitedString(str: string) {
     // Split by space or any whitespace character
     const items = str
         .split(/[,\s]+/)
-        .map(s => s.trim())
+        .map((s) => s.trim())
         .filter(Boolean);
     return items;
 }
@@ -118,9 +117,11 @@ type DistributionSummary = {
  * near the low end of the domain.
  */
 function shouldUseLogFromSummary(summary: DistributionSummary) {
-    return summary.lowerQuarterShare > 0.72 &&
+    return (
+        summary.lowerQuarterShare > 0.72 &&
         summary.lowerHalfShare > 0.9 &&
-        (summary.lowerTenthShare > 0.35 || summary.meanPosition < 0.22);
+        (summary.lowerTenthShare > 0.35 || summary.meanPosition < 0.22)
+    );
 }
 
 /**
@@ -164,7 +165,9 @@ export function resolveAutoHistogramXScaleFromValues(
         lowerQuarterShare: lowerQuarter / count,
         lowerHalfShare: lowerHalf / count,
         meanPosition: weightedPosition / count,
-    }) ? "log" : "linear";
+    })
+        ? "log"
+        : "linear";
 }
 
 /**
@@ -173,10 +176,7 @@ export function resolveAutoHistogramXScaleFromValues(
  * This uses the same left-heavy heuristic as the raw-value version, but estimates the mass
  * position from bin indices instead of original samples.
  */
-export function resolveAutoHistogramXScaleFromHistogram(
-    domain: NumericRange,
-    histogram: number[],
-): HistogramScaleMode {
+export function resolveAutoHistogramXScaleFromHistogram(domain: NumericRange, histogram: number[]): HistogramScaleMode {
     const [min, max] = domain;
     if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
         return "linear";
@@ -200,16 +200,16 @@ export function resolveAutoHistogramXScaleFromHistogram(
         lowerQuarterShare: lowerQuarter / total,
         lowerHalfShare: lowerHalf / total,
         meanPosition: weightedPosition / total,
-    }) ? "log" : "linear";
+    })
+        ? "log"
+        : "linear";
 }
 
 /**
  * Infer whether the y-axis should use log scaling based on how uneven the non-zero bin
  * magnitudes are.
  */
-export function resolveAutoHistogramYScale(
-    histogram: number[],
-): HistogramScaleMode {
+export function resolveAutoHistogramYScale(histogram: number[]): HistogramScaleMode {
     const nonZero = histogram.filter((value) => value > 0);
     if (nonZero.length < 2) return "linear";
     const min = Math.min(...nonZero);

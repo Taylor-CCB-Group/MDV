@@ -1,30 +1,20 @@
 import type { Layer } from "@deck.gl/core";
 import type { SpatialData } from "@spatialdata/core";
-import {
-    RENDER_STACK_SCHEMA_VERSION,
-    type RenderStack,
-    type RenderStackEntry,
-} from "@spatialdata/layers";
+import { RENDER_STACK_SCHEMA_VERSION, type RenderStack, type RenderStackEntry } from "@spatialdata/layers";
 import { describe, expect, test, vi } from "vitest";
 
 vi.mock("@spatialdata/vis", () => ({
-    layerConfig: (
-        type: string,
-        base: Record<string, unknown>,
-        props: Record<string, unknown> = {},
-    ) => ({ ...props, ...base, type }),
+    layerConfig: (type: string, base: Record<string, unknown>, props: Record<string, unknown> = {}) => ({
+        ...props,
+        ...base,
+        type,
+    }),
     renderStackToLayerInputs: (stack: RenderStack) => ({
         layers: {},
-        layerOrder: stack.entries
-            .filter((entry) => entry.kind === "spatial")
-            .map((entry) => entry.id),
+        layerOrder: stack.entries.filter((entry) => entry.kind === "spatial").map((entry) => entry.id),
     }),
     renderStackOrder: (stack: RenderStack | undefined, fallback: string[]) =>
-        stack
-            ? stack.entries
-                  .filter((entry) => entry.kind === "spatial")
-                  .map((entry) => entry.id)
-            : fallback,
+        stack ? stack.entries.filter((entry) => entry.kind === "spatial").map((entry) => entry.id) : fallback,
 }));
 
 vi.mock("@/react/context", () => ({
@@ -35,25 +25,30 @@ vi.mock("@/react/hooks", () => ({
     useConfig: vi.fn(),
 }));
 
+import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 import {
     createRenderStackLayerInputsCache,
     resolveCachedHostDeckLayers,
     syncRenderStackLayerInputs,
 } from "@/react/spatialdata/render_stack_adapter";
 import {
-    createHostOnlyRenderStack,
-    normalizeRenderStack,
-} from "@/react/spatialdata/render_stack_defaults";
-import {
     patchRenderStackEntry,
+    patchRenderStackEntryPropsInPlace,
     removeRenderStackEntry,
     seedRenderStackFromSpatialData,
 } from "@/react/spatialdata/render_stack_control";
-import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 import {
-    renderStackSpatialRevision,
-    touchRenderStackEntry,
-} from "@/react/spatialdata/render_stack_observe";
+    createHostOnlyRenderStack,
+    mergeHostOverlayEntriesInPlace,
+    normalizeRenderStack,
+    syncOverlayFollowerVisibility,
+} from "@/react/spatialdata/render_stack_defaults";
+import {
+    customDisplayName,
+    numberedDefaultName,
+    renderStackEntryDisplayName,
+} from "@/react/spatialdata/render_stack_display";
+import { renderStackSpatialRevision, touchRenderStackEntry } from "@/react/spatialdata/render_stack_observe";
 
 type SpatialEntry = Extract<RenderStackEntry, { kind: "spatial" }>;
 type HostEntry = Extract<RenderStackEntry, { kind: "host" }>;
@@ -96,10 +91,13 @@ function renderStack(entries: RenderStackEntry[]): RenderStack {
 }
 
 function fakeDeckLayer(id: string) {
-    const clonedLayer = { id: `${id}-clone` } as Layer;
-    const clone = vi.fn(() => clonedLayer);
+    let cloneCount = 0;
+    const clone = vi.fn((props?: { id?: string }) => {
+        cloneCount += 1;
+        return { id: props?.id ?? `${id}-clone-${cloneCount}` } as Layer;
+    });
     const sourceLayer = { id, clone } as unknown as Layer;
-    return { clonedLayer, clone, sourceLayer };
+    return { clone, sourceLayer };
 }
 
 function fakeSpatialData(): SpatialData {
@@ -132,16 +130,52 @@ describe("render stack adapter", () => {
         expect(second.layers["image-a"]?.opacity).toBe(0.25);
     });
 
+    test("replaces a layer config when table-driven annotation props change", () => {
+        const labelsEntry = spatialEntry({
+            id: "labels-a",
+            elementKey: "cell_labels",
+            elementType: "labels",
+            props: {
+                fillColorByColumn: {
+                    columnName: "Expressed_genes",
+                    mode: "categorical",
+                },
+            },
+        });
+        const stack = renderStack([labelsEntry]);
+        const cache = createRenderStackLayerInputsCache();
+
+        const first = syncRenderStackLayerInputs(stack, cache);
+        const layers = first.layers;
+        const layer = first.layers["labels-a"];
+
+        patchRenderStackEntry(stack, "labels-a", {
+            props: {
+                fillColorByColumn: {
+                    columnName: "Leiden",
+                    mode: "categorical",
+                },
+            },
+        });
+        const second = syncRenderStackLayerInputs(stack, cache);
+
+        expect(second.layers).toBe(layers);
+        expect(second.layers["labels-a"]).not.toBe(layer);
+        expect(second.layers["labels-a"]).toMatchObject({
+            fillColorByColumn: {
+                columnName: "Leiden",
+                mode: "categorical",
+            },
+        });
+    });
+
     test("removes deleted spatial layers and updates layer order", () => {
         const imageA = spatialEntry({ id: "image-a", elementKey: "imageA" });
         const imageB = spatialEntry({ id: "image-b", elementKey: "imageB" });
         const stack = renderStack([imageA, imageB]);
         const cache = createRenderStackLayerInputsCache();
 
-        expect(syncRenderStackLayerInputs(stack, cache).layerOrder).toEqual([
-            "image-a",
-            "image-b",
-        ]);
+        expect(syncRenderStackLayerInputs(stack, cache).layerOrder).toEqual(["image-a", "image-b"]);
 
         removeRenderStackEntry(stack, "image-a");
         const next = syncRenderStackLayerInputs(stack, cache);
@@ -191,23 +225,79 @@ describe("render stack adapter", () => {
         expect(afterTone).not.toBe(afterChannels);
     });
 
-    test("resolves only visible host entries and reuses host clones", () => {
+    test("spatial revision changes when non-image layer props change in place", () => {
+        const labelsEntry = spatialEntry({
+            id: "labels-a",
+            elementKey: "cell_labels",
+            elementType: "labels",
+        });
+        const stack = renderStack([labelsEntry]);
+        touchRenderStackEntry(labelsEntry);
+        const before = renderStackSpatialRevision(stack);
+
+        patchRenderStackEntry(stack, "labels-a", {
+            props: {
+                fillColorByColumn: {
+                    columnName: "Expressed_genes",
+                    mode: "categorical",
+                },
+            },
+        });
+        touchRenderStackEntry(labelsEntry);
+        const afterFillColumn = renderStackSpatialRevision(stack);
+
+        patchRenderStackEntry(stack, "labels-a", {
+            props: { tooltipFields: ["Expressed_genes", "Leiden"] },
+        });
+        touchRenderStackEntry(labelsEntry);
+        const afterTooltipFields = renderStackSpatialRevision(stack);
+
+        expect(afterFillColumn).not.toBe(before);
+        expect(afterTooltipFields).not.toBe(afterFillColumn);
+    });
+
+    test("patching a layer prop to undefined clears it and changes spatial revision", () => {
+        const labelsEntry = spatialEntry({
+            id: "labels-a",
+            elementKey: "cell_labels",
+            elementType: "labels",
+            props: {
+                fillColorByColumn: {
+                    columnName: "Expressed_genes",
+                    mode: "categorical",
+                },
+            },
+        });
+        const stack = renderStack([labelsEntry]);
+        touchRenderStackEntry(labelsEntry);
+        const before = renderStackSpatialRevision(stack);
+
+        patchRenderStackEntry(stack, "labels-a", {
+            props: { fillColorByColumn: undefined },
+        });
+        touchRenderStackEntry(labelsEntry);
+        const after = renderStackSpatialRevision(stack);
+
+        expect(labelsEntry.props.fillColorByColumn).toBeUndefined();
+        expect(after).not.toBe(before);
+    });
+
+    test("resolves only visible host entries and refreshes host clones", () => {
         const visibleHostId = deckHostLayerId("scatter");
         const hiddenHostId = deckHostLayerId("selection");
-        const stack = renderStack([
-            hostEntry(visibleHostId),
-            hostEntry(hiddenHostId, false),
-        ]);
-        const { clone, clonedLayer, sourceLayer } = fakeDeckLayer("scatter");
+        const stack = renderStack([hostEntry(visibleHostId), hostEntry(hiddenHostId, false)]);
+        const { clone, sourceLayer } = fakeDeckLayer("scatter");
         const resolver = vi.fn(() => sourceLayer);
 
         const first = resolveCachedHostDeckLayers(stack, resolver);
         const second = resolveCachedHostDeckLayers(stack, resolver);
 
-        expect(first).toEqual([clonedLayer]);
-        expect(second).toEqual([clonedLayer]);
-        expect(first[0]).toBe(second[0]);
-        expect(clone).toHaveBeenCalledTimes(1);
+        expect(first).toHaveLength(1);
+        expect(second).toHaveLength(1);
+        expect(first[0]).not.toBe(second[0]);
+        expect(first[0]?.id).toBe(visibleHostId);
+        expect(second[0]?.id).toBe(visibleHostId);
+        expect(clone).toHaveBeenCalledTimes(2);
         expect(resolver).toHaveBeenCalledTimes(2);
     });
 });
@@ -229,9 +319,119 @@ describe("render stack control", () => {
         expect(imageA.props.opacity).toBe(0.5);
         expect(imageB.props.opacity).toBe(1);
     });
+
+    test("merges labels channel appearance into saved channels", () => {
+        const props: Record<string, unknown> = { channels: { colors: [[255, 0, 0]], channelOpacities: [0.2] } };
+        patchRenderStackEntryPropsInPlace(props, {
+            channels: { channelsFilled: [false], channelStrokeWidths: [3] },
+        });
+        expect(props.channels).toEqual({
+            colors: [[255, 0, 0]],
+            channelOpacities: [0.2],
+            channelsFilled: [false],
+            channelStrokeWidths: [3],
+        });
+    });
+});
+
+describe("render stack display names", () => {
+    test("a user-chosen name wins; blank names fall back to the element", () => {
+        const named = spatialEntry({
+            id: "a",
+            elementKey: "cells",
+            elementType: "shapes",
+            props: { displayName: " Nuclei " },
+        });
+        const blank = spatialEntry({
+            id: "b",
+            elementKey: "cells",
+            elementType: "shapes",
+            props: { displayName: "  " },
+        });
+        expect(renderStackEntryDisplayName(named)).toBe("Nuclei");
+        expect(customDisplayName(blank)).toBeUndefined();
+        expect(renderStackEntryDisplayName(blank)).toBe("shapes: cells");
+    });
+
+    test("unnamed entries of the same element are numbered in stack order", () => {
+        const first = spatialEntry({ id: "a", elementKey: "cells", elementType: "shapes" });
+        const second = spatialEntry({ id: "b", elementKey: "cells", elementType: "shapes" });
+        const other = spatialEntry({ id: "c", elementKey: "imageA" });
+        const stack = renderStack([first, other, second]);
+        expect(renderStackEntryDisplayName(first, stack)).toBe("shapes: cells (1)");
+        expect(renderStackEntryDisplayName(second, stack)).toBe("shapes: cells (2)");
+        expect(renderStackEntryDisplayName(other, stack)).toBe("image: imageA");
+
+        second.props.displayName = "Outlines";
+        expect(renderStackEntryDisplayName(second, stack)).toBe("Outlines");
+        // the default stays numbered, e.g. as the placeholder of a named entry
+        expect(numberedDefaultName(second, stack)).toBe("shapes: cells (2)");
+    });
+
+    test("the name does not reach the viewer's layer config", () => {
+        const entry = spatialEntry({ id: "a", elementKey: "imageA", props: { displayName: "DAPI" } });
+        const inputs = syncRenderStackLayerInputs(renderStack([entry]), createRenderStackLayerInputsCache());
+        expect(inputs.layers.a).toBeDefined();
+        expect("displayName" in (inputs.layers.a ?? {})).toBe(false);
+    });
 });
 
 describe("render stack defaults", () => {
+    test("a restored stack's grey scatter follows the data points' visibility", () => {
+        const scatter = hostEntry(deckHostLayerId("scatter"), false);
+        const grey = hostEntry(deckHostLayerId("grey_scatter"), true);
+        const gates = hostEntry(deckHostLayerId("gate_display"), false);
+        syncOverlayFollowerVisibility(renderStack([grey, scatter, gates]));
+        expect(grey.visible).toBe(false);
+        expect(gates.visible).toBe(false);
+        scatter.visible = true;
+        syncOverlayFollowerVisibility(renderStack([grey, scatter, gates]));
+        expect(grey.visible).toBe(true);
+        expect(gates.visible).toBe(false);
+    });
+
+    test("a grey scatter added to a saved stack follows the data points' visibility", () => {
+        const scatter = hostEntry(deckHostLayerId("scatter"), false);
+        const stack = renderStack([scatter]);
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        const grey = stack.entries.find((entry) => entry.id === deckHostLayerId("grey_scatter"));
+        expect(grey?.visible).toBe(false);
+        // Other added overlays keep their default.
+        const gates = stack.entries.find((entry) => entry.id === deckHostLayerId("gate_display"));
+        expect(gates?.visible).toBe(true);
+    });
+
+    test("an existing grey scatter keeps its saved visibility when merging", () => {
+        const scatter = hostEntry(deckHostLayerId("scatter"), false);
+        const grey = hostEntry(deckHostLayerId("grey_scatter"), true);
+        const stack = renderStack([grey, scatter]);
+        mergeHostOverlayEntriesInPlace(stack);
+        expect(grey.visible).toBe(true);
+    });
+
+    test("a saved stack without density gets it just above the data points", () => {
+        // A stack saved before density was its own overlay: an image under the MDV overlays.
+        const image = {
+            kind: "spatial",
+            id: "image-1",
+            visible: true,
+            source: { elementType: "image", elementKey: "img" },
+            props: {},
+        } satisfies RenderStackEntry;
+        const saved = ["grey_scatter", "scatter", "gate_display", "selection", "gate_labels"] as const;
+        const stack = renderStack([image, ...saved.map((deckId) => hostEntry(deckHostLayerId(deckId)))]);
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        expect(stack.entries.map((entry) => entry.id)).toEqual([
+            "image-1",
+            "deck:grey_scatter",
+            "deck:scatter",
+            "deck:density",
+            "deck:gate_display",
+            "deck:selection",
+            "deck:gate_labels",
+        ]);
+    });
+
     test("createHostOnlyRenderStack seeds host overlay entries", () => {
         const stack = createHostOnlyRenderStack();
         expect(stack.entries.length).toBeGreaterThan(0);
@@ -246,20 +446,41 @@ describe("render stack defaults", () => {
         const chart = {
             seedDefaultSpatialLayers: true,
             bumpRenderStackGeneration: vi.fn(),
+            bumpRenderStackPropsGeneration: vi.fn(),
             finishDefaultSpatialLayerSeed: vi.fn(),
         };
-        seedRenderStackFromSpatialData(
-            config as never,
-            fakeSpatialData(),
-            "global",
-            chart as never,
-        );
+        seedRenderStackFromSpatialData(config as never, fakeSpatialData(), "global", chart as never);
         expect(
             config.renderStack?.entries.some(
                 (entry) => entry.kind === "spatial" && entry.source.elementType === "image",
             ),
         ).toBe(true);
         expect(chart.finishDefaultSpatialLayerSeed).toHaveBeenCalled();
+    });
+
+    test("seedRenderStackFromSpatialData gives the first image layer the chart's default image props", () => {
+        const config = {
+            type: "SpatialDataMdvRegionReact",
+            renderStack: createHostOnlyRenderStack(),
+        } as const;
+        const defaultImageLayerProps = {
+            channels: { colors: [[255, 0, 0]], contrastLimits: [[0, 100]] },
+            vivLayerProps: { brightness: [0.6] },
+        };
+        const chart = {
+            seedDefaultSpatialLayers: true,
+            defaultImageLayerProps,
+            bumpRenderStackGeneration: vi.fn(),
+            bumpRenderStackPropsGeneration: vi.fn(),
+            finishDefaultSpatialLayerSeed: vi.fn(),
+        };
+        seedRenderStackFromSpatialData(config as never, fakeSpatialData(), "global", chart as never);
+        const image = config.renderStack.entries.find(
+            (entry) => entry.kind === "spatial" && entry.source.elementType === "image",
+        );
+        expect(image?.props).toEqual({ opacity: 1, ...defaultImageLayerProps });
+        // a copy, so editing the layer leaves the chart's props alone
+        expect(image?.props.channels).not.toBe(defaultImageLayerProps.channels);
     });
 
     test("seedRenderStackFromSpatialData keeps persisted host-only stacks spatial-free", () => {
@@ -270,18 +491,13 @@ describe("render stack defaults", () => {
         const chart = {
             seedDefaultSpatialLayers: false,
             bumpRenderStackGeneration: vi.fn(),
+            bumpRenderStackPropsGeneration: vi.fn(),
             finishDefaultSpatialLayerSeed: vi.fn(),
         };
-        seedRenderStackFromSpatialData(
-            config as never,
-            fakeSpatialData(),
-            "global",
-            chart as never,
-        );
-        expect(
-            config.renderStack?.entries.every((entry) => entry.kind === "host"),
-        ).toBe(true);
+        seedRenderStackFromSpatialData(config as never, fakeSpatialData(), "global", chart as never);
+        expect(config.renderStack?.entries.every((entry) => entry.kind === "host")).toBe(true);
         expect(chart.finishDefaultSpatialLayerSeed).not.toHaveBeenCalled();
+        expect(chart.bumpRenderStackPropsGeneration).toHaveBeenCalledTimes(1);
     });
 
     test("seedRenderStackFromSpatialData keeps the same renderStack object", () => {
@@ -293,14 +509,10 @@ describe("render stack defaults", () => {
         const chart = {
             seedDefaultSpatialLayers: true,
             bumpRenderStackGeneration: vi.fn(),
+            bumpRenderStackPropsGeneration: vi.fn(),
             finishDefaultSpatialLayerSeed: vi.fn(),
         };
-        seedRenderStackFromSpatialData(
-            config as never,
-            fakeSpatialData(),
-            "global",
-            chart as never,
-        );
+        seedRenderStackFromSpatialData(config as never, fakeSpatialData(), "global", chart as never);
         expect(config.renderStack).toBe(stackBefore);
     });
 
@@ -316,8 +528,6 @@ describe("render stack defaults", () => {
 
         expect(normalized.entries[0]).toBe(savedImage);
         expect(normalized.entries.some((entry) => entry.kind === "host")).toBe(true);
-        expect(
-            normalized.entries.filter((entry) => entry.kind === "spatial").length,
-        ).toBe(1);
+        expect(normalized.entries.filter((entry) => entry.kind === "spatial").length).toBe(1);
     });
 });

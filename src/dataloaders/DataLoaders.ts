@@ -6,14 +6,8 @@
  *
  **/
 
-import type {
-    DataColumn,
-    DataSource,
-    DataSourceName,
-    DataType,
-    FieldName,
-} from "@/charts/charts";
 import type { TypedArrayConstructor } from "@luma.gl/core";
+import type { DataColumn, DataSource, DataSourceName, DataType, FieldName } from "@/charts/charts";
 
 type Columns = DataColumn<DataType>[];
 type DataLoaderFaultMode = "empty" | "corrupt" | "timeout";
@@ -35,11 +29,7 @@ function readDataLoaderFaultConfig(): DataLoaderFaultConfig | null {
             return null;
         }
         const config = JSON.parse(value) as Partial<DataLoaderFaultConfig>;
-        if (
-            config.mode !== "empty" &&
-            config.mode !== "corrupt" &&
-            config.mode !== "timeout"
-        ) {
+        if (config.mode !== "empty" && config.mode !== "corrupt" && config.mode !== "timeout") {
             return null;
         }
         const faultConfig = {
@@ -77,10 +67,7 @@ async function applyDataLoaderFaultBeforeFetch(config: DataLoaderFaultConfig | n
     }
 }
 
-function applyDataLoaderFaultAfterFetch(
-    config: DataLoaderFaultConfig | null,
-    data: ArrayBufferLike,
-) {
+function applyDataLoaderFaultAfterFetch(config: DataLoaderFaultConfig | null, data: ArrayBufferLike) {
     if (!config) {
         return data;
     }
@@ -108,8 +95,7 @@ function processArrayBuffer(data: ArrayBufferLike, columns: Columns, size: numbe
     let offset = 0;
     for (const column of columns) {
         //default values for numbers
-        let arrayType: TypedArrayConstructor =
-            column.datatype === "int32" ? Int32Array : Float32Array;
+        let arrayType: TypedArrayConstructor = column.datatype === "int32" ? Int32Array : Float32Array;
         //the length of the typed array
         let arr_len = size;
         //the number of bytes for each item in the column's data
@@ -195,11 +181,7 @@ function processArrayBuffer(data: ArrayBufferLike, columns: Columns, size: numbe
  * @returns a dataloader that can be used to construct {@link ChartManager}
  **/
 function getArrayBufferDataLoader(url: string, decompress = false) {
-    return async (
-        columns: DataColumn<DataType>[],
-        dataSource: DataSourceName,
-        size: number,
-    ) => {
+    return async (columns: DataColumn<DataType>[], dataSource: DataSourceName, size: number) => {
         const faultConfig = readDataLoaderFaultConfig();
         await applyDataLoaderFaultBeforeFetch(faultConfig);
         //get the data
@@ -221,8 +203,7 @@ function getArrayBufferDataLoader(url: string, decompress = false) {
         // Heuristic check for zlib data (0x78 0x9C). This can false-positive,
         // so decompression is attempted best-effort and falls back to raw bytes.
         const arr = new Uint8Array(data);
-        const shouldDecompress =
-            decompress || (arr.length > 3 && arr[0] === 120 && arr[1] === 156);
+        const shouldDecompress = decompress || (arr.length > 3 && arr[0] === 120 && arr[1] === 156);
         data = shouldDecompress ? await decompressData(arr, true) : data;
         return processArrayBuffer(data, columns, size);
     };
@@ -240,22 +221,12 @@ function getArrayBufferDataLoader(url: string, decompress = false) {
  * @returns a dataloader that can be used to construct {@link ChartManager}
  **/
 
-function getLocalCompressedBinaryDataLoader(
-    dataSources: DataSource[],
-    folder: string,
-) {
+function getLocalCompressedBinaryDataLoader(dataSources: DataSource[], folder: string) {
     const loaders: Record<DataSourceName, CompressedBinaryDataLoader> = {};
     for (const ds of dataSources) {
-        loaders[ds.name] = new CompressedBinaryDataLoader(
-            `${folder}/${ds.name}.gz`,
-            ds.size,
-        );
+        loaders[ds.name] = new CompressedBinaryDataLoader(`${folder}/${ds.name}.gz`, ds.size);
     }
-    return async (
-        columns: Columns,
-        dataSource: DataSourceName,
-        size: number,
-    ) => {
+    return async (columns: Columns, dataSource: DataSourceName, size: number) => {
         return await loaders[dataSource].getColumnData(columns, size);
     };
 }
@@ -342,26 +313,17 @@ class CompressedBinaryDataLoader {
     }
 }
 
-
 async function decompressData(buffer: Uint8Array, fallbackToRaw = false) {
     const { default: pako } = await import("pako");
     try {
         return pako.inflate(buffer).buffer;
     } catch (error) {
         if (fallbackToRaw) {
-            console.warn(
-                "Failed to decompress payload, using raw bytes instead",
-                error,
-            );
+            console.warn("Failed to decompress payload, using raw bytes instead", error);
             return buffer.buffer;
         }
         throw error;
     }
 }
 
-export {
-    getArrayBufferDataLoader,
-    processArrayBuffer,
-    getLocalCompressedBinaryDataLoader,
-    decompressData,
-};
+export { decompressData, getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader, processArrayBuffer };

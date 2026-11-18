@@ -58,7 +58,7 @@ function getTextSort({ data, values, desc }) {
 function getUniqueSort({ data, desc, size }) {
     const names = {};
     const tc = new TextDecoder();
-    const mu =  desc ? -1 : 1;
+    const mu = desc ? -1 : 1;
     for (let i = 0; i < data.length; i++) {
         const index = data[i];
         names[index] = tc.decode(col.slice(index * size, index * size + size));
@@ -88,9 +88,7 @@ function getMultiTextSort({ data, desc, values, size }) {
 
 function getSortedValues(values, desc) {
     const mu = desc ? -1 : 1;
-    const o = values
-        .map((x, i) => [x, i])
-        .sort((a, b) => a[0].localeCompare(b[0]) * mu);
+    const o = values.map((x, i) => [x, i]).sort((a, b) => a[0].localeCompare(b[0]) * mu);
     const map = {};
     for (let i = 0; i < o.length; i++) {
         map[o[i][1]] = i;

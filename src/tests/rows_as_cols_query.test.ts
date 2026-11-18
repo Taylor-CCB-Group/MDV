@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { RowsAsColsQuery, type RowsAsColslink } from "@/links/link_utils";
+import { type RowsAsColslink, RowsAsColsQuery } from "@/links/link_utils";
 
 function mockLink(): RowsAsColslink {
     return {

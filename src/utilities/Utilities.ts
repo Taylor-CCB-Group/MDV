@@ -1,7 +1,8 @@
 import type { CategoricalDataType, DataColumn, DataType, NumberDataType } from "@/charts/charts";
 import { isDatatypeCategorical, isDatatypeNumeric } from "@/lib/utils";
 
-export function getRandomString(len=6) {//, an) {
+export function getRandomString(len = 6) {
+    //, an) {
     if (!len) {
         len = 6;
     }
@@ -24,7 +25,7 @@ export function NPOT(n: number) {
 }
 
 /**
- * Debounce function. Return a function that, as long as it continues to be invoked, 
+ * Debounce function. Return a function that, as long as it continues to be invoked,
  * will not be called until `timeout` ms have passed since the last call.
  * based on https://www.freecodecamp.org/news/javascript-debounce-example/
  */
@@ -62,11 +63,7 @@ export function isColumnText(column: DataColumn<DataType>): column is DataColumn
  * Convert rgb to hex
  */
 export function rgbToHex([r, g, b]: [number, number, number]): string {
-    return (
-        `#${[r, g, b]
-            .map((x) => Math.round(x).toString(16).padStart(2, "0"))
-            .join("")}`
-    );
+    return `#${[r, g, b].map((x) => Math.round(x).toString(16).padStart(2, "0")).join("")}`;
 }
 
 /**

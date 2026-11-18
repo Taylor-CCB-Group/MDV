@@ -52,6 +52,7 @@ declare module "@turf/helpers" {
 // Mirrors our current use: clone returns same geojson shape.
 declare module "@turf/clone" {
     import type { AllGeoJSON } from "@turf/helpers";
+
     declare function clone<T extends AllGeoJSON>(geojson: T): T;
     export default clone;
 }

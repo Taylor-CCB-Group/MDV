@@ -1,5 +1,5 @@
-import { ScatterplotLayer } from "@deck.gl/layers";
 import type { PickingInfo } from "@deck.gl/core";
+import { ScatterplotLayer } from "@deck.gl/layers";
 import { describe, expect, it } from "vitest";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { combineTooltipContent, getCombinedScatterTooltip } from "@/lib/scatterTooltip";
@@ -33,7 +33,7 @@ describe("scatterTooltip", () => {
 
         const tooltip = getCombinedScatterTooltip(richInfo, {
             gateDisplayLayerId: "gate-display",
-            getPointTooltip: (info) => info ? { html: "<strong>Gene:</strong> CD4" } : null,
+            getPointTooltip: (info) => (info ? { html: "<strong>Gene:</strong> CD4" } : null),
         });
 
         expect(tooltip).toMatchObject({
@@ -52,7 +52,7 @@ describe("scatterTooltip", () => {
 
     it("escapes text tooltip parts when combining", () => {
         expect(combineTooltipContent("A < B", { text: "C > D" })).toMatchObject({
-            html: "A &lt; B<div style=\"border-top: 1px solid rgba(255,255,255,0.35); margin: 6px 0;\"></div>C &gt; D",
+            html: 'A &lt; B<div style="border-top: 1px solid rgba(255,255,255,0.35); margin: 6px 0;"></div>C &gt; D',
         });
     });
 });

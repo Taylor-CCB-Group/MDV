@@ -8,12 +8,7 @@ interface DashboardActionButtonProps {
     active?: boolean;
 }
 
-const DashboardActionButton = ({
-    icon,
-    label,
-    onClick,
-    active = false,
-}: DashboardActionButtonProps) => (
+const DashboardActionButton = ({ icon, label, onClick, active = false }: DashboardActionButtonProps) => (
     <Paper
         elevation={1}
         sx={{
@@ -40,9 +35,7 @@ const DashboardActionButton = ({
             onClick={onClick}
         >
             {icon}
-            <Typography sx={{ marginLeft: 1 }}>
-                {label}
-            </Typography>
+            <Typography sx={{ marginLeft: 1 }}>{label}</Typography>
         </Button>
     </Paper>
 );

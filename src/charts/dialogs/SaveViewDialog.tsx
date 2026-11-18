@@ -1,5 +1,5 @@
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
-import { useEffect, useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import StateDiffComponent from "./StateDiffComponent";
 
 const SaveViewDialogComponent = (props: {
@@ -31,7 +31,7 @@ const SaveViewDialogComponent = (props: {
                 event.preventDefault();
                 props?.action?.();
                 props.onClose();
-            }            
+            }
         };
 
         // seems ok to use window here since this is a modal dialog
@@ -51,28 +51,18 @@ const SaveViewDialogComponent = (props: {
                         ? props?.content
                         : "You have unsaved changes, do you want to save the current view?"}
                 </Typography>
-                {
-                    showDiff && (
-                        <Box sx={{mt: 2, bgcolor: "background.default"}}>
-                            <StateDiffComponent 
-                                input1={viewManager.getCleanPrevState()} 
-                                input2={viewManager.getCleanCurrState()} 
-                            />
-                        </Box>
-                    )
-                }
+                {showDiff && (
+                    <Box sx={{ mt: 2, bgcolor: "background.default" }}>
+                        <StateDiffComponent
+                            input1={viewManager.getCleanPrevState()}
+                            input2={viewManager.getCleanCurrState()}
+                        />
+                    </Box>
+                )}
             </DialogContent>
             <DialogActions>
-                {
-                    dev && (
-                        <Button onClick={() => setShowDiff(!showDiff)}>
-                            {showDiff ? "Hide Diff" : "Show Diff"}
-                        </Button>
-                    )
-                }
-                <Button onClick={onSave}>
-                    Yes
-                </Button>
+                {dev && <Button onClick={() => setShowDiff(!showDiff)}>{showDiff ? "Hide Diff" : "Show Diff"}</Button>}
+                <Button onClick={onSave}>Yes</Button>
                 <Button
                     color="error"
                     onClick={() => {

@@ -44,11 +44,7 @@ export function parseDateDays(iso: string): number | null {
     const ms = Date.UTC(year, month - 1, day);
     // Reject impossible calendar dates (e.g. 2020-02-31 → Mar 2).
     const date = new Date(ms);
-    if (
-        date.getUTCFullYear() !== year ||
-        date.getUTCMonth() + 1 !== month ||
-        date.getUTCDate() !== day
-    ) {
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) {
         return null;
     }
     return Math.round(ms / MS_PER_DAY);

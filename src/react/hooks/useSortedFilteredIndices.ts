@@ -1,17 +1,17 @@
+import { autorun } from "mobx";
 import { useEffect, useState } from "react";
-import { useConfig, useSimplerFilteredIndices } from "../hooks";
 import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useDataStore } from "../context";
-import { autorun } from "mobx";
+import { useConfig, useSimplerFilteredIndices } from "../hooks";
 
 /**
- * 
+ *
  * @param indices - array of indices to be sorted
  * @param decodedData - map of decoded data
  * @param ascending - order of sort
  * @param isEmpty - function to check if the value is empty or not
- * 
- * Uses Collator to naturally sort the string, this is useful when 
+ *
+ * Uses Collator to naturally sort the string, this is useful when
  * there is a numeric part in the string
  */
 function sortDecodedStrings(
@@ -45,7 +45,7 @@ function sortDecodedStrings(
  * For unique, multitext, text and text16 columns, we decode the data and sort by string.
  * For all other columns we directly sort by raw value.
  * The null, NaN and empty values are put at the end.
- * 
+ *
  * ! Multitext column values are sorted based on the displayed values currently
  * Ex: ["B, B", "C, C", "A, A"] -> Sorted: ["A, A", "B, B", "C, C"]
  *
@@ -126,7 +126,6 @@ const useSortedFilteredIndices = () => {
                 // Sort the indices by comparing decoded strings
                 sortDecodedStrings(indices, decodedData, ascending, (s) => !s || s.trim() === "");
                 setSortedFilteredIndices(new Uint32Array(indices));
-
             } else if (colInfo.datatype === "multitext") {
                 const decodedData: Record<number, string> = {};
                 const length = colInfo.stringLength;
@@ -163,18 +162,17 @@ const useSortedFilteredIndices = () => {
                 }
 
                 // Sort decoded displayed strings
-                //! Treating 'N/A' as the empty value for multitext as the gates column uses it 
+                //! Treating 'N/A' as the empty value for multitext as the gates column uses it
                 sortDecodedStrings(indices, decodedData, ascending, (s) => {
                     if (!s || s.trim() === "") return true;
                     // Check if the parts of the value are empty, like: "N/A, N/A"
-                    return s.split(",")
+                    return s
+                        .split(",")
                         .map((v) => v.trim())
                         .every((part) => part === "" || part === "N/A");
                 });
                 setSortedFilteredIndices(new Uint32Array(indices));
-
             } else if (colInfo.datatype === "text" || colInfo.datatype === "text16") {
-
                 const values = colInfo.values;
 
                 if (!values || !Array.isArray(values)) {
@@ -190,16 +188,12 @@ const useSortedFilteredIndices = () => {
                     // Get the value index (values array index)
                     const valueIndex = data?.[dataIndex];
 
-                    const isValidValueIndex = valueIndex != null && valueIndex >= 0 && valueIndex < values.length
-                    decodedData[dataIndex] =
-                        isValidValueIndex
-                            ? values[valueIndex] ?? ""
-                            : "";
+                    const isValidValueIndex = valueIndex != null && valueIndex >= 0 && valueIndex < values.length;
+                    decodedData[dataIndex] = isValidValueIndex ? (values[valueIndex] ?? "") : "";
                 }
 
                 sortDecodedStrings(indices, decodedData, ascending, (s) => !s || s.trim() === "");
                 setSortedFilteredIndices(new Uint32Array(indices));
-
             } else {
                 // Numeric datatypes
                 indices.sort((a, b) => {

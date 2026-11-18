@@ -7,9 +7,7 @@ function intersectionArea(circles, stats) {
     const intersectionPoints = getIntersectionPoints(circles);
 
     // filter out points that aren't included in all the circles
-    const innerPoints = intersectionPoints.filter((p) =>
-        containedInCircles(p, circles),
-    );
+    const innerPoints = intersectionPoints.filter((p) => containedInCircles(p, circles));
 
     let arcArea = 0;
     let polygonArea = 0;
@@ -95,10 +93,7 @@ function intersectionArea(circles, stats) {
         // the other circles
         let disjoint = false;
         for (i = 0; i < circles.length; ++i) {
-            if (
-                distance(circles[i], smallest) >
-                Math.abs(smallest.radius - circles[i].radius)
-            ) {
+            if (distance(circles[i], smallest) > Math.abs(smallest.radius - circles[i].radius)) {
                 disjoint = true;
                 break;
             }
@@ -158,17 +153,12 @@ function getIntersectionPoints(circles) {
 
 /** Circular segment area calculation. See http://mathworld.wolfram.com/CircularSegment.html */
 export function circleArea(r, width) {
-    return (
-        r * r * Math.acos(1 - width / r) -
-        (r - width) * Math.sqrt(width * (2 * r - width))
-    );
+    return r * r * Math.acos(1 - width / r) - (r - width) * Math.sqrt(width * (2 * r - width));
 }
 
 /** euclidean distance between two points */
 function distance(p1, p2) {
-    return Math.sqrt(
-        (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y),
-    );
+    return Math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y));
 }
 
 /** Returns the overlap area of two circles of radius r1 and r2 - that
@@ -229,10 +219,4 @@ function getCenter(points) {
     return center;
 }
 
-export {
-    intersectionArea,
-    circleOverlap,
-    circleCircleIntersection,
-    distance,
-    getCenter,
-};
+export { circleCircleIntersection, circleOverlap, distance, getCenter, intersectionArea };

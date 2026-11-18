@@ -57,7 +57,11 @@ There's also a command-line interface:
 
 ```bash
 mdvtools --help
+mdvtools --version   # version, commit, Python and platform details
 ```
+
+If a command fails unexpectedly it prints an error report with the traceback, command line and
+version information; please include it when filing an issue.
 
 ## License
 

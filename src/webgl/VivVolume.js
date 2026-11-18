@@ -8,19 +8,12 @@ class VivVolume extends BaseChart {
         super(dataStore, div, config);
         this.setupScatterplot();
         this.afterAppCreation();
-        this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener(
-            "click",
-            () => {
-                if (this.dialog) {
-                    this.dialog.close();
-                    this.dialog = null;
-                } else
-                    this.dialog = new ColorChannelDialog(
-                        this.viv,
-                        this.__doc__,
-                    );
-            },
-        );
+        this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", () => {
+            if (this.dialog) {
+                this.dialog.close();
+                this.dialog = null;
+            } else this.dialog = new ColorChannelDialog(this.viv, this.__doc__);
+        });
     }
     setSize(x, y) {
         super.setSize(x, y);
@@ -80,21 +73,19 @@ class VivVolume extends BaseChart {
             .fill()
             .map((_, i) => (dataStore.filterArray[i] ? -1 : i))
             .filter((v) => v > -1);
-        this.scatterData = new Array(dataStore.filterSize)
-            .fill()
-            .map((_, j) => {
-                const i = indices[j];
-                const x = xCol[i];
-                const y = yCol[i];
-                const z = zCol[i];
-                const cat = catCol[i];
-                const position = [x, y, z];
-                return {
-                    position,
-                    cat,
-                    i,
-                };
-            });
+        this.scatterData = new Array(dataStore.filterSize).fill().map((_, j) => {
+            const i = indices[j];
+            const x = xCol[i];
+            const y = yCol[i];
+            const z = zCol[i];
+            const cat = catCol[i];
+            const position = [x, y, z];
+            return {
+                position,
+                cat,
+                i,
+            };
+        });
         config.scatterData = this.scatterData;
     }
     _update() {
@@ -148,7 +139,7 @@ class VivVolume extends BaseChart {
                 max: 1,
                 current_value: this.viv.clipX,
                 continuous: true,
-                func: (x) => this.viv.setClipX(x[0],x[1]),
+                func: (x) => this.viv.setClipX(x[0], x[1]),
             },
             {
                 type: "doubleslider",

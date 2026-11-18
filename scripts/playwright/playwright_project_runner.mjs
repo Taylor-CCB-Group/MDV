@@ -18,7 +18,9 @@ const FLAGS_WITH_VALUES = new Set([
 ]);
 
 function hasFlag(prefix) {
-    return args.some((arg, index) => arg === prefix || arg.startsWith(`${prefix}=`) || (arg === prefix && index < args.length - 1));
+    return args.some(
+        (arg, index) => arg === prefix || arg.startsWith(`${prefix}=`) || (arg === prefix && index < args.length - 1),
+    );
 }
 
 function hasPositionalArgs() {

@@ -1,6 +1,6 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Link, Typography } from "@mui/material";
-import { DialogCloseIconButton } from "./ProjectRenameModal";
 import { HELP_DIALOG_MESSAGE, MDV_DOC_WEBSITE, MDV_EMAIL } from "@/utilities/constants";
+import { DialogCloseIconButton } from "./ProjectRenameModal";
 
 export type HelpDialogType = {
     open: boolean;
@@ -28,10 +28,10 @@ const HelpDialog = ({ open, onClose }: HelpDialogType) => {
                     </Link>
                     .
                 </Typography>
-                <Typography  variant="body1" sx={{mt: 1}}>
+                <Typography variant="body1" sx={{ mt: 1 }}>
                     {HELP_DIALOG_MESSAGE[1]}
                 </Typography>
-                <Typography sx={{mt: 3, mb: 1 }} variant="body1">
+                <Typography sx={{ mt: 3, mb: 1 }} variant="body1">
                     {HELP_DIALOG_MESSAGE[2]}{" "}
                     <Link
                         href={MDV_DOC_WEBSITE}

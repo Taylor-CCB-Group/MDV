@@ -6,6 +6,7 @@ type IgvTrackApi = {
 
 const { default: igvBase } = await import("igv");
 const igv = igvBase as typeof igvBase & IgvTrackApi;
+
 import type { IGVBaseFeature } from "./igvUtils";
 import { getStructuralVariantStyle } from "./igvUtils";
 
@@ -135,7 +136,7 @@ class MdvFeatureTrack extends igv.TrackBase {
         const normalizedSvType = typeof proxy.svtype === "string" ? proxy.svtype.trim().toUpperCase() : "";
         const style = getStructuralVariantStyle(proxy.svtype);
         const color = proxy.color || style.fillStyle;
-        const stroke = proxy.color || style.strokeStyle; 
+        const stroke = proxy.color || style.strokeStyle;
         const featureStart = Number.isFinite(renderStart) ? Number(renderStart) : proxy.start;
         const featureEnd = Number.isFinite(renderEnd) ? Number(renderEnd) : proxy.end;
         const startPx = Math.round((featureStart - bpStart) / bpPerPixel);
@@ -164,7 +165,7 @@ class MdvFeatureTrack extends igv.TrackBase {
 
         ctx.save();
         ctx.lineWidth = 2;
-        ctx.fillStyle =color;
+        ctx.fillStyle = color;
         ctx.strokeStyle = stroke;
 
         if (style.glyph === "breakend") {
@@ -200,11 +201,26 @@ class MdvFeatureTrack extends igv.TrackBase {
                     if (normalizedSvType === "INS") {
                         this.drawThinInsertionTriangle(ctx, centerX, midY, 3, 9, color, stroke);
                     } else {
-                        this.drawTriangle(ctx, centerX, midY - halfH / 2, Math.max(5, Math.min(10, spanWidth / 3)), color, stroke);
+                        this.drawTriangle(
+                            ctx,
+                            centerX,
+                            midY - halfH / 2,
+                            Math.max(5, Math.min(10, spanWidth / 3)),
+                            color,
+                            stroke,
+                        );
                     }
                     break;
                 case "double_bar":
-                    this.drawDoubleBar(ctx, centerX, midY, Math.max(6, Math.min(12, spanWidth / 2)), halfH, color, stroke);
+                    this.drawDoubleBar(
+                        ctx,
+                        centerX,
+                        midY,
+                        Math.max(6, Math.min(12, spanWidth / 2)),
+                        halfH,
+                        color,
+                        stroke,
+                    );
                     break;
                 default:
                     this.drawDiamond(ctx, centerX, midY, Math.max(5, Math.min(10, spanWidth / 3)), color, stroke);
@@ -215,7 +231,14 @@ class MdvFeatureTrack extends igv.TrackBase {
         ctx.restore();
     }
 
-    private drawDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, fillStyle: string, strokeStyle: string) {
+    private drawDiamond(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        radius: number,
+        fillStyle: string,
+        strokeStyle: string,
+    ) {
         ctx.save();
         ctx.fillStyle = fillStyle;
         ctx.strokeStyle = strokeStyle;
@@ -230,7 +253,14 @@ class MdvFeatureTrack extends igv.TrackBase {
         ctx.restore();
     }
 
-    private drawTriangle(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, fillStyle: string, strokeStyle: string) {
+    private drawTriangle(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        radius: number,
+        fillStyle: string,
+        strokeStyle: string,
+    ) {
         ctx.save();
         ctx.fillStyle = fillStyle;
         ctx.strokeStyle = strokeStyle;
@@ -266,7 +296,15 @@ class MdvFeatureTrack extends igv.TrackBase {
         ctx.restore();
     }
 
-    private drawDoubleBar(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, halfHeight: number, fillStyle: string, strokeStyle: string) {
+    private drawDoubleBar(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        width: number,
+        halfHeight: number,
+        fillStyle: string,
+        strokeStyle: string,
+    ) {
         ctx.save();
         ctx.fillStyle = fillStyle;
         ctx.strokeStyle = strokeStyle;
@@ -278,7 +316,14 @@ class MdvFeatureTrack extends igv.TrackBase {
         ctx.restore();
     }
 
-    private drawDeletionTicks(ctx: CanvasRenderingContext2D, x1: number, x2: number, y: number, halfHeight: number, strokeStyle: string) {
+    private drawDeletionTicks(
+        ctx: CanvasRenderingContext2D,
+        x1: number,
+        x2: number,
+        y: number,
+        halfHeight: number,
+        strokeStyle: string,
+    ) {
         ctx.save();
         ctx.strokeStyle = strokeStyle;
         ctx.lineWidth = 2;
@@ -291,7 +336,14 @@ class MdvFeatureTrack extends igv.TrackBase {
         ctx.restore();
     }
 
-    private drawArrowHead(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, strokeStyle: string, rightFacing: boolean) {
+    private drawArrowHead(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        size: number,
+        strokeStyle: string,
+        rightFacing: boolean,
+    ) {
         ctx.save();
         ctx.strokeStyle = strokeStyle;
         ctx.beginPath();
@@ -308,7 +360,14 @@ class MdvFeatureTrack extends igv.TrackBase {
         ctx.restore();
     }
 
-    private drawCircle(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, strokeStyle: string, fillStyle: string) {
+    private drawCircle(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        radius: number,
+        strokeStyle: string,
+        fillStyle: string,
+    ) {
         ctx.save();
         ctx.fillStyle = fillStyle;
         ctx.strokeStyle = strokeStyle;
@@ -331,33 +390,33 @@ class MdvFeatureTrack extends igv.TrackBase {
             return baseFeatures;
         }
 
-     const out = baseFeatures
-        .filter((feature: IGVBaseFeature) => {
-            const rowIndex = Number.parseInt(`${feature?.id ?? ""}`, 10);
-            if (!Number.isFinite(rowIndex)) return false;
-            if (typeof filterFn === "function" && !filterFn(rowIndex)) return false;
-            return true;
-        })
-        .map((feature: IGVBaseFeature) => {
-            const proxy = feature._f?feature._f:feature;//sometimes igv wraps features in an object with a _f property
-            const rowIndex = Number.parseInt(`${feature?.id ?? ""}`, 10);
-            if (typeof styleGetter === "function") {
-                const style: MdvStyle = styleGetter(rowIndex);
-                if (style?.name !== undefined) {
-                    proxy.name = style.name;
-                } else {
-                    proxy.name="";
+        const out = baseFeatures
+            .filter((feature: IGVBaseFeature) => {
+                const rowIndex = Number.parseInt(`${feature?.id ?? ""}`, 10);
+                if (!Number.isFinite(rowIndex)) return false;
+                if (typeof filterFn === "function" && !filterFn(rowIndex)) return false;
+                return true;
+            })
+            .map((feature: IGVBaseFeature) => {
+                const proxy = feature._f ? feature._f : feature; //sometimes igv wraps features in an object with a _f property
+                const rowIndex = Number.parseInt(`${feature?.id ?? ""}`, 10);
+                if (typeof styleGetter === "function") {
+                    const style: MdvStyle = styleGetter(rowIndex);
+                    if (style?.name !== undefined) {
+                        proxy.name = style.name;
+                    } else {
+                        proxy.name = "";
+                    }
+                    if (style?.color !== undefined) {
+                        proxy.color = style.color;
+                    } else {
+                        delete proxy.color;
+                    }
                 }
-                if (style?.color !== undefined) {
-                    proxy.color = style.color;
-                } else {
-                    delete proxy.color;
-                }
-            }
-            return feature;
-        });
-            return out;
-        }
+                return feature;
+            });
+        return out;
+    }
 
     draw(options: any) {
         if (!this.isSvs) {
@@ -407,7 +466,7 @@ class MdvFeatureTrack extends igv.TrackBase {
         const stackingInfo = new WeakMap<IGVBaseFeature, number>();
         for (let laneIdx = 0; laneIdx < laneCount; ++laneIdx) {
             const laneFeatures = featuresByLane[laneIdx];
-            laneFeatures.sort((a, b) => (a.renderStart - b.renderStart) || (a.renderEnd - b.renderEnd));
+            laneFeatures.sort((a, b) => a.renderStart - b.renderStart || a.renderEnd - b.renderEnd);
             const singleLevelLane = laneIdx === 1 || laneIdx === 4 || laneIdx === 5; // INS, TRA, BND
             if (singleLevelLane) {
                 for (const item of laneFeatures) {
@@ -415,13 +474,13 @@ class MdvFeatureTrack extends igv.TrackBase {
                 }
                 continue;
             }
-            const active: { end: number, stack: number }[] = [];
+            const active: { end: number; stack: number }[] = [];
             for (const item of laneFeatures) {
                 for (let i = active.length - 1; i >= 0; --i) {
                     if (active[i].end < item.renderStart) active.splice(i, 1);
                 }
                 let stackIdx = 0;
-                const used = new Set(active.map(a => a.stack));
+                const used = new Set(active.map((a) => a.stack));
                 while (used.has(stackIdx) && stackIdx < 3) stackIdx++;
                 if (stackIdx >= 3) stackIdx = 2;
                 stackingInfo.set(item.feature, stackIdx);
@@ -491,43 +550,35 @@ class MdvFeatureTrack extends igv.TrackBase {
                 const queryChr = chrCoord?.chr;
                 const queryPos = Number(chrCoord?.position);
                 if (typeof queryChr === "string" && Number.isFinite(queryPos)) {
-                    candidates = cache.queryFeatures(
-                        queryChr,
-                        queryPos - bpLeeway,
-                        queryPos + bpLeeway,
-                    ) || [];
+                    candidates = cache.queryFeatures(queryChr, queryPos - bpLeeway, queryPos + bpLeeway) || [];
                 }
             }
 
             // Fallback in case this feature cache stores all-view records directly.
             if (candidates.length === 0) {
-                candidates = cache.queryFeatures(
-                    referenceFrame.chr,
-                    genomicLocation - bpLeeway,
-                    genomicLocation + bpLeeway,
-                ) || [];
+                candidates =
+                    cache.queryFeatures(referenceFrame.chr, genomicLocation - bpLeeway, genomicLocation + bpLeeway) ||
+                    [];
             }
         } else {
-            candidates = cache.queryFeatures(
-                referenceFrame.chr,
-                genomicLocation - bpLeeway,
-                genomicLocation + bpLeeway,
-            ) || [];
+            candidates =
+                cache.queryFeatures(referenceFrame.chr, genomicLocation - bpLeeway, genomicLocation + bpLeeway) || [];
         }
 
         const hits = candidates.filter((feature: IGVBaseFeature) => {
             const proxy = this.getFeature(feature);
             return this.getSvLaneIndex(proxy.svtype) === clickedLane;
         });
-        //remove any that have been filtered out by the user config 
+        //remove any that have been filtered out by the user config
         const filterFn = this.config?.__mdvIsFeatureVisible;
-        const finalHits = typeof filterFn === "function"
-            ? hits.filter(feature => {
-                const proxy = this.getFeature(feature);
-                const rowIndex = Number.parseInt(`${proxy?.id ?? ""}`, 10);
-                return Number.isFinite(rowIndex) && filterFn(rowIndex);
-            })
-            : hits;        
+        const finalHits =
+            typeof filterFn === "function"
+                ? hits.filter((feature) => {
+                      const proxy = this.getFeature(feature);
+                      const rowIndex = Number.parseInt(`${proxy?.id ?? ""}`, 10);
+                      return Number.isFinite(rowIndex) && filterFn(rowIndex);
+                  })
+                : hits;
 
         if (finalHits.length > 1) {
             finalHits.sort((a: IGVBaseFeature, b: IGVBaseFeature) => {
@@ -547,7 +598,7 @@ class MdvFeatureTrack extends igv.TrackBase {
 
         return finalHits;
     }
-    
+
     popupData(clickState: any) {
         return this.clickedFeatures(clickState);
     }
@@ -592,13 +643,14 @@ class MdvFeatureTrack extends igv.TrackBase {
         if (!viewports || viewports.length === 0) {
             return;
         }
-        await Promise.all(viewports.map(async (viewport: any) => {
-            viewport.featureCache = undefined;
-            await viewport.loadFeatures();
-            viewport.repaint();
-        }));
+        await Promise.all(
+            viewports.map(async (viewport: any) => {
+                viewport.featureCache = undefined;
+                await viewport.loadFeatures();
+                viewport.repaint();
+            }),
+        );
     }
-
 
     get defaultHeight() {
         return this.height;
@@ -631,7 +683,7 @@ class StandaloneCramTrack extends igv.TrackBase {
             // Auto-generate CRAI URL preserving query and hash
             try {
                 const url = new URL(config.url, window.location.href);
-                url.pathname = url.pathname + '.crai';
+                url.pathname = url.pathname + ".crai";
                 this.config.indexURL = url.href;
             } catch (e) {
                 // Fallback for relative URLs or parsing errors
@@ -655,7 +707,6 @@ class StandaloneCramTrack extends igv.TrackBase {
             },
             this.browser,
         );
-        
     }
 
     async getFeatures(chr: string, start: number, end: number) {
@@ -677,10 +728,6 @@ type SupplementalSegment = {
     readStart: number;
     readEnd: number;
 };
-
-
-
-
 
 function parseCigarOps(cigar: unknown): Array<{ len: number; op: string }> {
     if (typeof cigar !== "string" || !cigar) return [];
@@ -717,10 +764,7 @@ function getTerminalClipTotals(cigar: unknown): { leftClip: number; rightClip: n
     // This handles patterns like 624M10475H (clip dominates).
     if (i < ops.length) {
         const edge = ops[i];
-        if (
-            edge &&
-            (edge.op === "M" || edge.op === "=" || edge.op === "X")
-        ) {
+        if (edge && (edge.op === "M" || edge.op === "=" || edge.op === "X")) {
             leftEdgeMatch = edge.len;
             let k = i + 1;
             let adjacentClip = 0;
@@ -765,10 +809,7 @@ function getTerminalClipTotals(cigar: unknown): { leftClip: number; rightClip: n
     }
     if (j >= 0) {
         const edge = ops[j];
-        if (
-            edge &&
-            (edge.op === "M" || edge.op === "=" || edge.op === "X")
-        ) {
+        if (edge && (edge.op === "M" || edge.op === "=" || edge.op === "X")) {
             rightEdgeMatch = edge.len;
             let k = j - 1;
             let adjacentClip = 0;
@@ -825,7 +866,10 @@ function getTerminalEdgeMatchTotals(cigar: unknown): { leftMatch: number; rightM
     return { leftMatch, rightMatch };
 }
 
-function computeOriginalReadIntervalFromCigar(cigar: unknown, strandPlus: boolean): { readStart: number; readEnd: number } | null {
+function computeOriginalReadIntervalFromCigar(
+    cigar: unknown,
+    strandPlus: boolean,
+): { readStart: number; readEnd: number } | null {
     const ops = parseCigarOps(cigar);
     if (ops.length === 0) return null;
 
@@ -865,8 +909,6 @@ function endpointCoord(start: number, end: number, strandPlus: boolean, side: En
     return strandPlus ? end : start;
 }
 
-
-
 class MdvSplitAlignmentTrack extends igv.TrackBase {
     config: any;
     browser: any;
@@ -886,7 +928,7 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
     private _boundLocusChangeHandler?: () => void;
 
     constructor(config: any, browser: any) {
-        config.visibilityWindow=100000;
+        config.visibilityWindow = 100000;
         super(config, browser);
         this.config = config;
         this.browser = browser;
@@ -911,18 +953,12 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
             },
             this.browser,
         );
-     
-        
-       
-        
-        
+
         this._boundTrackDragHandler = this.onTrackDrag.bind(this);
         this.browser?.on?.("trackdrag", this._boundTrackDragHandler);
         this._boundLocusChangeHandler = this.onLocusChange.bind(this);
         this.browser?.on?.("locuschange", this._boundLocusChangeHandler);
     }
-
-
 
     private onTrackDrag() {
         if (this._dragOverlayRafPending) return;
@@ -953,7 +989,6 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
     }
 
     private onLocusChange() {
-       
         // Ignore drag-time locus updates; keep links visible while panning.
         if (this.browser?.dragObject || this.browser?.isTrackPanning?.()) {
             return;
@@ -987,26 +1022,28 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
         return `hsla(${hue}, 70%, 45%, ${alpha})`;
     }
 
-
-
-
     private requestHoverRepaint(viewport?: any) {
-         viewport?.repaint?.();
+        viewport?.repaint?.();
     }
 
     private pickSplitReadNameFromHits(hits: any[]): string | null {
         const first = Array.isArray(hits) && hits.length > 0 ? hits[0] : null;
         const candidate =
-            first?.firstAlignment && this.hasSplitTag(first.firstAlignment) ? first.firstAlignment :
-            first?.secondAlignment && this.hasSplitTag(first.secondAlignment) ? first.secondAlignment :
-            this.hasSplitTag(first) ? first :
-            null;
+            first?.firstAlignment && this.hasSplitTag(first.firstAlignment)
+                ? first.firstAlignment
+                : first?.secondAlignment && this.hasSplitTag(first.secondAlignment)
+                  ? first.secondAlignment
+                  : this.hasSplitTag(first)
+                    ? first
+                    : null;
         return typeof candidate?.readName === "string" ? candidate.readName : null;
     }
 
     private buildProxyClickState(sourceViewport: any, event: MouseEvent): any {
         const delegateViewports = this.delegateTrack?.trackView?.viewports || [];
-        let delegateViewport = delegateViewports.find((vp: any) => vp?.referenceFrame === sourceViewport?.referenceFrame);
+        let delegateViewport = delegateViewports.find(
+            (vp: any) => vp?.referenceFrame === sourceViewport?.referenceFrame,
+        );
         if (!delegateViewport && Array.isArray(this.trackView?.viewports)) {
             const idx = this.trackView.viewports.indexOf(sourceViewport);
             if (idx >= 0 && idx < delegateViewports.length) {
@@ -1021,8 +1058,6 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
         this._interactionVersion += 1;
     }
 
-
-
     private isInteractionSynced() {
         return this._syncedInteractionVersion === this._interactionVersion;
     }
@@ -1034,8 +1069,9 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
             this._hoverBoundViewports.add(vp);
             const evaluateHover = (event: MouseEvent) => {
                 if (this.browser?.dragObject || this.browser?.isScrolling) return;
-                const clickState = this.buildProxyClickState(vp, event)
-                    || (typeof vp.createClickState === "function" ? vp.createClickState(event) : null);
+                const clickState =
+                    this.buildProxyClickState(vp, event) ||
+                    (typeof vp.createClickState === "function" ? vp.createClickState(event) : null);
                 if (!clickState) return;
                 // Normalize packed group bounds in-place for this exact hover state.
                 // This fixes slight-pan cases where group.pixelBottom remains 0.
@@ -1068,7 +1104,7 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
                     run();
                 }
             };
-        
+
             const onMouseUp = (event: MouseEvent) => {
                 if (this.isInteractionSynced()) evaluateHover(event);
             };
@@ -1126,9 +1162,8 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
     async popupData(clickState: any) {
         const delegate = this.delegateTrack;
         if (!delegate) return [];
-        return await delegate.popupData?.(clickState) || [];
+        return (await delegate.popupData?.(clickState)) || [];
     }
- 
 
     private getVisibleReferenceFrames() {
         const viewports = this.delegateTrack?.trackView?.viewports || [];
@@ -1140,7 +1175,12 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
             const start = Number(rf?.start);
             const width = Number(vp?.getWidth?.());
             const bpp = Number(rf?.bpPerPixel);
-            if (typeof chr !== "string" || !Number.isFinite(start) || !Number.isFinite(width) || !Number.isFinite(bpp)) {
+            if (
+                typeof chr !== "string" ||
+                !Number.isFinite(start) ||
+                !Number.isFinite(width) ||
+                !Number.isFinite(bpp)
+            ) {
                 continue;
             }
             frames.push({
@@ -1214,11 +1254,6 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
         this.trackView?.repaintViews?.();
     }
 
-
-
-
-
-
     private parseAlignmentReadInterval(alignment: any): {
         readStart: number;
         readEnd: number;
@@ -1249,22 +1284,24 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
         return Boolean(tags?.SA ?? tags?.["SA"]);
     }
 
-    private orderNodesByReadPath<T extends {
-        readStart: number;
-        readEnd: number;
-        clipAtReadStart?: boolean;
-        clipAtReadEnd?: boolean;
-    }>(nodes: T[]): T[] {
+    private orderNodesByReadPath<
+        T extends {
+            readStart: number;
+            readEnd: number;
+            clipAtReadStart?: boolean;
+            clipAtReadEnd?: boolean;
+        },
+    >(nodes: T[]): T[] {
         // Build a path using explicit read-coordinate continuity:
         // choose the next segment whose readStart is closest to previous readEnd.
-        const remaining = [...nodes].sort((a, b) => (a.readStart - b.readStart) || (a.readEnd - b.readEnd));
+        const remaining = [...nodes].sort((a, b) => a.readStart - b.readStart || a.readEnd - b.readEnd);
         if (remaining.length <= 1) return remaining;
 
         // If present, seed with segment clipped at read end (first segment),
         // else earliest by readStart.
-        let seedIdx = remaining.findIndex(n => Boolean(n.clipAtReadEnd) && !Boolean(n.clipAtReadStart));
+        let seedIdx = remaining.findIndex((n) => Boolean(n.clipAtReadEnd) && !Boolean(n.clipAtReadStart));
         if (seedIdx < 0) {
-            seedIdx = remaining.findIndex(n => Boolean(n.clipAtReadEnd));
+            seedIdx = remaining.findIndex((n) => Boolean(n.clipAtReadEnd));
         }
         if (seedIdx < 0) seedIdx = 0;
         const ordered: T[] = [remaining.splice(seedIdx, 1)[0] as T];
@@ -1280,7 +1317,10 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
                     bestIdx = i;
                 } else if (dist === bestDist) {
                     const cur = remaining[bestIdx];
-                    if (cand.readStart < cur.readStart || (cand.readStart === cur.readStart && cand.readEnd < cur.readEnd)) {
+                    if (
+                        cand.readStart < cur.readStart ||
+                        (cand.readStart === cur.readStart && cand.readEnd < cur.readEnd)
+                    ) {
                         bestIdx = i;
                     }
                 }
@@ -1297,9 +1337,10 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
             return rows;
         }
 
-        const alignmentRowHeight = this.delegateTrack?.displayMode === "SQUISHED"
-            ? this.delegateTrack?.squishedRowHeight || 8
-            : this.delegateTrack?.alignmentRowHeight || 14;
+        const alignmentRowHeight =
+            this.delegateTrack?.displayMode === "SQUISHED"
+                ? this.delegateTrack?.squishedRowHeight || 8
+                : this.delegateTrack?.alignmentRowHeight || 14;
         const yInset = Number(this.delegateTrack?.alignmentsYOffset) || 0;
         let y = yInset;
         for (const group of packedGroups.values()) {
@@ -1376,7 +1417,9 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
             const rows = rowsByViewport.get(frame.viewport) || [];
             for (const row of rows) {
                 for (const item of row.alignments) {
-                    const alignments = item?.paired ? [item.firstAlignment, item.secondAlignment].filter(Boolean) : [item];
+                    const alignments = item?.paired
+                        ? [item.firstAlignment, item.secondAlignment].filter(Boolean)
+                        : [item];
                     for (const alignment of alignments) {
                         const readName = typeof alignment?.readName === "string" ? alignment.readName : "";
                         if (!readName) continue;
@@ -1410,7 +1453,7 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
         for (const [readName, nodes] of nodesByRead.entries()) {
             if (this._activeReadName && readName !== this._activeReadName) continue;
             if (nodes.length < 2) continue;
-            if (!nodes.some(n => n.hasSplit)) continue;
+            if (!nodes.some((n) => n.hasSplit)) continue;
             const orderedNodes = this.orderNodesByReadPath(nodes);
             octx.strokeStyle = this.splitReadColor(readName);
             for (let i = 0; i < orderedNodes.length - 1; i++) {
@@ -1427,13 +1470,13 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
 
                 const sourceContentTop = Number(source.frame.viewport?.getContentTop?.() || 0);
                 const targetContentTop = Number(target.frame.viewport?.getContentTop?.() || 0);
-                const x1 = (sourceRect.left - hostRect.left) + ((sourceBp - source.frame.start) / source.frame.bpPerPixel);
-                const y1 = (sourceRect.top - hostRect.top) + (source.y - sourceContentTop);
-                const x2 = (targetRect.left - hostRect.left) + ((targetBp - target.frame.start) / target.frame.bpPerPixel);
-                const y2 = (targetRect.top - hostRect.top) + (target.y - targetContentTop);
+                const x1 = sourceRect.left - hostRect.left + (sourceBp - source.frame.start) / source.frame.bpPerPixel;
+                const y1 = sourceRect.top - hostRect.top + (source.y - sourceContentTop);
+                const x2 = targetRect.left - hostRect.left + (targetBp - target.frame.start) / target.frame.bpPerPixel;
+                const y2 = targetRect.top - hostRect.top + (target.y - targetContentTop);
 
-                if (x1 < (sourceRect.left - hostRect.left) || x1 > (sourceRect.right - hostRect.left)) continue;
-                if (x2 < (targetRect.left - hostRect.left) || x2 > (targetRect.right - hostRect.left)) continue;
+                if (x1 < sourceRect.left - hostRect.left || x1 > sourceRect.right - hostRect.left) continue;
+                if (x2 < targetRect.left - hostRect.left || x2 > targetRect.right - hostRect.left) continue;
 
                 const cx = (x1 + x2) / 2;
                 const cy = Math.min(y1, y2) - Math.max(16, Math.min(72, Math.abs(x2 - x1) * 0.12));
@@ -1469,7 +1512,13 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
         const bpPerPixel = Number(options?.bpPerPixel);
         const pixelWidth = Number(options?.pixelWidth);
         const alignmentContainer = options?.features;
-        if (!ctx || !referenceFrame || !Number.isFinite(bpStart) || !Number.isFinite(bpPerPixel) || !Number.isFinite(pixelWidth)) {
+        if (
+            !ctx ||
+            !referenceFrame ||
+            !Number.isFinite(bpStart) ||
+            !Number.isFinite(bpPerPixel) ||
+            !Number.isFinite(pixelWidth)
+        ) {
             return;
         }
 
@@ -1535,7 +1584,7 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
         for (const [readName, nodes] of nodesByRead.entries()) {
             if (this._activeReadName && readName !== this._activeReadName) continue;
             if (nodes.length < 2) continue;
-            if (!nodes.some(n => n.hasSplit)) continue;
+            if (!nodes.some((n) => n.hasSplit)) continue;
             const orderedNodes = this.orderNodesByReadPath(nodes);
             ctx.strokeStyle = this.splitReadColor(readName);
             for (let i = 0; i < orderedNodes.length - 1; i++) {
@@ -1548,7 +1597,8 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
                 if (sourceX < 0 || sourceX > pixelWidth) continue;
                 if (targetX < 0 || targetX > pixelWidth) continue;
                 const midX = (sourceX + targetX) / 2;
-                const midY = Math.min(source.y, target.y) - Math.max(8, Math.min(32, Math.abs(targetX - sourceX) * 0.14));
+                const midY =
+                    Math.min(source.y, target.y) - Math.max(8, Math.min(32, Math.abs(targetX - sourceX) * 0.14));
                 ctx.beginPath();
                 ctx.moveTo(sourceX, source.y);
                 ctx.quadraticCurveTo(midX, midY, targetX, target.y);
@@ -1566,9 +1616,10 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
             const right = Math.min(pixelWidth, (aEnd - bpStart) / bpPerPixel);
             const width = right - left;
             if (width <= 1) continue;
-            const rowHeight = this.delegateTrack?.displayMode === "SQUISHED"
-                ? this.delegateTrack?.squishedRowHeight || 8
-                : this.delegateTrack?.alignmentRowHeight || 14;
+            const rowHeight =
+                this.delegateTrack?.displayMode === "SQUISHED"
+                    ? this.delegateTrack?.squishedRowHeight || 8
+                    : this.delegateTrack?.alignmentRowHeight || 14;
             const outlineTop = y - rowHeight / 2 + 0.5;
             const outlineHeight = Math.max(4, rowHeight - 2);
             ctx.save();
@@ -1578,7 +1629,7 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
                 ctx.fillStyle = "rgba(150, 150, 150, 0.16)";
                 ctx.strokeStyle = "rgba(120, 120, 120, 0.9)";
             } else {
-                ctx.fillStyle = this.splitReadColorAlpha(readName, 0.20);
+                ctx.fillStyle = this.splitReadColorAlpha(readName, 0.2);
                 ctx.strokeStyle = this.splitReadColor(readName);
             }
             ctx.fillRect(left, outlineTop, width, outlineHeight);

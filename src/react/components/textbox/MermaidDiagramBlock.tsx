@@ -62,17 +62,13 @@ export function MermaidDiagramBlock({ code }: { code: string }) {
             ) : null}
             {state.error ? (
                 <>
-                    <div className="mdv-textbox-mermaid-error">
-                        Unable to render Mermaid diagram.
-                    </div>
+                    <div className="mdv-textbox-mermaid-error">Unable to render Mermaid diagram.</div>
                     <pre className="mdv-textbox-mermaid-fallback">
                         <code>{code}</code>
                     </pre>
                 </>
             ) : null}
-            {!state.svg && !state.error ? (
-                <div className="mdv-textbox-mermaid-loading">Rendering diagram…</div>
-            ) : null}
+            {!state.svg && !state.error ? <div className="mdv-textbox-mermaid-loading">Rendering diagram…</div> : null}
         </div>
     );
 }

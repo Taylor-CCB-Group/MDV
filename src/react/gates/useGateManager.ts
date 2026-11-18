@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useDataStore } from "../context";
 import type DataStore from "@/datastore/DataStore";
+import { useDataStore } from "../context";
 import { GateManager } from "./GateManager";
 
 /**

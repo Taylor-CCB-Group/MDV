@@ -31,8 +31,7 @@ class HierarchicalClustering {
             this.distance = distances["euclidean"];
         }
         this.linkage = linkage ? linkage : "average";
-        this.threshold =
-            threshold === undefined ? Number.POSITIVE_INFINITY : threshold;
+        this.threshold = threshold === undefined ? Number.POSITIVE_INFINITY : threshold;
     }
 
     cluster(items, snapshotPeriod, snapshotCb) {
@@ -57,12 +56,7 @@ class HierarchicalClustering {
         for (let i = 0; i < this.clusters.length; i++) {
             for (let j = 0; j <= i; j++) {
                 const dist =
-                    i === j
-                        ? Number.POSITIVE_INFINITY
-                        : this.distance(
-                              this.clusters[i].value,
-                              this.clusters[j].value,
-                          );
+                    i === j ? Number.POSITIVE_INFINITY : this.distance(this.clusters[i].value, this.clusters[j].value);
                 this.dists[i][j] = dist;
                 this.dists[j][i] = dist;
 
@@ -140,9 +134,7 @@ class HierarchicalClustering {
                 }
             } else if (this.linkage === "average") {
                 dist =
-                    (this.dists[c1.key][ci.key] * c1.size +
-                        this.dists[c2.key][ci.key] * c2.size) /
-                    (c1.size + c2.size);
+                    (this.dists[c1.key][ci.key] * c1.size + this.dists[c2.key][ci.key] * c2.size) / (c1.size + c2.size);
             } else {
                 dist = this.distance(ci.value, c1.value);
             }
@@ -189,11 +181,7 @@ class HierarchicalClustering {
 }
 
 function getHierarchicalNodes(data, config = {}) {
-    const hc = new HierarchicalClustering(
-        config.distance,
-        config.linkage,
-        config.threshold,
-    );
+    const hc = new HierarchicalClustering(config.distance, config.linkage, config.threshold);
     hc.cluster(data);
     try {
         const nodes = d3_hierarchy(hc.clusters[0]);
@@ -267,4 +255,4 @@ function parseNewick(tree) {
     return d3_hierarchy(r);
 }
 
-export { HierarchicalClustering, getHierarchicalNodes, parseNewick };
+export { getHierarchicalNodes, HierarchicalClustering, parseNewick };

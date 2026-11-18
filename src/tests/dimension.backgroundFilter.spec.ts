@@ -1,5 +1,5 @@
-import Dimension from "@/datastore/Dimension";
 import { describe, expect, test } from "vitest";
+import Dimension from "@/datastore/Dimension";
 
 type TestParent = {
     size: number;
@@ -77,10 +77,7 @@ describe("Dimension 0/1/2/3 background-filter transitions", () => {
         assertInvariant(parent, dim);
 
         const includeOnlyFirst = new Set([0]);
-        dim.filterPredicate(
-            { predicate: (i: number) => includeOnlyFirst.has(i) },
-            [],
-        );
+        dim.filterPredicate({ predicate: (i: number) => includeOnlyFirst.has(i) }, []);
 
         // exclude row 1: 0->1
         expect(Array.from(dim.filterArray)).toEqual([0, 1, 3, 3]);
@@ -111,11 +108,7 @@ describe("Dimension 0/1/2/3 background-filter transitions", () => {
             delimiter: ",",
             stringLength: 3,
             values: ["N/A", "a", "b"],
-            data: new Uint16Array([
-                1, 65535, 65535,
-                2, 65535, 65535,
-                1, 2, 65535,
-            ]),
+            data: new Uint16Array([1, 65535, 65535, 2, 65535, 65535, 1, 2, 65535]),
         };
         const { parent, dim } = createMultitextDimension(column, 3);
 

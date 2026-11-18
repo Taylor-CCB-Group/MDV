@@ -1,7 +1,7 @@
-import TableChartReactComponent from "@/react/components/TableChartReactComponent";
 import { render, screen } from "@testing-library/react";
-import { describe, test, expect, beforeEach, vi } from "vitest";
 import { observable } from "mobx";
+import { beforeEach, describe, expect, test, vi } from "vitest";
+import TableChartReactComponent from "@/react/components/TableChartReactComponent";
 import { createSlickGridMock } from "./hooks/testUtils/createSlickGridMock";
 
 // Mock SlickgridReact to avoid browser API issues
@@ -26,8 +26,7 @@ vi.mock("@/react/components/BulkEditColumnDialog", () => ({
 }));
 
 vi.mock("@/react/components/RenameTableColumnDialog", () => ({
-    default: ({ open }: { open: boolean }) =>
-        open ? <div data-testid="mock-rename-column-dialog" /> : null,
+    default: ({ open }: { open: boolean }) => (open ? <div data-testid="mock-rename-column-dialog" /> : null),
 }));
 
 vi.mock("@/react/components/ColumnRemovalImpactDialog", () => ({

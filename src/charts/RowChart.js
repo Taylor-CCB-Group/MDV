@@ -1,9 +1,9 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
-import CategoryChart from "./CategoryChart.js";
-import BaseChart from "./BaseChart";
-import { createEl } from "../utilities/Elements.js";
+import { select } from "d3-selection";
 import WordCloud from "wordcloud";
+import { createEl } from "../utilities/Elements.js";
+import BaseChart from "./BaseChart";
+import CategoryChart from "./CategoryChart.js";
 
 class RowChart extends CategoryChart {
     constructor(dataStore, div, config) {
@@ -30,12 +30,10 @@ class RowChart extends CategoryChart {
         const vals = this.dataStore.getColumnValues(this.config.param[0]);
         const colors = this.dataStore.getColumnColors(this.config.param[0]);
         const color = (word) => {
-            const filtered =
-                this.filter.length > 0 && this.filter.indexOf(word) === -1;
+            const filtered = this.filter.length > 0 && this.filter.indexOf(word) === -1;
             return filtered ? "lightgray" : colors[vals.indexOf(word)];
         };
-        const click = (item, dimension, e) =>
-            this.filterCategories(item[0], e.shiftKey);
+        const click = (item, dimension, e) => this.filterCategories(item[0], e.shiftKey);
         const list = data.map((d) => {
             return [vals[d[1]], Math.log(d[0])];
         });
@@ -48,8 +46,7 @@ class RowChart extends CategoryChart {
         canvas.style.display = "block";
         this.graph_area.style.display = "none";
         //won't redraw if we change the theme...
-        const backgroundColor =
-            getComputedStyle(canvas).getPropertyValue("--main_panel_color");
+        const backgroundColor = getComputedStyle(canvas).getPropertyValue("--main_panel_color");
         const options = {
             list,
             color,
@@ -66,13 +63,9 @@ class RowChart extends CategoryChart {
 
     drawChart(tTime = 400) {
         const c = this.config;
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(tTime)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
         const chartWidth = this.width - this.margins.left - this.margins.right;
-        const chartHeight =
-            this.height - this.margins.bottom - this.margins.top;
+        const chartHeight = this.height - this.margins.bottom - this.margins.top;
 
         const colors = this.dataStore.getColumnColors(this.config.param[0]);
         const vals = this.dataStore.getColumnValues(this.config.param[0]);
@@ -81,9 +74,7 @@ class RowChart extends CategoryChart {
         let data = this.rowData;
         if (!data) {
             //seen this happen at least once when it shouldn't have, likely related to other data-loading issues
-            console.error(
-                ">>> No data for row chart - probably a bug, needs tracking...",
-            );
+            console.error(">>> No data for row chart - probably a bug, needs tracking...");
         }
         let maxCount = this.maxCount;
 

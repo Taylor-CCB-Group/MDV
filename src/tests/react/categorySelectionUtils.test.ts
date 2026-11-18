@@ -1,9 +1,9 @@
+import { describe, expect, test, vi } from "vitest";
 import {
     getAvailableCategorySelectionValues,
     getCategorySelectionDropdownKey,
     shouldRefreshCategorySelectionValues,
 } from "@/react/components/categorySelectionUtils";
-import { describe, expect, test, vi } from "vitest";
 
 describe("categorySelectionUtils", () => {
     test("reads single-item values from multitext source columns", () => {
@@ -19,10 +19,7 @@ describe("categorySelectionUtils", () => {
             getColumnValues: vi.fn(),
         } as any;
 
-        expect(getAvailableCategorySelectionValues(dataStore, "__tags")).toEqual([
-            "a",
-            "b",
-        ]);
+        expect(getAvailableCategorySelectionValues(dataStore, "__tags")).toEqual(["a", "b"]);
     });
 
     test("includes source column in dropdown remount key", () => {
@@ -32,38 +29,14 @@ describe("categorySelectionUtils", () => {
     });
 
     test("refreshes when the active source column changes data", () => {
-        expect(
-            shouldRefreshCategorySelectionValues(
-                "data_changed",
-                { columns: ["__tags"] },
-                "__tags",
-            ),
-        ).toBe(true);
+        expect(shouldRefreshCategorySelectionValues("data_changed", { columns: ["__tags"] }, "__tags")).toBe(true);
 
-        expect(
-            shouldRefreshCategorySelectionValues(
-                "data_changed",
-                { columns: ["other"] },
-                "__tags",
-            ),
-        ).toBe(false);
+        expect(shouldRefreshCategorySelectionValues("data_changed", { columns: ["other"] }, "__tags")).toBe(false);
     });
 
     test("refreshes when rows are added or the active source column is removed", () => {
-        expect(
-            shouldRefreshCategorySelectionValues(
-                "data_added",
-                10,
-                "__tags",
-            ),
-        ).toBe(true);
+        expect(shouldRefreshCategorySelectionValues("data_added", 10, "__tags")).toBe(true);
 
-        expect(
-            shouldRefreshCategorySelectionValues(
-                "column_removed",
-                "__tags",
-                "__tags",
-            ),
-        ).toBe(true);
+        expect(shouldRefreshCategorySelectionValues("column_removed", "__tags", "__tags")).toBe(true);
     });
 });

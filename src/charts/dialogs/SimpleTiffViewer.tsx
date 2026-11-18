@@ -1,100 +1,118 @@
-import type React from 'react';
-import { useEffect, useMemo } from 'react';
+import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
 import { observer } from "mobx-react-lite";
-import { DetailView, getDefaultInitialViewState } from '@hms-dbmi/viv';
-import { ColorPaletteExtension } from '@hms-dbmi/viv';
-import { useLoader, useChannelsStore, useViewerStore, useViewerStoreApi } from '../../react/components/avivatorish/state';
-import { shallow } from 'zustand/shallow';
-import MDVivViewer from '../../react/components/avivatorish/MDVivViewer';
-import { useOuterContainer } from '@/react/screen_state';
+import type React from "react";
+import { useEffect, useMemo } from "react";
+import { shallow } from "zustand/shallow";
+import { useOuterContainer } from "@/react/screen_state";
+import MDVivViewer from "../../react/components/avivatorish/MDVivViewer";
+import {
+    useChannelsStore,
+    useLoader,
+    useViewerStore,
+    useViewerStoreApi,
+} from "../../react/components/avivatorish/state";
 
 export interface SimpleTiffViewerProps {
-  width: number;
-  height: number;
-  isFullscreen: boolean;
+    width: number;
+    height: number;
+    isFullscreen: boolean;
 }
 
-const SimpleTiffViewer: React.FC<SimpleTiffViewerProps> = observer(({ width, height, isFullscreen }: SimpleTiffViewerProps) => {
-  const loader = useLoader();
-  const { colors, contrastLimits, channelsVisible, selections, brightness, contrast } = useChannelsStore(
-    ({ colors, contrastLimits, channelsVisible, selections, brightness, contrast }) => ({
-      colors, contrastLimits, channelsVisible, selections, brightness, contrast
-    }),
-    shallow
-  );
-  const viewState = useViewerStore(store => store.viewState);
-  const outerContainer = useOuterContainer();
+const SimpleTiffViewer: React.FC<SimpleTiffViewerProps> = observer(
+    ({ width, height, isFullscreen }: SimpleTiffViewerProps) => {
+        const loader = useLoader();
+        const { colors, contrastLimits, channelsVisible, selections, brightness, contrast } = useChannelsStore(
+            ({ colors, contrastLimits, channelsVisible, selections, brightness, contrast }) => ({
+                colors,
+                contrastLimits,
+                channelsVisible,
+                selections,
+                brightness,
+                contrast,
+            }),
+            shallow,
+        );
+        const viewState = useViewerStore((store) => store.viewState);
+        const outerContainer = useOuterContainer();
 
-  const viewerWidth = isFullscreen ? outerContainer.clientWidth : width;
-  const viewerHeight = isFullscreen ? outerContainer.clientHeight : height;
+        const viewerWidth = isFullscreen ? outerContainer.clientWidth : width;
+        const viewerHeight = isFullscreen ? outerContainer.clientHeight : height;
 
-  useEffect(() => {
-    console.log('Loader:', loader);
-    console.log('ViewState:', viewState);
-  }, [loader, viewState]);
-  
-  const extensions = useMemo(() => [new ColorPaletteExtension()], []);
-  
-  const layerConfig = useMemo(() => {
-    const config = {
-      loader,
-      selections,
-      contrastLimits,
-      colors,
-      channelsVisible,
-      brightness,
-      contrast,
-      extensions
-    };
-    console.log('Layer Config:', config);
-    return config;
-  }, [loader, selections, contrastLimits, colors, channelsVisible, brightness, contrast, extensions]);
+        useEffect(() => {
+            console.log("Loader:", loader);
+            console.log("ViewState:", viewState);
+        }, [loader, viewState]);
 
-  const viewerStore = useViewerStoreApi();
-  useEffect(() => {
-    if (loader && !viewState) {
-      const initialViewState = getDefaultInitialViewState(loader, { width: viewerWidth, height: viewerHeight });
-      viewerStore.setState({ viewState: initialViewState });
-    }
-  }, [loader, viewState, viewerWidth, viewerHeight, viewerStore]);
+        const extensions = useMemo(() => [new ColorPaletteExtension()], []);
 
-  const detailView = useMemo(() => new DetailView({
-    id: 'detail-view',
-    // @ts-expect-error viv runtime supports this, types do not
-    snapScaleBar: true,
-    width: viewerWidth,
-    height: viewerHeight
-  }), [viewerWidth, viewerHeight]);
+        const layerConfig = useMemo(() => {
+            const config = {
+                loader,
+                selections,
+                contrastLimits,
+                colors,
+                channelsVisible,
+                brightness,
+                contrast,
+                extensions,
+            };
+            console.log("Layer Config:", config);
+            return config;
+        }, [loader, selections, contrastLimits, colors, channelsVisible, brightness, contrast, extensions]);
 
-  if (!loader) {
-    return <div>No loader available</div>;
-  }
+        const viewerStore = useViewerStoreApi();
+        useEffect(() => {
+            if (loader && !viewState) {
+                const initialViewState = getDefaultInitialViewState(loader, {
+                    width: viewerWidth,
+                    height: viewerHeight,
+                });
+                viewerStore.setState({ viewState: initialViewState });
+            }
+        }, [loader, viewState, viewerWidth, viewerHeight, viewerStore]);
 
-  if (!viewState) {
-    return <div>No view state available</div>;
-  }
+        const detailView = useMemo(
+            () =>
+                new DetailView({
+                    id: "detail-view",
+                    // @ts-expect-error viv runtime supports this, types do not
+                    snapScaleBar: true,
+                    width: viewerWidth,
+                    height: viewerHeight,
+                }),
+            [viewerWidth, viewerHeight],
+        );
 
-  return (
-    <MDVivViewer
-      views={[detailView]}
-      layerProps={[layerConfig]}
-      viewStates={[{ ...viewState, id: 'detail-view' }]}
-      onViewStateChange={(e: any) => {
-        console.log('View State Change:', e.viewState);
-        viewerStore.setState({ viewState: { ...e.viewState, id: 'detail-view' } });
-      }}
-      deckProps={{
-        style: {
-          height: `${viewerHeight}px`,
-          width: `${viewerWidth}px`,
-          position: 'relative',
-        },
-        onError: (error: any) => {
-          console.error('MDVivViewer Error:', error);
-        },
-      }}
-    />
-  );
-});
+        if (!loader) {
+            return <div>No loader available</div>;
+        }
+
+        if (!viewState) {
+            return <div>No view state available</div>;
+        }
+
+        return (
+            <MDVivViewer
+                views={[detailView]}
+                layerProps={[layerConfig]}
+                viewStates={[{ ...viewState, id: "detail-view" }]}
+                onViewStateChange={(e: any) => {
+                    console.log("View State Change:", e.viewState);
+                    viewerStore.setState({ viewState: { ...e.viewState, id: "detail-view" } });
+                }}
+                deckProps={{
+                    style: {
+                        height: `${viewerHeight}px`,
+                        width: `${viewerWidth}px`,
+                        position: "relative",
+                    },
+                    onError: (error: any) => {
+                        console.error("MDVivViewer Error:", error);
+                    },
+                }}
+            />
+        );
+    },
+);
 
 export default SimpleTiffViewer;

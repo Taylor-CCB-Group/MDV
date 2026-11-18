@@ -28,7 +28,6 @@ function useFilter(datastore) {
     return filter;
 }
 
-
 // Blue color scale for nonzero, neutral gray for zero
 function getCellColor(value, maxValue, isDark) {
     if (maxValue <= 0 || value <= 0) {
@@ -174,20 +173,14 @@ const CategoryHeatmapComponent = observer(() => {
     const displayData =
         aggregation == null
             ? null
-            : pruneAggregation(
-                  aggregation,
-                  chart.config.x_display_categories,
-                  chart.config.y_display_categories,
-              );
+            : pruneAggregation(aggregation, chart.config.x_display_categories, chart.config.y_display_categories);
 
     if (isLoading) {
         return <div style={{ padding: "12px" }}>Loading category heatmap...</div>;
     }
 
     if (errorMessage) {
-        return (
-            <div style={{ padding: "12px", color: "#b00020" }}>{errorMessage}</div>
-        );
+        return <div style={{ padding: "12px", color: "#b00020" }}>{errorMessage}</div>;
     }
 
     if (!displayData || displayData.xLabels.length === 0 || displayData.yLabels.length === 0) {
@@ -197,7 +190,8 @@ const CategoryHeatmapComponent = observer(() => {
     if (displayData.totalCells > MAX_VISIBLE_CELLS) {
         return (
             <div style={{ padding: "12px", color: "#8a1c0f" }}>
-                Category heatmap not drawn: {displayData.yLabels.length} x {displayData.xLabels.length} = {displayData.totalCells} cells exceeds the limit of {MAX_VISIBLE_CELLS}.
+                Category heatmap not drawn: {displayData.yLabels.length} x {displayData.xLabels.length} ={" "}
+                {displayData.totalCells} cells exceeds the limit of {MAX_VISIBLE_CELLS}.
             </div>
         );
     }
@@ -268,19 +262,26 @@ const CategoryHeatmapComponent = observer(() => {
                         {displayData.xLabels.map((xLabel, xIndex) => {
                             const value = displayData.counts[xIndex]?.[yIndex] || 0;
                             const isActive =
-                                chart.cellFilter &&
-                                chart.cellFilter[0] === xLabel &&
-                                chart.cellFilter[1] === yLabel;
+                                chart.cellFilter && chart.cellFilter[0] === xLabel && chart.cellFilter[1] === yLabel;
                             return (
                                 <div
                                     key={`cell-${xLabel}-${yLabel}`}
                                     style={{
                                         ...cellBaseStyle,
                                         background: getCellColor(value, displayData.maxCount, isDark),
-                                        color: value > 0 ? (isDark ? "#e0e6ef" : "#0e2238") : (isDark ? "#7a8699" : "#8a96a3"),
+                                        color:
+                                            value > 0
+                                                ? isDark
+                                                    ? "#e0e6ef"
+                                                    : "#0e2238"
+                                                : isDark
+                                                  ? "#7a8699"
+                                                  : "#8a96a3",
                                         cursor: "pointer",
                                         boxShadow: isActive
-                                            ? (isDark ? "inset 0 0 0 2px #4fc3f7" : "inset 0 0 0 2px #0b4f8a")
+                                            ? isDark
+                                                ? "inset 0 0 0 2px #4fc3f7"
+                                                : "inset 0 0 0 2px #0b4f8a"
                                             : "none",
                                     }}
                                     title={`${xLabel} x ${yLabel}: ${value}`}
@@ -313,7 +314,16 @@ const CategoryHeatmapComponent = observer(() => {
                 </div>
                 <span style={{ fontSize: 12, color: isDark ? "#e0e6ef" : "#0e2238" }}>High</span>
                 <span style={{ fontSize: 12, color: isDark ? "#8a96a3" : "#7a8699" }}>&nbsp;&nbsp;0</span>
-                <div style={{ width: 16, height: 16, background: getCellColor(0, 100, isDark), border: "1px solid #aaa", display: "inline-block", marginLeft: 2 }} />
+                <div
+                    style={{
+                        width: 16,
+                        height: 16,
+                        background: getCellColor(0, 100, isDark),
+                        border: "1px solid #aaa",
+                        display: "inline-block",
+                        marginLeft: 2,
+                    }}
+                />
             </div>
         </div>
     );

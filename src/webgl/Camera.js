@@ -27,12 +27,8 @@ class Camera {
         this.right = new Float32Array([1, 0, 0]);
         this.front = new Float32Array([0, 0, 1]);
 
-        this.minDistance = Math.log(
-            "minDistance" in props ? props.minDistance : 0.5,
-        );
-        this.maxDistance = Math.log(
-            "maxDistance" in props ? props.maxDistance : 100000000000000,
-        );
+        this.minDistance = Math.log("minDistance" in props ? props.minDistance : 0.5);
+        this.maxDistance = Math.log("maxDistance" in props ? props.maxDistance : 100000000000000);
 
         this.dtheta = 0;
         this.dphi = 0;
@@ -69,11 +65,7 @@ class Camera {
         const up = this.cameraState.up;
 
         this.cameraState.theta += this.dtheta;
-        this.cameraState.phi = clamp(
-            this.cameraState.phi + this.dphi,
-            -Math.PI / 2.0,
-            Math.PI / 2.0,
-        );
+        this.cameraState.phi = clamp(this.cameraState.phi + this.dphi, -Math.PI / 2.0, Math.PI / 2.0);
         this.cameraState.distance = clamp(
             this.cameraState.distance + this.ddistance,
             this.minDistance,
@@ -94,11 +86,7 @@ class Camera {
         const vu = r * Math.sin(phi);
 
         for (let i = 0; i < 3; ++i) {
-            eye[i] =
-                center[i] +
-                vf * this.front[i] +
-                vr * this.right[i] +
-                vu * up[i];
+            eye[i] = center[i] + vf * this.front[i] + vr * this.right[i] + vu * up[i];
         }
 
         const test = [60 * Math.cos(0.01), 30, 60 * Math.sin(0.01)];

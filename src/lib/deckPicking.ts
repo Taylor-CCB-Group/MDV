@@ -99,10 +99,7 @@ export function getPickingInfoSourceLayerId(info: PickingInfo | null | undefined
     return info?.sourceLayer?.id ?? "";
 }
 
-export function pickingInfoMatchesLayer(
-    info: PickingInfo | null | undefined,
-    predicate: (layerId: string) => boolean,
-) {
+export function pickingInfoMatchesLayer(info: PickingInfo | null | undefined, predicate: (layerId: string) => boolean) {
     const layerId = getPickingInfoLayerId(info);
     const sourceLayerId = getPickingInfoSourceLayerId(info);
     return predicate(layerId) || predicate(sourceLayerId);

@@ -2492,6 +2492,17 @@ const jQuery = $;
       }
     }
 
+    function getSafeCssRules(sheet) {
+      if (!sheet) {
+        return [];
+      }
+      try {
+        return sheet.cssRules || sheet.rules || [];
+      } catch (e) {
+        return [];
+      }
+    }
+
     function getColumnCssRules(idx) {
       var i;
       if (!stylesheet) {
@@ -2502,7 +2513,8 @@ const jQuery = $;
             stylesheet = sheets[i];
             break;
           }
-          if (sheets[i].cssRules[0] && sheets[i].cssRules[0].selectorText && sheets[i].cssRules[0].selectorText.includes(uid)){
+          var sheetRules = getSafeCssRules(sheets[i]);
+          if (sheetRules && sheetRules[0] && sheetRules[0].selectorText && sheetRules[0].selectorText.includes(uid)){
             stylesheet=sheets[i];
             break;
           }
@@ -2515,7 +2527,7 @@ const jQuery = $;
         // find and cache column CSS rules
         columnCssRulesL = [];
         columnCssRulesR = [];
-        var cssRules = (stylesheet.cssRules || stylesheet.rules);
+        var cssRules = getSafeCssRules(stylesheet) || [];
         var matches, columnIdx;
         for (i = 0; i < cssRules.length; i++) {
           var selector = cssRules[i].selectorText;
@@ -6333,13 +6345,17 @@ const jQuery = $;
       var sheets = __doc__.styleSheets;
         
       for (let i = 0; i < sheets.length; i++) {
-        if (sheets[i].cssRules[0].selectorText && sheets[i].cssRules[0].selectorText.includes(uid)){
+        var sheetRules = getSafeCssRules(sheets[i]);
+        if (sheetRules && sheetRules[0] && sheetRules[0].selectorText && sheetRules[0].selectorText.includes(uid)){
           stylesheet=sheets[i];
           break;
         }
       }
-     
-      $style=$(stylesheet.ownerNode);
+      const styleNode = 
+            stylesheet && (stylesheet.ownerNode || stylesheet.owningElement);
+      if (styleNode) {
+        $style = $(styleNode);
+      }     
       removeCssRules();
       createCssRules();
       //applyColumnWidths();

@@ -1,4 +1,4 @@
-import { io, type Socket } from 'socket.io-client';
+import { io, type Socket } from "socket.io-client";
 
 export interface SocketIOUploadConfig {
     namespace: string;
@@ -24,7 +24,7 @@ export interface SocketIOUploadConfig {
 
 export interface SocketIOUploadState {
     fileId: string;
-    status: 'initializing' | 'uploading' | 'processing' | 'completed' | 'error' | 'cancelled';
+    status: "initializing" | "uploading" | "processing" | "completed" | "error" | "cancelled";
     uploadedBytes: number;
     totalBytes: number;
     error?: string;
@@ -51,12 +51,12 @@ export class SocketIOUploadClient {
             chunkSize: 256 * 1024, // 256KB
             maxRetries: 3,
             retryDelay: 5000, // 5 seconds
-            ...config
+            ...config,
         };
 
         this.state = {
             fileId: config.fileId || this.generateFileId(),
-            status: 'initializing',
+            status: "initializing",
             uploadedBytes: 0,
             totalBytes: config.file.size,
         };
@@ -69,25 +69,25 @@ export class SocketIOUploadClient {
     private detectFileType(): { type: string; contentType: string } {
         const fileName = this.config.fileName || this.config.file.name;
         const lowerName = fileName.toLowerCase();
-        
-        if (lowerName.endsWith('.csv')) {
-            return { type: 'csv', contentType: 'text/csv' };
-        } else if (lowerName.endsWith('.tsv') || lowerName.endsWith('.tab')) {
-            return { type: 'tsv', contentType: 'text/tab-separated-values' };
-        } else if (lowerName.endsWith('.txt')) {
-            return { type: 'tsv', contentType: 'text/plain' };
-        } else if (lowerName.endsWith('.h5ad')) {
-            return { type: 'anndata', contentType: 'application/x-hdf' };
-        } else if (lowerName.endsWith('.tiff') || lowerName.endsWith('.tif')) {
-            return { type: 'tiff', contentType: 'image/tiff' };
-        } else if (lowerName.endsWith('.zip')) {
-            return { type: 'zip', contentType: 'application/zip' };
+
+        if (lowerName.endsWith(".csv")) {
+            return { type: "csv", contentType: "text/csv" };
+        } else if (lowerName.endsWith(".tsv") || lowerName.endsWith(".tab")) {
+            return { type: "tsv", contentType: "text/tab-separated-values" };
+        } else if (lowerName.endsWith(".txt")) {
+            return { type: "tsv", contentType: "text/plain" };
+        } else if (lowerName.endsWith(".h5ad")) {
+            return { type: "anndata", contentType: "application/x-hdf" };
+        } else if (lowerName.endsWith(".tiff") || lowerName.endsWith(".tif")) {
+            return { type: "tiff", contentType: "image/tiff" };
+        } else if (lowerName.endsWith(".zip")) {
+            return { type: "zip", contentType: "application/zip" };
         }
-        
-        return { type: 'unknown', contentType: 'application/octet-stream' };
+
+        return { type: "unknown", contentType: "application/octet-stream" };
     }
 
-    private updateStatus(status: SocketIOUploadState['status'], message?: string) {
+    private updateStatus(status: SocketIOUploadState["status"], message?: string) {
         this.state.status = status;
         if (this.config.onStatusChange) {
             this.config.onStatusChange(status, message);
@@ -98,7 +98,7 @@ export class SocketIOUploadClient {
         this.state.uploadedBytes = uploaded;
         this.state.totalBytes = total;
         const progress = total > 0 ? (uploaded / total) * 100 : 0;
-        
+
         if (this.config.onProgress) {
             this.config.onProgress(progress, uploaded, total);
         }
@@ -107,25 +107,25 @@ export class SocketIOUploadClient {
     private setupSocketEventHandlers() {
         if (!this.socket) return;
 
-        this.socket.on('connect', () => {
-            console.log('Connected to SocketIO server');
+        this.socket.on("connect", () => {
+            console.log("Connected to SocketIO server");
             this.connectionEstablished = true;
         });
 
-        this.socket.on('disconnect', () => {
-            console.log('Disconnected from SocketIO server');
+        this.socket.on("disconnect", () => {
+            console.log("Disconnected from SocketIO server");
             this.connectionEstablished = false;
         });
 
-        this.socket.on('upload_start_ack', (data: any) => {
-            console.log('Upload start acknowledged:', data);
+        this.socket.on("upload_start_ack", (data: any) => {
+            console.log("Upload start acknowledged:", data);
             if (data.file_id === this.state.fileId) {
                 this.uploadAcknowledged = true;
             }
         });
 
-        this.socket.on('upload_resume_ack', (data: any) => {
-            console.log('Upload resume acknowledged:', data);
+        this.socket.on("upload_resume_ack", (data: any) => {
+            console.log("Upload resume acknowledged:", data);
             if (data.file_id === this.state.fileId) {
                 this.resumeOffset = data.received_bytes || 0;
                 this.isResuming = true;
@@ -133,68 +133,68 @@ export class SocketIOUploadClient {
             }
         });
 
-        this.socket.on('upload_end_ack', (data: any) => {
-            console.log('Upload end acknowledged:', data);
+        this.socket.on("upload_end_ack", (data: any) => {
+            console.log("Upload end acknowledged:", data);
             if (data.file_id === this.state.fileId) {
                 this.uploadTransferComplete = true;
             }
         });
 
-        this.socket.on('upload_progress', (data: any) => {
+        this.socket.on("upload_progress", (data: any) => {
             if (data.file_id === this.state.fileId) {
                 this.updateProgress(data.received || 0, data.total || this.state.totalBytes);
             }
         });
 
-        this.socket.on('upload_processing_initiated', (data: any) => {
-            console.log('Server initiated processing:', data);
+        this.socket.on("upload_processing_initiated", (data: any) => {
+            console.log("Server initiated processing:", data);
             if (data.file_id === this.state.fileId) {
-                if (this.processingComplete || this.state.status === 'completed') {
+                if (this.processingComplete || this.state.status === "completed") {
                     return;
                 }
-                this.updateStatus('processing', 'Server processing file...');
+                this.updateStatus("processing", "Server processing file...");
                 this.serverRespondedToQuery = true;
             }
         });
 
-        this.socket.on('upload_processing', (data: any) => {
-            console.log('Server processing file:', data);
+        this.socket.on("upload_processing", (data: any) => {
+            console.log("Server processing file:", data);
             if (data.file_id === this.state.fileId) {
-                if (this.processingComplete || this.state.status === 'completed') {
+                if (this.processingComplete || this.state.status === "completed") {
                     return;
                 }
-                this.updateStatus('processing', 'File processing started');
+                this.updateStatus("processing", "File processing started");
             }
         });
 
-        this.socket.on('upload_success', (data: any) => {
-            console.log('Processing successful:', data);
+        this.socket.on("upload_success", (data: any) => {
+            console.log("Processing successful:", data);
             if (data.file_id === this.state.fileId) {
                 this.processingComplete = true;
                 this.shouldExitProcessingWait = true;
                 this.state.result = data;
-                this.updateStatus('completed', 'File processed successfully');
+                this.updateStatus("completed", "File processed successfully");
                 if (this.config.onSuccess) {
                     this.config.onSuccess(data);
                 }
             }
         });
 
-        this.socket.on('upload_error', (data: any) => {
-            console.error('Server error:', data);
+        this.socket.on("upload_error", (data: any) => {
+            console.error("Server error:", data);
             if (data.file_id === this.state.fileId || !data.file_id) {
                 this.processingComplete = true;
                 this.shouldExitProcessingWait = true;
-                this.state.error = data.message || 'Unknown error';
-                this.updateStatus('error', this.state.error);
+                this.state.error = data.message || "Unknown error";
+                this.updateStatus("error", this.state.error);
                 if (this.config.onError) {
                     this.config.onError(data);
                 }
             }
         });
 
-        this.socket.on('upload_resume_info', (data: any) => {
-            console.log('Resume info received:', data);
+        this.socket.on("upload_resume_info", (data: any) => {
+            console.log("Resume info received:", data);
             if (data.file_id === this.state.fileId) {
                 this.resumeOffset = data.received_bytes || 0;
                 this.isResuming = true;
@@ -203,8 +203,8 @@ export class SocketIOUploadClient {
             }
         });
 
-        this.socket.on('upload_not_found', (data: any) => {
-            console.log('Server does not have state for file:', data);
+        this.socket.on("upload_not_found", (data: any) => {
+            console.log("Server does not have state for file:", data);
             if (data.file_id === this.state.fileId) {
                 this.resumeOffset = 0;
                 this.isResuming = false;
@@ -213,21 +213,21 @@ export class SocketIOUploadClient {
             }
         });
 
-        this.socket.on('pong', () => {
-            console.log('Received pong from server');
+        this.socket.on("pong", () => {
+            console.log("Received pong from server");
         });
     }
 
     private async connectToServer(): Promise<boolean> {
         return new Promise((resolve) => {
-            console.log('Using namespace:', this.config.namespace);
-            console.log('Using socket path:', this.config.socketPath);
-            
+            console.log("Using namespace:", this.config.namespace);
+            console.log("Using socket path:", this.config.socketPath);
+
             // Connect to the specific namespace directly
             this.socket = io(`${this.config.namespace}`, {
-                path: this.config.socketPath || '/socket.io',   // '/test/socket.io' or '/carroll/socket.io'
+                path: this.config.socketPath || "/socket.io", // '/test/socket.io' or '/carroll/socket.io'
                 autoConnect: false,
-                transports: ['polling'],
+                transports: ["polling"],
                 timeout: 60000,
                 forceNew: true,
                 reconnection: false,
@@ -242,31 +242,30 @@ export class SocketIOUploadClient {
             // Wait for connection with timeout
             const connectionTimeout = setTimeout(() => {
                 if (!this.connectionEstablished) {
-                    console.error('Connection timeout after 15 seconds');
+                    console.error("Connection timeout after 15 seconds");
                     resolve(false);
                 }
             }, 15000);
 
-            this.socket.on('connect', () => {
-                console.log('Socket connected successfully to namespace:', this.config.namespace);
+            this.socket.on("connect", () => {
+                console.log("Socket connected successfully to namespace:", this.config.namespace);
                 clearTimeout(connectionTimeout);
                 this.connectionEstablished = true;
                 resolve(true);
             });
 
-            this.socket.on('connect_error', (error) => {
-                console.error('Socket connection error:', error);
+            this.socket.on("connect_error", (error) => {
+                console.error("Socket connection error:", error);
                 clearTimeout(connectionTimeout);
                 resolve(false);
             });
 
-            this.socket.on('disconnect', (reason) => {
-                console.log('Socket disconnected:', reason);
+            this.socket.on("disconnect", (reason) => {
+                console.log("Socket disconnected:", reason);
                 this.connectionEstablished = false;
             });
         });
     }
-
 
     private async queryUploadStatus(): Promise<boolean> {
         return new Promise((resolve) => {
@@ -276,22 +275,22 @@ export class SocketIOUploadClient {
             }
 
             // Don't query if we're already in processing state
-            if (this.state.status === 'processing' && this.processingComplete === false) {
-                console.log('Already in processing state, skipping query');
+            if (this.state.status === "processing" && this.processingComplete === false) {
+                console.log("Already in processing state, skipping query");
                 resolve(true);
                 return;
             }
 
             this.serverRespondedToQuery = false;
             const queryMsg = { file_id: this.state.fileId };
-            
-            console.log('Querying server status for file_id:', this.state.fileId);
-            this.socket.emit('upload_query', queryMsg);
+
+            console.log("Querying server status for file_id:", this.state.fileId);
+            this.socket.emit("upload_query", queryMsg);
 
             // Wait for response with timeout
             const timeout = setTimeout(() => {
                 if (!this.serverRespondedToQuery) {
-                    console.log('Query timeout, assuming new upload');
+                    console.log("Query timeout, assuming new upload");
                     this.resumeOffset = 0;
                     this.isResuming = false;
                     resolve(true);
@@ -312,10 +311,10 @@ export class SocketIOUploadClient {
     }
 
     private async startUpload(): Promise<void> {
-        if (!this.socket) throw new Error('Socket not connected');
+        if (!this.socket) throw new Error("Socket not connected");
 
         const { type, contentType } = this.detectFileType();
-        
+
         const startMsg: any = {
             file_id: this.state.fileId,
             filename: this.config.fileName || this.config.file.name,
@@ -324,28 +323,29 @@ export class SocketIOUploadClient {
         };
 
         // Tabular datasource parameters (CSV / TSV / tab-delimited text)
-        if (type === 'csv' || type === 'tsv') {
-            startMsg.name = this.config.datasourceName || 
-                           this.config.fileName?.replace(/\.[^/.]+$/, '') || 
-                           this.config.file.name.replace(/\.[^/.]+$/, '');
-            startMsg.view = this.config.view || 'default';
+        if (type === "csv" || type === "tsv") {
+            startMsg.name =
+                this.config.datasourceName ||
+                this.config.fileName?.replace(/\.[^/.]+$/, "") ||
+                this.config.file.name.replace(/\.[^/.]+$/, "");
+            startMsg.view = this.config.view || "default";
             startMsg.replace = this.config.replace || false;
             startMsg.supplied_only = this.config.suppliedOnly || false;
         }
 
-        console.log('Sending upload start for', type, 'file, ID', this.state.fileId);
-        this.socket.emit('upload_start', startMsg);
+        console.log("Sending upload start for", type, "file, ID", this.state.fileId);
+        this.socket.emit("upload_start", startMsg);
     }
 
     private async sendFileChunks(): Promise<void> {
-        if (!this.socket) throw new Error('Socket not connected');
+        if (!this.socket) throw new Error("Socket not connected");
 
         const chunkSize = this.config.chunkSize || 256 * 1024;
         let chunkNum = 0;
         let uploadedBytes = this.resumeOffset;
         let currentOffset = this.resumeOffset;
 
-        console.log('Starting file transmission from offset', this.resumeOffset);
+        console.log("Starting file transmission from offset", this.resumeOffset);
 
         while (!this.cancelRequested && currentOffset < this.config.file.size) {
             const endOffset = Math.min(currentOffset + chunkSize, this.config.file.size);
@@ -354,7 +354,7 @@ export class SocketIOUploadClient {
             try {
                 // Read chunk as base64
                 const base64Data = await this.readFileChunkAsBase64(chunk);
-                
+
                 const chunkMsg = {
                     file_id: this.state.fileId,
                     chunk_num: chunkNum,
@@ -362,8 +362,8 @@ export class SocketIOUploadClient {
                 };
 
                 // Send chunk
-                this.socket.emit('upload_chunk', chunkMsg);
-                
+                this.socket.emit("upload_chunk", chunkMsg);
+
                 uploadedBytes += chunk.size;
                 currentOffset = endOffset;
                 chunkNum++;
@@ -373,14 +373,13 @@ export class SocketIOUploadClient {
 
                 // Small delay to prevent overwhelming the server
                 await this.delay(10);
-                
             } catch (error) {
-                console.error('Error processing chunk:', error);
+                console.error("Error processing chunk:", error);
                 throw error;
             }
         }
 
-        console.log('Finished sending chunks. Total bytes uploaded:', uploadedBytes);
+        console.log("Finished sending chunks. Total bytes uploaded:", uploadedBytes);
     }
 
     private readFileChunkAsBase64(chunk: Blob): Promise<string> {
@@ -388,7 +387,7 @@ export class SocketIOUploadClient {
             const reader = new FileReader();
             reader.onload = () => {
                 const dataUrl = reader.result as string;
-                resolve(dataUrl.substring(dataUrl.indexOf(',') + 1));
+                resolve(dataUrl.substring(dataUrl.indexOf(",") + 1));
             };
             reader.onerror = (error) => {
                 reject(error);
@@ -396,148 +395,148 @@ export class SocketIOUploadClient {
             reader.readAsDataURL(chunk);
         });
     }
-    
+
     private delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     private async endUpload(): Promise<void> {
-        if (!this.socket) throw new Error('Socket not connected');
+        if (!this.socket) throw new Error("Socket not connected");
 
         const endMsg = { file_id: this.state.fileId };
-        console.log('Sending upload end for file_id:', this.state.fileId);
-        this.socket.emit('upload_end', endMsg);
+        console.log("Sending upload end for file_id:", this.state.fileId);
+        this.socket.emit("upload_end", endMsg);
     }
 
-private async waitForProcessing(): Promise<void> {
-    const timeout = 3600000; // 1 hour timeout
-    const startTime = Date.now();
-    let lastPingTime = Date.now();
-    const pingInterval = 30000; // 30 seconds
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
+    private async waitForProcessing(): Promise<void> {
+        const timeout = 3600000; // 1 hour timeout
+        const startTime = Date.now();
+        let lastPingTime = Date.now();
+        const pingInterval = 30000; // 30 seconds
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
 
-    console.log('Waiting for processing completion...');
+        console.log("Waiting for processing completion...");
 
-    while (!this.shouldExitProcessingWait && !this.cancelRequested) {
-        const currentTime = Date.now();
+        while (!this.shouldExitProcessingWait && !this.cancelRequested) {
+            const currentTime = Date.now();
 
-        // Check timeout
-        if (currentTime - startTime > timeout) {
-            throw new Error('Timeout waiting for processing completion');
-        }
+            // Check timeout
+            if (currentTime - startTime > timeout) {
+                throw new Error("Timeout waiting for processing completion");
+            }
 
-        // Check connection and handle reconnection
-        if (!this.socket?.connected) {
-            console.warn('Connection lost during processing wait');
-            
-            if (reconnectAttempts < maxReconnectAttempts) {
-                try {
-                    console.log(`Attempting reconnection ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
-                    
-                    // Disconnect old socket completely
-                    if (this.socket) {
-                        this.socket.disconnect();
-                        this.socket = null;
-                    }
-                    
-                    // Create new connection with preferred transport
-                    const connected = await this.connectToServer();
-                    if (connected) {
-                        console.log('Reconnected successfully');
-                        reconnectAttempts = 0; // Reset on successful connection
-                        lastPingTime = currentTime; // Reset ping timer
-                        
-                        // Re-query status to get current processing state
-                        await this.queryUploadStatus();
-                    } else {
+            // Check connection and handle reconnection
+            if (!this.socket?.connected) {
+                console.warn("Connection lost during processing wait");
+
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    try {
+                        console.log(`Attempting reconnection ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
+
+                        // Disconnect old socket completely
+                        if (this.socket) {
+                            this.socket.disconnect();
+                            this.socket = null;
+                        }
+
+                        // Create new connection with preferred transport
+                        const connected = await this.connectToServer();
+                        if (connected) {
+                            console.log("Reconnected successfully");
+                            reconnectAttempts = 0; // Reset on successful connection
+                            lastPingTime = currentTime; // Reset ping timer
+
+                            // Re-query status to get current processing state
+                            await this.queryUploadStatus();
+                        } else {
+                            reconnectAttempts++;
+                            console.warn(`Reconnection attempt ${reconnectAttempts} failed`);
+
+                            // Exponential backoff
+                            await new Promise((resolve) =>
+                                setTimeout(resolve, Math.min(1000 * 2 ** reconnectAttempts, 30000)),
+                            );
+                        }
+                    } catch (error) {
                         reconnectAttempts++;
-                        console.warn(`Reconnection attempt ${reconnectAttempts} failed`);
-                        
-                        // Exponential backoff
-                        await new Promise(resolve => 
-                            setTimeout(resolve, Math.min(1000 * (2 ** reconnectAttempts), 30000))
-                        );
+                        console.warn("Reconnection failed:", error);
+
+                        if (reconnectAttempts >= maxReconnectAttempts) {
+                            throw new Error(`Failed to reconnect after ${maxReconnectAttempts} attempts`);
+                        }
                     }
-                } catch (error) {
-                    reconnectAttempts++;
-                    console.warn('Reconnection failed:', error);
-                    
-                    if (reconnectAttempts >= maxReconnectAttempts) {
-                        throw new Error(`Failed to reconnect after ${maxReconnectAttempts} attempts`);
-                    }
+                } else {
+                    throw new Error(`Connection lost and failed to reconnect after ${maxReconnectAttempts} attempts`);
                 }
-            } else {
-                throw new Error(`Connection lost and failed to reconnect after ${maxReconnectAttempts} attempts`);
             }
-        }
 
-        // Send periodic pings only when connected
-        if (this.socket?.connected && currentTime - lastPingTime > pingInterval) {
-            try {
-                this.socket.emit('ping', { message: 'keepalive', file_id: this.state.fileId });
-                lastPingTime = currentTime;
-                console.log('Sent keepalive ping');
-            } catch (error) {
-                console.warn('Failed to send keepalive ping:', error);
+            // Send periodic pings only when connected
+            if (this.socket?.connected && currentTime - lastPingTime > pingInterval) {
+                try {
+                    this.socket.emit("ping", { message: "keepalive", file_id: this.state.fileId });
+                    lastPingTime = currentTime;
+                    console.log("Sent keepalive ping");
+                } catch (error) {
+                    console.warn("Failed to send keepalive ping:", error);
+                }
             }
-        }
 
-        // Wait before next check
-        await new Promise(resolve => setTimeout(resolve, 1000));
+            // Wait before next check
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
     }
-}
 
     public async upload(): Promise<any> {
         try {
-            this.updateStatus('initializing', 'Connecting to server...');
-            console.log('Starting upload for file:', this.config.file.name, 'Size:', this.config.file.size);
+            this.updateStatus("initializing", "Connecting to server...");
+            console.log("Starting upload for file:", this.config.file.name, "Size:", this.config.file.size);
 
             // Connect to server
             const connected = await this.connectToServer();
             if (!connected) {
-                throw new Error('Failed to connect to server');
+                throw new Error("Failed to connect to server");
             }
 
             // Query upload status
             const shouldProceed = await this.queryUploadStatus();
             if (!shouldProceed) {
-                throw new Error('Server refused upload');
+                throw new Error("Server refused upload");
             }
 
             // Start upload if needed
             if (!this.uploadTransferComplete) {
-                this.updateStatus('uploading', 'Starting upload...');
-                
+                this.updateStatus("uploading", "Starting upload...");
+
                 await this.startUpload();
-                console.log('Upload start sent, waiting for acknowledgment...');
-                
+                console.log("Upload start sent, waiting for acknowledgment...");
+
                 // Wait for acknowledgment
                 await this.waitForAcknowledgment();
-                console.log('Upload acknowledged, starting file transfer...');
-                
+                console.log("Upload acknowledged, starting file transfer...");
+
                 // Send file chunks
                 await this.sendFileChunks();
-                console.log('File chunks sent, ending upload...');
-                
+                console.log("File chunks sent, ending upload...");
+
                 // End upload
                 await this.endUpload();
-                console.log('Upload end sent, waiting for completion...');
-                
+                console.log("Upload end sent, waiting for completion...");
+
                 // Wait for upload completion acknowledgment
                 await this.waitForUploadCompletion();
-                console.log('Upload transfer completed');
+                console.log("Upload transfer completed");
             }
 
             // Wait for processing only if completion wasn't already received.
-            if (!this.processingComplete && this.state.status !== 'completed') {
-                this.updateStatus('processing', 'Processing file...');
-                console.log('Waiting for server processing...');
+            if (!this.processingComplete && this.state.status !== "completed") {
+                this.updateStatus("processing", "Processing file...");
+                console.log("Waiting for server processing...");
                 await this.waitForProcessing();
             }
 
             if (this.state.result) {
-                console.log('Upload completed successfully:', this.state.result);
+                console.log("Upload completed successfully:", this.state.result);
                 return this.state.result;
             }
 
@@ -546,12 +545,11 @@ private async waitForProcessing(): Promise<void> {
                 throw new Error(this.state.error);
             }
 
-            throw new Error('Upload completed but no result received');
-
+            throw new Error("Upload completed but no result received");
         } catch (error) {
-            console.error('Upload error:', error);
-            this.state.error = error instanceof Error ? error.message : 'Unknown error';
-            this.updateStatus('error', this.state.error);
+            console.error("Upload error:", error);
+            this.state.error = error instanceof Error ? error.message : "Unknown error";
+            this.updateStatus("error", this.state.error);
             if (this.config.onError) {
                 this.config.onError(error);
             }
@@ -564,7 +562,7 @@ private async waitForProcessing(): Promise<void> {
     private async waitForAcknowledgment(): Promise<void> {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
-                reject(new Error('Upload acknowledgment timeout'));
+                reject(new Error("Upload acknowledgment timeout"));
             }, 15000);
 
             const checkAcknowledgment = () => {
@@ -580,16 +578,19 @@ private async waitForProcessing(): Promise<void> {
     }
 
     private async waitForUploadCompletion(): Promise<void> {
-        return new Promise((resolve, reject) => { // Add reject
+        return new Promise((resolve, reject) => {
+            // Add reject
             const timeout = setTimeout(() => {
                 // FIX: Reject with an error
-                reject(new Error('Timeout: Server did not acknowledge upload completion. The connection was likely lost.'));
+                reject(
+                    new Error("Timeout: Server did not acknowledge upload completion. The connection was likely lost."),
+                );
             }, 30000);
 
             const checkCompletion = () => {
                 if (this.cancelRequested) {
                     clearTimeout(timeout);
-                    reject(new Error('Upload was cancelled.'));
+                    reject(new Error("Upload was cancelled."));
                     return;
                 }
                 if (this.uploadTransferComplete) {
@@ -605,12 +606,12 @@ private async waitForProcessing(): Promise<void> {
 
     public cancel(): void {
         this.cancelRequested = true;
-        this.updateStatus('cancelled', 'Upload cancelled');
-        
+        this.updateStatus("cancelled", "Upload cancelled");
+
         if (this.socket?.connected) {
-            this.socket.emit('upload_cancel', { file_id: this.state.fileId });
+            this.socket.emit("upload_cancel", { file_id: this.state.fileId });
         }
-        
+
         this.disconnect();
     }
 

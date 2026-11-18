@@ -10,6 +10,7 @@ Classes:
     FileService: Manages file-related database operations
     UserService: Manages user-related database operations
     UserProjectService: Manages user-project relationships and permissions
+    InvitationService: Accepts an Invitation when someone signs in
 
 All services follow a consistent pattern:
     - Static methods for stateless operations
@@ -23,15 +24,24 @@ Example:
     >>> new_project = ProjectService.add_new_project('/path/to/project', 'My Project')
 """
 
-from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject
+from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject, UsageEvent, Invitation, InvitationProject
 from datetime import datetime
-from mdvtools.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject, forget_project_thumbnail, get_project_thumbnail
 from typing import Optional
+from sqlalchemy import func, update
 import os
 import shutil
 from mdvtools.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# Usage recording can be switched off for a whole deployment - an institution
+# may not want it logged at all, and that should be a config change rather than
+# a rebuild. Read at import like ENABLE_AUTH, so it is a deployment-wide
+# decision that no individual request can alter.
+ENABLE_USAGE_TRACKING = os.getenv("ENABLE_USAGE_TRACKING", "1").lower() in ["1", "true", "yes"]
+if not ENABLE_USAGE_TRACKING:
+    logger.info("Usage tracking is disabled (ENABLE_USAGE_TRACKING)")
 
 
 class ProjectService:
@@ -66,8 +76,9 @@ class ProjectService:
             list[dict]: List of project dictionaries, each containing:
                 - id (int): Project ID
                 - name (str): Project name
+                - path (str): Project directory path for internal server checks
                 - lastModified (str): Formatted update timestamp (YYYY-MM-DD HH:MM:SS)
-                - thumbnail (str|None): First available viewImage from project views
+                - thumbnail (str|None): Image of the first view (in all_views order) that has one
                 - readme (str|None): Project README content if available
         
         Raises:
@@ -82,86 +93,66 @@ class ProjectService:
         try:
             failed_project_ids = {f[0] for f in ProjectService.failed_projects}  
             projects = Project.query.filter(~Project.is_deleted).all()
-
-
-            # Convert to JSON-ready list of dictionaries
-            def get_project_thumbnail(project_path):
-                """Extract the first available viewImage from a project's views."""
-                try:
-                    mdv_project = MDVProject(project_path)
-                    return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
-                except Exception as e:
-                    logger.exception(f"Error extracting thumbnail for project at {project_path}: {e}")
-                    return None
-            
-            def get_readme_file(project_path):
-                try:
-                    mdv_project = MDVProject(project_path)
-                    readme_file = mdv_project.readme
-                    return readme_file
-                except Exception as e:
-                    logger.exception(f"Error getting readme file for project at {project_path}: {e}")
-                    return None
-
-            project_list = [
-                {
-                    "id": p.id,
-                    "name": p.name,
-                    "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                    "thumbnail": get_project_thumbnail(p.path),
-                    "readme": get_readme_file(p.path),
-                }
+            return [
+                ProjectService._project_entry(p)
                 for p in projects if p.id not in failed_project_ids
             ]
-
-            return project_list
         except Exception as e:
             logger.exception(f"Error in dbservice: Error querying active projects: {e}")
             raise
 
     @staticmethod
-    def get_next_project_id():
+    def get_active_project(project_id: int) -> Optional[dict]:
         """
-        Calculate the next available project ID.
-        
-        Queries the database for the maximum existing project ID and returns
-        the next sequential ID. If no projects exist, returns 1.
-        
-        Returns:
-            int: The next available project ID (minimum 1)
-        
-        Raises:
-            Exception: If database query fails. The exception is logged and re-raised.
-        
+        One active project, in the same shape as an entry of get_active_projects(),
+        or None if it doesn't exist, is deleted, or failed to load.
+
         Note:
-            This method is used by the /create_project API route.
+            This method is used by the /projects/<id> API route.
         """
         try:
-            next_id = db.session.query(db.func.max(Project.id)).scalar()
-            if next_id is None:
-                next_id = 1
-            else:
-                next_id += 1
-            return next_id
+            if project_id in {f[0] for f in ProjectService.failed_projects}:
+                return None
+            project = Project.query.filter(Project.id == project_id, ~Project.is_deleted).first()
+            return ProjectService._project_entry(project) if project else None
         except Exception as e:
-            logger.exception(f"Error in dbservice: Error getting next project ID: {e}")
+            logger.exception(f"Error in dbservice: Error querying active project {project_id}: {e}")
             raise
+
+    @staticmethod
+    def _project_entry(p: Project) -> dict:
+        def get_readme_file(project_path):
+            try:
+                return MDVProject(project_path).readme
+            except Exception as e:
+                logger.exception(f"Error getting readme file for project at {project_path}: {e}")
+                return None
+
+        return {
+            "id": p.id,
+            "name": p.name,
+            "path": p.path,
+            "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            "thumbnail": get_project_thumbnail(p.path),
+            "readme": get_readme_file(p.path),
+        }
 
     @staticmethod
     def add_new_project(path, name='unnamed_project'):
         """
         Create a new project record in the database.
         
-        Creates a new Project instance with the specified path and name,
-        adds it to the database session, and commits the transaction.
-        
+        Creates a new Project instance with the specified path and name, adds it
+        to the database session and flushes so the database assigns the Project
+        ID. The caller owns the commit.
+
         Args:
             path (str): Filesystem path to the project directory. Must be unique.
             name (str, optional): Project name. Defaults to 'unnamed_project'.
-        
+
         Returns:
-            Project: The newly created Project model instance.
-        
+            Project: The newly created Project model instance, with its assigned id.
+
         Raises:
             Exception: If database operation fails (e.g., duplicate path).
             The exception is logged, transaction is rolled back, and exception
@@ -178,7 +169,7 @@ class ProjectService:
             new_project.name = name
             new_project.path = path
             db.session.add(new_project)
-            db.session.commit()
+            db.session.flush()
             return new_project
         except Exception as e:
             logger.exception(f"Error in dbservice: Error creating project: {e}")
@@ -318,6 +309,8 @@ class ProjectService:
             if not project.path:
                 return False, "Project path is missing."
 
+            # read before the delete: the row's attributes may expire on commit
+            cached_path = project.path
             project_path = os.path.abspath(project.path)
             if project_path == os.path.abspath(os.sep):
                 return False, "Refusing to delete filesystem root."
@@ -334,11 +327,51 @@ class ProjectService:
 
             File.query.filter_by(project_id=project_id).delete(synchronize_session=False)
             UserProject.query.filter_by(project_id=project_id).delete(synchronize_session=False)
+            InvitationProject.query.filter_by(project_id=project_id).delete(synchronize_session=False)
+            # Detach the usage history rather than deleting it. The foreign key
+            # would block this delete otherwise, and dropping the rows would make
+            # last month's access numbers silently change when somebody empties
+            # the recycle bin.
+            #
+            # The project name is merged into details rather than assigned over
+            # it. details also carries what an event meant - a rename's old and
+            # new names, the demo seeder's marker - and replacing it would erase
+            # that at the one moment the name is about to become unrecoverable.
+            #
+            # Two passes, because the merge cannot be expressed in SQL the same
+            # way on SQLite and Postgres. The first handles the rows that carry
+            # something, which are a small minority - an event only has details
+            # if it was a rename or was seeded - and it reads them all before
+            # writing any, because updating project_id while scanning on
+            # project_id is exactly the kind of thing SQLite leaves undefined.
+            # The second is the original single statement, and still does the
+            # overwhelming majority of the work.
+            carrying_details = (
+                UsageEvent.query.filter(
+                    UsageEvent.project_id == project_id,
+                    UsageEvent.details.isnot(None),
+                )
+                .with_entities(UsageEvent.id, UsageEvent.details)
+                .all()
+            )
+            for event_id, existing_details in carrying_details:
+                merged = dict(existing_details) if isinstance(existing_details, dict) else {}
+                merged["project_name"] = project.name
+                UsageEvent.query.filter_by(id=event_id).update(
+                    {"project_id": None, "details": merged},
+                    synchronize_session=False,
+                )
+            # Everything still attached had no details to preserve.
+            UsageEvent.query.filter_by(project_id=project_id).update(
+                {"project_id": None, "details": {"project_name": project.name}},
+                synchronize_session=False,
+            )
             db.session.delete(project)
             db.session.flush()
             if filesystem_delete is not None:
                 filesystem_delete()
             db.session.commit()
+            forget_project_thumbnail(cached_path)
             return True, None
         except Exception as e:
             db.session.rollback()
@@ -890,6 +923,36 @@ class UserProjectService:
             raise
 
     @staticmethod
+    def grant_all_projects_to_admins():
+        """
+        Give every administrator owner access to every project.
+
+        MDV treats administrators as owners of all projects, but those grants are
+        only written in particular places - Admin's Make Admin, and a project
+        rescan. Anything that creates an administrator or discovers projects
+        outside those paths leaves the grants missing, and the administrator sees
+        an empty project list. Call this from those places rather than repeating
+        the loop.
+
+        Safe to call repeatedly: existing grants are updated in place.
+
+        Returns:
+            int: The number of user-project grants written.
+        """
+        admin_ids = [admin.id for admin in User.query.filter_by(is_admin=True).all()]
+        project_ids = [project.id for project in Project.query.all()]
+
+        for user_id in admin_ids:
+            for project_id in project_ids:
+                UserProjectService.add_or_update_user_project(
+                    user_id=user_id,
+                    project_id=project_id,
+                    is_owner=True,
+                )
+
+        return len(admin_ids) * len(project_ids)
+
+    @staticmethod
     def get_user_project_permissions(user_id: int, project_id: int) -> dict:
         """
         Get the permission information for a user-project relationship.
@@ -968,3 +1031,215 @@ class UserProjectService:
             logger.exception(f"Error in remove_user_from_project: {e}")
             db.session.rollback()  # Rollback in case of error
             raise
+
+
+class InvitationService:
+    """Accepts an Invitation when someone signs in with no User (ADRs 0019 and 0021)."""
+
+    @staticmethod
+    def accept_for_sign_in(sign_in: dict) -> Optional[User]:
+        """Accept the open Invitation this sign-in matches, and return its User.
+
+        sign_in holds what Auth0 returned: sub, email, email_verified, and the
+        connection, connection_strategy and xms_edov claims the post-login
+        Action adds. Returns None, changing nothing, when no open Invitation
+        matches.
+        """
+        invitation = next(
+            (
+                invitation
+                for invitation in Invitation.open_for_email(sign_in.get("email") or "")
+                if InvitationService._sign_in_matches(invitation, sign_in)
+            ),
+            None,
+        )
+        if invitation is None:
+            return None
+        try:
+            now = datetime.now()
+            # Claim the Invitation before writing anything else. An Admin can
+            # revoke it after it was picked, and the database checks it is
+            # still open when this update takes the row's write lock.
+            claimed_expiry = db.session.execute(
+                update(Invitation)
+                .where(
+                    Invitation.id == invitation.id,
+                    Invitation.accepted_at.is_(None),
+                    Invitation.revoked_at.is_(None),
+                    Invitation.expires_at > now,
+                )
+                .values(accepted_at=now)
+                .returning(Invitation.expires_at)
+                .execution_options(synchronize_session=False)
+            ).scalar_one_or_none()
+            # The update can wait for another request's lock, so check expiry
+            # again once it has the row. expires_at comes from the row itself,
+            # because a resend can extend it after the Invitation was picked.
+            if claimed_expiry is not None and datetime.now() >= claimed_expiry:
+                claimed_expiry = None
+            if claimed_expiry is None:
+                logger.info(f"Invitation {invitation.id} closed before its sign-in could accept it.")
+                db.session.rollback()
+                user = User.query.filter_by(auth_id=sign_in["sub"]).first()
+                return user if user is not None and user.is_active else None
+            if invitation.user_id is None:
+                user = User(email=invitation.email, auth_id=sign_in["sub"], is_active=True, confirmed_at=now)
+                db.session.add(user)
+                db.session.flush()
+            else:
+                # The Invitation moves an existing User to this Auth0 account, so the
+                # account they signed in with before no longer reaches them (ADR 0019).
+                # Read the row as it is now, and lock it. This request may hold a
+                # copy loaded before the claim, and Remove Admin can commit since.
+                user = db.session.get(User, invitation.user_id, populate_existing=True, with_for_update=True)
+                if user is None:
+                    db.session.rollback()
+                    return None
+                user.auth_id = sign_in["sub"]
+                user.email = invitation.email
+                if not user.is_active:
+                    if user.is_admin:
+                        # Deactivating an Admin leaves is_admin set, and an Owner
+                        # role on every project. The Invitation grants only its
+                        # projects, so Admin rights come back only when an Admin
+                        # gives them again. MDV cannot tell the Owner roles that
+                        # came with Admin rights from others, so all go, as with
+                        # Admin's Remove Admin.
+                        UserProject.query.filter_by(user_id=user.id).delete()
+                        user.is_admin = False
+                    user.is_active = True
+            for grant in invitation.projects:
+                # The Invitation's role replaces any earlier role on the project,
+                # except that an Admin stays Owner of every project.
+                role = "owner" if user.is_admin else grant.role
+                UserProject.query.filter_by(user_id=user.id, project_id=grant.project_id).delete()
+                db.session.add(
+                    UserProject(
+                        user_id=user.id,
+                        project_id=grant.project_id,
+                        is_owner=role == "owner",
+                        can_read=True,
+                        can_write=role in ("editor", "owner"),
+                    )
+                )
+            invitation.accepted_at = now
+            invitation.accepted_user_id = user.id
+            db.session.commit()
+            return user
+        except Exception as e:
+            logger.exception(f"Failed to accept Invitation {invitation.id}: {e}")
+            db.session.rollback()
+            raise
+
+    @staticmethod
+    def _sign_in_matches(invitation: Invitation, sign_in: dict) -> bool:
+        """Whether this sign-in may accept the Invitation under ADR 0021's rule.
+
+        The sign-in must come through the Invitation's connection, its account and
+        email must not belong to a User the Invitation does not name, and Auth0
+        must vouch for the email in the way the connection's strategy calls for.
+        """
+        if sign_in.get("connection") != invitation.connection:
+            return False
+        # An Auth0 account tied to one User cannot accept an Invitation for
+        # anyone else, or two Users would share it.
+        account_user = User.query.filter_by(auth_id=sign_in.get("sub")).first()
+        if account_user is not None and account_user.id != invitation.user_id:
+            return False
+        # Nor can it take the email of a User the Invitation does not name.
+        # Older Users' emails were stored as typed, so compare ignoring case.
+        # Two older Users can hold the same email in different cases, so look
+        # for any User other than the named one.
+        email_user = User.query.filter(
+            func.lower(User.email) == invitation.email, User.id != invitation.user_id
+        ).first()
+        if email_user is not None:
+            logger.warning(
+                f"Invitation {invitation.id} cannot be accepted: its email belongs to "
+                f"User {email_user.id}, whom it does not name."
+            )
+            return False
+        # The connection's strategy says who vouches for the email (ADR 0021).
+        strategy = sign_in.get("connection_strategy")
+        if strategy == "auth0":
+            # A password connection: MDV-Admin creates the account verified.
+            return sign_in.get("email_verified") is True
+        if strategy in ("waad", "oidc"):
+            # Microsoft, through Auth0's Azure AD connection or an OpenID Connect
+            # connection to Entra: Entra's email claim is unverified, but
+            # xms_edov says the tenant owns the email's domain.
+            return sign_in.get("xms_edov") is True
+        return False
+
+
+class UsageEventService:
+    """Records who used what, for the Admin usage page.
+
+    Two deliberate departures from every other service in this module. Both are
+    intentional - please do not "fix" them to match the siblings:
+
+    1. Writes go through db.engine.begin(), not db.session. The sibling services
+       call db.session.rollback() on failure; doing that here would roll back
+       *the caller's* uncommitted work, and the login hook fires immediately
+       after a user-activation commit.
+    2. Every exception is swallowed rather than re-raised. Telemetry must never
+       turn a working page into an error for the person using it.
+    """
+
+    @staticmethod
+    def record_event(user_id, event_type, project_id=None, view_name=None, details=None):
+        """Insert one usage row. Never raises, never touches the caller's session.
+
+        The off switch is checked here rather than at each call site because
+        every recording path funnels through this one function - so a new event
+        type cannot be added that quietly ignores it.
+
+        details carries the few facts that have nowhere else to live, such as the
+        names either side of a rename. Values are truncated like view_name: they
+        come from request bodies, and this column has no length limit of its own.
+        """
+        try:
+            if not ENABLE_USAGE_TRACKING:
+                return False
+            if not user_id or not event_type:
+                return False
+
+            if view_name is not None:
+                view_name = str(view_name)[:128]
+            if details is not None:
+                details = {
+                    str(key)[:64]: (str(value)[:256] if isinstance(value, str) else value)
+                    for key, value in details.items()
+                }
+
+            with db.engine.begin() as connection:
+                connection.execute(
+                    UsageEvent.__table__.insert().values(
+                        user_id=user_id,
+                        project_id=project_id,
+                        event_type=event_type,
+                        view_name=view_name,
+                        details=details,
+                        occurred_at=datetime.now(),
+                    )
+                )
+            return True
+        except Exception as e:
+            # Deliberately not re-raised - see the class docstring.
+            logger.warning(f"Could not record usage event '{event_type}': {e}")
+            return False
+
+    @staticmethod
+    def record_login(user_id):
+        return UsageEventService.record_event(user_id, "login")
+
+    @staticmethod
+    def record_project_open(user_id, project_id):
+        return UsageEventService.record_event(user_id, "project_open", project_id=project_id)
+
+    @staticmethod
+    def record_view_open(user_id, project_id, view_name):
+        """view_name arrives from an untrusted request body, so record_event truncates it."""
+        return UsageEventService.record_event(
+            user_id, "view_open", project_id=project_id, view_name=view_name
+        )

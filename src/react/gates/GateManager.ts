@@ -1,9 +1,9 @@
-import type DataStore from "@/datastore/DataStore";
-import type { Gate } from "./types";
 import { action, computed, makeObservable, observable } from "mobx";
 import type { LoadedDataColumn } from "@/charts/charts";
-import { extractCoords, isPointInPolygon } from "./gateUtils";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
+import type DataStore from "@/datastore/DataStore";
+import { extractCoords, isPointInPolygon } from "./gateUtils";
+import type { Gate } from "./types";
 
 const GATES_COLUMN_NAME = "__gates__";
 const GATE_NONE_VALUE = "N/A";
@@ -324,9 +324,7 @@ export class GateManager {
 
         const gateRegion = gate.region;
         const regionField = this.dataStore.regions?.region_field;
-        const regionCol = gateRegion !== undefined && regionField
-            ? this.dataStore.columnIndex[regionField]
-            : null;
+        const regionCol = gateRegion !== undefined && regionField ? this.dataStore.columnIndex[regionField] : null;
 
         // If region column isn't loaded, skip
         if (gateRegion !== undefined && !regionCol?.data) return;

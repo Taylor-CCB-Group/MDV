@@ -1,15 +1,16 @@
-import { select } from "d3-selection";
-import { easeLinear } from "d3-ease";
-import BaseChart from "./BaseChart";
-import SVGChart from "./SVGChart.js";
-import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
-import { getHierarchicalNodes } from "../utilities/clustering.js";
-import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import { easeLinear } from "d3-ease";
+import { scaleSqrt } from "d3-scale";
+import { select } from "d3-selection";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
-import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 import FractionLegend from "@/react/components/legend/FractionLegend";
 import LegendWrapper from "@/react/components/legend/LegendWrapper";
+import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+import { getHierarchicalNodes } from "../utilities/clustering.js";
+import BaseChart from "./BaseChart";
+import { canvasMeasureText, layoutXLabels, stripSharedSubgroupSuffix } from "./dotplot/xAxisLabels";
+import SVGChart from "./SVGChart.js";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -25,31 +26,29 @@ class DotPlot extends SVGChart {
         } else if (cf.background_filter.column === "__none__") {
             cf.background_filter.column = null;
         } else if (!cf.background_filter.categories) {
-            cf.background_filter.categories = cf.background_filter.category
-                ? [cf.background_filter.category]
-                : [];
+            cf.background_filter.categories = cf.background_filter.category ? [cf.background_filter.category] : [];
         }
-       
+
         super(dataStore, div, config, {
             x: { type: "band" },
             y: { type: "band" },
             ry: {},
         });
         //! this.config is not the object that was passed in, it's been processed by super()
-        const c = this.config; 
-        
+        const c = this.config;
+
         this.addToolTip();
         this.dim = this.dataStore.getDimension("catcol_dimension");
         this.colorScheme = schemeReds[8];
-        console.log('setting fields for dot plot', c.param.slice(1));
-        
+        console.log("setting fields for dot plot", c.param.slice(1));
+
         //this works ok because the method is decorated... which I think means if there's a query object,
         //`setFields` won't actually be called until the link is properly initialised
         // this.setParams(c.param);
         //work out color scales
         c.color_scale = c.color_scale || { log: false };
         c.color_scale.palette = c.color_scale.palette || "reds";
-      
+
         if (!c.color_legend) {
             c.color_legend = { display: true };
         }
@@ -63,6 +62,12 @@ class DotPlot extends SVGChart {
             c.axis.x.rotate_labels = true;
             this.setAxisSize("x", 60);
         }
+        // Fit and truncate labels by default
+        c.axis.x.fit_labels ??= true;
+        c.axis.x.truncate_labels ??= true;
+
+        // Only thin labels when user explicitly allows it
+        c.axis.x.thin_labels ??= false;
         if (!hasCustomYAxis) {
             this.setAxisSize("y", 110);
         }
@@ -92,23 +97,87 @@ class DotPlot extends SVGChart {
         }
         this.colorScheme = schemeReds[8];
     }
-    
+
     // removing this decorator as it muddies the waters with setParams.
     // - both methods having the annotation didn't particularly cause an issue..
     //   as long as we had the workaround in `setParams()` to manually look for activeQuery
     //   but that was itself a hack.
     // @loadColumnData
     _setFields(fieldNames) {
-        //! we don't want to mutate the config object... 
+        //! we don't want to mutate the config object...
         // we want to have a special value which signifies that it should use this behaviour.
         // then when we save state, it will have the appropriate value.
         //this.config.param = [p0, ...fieldNames]; //first is the category column
         this.fieldNames = fieldNames;
         this.colorLegendRange = undefined;
         // await cm.loadColumnSetAsync(fieldNames, this.dataStore.name);
-        const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
-        this.x_scale.domain(yLabels);
+        this.x_scale.domain(fieldNames);
         this.onDataFiltered();
+    }
+
+    /**
+     * Maps each field to its x-axis label, without the `(subgroup)` suffix
+     * when every field shares one.
+     */
+    getXAxisLabels(fieldIds) {
+        const names = stripSharedSubgroupSuffix(
+            fieldIds.map((f) => ({
+                field: f,
+                name: this.dataStore.getColumnName(f) ?? f,
+                inSubgroup: Boolean(this.dataStore.columnIndex[f]?.subgroup),
+            })),
+        );
+        return new Map(fieldIds.map((f, i) => [f, names[i]]));
+    }
+
+    /**
+     * Fits the x labels to the chart's current size (see `layoutXLabels`) and
+     * sets the bottom margin to match.
+     * @returns the labels to display, keyed by field
+     */
+    fitXAxisLabels(fieldIds, labels) {
+        const ax = this.config.axis.x;
+        const layout = layoutXLabels(
+            {
+                labels: fieldIds.map((f) => labels.get(f)),
+                plotLeft: this.margins.left,
+                plotWidth: this.width - this.margins.left - this.margins.right,
+                chartHeight: this.height,
+                fontSize: ax.tickfont,
+                titleSize: ax.label ? (ax.textsize ?? ax.textSize ?? 13) + 6 : 0,
+                truncate: ax.truncate_labels,
+                thin: ax.thin_labels,
+            },
+            canvasMeasureText,
+        );
+        this.xLabelAngle = layout.angle;
+        this.xLabelFontSize = layout.fontSize;
+        // keep the configured height, which applies again when auto-fit is off
+        const configuredSize = ax.size;
+        this.setAxisSize("x", layout.margin);
+        ax.size = configuredSize;
+        return new Map(fieldIds.map((f, i) => [f, layout.labels[i]]));
+    }
+
+    updateAxis() {
+        super.updateAxis();
+        // full name on hover, as labels may be shortened
+        this.x_axis_svg
+            .selectAll(".tick")
+            .on("mouseover pointermove", (e, id) => {
+                this.showToolTip(e, this.dataStore.getColumnName(id) ?? id);
+            })
+            .on("mouseout", () => this.hideToolTip());
+        const ax = this.config.axis.x;
+        if (!ax.fit_labels || this.xLabelAngle === undefined) {
+            return;
+        }
+        const text = this.x_axis_svg.selectAll(".tick text").attr("font-size", this.xLabelFontSize);
+        if (this.xLabelAngle === 0) {
+            text.style("text-anchor", "middle").attr("dx", null).attr("dy", ".71em").attr("transform", null);
+        } else {
+            text.style("text-anchor", "end").attr("dx", "-.8em").attr("dy", ".10em").attr("transform", "rotate(-45)");
+        }
     }
 
     @loadColumnData
@@ -144,23 +213,19 @@ class DotPlot extends SVGChart {
         this.drawChart();
     }
 
-   
-    async setBackgroundFilter(){
+    async setBackgroundFilter() {
         const bf = this.config.background_filter;
         const categories = Array.isArray(bf?.categories)
             ? bf.categories.filter((x) => x !== undefined && x !== null)
             : [];
         if (!bf || !bf.column || bf.column === "__none__" || categories.length === 0) {
             this.dim.clearBackgroundFilter();
-        }
-        else{
+        } else {
             await loadColumn(this.dataStore.name, bf.column);
             this.dim.setBackgroundFilter(bf.column, categories);
         }
         this.onDataFiltered();
     }
-
-    
 
     getColorScaleRange() {
         if (!this.data?.mean_range) {
@@ -223,12 +288,8 @@ class DotPlot extends SVGChart {
             return;
         }
         const pos = c.fraction_legend.position || c.fraction_legend.pos || [0, 0];
-        const tickValues = this.fractionScale
-            .ticks(4)
-            .filter((x) => x > 0);
-        const values = tickValues.length
-            ? tickValues
-            : [this.data?.frac_range?.[1] || 1];
+        const tickValues = this.fractionScale.ticks(4).filter((x) => x > 0);
+        const values = tickValues.length ? tickValues : [this.data?.frac_range?.[1] || 1];
         const spec = {
             label: "fraction",
             width: 100,
@@ -239,17 +300,11 @@ class DotPlot extends SVGChart {
                 radius: this.fractionScale(value),
             })),
         };
-        this.fractionLegendWrapper.render(
-            spec,
-            { left: `${pos[0]}px`, top: `${pos[1]}px` },
-            FractionLegend,
-            {
-                dragHandle: ".legend-drag-handle",
-                resizable: true,
-            },
-        );
-        this.fractionLegend =
-            this.fractionLegendWrapper.getWrapperElement() ?? undefined;
+        this.fractionLegendWrapper.render(spec, { left: `${pos[0]}px`, top: `${pos[1]}px` }, FractionLegend, {
+            dragHandle: ".legend-drag-handle",
+            resizable: true,
+        });
+        this.fractionLegend = this.fractionLegendWrapper.getWrapperElement() ?? undefined;
     }
 
     getConfig() {
@@ -261,7 +316,7 @@ class DotPlot extends SVGChart {
         }
         return config;
     }
-  
+
     onDataFiltered(dim) {
         //no need to change anything
         //(we may want to review what isPinned means in relation to dynamic column selection - would be useful to have a way of pinning that)
@@ -278,8 +333,16 @@ class DotPlot extends SVGChart {
             threshold: this.config.threshold_value,
         };
         const p = [this.config.param[0], ...this.fieldNames];
+        // The worker answers every request in turn, so an answer can arrive after the fields have
+        // changed again. Only the latest request matches the current fields - applying an older
+        // answer would also freeze its range as the colour scale (see getColorScaleRange).
+        const requestId = (this.averagesRequestId ?? 0) + 1;
+        this.averagesRequestId = requestId;
         this.dim.getAverages(
             (data) => {
+                if (requestId !== this.averagesRequestId) {
+                    return;
+                }
                 this.data = data;
                 this.clusterRows();
                 this.clusterColumns();
@@ -353,39 +416,41 @@ class DotPlot extends SVGChart {
         if (!this.data?.data || !this.data?.mean_range || !this.fieldNames?.length) {
             return;
         }
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(tTime)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
+        let xFieldIds = this.fieldNames;
+        if (this.config.cluster_columns && this.columnOrder) {
+            xFieldIds = this.columnOrder;
+        }
+        // sets the bottom margin, so must run before reading content dimensions
+        const ax = this.config.axis.x;
+        let xLabels = this.getXAxisLabels(xFieldIds);
+        if (ax.fit_labels) {
+            xLabels = this.fitXAxisLabels(xFieldIds, xLabels);
+        } else {
+            this.setAxisSize("x", ax.size);
+        }
+        this.x_scale.domain(xFieldIds);
+        this.x_axis_call.tickFormat((id) => xLabels.get(id));
         const dim = this._getContentDimensions();
-        const cWidth = dim.width / (this.fieldNames.length);
+        const cWidth = dim.width / this.fieldNames.length;
         const fa = this.dim.filterMethod;
         this.setColorFunction(false);
         // is this something we need to review to make sure that changing the category column behaves as expected?
         const vals = this.dataStore.getColumnValues(this.config.param[0]);
         const data = this.data.data.filter((x) => x.count !== 0);
-        let orderedData = this.config.y_axis_order === "alphabetical"
-            ? data.slice(0).sort((a, b) =>
-                String(vals[a.id]).localeCompare(String(vals[b.id]), undefined, {
-                    sensitivity: "base",
-                    numeric: true,
-                }),
-            )
-            : data;
+        let orderedData =
+            this.config.y_axis_order === "alphabetical"
+                ? data.slice(0).sort((a, b) =>
+                      String(vals[a.id]).localeCompare(String(vals[b.id]), undefined, {
+                          sensitivity: "base",
+                          numeric: true,
+                      }),
+                  )
+                : data;
         if (this.config.cluster_rows && this.rowOrder) {
             const rowById = new Map(data.map((row) => [row.id, row]));
-            orderedData = this.rowOrder
-                .map((id) => rowById.get(id))
-                .filter((row) => row !== undefined);
+            orderedData = this.rowOrder.map((id) => rowById.get(id)).filter((row) => row !== undefined);
         }
-
-        let xFieldIds = this.fieldNames;
-        if (this.config.cluster_columns && this.columnOrder) {
-            xFieldIds = this.columnOrder;
-        }
-        this.x_scale.domain(
-            xFieldIds.map((id) => this.dataStore.getColumnName(id)),
-        );
 
         const orderedDataWithColumns = orderedData.map((row) => {
             if (!this.config.cluster_columns || !this.columnOrder) {
@@ -394,9 +459,7 @@ class DotPlot extends SVGChart {
             const valueById = new Map(row.values.map((v) => [v.id, v]));
             return {
                 ...row,
-                values: this.columnOrder
-                    .map((id) => valueById.get(id))
-                    .filter((v) => v !== undefined),
+                values: this.columnOrder.map((id) => valueById.get(id)).filter((v) => v !== undefined),
             };
         });
         this.y_scale.domain(orderedData.map((x) => vals[x.id]));
@@ -420,25 +483,15 @@ class DotPlot extends SVGChart {
                     enter
                         .append("g")
                         .attr("class", "dotplot-row")
-                        .attr(
-                            "transform",
-                            (d, i) => `translate(${-dim.width},${i * cHeight})`,
-                        ),
+                        .attr("transform", (d, i) => `translate(${-dim.width},${i * cHeight})`),
                 null,
                 (exit) =>
                     exit
                         .transition(trans)
-                        .attr(
-                            "transform",
-                            (d, i) => `translate(${dim.width},${i * cHeight})`,
-                        )
+                        .attr("transform", (d, i) => `translate(${dim.width},${i * cHeight})`)
                         .remove(),
             )
-            .call((a) =>
-                a
-                    .transition(trans)
-                    .attr("transform", (d, i) => `translate(0,${i * cHeight})`),
-            ) //use call so can chain selectAll
+            .call((a) => a.transition(trans).attr("transform", (d, i) => `translate(0,${i * cHeight})`)) //use call so can chain selectAll
             .selectAll(".dotplot-circle")
             .data(
                 (d) => d.values,
@@ -457,7 +510,10 @@ class DotPlot extends SVGChart {
                         //const tip = { category: vals[d.cat_id], value: d.id, fraction: d.frac };
                         const category = this.dataStore.columnIndex[this.config.param[0]].name;
                         const id = this.dataStore.columnIndex[d.id].name;
-                        this.showToolTip(e, `${d.id}<br />${category}: ${vals[d.cat_id]}<br>percentage: ${d.frac.toFixed(0)}%`);
+                        this.showToolTip(
+                            e,
+                            `${id}<br />${category}: ${vals[d.cat_id]}<br>percentage: ${d.frac.toFixed(0)}%`,
+                        );
                     })
                     .on("mouseout", () => {
                         this.hideToolTip();
@@ -465,10 +521,7 @@ class DotPlot extends SVGChart {
             )
             .attr("stroke-width", (d) => {
                 if (fa) {
-                    if (
-                        this.dim.filterArguments.cat === vals[d.cat_id] &&
-                        this.dim.filterColumns[1] === d.id
-                    ) {
+                    if (this.dim.filterArguments.cat === vals[d.cat_id] && this.dim.filterColumns[1] === d.id) {
                         return 4;
                     }
                 }
@@ -478,7 +531,7 @@ class DotPlot extends SVGChart {
 
             .attr("cx", (d, i) => i * cWidth + 0.5 * cWidth)
             .attr("cy", cyPos)
-            .attr("r", (d) => this.fractionScale(d.frac)) // 
+            .attr("r", (d) => this.fractionScale(d.frac)) //
             .attr("fill", (d, i) => {
                 return this.colorFunction(d.mean);
             });
@@ -503,8 +556,8 @@ class DotPlot extends SVGChart {
         const textColumnsWithNone = textColumns.slice(0);
         textColumnsWithNone.push({ name: "None", field: null });
         const bfColumn = c.background_filter.column || null;
-        const bgCurrentCats = c.background_filter?.categories
-            || (c.background_filter?.category ? [c.background_filter.category] : []);
+        const bgCurrentCats =
+            c.background_filter?.categories || (c.background_filter?.category ? [c.background_filter.category] : []);
 
         return settings.concat([
             {
@@ -517,7 +570,7 @@ class DotPlot extends SVGChart {
                     //clear irrelevant category selections when changing column
                     c.background_filter.categories = [];
                     c.background_filter.category = undefined;
-                    
+
                     this.setBackgroundFilter();
                 },
             },
@@ -534,6 +587,33 @@ class DotPlot extends SVGChart {
                     c.background_filter.categories = vals;
                     c.background_filter.category = vals[0];
                     void this.setBackgroundFilter();
+                },
+            },
+            {
+                type: "check",
+                label: "Auto-fit X axis labels",
+                current_value: c.axis.x.fit_labels,
+                func: (v) => {
+                    c.axis.x.fit_labels = v;
+                    this.drawChart();
+                },
+            },
+            {
+                type: "check",
+                label: "Shorten long X axis labels",
+                current_value: c.axis.x.truncate_labels,
+                func: (v) => {
+                    c.axis.x.truncate_labels = v;
+                    this.drawChart();
+                },
+            },
+            {
+                type: "check",
+                label: "Hide overlapping X axis labels",
+                current_value: c.axis.x.thin_labels,
+                func: (v) => {
+                    c.axis.x.thin_labels = v;
+                    this.drawChart();
                 },
             },
             {
@@ -609,6 +689,15 @@ class DotPlot extends SVGChart {
                 },
             },
             {
+                label: "Show Fraction Legend",
+                type: "check",
+                current_value: c.fraction_legend.display,
+                func: (x) => {
+                    c.fraction_legend.display = x;
+                    this.showFractionLegend();
+                },
+            },
+            {
                 type: "check",
                 label: "Log Color Scale",
                 current_value: c.color_scale.log,
@@ -628,7 +717,7 @@ BaseChart.types["dot_plot"] = {
     // methodsUsingColumns: ["setFields"], //no longer necessary, @loadColumnData decorator will handle this
     params: [
         {
-            type: ["text","text16"],
+            type: ["text", "text16"],
             name: "Categories on y-axis",
         },
         {

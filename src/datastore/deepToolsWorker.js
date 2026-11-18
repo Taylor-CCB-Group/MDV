@@ -1,14 +1,6 @@
 // biome-ignore lint/suspicious/noGlobalAssign: relatively innocuous in simple web worker
 onmessage = (e) => {
-    const {
-        orderBuffer,
-        filterBuffer,
-        dimensions,
-        data,
-        displayData,
-        colorScale,
-        colorOnly,
-    } = e.data;
+    const { orderBuffer, filterBuffer, dimensions, data, displayData, colorScale, colorOnly } = e.data;
     //get access to the shared buffers
     const len = dimensions.length;
 
@@ -49,8 +41,7 @@ onmessage = (e) => {
         //update the colors
         let v = Math.min(colorScale.max, values[n]);
         v = Math.max(colorScale.min, v);
-        const color =
-            colorScale.colors[Math.floor((v - colorScale.min) / interval_size)];
+        const color = colorScale.colors[Math.floor((v - colorScale.min) / interval_size)];
         const p = 3 * i;
         colors[p] = color[0];
         colors[p + 1] = color[1];

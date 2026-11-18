@@ -1,11 +1,6 @@
 import type { PickingInfo } from "@deck.gl/core";
 import { escapeHtml } from "@/utilities/Utilities";
-import {
-    findPickedInfo,
-    getPickingInfoLayerId,
-    pickingInfoMatchesLayer,
-    type MDVPickingInfo,
-} from "./deckPicking";
+import { findPickedInfo, getPickingInfoLayerId, type MDVPickingInfo, pickingInfoMatchesLayer } from "./deckPicking";
 
 type TooltipContent =
     | null
@@ -30,9 +25,7 @@ function tooltipContentToHtml(content: TooltipContent | undefined) {
 }
 
 export function combineTooltipContent(...contents: (TooltipContent | undefined)[]): TooltipContent {
-    const htmlParts = contents
-        .map((content) => tooltipContentToHtml(content))
-        .filter((html) => html !== null);
+    const htmlParts = contents.map((content) => tooltipContentToHtml(content)).filter((html) => html !== null);
     if (htmlParts.length === 0) return null;
     return { html: htmlParts.join(TOOLTIP_SEPARATOR) };
 }
@@ -62,12 +55,11 @@ function getGateOrLabelTooltip(info: PickableInfo, gateDisplayLayerId?: string, 
 }
 
 function getScatterPickingInfo(info: PickableInfo) {
-    return findPickedInfo(
-        info,
-        (pickedInfo) =>
-            pickingInfoMatchesLayer(pickedInfo, (layerId) =>
-                layerId.includes("scatter_") || layerId.includes("spatial.scatterplot"),
-            ),
+    return findPickedInfo(info, (pickedInfo) =>
+        pickingInfoMatchesLayer(
+            pickedInfo,
+            (layerId) => layerId.includes("scatter_") || layerId.includes("spatial.scatterplot"),
+        ),
     );
 }
 
@@ -79,11 +71,7 @@ export function getCombinedScatterTooltip(
         getPointTooltip: (info?: PickingInfo | null) => TooltipContent | undefined;
     },
 ) {
-    const gateOrLabelTooltip = getGateOrLabelTooltip(
-        info,
-        options.gateDisplayLayerId,
-        options.gateLabelLayerId,
-    );
+    const gateOrLabelTooltip = getGateOrLabelTooltip(info, options.gateDisplayLayerId, options.gateLabelLayerId);
     const pointTooltip = options.getPointTooltip(getScatterPickingInfo(info));
     return combineTooltipContent(gateOrLabelTooltip, pointTooltip);
 }

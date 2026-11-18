@@ -1,30 +1,11 @@
-import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart";
-import {
-    forceSimulation,
-    forceLink,
-    forceManyBody,
-    forceCenter,
-    drag,
-    scaleSqrt,
-    scaleLinear,
-    schemeReds,
-} from "d3";
-import { getColorLegendCustom } from "../utilities/Color.js";
+import { drag, forceCenter, forceLink, forceManyBody, forceSimulation, scaleLinear, scaleSqrt, schemeReds } from "d3";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
+import { getColorLegendCustom } from "../utilities/Color.js";
+import BaseChart from "./BaseChart";
+import SVGChart from "./SVGChart.js";
 
 const color_schemes = {
-    "blue yellow": [
-        "#115f9a",
-        "#1984c5",
-        "#22a7f0",
-        "#48b5c4",
-        "#76c68f",
-        "#a6d75b",
-        "#c9e52f",
-        "#d0ee11",
-        "#d0f400",
-    ],
+    "blue yellow": ["#115f9a", "#1984c5", "#22a7f0", "#48b5c4", "#76c68f", "#a6d75b", "#c9e52f", "#d0ee11", "#d0f400"],
     red: schemeReds[8].slice(1),
     "blue yellow red": ["blue", "yellow", "red"],
 };
@@ -128,24 +109,13 @@ class CellNetworkChart extends SVGChart {
         this.svg.selectAll("*").remove();
 
         const colors = this.dataStore.getColumnColors(c.param[1]);
-        const ncolor = this.dataStore.getColorForCategory(
-            c.param[0],
-            c.category,
-        );
-        const tcolors =
-            c.node_color === "type"
-                ? this.dataStore.getColumnColors(c.param[7])
-                : null;
+        const ncolor = this.dataStore.getColorForCategory(c.param[0], c.category);
+        const tcolors = c.node_color === "type" ? this.dataStore.getColumnColors(c.param[7]) : null;
         const drawColors = c.link_color.colors !== "none";
 
         const thick = this.dataStore.getRawColumn(c.param[4]);
 
-        const lnks = this.svg
-            .append("g")
-            .attr("class", "links")
-            .selectAll("line")
-            .data(this.linkData)
-            .enter();
+        const lnks = this.svg.append("g").attr("class", "links").selectAll("line").data(this.linkData).enter();
         this.link = lnks
             .append("line")
             .attr("stroke-width", (d) => {
@@ -174,13 +144,7 @@ class CellNetworkChart extends SVGChart {
                 return "currentcolor";
             });
 
-        this.node = this.svg
-            .append("g")
-            .attr("class", "nodes")
-            .selectAll("g")
-            .data(this.nodeData)
-            .enter()
-            .append("g");
+        this.node = this.svg.append("g").attr("class", "nodes").selectAll("g").data(this.nodeData).enter().append("g");
 
         this.circles = this.node
             .append("circle")
@@ -228,10 +192,7 @@ class CellNetworkChart extends SVGChart {
         if (domain) {
             c.node_size.domain = domain;
         }
-        this.nodeScale = scaleSqrt()
-            .domain(c.node_size.domain)
-            .range(c.node_size.range)
-            .clamp(true);
+        this.nodeScale = scaleSqrt().domain(c.node_size.domain).range(c.node_size.range).clamp(true);
 
         const l = this.nodeColorLegend;
 
@@ -280,10 +241,7 @@ class CellNetworkChart extends SVGChart {
             c.link_thickness.domain = domain;
         }
 
-        this.linkThicknessScale
-            .domain(c.link_thickness.domain)
-            .range(c.link_thickness.range)
-            .clamp(true);
+        this.linkThicknessScale.domain(c.link_thickness.domain).range(c.link_thickness.range).clamp(true);
 
         if (update) {
             const thick = this.dataStore.getRawColumn(c.param[4]);
@@ -305,10 +263,7 @@ class CellNetworkChart extends SVGChart {
         const pos = c.link_thickness.legend_position;
         const name = this.dataStore.columnIndex[c.param[4]].name;
 
-        this.linkThicknessLegend = getColorLegendCustom(
-            this.linkThicknessScale,
-            { label: name, type: "line" },
-        );
+        this.linkThicknessLegend = getColorLegendCustom(this.linkThicknessScale, { label: name, type: "line" });
         this.contentDiv.append(this.linkThicknessLegend);
         this.linkThicknessLegend.style.top = `${pos[1]}px`;
         this.linkThicknessLegend.style.left = `${pos[0]}px`;
@@ -352,12 +307,8 @@ class CellNetworkChart extends SVGChart {
         c.node_color = v;
 
         const colors = this.dataStore.getColumnColors(c.param[1]);
-        const ncolor = this.dataStore.getColorForCategory(
-            c.param[0],
-            c.category,
-        );
-        const tcolors =
-            v === "type" ? this.dataStore.getColumnColors(c.param[7]) : null;
+        const ncolor = this.dataStore.getColorForCategory(c.param[0], c.category);
+        const tcolors = v === "type" ? this.dataStore.getColumnColors(c.param[7]) : null;
 
         this.circles.attr("fill", (d) => {
             if (tcolors) {
@@ -374,10 +325,7 @@ class CellNetworkChart extends SVGChart {
         const config = super.getConfig();
         const sl = this.linkThicknessLegend;
         if (sl) {
-            config.link_thickness.legend_position = [
-                sl.offsetLeft,
-                sl.offsetTop,
-            ];
+            config.link_thickness.legend_position = [sl.offsetLeft, sl.offsetTop];
         }
         const ns = this.nodeColorLegend;
         if (ns) {
@@ -395,17 +343,14 @@ class CellNetworkChart extends SVGChart {
         }
         if (colors !== "none") {
             const d = this.config.link_color.domain;
-            this.linkColorScale = this.dataStore.getColorFunction(
-                this.config.param[5],
-                {
-                    overideValues: {
-                        min: d[0],
-                        max: d[1],
-                        colors: color_schemes[this.config.link_color.colors],
-                        //schemeReds[8].slice(1)
-                    },
+            this.linkColorScale = this.dataStore.getColorFunction(this.config.param[5], {
+                overideValues: {
+                    min: d[0],
+                    max: d[1],
+                    colors: color_schemes[this.config.link_color.colors],
+                    //schemeReds[8].slice(1)
                 },
-            );
+            });
         }
         if (update) {
             this.link
@@ -475,9 +420,7 @@ class CellNetworkChart extends SVGChart {
             .attr("y2", (d) => d.target.y);
 
         this.arrows.attr("d", (d) => {
-            let len = Math.sqrt(
-                (d.source.y - d.target.y) ** 2 + (d.target.x - d.source.x) ** 2,
-            );
+            let len = Math.sqrt((d.source.y - d.target.y) ** 2 + (d.target.x - d.source.x) ** 2);
             len = len === 0 ? 0.1 : len;
             const f = (len / 2 - 5) / len;
             const x2 = (d.target.x - d.source.x) / 2 + d.source.x;
@@ -513,10 +456,7 @@ class CellNetworkChart extends SVGChart {
             event.subject.fy = null;
         };
 
-        return drag()
-            .on("start", dragstarted)
-            .on("drag", dragged)
-            .on("end", dragended);
+        return drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
     }
 
     reCalculate() {
@@ -548,9 +488,7 @@ class CellNetworkChart extends SVGChart {
         const p = this.config.param;
         const cells = this.dataStore.getColumnValues(p[1]);
         const cells2 = this.dataStore.getColumnValues(p[2]);
-        const cat_needed = this.dataStore
-            .getColumnValues(p[0])
-            .indexOf(this.config.category);
+        const cat_needed = this.dataStore.getColumnValues(p[0]).indexOf(this.config.category);
         const index = this.dataStore.columnIndex;
         const cat = index[p[0]].data;
         const c1 = index[p[1]].data;
@@ -579,12 +517,7 @@ class CellNetworkChart extends SVGChart {
             if (f[n] > 0) {
                 continue;
             }
-            if (
-                cat[n] === cat_needed &&
-                c1[n] === bc &&
-                allowed.has(c2[n]) &&
-                c1[n] !== c2[n]
-            ) {
+            if (cat[n] === cat_needed && c1[n] === bc && allowed.has(c2[n]) && c1[n] !== c2[n]) {
                 linksNeeded.add(`${c1[n]}|${c2[n]}`);
                 firstRound.add(c2[n]);
             }
@@ -595,12 +528,7 @@ class CellNetworkChart extends SVGChart {
                 if (f[n] > 0) {
                     continue;
                 }
-                if (
-                    cat[n] === cat_needed &&
-                    firstRound.has(c1[n]) &&
-                    allowed.has(c2[n]) &&
-                    c1[n] !== c2[n]
-                ) {
+                if (cat[n] === cat_needed && firstRound.has(c1[n]) && allowed.has(c2[n]) && c1[n] !== c2[n]) {
                     if (c2[n] === bc) {
                         continue;
                     }
@@ -662,9 +590,7 @@ class CellNetworkChart extends SVGChart {
         const cells = this.dataStore.getColumnValues(p[1]);
         const cells2 = this.dataStore.getColumnValues(p[2]);
         this.nodeData = [];
-        const cat_needed = this.dataStore
-            .getColumnValues(p[0])
-            .indexOf(this.config.category);
+        const cat_needed = this.dataStore.getColumnValues(p[0]).indexOf(this.config.category);
         const index = this.dataStore.columnIndex;
         //get the data required to work out links/nodes
         const cat = index[p[0]].data;
@@ -729,10 +655,7 @@ class CellNetworkChart extends SVGChart {
 
     setSize(x, y) {
         super.setSize(x, y);
-        this.simulation.force(
-            "center",
-            forceCenter(this.width / 2, this.height / 2),
-        );
+        this.simulation.force("center", forceCenter(this.width / 2, this.height / 2));
         this._changeLinkLengthScale(null, null, true);
     }
 
@@ -1031,11 +954,7 @@ class CellNetworkChart extends SVGChart {
 BaseChart.types["cell_network_chart"] = {
     name: "Spatial Connectivity Map",
     required: ["interactions"],
-    methodsUsingColumns: [
-        "changeLinkThicknessParameter",
-        "changeLinkLengthParameter",
-        "changeLinkColorParameter",
-    ],
+    methodsUsingColumns: ["changeLinkThicknessParameter", "changeLinkLengthParameter", "changeLinkColorParameter"],
     class: CellNetworkChart,
     init: (config, dataSource, extraControls) => {
         const i = dataSource.interactions;
@@ -1061,9 +980,7 @@ BaseChart.types["cell_network_chart"] = {
                 type: "dropdown",
                 name: "pivot",
                 label: dataSource.getColumnName(pc),
-                values: dataSource
-                    .getColumnValues(pc)
-                    .map((x) => ({ name: x, value: x })),
+                values: dataSource.getColumnValues(pc).map((x) => ({ name: x, value: x })),
             },
         ];
     },

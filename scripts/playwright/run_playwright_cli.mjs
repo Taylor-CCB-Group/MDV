@@ -1,6 +1,6 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { playwrightSpawnEnv } from "./playwright_env.mjs";
 
@@ -50,10 +50,6 @@ await new Promise((resolve, reject) => {
         );
     });
     child.on("error", (error) => {
-        reject(
-            new Error(
-                `Unable to launch Playwright CLI: ${error instanceof Error ? error.message : String(error)}`,
-            ),
-        );
+        reject(new Error(`Unable to launch Playwright CLI: ${error instanceof Error ? error.message : String(error)}`));
     });
 });

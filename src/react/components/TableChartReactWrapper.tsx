@@ -1,14 +1,15 @@
-import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
-import { BaseReactChart } from "./BaseReactChart";
-import type DataStore from "@/datastore/DataStore";
-import TableChartReactComponent from "./TableChartReactComponent";
-import { g } from "@/lib/utils";
 import { action } from "mobx";
 import type { SlickgridReactInstance } from "slickgrid-react";
+import type DataStore from "@/datastore/DataStore";
 import { getTableExportBlob } from "@/datastore/dataExportUtils";
-import { createEl } from "@/utilities/ElementsTyped";
+import { getDataSourceDisplayName } from "@/datastore/dataSourceDisplayName";
+import { type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
+import { g } from "@/lib/utils";
 import { DataModel } from "@/table/DataModel";
-import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
+import { createEl } from "@/utilities/ElementsTyped";
+import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
+import { BaseReactChart } from "./BaseReactChart";
+import TableChartReactComponent from "./TableChartReactComponent";
 
 const TableChartComponent = () => {
     return <TableChartReactComponent />;
@@ -24,11 +25,11 @@ export type TableChartReactConfig = BaseConfig & {
 
 /**
  * Adapts and validates the config before it is made observable by makeAutoObservable.
- * 
+ *
  * This ensures all properties exist before makeAutoObservable is called, which is required
  * for MobX to properly track them. All properties should be initialized to their default
  * values here.
- * 
+ *
  * In future, this may be replaced with a more formal validation step (e.g., zod schema).
  * Probably incorporated into the `initialiseChartConfig` function, which will be able to lookup
  * from schemas...
@@ -41,7 +42,7 @@ function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
     if (config.include_index === undefined || config.include_index === null) {
         config.include_index = false;
     }
-    if (!('sort' in config)) {
+    if (!("sort" in config)) {
         // Assigning this to null instead of undefined to make it observable
         config.sort = null;
     }
@@ -133,6 +134,14 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         this.gridRef = gridRef;
     }
 
+    setSize(x?: number, y?: number) {
+        super.setSize(x, y);
+        // Slickgrid's container observer is created before the chart moves to a
+        // popout window. Resize it explicitly so the grid follows that window
+        // immediately, rather than waiting for its original observer to fire.
+        void this.gridRef?.current?.resizerService.resizeGrid(0);
+    }
+
     setAddColumnDialogOpener(opener?: () => void) {
         this.addColumnDialogOpener = opener;
     }
@@ -186,11 +195,11 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
             const save = createEl(
                 "a",
                 {
-                    download: `${this.dataStore.name}.txt`,
+                    download: `${getDataSourceDisplayName(this.dataStore)}.txt`,
                     target: "_blank",
                     href: url,
                 },
-                document.body,
+                this.__doc__.body,
             );
             save.click();
             save.remove();
@@ -210,17 +219,14 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         }
         // `config.param` can contain either plain field names or query-backed FieldSpec objects
         // flatten each spec to concrete field names so removals work for both
-        const containsRemovedColumn = (fieldSpec: FieldSpec) =>
-            flattenFields(fieldSpec).includes(column);
+        const containsRemovedColumn = (fieldSpec: FieldSpec) => flattenFields(fieldSpec).includes(column);
         if (!this.config.param.some(containsRemovedColumn)) {
             return false;
         }
 
         action(() => {
             // Remove column from config.param, config.order
-            this.config.param = this.config.param.filter(
-                (fieldSpec) => !containsRemovedColumn(fieldSpec),
-            );
+            this.config.param = this.config.param.filter((fieldSpec) => !containsRemovedColumn(fieldSpec));
             const nextOrder = { ...(this.config.order ?? {}) };
             const removedOrder = nextOrder[column];
             delete nextOrder[column];
@@ -256,9 +262,7 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
             .map((column) => column.field)
             .filter(
                 (field): field is string =>
-                    typeof field === "string" &&
-                    field !== "__index__" &&
-                    Boolean(this.dataStore.columnIndex[field]),
+                    typeof field === "string" && field !== "__index__" && Boolean(this.dataStore.columnIndex[field]),
             );
 
         if (visibleFields.length > 0 && Array.isArray(config.param)) {
@@ -266,11 +270,9 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
             // Params affect the active link and if turned into concrete fields, active link
             // can turn to link, hence preserving the active link params
             config.param = orderSerializedTableParams(activeParams, config.param, visibleFields);
-            
+
             // Rest of the properties don't affect the active link
-            config.order = Object.fromEntries(
-                visibleFields.map((field, index) => [field, index]),
-            );
+            config.order = Object.fromEntries(visibleFields.map((field, index) => [field, index]));
 
             const visibleFieldSet = new Set(visibleFields);
             const columnWidths: Record<string, number> = {};

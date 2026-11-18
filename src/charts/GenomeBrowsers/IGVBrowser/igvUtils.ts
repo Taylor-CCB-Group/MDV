@@ -1,7 +1,4 @@
-import {
-    type GenomeMetadata,
-} from "../genomicLocationUtils";
-
+import { type GenomeMetadata } from "../genomicLocationUtils";
 
 export interface IGVBaseFeature {
     chr: string;
@@ -16,7 +13,7 @@ export interface IGVBaseFeature {
     pos2?: number;
     svtype?: string;
     length?: number;
-    _f?: IGVBaseFeature;//sometimes igv wraps features in an object with a _f property
+    _f?: IGVBaseFeature; //sometimes igv wraps features in an object with a _f property
 }
 
 export interface IGVStructuralVariantStyle {
@@ -25,37 +22,34 @@ export interface IGVStructuralVariantStyle {
     glyph: "capped_line" | "diamond" | "triangle" | "double_bar" | "inversion" | "breakend";
 }
 
-
 export function buildBaseFeatures(
     rows: Record<string, unknown>[],
     genomicInfo: GenomeMetadata,
     maxInitialFeatures: number,
 ): IGVBaseFeature[] {
-  
     const maxRows = Math.min(rows.length, maxInitialFeatures);
     //nice and easy
     if (genomicInfo.type === "interval") {
         const map = genomicInfo.columns as Record<string, string>;
-        const features: IGVBaseFeature[] =  new Array(maxRows);
+        const features: IGVBaseFeature[] = new Array(maxRows);
         for (let i = 0; i < maxRows; i++) {
             const row = rows[i];
-            features[i]= {
+            features[i] = {
                 chr: String(row[map.chr]),
                 start: Number(row[map.start]),
                 end: Number(row[map.end]),
-                id: String((row.__index__ )),
-            }
+                id: String(row.__index__),
+            };
         }
-        return features
-    }
-    else if (genomicInfo.type === "sv") {
-        const map = genomicInfo.columns as  Record<string, string>;
+        return features;
+    } else if (genomicInfo.type === "sv") {
+        const map = genomicInfo.columns as Record<string, string>;
         //don't know array size upfront because of potential for one or two features per row depending on svtype
-        const features: IGVBaseFeature[] =  [];
+        const features: IGVBaseFeature[] = [];
 
         for (let i = 0; i < maxRows; i++) {
             const row = rows[i];
-          
+
             const chr1 = String(row[map.chr1]);
             const pos1 = Number(row[map.pos1]);
             const pos2 = Number(row[map.pos2]);
@@ -63,17 +57,16 @@ export function buildBaseFeatures(
             if (!chr1 || !chr2 || !Number.isFinite(pos1) || !Number.isFinite(pos2)) {
                 continue;
             }
-            const id = String(row.__index__ );
+            const id = String(row.__index__);
             const svtype = String(row[map.svtype]);
             const length = Number(row[map.length]);
             const baseFeature = {
                 id,
                 chr2,
-                pos1, 
+                pos1,
                 pos2,
                 svtype,
                 length,
-             
             };
             if (svtype === "TRA" || svtype === "BND") {
                 features.push({
@@ -83,7 +76,7 @@ export function buildBaseFeatures(
                     start: pos1,
                     end: pos1,
                 });
-            
+
                 if (typeof chr2 === "string") {
                     features.push({
                         ...baseFeature,
@@ -106,18 +99,15 @@ export function buildBaseFeatures(
             }
             features.push({
                 ...baseFeature,
-                chr:chr1,
+                chr: chr1,
                 start: Math.min(pos1, pos2),
                 end: Math.max(pos1, pos2),
             });
-            
         }
         return features;
-       
     }
-    return []; 
+    return [];
 }
-
 
 export function getStructuralVariantStyle(svtype: unknown): IGVStructuralVariantStyle {
     const normalized = typeof svtype === "string" ? svtype.trim().toUpperCase() : "";
@@ -137,6 +127,3 @@ export function getStructuralVariantStyle(svtype: unknown): IGVStructuralVariant
             return { fillStyle: "#777777", strokeStyle: "#555555", glyph: "diamond" };
     }
 }
-
-
-

@@ -1,9 +1,4 @@
-import {
-    type Layer,
-    type LayerContext,
-    LayerExtension,
-    type UpdateParameters,
-} from "@deck.gl/core";
+import { type Layer, type LayerContext, LayerExtension, type UpdateParameters } from "@deck.gl/core";
 import type { ImageArray } from "./ImageArray";
 
 export type ImageArrayExtensionProps = { imageArray: ImageArray; saturation: number };
@@ -103,11 +98,7 @@ export class ImageArrayDeckExtension<
             },
         };
     }
-    initializeState(
-        this: Layer<ImageArrayExtensionProps>,
-        context: LayerContext,
-        extension: this,
-    ): void {
+    initializeState(this: Layer<ImageArrayExtensionProps>, context: LayerContext, extension: this): void {
         this.getAttributeManager()?.addInstanced({
             imageIndex: { size: 1, accessor: "getImageIndex", defaultValue: 0 },
             imageAspect: {
@@ -116,12 +107,9 @@ export class ImageArrayDeckExtension<
                 defaultValue: 1,
             },
         });
-        this.props.saturation
+        this.props.saturation;
     }
-    updateState(
-        this: Layer<ImageArrayExtensionProps>,
-        params: UpdateParameters<Layer<ImageArrayExtensionProps>>,
-    ) {
+    updateState(this: Layer<ImageArrayExtensionProps>, params: UpdateParameters<Layer<ImageArrayExtensionProps>>) {
         // const { texture } = params.props.imageArray;
         const { saturation } = params.props;
         for (const model of this.getModels()) {
@@ -136,7 +124,7 @@ export class ImageArrayDeckExtension<
             });
             model.setBindings({
                 imageArray: lumaTexture,
-            })
+            });
         }
     }
 }

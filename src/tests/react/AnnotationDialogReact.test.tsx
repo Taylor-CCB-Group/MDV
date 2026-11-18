@@ -1,11 +1,11 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
     AnnotationDialogComponent,
     getAnnotationColumnChoiceState,
     getEditableAnnotationColumnNames,
 } from "@/charts/dialogs/AnnotationDialogReact";
 import TagModel from "@/table/TagModel";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.mock("@/table/TagModel", () => ({
     default: {
@@ -31,8 +31,7 @@ function createMockTagModel(
                 showFilteredScopeCoversWholeTableWarning = !dataStore.isFiltered();
             } else {
                 const totalRows = dataStore.size ?? selectionCount;
-                showFilteredScopeCoversWholeTableWarning =
-                    selectionCount === totalRows;
+                showFilteredScopeCoversWholeTableWarning = selectionCount === totalRows;
             }
         }
         return {
@@ -84,9 +83,7 @@ function createMockDataStore() {
     ];
 
     return {
-        columnIndex: Object.fromEntries(
-            columns.map((column) => [column.field, column]),
-        ),
+        columnIndex: Object.fromEntries(columns.map((column) => [column.field, column])),
         columns,
         dataHighlighted: vi.fn(),
         getHighlightedData: vi.fn(() => []),
@@ -112,18 +109,10 @@ describe("AnnotationDialogReact", () => {
     test("filters the chooser to editable multitext columns", () => {
         const dataStore = createMockDataStore();
 
-        expect(getEditableAnnotationColumnNames(dataStore.columns)).toEqual([
-            "editable_tags",
-        ]);
-        expect(
-            getAnnotationColumnChoiceState(dataStore as never, "readonly_tags"),
-        ).toBe("readonly");
-        expect(
-            getAnnotationColumnChoiceState(dataStore as never, "labels"),
-        ).toBe("clash");
-        expect(
-            getAnnotationColumnChoiceState(dataStore as never, "new_annotations"),
-        ).toBe("ok");
+        expect(getEditableAnnotationColumnNames(dataStore.columns)).toEqual(["editable_tags"]);
+        expect(getAnnotationColumnChoiceState(dataStore as never, "readonly_tags")).toBe("readonly");
+        expect(getAnnotationColumnChoiceState(dataStore as never, "labels")).toBe("clash");
+        expect(getAnnotationColumnChoiceState(dataStore as never, "new_annotations")).toBe("ok");
     });
 
     test("renders tabbed scopes and shows read-only validation feedback", async () => {
@@ -145,16 +134,8 @@ describe("AnnotationDialogReact", () => {
             expect(screen.getByText(/read-only/i)).toBeTruthy();
         });
 
-        expect(vi.mocked(TagModel.create)).toHaveBeenCalledWith(
-            dataStore,
-            "editable_tags",
-            "filtered",
-        );
-        expect(vi.mocked(TagModel.create)).toHaveBeenCalledWith(
-            dataStore,
-            "editable_tags",
-            "highlighted",
-        );
+        expect(vi.mocked(TagModel.create)).toHaveBeenCalledWith(dataStore, "editable_tags", "filtered");
+        expect(vi.mocked(TagModel.create)).toHaveBeenCalledWith(dataStore, "editable_tags", "highlighted");
     });
 
     test("defaults to highlighted scope when highlighted rows exist and warns only when filtered would hit all rows", async () => {
@@ -169,17 +150,13 @@ describe("AnnotationDialogReact", () => {
 
         fireEvent.click(screen.getByRole("tab", { name: "Filtered" }));
 
-        expect(
-            screen.getByTestId("annotation-whole-table-filter-warning"),
-        ).toBeTruthy();
+        expect(screen.getByTestId("annotation-whole-table-filter-warning")).toBeTruthy();
 
         dataStore.isFiltered = vi.fn(() => true);
         fireEvent.click(screen.getByRole("tab", { name: "Highlighted" }));
         fireEvent.click(screen.getByRole("tab", { name: "Filtered" }));
 
-        expect(
-            screen.queryByTestId("annotation-whole-table-filter-warning"),
-        ).toBeNull();
+        expect(screen.queryByTestId("annotation-whole-table-filter-warning")).toBeNull();
     });
 
     test("shows a warning when the active scope has no matching rows", async () => {
@@ -200,9 +177,7 @@ describe("AnnotationDialogReact", () => {
             expect(screen.getByTestId("annotation-no-rows-warning")).toBeTruthy();
         });
 
-        expect(screen.getByTestId("annotation-no-rows-warning").textContent).toMatch(
-            /highlighted/i,
-        );
+        expect(screen.getByTestId("annotation-no-rows-warning").textContent).toMatch(/highlighted/i);
     });
 
     test("shows tag mutation errors and keeps the draft value when add fails", async () => {

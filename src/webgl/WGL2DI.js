@@ -1,5 +1,5 @@
-import regl from "regl";
 import * as glMatrix from "gl-matrix";
+import regl from "regl";
 import { createEl, makeDraggable } from "../utilities/Elements.js";
 import { Camera } from "./Camera.js";
 
@@ -10,7 +10,7 @@ class WGL2DI {
      * @param {object} config (optional)
      * - in_view_only - if true then only those objects in view will be drawn after panning/zooming.This will
      * speed things up if maniluplating individual objects but slow down panning and zooming
-     * - allow_object_drag - if true individual objects can be dragged 
+     * - allow_object_drag - if true individual objects can be dragged
      * - default_brush - if true then brushing will be the default drag behavior - uses shift for panning
      *  Otherwise panning is default and shift used for brushing
      * - noCameraControl - if true then it won't use pan/zoom controls
@@ -201,8 +201,7 @@ class WGL2DI {
         this.object_mouse_over = null;
 
         this.zoom_amount = 0;
-        this.draw_order =
-            this.mode === "3d" ? [2, 0, 1, 3, 4] : [2, 0, 1, 3, 4];
+        this.draw_order = this.mode === "3d" ? [2, 0, 1, 3, 4] : [2, 0, 1, 3, 4];
 
         regl({
             onDone: (err, regl) => {
@@ -339,9 +338,7 @@ class WGL2DI {
             this.pickbuffer.destroy();
         } catch (e) {
             // we mostly avoid situations like this, which was arising with -ve width/height leading to inconsistent state.
-            console.error(
-                `caught exception '${e}' when destroying buffer... suggest re-writing app in Rust.`,
-            );
+            console.error(`caught exception '${e}' when destroying buffer... suggest re-writing app in Rust.`);
         }
         this.pickbuffer = this.regl.framebuffer({
             colorFormat: "rgba",
@@ -455,10 +452,7 @@ class WGL2DI {
     }
 
     addLine(positionTo, positionFrom, color = [0, 0, 0], opacity = 1) {
-        this.lines.position = this.lines.position.concat(
-            positionTo,
-            positionFrom,
-        );
+        this.lines.position = this.lines.position.concat(positionTo, positionFrom);
         this.lines.color = this.lines.color.concat(color, color);
         this.lines.opacity = this.lines.opacity.concat([opacity, opacity]);
         this.lines.count++;
@@ -593,14 +587,7 @@ class WGL2DI {
         this.images.position.push([x + width, y + height]);
         this.images.position.push([x + width, y]);
         this.images.position.push([x, y]);
-        this.image_position = [
-            [-1, 1],
-            [-1, 0],
-            [0, 0],
-            [0, 0],
-            [0, 1],
-            [-1.0],
-        ];
+        this.image_position = [[-1, 1], [-1, 0], [0, 0], [0, 0], [0, 1], [-1.0]];
 
         const opacity = c.opacity == null ? 1 : c.opacity;
         for (let a = 0; a < 6; a++) {
@@ -610,9 +597,7 @@ class WGL2DI {
         this.images.count++;
         this.images.props.x_y.push([x, y]);
         this.images.props.w_h.push([width, height]);
-        this.images.props.text.push(
-            this.regl.texture({ data: image, min: "linear" }),
-        );
+        this.images.props.text.push(this.regl.texture({ data: image, min: "linear" }));
         return this.images.count - 1;
     }
 
@@ -801,9 +786,7 @@ class WGL2DI {
                 offset: this.offset,
             };
         }
-        obj.point_scale = this.pointScale
-            ? (this.x_scale + this.y_scale) / 2 / this.pointScale
-            : 1;
+        obj.point_scale = this.pointScale ? (this.x_scale + this.y_scale) / 2 / this.pointScale : 1;
         obj.point_radius = this.pointRadius;
         obj.is_filtered = this.isFiltered ? 1 : 0;
         obj.point_opacity = this.pointOpacity;
@@ -929,11 +912,7 @@ class WGL2DI {
         });
         const s = new Set();
         for (let i = 0; i < max; i += 4) {
-            const index = this._getIndexFromRGB([
-                pixels[i],
-                pixels[i + 1],
-                pixels[i + 2],
-            ]);
+            const index = this._getIndexFromRGB([pixels[i], pixels[i + 1], pixels[i + 2]]);
             if (index !== null) {
                 s.add(index - 1);
             }
@@ -942,12 +921,7 @@ class WGL2DI {
     }
 
     _getObjectAtPosition(position) {
-        if (
-            position[1] <= 0 ||
-            position[0] <= 0 ||
-            position[0] >= this.width ||
-            position[1] >= this.height
-        ) {
+        if (position[1] <= 0 || position[0] <= 0 || position[0] >= this.width || position[1] >= this.height) {
             return;
         }
         try {
@@ -1022,9 +996,7 @@ class WGL2DI {
             active: true,
         };
         const ctx = this.label_context;
-        ctx.strokeStyle = getComputedStyle(this.canvas).getPropertyValue(
-            "color",
-        );
+        ctx.strokeStyle = getComputedStyle(this.canvas).getPropertyValue("color");
         ctx.beginPath();
         ctx.moveTo(pos[0], pos[1]);
     }
@@ -1032,8 +1004,7 @@ class WGL2DI {
     _extendPolyBrush(pos, threshold = 15) {
         const ctx = this.label_context;
         if (this.poly_brush.points.length) {
-            const prev =
-                this.poly_brush.points[this.poly_brush.points.length - 1];
+            const prev = this.poly_brush.points[this.poly_brush.points.length - 1];
             const dx = prev[0] - pos[0];
             const dy = prev[1] - pos[1];
             const d = Math.sqrt(dx ** 2 + dy ** 2);
@@ -1203,15 +1174,9 @@ class WGL2DI {
                 } else {
                     const x_amount = dx / this.x_scale;
                     const y_amount = dy / this.y_scale;
-                    if (
-                        this.movingImage != null &&
-                        e.ctrlKey &&
-                        this.images.count > 0
-                    ) {
+                    if (this.movingImage != null && e.ctrlKey && this.images.count > 0) {
                         this.moveImage(x_amount, y_amount);
-                        this.imageMoved = this.getImageDetails(
-                            this.movingImage,
-                        );
+                        this.imageMoved = this.getImageDetails(this.movingImage);
                     } else if (this.offsets && e.which === 3) {
                         this.alterOffsets(x_amount, y_amount);
                     } else {
@@ -1221,11 +1186,7 @@ class WGL2DI {
                         this.offset[1] += y_amount;
                         if (!noCameraControl) {
                             for (const i in this.handlers.pan_or_zoom) {
-                                this.handlers.pan_or_zoom[i](
-                                    this.offset,
-                                    this.x_scale,
-                                    this.y_scale,
-                                );
+                                this.handlers.pan_or_zoom[i](this.offset, this.x_scale, this.y_scale);
                             }
                         }
                     }
@@ -1275,11 +1236,7 @@ class WGL2DI {
             this.__doc__.removeEventListener("mouseup", mouseup);
 
             this._finish(evt);
-            if (
-                !this.dragging &&
-                !(this.brush || this.poly_brush) &&
-                evt.button === 0
-            ) {
+            if (!this.dragging && !(this.brush || this.poly_brush) && evt.button === 0) {
                 const position = this._getMousePosition(evt);
                 const obj = this._getObjectAtPosition(position);
                 const apos = this._getActualPosition(position);
@@ -1295,9 +1252,7 @@ class WGL2DI {
             (event) => {
                 if (noCameraControl) return;
                 event.preventDefault();
-                const position = this._getActualPosition(
-                    this._getMousePosition(event),
-                );
+                const position = this._getActualPosition(this._getMousePosition(event));
                 let wdelta = 0;
                 if (event.wheelDelta > 0 || event.detail < 0) {
                     this.zoom_amount += 0.01;
@@ -1310,20 +1265,10 @@ class WGL2DI {
                     this.camera.mouseWheel(0, wdelta);
                 } else {
                     if (this.movingImage != null && event.ctrlKey) {
-                        this.resizeImage(
-                            1 + this.zoom_amount,
-                            this.movingImage,
-                        );
-                        const new_position = this._getActualPosition(
-                            this._getMousePosition(event),
-                        );
-                        this.moveImage(
-                            new_position[0] - position[0],
-                            new_position[1] - position[1],
-                        );
-                        this.imageMoved = this.getImageDetails(
-                            this.movingImage,
-                        );
+                        this.resizeImage(1 + this.zoom_amount, this.movingImage);
+                        const new_position = this._getActualPosition(this._getMousePosition(event));
+                        this.moveImage(new_position[0] - position[0], new_position[1] - position[1]);
+                        this.imageMoved = this.getImageDetails(this.movingImage);
                     } else {
                         if (!this.config.lock_x_axis) {
                             this.x_scale *= 1 + this.zoom_amount;
@@ -1331,17 +1276,11 @@ class WGL2DI {
                         if (!this.config.lock_y_axis) {
                             this.y_scale *= 1 + this.zoom_amount;
                         }
-                        const new_position = this._getActualPosition(
-                            this._getMousePosition(event),
-                        );
+                        const new_position = this._getActualPosition(this._getMousePosition(event));
                         this.offset[0] += new_position[0] - position[0];
                         this.offset[1] += new_position[1] - position[1];
                         for (const i in this.handlers.pan_or_zoom) {
-                            this.handlers.pan_or_zoom[i](
-                                this.offset,
-                                this.x_scale,
-                                this.y_scale,
-                            );
+                            this.handlers.pan_or_zoom[i](this.offset, this.x_scale, this.y_scale);
                         }
                     }
                 }
@@ -1390,16 +1329,9 @@ class WGL2DI {
             if (evt.which === 3) {
                 //add right click behaviour
             }
-            const otherKey =
-                evt.shiftKey ||
-                evt.ctrlKey ||
-                evt.which === 2 ||
-                evt.which === 3;
+            const otherKey = evt.shiftKey || evt.ctrlKey || evt.which === 2 || evt.which === 3;
             //create brush
-            if (
-                (this.config.brush && !otherKey) ||
-                (!this.config.brush && otherKey)
-            ) {
+            if ((this.config.brush && !otherKey) || (!this.config.brush && otherKey)) {
                 const origin = this._getMousePosition(evt);
                 if (this.config.brush === "default") {
                     const t = evt.target;

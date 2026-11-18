@@ -1,3 +1,4 @@
+import { Close as CloseIcon } from "@mui/icons-material";
 import {
     Box,
     Button,
@@ -11,7 +12,6 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import { Close as CloseIcon } from "@mui/icons-material";
 import { useCallback, useRef, useState } from "react";
 import Draggable from "react-draggable";
 
@@ -173,7 +173,7 @@ const FindAndReplaceDialog = ({
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter" && replaceText.trim()) {
                                             e.preventDefault();
-                                            handleReplace(findText, replaceText)
+                                            handleReplace(findText, replaceText);
                                         }
                                     }}
                                     sx={{ flexGrow: 1 }}

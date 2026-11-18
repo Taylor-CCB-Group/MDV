@@ -1,5 +1,5 @@
-import { BaseDialog } from "./Dialog.js";
 import { createEl } from "../utilities/Elements.js";
+import { BaseDialog } from "./Dialog.js";
 
 /**
  * A dialog which allows user to upload files
@@ -55,21 +55,9 @@ class FileUploadDialog extends BaseDialog {
 
     init(content) {
         this.files = [];
-        createEl(
-            "div",
-            { text: content.text, classes: ["civ-dg-div"] },
-            this.dialog,
-        );
-        const b = createEl(
-            "div",
-            { classes: ["civ-dg-div", "ciview-center"] },
-            this.dialog,
-        );
-        const s = createEl(
-            "button",
-            { classes: ["ciview-button-sm"], text: "Select Files" },
-            b,
-        );
+        createEl("div", { text: content.text, classes: ["civ-dg-div"] }, this.dialog);
+        const b = createEl("div", { classes: ["civ-dg-div", "ciview-center"] }, this.dialog);
+        const s = createEl("button", { classes: ["ciview-button-sm"], text: "Select Files" }, b);
         createEl(
             "i",
             {
@@ -81,16 +69,8 @@ class FileUploadDialog extends BaseDialog {
         b.addEventListener("click", () => {
             this.fileInput.click();
         });
-        this.fileDiv = createEl(
-            "div",
-            { classes: ["civ-dg-div"] },
-            this.dialog,
-        );
-        this.infoDiv = createEl(
-            "div",
-            { classes: ["civ-dg-div", "ciview-center"] },
-            this.dialog,
-        );
+        this.fileDiv = createEl("div", { classes: ["civ-dg-div"] }, this.dialog);
+        this.infoDiv = createEl("div", { classes: ["civ-dg-div", "ciview-center"] }, this.dialog);
         this.progressDiv = createEl(
             "progress",
             { classes: ["civ-dg-div"], styles: { width: "100%" }, value: 0 },

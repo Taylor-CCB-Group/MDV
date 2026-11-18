@@ -10,11 +10,7 @@ export type TextBoxChartConfig = BaseConfig & {
 };
 
 class TextBoxChartReactWrapper extends BaseReactChart<TextBoxChartConfig> {
-    constructor(
-        dataStore: DataStore,
-        div: string | HTMLDivElement,
-        config: TextBoxChartConfig,
-    ) {
+    constructor(dataStore: DataStore, div: string | HTMLDivElement, config: TextBoxChartConfig) {
         if (!config.text) config.text = "";
         super(dataStore, div, config, TextBoxChartComponent);
     }

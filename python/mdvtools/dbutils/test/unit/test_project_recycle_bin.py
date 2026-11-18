@@ -85,6 +85,19 @@ def test_purge_deleted_project_removes_dependencies_and_allows_missing_path(app,
         assert UserProject.query.count() == 0
 
 
+def test_purge_deleted_project_drops_its_cached_thumbnail(app, tmp_path, monkeypatch):
+    from mdvtools import mdvproject
+
+    with app.app_context():
+        project = add_project(tmp_path, 1, deleted=True)
+        monkeypatch.setitem(mdvproject._thumbnail_cache, project.path, ((0, 0, 0, 0), "img"))
+
+        success, _ = ProjectService.purge_deleted_project(project.id)
+
+        assert success
+        assert project.path not in mdvproject._thumbnail_cache
+
+
 def test_purge_deleted_project_keeps_record_when_filesystem_delete_fails(app, tmp_path, monkeypatch):
     with app.app_context():
         project = add_project(tmp_path, 1, deleted=True)

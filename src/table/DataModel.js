@@ -1,8 +1,5 @@
 import { getExportCsvStream } from "@/datastore/dataExportUtils";
-import {
-    getCellValueAsString,
-    setCellValueFromString,
-} from "@/react/utils/valueReplacementUtil";
+import { getCellValueAsString, setCellValueFromString } from "@/react/utils/valueReplacementUtil";
 
 const DEFAULT_MULTITEXT_CAPACITY = 24;
 const DEFAULT_UNIQUE_STRING_LENGTH = 64;
@@ -11,7 +8,7 @@ const MAX_TEXT16_DISTINCT_VALUES = 65536;
 let nextDataModelFilterListenerSeq = 0;
 
 /**
- * Helper to clone data type agnostically 
+ * Helper to clone data type agnostically
  */
 function cloneTypedArrayBuffer(data) {
     const buffer = new SharedArrayBuffer(data.byteLength);
@@ -105,9 +102,7 @@ class DataModel {
             const mu = order === "desc" ? 1 : -1;
             for (let i = 0; i < this.data.length; i++) {
                 const index = this.data[i];
-                names[index] = tc.decode(
-                    col.slice(index * sl, index * sl + sl),
-                );
+                names[index] = tc.decode(col.slice(index * sl, index * sl + sl));
             }
             this.data.sort((a, b) => {
                 return names[a].localeCompare(names[b]) * mu;
@@ -134,19 +129,19 @@ class DataModel {
     }
 
     /**
-     * @param {string|Object} column - `string` when we clone a column 
+     * @param {string|Object} column - `string` when we clone a column
      * and `object`: `{name, datatype, stringLength, delimiter}` when we create a new empty column
-     * 
+     *
      * @param {string} [cloneCol] - optional legacy clone source
      */
     createColumn(column, cloneCol) {
         const columnSpec =
             typeof column === "string"
                 ? {
-                    name: column,
-                    cloneColumn: cloneCol,
-                    datatype: cloneCol ? undefined : "text",
-                }
+                      name: column,
+                      cloneColumn: cloneCol,
+                      datatype: cloneCol ? undefined : "text",
+                  }
                 : column;
 
         if (!columnSpec?.name) {
@@ -179,9 +174,7 @@ class DataModel {
                 throw new Error(`Column ${sourceColumnName} not found`);
             }
             if (sourceColumn.datatype !== "text" && sourceColumn.datatype !== "text16") {
-                throw new Error(
-                    `Compound source column ${sourceColumnName} must be text or text16`,
-                );
+                throw new Error(`Compound source column ${sourceColumnName} must be text or text16`);
             }
         }
         const values = new Array(this.dataStore.size);
@@ -199,8 +192,7 @@ class DataModel {
                 `Compound column '${columnSpec.name}' has ${distinctCount} distinct values, exceeding text16 limit (${MAX_TEXT16_DISTINCT_VALUES})`,
             );
         }
-        const datatype =
-            requestedDatatype === "text" && distinctCount > 256 ? "text16" : requestedDatatype;
+        const datatype = requestedDatatype === "text" && distinctCount > 256 ? "text16" : requestedDatatype;
         this.dataStore.addColumn(
             {
                 name: columnSpec.name,
@@ -215,10 +207,10 @@ class DataModel {
     }
 
     /**
-     * 
+     *
      * @param {string} columnName - name of the new column
      * @param {string} cloneColumnName - name of the column to be cloned from
-     * 
+     *
      * Fetch the column spec of the actual column and assign them to the new column specs
      * Create a deep copy of the data of the actual column to avoid mutations
      * Add the new column to the datastore
@@ -259,9 +251,9 @@ class DataModel {
     }
 
     /**
-     * 
+     *
      * @param {object} columnSpec - Column specs of new column to be created
-     * 
+     *
      * Assign column specs based on the datatype and add the column to datastore
      */
     _createEmptyColumn(columnSpec) {
@@ -278,15 +270,12 @@ class DataModel {
         if (datatype === "text" || datatype === "text16") {
             col.values = [""];
             data = new Array(this.dataStore.size).fill("");
-        } else if (
-            datatype === "double" ||
-            datatype === "integer"
-        ) {
+        } else if (datatype === "double" || datatype === "integer") {
             data = new Array(this.dataStore.size).fill(Number.NaN);
         } else if (datatype === "int32") {
             //! int32 cannot truly represent NaN, so empty int32 cells currently coerce during storage and need a real missing-value strategy later.
             // todo: add a missing value sentinal for int32
-            throw new Error("Creating empty int32 column is not supported currently")
+            throw new Error("Creating empty int32 column is not supported currently");
         } else if (datatype === "multitext") {
             const stringLength = parsePositiveIntOrDefault(
                 columnSpec.stringLength,
@@ -329,16 +318,10 @@ class DataModel {
         if (!col.editable) {
             throw new Error(`Column ${columnName} not editable`);
         }
-        const rowCount =
-            this.dataStore.rowCount ?? this.dataStore.data?.length ?? this.dataStore.size ?? 0;
+        const rowCount = this.dataStore.rowCount ?? this.dataStore.data?.length ?? this.dataStore.size ?? 0;
 
         for (const rowIndex of rowIndices) {
-            if (
-                !Number.isFinite(rowIndex) ||
-                !Number.isInteger(rowIndex) ||
-                rowIndex < 0 ||
-                rowIndex >= rowCount
-            ) {
+            if (!Number.isFinite(rowIndex) || !Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= rowCount) {
                 throw new Error(`Invalid row index ${rowIndex} for column ${columnName}`);
             }
             if (emptyOnly) {
@@ -383,9 +366,7 @@ class DataModel {
         if (index === -1) {
             col.values.push(value);
             if (col.values.length > 256)
-                throw new Error(
-                    `text column '${col.name}' exceeded 256 values when adding '${value}'`,
-                );
+                throw new Error(`text column '${col.name}' exceeded 256 values when adding '${value}'`);
             index = col.values.length - 1;
         }
         return index;
@@ -472,9 +453,7 @@ class DataModel {
     }
 
     getItemField(index, column) {
-        return this.dataStore.getRowAsObject(this.data[index], [column])[
-            column
-        ];
+        return this.dataStore.getRowAsObject(this.data[index], [column])[column];
     }
 
     getItem(index) {

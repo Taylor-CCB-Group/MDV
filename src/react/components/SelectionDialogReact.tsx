@@ -1,20 +1,20 @@
 import { action } from "mobx";
+import type DataStore from "@/datastore/DataStore";
+import { g } from "@/lib/utils";
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
-import type DataStore from "@/datastore/DataStore";
-import { g } from "@/lib/utils";
 
 // export type CommonFilter = { noClear?: boolean, invert?: boolean }; //todo - implement these features.
 export type CategoryFilter = { category: string[] };
 export type MultiTextFilter = CategoryFilter & { operand: "or" | "and" };
 export type RangeFilter = [number, number];
 export type UniqueFilter = string;
-export type SelectionDialogFilter = (CategoryFilter | MultiTextFilter | UniqueFilter | RangeFilter);// & CommonFilter;
+export type SelectionDialogFilter = CategoryFilter | MultiTextFilter | UniqueFilter | RangeFilter; // & CommonFilter;
 
 export type SelectionDialogConfig = {
     type: "selection_dialog";
-    noClearFilters?:boolean;
+    noClearFilters?: boolean;
     filters: Record<string, SelectionDialogFilter | null>;
     order?: Record<string, number>;
 } & BaseConfig;
@@ -32,12 +32,12 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
         if (!config.order) {
             config.order = {};
         }
-        //for legacy configs, if left undefined makeAutoObservable will 
+        //for legacy configs, if left undefined makeAutoObservable will
         // not work correctly.
         if (config.noClearFilters === undefined) {
             config.noClearFilters = false;
         }
-        
+
         for (const col of config.param) {
             //@ts-expect-error MultiColumnQuery cannot be used as index
             if (!config.filters[col]) {
@@ -48,6 +48,12 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
         // makeAutoObservable(config); //super will do this
         //nb, considered `this.mobxAutorun` for showing/hiding reset button, but we use a hook.
         super(dataStore, div, config, SelectionDialogComponent);
+        // The filters are applied by the column components, in effects, some time after this returns. `param` holds
+        // concrete field names at this point (any active link is restored afterwards), and each of those columns
+        // gets a component, which reports back once it has applied its filter.
+        for (const field of this.config.param) {
+            if (typeof field === "string" && this.config.filters[field]) this.storedFilters.expect(field);
+        }
     }
     removeFilter(): void {
         action(() => {
@@ -57,10 +63,10 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
         })();
     }
 
-    getSettings(){
-          const settings = super.getSettings();
-          const c = this.config;
-          return [
+    getSettings() {
+        const settings = super.getSettings();
+        const c = this.config;
+        return [
             ...settings,
             g({
                 //set whether filters are cleared on Reset All
@@ -70,9 +76,9 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
                 func: (x) => {
                     // func() is already called in an action, so no need to wrap again
                     c.noClearFilters = x;
-                }
-            })
-          ]
+                },
+            }),
+        ];
     }
 }
 
@@ -85,5 +91,5 @@ BaseChart.types["selection_dialog"] = {
             name: "Columns To filter",
         },
     ],
-}
+};
 // BaseChart.types["selection_dialog_experimental"] = BaseChart.types["selection_dialog"];

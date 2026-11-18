@@ -1,5 +1,5 @@
-import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
+import { select } from "d3-selection";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
 
@@ -19,9 +19,7 @@ class SingleSeriesChart extends SVGChart {
         const c = this.config;
         const vals = this.dataStore.getColumnValues(p[0]);
         this.x_scale.domain(vals.slice(0));
-        this.config.scale =
-            this.config.scale ||
-            this.dataStore.getColumnQuantile(p[4], "0.001");
+        this.config.scale = this.config.scale || this.dataStore.getColumnQuantile(p[4], "0.001");
         this.initialSetUp();
         this.drawChart();
         this.addToolTip();
@@ -71,12 +69,8 @@ class SingleSeriesChart extends SVGChart {
         const values = this.dataStore.columnIndex[p[4]].data;
         const len = this.dataStore.size;
         const data = [];
-        const cat1 = this.dataStore.columnIndex[p[1]].values.indexOf(
-            this.config.categories[0],
-        );
-        const cat2 = this.dataStore.columnIndex[p[2]].values.indexOf(
-            this.config.categories[1],
-        );
+        const cat1 = this.dataStore.columnIndex[p[1]].values.indexOf(this.config.categories[0]);
+        const cat2 = this.dataStore.columnIndex[p[2]].values.indexOf(this.config.categories[1]);
         let min = null;
         let max = null;
         for (let i = 0; i < len; i++) {
@@ -87,13 +81,7 @@ class SingleSeriesChart extends SVGChart {
                 max = max === null ? values[i] : Math.max(values[i], max);
                 min = min == null ? values[i] : Math.min(values[i], min);
 
-                data.push([
-                    values[i],
-                    fc[i],
-                    sc[i],
-                    i,
-                    Math.floor(Math.random() * 6) + 1,
-                ]);
+                data.push([values[i], fc[i], sc[i], i, Math.floor(Math.random() * 6) + 1]);
                 const eb = errorBars[fc[i]];
                 eb.values.push(values[i]);
                 eb.totals += values[i];
@@ -103,10 +91,7 @@ class SingleSeriesChart extends SVGChart {
             eb.mean = eb.totals / eb.values.length;
             let n = eb.values.length - 1;
             n = n === 0 ? 1 : n;
-            eb.std = eb.values.reduce(
-                (prev, cur) => prev + (cur - eb.mean) ** 2,
-                0,
-            );
+            eb.std = eb.values.reduce((prev, cur) => prev + (cur - eb.mean) ** 2, 0);
             eb.std = Math.sqrt(eb.std / n);
             eb.values = undefined;
         }
@@ -137,11 +122,7 @@ class SingleSeriesChart extends SVGChart {
             {
                 label: this.dataStore.getColumnName(c.param[1]),
                 type: "dropdown",
-                values: [
-                    this.dataStore.getColumnValues(c.param[1], "name_value"),
-                    "name",
-                    "value",
-                ],
+                values: [this.dataStore.getColumnValues(c.param[1], "name_value"), "name", "value"],
                 current_value: c.categories[0],
                 func: (v) => {
                     c.categories[0] = v;
@@ -152,11 +133,7 @@ class SingleSeriesChart extends SVGChart {
             {
                 label: this.dataStore.getColumnName(c.param[2]),
                 type: "dropdown",
-                values: [
-                    this.dataStore.getColumnValues(c.param[2], "name_value"),
-                    "name",
-                    "value",
-                ],
+                values: [this.dataStore.getColumnValues(c.param[2], "name_value"), "name", "value"],
                 current_value: c.categories[1],
                 func: (v) => {
                     c.categories[1] = v;
@@ -170,14 +147,9 @@ class SingleSeriesChart extends SVGChart {
 
     drawChart(tTime = 300) {
         const p = this.config.param;
-        this.y_scale
-            .domain([this.config.scale[1], this.config.scale[0]])
-            .clamp(true);
+        this.y_scale.domain([this.config.scale[1], this.config.scale[0]]).clamp(true);
         this.updateAxis();
-        const trans = select(this.contentDiv)
-            .transition()
-            .duration(tTime)
-            .ease(easeLinear);
+        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
         const xvals = this.dataStore.getColumnValues(p[0]);
         const svalues = this.dataStore.getColumnValues(p[3]);
         const dim = this._getContentDimensions();
@@ -202,10 +174,7 @@ class SingleSeriesChart extends SVGChart {
             })
 
             .transition(trans)
-            .attr(
-                "cx",
-                (d) => recWidth / 8 + recWidth * (d[4] / 8) + d[1] * recWidth,
-            )
+            .attr("cx", (d) => recWidth / 8 + recWidth * (d[4] / 8) + d[1] * recWidth)
             .attr("cy", (d) => this.y_scale(d[0]))
             .attr("r", 5)
             .attr("fill", (d) => colors[d[1]]);
@@ -246,33 +215,25 @@ BaseChart.types["single_series_chart"] = {
         const c1 = i.interaction_columns[0];
         const c2 = i.interaction_columns[1];
         const ex = new Set([c1, c2, i.pivot_column]);
-        const groups = dataSource
-            .getColumnList("text")
-            .filter((x) => !ex.has(x.field));
+        const groups = dataSource.getColumnList("text").filter((x) => !ex.has(x.field));
         return [
             {
                 type: "dropdown",
                 name: "c1",
                 label: dataSource.getColumnName(c1),
-                values: dataSource
-                    .getColumnValues(c1)
-                    .map((x) => ({ name: x, value: x })),
+                values: dataSource.getColumnValues(c1).map((x) => ({ name: x, value: x })),
             },
             {
                 type: "dropdown",
                 name: "c2",
                 label: dataSource.getColumnName(c2),
-                values: dataSource
-                    .getColumnValues(c2)
-                    .map((x) => ({ name: x, value: x })),
+                values: dataSource.getColumnValues(c2).map((x) => ({ name: x, value: x })),
             },
             {
                 type: "dropdown",
                 name: "data",
                 label: "Data to display",
-                values: dataSource
-                    .getColumnList("number")
-                    .map((x) => ({ name: x.name, value: x.field })),
+                values: dataSource.getColumnList("number").map((x) => ({ name: x.name, value: x.field })),
             },
             {
                 type: "dropdown",
@@ -285,13 +246,7 @@ BaseChart.types["single_series_chart"] = {
     init: (config, ds, ec) => {
         const i = ds.interactions;
         const param = ds.interactions.cell_radial_chart;
-        config.param = [
-            ec.group,
-            i.interaction_columns[0],
-            i.interaction_columns[1],
-            i.pivot_column,
-            ec.data,
-        ];
+        config.param = [ec.group, i.interaction_columns[0], i.interaction_columns[1], i.pivot_column, ec.data];
         config.categories = [ec.c1, ec.c2];
     },
 };

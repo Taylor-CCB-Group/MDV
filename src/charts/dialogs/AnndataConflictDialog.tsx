@@ -11,8 +11,8 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import { useState } from "react";
 import type React from "react";
+import { useState } from "react";
 
 export interface AnndataConflictDialogProps {
     open: boolean;
@@ -21,17 +21,11 @@ export interface AnndataConflictDialogProps {
     onError?: (error: { message: string; status?: number }) => void;
 }
 
-const AnndataConflictDialog: React.FC<AnndataConflictDialogProps> = ({
-    open,
-    onClose,
-    onConfirm,
-    onError,
-}) => {
+const AnndataConflictDialog: React.FC<AnndataConflictDialogProps> = ({ open, onClose, onConfirm, onError }) => {
     const [prefix, setPrefix] = useState("");
     const [error, setError] = useState("");
 
-    const isValidPrefix =
-        prefix.trim() && /^[A-Za-z][A-Za-z0-9_]*$/.test(prefix);
+    const isValidPrefix = prefix.trim() && /^[A-Za-z][A-Za-z0-9_]*$/.test(prefix);
 
     const handleConfirm = () => {
         if (!prefix.trim()) {
@@ -41,8 +35,7 @@ const AnndataConflictDialog: React.FC<AnndataConflictDialogProps> = ({
             return;
         }
         if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(prefix)) {
-            const errorMessage =
-                "Prefix must start with a letter and contain only letters, numbers, and underscores";
+            const errorMessage = "Prefix must start with a letter and contain only letters, numbers, and underscores";
             setError(errorMessage);
             onError?.({ message: errorMessage, status: 400 });
             return;
@@ -74,11 +67,7 @@ const AnndataConflictDialog: React.FC<AnndataConflictDialogProps> = ({
         >
             <DialogTitle className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900 border-b px-6 py-4">
                 <MergeTypeIcon className="text-blue-600 dark:text-blue-400" />
-                <Typography
-                    variant="h6"
-                    component="span"
-                    className="font-semibold"
-                >
+                <Typography variant="h6" component="span" className="font-semibold">
                     Existing AnnData File Found
                 </Typography>
             </DialogTitle>
@@ -86,9 +75,8 @@ const AnndataConflictDialog: React.FC<AnndataConflictDialogProps> = ({
             <DialogContent className="p-6">
                 <Box className="space-y-4 mt-4">
                     <Typography variant="body1">
-                        An AnnData file already exists in this project. To
-                        combine the files, please specify a prefix for the new
-                        datasources to prevent naming conflicts:
+                        An AnnData file already exists in this project. To combine the files, please specify a prefix
+                        for the new datasources to prevent naming conflicts:
                     </Typography>
 
                     <TextField
@@ -97,10 +85,7 @@ const AnndataConflictDialog: React.FC<AnndataConflictDialogProps> = ({
                         value={prefix}
                         onChange={handlePrefixChange}
                         error={!!error}
-                        helperText={
-                            error ||
-                            "This prefix will be added to all new datasource names"
-                        }
+                        helperText={error || "This prefix will be added to all new datasource names"}
                         placeholder="Enter prefix"
                         className="mt-4"
                         autoFocus
@@ -112,9 +97,8 @@ const AnndataConflictDialog: React.FC<AnndataConflictDialogProps> = ({
                     </Box>
 
                     <Alert severity="info" className="mt-4">
-                        This will preserve your existing data, while adding new
-                        datasources with your chosen prefix (columns will not be
-                        merged, these will be distinct, separate, datasources).
+                        This will preserve your existing data, while adding new datasources with your chosen prefix
+                        (columns will not be merged, these will be distinct, separate, datasources).
                     </Alert>
                 </Box>
             </DialogContent>

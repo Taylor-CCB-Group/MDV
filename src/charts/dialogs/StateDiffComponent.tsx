@@ -7,7 +7,6 @@ export type StateDiffProps = {
 };
 
 const StateDiffComponent = ({ input1, input2 }: StateDiffProps) => {
-
     const diff = useDiff(input1, input2);
 
     return (

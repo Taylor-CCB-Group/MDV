@@ -9,16 +9,14 @@ function getCurrentThemeMode(doc: Document): ThemeMode {
 function getThemeConfig(doc: Document) {
     const rootStyle = getComputedStyle(doc.documentElement);
     const themeMode = getCurrentThemeMode(doc);
-    const textColor = rootStyle.getPropertyValue("--text_color").trim() || (themeMode === "dark" ? "#ffffff" : "#111111");
+    const textColor =
+        rootStyle.getPropertyValue("--text_color").trim() || (themeMode === "dark" ? "#ffffff" : "#111111");
     const mainPanelColor =
-        rootStyle.getPropertyValue("--main_panel_color").trim() ||
-        (themeMode === "dark" ? "#000000" : "#f1f1f1");
+        rootStyle.getPropertyValue("--main_panel_color").trim() || (themeMode === "dark" ? "#000000" : "#f1f1f1");
     const primaryBackground =
-        rootStyle.getPropertyValue("--primary_background").trim() ||
-        (themeMode === "dark" ? "#353536" : "#ecf0f1");
+        rootStyle.getPropertyValue("--primary_background").trim() || (themeMode === "dark" ? "#353536" : "#ecf0f1");
     const borderColor =
-        rootStyle.getPropertyValue("--border_menu_bar_color").trim() ||
-        (themeMode === "dark" ? "#727272" : "#c9c9c9");
+        rootStyle.getPropertyValue("--border_menu_bar_color").trim() || (themeMode === "dark" ? "#727272" : "#c9c9c9");
 
     return {
         startOnLoad: false,

@@ -53,6 +53,340 @@ Remove the unused `refreshRenderStackShell` helper. Replacing only the stack she
 
 Possible follow-up: consider publishing MDV to npm so SpatialData.js can exercise real MDV integration points without local worktree/link setup. This is an integration enabler, not part of the adapter refactor.
 
+## Local linked `@spatialdata/*` (pre-publish verification)
+
+To iterate on an upstream fix against this MDV worktree before publishing another `@spatialdata/*` patch:
+
+```bash
+# optional if checkout is not at ~/code/www/SpatialData.ts or ../SpatialData.ts
+export SPATIALDATA_ROOT=~/code/www/SpatialData.ts
+(cd "$SPATIALDATA_ROOT" && pnpm build)   # or watch the packages you edit
+pnpm link:spatialdata
+# restart Vite; clear cache if needed: rm -rf node_modules/.vite
+```
+
+Restore registry packages with `pnpm unlink:spatialdata` before committing dependency pins.
+
+Note that `resolve.dedupe` and `server.fs.allow` in `vite.config.mts` are what make a linked checkout usable — without them you get two copies of deck/luma/React (`DECKGL_FILTER_COLOR: no matching overloaded function`) and 404s on the linked packages' non-JS assets. Both are gated on a link being present.
+
+## Who owns fill colour
+
+The viewer does, for any column in the annotating table's `obs`. MDV supplies the
+*scheme* — the palette, the domain — and the viewer does the reading and the
+encoding. Everything else stays MDV's.
+
+The routing is one question, asked in `obsColumnNamesForElement`: **is this column
+in the table's obs?**
+
+| | Colour comes from | Why |
+|---|---|---|
+| Column in obs | `fillColorByColumn`, with MDV's palette attached | The viewer can read it, so it should |
+| Column not in obs | `featureState.fillColorByFeatureId` | Gene scores, `mdv_cell_id`, anything computed at runtime — the viewer has no way to reach these |
+| Filtering (`hiddenFeatureIds`) | Always `featureState` | Cross-filtering is MDV's, and no column in obs can express it |
+
+`fillColorSchemeFromDataStore` is what makes the first row safe. It turns an MDV
+column into viewer config: a categorical column becomes
+`categoricalPalette: { byValue }` — colours named by category, so the viewer cannot
+reorder them — and a numeric column becomes `numericRamp` (the bins
+`getColumnColors` already produced) plus `numericDomain` from the column's
+`minMax`. A column drawn on the canvas therefore matches the same column in every
+other MDV chart, log scale included: the log remap is baked into those bins, which
+is why nothing sets `numericScale` (doing both would apply it twice).
+
+This replaces an earlier arrangement where MDV computed every feature's colour and
+kept `fillColorByColumn` out of viewer inputs entirely. That was defensible while
+`fillColorByColumn` could not express an MDV palette — it could only cycle an
+index-ordered list, which is not the same thing as naming a category's colour — but
+it cost a `Record<string, [r,g,b,a]>` with one entry per cell on every filter
+change, and it produced a saved render stack that only looked right inside MDV.
+Named palettes and pinned domains landed upstream in the same release as the
+categorical/string fixes; see the version note below.
+
+`withPreservedFillColorsWhileLoading` survives, scoped to the per-feature route
+alone. It covers MDV's asynchronous `loadColumnSet`, which the viewer knows nothing
+about. Columns the viewer owns are covered by the viewer's own last-good retention.
+
+### Tooltip fields
+
+Split along the same line as fill colour. `splitTooltipFields` hands the viewer the
+fields in the table's obs, which it reads and formats itself, and MDV keeps the rest:
+`useAssociatedShapesLayerInputs` projects each layer's `tooltipFields` down to its obs
+fields, loads the others from the datasource, and `mdvTooltipItems(entryId, featureId)`
+reads them from the feature's datasource row at hover time. The chart appends those items
+to the viewer's tooltip. Without that, a gene score chosen as a tooltip field showed
+nothing — the viewer has no way to reach it.
+
+The hover handler goes to `SpatialViewer` as its `onHover` prop. Passing it inside
+`deckProps` does not work: `SpatialViewer` spreads `deckProps` and then sets `onHover` from
+its own prop, so a handler there is overwritten with `undefined` and no feature tooltip
+ever appears.
+
+### Columns that keep moving
+
+MDV's column picker can also return a `RowsAsColsQuery` — an "active link", whose
+column is whatever the linked datasource has selected *right now*. A layer config
+has nowhere to put that: `fillColorByColumn.columnName` and `tooltipFields` are
+plain strings by design, because a saved Render Stack has to mean the same thing to
+a reader that has never heard of MDV's links.
+
+So the query stays on MDV's side of the layer props, under `mdvFieldSpecs`, and
+`projectMdvFieldSpecs` writes the concrete fields from it whenever it resolves
+somewhere new — see `field_spec_projection.ts`. The spec is the source of truth and
+the concrete fields are derived, which is why the picker stores a spec even for an
+ordinary column: a config where the two could disagree is one where the last writer
+wins at random. `withoutMdvFieldSpecs` takes it off at the viewer boundary.
+
+Gene scores live in a linked datasource, never in obs, so an active-link colour
+always takes the per-feature route above. Before this existed the picker offered the
+tab and the handler dropped anything that was not a string, so choosing an active
+link did nothing at all — silently.
+
+## The layer dialog
+
+One place for everything about how layers look. Chart settings hold only chart-wide
+options (name, region, rendering backend) and a button that opens the dialog.
+
+- **SpatialData elements** are sortable rows. **MDV data** lists the host overlays that
+  mean something to a user — data points, gates, gate labels — in a section of their own,
+  because host layers always draw above SpatialData layers and cannot be reordered among
+  them. They cannot be removed either: `mergeHostOverlayEntriesInPlace` puts them back.
+  The grey (filtered-out) scatter follows the data points' visibility
+  (`DECK_OVERLAY_VISIBILITY_FOLLOWERS`); the selection overlay belongs to the selection tools.
+- The **Data points** layer's properties are the GuiSpecs from
+  `SpatialDataMdvReact.getDataLayerSettings()` — BaseChart's colour folder plus the shared
+  scatter settings — rendered with the settings dialog's controls via `SettingsGuiList`.
+  They used to be chart settings; they still write the same config fields.
+- **Names.** A layer's name is `props.displayName`, the only open part of a render-stack
+  entry (its top level is a strict schema). `withoutMdvOnlyProps` takes it off at the
+  viewer boundary along with the field specs. Unnamed layers that show the same element
+  are numbered in stack order (`renderStackEntryDisplayName(entry, stack)`), so duplicates
+  can be told apart before anyone renames them.
+- **Labels appearance** (colour, filled, fill/outline opacity, outline width) is the labels
+  layer's `channels`. `patchRenderStackEntryPropsInPlace` merges `channels` field by field,
+  so its key list covers the labels fields as well as the image ones; without them those edits
+  would be dropped once a layer had any saved channels.
+
+## The points layer panel
+
+`PointsLayerPanel` is a bridge, not a leaf. The layer dialog is a portal with its own
+React tree, so it cannot see the renderer hook's result; the chart publishes the live
+`PointsDataEngine` on `chart.pointsLayerRegistry` (an effect in
+`SpatialDataMDVReactComponent`, cleared on unmount) and the panel wraps its subtree in
+`<PointsFeatureStateProvider>`. That engine must be the one the render path owns — it
+holds the resident window, the feature catalog and the in-flight scans, so a second
+instance would reload everything and answer different questions from the one drawing.
+`resolveTarget` comes from the renderer hook for the same reason: panel reads have to
+hit the cache keys the render writes.
+
+Two consequences worth knowing before editing either panel file:
+
+- Every component calling `usePointsFeatureState` needs `'use no memo'`. The hook
+  re-renders on each engine notify via `useSyncExternalStore`, but the values it
+  returns come from mutable engine state the React Compiler cannot see as a
+  dependency — it would memoize the JSX and hold the pre-catalog branch on screen.
+- The hook throws outside the provider, so the style controls take an
+  `engineAvailable` flag rather than assuming one is present.
+
+The feature selection persists as **names** (`featureNames`), never codes. For a
+dictionary-only element — a Xenium `transcripts` has `feature_name` and no code
+column — the codes are app-assigned from whichever catalog scan ran first, so a saved
+code can come back meaning a different gene. The panel writes names and clears any
+legacy `featureCodes` so the two can never disagree.
+
+There is deliberately **no colour-by-feature switch**: `colorByFeature: false` does not
+reach the deck layer upstream (SpatialData.js#147), so the control would be inert. The
+flat colour control stays, with a caption saying what it actually does when the element
+has features.
+
+### On-demand feature loading
+
+Selecting a feature whose points fall outside the memory cap triggers a feature-index
+scan that fetches them. That scan runs in the **core parquet worker**, which
+`ensureParquetWorker` starts alongside the zarr chunk worker. It is not optional:
+`loadPointsMatchingFeatureCodes` throws outright without a worker rather than falling
+back to the main thread, so without it a selection silently shows only whatever part of
+the feature was inside the cap.
+
+The worker was the points worker until `@spatialdata/core@0.9.0` renamed it, with no
+aliases: it decodes and scans parquet for shapes as much as for points. MDV starts it
+through `ensureWorkers` from `@spatialdata/vis`, which is the seam that hides how
+differently the two workers are wired — the codec worker needs no configuration, the
+parquet worker needs a URL MDV's bundler produces:
+
+```ts
+import { ensureWorkers } from "@spatialdata/vis";
+import workerUrl from "@spatialdata/core/parquet-worker?worker&url";
+
+ensureWorkers({ parquet: { workerUrl, requestTimeoutMs: 120_000 } });
+```
+
+That import is doing the work — it asks Vite to *build* the worker, shared chunks and
+parquet-wasm included. The worker cannot ship self-contained, so there is no default URL
+that survives being re-bundled into MDV's `assets/`.
+
+Running a worker at all was impossible before `@spatialdata/core@0.8.0` — the published
+worker entry was a CommonJS file in an ESM package, so `new Worker(url, {type: "module"})`
+died on `require is not defined` (SpatialData.js#148).
+
+The panel still gates its on-demand messaging on `isParquetWorkerEnabled()`: if the
+worker ever fails to start, a greyed row must not invite a click that cannot work. From
+0.9.0 that answer is trustworthy rather than optimistic — a worker that errors before
+answering anything is recognised as never wired up and switched off, so every other
+caller takes its main-thread fallback instead of stalling a request at a time.
+
+Two things about the panel that follow from how the engine reports state, both easy to
+misread:
+
+- A feature is **"resident" if it has one point inside the cap**, not if all of its
+  points are there. On an 8.07M-point element at the 4M default, all 541 features are
+  resident. Rows whose resident count falls short of the dataset total are therefore
+  classified `partial` and print `resident / dataset` — un-greyed, because they *are*
+  drawn, but never claiming to be whole.
+- A **failed** scan still draws: the render path falls back to filtering the resident
+  batch, so the canvas shows a subset and nothing about it looks broken. The panel
+  reports `matchingLoadState.failed` explicitly with a Retry, rather than letting that
+  subset read as the complete answer.
+
+## Minimum upstream version
+
+**`@spatialdata/* >= 0.10.0`, and `zarrextra >= 0.5.0` with it.**
+
+0.10.0 is what the pins ask for, though the *compile* floor is still 0.9.0 — nothing in
+0.10.0 is breaking. The reason to pin it anyway is that it is the release where a points
+layer stopped freezing the tab, and the numbers are not marginal.
+
+The progressive preload used to run parquet-wasm's `ParquetFile.stream()` on the main
+thread from above the worker gate, so enabling the parquet worker did nothing for it
+(SpatialData.js#174). It now range-fetches and decodes in the worker and posts batches
+back, so the coloured progressive paint survives and the main thread only copies each
+batch into its accumulator. Upstream's measurement on a 4.83M-row Xenium transcripts
+element capped at 4M, with a 12,448-feature panel: the preload went from *never
+completing* (still running at 9.4 minutes) to 75 s, worst single task 113 s → ~4.2 s.
+
+0.10.0 also virtualizes the upstream feature list (SpatialData.js#172), which matters
+here only for the panels MDV does not own — MDV#542 did the same for
+`PointsFeatureFilterPanel`. On the element above the two together were the difference
+between a usable panel and a minute of frozen UI, and neither alone got there.
+
+0.9.0 remains the hard compile floor: the points worker was renamed to the parquet
+worker with no aliases, so `@spatialdata/core/points-worker`, `enablePointsWorker` and
+`isPointsWorkerEnabled` no longer exist and MDV does not compile below it. It is also
+the release that made a production build work at all — core reaches its vendored
+parquet-wasm through the `@spatialdata/core/parquet-wasm` export now, so MDV's bundler
+emits the wasm itself. Below 0.9.0 that import hid behind a `@vite-ignore`d relative
+path no bundler could resolve, every production build 404d on the first parquet read
+while dev worked, and MDV carried a plugin copying core's `vendor/` tree into its output
+(MDV#539) to paper over it. That plugin is gone.
+
+0.8.0 was the previous floor. It is the first release whose published worker entry is an
+ES module and can therefore be started at all, which is what makes on-demand feature
+loading work rather than fail silently. It also carries `describeFeatureRowState`
+(imported here rather than mirrored) and the resident-vs-dataset feature counts the panel
+prints.
+
+0.7.0 first re-exported `PointsFeatureStateProvider` / `usePointsFeatureState` from the
+`@spatialdata/vis` entry — below it they are not reachable at all, since the package
+publishes only a `"."` export.
+
+0.6.0 remains the floor for the table work underneath that. Do not ship an MDV that
+touches SpatialData tables against anything older. Before
+0.6.0, `'auto'` mode sniffed values instead of trusting the store's declared column
+kind — one `NaN` in a float column made it categorical and gave every distinct float
+its own hue — and category colours depended on which features happened to load.
+AnnData written by newer tooling is more likely to hit both. Nor is it a
+degrade-gracefully situation: the scheme MDV now sends (`categoricalPalette:
+{ byValue }`) reaches 0.4.0 as an object where it expects a list, indexes it with a
+`NaN`, and throws `Cannot read properties of undefined` three frames away inside the
+layer.
+
+`zarrextra` moves in step because `@spatialdata/core` depends on `0.5.0`
+exactly; leaving MDV's own pin behind installs a second copy. MDV no longer
+imports it directly: sd.js owns codec-worker setup and the chunk cache
+(`ensureCodecWorkers`), and a direct `enableWorkerChunkDecode` call from MDV
+would replace that page-global backend without the cache.
+
+The pins in `package.json` are the enforcement; keep them at or above these.
+
+## WebGPU
+
+SpatialData.js 0.12 renders images, labels, shapes and points on WebGPU when the canvas
+is given `deckProps.deviceProps = { type: "webgpu", adapters: [webgpuAdapter] }`.
+**WebGPU is the default** for SpatialData charts wherever the browser has it. A chart can
+choose its own backend (`render_backend`, "Rendering backend" in its settings); charts
+left at the default follow the "Default rendering backend" browser setting in the Debug
+dialog (`src/lib/browserSettings.ts`, stored in localStorage; it replaced the old
+`MDV_WEBGPU` flag, which it still reads), and `?webgpu` / `?webgpu=0` overrides that for
+one page load — see `src/react/spatialdata/deck_backend.ts`. deck picks its device once,
+so changing the backend remounts the canvas.
+
+**Falling back to WebGL.** A chart moves to WebGL for the rest of its session, with the
+reason in its debug dialog's "Chart status", when:
+
+- the browser has no WebGPU, no adapter, or the adapter refuses the device deck will ask
+  for (probed once per page, `probeWebGPU`);
+- deck cannot create the device anyway (luma's device setup, or the canvas's WebGPU
+  context), or the device is lost later, e.g. a GPU process crash or reset;
+- it follows the default backend and a layer fails on WebGPU, or the canvas throws there.
+  The layer stays on, since it most likely works on WebGL; a failure on WebGL is reported
+  and the layer turned off as usual. A chart set to WebGPU explicitly stays on it, and the
+  failing layer is turned off and reported instead.
+
+Unattributed WebGPU validation errors are reported, not treated as a reason to fall back.
+Changing a chart's backend setting gives WebGPU another try.
+
+**Chart status.** A dot on a chart's "more" (☰) menu icon, and on its "debug / report
+chart" item, flags problems: red for render errors nobody has dismissed, yellow while
+layers stay off or image data is slow. The details are under "Chart status" in that
+debug dialog (`BaseChart.setMenuPip` / `getDebugPanel`; `SpatialStatusPanel`).
+
+**Diagnosing WebGPU errors.** A chart's "Chart status" has "Copy details": a plain-text
+report of the renderer, GPU, browser and each failure. Validation errors arrive
+asynchronously, so their own stack never shows the caller. For those, turn on "WebGPU call
+tracing" in the Debug dialog's browser settings and reload: `webgpu_trace.ts` then wraps
+the WebGPU encoder API before any device exists, reports a pass still open when its
+encoder is finished (with both stacks), logs the recent encoder calls before each
+uncaptured error, and adds both to "Copy details". Turn it off when done; it slows
+rendering a little.
+
+**Tested** (macOS, Apple silicon): Chrome (Dawn/Metal) end to end; Safari and Firefox by
+hand. Known issue: Firefox does not support the `float32-filterable` feature, which some
+WebGPU code paths need; there a failing layer moves default-following charts to WebGL.
+
+Host layers (MDV's scatter, grey-out, gate and selection overlays) go into the same Deck
+unadapted, so they must work on WebGPU themselves:
+
+- deck 9.4 has **no WGSL shader hooks**, so GLSL `inject`-based extensions cannot simply
+  carry over. `MdvScatterplotLayer` stands in for them: extensions implementing
+  `WGSLLayerExtension` (`src/webgl/wgslLayerExtension.ts`) edit deck's scatterplot WGSL at
+  exact anchors, which `src/tests/webgl/wgslLayerExtensions.test.ts` pins against the
+  installed deck. The square and gaussian point shapes work this way.
+- **`DataFilterExtension` is GLSL-only upstream.** `MdvDataFilterExtension` keeps
+  upstream's JS (attribute, uniforms) and supplies a WGSL `dataFilter` module plus a luma
+  `ShaderPlugin` vertex input, for the subset MDV uses (`filterSize: 1`, no categories,
+  soft range, fp64 or `countItems`). Retire both once deck has WGSL hooks and a WebGPU
+  data filter; luma 9.4.2's `filterShaderPlugin` targets a `FILTER_POSITION` hook that
+  deck's layers do not call yet, which is the likely shape of an upstream PR.
+- **Contours**: `TriangleLayerContours` is GLSL-only, so on WebGPU contours are drawn by
+  `@intraspatial/deck`'s `DensityLayer` (KDE splatting in data units, WGSL presentation
+  shader). `src/webgl/intraspatialDensity.ts` converts the heatmap props exactly: σ is
+  `5 · bandwidth` world units, and heatmap weight is `density · 12√π · σ²`, so MDV's fill
+  threshold and contour spacing carry over. For local IntraSpatial development,
+  `INTRASPATIAL_ROOT=… pnpm link:intraspatial` links a checkout (`pnpm unlink:intraspatial`
+  to undo).
+- **Synchronous picking throws on WebGPU** (`readPixelsToArrayWebGL: not implemented`).
+  editable-layers picks synchronously on every pointer event, which aborted clicks before
+  deck dispatched them to the scatter layer. On WebGPU, `MonkeyPatchEditableGeoJsonLayer`
+  computes the selection layer's picks on the CPU (`src/editable-layers/cpuPicks.ts`), and
+  the single selection shape is always selected, so translate, modify and draw do not race
+  async picks. This is a short-term workaround: GPU picking should be fixed upstream
+  (deck.gl, editable-layers) rather than worked around further in MDV.
+- Use luma's portable parameters (`depthCompare`, `depthWriteEnabled`), not WebGL ones
+  like `depthTest`, which WebGPU rejects.
+- SpatialData.js drops Viv image extensions on WebGPU, so `VivContrastExtension`'s tone
+  controls have no effect there. The layer dialog disables them while the chart draws with
+  WebGPU: the chart publishes its effective backend as `activeBackend` (after any fallback
+  to WebGL), and the image panel context passes `toneUnavailable` to `BrightnessContrast`.
+
 ## Avivatorish comparison
 
 MDV currently carries a local `src/react/components/avivatorish` implementation and also depends on `@spatialdata/avivatorish`. Treat the local copy as the integration shim for now, not as a desired long-term fork.
@@ -103,7 +437,7 @@ Useful follow-up SpatialData.js changes (not blocking this PR):
 
 ### Image layer panel pattern (MDV)
 
-Dependencies: pin `@spatialdata/{core,layers,react,vis,avivatorish}` at **0.2.3**.
+Dependencies: `@spatialdata/{core,layers,react,vis,avivatorish}` at **>= 0.10.0** (see the version floor above).
 
 **Viewer (chart tree)**
 
@@ -204,7 +538,7 @@ Implemented under `src/react/spatialdata/` and `src/react/components/SpatialData
 
 ## Deferred (follow-up PR)
 
-- Table-driven shape colouring (`fillColorByColumn`, `spatial_table_association`)
+- Render stacks saved before `FILL_COLOR_MODE` became `"auto"` still carry `mode: "categorical"` on every colour column, including numeric ones. It is inert while MDV strips `fillColorByColumn` from viewer inputs, so nothing is mis-drawn today — but whoever lifts that strip, or writes an importer for a saved stack, needs to normalise the stale value first (an explicit mode is honoured verbatim by the viewer).
 - `@spatialdata/avivatorish` zarr loader delegation (MDV keeps OME-TIFF local)
 - Playwright fixture test
 

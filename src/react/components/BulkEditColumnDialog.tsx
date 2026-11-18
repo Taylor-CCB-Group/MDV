@@ -1,37 +1,17 @@
-import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
-import {
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Stack,
-    TextField,
-    Typography,
-} from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
+import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
 
-export type BulkEditAction =
-    | "fill-all"
-    | "fill-empty";
+export type BulkEditAction = "fill-all" | "fill-empty";
 
 type BulkEditColumnDialogProps = {
     open: boolean;
     columnName: string | null;
     onClose: () => void;
-    onSubmit: (args: {
-        action: BulkEditAction;
-        columnName: string;
-        value: string;
-    }) => void;
+    onSubmit: (args: { action: BulkEditAction; columnName: string; value: string }) => void;
 };
 
-const BulkEditColumnDialog = ({
-    open,
-    columnName,
-    onClose,
-    onSubmit,
-}: BulkEditColumnDialogProps) => {
+const BulkEditColumnDialog = ({ open, columnName, onClose, onSubmit }: BulkEditColumnDialogProps) => {
     const [value, setValue] = useState("");
 
     useEffect(() => {

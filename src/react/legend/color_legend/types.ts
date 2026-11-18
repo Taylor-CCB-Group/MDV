@@ -30,9 +30,7 @@ export type ColorLegendContinuousSpec = {
     isDate?: boolean;
 };
 
-export type ColorLegendSpec =
-    | ColorLegendCategoricalSpec
-    | ColorLegendContinuousSpec;
+export type ColorLegendSpec = ColorLegendCategoricalSpec | ColorLegendContinuousSpec;
 
 export type ColorLegendOverrideValues = {
     min?: number | null;

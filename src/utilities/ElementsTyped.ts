@@ -10,11 +10,7 @@ export type Attrs = {
 };
 
 /** Create an HTML element of the given type */
-export function createEl<T extends TagKey>(
-    type: T,
-    attrs: Attrs,
-    parent?: Element,
-) {
+export function createEl<T extends TagKey>(type: T, attrs: Attrs, parent?: Element) {
     const el = document.createElement(type);
 
     if (attrs) {

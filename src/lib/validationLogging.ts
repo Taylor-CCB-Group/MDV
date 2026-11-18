@@ -1,5 +1,5 @@
-import type ValidationFindingsStore from "./ValidationFindingsStore";
 import type { ChartConfig } from "@/charts/schemas/ChartConfigSchema";
+import type ValidationFindingsStore from "./ValidationFindingsStore";
 
 type ValidationContext = "datasource" | "chart";
 
@@ -19,10 +19,11 @@ export interface LogValidationErrorOptions {
 
 function extractIssues(error: unknown): ValidationIssue[] {
     const err: any = error;
-    const entries: any[] | null =
-        Array.isArray(err?.issues) ? err.issues :
-        Array.isArray(err?.errors) ? err.errors :
-        null;
+    const entries: any[] | null = Array.isArray(err?.issues)
+        ? err.issues
+        : Array.isArray(err?.errors)
+          ? err.errors
+          : null;
 
     if (entries) {
         return entries.map((issue) => ({
@@ -32,15 +33,14 @@ function extractIssues(error: unknown): ValidationIssue[] {
         }));
     }
 
-    const message =
-        error instanceof Error ? error.message :
-        typeof error === "string" ? error :
-        JSON.stringify(error);
+    const message = error instanceof Error ? error.message : typeof error === "string" ? error : JSON.stringify(error);
 
-    return [{
-        path: "",
-        message,
-    }];
+    return [
+        {
+            path: "",
+            message,
+        },
+    ];
 }
 
 function getFindingsStore(): ValidationFindingsStore | undefined {
@@ -58,10 +58,7 @@ export function logValidationError(options: LogValidationErrorOptions) {
     const bucketName = context === "datasource" ? "datasources" : "charts";
     const label = name ?? (context === "datasource" ? "(unknown datasource)" : "(unknown chart)");
 
-    console.error(
-        `Invalid ${context} config for '${label}'. See Debug / Report for aggregated details.`,
-        issues,
-    );
+    console.error(`Invalid ${context} config for '${label}'. See Debug / Report for aggregated details.`, issues);
 
     const store = getFindingsStore();
     if (!store) return;
@@ -98,6 +95,4 @@ export function logChartValidationError(
     });
 }
 
-export function useValidationErrors() {
-
-}
+export function useValidationErrors() {}

@@ -1,7 +1,7 @@
-import BaseChart from "./BaseChart";
-import ImagePanZoom from "../utilities/PanZoom.js";
-import { createEl, makeSortable } from "../utilities/Elements.js";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";
+import { createEl, makeSortable } from "../utilities/Elements.js";
+import ImagePanZoom from "../utilities/PanZoom.js";
+import BaseChart from "./BaseChart";
 
 class RowSummaryBox extends BaseChart {
     constructor(dataStore, div, config) {
@@ -15,23 +15,22 @@ class RowSummaryBox extends BaseChart {
                 },
                 this.contentDiv,
             );
-            if (config.image_set){
-                this.img_data =  JSON.parse(JSON.stringify(dataStore.large_images[config.image_set]));
+            if (config.image_set) {
+                this.img_data = JSON.parse(JSON.stringify(dataStore.large_images[config.image_set]));
             }
             //legacy - images defined in config
-            else{
-                this.img_data =  JSON.parse(JSON.stringify(config.image));
+            else {
+                this.img_data = JSON.parse(JSON.stringify(config.image));
                 this.img_data.key_column = this.config.param[this.img_data.param];
             }
             //base url may be stub e.g /project/data/im
             //in which case trailing / added by getProjectURL needs to be removed
-            let base_url  = getProjectURL(this.img_data.base_url);
+            let base_url = getProjectURL(this.img_data.base_url);
             if (!this.img_data.base_url.endsWith("/")) {
                 base_url = base_url.replace(/\/+$/, "");
             }
             this.img_data.base_url = base_url;
             this.imViewer = new ImagePanZoom(d, this._getImage(0));
-            
         }
         this.paramHolders = {};
         const sectionDiv = createEl("div", {}, this.contentDiv);
@@ -42,11 +41,7 @@ class RowSummaryBox extends BaseChart {
             const c = this.dataStore.columnIndex[p];
             const d = createEl("div", { classes: ["mdv-section"] }, sectionDiv);
             d.__mcol__ = c.field;
-            createEl(
-                "div",
-                { text: c.name, classes: ["mdv-section-header"] },
-                d,
-            );
+            createEl("div", { text: c.name, classes: ["mdv-section-header"] }, d);
             let te = createEl("div", { classes: ["mdv-section-value"] }, d);
             if (c.is_url) {
                 te = createEl("a", { target: "_blank" }, te);

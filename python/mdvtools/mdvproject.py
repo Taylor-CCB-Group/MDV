@@ -29,10 +29,90 @@ import copy
 import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
+from mdvtools.entry_assets import entry_assets
 from mdvtools.logging_config import get_logger
 from mdvtools.project_protocols import RowsAsColumnsLinkSource
 
 logger = get_logger(__name__)
+
+
+def get_unwritable_project_paths(project_dir: str) -> list[str]:
+    """Return project paths the current process cannot modify as required."""
+    statefile = join(project_dir, "state.json")
+    viewsfile = join(project_dir, "views.json")
+    datasourcesfile = join(project_dir, "datasources.json")
+    h5file = join(project_dir, "datafile.h5")
+    # MDVProject.__init__ creates the directory and these three files, so they
+    # are always present. The h5 file only exists once the project has data,
+    # which is why it is checked separately below.
+    required_access = (
+        (statefile, os.W_OK),
+        (project_dir, os.W_OK | os.X_OK),
+        (viewsfile, os.W_OK),
+        (datasourcesfile, os.W_OK),
+    )
+    unwritable = [
+        path for path, mode in required_access if not os.access(path, mode)
+    ]
+    if exists(h5file) and not os.access(h5file, os.W_OK):
+        unwritable.append(h5file)
+    return unwritable
+
+
+def pick_thumbnail(state: dict, views: dict) -> Optional[str]:
+    """The image of the first view, in the order the project lists its views.
+
+    Views without an image are skipped. Views missing from ``all_views`` come last.
+    """
+    listed = [v for v in state.get("all_views") or [] if v in views]
+    unlisted = [v for v in views if v not in listed]
+    for name in listed + unlisted:
+        view = views.get(name)
+        image = view.get("viewImage") if isinstance(view, dict) else None
+        if image:
+            return image
+    return None
+
+
+# project_dir -> ((state mtime_ns, state size, views mtime_ns, views size), thumbnail)
+_thumbnail_cache: dict[str, tuple[tuple[int, int, int, int], Optional[str]]] = {}
+
+
+def _file_signature(path: str) -> tuple[int, int]:
+    # Size as well as mtime, so two writes inside one mtime tick (coarse on some
+    # mounted filesystems) still miss the cache unless they are the same length.
+    st = os.stat(path)
+    return st.st_mtime_ns, st.st_size
+
+
+def get_project_thumbnail(project_dir: str) -> Optional[str]:
+    """Thumbnail for the project catalog, re-read whenever state.json or views.json changes.
+
+    The cache is keyed on file metadata rather than contents: comparing contents
+    would mean reading views.json, which holds every view's image, on each request.
+    """
+    statefile = join(project_dir, "state.json")
+    viewsfile = join(project_dir, "views.json")
+    try:
+        key = _file_signature(statefile) + _file_signature(viewsfile)
+        cached = _thumbnail_cache.get(project_dir)
+        if cached and cached[0] == key:
+            return cached[1]
+        with open(statefile) as f:
+            state = json.load(f)
+        with open(viewsfile) as f:
+            views = json.load(f)
+        thumbnail = pick_thumbnail(state, views)
+        _thumbnail_cache[project_dir] = (key, thumbnail)
+        return thumbnail
+    except Exception as e:
+        logger.exception(f"Error extracting thumbnail for project at {project_dir}: {e}")
+        return None
+
+
+def forget_project_thumbnail(project_dir: str) -> None:
+    """Drop a project's cached thumbnail, e.g. once it has been purged."""
+    _thumbnail_cache.pop(project_dir, None)
 
 
 def _agent_debug_log(
@@ -98,8 +178,9 @@ datatype_mappings = {
 
     # Text-like and boolean values have no dedicated MDV boolean type.
     "object": "text",
-    "string": "text",
     "str": "text",
+    # pandas' nullable StringDtype, e.g. an anndata `nullable-string-array`
+    "string": "text",
     "category": "text",
     "bool": "text",
     "boolean": "text",
@@ -193,6 +274,15 @@ def map_polars_datetime_to_day_doubles(series: "pl.Series") -> "pl.Series":
     return days.cast(pl.Float64)
 
 
+def datasource_display_name(datasource: dict) -> str:
+    """The name a datasource is shown under: its `display_name` if it has a usable one,
+    otherwise its `name`. Matches `getDataSourceDisplayName` in the frontend."""
+    display_name = datasource.get("display_name")
+    if isinstance(display_name, str) and display_name.strip():
+        return display_name.strip()
+    return datasource["name"]
+
+
 class MDVProject:
     def __init__(
         self,
@@ -234,23 +324,22 @@ class MDVProject:
                 o.write(json.dumps({"all_views": []}))
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
         self.backend_db = backend_db
+        self._writability_warning_logged = False
 
     @property
-    def writable(self):
+    def unwritable_paths(self):
         """
-        Determine whether the user running this process has write-permission on relevant files
+        List project paths the current process cannot modify as required.
+
         This is independent of any permissions set in db etc,
         but can be used to guard against inappropriate admin actions
         """
-        # check if project has a h5 file or write permissions, newly created project doesn't have a h5 file which blocks file upload
-        h5_writable_or_not_created = (not exists(self.h5file)) or os.access(self.h5file, os.W_OK)
-        return (
-            # belt and braces
-            os.access(self.statefile, os.W_OK)
-            and os.access(self.dir, os.W_OK | os.X_OK)
-            and os.access(self.viewsfile, os.W_OK)
-            and h5_writable_or_not_created
-        )
+        return get_unwritable_project_paths(self.dir)
+
+    @property
+    def writable(self):
+        """Whether the current process can modify all required project paths."""
+        return not self.unwritable_paths
 
     @property
     def datasources(self):
@@ -286,12 +375,45 @@ class MDVProject:
         save_json(self.statefile, value ,self.safe_file_save)
 
     def set_editable(self, edit=True):
-        if not self.writable:
-            logger.log(1, f"can't set_editable on '{self.dir}' because it's not writable")
+        unwritable_paths = self.unwritable_paths
+        if unwritable_paths:
+            logger.warning(
+                "Cannot set project '%s' editable state because the process lacks "
+                "write access to these paths (the project directory also requires "
+                "execute access): %s",
+                self.dir,
+                ", ".join(unwritable_paths),
+            )
             return
-        c = self.state
-        c["permission"] = "edit" if edit else "view"
-        self.state = c
+        # The whole file is rewritten, so a concurrent write to another field
+        # would otherwise be lost.
+        with self.lock("write"):
+            c = self.state
+            c["permission"] = "edit" if edit else "view"
+            self.state = c
+
+    def set_display_name(self, name):
+        """Record the project's display name in state.json.
+
+        The database is authoritative for the name. This copy is what a rescan
+        reads when it finds a directory with no catalog row.
+        """
+        unwritable_paths = self.unwritable_paths
+        if unwritable_paths:
+            logger.warning(
+                "Cannot record the display name of project '%s' because the process "
+                "lacks write access to these paths (the project directory also "
+                "requires execute access): %s",
+                self.dir,
+                ", ".join(unwritable_paths),
+            )
+            return
+        # The whole file is rewritten, so a concurrent write to another field
+        # would otherwise be lost.
+        with self.lock("write"):
+            c = self.state
+            c["name"] = name
+            self.state = c
 
     def set_chat_enabled(self, chat_enabled=True):
         # would prefer not to be adding methods in this file, maybe it could be in chat_server_extension.py
@@ -304,7 +426,7 @@ class MDVProject:
 
     def get_column_metadata(self, datasource, column):
         ds = self.get_datasource_metadata(datasource)
-        col = [x for x in ds["columns"] if x["field"] == column]
+        col = [x for x in ds["columns"] if x.get("field") == column]
         if len(col) == 0:
             raise AttributeError(
                 f"column {column} not found in {datasource} datasource"
@@ -313,13 +435,201 @@ class MDVProject:
 
     def set_column_metadata(self, datasource, column, parameter, value):
         ds = self.get_datasource_metadata(datasource)
-        col_index = [c for c, x in enumerate(ds["columns"]) if x["field"] == column]
+        col_index = [c for c, x in enumerate(ds["columns"]) if x.get("field") == column]
         if len(col_index) == 0:
             raise AttributeError(
                 f"column {column} not found in {datasource} datasource"
             )
         ds["columns"][col_index[0]][parameter] = value
         self.set_datasource_metadata(ds)
+
+    def rename_column(self, datasource: str, field: str, new_name: str) -> bool:
+        """Change a column's display name, leaving its `field` identifier untouched.
+
+        This is the scriptable equivalent of the table chart's "Rename Column" menu item.
+        Only the user-facing `name` changes; `field` is what charts, column groups, links
+        and image key columns reference, so renaming can never break them.
+
+        Args:
+            datasource (str): The name of the datasource.
+            field (str): The column's `field` identifier (not its display name).
+            new_name (str): The new display name. Surrounding whitespace is stripped.
+
+        Returns:
+            bool: True if the name changed, False if the column already had that name.
+
+        Raises:
+            AttributeError: if the datasource or column does not exist, or the column
+                cannot be renamed (soft-deleted, a spatial `sgindex`/`sgtype` column, or
+                a legacy column carrying no `field` identifier).
+            ValueError: if `new_name` is empty, or another live column already uses it
+                (compared case-insensitively, matching the frontend).
+        """
+        ds = self.get_datasource_metadata(datasource)
+        columns = ds.get("columns", [])
+
+        trimmed = new_name.strip() if isinstance(new_name, str) else ""
+        if not trimmed:
+            raise ValueError("Column name is required")
+
+        column = next((x for x in columns if x.get("field") == field), None)
+        if column is None:
+            # A legacy column carrying only `name` has no stable identifier: the frontend
+            # synthesises `field` from `name` on load, so renaming it would silently change
+            # the column's identity rather than its label.
+            if any(x.get("field") is None and x.get("name") == field for x in columns):
+                raise AttributeError(
+                    f"column {field} in {datasource} datasource has no 'field' identifier"
+                    " so cannot be renamed"
+                )
+            raise AttributeError(
+                f"column {field} not found in {datasource} datasource"
+            )
+
+        if column.get("deleted"):
+            raise AttributeError(
+                f"column {field} in {datasource} datasource is deleted so cannot be renamed"
+            )
+
+        spatial_key = next(
+            (key for key in ("sgindex", "sgtype") if column.get(key) is not None), None
+        )
+        if spatial_key:
+            raise AttributeError(
+                f"column {field} in {datasource} datasource is a spatial ({spatial_key})"
+                " column so cannot be renamed"
+            )
+
+        if column.get("name") == trimmed:
+            return False
+
+        normalized = trimmed.casefold()
+        clash = next(
+            (
+                x
+                for x in columns
+                if x.get("field") != field
+                and not x.get("deleted")
+                and str(x.get("name", "")).strip().casefold() == normalized
+            ),
+            None,
+        )
+        if clash is not None:
+            raise ValueError(
+                f"column {trimmed} already exists in {datasource} datasource"
+            )
+
+        self.set_column_metadata(datasource, field, "name", trimmed)
+        return True
+
+    def _find_column_references(self, datasource: str, field: str) -> List[tuple]:
+        """Find charts in saved views that reference a column by its `field`.
+
+        This is a generic recursive scan of each chart config, rather than a port of the
+        frontend's chart-type-aware `configEntriesUsingColumns` list (see ADR-0003). It
+        cannot go stale as chart types are added, and it fails closed: it may over-report
+        (a field name appearing in an unrelated string) but it cannot miss a reference.
+
+        Returns:
+            list: (view_name, chart_label) tuples, empty if nothing references the column.
+        """
+
+        def references(value) -> bool:
+            if isinstance(value, str):
+                return value == field
+            if isinstance(value, dict):
+                return any(references(v) for v in value.values())
+            if isinstance(value, (list, tuple)):
+                return any(references(v) for v in value)
+            return False
+
+        def label(chart: dict) -> str:
+            title = chart.get("title")
+            if isinstance(title, list):
+                title = " ".join(str(x) for x in title)
+            return str(title or chart.get("type") or chart.get("id") or "untitled chart")
+
+        hits = []
+        for view_name, view in (self.views or {}).items():
+            if not isinstance(view, dict):
+                continue
+            charts = (view.get("initialCharts") or {}).get(datasource) or []
+            for chart in charts:
+                if isinstance(chart, dict) and references(chart):
+                    hits.append((view_name, label(chart)))
+        return hits
+
+    def soft_delete_column(self, datasource: str, field: str) -> bool:
+        """Hide a column from MDV without removing it or its data.
+
+        Sets the `deleted` tombstone on the column's metadata. The column stays in the
+        datasource and in exported files; MDV simply stops showing it. This is the
+        scriptable equivalent of the table chart's "Delete Column" menu item, and it
+        applies the same rule the UI does: deletion is blocked while a saved view still
+        references the column.
+
+        Not to be confused with `remove_column`, which deletes the column *and its data*
+        and cannot be undone.
+
+        Ordering matters in scripts. `add_datasource` defaults to `add_to_view="default"`,
+        which builds a view whose table plot lists every column - that view then blocks
+        every deletion. Pass `add_to_view=None`, hide the unwanted columns, and generate
+        views afterwards; `create_view_with_all_datasources` skips tombstoned columns.
+
+        Args:
+            datasource (str): The name of the datasource.
+            field (str): The column's `field` identifier (not its display name).
+
+        Returns:
+            bool: True if the column was tombstoned, False if it already was.
+
+        Raises:
+            AttributeError: if the datasource or column does not exist, or the column
+                cannot be curated (a spatial `sgindex`/`sgtype` column, or a legacy
+                column carrying no `field` identifier).
+            ValueError: if any saved view still references the column.
+        """
+        ds = self.get_datasource_metadata(datasource)
+        columns = ds.get("columns", [])
+
+        column = next((x for x in columns if x.get("field") == field), None)
+        if column is None:
+            # As with rename, a legacy column carrying only `name` has no stable
+            # identifier, so there is nothing safe to tombstone it by.
+            if any(x.get("field") is None and x.get("name") == field for x in columns):
+                raise AttributeError(
+                    f"column {field} in {datasource} datasource has no 'field' identifier"
+                    " so cannot be deleted"
+                )
+            raise AttributeError(
+                f"column {field} not found in {datasource} datasource"
+            )
+
+        if column.get("deleted"):
+            return False
+
+        spatial_key = next(
+            (key for key in ("sgindex", "sgtype") if column.get(key) is not None), None
+        )
+        if spatial_key:
+            raise AttributeError(
+                f"column {field} in {datasource} datasource is a spatial ({spatial_key})"
+                " column so cannot be deleted"
+            )
+
+        references = self._find_column_references(datasource, field)
+        if references:
+            used_by = "; ".join(
+                f"{view_name}: {chart_label}" for view_name, chart_label in references
+            )
+            raise ValueError(
+                f"deletion of column {field} in {datasource} datasource is blocked:"
+                f" it is still used by other charts or views ({used_by})."
+                " Update those charts, then try deleting again."
+            )
+
+        self.set_column_metadata(datasource, field, "deleted", True)
+        return True
 
     def get_datasource_as_dataframe(
         self, datasource: str, columns: Optional[List[str]] = None
@@ -583,6 +893,56 @@ class MDVProject:
         else:
             mds[index[0]] = ds
         self.datasources = mds
+
+    def rename_datasource(self, datasource: str, new_name: str) -> bool:
+        """Change the name a datasource is shown under, leaving its `name` untouched.
+
+        The new name is stored as `display_name` on the datasource's entry in
+        datasources.json, which the frontend shows in place of `name`. `name` stays the
+        datasource's identifier: the h5 file, views, links, the API and Python code all use
+        it, so renaming cannot break any of them, and nothing but that one entry changes.
+
+        Args:
+            datasource (str): The datasource's `name` (not its display name).
+            new_name (str): The new display name. Surrounding whitespace is stripped.
+
+        Returns:
+            bool: True if the name changed, False if the datasource is already shown
+                under that name.
+
+        Raises:
+            AttributeError: if the datasource does not exist.
+            ValueError: if `new_name` is empty or not a string, or another datasource is
+                already called or shown as it (compared case-insensitively). The names of
+                other datasources stay reserved after they are renamed, so a datasource can
+                never be shown under another one's identifier.
+        """
+        trimmed = new_name.strip() if isinstance(new_name, str) else ""
+        if not trimmed:
+            raise ValueError("Datasource name is required")
+
+        # The whole file is rewritten, so a concurrent write to another datasource
+        # would otherwise be lost.
+        with self.lock("write"):
+            datasources = self.datasources
+            entry = next((x for x in datasources if x.get("name") == datasource), None)
+            if entry is None:
+                raise AttributeError(f"{datasource} datasource not found")
+
+            if datasource_display_name(entry) == trimmed:
+                return False
+
+            normalized = trimmed.casefold()
+            for other in datasources:
+                if other is entry:
+                    continue
+                taken = (other.get("name"), other.get("display_name"))
+                if any(isinstance(n, str) and n.strip().casefold() == normalized for n in taken):
+                    raise ValueError(f"A datasource called '{trimmed}' already exists")
+
+            entry["display_name"] = trimmed
+            self.datasources = datasources
+        return True
 
     def add_images_to_datasource(
         self,
@@ -898,11 +1258,9 @@ class MDVProject:
         return join(image_meta["original_folder"], filename)
 
     def _get_h5_handle(self, read_only=False, attempt=0) -> h5py.File:
-        mode = "r"
-        if not exists(self.h5file):
-            mode = "w"
-        elif not read_only:
-            mode = "a"
+        # "a" creates a missing file for writers, and "r" raises for readers rather than
+        # creating an empty one.
+        mode = "r" if read_only else "a"
         try:
             handle = h5py.File(self.h5file, mode)
             return handle
@@ -1765,7 +2123,12 @@ class MDVProject:
         for ds in all_ds:
             ds_name = ds["name"]
             view_data["dataSources"][ds_name] = {"layout": "gridstack"}
-            columns = [x["field"] for x in ds.get("columns", [])]
+            # Soft-deleted columns are hidden in MDV, so a generated view must not
+            # list them: the frontend refuses to restore a tombstoned column, leaving
+            # the chart a column short.
+            columns = [
+                x["field"] for x in ds.get("columns", []) if not x.get("deleted")
+            ]
             if columns:
                 table_plot = self.create_table_plot(ds_name, columns, [792, 472], [10, 10])
                 view_data["initialCharts"][ds_name] = [self.convert_plot_to_json(table_plot)]
@@ -2020,6 +2383,12 @@ class MDVProject:
         page = open(template).read()
         # make sure the static files are referenced correctly
         page = page.replace("/static", "static")
+        mdv = entry_assets(join(fdir, "static"), "mdv")
+        page = page.replace("static/js/mdv.js", f"static/{mdv.js}")
+        page = page.replace(
+            '<link rel="stylesheet" href="static/assets/mdv.css">',
+            "\n".join(f'<link rel="stylesheet" href="static/{css}">' for css in mdv.css),
+        )
         # call init with no route, will be interpreted as static page (at /)
         page = page.replace(
             "_mdvInit('{{route}}')", "_mdvInit()"
@@ -2762,14 +3131,16 @@ def add_column_to_group(
             col["values"] = [str(x) for x in col["values"]]
 
         else:
-            # unique: ensure string (e.g. CSV-inferred int cell_id)
-            if pandas.api.types.is_numeric_dtype(data):
-                data = data.astype(str)
-            max_len = max(data.str.len())
-            utf8_type = h5py.string_dtype("utf-8", int(max_len))
+            # unique: astype(str) covers non-string input (e.g. CSV-inferred int cell_id).
+            # Encoded here because h5py writes str to a fixed-length dataset as ASCII, and
+            # because stringLength is bytes per value for the frontend, not characters.
+            encoded = data.astype(str).str.encode("utf-8")
+            # int(): pandas measures lengths as numpy ints, which json can't write.
+            max_len = int(encoded.str.len().max())
+            utf8_type = h5py.string_dtype("utf-8", max_len)
             col["datatype"] = "unique"
             col["stringLength"] = max_len
-            group.create_dataset(col["field"], length, data=data, dtype=utf8_type)
+            group.create_dataset(col["field"], length, data=encoded.to_numpy(dtype=f"S{max_len}").astype(utf8_type))
 
     elif col["datatype"] == "multitext":
         delim = col.get("delimiter", ",")
