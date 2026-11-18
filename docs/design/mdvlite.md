@@ -61,8 +61,9 @@ and can be cached.
 | **Rewriting the store for the browser** | `--browser-preset`, `--pyramids`, `--image-codec`, `--image-preset`, `--csc-tables`, `--morton-points`, `--points-zarr` | No: an offline step that produces a source store. The descriptor may record that it was applied |
 | **Computing new data** | `--compute-x-umap`, `--leiden-resolution` | No: these produce new columns, which are Project columns (ADR-0023) or the output of a job |
 
-The rest (`--density`, `--output_geojson`, `--serve`, `--preserve-existing`, `--verbose`) still
-need sorting into these groups.
+`--output_geojson` belongs in none of them: it writes region GeoJSON that only legacy charts read,
+and is being retired (#670). The rest (`--density`, `--serve`, `--preserve-existing`,
+`--verbose`) still need sorting into these groups.
 
 **The equivalence contract.** For the same stores and the same descriptor, the manifested
 datasources should match what `convert-spatial` writes, apart from fields that only exist
