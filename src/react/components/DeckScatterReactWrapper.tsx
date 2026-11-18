@@ -17,6 +17,7 @@ import {
 } from "../scatter_state";
 import { BaseReactChart } from "./BaseReactChart";
 import DeckScatterComponent from "./DeckScatterComponent";
+import { supportsDensityGridMode } from "./densityGridUtils";
 import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 
 const MainChart = observer(() => {
@@ -308,6 +309,18 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                     },
                 }),
             );
+            if (supportsDensityGridMode(c.type)) {
+                settings.push(
+                    g({
+                        type: "check",
+                        label: "Show density fields as a grid",
+                        current_value: c.density_mode === "grid",
+                        func: (x) => {
+                            c.density_mode = x ? "grid" : "overlay";
+                        },
+                    }),
+                );
+            }
         }
         return settings.concat([
             ...this.getBackgroundFilterSettings(),

@@ -178,6 +178,10 @@ const ContourVisualConfigSchema = z
 const DensityFieldsConfigSchema = z
     .object({
         densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),
+        density_mode: z
+            .enum(["overlay", "grid"])
+            .optional()
+            .describe("Whether density fields are drawn over one plot or each in its own cell of a grid"),
     })
     .describe("Density field selection shared by contour-based charts");
 
