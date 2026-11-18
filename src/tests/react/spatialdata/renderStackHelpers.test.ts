@@ -1,21 +1,14 @@
 import type { Layer } from "@deck.gl/core";
 import type { SpatialData } from "@spatialdata/core";
-import { RENDER_STACK_SCHEMA_VERSION, type RenderStack, type RenderStackEntry } from "@spatialdata/layers";
+import {
+    findRenderStackEntry,
+    getRenderStackEntryIds,
+    RENDER_STACK_SCHEMA_VERSION,
+    type RenderStack,
+    type RenderStackEntry,
+    type RenderStackV1,
+} from "@spatialdata/layers";
 import { describe, expect, test, vi } from "vitest";
-
-vi.mock("@spatialdata/vis", () => ({
-    layerConfig: (type: string, base: Record<string, unknown>, props: Record<string, unknown> = {}) => ({
-        ...props,
-        ...base,
-        type,
-    }),
-    renderStackToLayerInputs: (stack: RenderStack) => ({
-        layers: {},
-        layerOrder: stack.entries.filter((entry) => entry.kind === "spatial").map((entry) => entry.id),
-    }),
-    renderStackOrder: (stack: RenderStack | undefined, fallback: string[]) =>
-        stack ? stack.entries.filter((entry) => entry.kind === "spatial").map((entry) => entry.id) : fallback,
-}));
 
 vi.mock("@/react/context", () => ({
     useChart: vi.fn(),
@@ -25,18 +18,38 @@ vi.mock("@/react/hooks", () => ({
     useConfig: vi.fn(),
 }));
 
-import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
+import { DECK_OVERLAY_IDS, deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
+import { flattenLayerTree, projectLayerTreeDrop } from "@/react/spatialdata/layer_tree";
 import {
     createRenderStackLayerInputsCache,
     resolveCachedHostDeckLayers,
     syncRenderStackLayerInputs,
 } from "@/react/spatialdata/render_stack_adapter";
 import {
+    DATA_POINTS_GROUP_ID,
+    DEFAULT_COMPOSITING,
+    insertRenderStackGroup,
+    insertSpatialRenderStackEntry,
+    moveRenderStackEntry,
     patchRenderStackEntry,
+    patchRenderStackEntryPropsInPlace,
     removeRenderStackEntry,
     seedRenderStackFromSpatialData,
+    setDataPointsCompositing,
+    ungroupRenderStackEntry,
 } from "@/react/spatialdata/render_stack_control";
-import { createHostOnlyRenderStack, normalizeRenderStack } from "@/react/spatialdata/render_stack_defaults";
+import {
+    createHostOnlyRenderStack,
+    mergeHostOverlayEntriesInPlace,
+    migrateSavedRenderStack,
+    normalizeRenderStack,
+    syncOverlayFollowerVisibility,
+} from "@/react/spatialdata/render_stack_defaults";
+import {
+    customDisplayName,
+    numberedDefaultName,
+    renderStackEntryDisplayName,
+} from "@/react/spatialdata/render_stack_display";
 import { renderStackSpatialRevision, touchRenderStackEntry } from "@/react/spatialdata/render_stack_observe";
 
 type SpatialEntry = Extract<RenderStackEntry, { kind: "spatial" }>;
@@ -308,9 +321,119 @@ describe("render stack control", () => {
         expect(imageA.props.opacity).toBe(0.5);
         expect(imageB.props.opacity).toBe(1);
     });
+
+    test("merges labels channel appearance into saved channels", () => {
+        const props: Record<string, unknown> = { channels: { colors: [[255, 0, 0]], channelOpacities: [0.2] } };
+        patchRenderStackEntryPropsInPlace(props, {
+            channels: { channelsFilled: [false], channelStrokeWidths: [3] },
+        });
+        expect(props.channels).toEqual({
+            colors: [[255, 0, 0]],
+            channelOpacities: [0.2],
+            channelsFilled: [false],
+            channelStrokeWidths: [3],
+        });
+    });
+});
+
+describe("render stack display names", () => {
+    test("a user-chosen name wins; blank names fall back to the element", () => {
+        const named = spatialEntry({
+            id: "a",
+            elementKey: "cells",
+            elementType: "shapes",
+            props: { displayName: " Nuclei " },
+        });
+        const blank = spatialEntry({
+            id: "b",
+            elementKey: "cells",
+            elementType: "shapes",
+            props: { displayName: "  " },
+        });
+        expect(renderStackEntryDisplayName(named)).toBe("Nuclei");
+        expect(customDisplayName(blank)).toBeUndefined();
+        expect(renderStackEntryDisplayName(blank)).toBe("shapes: cells");
+    });
+
+    test("unnamed entries of the same element are numbered in stack order", () => {
+        const first = spatialEntry({ id: "a", elementKey: "cells", elementType: "shapes" });
+        const second = spatialEntry({ id: "b", elementKey: "cells", elementType: "shapes" });
+        const other = spatialEntry({ id: "c", elementKey: "imageA" });
+        const stack = renderStack([first, other, second]);
+        expect(renderStackEntryDisplayName(first, stack)).toBe("shapes: cells (1)");
+        expect(renderStackEntryDisplayName(second, stack)).toBe("shapes: cells (2)");
+        expect(renderStackEntryDisplayName(other, stack)).toBe("image: imageA");
+
+        second.props.displayName = "Outlines";
+        expect(renderStackEntryDisplayName(second, stack)).toBe("Outlines");
+        // the default stays numbered, e.g. as the placeholder of a named entry
+        expect(numberedDefaultName(second, stack)).toBe("shapes: cells (2)");
+    });
+
+    test("the name does not reach the viewer's layer config", () => {
+        const entry = spatialEntry({ id: "a", elementKey: "imageA", props: { displayName: "DAPI" } });
+        const inputs = syncRenderStackLayerInputs(renderStack([entry]), createRenderStackLayerInputsCache());
+        expect(inputs.layers.a).toBeDefined();
+        expect("displayName" in (inputs.layers.a ?? {})).toBe(false);
+    });
 });
 
 describe("render stack defaults", () => {
+    test("a restored stack's grey scatter follows the data points' visibility", () => {
+        const scatter = hostEntry(deckHostLayerId("scatter"), false);
+        const grey = hostEntry(deckHostLayerId("grey_scatter"), true);
+        const gates = hostEntry(deckHostLayerId("gate_display"), false);
+        syncOverlayFollowerVisibility(renderStack([grey, scatter, gates]));
+        expect(grey.visible).toBe(false);
+        expect(gates.visible).toBe(false);
+        scatter.visible = true;
+        syncOverlayFollowerVisibility(renderStack([grey, scatter, gates]));
+        expect(grey.visible).toBe(true);
+        expect(gates.visible).toBe(false);
+    });
+
+    test("a grey scatter added to a saved stack follows the data points' visibility", () => {
+        const scatter = hostEntry(deckHostLayerId("scatter"), false);
+        const stack = renderStack([scatter]);
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        const grey = stack.entries.find((entry) => entry.id === deckHostLayerId("grey_scatter"));
+        expect(grey?.visible).toBe(false);
+        // Other added overlays keep their default.
+        const gates = stack.entries.find((entry) => entry.id === deckHostLayerId("gate_display"));
+        expect(gates?.visible).toBe(true);
+    });
+
+    test("an existing grey scatter keeps its saved visibility when merging", () => {
+        const scatter = hostEntry(deckHostLayerId("scatter"), false);
+        const grey = hostEntry(deckHostLayerId("grey_scatter"), true);
+        const stack = renderStack([grey, scatter]);
+        mergeHostOverlayEntriesInPlace(stack);
+        expect(grey.visible).toBe(true);
+    });
+
+    test("a saved stack without density gets it just above the data points", () => {
+        // A stack saved before density was its own overlay: an image under the MDV overlays.
+        const image = {
+            kind: "spatial",
+            id: "image-1",
+            visible: true,
+            source: { elementType: "image", elementKey: "img" },
+            props: {},
+        } satisfies RenderStackEntry;
+        const saved = ["grey_scatter", "scatter", "gate_display", "selection", "gate_labels"] as const;
+        const stack = renderStack([image, ...saved.map((deckId) => hostEntry(deckHostLayerId(deckId)))]);
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        expect(stack.entries.map((entry) => entry.id)).toEqual([
+            "image-1",
+            "deck:grey_scatter",
+            "deck:scatter",
+            "deck:density",
+            "deck:gate_display",
+            "deck:selection",
+            "deck:gate_labels",
+        ]);
+    });
+
     test("createHostOnlyRenderStack seeds host overlay entries", () => {
         const stack = createHostOnlyRenderStack();
         expect(stack.entries.length).toBeGreaterThan(0);
@@ -335,6 +458,31 @@ describe("render stack defaults", () => {
             ),
         ).toBe(true);
         expect(chart.finishDefaultSpatialLayerSeed).toHaveBeenCalled();
+    });
+
+    test("seedRenderStackFromSpatialData gives the first image layer the chart's default image props", () => {
+        const config = {
+            type: "SpatialDataMdvRegionReact",
+            renderStack: createHostOnlyRenderStack(),
+        } as const;
+        const defaultImageLayerProps = {
+            channels: { colors: [[255, 0, 0]], contrastLimits: [[0, 100]] },
+            vivLayerProps: { brightness: [0.6] },
+        };
+        const chart = {
+            seedDefaultSpatialLayers: true,
+            defaultImageLayerProps,
+            bumpRenderStackGeneration: vi.fn(),
+            bumpRenderStackPropsGeneration: vi.fn(),
+            finishDefaultSpatialLayerSeed: vi.fn(),
+        };
+        seedRenderStackFromSpatialData(config as never, fakeSpatialData(), "global", chart as never);
+        const image = config.renderStack.entries.find(
+            (entry) => entry.kind === "spatial" && entry.source.elementType === "image",
+        );
+        expect(image?.props).toEqual({ opacity: 1, ...defaultImageLayerProps });
+        // a copy, so editing the layer leaves the chart's props alone
+        expect(image?.props.channels).not.toBe(defaultImageLayerProps.channels);
     });
 
     test("seedRenderStackFromSpatialData keeps persisted host-only stacks spatial-free", () => {
@@ -383,5 +531,328 @@ describe("render stack defaults", () => {
         expect(normalized.entries[0]).toBe(savedImage);
         expect(normalized.entries.some((entry) => entry.kind === "host")).toBe(true);
         expect(normalized.entries.filter((entry) => entry.kind === "spatial").length).toBe(1);
+    });
+});
+
+describe("render stack groups", () => {
+    const hostIds = DECK_OVERLAY_IDS.map(deckHostLayerId);
+
+    function groupedStack(groupProps: Record<string, unknown> = {}, visible = true): RenderStack {
+        return renderStack([
+            spatialEntry({ id: "image-a", elementKey: "imageA" }),
+            {
+                kind: "group",
+                id: "points",
+                visible,
+                props: groupProps,
+                children: [
+                    hostEntry(deckHostLayerId("grey_scatter")),
+                    hostEntry(deckHostLayerId("scatter")),
+                    spatialEntry({ id: "shapes-a", elementKey: "cells", elementType: "shapes" }),
+                ],
+            },
+            ...hostIds.slice(2).map((id) => hostEntry(id)),
+        ]);
+    }
+
+    test("a saved v1 stack loads unchanged, at v2", () => {
+        // MDV's default stack as saved before v2: an image, then the host overlays.
+        const v1: RenderStackV1 = {
+            schemaVersion: 1,
+            entries: [
+                spatialEntry({ id: "image-a", elementKey: "imageA", props: { vivLayerProps: { contrast: 2 } } }),
+                ...hostIds.map((id) => hostEntry(id, id !== deckHostLayerId("grey_scatter"))),
+            ],
+        };
+        const before = structuredClone(v1);
+
+        const loaded = migrateSavedRenderStack(v1);
+
+        expect(loaded).toEqual({ ...before, schemaVersion: 2 });
+        expect(normalizeRenderStack(loaded)).toEqual(loaded);
+    });
+
+    test("a stack re-saved by a build from before groups loads without the overlays it added twice", () => {
+        // An older build found the scatter overlays missing from the top level and added them
+        // there, after the data points' group that still holds them. (It also wrote
+        // schemaVersion 1; migration keeps a v1 group's entry children as they are.)
+        const saved = renderStack([
+            spatialEntry({ id: "image-a", elementKey: "imageA" }),
+            {
+                kind: "group",
+                id: DATA_POINTS_GROUP_ID,
+                visible: true,
+                props: { opacity: 0.5, isolate: true },
+                children: [hostEntry(deckHostLayerId("grey_scatter")), hostEntry(deckHostLayerId("scatter"))],
+            },
+            ...hostIds.slice(2).map((id) => hostEntry(id)),
+            hostEntry(deckHostLayerId("grey_scatter")),
+            hostEntry(deckHostLayerId("scatter"), false),
+        ]);
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const loaded = migrateSavedRenderStack(saved);
+
+        expect(getRenderStackEntryIds(loaded)).toEqual(["image-a", DATA_POINTS_GROUP_ID, ...hostIds]);
+        expect(findRenderStackEntry(loaded, deckHostLayerId("scatter"))?.visible).toBe(true);
+        expect(warn).toHaveBeenCalledTimes(2);
+        warn.mockRestore();
+    });
+
+    test("a v1 stack saved by an older build, with inline group children, loads without its duplicates", () => {
+        // As written by a build from before groups: it keeps the group as it found it, adds
+        // the scatter overlays it couldn't find at the top level, and writes schemaVersion 1.
+        const saved = JSON.parse(`{
+            "schemaVersion": 1,
+            "entries": [
+                { "kind": "spatial", "id": "image-a", "visible": true,
+                  "source": { "elementType": "image", "elementKey": "imageA" }, "props": {} },
+                { "kind": "group", "id": "${DATA_POINTS_GROUP_ID}", "visible": true,
+                  "props": { "opacity": 0.5, "isolate": true },
+                  "children": [
+                    { "kind": "host", "id": "deck:grey_scatter", "visible": true, "source": { "hostLayerId": "deck:grey_scatter" }, "props": {} },
+                    { "kind": "host", "id": "deck:scatter", "visible": true, "source": { "hostLayerId": "deck:scatter" }, "props": {} }
+                  ] },
+                { "kind": "host", "id": "deck:density", "visible": true, "source": { "hostLayerId": "deck:density" }, "props": {} },
+                { "kind": "host", "id": "deck:grey_scatter", "visible": true, "source": { "hostLayerId": "deck:grey_scatter" }, "props": {} },
+                { "kind": "host", "id": "deck:scatter", "visible": false, "source": { "hostLayerId": "deck:scatter" }, "props": {} }
+            ]
+        }`);
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const loaded = migrateSavedRenderStack(saved);
+
+        expect(loaded.schemaVersion).toBe(2);
+        expect(getRenderStackEntryIds(loaded)).toEqual([
+            "image-a",
+            DATA_POINTS_GROUP_ID,
+            "deck:grey_scatter",
+            "deck:scatter",
+            "deck:density",
+        ]);
+        expect(findRenderStackEntry(loaded, DATA_POINTS_GROUP_ID)).toMatchObject({
+            props: { opacity: 0.5, isolate: true },
+            children: [{ id: "deck:grey_scatter" }, { id: "deck:scatter" }],
+        });
+        expect(findRenderStackEntry(loaded, "deck:scatter")?.visible).toBe(true);
+        warn.mockRestore();
+    });
+
+    test("a second group with a repeated id keeps its layers, under a new id", () => {
+        const stack = renderStack([
+            {
+                kind: "group",
+                id: "g",
+                visible: true,
+                props: {},
+                children: [spatialEntry({ id: "a", elementKey: "a" })],
+            },
+            {
+                kind: "group",
+                id: "g",
+                visible: true,
+                props: {},
+                children: [spatialEntry({ id: "b", elementKey: "b" })],
+            },
+        ]);
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const loaded = migrateSavedRenderStack(stack);
+
+        const ids = getRenderStackEntryIds(loaded);
+        expect(ids).toHaveLength(4);
+        expect(ids.filter((id) => id === "g")).toHaveLength(1);
+        const second = loaded.entries[1];
+        expect(second?.kind).toBe("group");
+        expect(second?.id).not.toBe("g");
+        expect(second?.kind === "group" && second.children.map((child) => child.id)).toEqual(["b"]);
+        warn.mockRestore();
+    });
+
+    test("a scatter overlay missing from the data points' group goes back into it", () => {
+        const stack = createHostOnlyRenderStack();
+        setDataPointsCompositing(stack, { ...DEFAULT_COMPOSITING, isolate: true });
+        const group = stack.entries[0];
+        if (group.kind !== "group") throw new Error("expected the data points' group");
+        group.children.splice(0, 1); // lose the grey scatter
+
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        expect(group.children.map((child) => child.id)).toEqual([
+            deckHostLayerId("grey_scatter"),
+            deckHostLayerId("scatter"),
+        ]);
+        expect(getRenderStackEntryIds(stack).filter((id) => id === deckHostLayerId("grey_scatter"))).toHaveLength(1);
+    });
+
+    test("a scatter overlay left at the top level joins the data points' group", () => {
+        const stack = createHostOnlyRenderStack();
+        setDataPointsCompositing(stack, { ...DEFAULT_COMPOSITING, isolate: true });
+        const group = stack.entries[0];
+        if (group.kind !== "group") throw new Error("expected the data points' group");
+        const [grey] = group.children.splice(0, 1);
+        stack.entries.push({ ...grey, visible: false });
+
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        expect(group.children.map((child) => [child.id, child.visible])).toEqual([
+            [deckHostLayerId("grey_scatter"), false],
+            [deckHostLayerId("scatter"), true],
+        ]);
+        expect(stack.entries.map((entry) => entry.id)).not.toContain(deckHostLayerId("grey_scatter"));
+    });
+
+    test("moving a spatial layer at the top level keeps the overlays above it", () => {
+        // saved with an overlay among the spatial layers
+        const stack = renderStack([
+            spatialEntry({ id: "a", elementKey: "a" }),
+            hostEntry(deckHostLayerId("density")),
+            spatialEntry({ id: "b", elementKey: "b" }),
+            hostEntry(deckHostLayerId("scatter")),
+        ]);
+
+        expect(moveRenderStackEntry(stack, "a", null, "b")).toBe(true);
+        expect(stack.entries.map((entry) => entry.id)).toEqual(["b", "a", "deck:density", "deck:scatter"]);
+    });
+
+    test("moving a layer out of a group changes the revision and its inherited opacity", () => {
+        const image = spatialEntry({ id: "image-a", elementKey: "imageA", props: { opacity: 1 } });
+        const group: RenderStackEntry = {
+            kind: "group",
+            id: "g",
+            visible: true,
+            props: { opacity: 0.25 },
+            children: [image],
+        };
+        const stack = renderStack([group]);
+        const cache = createRenderStackLayerInputsCache();
+        expect(syncRenderStackLayerInputs(stack, cache).layers["image-a"]?.opacity).toBe(0.25);
+        const before = renderStackSpatialRevision(stack);
+
+        // the only child moves to just after the group: same order, same props
+        expect(moveRenderStackEntry(stack, "image-a", null, "g")).toBe(true);
+
+        expect(renderStackSpatialRevision(stack)).not.toBe(before);
+        expect(syncRenderStackLayerInputs(stack, cache).layers["image-a"]?.opacity).toBe(1);
+    });
+
+    test("normalizing finds host entries inside groups, and migrates a v1 group", () => {
+        const stack = groupedStack();
+        expect(getRenderStackEntryIds(normalizeRenderStack(stack))).toEqual(getRenderStackEntryIds(stack));
+
+        const v1 = {
+            schemaVersion: 1,
+            entries: [
+                hostEntry(deckHostLayerId("grey_scatter")),
+                { kind: "group", id: "g", visible: true, props: {}, children: [deckHostLayerId("grey_scatter")] },
+            ],
+        } satisfies RenderStackV1;
+        const live = v1 as unknown as RenderStack;
+        expect(mergeHostOverlayEntriesInPlace(live)).toBe(true);
+        expect(live.schemaVersion).toBe(2);
+        expect(getRenderStackEntryIds(live)).toEqual(["g", ...hostIds]);
+    });
+
+    test("a missing overlay goes just above the group holding the overlay it follows", () => {
+        const stack = groupedStack();
+        const group = stack.entries[1];
+        stack.entries.splice(2, 1); // drop deck:density, which sits right after the group
+        expect(stack.entries.map((entry) => entry.id)).not.toContain(deckHostLayerId("density"));
+
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        expect(stack.entries.map((entry) => entry.id)).toEqual([
+            "image-a",
+            "points",
+            deckHostLayerId("density"),
+            ...hostIds.slice(3),
+        ]);
+        expect(stack.entries[1]).toBe(group);
+    });
+
+    test("syncs spatial entries and resolves host entries at any depth, inheriting visibility", () => {
+        const visible = syncRenderStackLayerInputs(groupedStack(), createRenderStackLayerInputsCache());
+        expect(Object.keys(visible.layers)).toEqual(["image-a", "shapes-a"]);
+        expect(visible.layerOrder).toEqual(["image-a", ...hostIds.slice(0, 2), "shapes-a", ...hostIds.slice(2)]);
+
+        const hidden = groupedStack({}, false);
+        const inputs = syncRenderStackLayerInputs(hidden, createRenderStackLayerInputsCache());
+        expect(inputs.layers["shapes-a"]?.visible).toBe(false);
+
+        const resolver = (entry: HostEntry) => fakeDeckLayer(entry.id).sourceLayer;
+        expect(resolveCachedHostDeckLayers(groupedStack(), resolver).map((layer) => layer.id)).toEqual(hostIds);
+        expect(resolveCachedHostDeckLayers(hidden, resolver).map((layer) => layer.id)).toEqual(hostIds.slice(2));
+    });
+
+    test("the data points' group exists only while their compositing is not the default", () => {
+        const stack = createHostOnlyRenderStack();
+        const isolated = { ...DEFAULT_COMPOSITING, opacity: 0.5, isolate: true };
+
+        expect(setDataPointsCompositing(stack, isolated)).toBe(true);
+        expect(getRenderStackEntryIds(stack)).toEqual([DATA_POINTS_GROUP_ID, ...hostIds]);
+        expect(setDataPointsCompositing(stack, { ...isolated, blendMode: "multiply" })).toBe(false);
+        expect(stack.entries[0]).toMatchObject({ props: { blendMode: "multiply" } });
+
+        expect(setDataPointsCompositing(stack, DEFAULT_COMPOSITING)).toBe(true);
+        expect(getRenderStackEntryIds(stack)).toEqual(hostIds);
+        expect(setDataPointsCompositing(stack, DEFAULT_COMPOSITING)).toBe(false);
+    });
+
+    test("groups are inserted below the overlays, filled by moving entries in, and ungrouped in place", () => {
+        const stack = renderStack([
+            spatialEntry({ id: "image-a", elementKey: "imageA" }),
+            spatialEntry({ id: "shapes-a", elementKey: "cells", elementType: "shapes" }),
+            hostEntry(deckHostLayerId("scatter")),
+        ]);
+        const groupId = insertRenderStackGroup(stack);
+        expect(stack.entries.map((entry) => entry.id)).toEqual(["image-a", "shapes-a", groupId, "deck:scatter"]);
+
+        expect(moveRenderStackEntry(stack, "shapes-a", groupId, null)).toBe(true);
+        expect(moveRenderStackEntry(stack, "image-a", groupId, "shapes-a")).toBe(true);
+        expect(getRenderStackEntryIds(stack)).toEqual([groupId, "shapes-a", "image-a", "deck:scatter"]);
+        expect(moveRenderStackEntry(stack, groupId, groupId, null)).toBe(false);
+
+        removeRenderStackEntry(stack, "image-a");
+        expect(getRenderStackEntryIds(stack)).toEqual([groupId, "shapes-a", "deck:scatter"]);
+
+        expect(ungroupRenderStackEntry(stack, groupId)).toBe(true);
+        expect(stack.entries.map((entry) => entry.id)).toEqual(["shapes-a", "deck:scatter"]);
+    });
+
+    test("new layers go on top of a group, or below the overlays and the data points' group", () => {
+        const stack = createHostOnlyRenderStack();
+        setDataPointsCompositing(stack, { ...DEFAULT_COMPOSITING, isolate: true });
+        const groupId = insertRenderStackGroup(stack);
+        expect(stack.entries.map((entry) => entry.id).slice(0, 2)).toEqual([groupId, DATA_POINTS_GROUP_ID]);
+
+        const imageId = insertSpatialRenderStackEntry(stack, "image", "imageA", {}, groupId);
+        const shapesId = insertSpatialRenderStackEntry(stack, "shapes", "cells", {}, groupId);
+        expect(getRenderStackEntryIds(stack).slice(0, 3)).toEqual([groupId, imageId, shapesId]);
+        const labelsId = insertSpatialRenderStackEntry(stack, "labels", "mask");
+        expect(stack.entries.map((entry) => entry.id).slice(0, 3)).toEqual([groupId, labelsId, DATA_POINTS_GROUP_ID]);
+    });
+
+    test("a dragged row lands at the depth the rows around it allow", () => {
+        const stack = renderStack([
+            spatialEntry({ id: "a", elementKey: "a" }),
+            {
+                kind: "group",
+                id: "g",
+                visible: true,
+                props: {},
+                children: [spatialEntry({ id: "b", elementKey: "b" })],
+            },
+            spatialEntry({ id: "c", elementKey: "c" }),
+        ]);
+        const rows = flattenLayerTree(stack.entries, new Set());
+        expect(rows.map((row) => `${row.id}@${row.depth}`)).toEqual(["a@0", "g@0", "b@1", "c@0"]);
+        expect(flattenLayerTree(stack.entries, new Set(["g"])).map((row) => row.id)).toEqual(["a", "g", "c"]);
+
+        // c dragged up over b takes its place: first in the group, before b
+        expect(projectLayerTreeDrop(rows, "c", "b", 0)).toEqual({ depth: 1, parentId: "g", afterId: null });
+        // b dragged left stays where it is but leaves the group, after it
+        expect(projectLayerTreeDrop(rows, "b", "b", -1)).toEqual({ depth: 0, parentId: null, afterId: "g" });
+        // a dragged down past the group's row lands first in the group: the row below it is the group's
+        expect(projectLayerTreeDrop(rows, "a", "g", 0)).toEqual({ depth: 1, parentId: "g", afterId: null });
+        // ...unless the group is collapsed, when it goes after the group
+        const collapsed = flattenLayerTree(stack.entries, new Set(["g"]));
+        expect(projectLayerTreeDrop(collapsed, "a", "g", 1)).toEqual({ depth: 0, parentId: null, afterId: "g" });
     });
 });

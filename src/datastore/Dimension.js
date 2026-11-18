@@ -77,6 +77,9 @@ class Dimension {
                 if (token <= this._appliedToken || token <= this._cancelledThrough) return false;
                 this._applyInclude(result);
                 this._appliedToken = token;
+                // listeners are only told a few ticks from now (see `_notifyWhenCommitted`), and anything asking
+                // for the filtered indices before then must not be given the ones cached for the previous filter
+                this.parent.invalidateFilteredIndices();
                 return true;
             })
             .finally(() => {

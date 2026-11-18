@@ -34,6 +34,7 @@ import {
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 import { getLegacyConversionTarget } from "./legacyCharts";
+import { StoredFilters } from "./viewFilterReadiness";
 
 /** A saved legend size from a view's config: [width, height] in pixels. */
 function isLegendSize(value: unknown): value is [number, number] {
@@ -377,6 +378,12 @@ class BaseChart<T extends BaseConfig> {
             container: this.__doc__.body,
         });
     }
+    /**
+     * The filters saved in this chart's config that it applies some time after its constructor returns
+     * (e.g. in React effects). A view that is loading waits for these before resolving active links to this
+     * chart's dataSource - see `viewFilterReadiness.ts`. Nothing to do for filters applied in the constructor.
+     */
+    storedFilters = new StoredFilters();
     _deferredInits: Promise<void>[] = [];
     /**
      * During chart initialisation, we defer some actions until after the constructor has returned.
@@ -784,6 +791,7 @@ class BaseChart<T extends BaseConfig> {
         }
         if (this.colorByColumn) {
             if (this.config.color_by === column) {
+                // not an explicit clear: leave any active query so it can recover if the link resolves again
                 clearColorLegendFilter(this, false);
                 this.config.color_by = undefined;
                 this.colorByDefault?.();
@@ -872,6 +880,16 @@ class BaseChart<T extends BaseConfig> {
         this.drawChart();
     }
     /**
+     * Re-run `colorByColumn` with the current active value, so that an active link (`RowsAsColsQuery`)
+     * isn't replaced by the concrete column name it resolved to #297.
+     */
+    reapplyColorBy() {
+        const { color_by } = this.config;
+        //@ts-expect-error LegacyColorBy should be gone by here; colorByColumn is decorated to accept queries
+        this.colorByColumn?.(this.activeQueries.activeValue("colorByColumn", color_by));
+    }
+
+    /**
      * Returns information about which controls to add to the settings dialog.
      * Subclasses should call this method and then add their own controls e.g.
      * ```
@@ -898,6 +916,14 @@ class BaseChart<T extends BaseConfig> {
      * @returns an array of objects describing tweakable parameters
      */
     getSettings() {
+        const settings = this.getGeneralSettings();
+        const colorSettings = this.getColorSettingsFolder();
+        if (colorSettings) settings.push(colorSettings);
+        return settings;
+    }
+
+    /** Name, legend and parameter settings: everything `getSettings` returns but colour. */
+    getGeneralSettings() {
         const c = this.config;
         const settings: GuiSpecs = [
             {
@@ -922,6 +948,12 @@ class BaseChart<T extends BaseConfig> {
         if (paramsSettings) {
             settings.push(paramsSettings);
         }
+        return settings;
+    }
+
+    /** The "Color Settings" folder, for charts whose `getColorOptions` allows colouring by a column. */
+    getColorSettingsFolder() {
+        const c = this.config;
         const colorOptions = this.getColorOptions();
 
         if (colorOptions.colorby) {
@@ -932,26 +964,25 @@ class BaseChart<T extends BaseConfig> {
                     : colorOptions.colorby;
 
             const colorSettings: GuiSpecs = [];
-            settings.push(
-                g({
-                    type: "folder",
-                    label: "Color Settings",
-                    current_value: colorSettings,
-                }),
-            );
+            const folder = g({
+                type: "folder",
+                label: "Color Settings",
+                current_value: colorSettings,
+            });
 
             // change this to use setting with type: "column" - so it should understand "filter" in a similar way
             colorSettings.push(
                 g({
                     label: "Color By",
                     type: "column",
-                    // c.color_by degrades active link here #297
+                    // use the active query (if any), not the concrete column name in the config #297
                     //@ts-expect-error LegacyColorBy should be gone by here
-                    current_value: c.color_by,
+                    current_value: this.activeQueries.activeValue("colorByColumn", c.color_by),
                     columnType: filter,
                     func: (x) => {
                         if (x === "_none") {
                             clearColorLegendFilter(this, false);
+                            this.activeQueries.clearActiveQuery("colorByColumn");
                             c.color_by = undefined;
                             this.colorByDefault?.();
                         } else {
@@ -971,8 +1002,7 @@ class BaseChart<T extends BaseConfig> {
                     current_value: c.color_overlay || 0,
                     func: (x) => {
                         c.color_overlay = x;
-                        //@ts-expect-error color_by
-                        this.colorByColumn?.(c.color_by);
+                        this.reapplyColorBy();
                     },
                 });
             }
@@ -1000,8 +1030,7 @@ class BaseChart<T extends BaseConfig> {
                 func: (x) => {
                     c.log_color_scale = x;
                     if (c.color_by) {
-                        //@ts-expect-error color_by
-                        this.colorByColumn?.(c.color_by);
+                        this.reapplyColorBy();
                     }
                 },
             });
@@ -1013,8 +1042,7 @@ class BaseChart<T extends BaseConfig> {
                 func: (x) => {
                     c.fallbackOnZero = x;
                     if (c.color_by) {
-                        //@ts-expect-error color_by
-                        this.colorByColumn?.(c.color_by);
+                        this.reapplyColorBy();
                     }
                 },
             });
@@ -1026,8 +1054,7 @@ class BaseChart<T extends BaseConfig> {
                 func: (x) => {
                     c.hideMissing = x;
                     if (c.color_by) {
-                        //@ts-expect-error color_by
-                        this.colorByColumn?.(c.color_by);
+                        this.reapplyColorBy();
                     }
                 },
             });
@@ -1042,17 +1069,16 @@ class BaseChart<T extends BaseConfig> {
                     ["0.05", "0.05"],
                 ] as const,
                 func: (v) => {
-                    //@ts-ignore we could type this, but it's a bit fussy
+                    //@ts-expect-error we could type this, but it's a bit fussy
                     c.trim_color_scale = v;
                     if (c.color_by) {
-                        //@ts-expect-error color_by
-                        this.colorByColumn?.(c.color_by);
+                        this.reapplyColorBy();
                     }
                 },
             });
+            return folder;
         }
-
-        return settings;
+        return undefined;
     }
 
     unpinIcon?: HTMLElement;

@@ -3,15 +3,19 @@ import { apiFetch } from "@/utils/mdvRouting";
 
 export type UserPermission = "View" | "Edit" | "Owner";
 
+// An Admin is Owner of every project, so the server refuses to change or
+// remove their role, and adds them only as Owner (ADR 0019).
 export type SharedUser = {
     id: number;
     email: string;
     permission: UserPermission;
+    is_admin: boolean;
 };
 
 export type RegisteredUser = {
     id: number;
     email: string;
+    is_admin: boolean;
 };
 
 const useProjectShare = (projectId: string) => {
@@ -91,7 +95,7 @@ const useProjectShare = (projectId: string) => {
                 } else if (res.status === 500) {
                     setError(errorData?.error || "Internal Server Error");
                 } else {
-                    setErrorMsg(errorData?.message || "An error occurred. Please try again.");
+                    setErrorMsg(errorData?.error || errorData?.message || "An error occurred. Please try again.");
                 }
             }
         } catch (error) {
@@ -128,7 +132,7 @@ const useProjectShare = (projectId: string) => {
                 } else if (res.status === 500) {
                     setError(errorData?.error || "Internal Server Error");
                 } else {
-                    setErrorMsg(errorData?.message || "An error occurred. Please try again.");
+                    setErrorMsg(errorData?.error || errorData?.message || "An error occurred. Please try again.");
                 }
             }
         } catch (error) {
@@ -160,10 +164,12 @@ const useProjectShare = (projectId: string) => {
                 }));
                 if (res.status === 403) {
                     setError(errorData?.error || "Forbidden: You are not allowed to perform this action.");
-                } else {
+                } else if (res.status === 500) {
                     setError(errorData?.error || "Internal Server Error");
+                } else {
+                    // A refusal, such as removing an Admin, shows next to the form.
+                    setErrorMsg(errorData?.error || errorData?.message || "An error occurred. Please try again.");
                 }
-                setErrorMsg(errorData?.message || "An error occurred. Please try again.");
             }
         } catch (error) {
             setErrorMsg("Error deleting user. Please try again.");

@@ -48,6 +48,12 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
         // makeAutoObservable(config); //super will do this
         //nb, considered `this.mobxAutorun` for showing/hiding reset button, but we use a hook.
         super(dataStore, div, config, SelectionDialogComponent);
+        // The filters are applied by the column components, in effects, some time after this returns. `param` holds
+        // concrete field names at this point (any active link is restored afterwards), and each of those columns
+        // gets a component, which reports back once it has applied its filter.
+        for (const field of this.config.param) {
+            if (typeof field === "string" && this.config.filters[field]) this.storedFilters.expect(field);
+        }
     }
     removeFilter(): void {
         action(() => {

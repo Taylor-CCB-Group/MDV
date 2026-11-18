@@ -1,4 +1,3 @@
-import { AxisLeft } from "@visx/axis";
 import { scaleBand } from "@visx/scale";
 import { observer } from "mobx-react-lite";
 import { useEffect, useMemo, useState } from "react";
@@ -15,6 +14,7 @@ import {
 import { escapeHtml } from "@/utilities/Utilities";
 import DotPlotPanel, { type DotPlotDot } from "./DotPlotPanel";
 import type { DotPlotReact } from "./DotPlotReactWrapper";
+import DotPlotRowAxis from "./DotPlotRowAxis";
 import { type DotPlotReactConfig, getColorRange } from "./dotPlotConfig";
 import { DOT_PLOT_MAX_RADIUS, getDotPlotLayout, getVisibleRows, getXLabelLayout } from "./dotPlotLayout";
 import { getLegendLayout, type LegendLayout } from "./dotPlotLegends";
@@ -310,14 +310,13 @@ const DotPlotComponent = observer(function DotPlotComponent() {
                 role="img"
                 aria-label={config.title}
             >
-                <AxisLeft
+                <DotPlotRowAxis
+                    rows={visibleRows}
+                    labels={rowColumn.values}
+                    scale={yScale}
                     left={layout.panelLefts[0]}
                     top={layout.top}
-                    scale={yScale}
-                    tickFormat={(row) => rowColumn.values[row]}
-                    stroke="var(--text_color)"
-                    tickStroke="var(--text_color)"
-                    tickLabelProps={{ fill: "var(--text_color)", fontSize: yAxis.tickfont, textAnchor: "end" }}
+                    tickfont={yAxis.tickfont}
                 />
                 {stats.panels.map((groups, panel) => (
                     <DotPlotPanel

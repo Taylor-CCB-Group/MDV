@@ -40,7 +40,8 @@ test.describe("Chart Creation Single", () => {
             const createdChart = chartsAfter.find(
                 (chart) =>
                     chart.title === title &&
-                    ["wgl_scatter_plot", "wgl_scatter_plot_dev"].includes(chart.type) &&
+                    // Add Chart's "2D Scatter Plot" since #614 (DECK_CONTOUR_SCATTER_TYPE)
+                    chart.type === "DeckContourScatter" &&
                     !chartsBefore.some((before) => before.id === chart.id),
             );
 

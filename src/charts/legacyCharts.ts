@@ -52,42 +52,94 @@ const adaptClassicScatter = (config: any) => {
     if (sizing) Object.assign(config, sizing);
 };
 
-/**
- * Where a legacy chart type has a current equivalent that reads the same config keys.
- * Only these are converted: the Viv image viewer's config has no direct SpatialData.js equivalent.
- */
-const legacyConversions: Record<string, LegacyConversion> = {
-    wgl_scatter_plot: { to: "DeckContourScatter", adapt: adaptClassicScatter },
-    // same chart class; `DeckContourScatter` only adds density settings, which are off by default
-    wgl_scatter_plot_dev: { to: "DeckContourScatter", adapt: adaptScatterBackgroundFilter },
-    // the sort direction is stored as `ascending` rather than `sortAsc`; the rest is shared
-    table_chart: {
-        to: "table_chart_react",
-        adapt: (config) => {
-            if (config.sort) config.sort = { columnId: config.sort.columnId, ascending: !!config.sort.sortAsc };
-        },
-    },
-    // `param[2]` (the category column) becomes `contourParameter` when the deck chart loads
-    // the Viv image viewer that is not a React chart; one whose region is SpatialData would want the
-    // SpatialData.js viewer instead, which is not something this converts to
-    viv_scatter_plot: {
-        to: "VivMdvRegionReact",
-        canConvert: (config, dataStore) => {
-            const region = dataStore?.regions?.all_regions?.[config.region];
-            return !!region?.viv_image && !region.spatial;
-        },
-    },
-    density_scatter_plot: {
-        to: "DeckContourScatter",
-        canConvert: (config) => !config.viv,
-        adapt: adaptClassicScatter,
-    },
+/** The region a Viv chart shows, as `dataStore.regions` describes it. */
+const vivRegion = (config: any, dataStore?: DataStore) => dataStore?.regions?.all_regions?.[config.region];
+
+/** A Viv image region that is also SpatialData, which the SpatialData.js viewer can show. */
+const isSpatialDataVivRegion = (config: any, dataStore?: DataStore) => {
+    const region = vivRegion(config, dataStore);
+    return !!region?.viv_image && !!region.spatial;
 };
 
-const findLegacyConversion = (config: { type: string }, dataStore?: DataStore) => {
-    const conversion = legacyConversions[config.type];
-    return conversion && conversion.canConvert?.(config, dataStore) !== false ? conversion : undefined;
+/**
+ * The Viv chart's saved channel settings as the SpatialData.js image layer's: the same per-channel
+ * arrays, with tone in `vivLayerProps`. Undefined if it saved none, so the layer starts with defaults.
+ */
+const vivChannelsToImageLayer = (channelsStore: any) => {
+    if (!channelsStore || typeof channelsStore !== "object") return undefined;
+    const channels: Record<string, unknown> = {};
+    for (const key of ["colors", "contrastLimits", "channelsVisible", "selections"]) {
+        if (Array.isArray(channelsStore[key])) channels[key] = channelsStore[key];
+    }
+    const vivLayerProps: Record<string, unknown> = {};
+    for (const key of ["brightness", "contrast"]) {
+        if (Array.isArray(channelsStore[key]) && channelsStore[key].length) vivLayerProps[key] = channelsStore[key];
+    }
+    if (!Object.keys(channels).length && !Object.keys(vivLayerProps).length) return undefined;
+    return {
+        ...(Object.keys(channels).length ? { channels } : {}),
+        ...(Object.keys(vivLayerProps).length ? { vivLayerProps } : {}),
+    };
 };
+
+/**
+ * The SpatialData.js viewer reads the same scatter, region and filter settings as the Viv viewer, but
+ * draws images from a render stack rather than `viv`. Left without one, it adds the store's first image
+ * on load, with the Viv channel settings from `defaultImageLayer`. The view position moves to the
+ * top-level `viewState`: both viewers draw the scatter in the same frame.
+ */
+const adaptVivToSpatialData = (config: any) => {
+    const vivView = config.viv?.viewerStore?.viewState;
+    const defaultImageLayer = vivChannelsToImageLayer(config.viv?.channelsStore);
+    for (const key of ["viv", "roi", "json", "showJson", "background_image", "renderStack", "viewState"]) {
+        delete config[key];
+    }
+    if (Array.isArray(vivView?.target)) {
+        config.viewState = { target: [...vivView.target], zoom: vivView.zoom };
+    }
+    if (defaultImageLayer) config.defaultImageLayer = defaultImageLayer;
+};
+
+/**
+ * Where a legacy chart type has current equivalents, the first that works for a chart's config is
+ * the one it converts to.
+ */
+const legacyConversions: Record<string, LegacyConversion[]> = {
+    wgl_scatter_plot: [{ to: "DeckContourScatter", adapt: adaptClassicScatter }],
+    // same chart class; `DeckContourScatter` only adds density settings, which are off by default
+    wgl_scatter_plot_dev: [{ to: "DeckContourScatter", adapt: adaptScatterBackgroundFilter }],
+    // the sort direction is stored as `ascending` rather than `sortAsc`; the rest is shared
+    table_chart: [
+        {
+            to: "table_chart_react",
+            adapt: (config) => {
+                if (config.sort) config.sort = { columnId: config.sort.columnId, ascending: !!config.sort.sortAsc };
+            },
+        },
+    ],
+    // `param[2]` (the category column) becomes `contourParameter` when the deck chart loads
+    viv_scatter_plot: [
+        { to: "SpatialDataMdvRegionReact", canConvert: isSpatialDataVivRegion, adapt: adaptVivToSpatialData },
+        {
+            to: "VivMdvRegionReact",
+            canConvert: (config, dataStore) => !!vivRegion(config, dataStore)?.viv_image,
+        },
+    ],
+    // still the viewer for a Viv image region that is not SpatialData
+    VivMdvRegionReact: [
+        { to: "SpatialDataMdvRegionReact", canConvert: isSpatialDataVivRegion, adapt: adaptVivToSpatialData },
+    ],
+    density_scatter_plot: [
+        {
+            to: "DeckContourScatter",
+            canConvert: (config) => !config.viv,
+            adapt: adaptClassicScatter,
+        },
+    ],
+};
+
+const findLegacyConversion = (config: { type: string }, dataStore?: DataStore) =>
+    legacyConversions[config.type]?.find((conversion) => conversion.canConvert?.(config, dataStore) !== false);
 
 /** The chart type that `config` could be converted to, if its type is legacy and that would work. */
 export function getLegacyConversionTarget(config: { type: string }, dataStore?: DataStore): string | undefined {

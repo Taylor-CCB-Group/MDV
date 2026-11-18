@@ -3,8 +3,10 @@ import "./wdyr";
 import "./all_css";
 import { createElement, type TransitionEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 import type ChartManager from "@/charts/ChartManager";
 import type { DataSource } from "@/charts/charts";
+import { diagnoseImportFailure, type ImportProbe } from "@/utils/importFailure";
 import { offerOwnTabIfFramed } from "@/utils/ownTabNotice";
 import { getProject } from "./ProjectContext";
 import { getProjectBootstrapContext, type LoadedProjectRuntime, loadProjectRuntime } from "./projectRuntime";
@@ -62,11 +64,18 @@ let stateHandlerRoot: Root | null = null;
 function LoadState({
     status,
     detail,
+    diagnosis,
+    copied,
+    onCopyDetails,
     isClosing,
     onTransitionEnd,
 }: {
     status: BootstrapStatus;
     detail: string;
+    /** Why loading failed, when that could be worked out; see `diagnoseImportFailure`. */
+    diagnosis?: string;
+    copied: boolean;
+    onCopyDetails: () => void;
     isClosing: boolean;
     onTransitionEnd: (event: TransitionEvent<HTMLDivElement>) => void;
 }) {
@@ -114,14 +123,38 @@ function LoadState({
                 {status.kind === "error" ? (
                     <>
                         <h2 className={titleClassName}>Error loading project</h2>
-                        <p className={progressClassName}>{detail}</p>
-                        <button
-                            type="button"
-                            onClick={() => window.location.reload()}
-                            className="rounded-md border border-slate-400/50 px-3 py-1.5 text-sm font-medium hover:bg-slate-500/15"
+                        {/* Messages often end in a long URL with nowhere to break: let it break anywhere. */}
+                        <p
+                            className={[
+                                "mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-md p-2 text-left font-mono text-xs leading-5 [overflow-wrap:anywhere]",
+                                isDark ? "bg-slate-900/60 text-slate-300" : "bg-slate-100 text-slate-700",
+                            ].join(" ")}
                         >
-                            Retry
-                        </button>
+                            {detail}
+                        </p>
+                        {diagnosis && (
+                            <p className={`${bodyTextClassName} text-left text-[14px] leading-6`}>{diagnosis}</p>
+                        )}
+                        <p className={`${bodyTextClassName} text-left text-[14px] leading-6`}>
+                            If reloading doesn't help, clearing this site's cookies and stored data often does
+                            (you may have to sign in again), as can opening the page in a private window.
+                        </p>
+                        <div className="flex justify-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => window.location.reload()}
+                                className="rounded-md border border-slate-400/50 px-3 py-1.5 text-sm font-medium hover:bg-slate-500/15"
+                            >
+                                Retry
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onCopyDetails}
+                                className="rounded-md border border-slate-400/50 px-3 py-1.5 text-sm font-medium hover:bg-slate-500/15"
+                            >
+                                {copied ? "Copied" : "Copy details"}
+                            </button>
+                        </div>
                     </>
                 ) : (
                     <>
@@ -151,6 +184,39 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
         if (status.error instanceof Error) return status.error.message;
         return `${status.error}`;
     }, [status]);
+    const [diagnosis, setDiagnosis] = useState<{ explanation: string; probe: ImportProbe }>();
+    const [copied, setCopied] = useState(false);
+    const { buildInfo } = useBuildInfo();
+
+    useEffect(() => {
+        setDiagnosis(undefined);
+        setCopied(false);
+        if (status.kind !== "error") return;
+        let cancelled = false;
+        void diagnoseImportFailure(status.error).then((result) => {
+            if (!result) return;
+            console.error("Project failed to load:", detail, "\n", result.explanation, result.probe);
+            if (!cancelled) setDiagnosis(result);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [status, detail]);
+
+    const copyDetails = () => {
+        const lines = [
+            `Error: ${detail}`,
+            diagnosis && `Diagnosis: ${diagnosis.explanation}`,
+            diagnosis && `Fetched again: ${JSON.stringify(diagnosis.probe)}`,
+            `Page: ${window.location.href}`,
+            `Build: ${buildInfo.commitHash || "unknown"} (${buildInfo.buildDate || "unknown date"})`,
+            `Browser: ${navigator.userAgent}`,
+        ];
+        void navigator.clipboard
+            .writeText(lines.filter(Boolean).join("\n"))
+            .then(() => setCopied(true))
+            .catch((error) => console.error("Could not copy error details", error));
+    };
 
     useEffect(() => {
         if (context.isPopout) {
@@ -272,7 +338,17 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
         }
     };
 
-    return <LoadState status={status} detail={detail} isClosing={isClosing} onTransitionEnd={handleTransitionEnd} />;
+    return (
+        <LoadState
+            status={status}
+            detail={detail}
+            diagnosis={diagnosis?.explanation}
+            copied={copied}
+            onCopyDetails={copyDetails}
+            isClosing={isClosing}
+            onTransitionEnd={handleTransitionEnd}
+        />
+    );
 }
 
 const holder = document.getElementById("holder");

@@ -14,7 +14,8 @@ python/mdvtools/static
 .env
 
 # Editor and IDE files
-.claude
+.claude/
+**/.claude/
 # OS generated files
 .DS_Store
 .DS_Store?
@@ -41,3 +42,11 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Test data and sample files that the app never reads at runtime. The dev
+# container and the Playwright CI job mount the repository, so they still see them.
+# Keep the rest of python/mdvtools/test_projects: chat reads RAG_examples/ at runtime.
+python/mdvtools/test_projects/data/
+tests_playwright/test-data/
+uploads/
+examples/data/

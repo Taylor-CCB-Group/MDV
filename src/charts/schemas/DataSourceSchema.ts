@@ -362,6 +362,10 @@ export const LinksConfigSchema = z
 export const DataSourceSchema = z
     .object({
         name: z.string().describe("Human-readable name for the datasource"),
+        display_name: z
+            .string()
+            .optional()
+            .describe("The name the datasource is shown under, set by renaming it; `name` stays its identifier"),
         size: z.number().int().positive().describe("Number of rows in the datasource"),
         columns: z.array(DataSourceColumnSchema).describe("Array of column configurations defining the data structure"),
         columnGroups: z.array(ColumnGroupSchema).optional().describe("Logical groupings of related columns"),

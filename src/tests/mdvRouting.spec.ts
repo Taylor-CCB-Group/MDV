@@ -28,6 +28,14 @@ describe("mdvRouting", () => {
         expect(buildDashboardUrl("/")).toBe("/mdv/");
     });
 
+    test("detects app root from the refused-sign-in page at /login", () => {
+        setUrl("/login?denied=no_account");
+        expect(getAppMountPath()).toBe("/");
+
+        setUrl("/mdv/login?denied=no_account");
+        expect(getAppMountPath()).toBe("/mdv/");
+    });
+
     test("builds mounted project urls for same-origin deployments", () => {
         setUrl("/mdv/");
 

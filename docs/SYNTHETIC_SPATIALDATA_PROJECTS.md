@@ -125,7 +125,7 @@ There are two useful modes; pick deliberately when measuring performance.
 
 ### 1. Through the running container (main-branch frontend)
 
-The local docker compose stack defined in `docker-secrets.yml` bind-mounts
+The local docker compose stack defined in `docker-compose.dev.yml` bind-mounts
 host `~/mdv` to the container's `/app/mdv`, so any direct child of `~/mdv`
 becomes visible to the running backend on `localhost:5055`. The frontend the
 container serves is whatever is built into its image, i.e. the **main**

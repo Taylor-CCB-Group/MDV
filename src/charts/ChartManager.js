@@ -1,11 +1,9 @@
 import { csv, json, tsv } from "d3-fetch";
 import DataStore from "../datastore/DataStore.js";
 import { ContextMenu } from "../utilities/ContextMenu";
-import { BaseDialog } from "../utilities/Dialog.js";
 import {
     createEl,
     createMenuIcon,
-    MDVProgress,
     makeDraggable,
     makeResizable,
     removeDraggable,
@@ -14,7 +12,6 @@ import {
 } from "../utilities/Elements";
 import { getRandomString } from "../utilities/Utilities";
 import BaseChart from "./BaseChart";
-import ColorPaletteWrapper from "./dialogs/ColorPaletteWrapper";
 import CustomDialog from "./dialogs/CustomDialog.js";
 // this is added as a side-effect of importing registerChartModules,
 // then we get the actual class from BaseDialog.experiment
@@ -25,7 +22,9 @@ import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts
 import "./registerChartModules";
 import { action, makeObservable, observable } from "mobx";
 import { createElement } from "react";
+import { flushSync } from "react-dom";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
+import DataSourceMenuBar from "@/react/components/DataSourceMenuBar";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
@@ -33,11 +32,16 @@ import { createMdvPortal } from "@/react/react_utils";
 import popoutChart from "@/utilities/Popout";
 import { addChartLink } from "../links/link_utils";
 import connectIPC from "../utilities/InterProcessCommunication";
-import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
-import AddChartDialogReact from "./dialogs/AddChartDialogReact";
+import { deserialiseParam, getConcreteFieldNames, withLoadedColumns } from "./chartConfigUtils";
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 import ViewManager from "./ViewManager";
+import {
+    allSettledWithin,
+    linkCycleMembers,
+    STORED_FILTERS_TIMEOUT_MS,
+    ViewFilterReadiness,
+} from "./viewFilterReadiness";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -144,7 +148,8 @@ export class ChartManager {
 
         this.listeners = {};
         this.infoAlerts = {};
-        this.progressBars = {};
+        /** @type {Set<string>} names of the datasources that have been shown in a view */
+        this.dataSourcesShown = new Set();
         this.setTheme(getPreferredColorScheme());
         //maybe better to stop listening once explicit option has been set
         //or to allow the user to explicitly say 'system default'
@@ -266,8 +271,8 @@ export class ChartManager {
         this.dataLoader = dataLoader.function; // || async function defaultDataLoaderFunction() { console.warn(`ceci n'est pas une dataLoader`) };
         this.viewLoader = dataLoader.viewLoader;
 
+        /** @type {Record<string, ContextMenu>} the "Change layout" menu of each datasource */
         this.layoutMenus = {};
-        this.isFullscreen = false;
 
         if (dataLoader.files) {
             this.filesToLoad = dataLoader.files.length;
@@ -660,6 +665,8 @@ export class ChartManager {
         }
 
         for (const ds of this.dataSources) {
+            ds.menuBarRoot?.unmount();
+            ds.menuBarRoot = undefined;
             ds.contentDiv = undefined;
             ds.menuBar = undefined;
         }
@@ -784,6 +791,18 @@ export class ChartManager {
         }
         //add charts - any columns will be added dynamically
         this._inInit = true;
+        // While the view loads, an active link is not resolved for a chart until the dataSource it links to has the
+        // filters saved with the view, which are applied by that dataSource's own charts - see viewFilterReadiness.ts
+        this._viewFilterReadiness?.abandon();
+        this._viewFilterReadiness = new ViewFilterReadiness(charts, linkCycleMembers(this._rowsAsColumnsLinkTargets()));
+        // links that are already set up drop the rows they had for the previous view, until the new one's are known
+        for (const ds of this.dataSources) {
+            for (const link of Object.values(ds.dataStore.links ?? {})) link.rows_as_columns?.refresh?.();
+        }
+        // Restore highlighted rows from view data (e.g. after loading or switching view) before any chart is added.
+        // Active links resolve to the highlighted rows, so a chart built before the highlight is known would
+        // resolve - and load columns for - whatever rows its link exposes without it, then change when it arrives.
+        this._restoreHighlights();
         const chartPromises = [];
         for (const ds in charts) {
             for (const ch of charts[ds]) {
@@ -798,19 +817,9 @@ export class ChartManager {
         // We are relying on the config being stable/settled when these promises resolve.
         console.log("after await Promise.all(chartPromises);");
 
-        // Restore highlighted indices from view data (e.g. after loading or switching view)
-        // this should probably happen before chart init so that they have stable config when finished
-        for (const dsName of Object.keys(this.viewData.dataSources || {})) {
-            const spec = this.viewData.dataSources[dsName];
-            const highlight = spec?.highlight;
-            const dstore = this.dsIndex[dsName]?.dataStore;
-            if (!dstore?.dataHighlighted) continue;
-            if (Array.isArray(highlight) && highlight.length > 0) {
-                dstore.dataHighlighted(highlight, null);
-            } else {
-                dstore.dataHighlighted([], null);
-            }
-        }
+        // ... and announce the highlights again now that the charts exist: some only show a highlight in response
+        // to the event. (This doesn't change what active links resolve to, so nothing is loaded again.)
+        this._restoreHighlights();
 
         //this could be a time to _callListeners("view_loaded",this.currentView)
         //but I'm not going to interfere with the current logic
@@ -825,13 +834,11 @@ export class ChartManager {
                 data.dataStore = ds.dataStore;
                 this._callListeners(type, data);
             } else if (type === "filtered") {
-                if (!this.progressBars[ds.name]) {
+                // kept from when this listener updated the datasource's progress bar, which only
+                // existed once the datasource had been in a view; the menu bar now tracks the count itself
+                if (!this.dataSourcesShown.has(ds.name)) {
                     return;
                 }
-                const n1 = ds.dataStore.size;
-                const n2 = ds.dataStore.filterSize;
-                this.progressBars[ds.name].setValue(n2);
-                this.progressBars[ds.name].setText(n2);
                 this._callListeners(type, data);
             }
         });
@@ -1471,178 +1478,25 @@ export class ChartManager {
     }
 
     /**
-     * @param {{dataStore: DataStore}} ds
+     * Mounts the React menu bar for a datasource; `_init` unmounts it when the view is rebuilt.
+     * @param {DataSource} ds
      */
     _setUpMenu(ds) {
-        const dataStore = ds.dataStore;
-        createMenuIcon(
-            "fas fa-chart-bar",
-            {
-                tooltip: {
-                    text: "Add Chart",
-                    position: "bottom-right",
-                },
-                func: () => {
-                    // new AddChartDialog(ds, (config) =>
-                    //     this.addChart(ds.name, config, true),
-                    // );
-                    // if (import.meta.env.DEV) new BaseDialog.experiment["AddChartDialogReact"](dataStore);
-                    new AddChartDialogReact(dataStore);
-                },
-            },
-            ds.menuBar,
-        );
-
-        createMenuIcon(
-            "fas fa-sync-alt",
-            {
-                tooltip: {
-                    text: "Reset All Filters",
-                    position: "bottom-right",
-                },
-                func: () => {
-                    dataStore.removeAllFilters();
-                },
-            },
-            ds.menuBar,
-        );
-        createMenuIcon(
-            "fas fa-palette",
-            {
-                tooltip: {
-                    text: "Change Color Scheme",
-                    position: "bottom-right",
-                },
-                func: () => {
-                    try {
-                        new ColorPaletteWrapper(this, ds);
-                    } catch (error) {
-                        console.error("error making ColorPalette", error);
-                        this.createInfoAlert("Error making Color Palette", {
-                            type: "warning",
-                            duration: 2000,
-                        });
-                    }
-                },
-            },
-            ds.menuBar,
-        );
-        createMenuIcon(
-            "fas fa-th",
-            {
-                tooltip: {
-                    text: "Change layout",
-                    position: "bottom-right",
-                },
-                func: (e) => {
-                    this.layoutMenus[ds.name].show(e);
-                },
-            },
-            ds.menuBar,
-        );
-        //previously we shared a TagModel between invocations of the annotation dialog
-        //but they should be able to change columns - not sure if the sharing had any benefits
-        this.addMenuIcon(ds.name, "fas fa-tags", "Tag Annotation", () => {
-            //todo - check whether we have a reason for hacky import here
-            new BaseDialog.experiment["AnnotationDialogReact"](ds.dataStore);
+        // React gets its own element, so that addMenuIcon can go on appending icons to ds.menuBar
+        const container = createEl("span", { styles: { display: "contents" } }, ds.menuBar);
+        // Render now rather than on React's schedule: the charts added next measure the space
+        // left under the bar (GridstackManager.getGrid caches cellHeight from it), and a bar
+        // that wraps onto a second line is taller than the empty one.
+        flushSync(() => {
+            ds.menuBarRoot = createMdvPortal(
+                createElement(DataSourceMenuBar, { dataSource: ds }),
+                container,
+                undefined,
+                this,
+            );
         });
-
-        const idiv = createEl(
-            "div",
-            {
-                styles: {
-                    float: "right",
-                    lineHeight: "1.0",
-                },
-            },
-            ds.menuBar,
-        );
-        createEl(
-            "span",
-            {
-                text: ds.name,
-                styles: {
-                    verticalAlign: "top",
-                    fontSize: "16px",
-                    marginRight: "4px",
-                },
-            },
-            idiv,
-        );
-        const size = ds.dataStore.size;
-        ds.filterBar = createEl(
-            "progress",
-            {
-                value: size,
-            },
-            ds.menBar,
-        );
-        const pb = createEl(
-            "div",
-            {
-                styles: {
-                    width: "100px",
-                    display: "inline-block",
-                    marginTop: "2px",
-                },
-            },
-            idiv,
-        );
-        const pbConf = {
-            max: size,
-            value: size,
-            text: `${size}`,
-        };
-        this.progressBars[ds.name] = new MDVProgress(pb, pbConf);
-        this._addFullscreenIcon(ds);
-    }
-
-    _addFullscreenIcon(ds) {
-        const iconElement = createMenuIcon(
-            "fas fa-expand",
-            {
-                tooltip: {
-                    text: "Full Screen",
-                    position: "bottom-right",
-                },
-                func: async () => {
-                    //nb, not sure best way to access the actual div I want here
-                    //this could easily break if the layout structure changes
-                    // ds.contentDiv.parentElement.requestFullscreen();
-                    try {
-                        if (!this.isFullscreen) {
-                            await ds.menuBar.parentElement.requestFullscreen();
-                        } else {
-                            await document.exitFullscreen();
-                        }
-                    } catch (error) {
-                        console.error("fullscreen error caused: ", error);
-                    }
-                },
-            },
-            ds.menuBar,
-        );
-
-        document.addEventListener("fullscreenchange", () => {
-            const iconEl = iconElement.querySelector("i");
-            if (document.fullscreenElement) {
-                if (ds.menuBar.parentElement === document.fullscreenElement) {
-                    if (iconEl) {
-                        iconEl.classList.remove("fa-expand");
-                        iconEl.classList.add("fa-compress");
-                    }
-                    iconElement.setAttribute("aria-label", "Exit Full Screen");
-                    this.isFullscreen = true;
-                }
-            } else {
-                if (iconEl) {
-                    iconEl.classList.remove("fa-compress");
-                    iconEl.classList.add("fa-expand");
-                }
-                iconElement.setAttribute("aria-label", "Full Screen");
-                this.isFullscreen = false;
-            }
-        });
+        // a datasource that has never had a menu bar does not pass on "filtered" events: see _addDSListeners
+        this.dataSourcesShown.add(ds.name);
     }
 
     /**
@@ -1673,6 +1527,59 @@ export class ChartManager {
     _callListeners(type, data) {
         for (const id in this.listeners) {
             this.listeners[id](type, this, data);
+        }
+    }
+
+    /** For each dataSource, the dataSources it has rows-as-columns links to. */
+    _rowsAsColumnsLinkTargets() {
+        /** @type {Record<string, string[]>} */
+        const targets = {};
+        for (const ds of this.dataSources) {
+            const links = ds.dataStore.links ?? {};
+            targets[ds.name] = Object.keys(links).filter((name) => links[name].rows_as_columns);
+        }
+        return targets;
+    }
+
+    /**
+     * Whether `dataSource` has the filters saved with the current view: false while a view is loading and some
+     * of its charts on that dataSource have yet to apply theirs.
+     * @param {string} dataSource
+     */
+    areViewFiltersApplied(dataSource) {
+        return this._viewFilterReadiness?.isReady(dataSource) ?? true;
+    }
+
+    /**
+     * Resolves once the charts of a view that is loading have applied the filters saved with them to `dataSource`.
+     * Resolves straight away when no view is loading, or it has no charts on that dataSource.
+     * @param {string} dataSource
+     * @returns {Promise<void>}
+     */
+    whenViewFiltersApplied(dataSource) {
+        return this._viewFilterReadiness?.whenReady(dataSource) ?? Promise.resolve();
+    }
+
+    /**
+     * Resolves once a newly added chart has applied the filters saved in its config - including any that are
+     * evaluated on a worker - to its dataStore.
+     */
+    async _whenStoredFiltersApplied(chart) {
+        await chart.storedFilters.whenApplied();
+        const pending = chart.dataStore.dimensions.map((d) => d.pendingFilter).filter(Boolean);
+        // a worker that neither answers nor raises an error must not stop the chart, and so the view, from loading
+        if (!(await allSettledWithin(pending, STORED_FILTERS_TIMEOUT_MS))) {
+            console.warn(`Filters on '${chart.dataStore.name}' did not land in time for chart '${chart.config.id}'`);
+        }
+    }
+
+    /** Sets each dataSource's highlighted rows to those saved with the current view (none, if it saved none). */
+    _restoreHighlights() {
+        for (const dsName of Object.keys(this.viewData.dataSources || {})) {
+            const highlight = this.viewData.dataSources[dsName]?.highlight;
+            const dstore = this.dsIndex[dsName]?.dataStore;
+            if (!dstore?.dataHighlighted) continue;
+            dstore.dataHighlighted(Array.isArray(highlight) ? [...highlight] : [], null);
         }
     }
 
@@ -1776,7 +1683,8 @@ export class ChartManager {
             // - other charts wanting to use similar neededCols end up not having data?
             // links should be initialised here as well...
             await this._getColumnsAsync(dataSource, neededCols);
-            await this._addChart(dataSource, config, div, notify);
+            const chart = await this._addChart(dataSource, config, div, notify);
+            await this._whenStoredFiltersApplied(chart);
         } catch (error) {
             console.error("Failed to add chart", {
                 chartId: config.id,
@@ -1862,6 +1770,8 @@ export class ChartManager {
             //not rethrowing doesn't help recovering from missing data in other charts.
             //throw new Error(error); //probably not a great way to handle this
         } finally {
+            // whether it has applied its filters or failed to load, this chart is no longer a reason to wait
+            this._viewFilterReadiness?.settle(dataSource, config);
             this._markInitialChartLoadComplete(config);
         }
     }
@@ -2084,10 +1994,6 @@ export class ChartManager {
     async _addChart(dataSource, config, div, notify = false) {
         //**convert legacy data***********
         const ds = this.dsIndex[dataSource];
-        div.innerHTML = "";
-        div.style.display = "";
-        div.style.alignItems = "";
-        div.style.justifyContent = "";
         const chartType = BaseChart.types[config.type];
         // sometimes the constructor doesn't understand active link, but chart.setParams() does...
         // it somewhat appears to work if we first manifest concrete field names,
@@ -2100,9 +2006,25 @@ export class ChartManager {
         // assert that the initialisation is complete before we consider the chart (and ultimately the view) to be loaded.
         // Also setParams() itself *should* always work - but depends on the chart implementation,
         // and not all charts implement that.
-        const originalParam = config.param.map((p) => deserialiseParam(ds, p));
-        config.param = originalParam.flatMap(getConcreteFieldNames);
-        const chart = new chartType.class(ds.dataStore, div, config);
+        // Active-link queries resolve to whichever columns the linked filter currently selects, which can change
+        // while columns are loading (addChart() loaded the fields as they were then). The chart is constructed in
+        // the same synchronous run as the check that everything its config refers to is loaded.
+        const { chart, originalParam } = await withLoadedColumns(
+            ds.dataStore,
+            () => this._getColumnsRequiredForChart(config),
+            (fields) => this._getMissingColumnData(dataSource, fields),
+            (specs) => this._getColumnsAsync(dataSource, specs),
+            () => {
+                // the div shows a spinner until this point
+                div.innerHTML = "";
+                div.style.display = "";
+                div.style.alignItems = "";
+                div.style.justifyContent = "";
+                const originalParam = config.param.map((p) => deserialiseParam(ds.dataStore, p));
+                config.param = originalParam.flatMap(getConcreteFieldNames);
+                return { chart: new chartType.class(ds.dataStore, div, config), originalParam };
+            },
+        );
         if (originalParam.some((p) => typeof p !== "string")) {
             console.log("setting param with active queries in timeout");
             chart.deferredInit(() => {

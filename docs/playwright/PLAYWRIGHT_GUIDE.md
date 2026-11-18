@@ -19,11 +19,9 @@ Three things must be true before any Playwright work.
 ### 1. Docker backend
 
 ```bash
-docker compose -f docker-secrets.yml up -d
+docker compose -f docker-compose.dev.yml up -d --build
 curl -f http://localhost:5055
 ```
-
-If the image is stale: `docker compose -f docker-secrets.yml up -d --build`
 
 ### 2. Browser binaries
 
@@ -188,7 +186,7 @@ browsers to a custom path — use Playwright's default browser location.
 
 ```bash
 curl -f http://localhost:5055
-docker compose -f docker-secrets.yml up -d
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 **Python env missing or broken**
@@ -208,7 +206,9 @@ cd python && uv sync --group dev --frozen
 
 **Reset local Docker database**
 
+`down -v` deletes every named volume in the compose project, whether or not the Postgres profile is on. That includes the SQLite database in `dev-db` and the Postgres data in `postgres-data`. Back up any data you need before you run it.
+
 ```bash
-docker compose -f docker-secrets.yml down -v
-docker compose -f docker-secrets.yml up -d
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up -d
 ```

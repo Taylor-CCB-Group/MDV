@@ -1,12 +1,13 @@
 import _ from "lodash";
-import { action, observable, toJS } from "mobx";
+import { action, observable, reaction, toJS } from "mobx";
 import { getPostData, getProjectRoot } from "@/dataloaders/DataLoaderUtil";
+import { convertLegacyChartsSetting } from "@/lib/browserSettings";
 import screenshot from "@/utilities/Screenshot";
 import BaseChart from "./BaseChart";
 import type ChartManager from "./ChartManager";
 import { restoreChartLinks, snapshotChartLinks } from "./chartLinks";
 import type { DataSource } from "./charts";
-import { convertLegacyChartConfig, convertLegacyChartConfigNow } from "./legacyCharts";
+import { convertLegacyChartConfig, convertLegacyChartConfigNow, getLegacyConversionTarget } from "./legacyCharts";
 
 /** Per–data-source view config (panel layout and optional highlight state). */
 export type ViewDataDataSource = {
@@ -63,6 +64,14 @@ class ViewManager {
         this.cm = window.mdv.chartManager;
         this.current_view = current_view;
         this.all_views = all_views;
+        // the charts already open are converted when the setting is turned on, as they would be on load;
+        // turning it off leaves them converted
+        reaction(
+            () => convertLegacyChartsSetting.get(),
+            (value) => {
+                if (value === "on") this.convertOpenLegacyCharts();
+            },
+        );
         // todo: uncomment when we fix state issues
         // setTimeout(() => {
         //     this.lastSavedState = this.cm.getState();
@@ -109,11 +118,23 @@ class ViewManager {
         this.reportLegacyConversion();
     }
 
+    /** Converts each open chart that has a current equivalent, one at a time, sharing one alert. */
+    async convertOpenLegacyCharts() {
+        const charts = Object.values(this.cm.charts)
+            .map(({ chart }) => chart)
+            .filter((chart) => chart && getLegacyConversionTarget(chart.config, chart.dataStore));
+        for (const chart of charts) {
+            if (await this.convertLegacyChart(chart, { announce: false })) this.reportLegacyConversion();
+        }
+    }
+
     /**
      * Replaces a legacy chart with its current equivalent, in the same place and with the same
      * settings that both understand. If the new chart cannot be created, the original is restored.
+     * @param announce whether to show an alert naming the chart once it is converted
+     * @returns whether the chart was converted
      */
-    async convertLegacyChart(chart: BaseChart<any>) {
+    async convertLegacyChart(chart: BaseChart<any>, { announce = true } = {}): Promise<boolean> {
         let current: unknown;
         try {
             current = chart.getConfig();
@@ -124,7 +145,7 @@ class ViewManager {
         }
         const original = JSON.parse(JSON.stringify(current));
         const config = JSON.parse(JSON.stringify(original));
-        if (!convertLegacyChartConfigNow(config, chart.dataStore)) return;
+        if (!convertLegacyChartConfigNow(config, chart.dataStore)) return false;
         const dataSource = chart.dataStore.name;
         const links = snapshotChartLinks(this.cm.viewData.links, config.id);
         this.removeChart(chart);
@@ -144,12 +165,15 @@ class ViewManager {
             });
         }
         restoreChartLinks(this.cm.viewData.links ?? [], links, config.id, (link) => this.cm._setUpLink(link));
-        if (!converted) return;
-        const typeName = (type: string) => BaseChart.types[type]?.name ?? type;
-        this.cm.createInfoAlert(
-            `Converted '${config.title}' from ${typeName(original.type)} to ${typeName(config.type)}`,
-            { duration: 4000 },
-        );
+        if (!converted) return false;
+        if (announce) {
+            const typeName = (type: string) => BaseChart.types[type]?.name ?? type;
+            this.cm.createInfoAlert(
+                `Converted '${config.title}' from ${typeName(original.type)} to ${typeName(config.type)}`,
+                { duration: 4000 },
+            );
+        }
+        return true;
     }
 
     /** Removes a chart and everything the manager holds for it, as its remove button does. */

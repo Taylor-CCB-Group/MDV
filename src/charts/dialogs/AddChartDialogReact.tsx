@@ -16,6 +16,7 @@ import { action, observable, reaction, toJS } from "mobx";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import JsonView from "react18-json-view";
+import { getDataSourceDisplayName } from "@/datastore/dataSourceDisplayName";
 import {
     columnMatchesType,
     type FieldSpec,
@@ -544,7 +545,7 @@ const Wrapper = (props: { dataStore: DataStore; modal: boolean; onDone: () => vo
             }}
         >
             <DialogTitle>
-                Add Chart in "{props.dataStore.name}"
+                Add Chart in "{getDataSourceDisplayName(props.dataStore)}"
                 <IconButton
                     aria-label="close"
                     onClick={() => {
@@ -569,7 +570,7 @@ class AddChartDialogReact extends BaseDialog {
     constructor(dataStore: DataStore) {
         super(
             {
-                title: `Add Chart in '${dataStore.name}'`,
+                title: `Add Chart in '${getDataSourceDisplayName(dataStore)}'`,
                 width: 600,
                 height: 420,
             },

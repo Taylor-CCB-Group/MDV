@@ -106,6 +106,21 @@ categorical/string fixes; see the version note below.
 alone. It covers MDV's asynchronous `loadColumnSet`, which the viewer knows nothing
 about. Columns the viewer owns are covered by the viewer's own last-good retention.
 
+### Tooltip fields
+
+Split along the same line as fill colour. `splitTooltipFields` hands the viewer the
+fields in the table's obs, which it reads and formats itself, and MDV keeps the rest:
+`useAssociatedShapesLayerInputs` projects each layer's `tooltipFields` down to its obs
+fields, loads the others from the datasource, and `mdvTooltipItems(entryId, featureId)`
+reads them from the feature's datasource row at hover time. The chart appends those items
+to the viewer's tooltip. Without that, a gene score chosen as a tooltip field showed
+nothing — the viewer has no way to reach it.
+
+The hover handler goes to `SpatialViewer` as its `onHover` prop. Passing it inside
+`deckProps` does not work: `SpatialViewer` spreads `deckProps` and then sets `onHover` from
+its own prop, so a handler there is overwritten with `undefined` and no feature tooltip
+ever appears.
+
 ### Columns that keep moving
 
 MDV's column picker can also return a `RowsAsColsQuery` — an "active link", whose
@@ -125,6 +140,31 @@ Gene scores live in a linked datasource, never in obs, so an active-link colour
 always takes the per-feature route above. Before this existed the picker offered the
 tab and the handler dropped anything that was not a string, so choosing an active
 link did nothing at all — silently.
+
+## The layer dialog
+
+One place for everything about how layers look. Chart settings hold only chart-wide
+options (name, region, rendering backend) and a button that opens the dialog.
+
+- **SpatialData elements** are sortable rows. **MDV data** lists the host overlays that
+  mean something to a user — data points, gates, gate labels — in a section of their own,
+  because host layers always draw above SpatialData layers and cannot be reordered among
+  them. They cannot be removed either: `mergeHostOverlayEntriesInPlace` puts them back.
+  The grey (filtered-out) scatter follows the data points' visibility
+  (`DECK_OVERLAY_VISIBILITY_FOLLOWERS`); the selection overlay belongs to the selection tools.
+- The **Data points** layer's properties are the GuiSpecs from
+  `SpatialDataMdvReact.getDataLayerSettings()` — BaseChart's colour folder plus the shared
+  scatter settings — rendered with the settings dialog's controls via `SettingsGuiList`.
+  They used to be chart settings; they still write the same config fields.
+- **Names.** A layer's name is `props.displayName`, the only open part of a render-stack
+  entry (its top level is a strict schema). `withoutMdvOnlyProps` takes it off at the
+  viewer boundary along with the field specs. Unnamed layers that show the same element
+  are numbered in stack order (`renderStackEntryDisplayName(entry, stack)`), so duplicates
+  can be told apart before anyone renames them.
+- **Labels appearance** (colour, filled, fill/outline opacity, outline width) is the labels
+  layer's `channels`. `patchRenderStackEntryPropsInPlace` merges `channels` field by field,
+  so its key list covers the labels fields as well as the image ones; without them those edits
+  would be dropped once a layer had any saved channels.
 
 ## The points layer panel
 

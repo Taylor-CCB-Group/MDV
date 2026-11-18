@@ -10,6 +10,7 @@ import {
     TextField,
 } from "@mui/material";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { getDataSourceDisplayName } from "@/datastore/dataSourceDisplayName";
 import { useDataSources } from "@/react/hooks";
 
 const AddViewDialogComponent = (props: { open: boolean; onClose: () => void }) => {
@@ -89,7 +90,7 @@ const AddViewDialogComponent = (props: { open: boolean; onClose: () => void }) =
 
                 {dataSources.length > 1 && (
                     <FormGroup sx={{ mt: 2 }}>
-                        {dataSources?.map?.(({ name: ds }: { name: string }) => (
+                        {dataSources?.map?.(({ name: ds, dataStore }) => (
                             <FormControlLabel
                                 key={ds}
                                 control={
@@ -100,7 +101,7 @@ const AddViewDialogComponent = (props: { open: boolean; onClose: () => void }) =
                                         disabled={isCloneView}
                                     />
                                 }
-                                label={`Include ${ds}`}
+                                label={`Include ${getDataSourceDisplayName(dataStore)}`}
                             />
                         ))}
                     </FormGroup>
