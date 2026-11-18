@@ -1,4 +1,4 @@
-import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
+import { type RenderStack, type RenderStackEntry, walkRenderStackEntries } from "@spatialdata/layers";
 import { autorun, runInAction, untracked } from "mobx";
 import { useEffect } from "react";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -67,7 +67,7 @@ export function withoutMdvFieldSpecs<T extends object>(config: T): T {
 }
 
 function spatialEntries(stack: RenderStack | undefined) {
-    return (stack?.entries ?? []).filter(
+    return Array.from(walkRenderStackEntries(stack?.entries ?? [])).filter(
         (entry): entry is Extract<RenderStackEntry, { kind: "spatial" }> => entry.kind === "spatial",
     );
 }
