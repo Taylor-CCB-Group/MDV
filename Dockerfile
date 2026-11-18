@@ -148,7 +148,7 @@ RUN echo 'cd /app/python && source .venv/bin/activate' >> ~/.bashrc && \
 #USER pn
 
 USER root
-RUN mkdir -p /app/mdv && chown -R pn:pn /app/mdv
+RUN mkdir -p /app/mdv /app/dev-db && chown -R pn:pn /app/mdv /app/dev-db
 USER pn
 
 
