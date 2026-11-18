@@ -78,8 +78,15 @@ function chartScope(ui: Page, id: string): Locator {
     return ui.locator(`[${CHART_ATTR}="${id}"]`);
 }
 
+/** The selection toolbar, which starts collapsed to the active tool. */
+function toolbar(ui: Page, id: string): Locator {
+    return chartScope(ui, id).getByRole("group", { name: "choose tool for manipulating view or selection" });
+}
+
 async function selectTool(ui: Page, id: string, tool: Tool) {
-    await chartScope(ui, id).locator(`button[aria-label="${tool}"]`).click();
+    const showTools = toolbar(ui, id).locator('button[aria-label="Show tools"]');
+    if (await showTools.isVisible()) await showTools.click();
+    await toolbar(ui, id).locator(`button[aria-label="${tool}"]`).click();
 }
 
 /** The deck canvas is the largest canvas in the chart's content div. */
@@ -426,7 +433,7 @@ test.describe("Scatter selection tools", () => {
             ]);
             try {
                 await popup.waitForLoadState("domcontentloaded");
-                await expect(chartScope(popup, id).locator('button[aria-label="Polygon"]')).toBeVisible();
+                await expect(toolbar(popup, id)).toBeVisible();
                 const popupBox = await measureCanvas(popup, id);
 
                 await checkAllTools(popup, page, id, popupBox, "(g) popped out");
@@ -436,7 +443,7 @@ test.describe("Scatter selection tools", () => {
                 }
             }
 
-            await expect(chartScope(page, id).locator('button[aria-label="Polygon"]')).toBeVisible();
+            await expect(toolbar(page, id)).toBeVisible();
             await expect.poll(async () => (await measureCanvas(page, id)).width).toBeGreaterThan(100);
             box = await measureCanvas(page, id);
 
