@@ -257,6 +257,14 @@ export function moveRenderStackEntry(
     from.siblings.splice(from.index, 1);
     const afterIndex = afterId === null ? -1 : target.findIndex((entry) => entry.id === afterId);
     target.splice(afterIndex + 1, 0, moved);
+    if (target === stack.entries && !isOverlayEntry(moved)) {
+        // The dialog lists only spatial rows, so `afterId` can sit below an overlay that a
+        // stack saved with them interleaved still has among them. Keep every overlay above
+        // the spatial layers, in its own order.
+        const overlays = stack.entries.filter(isOverlayEntry);
+        const spatial = stack.entries.filter((entry) => !isOverlayEntry(entry));
+        stack.entries.splice(0, stack.entries.length, ...spatial, ...overlays);
+    }
     return true;
 }
 

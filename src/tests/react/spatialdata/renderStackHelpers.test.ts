@@ -656,11 +656,15 @@ describe("render stack groups", () => {
         ]);
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-        const ids = getRenderStackEntryIds(migrateSavedRenderStack(stack));
+        const loaded = migrateSavedRenderStack(stack);
 
+        const ids = getRenderStackEntryIds(loaded);
         expect(ids).toHaveLength(4);
         expect(ids.filter((id) => id === "g")).toHaveLength(1);
-        expect(ids).toContain("b");
+        const second = loaded.entries[1];
+        expect(second?.kind).toBe("group");
+        expect(second?.id).not.toBe("g");
+        expect(second?.kind === "group" && second.children.map((child) => child.id)).toEqual(["b"]);
         warn.mockRestore();
     });
 
@@ -677,6 +681,35 @@ describe("render stack groups", () => {
             deckHostLayerId("scatter"),
         ]);
         expect(getRenderStackEntryIds(stack).filter((id) => id === deckHostLayerId("grey_scatter"))).toHaveLength(1);
+    });
+
+    test("a scatter overlay left at the top level joins the data points' group", () => {
+        const stack = createHostOnlyRenderStack();
+        setDataPointsCompositing(stack, { ...DEFAULT_COMPOSITING, isolate: true });
+        const group = stack.entries[0];
+        if (group.kind !== "group") throw new Error("expected the data points' group");
+        const [grey] = group.children.splice(0, 1);
+        stack.entries.push({ ...grey, visible: false });
+
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        expect(group.children.map((child) => [child.id, child.visible])).toEqual([
+            [deckHostLayerId("grey_scatter"), false],
+            [deckHostLayerId("scatter"), true],
+        ]);
+        expect(stack.entries.map((entry) => entry.id)).not.toContain(deckHostLayerId("grey_scatter"));
+    });
+
+    test("moving a spatial layer at the top level keeps the overlays above it", () => {
+        // saved with an overlay among the spatial layers
+        const stack = renderStack([
+            spatialEntry({ id: "a", elementKey: "a" }),
+            hostEntry(deckHostLayerId("density")),
+            spatialEntry({ id: "b", elementKey: "b" }),
+            hostEntry(deckHostLayerId("scatter")),
+        ]);
+
+        expect(moveRenderStackEntry(stack, "a", null, "b")).toBe(true);
+        expect(stack.entries.map((entry) => entry.id)).toEqual(["b", "a", "deck:density", "deck:scatter"]);
     });
 
     test("moving a layer out of a group changes the revision and its inherited opacity", () => {

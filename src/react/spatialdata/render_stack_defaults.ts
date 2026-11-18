@@ -277,23 +277,29 @@ export function normalizeRenderStack(stack: RenderStack | undefined): RenderStac
         }
     }
 
-    // A scatter overlay missing from the data points' group goes back into it, in member
-    // order: at the top level it would miss the group's visibility and compositing.
+    // A scatter overlay missing from the data points' group goes into it, in member order,
+    // whether it was missing from the stack or left at the top level: outside the group it
+    // would miss the group's visibility and compositing.
+    const movedIntoGroup = new Set<string>();
     const dataPointsGroup = migrated.entries.find((entry) => entry.id === DATA_POINTS_GROUP_ID);
     if (dataPointsGroup?.kind === "group") {
         DATA_POINTS_GROUP_MEMBERS.forEach((id, index) => {
             const entry = entriesById.get(id);
-            if (!entry || !added.delete(id)) return;
+            const atTopLevel = topLevelOf.get(id) === id;
+            if (!entry || !(added.has(id) || atTopLevel)) return;
+            added.delete(id);
+            if (atTopLevel) movedIntoGroup.add(id);
             const earlier = DATA_POINTS_GROUP_MEMBERS.slice(0, index);
             const at = dataPointsGroup.children.findLastIndex((child) => earlier.includes(child.id)) + 1;
             dataPointsGroup.children.splice(at, 0, entry);
+            topLevelOf.set(id, DATA_POINTS_GROUP_ID);
         });
     }
 
     // A missing overlay goes just above the overlay it follows in drawing order, so one
     // added to MDV later (e.g. density, above the data points) is not drawn over the rest.
     // An overlay inside a group stands for the group's top-level position.
-    const order = migrated.entries.map((entry) => entry.id);
+    const order = migrated.entries.map((entry) => entry.id).filter((id) => !movedIntoGroup.has(id));
     const positionOf = (deckId: (typeof DECK_OVERLAY_IDS)[number]) => {
         const id = deckHostLayerId(deckId);
         return order.indexOf(topLevelOf.get(id) ?? id);
