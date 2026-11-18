@@ -112,7 +112,10 @@ an open-axis tensor `[a][b][param]` (cross-PCF already returns `g[a·K·B + b·B
 for `(motif, measure)` and gets a value, a curve, or a raster handle. This is where the current chart
 compute (worker, latest-wins, abort) moves to, so two charts asking the same question don't compute
 twice. The key is the *inputs*, never a set's identity or host: two sets in different places that
-ask the same thing share the result.
+ask the same thing share the result. That includes the domain: a `DomainSourceRef` names a live gate
+or selection whose geometry changes under the same ref, so the key takes the **resolved** domain
+(its geometry and frame, as a content hash), not the ref. Editing a lasso then misses the cache, and
+redrawing the same shape, or a second chart on the same gate, hits it.
 
 ### Where a set lives
 

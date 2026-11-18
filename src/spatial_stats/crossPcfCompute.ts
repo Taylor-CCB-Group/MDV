@@ -2,17 +2,27 @@ import type { Domain } from "intraspatial/spatial/domain";
 import { crossPCFMatrixBinned, type LabelledCells, type PcfMatrixBinnedResult } from "intraspatial/spatial/pcf";
 import { type AnalysisFrame, affine2 } from "./analysisFrame";
 
-/** A column as MDV holds it: its (Shared)ArrayBuffer, not a copy. */
-export type ColumnBuffer = { buffer: ArrayBufferLike; datatype: string };
+/**
+ * Column arrays exactly as DataStore holds them (`column.data`): a view over its (Shared)ArrayBuffer,
+ * so posting one shares the memory rather than copying it when the buffer is shared.
+ *
+ * The typed array is passed rather than a buffer + `datatype`, because the datatype → array mapping
+ * is DataStore's to decide and isn't the obvious one: `integer` is held as `Float32Array` today
+ * (see `DataStructureTypes`), and `datatypes.ts` still says `Int32Array`. Reading the array DataStore
+ * built means this follows whatever that mapping becomes.
+ */
+export type NumericArray = Float32Array | Int32Array;
+/** Category codes: `text` → Uint8, `text16` → Uint16. */
+export type CodeArray = Uint8Array | Uint16Array;
 
 /** What the cross-PCF worker receives. Plain data, so it posts as-is. */
 export type CrossPcfRequest = {
-    x: ColumnBuffer;
-    y: ColumnBuffer;
-    /** Categorical column (`text` → Uint8, `text16` → Uint16): its codes are the type ids. */
-    type: ColumnBuffer & { nTypes: number };
+    x: NumericArray;
+    y: NumericArray;
+    /** Categorical column: its codes are the type ids. */
+    type: { codes: CodeArray; nTypes: number };
     /** Keep only rows whose region code equals `code`. */
-    region?: ColumnBuffer & { code: number };
+    region?: { codes: CodeArray; code: number };
     /** Data columns → analysis frame; `domain` is already in the analysis frame. */
     frame: AnalysisFrame;
     domain: Domain;
@@ -26,14 +36,6 @@ export type CrossPcfResponse = PcfMatrixBinnedResult & {
     candidates: number;
     ms: number;
 };
-
-function numeric({ buffer, datatype }: ColumnBuffer) {
-    return datatype === "int32" || datatype === "integer" ? new Int32Array(buffer) : new Float32Array(buffer);
-}
-
-function codes({ buffer, datatype }: ColumnBuffer) {
-    return datatype === "text16" || datatype === "multitext" ? new Uint16Array(buffer) : new Uint8Array(buffer);
-}
 
 /**
  * The cells handed to intraspatial: positions already in the analysis frame, as typed arrays.
@@ -53,10 +55,9 @@ export function labelledCells(xs: Float64Array, ys: Float64Array, typeId: Uint16
  * so they go straight into typed arrays sized for the worst case and are trimmed with `subarray`.
  */
 export function gatherCells(req: Pick<CrossPcfRequest, "x" | "y" | "type" | "region" | "frame" | "domain">) {
-    const x = numeric(req.x);
-    const y = numeric(req.y);
-    const type = codes(req.type);
-    const region = req.region ? codes(req.region) : undefined;
+    const { x, y } = req;
+    const type = req.type.codes;
+    const region = req.region?.codes;
     const regionCode = req.region?.code;
     const [minX, minY, maxX, maxY] = req.domain.bbox;
     const [a, b, c, d, tx, ty] = affine2(req.frame);

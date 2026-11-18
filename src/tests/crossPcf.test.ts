@@ -197,10 +197,10 @@ describe("cross-PCF on a domain", () => {
         region[i] = i % 2;
     }
     const base = {
-        x: { buffer: x.buffer, datatype: "double" },
-        y: { buffer: y.buffer, datatype: "double" },
-        type: { buffer: type.buffer, datatype: "text", nTypes: 3 },
-        region: { buffer: region.buffer, datatype: "text", code: 1 },
+        x,
+        y,
+        type: { codes: type, nTypes: 3 },
+        region: { codes: region, code: 1 },
     };
 
     test("cells go through the same frame as the domain, into typed arrays", () => {
@@ -215,6 +215,21 @@ describe("cross-PCF on a domain", () => {
         let insideFrame = 0;
         for (let i = 0; i < cells.xs.length; i++) if (domainContains(domain, cells.xs[i], cells.ys[i])) insideFrame++;
         expect(insideFrame).toBe(insideData);
+    });
+
+    test("positions are read from whichever array DataStore built (Float32 or Int32)", () => {
+        const domain = polygonGeometryDomain(holed, aniso);
+        const asInt = gatherCells({ ...base, x: Int32Array.from(x), y: Int32Array.from(y), frame: aniso, domain });
+        const asFloat = gatherCells({
+            ...base,
+            x: Float32Array.from(x, Math.trunc),
+            y: Float32Array.from(y, Math.trunc),
+            frame: aniso,
+            domain,
+        });
+        expect(asInt.xs.length).toBeGreaterThan(0);
+        expect(Array.from(asInt.xs)).toEqual(Array.from(asFloat.xs));
+        expect(Array.from(asInt.typeId)).toEqual(Array.from(asFloat.typeId));
     });
 
     test("uniform random cells give g ≈ 1 inside a holed domain under an anisotropic frame", () => {
@@ -354,9 +369,9 @@ describe("whole-region domain", () => {
             type[i] = i % 2;
         }
         const res = crossPcfInDomain({
-            x: { buffer: x.buffer, datatype: "double" },
-            y: { buffer: y.buffer, datatype: "double" },
-            type: { buffer: type.buffer, datatype: "text", nTypes: 2 },
+            x,
+            y,
+            type: { codes: type, nTypes: 2 },
             frame: aniso,
             domain: boundsDomain({ minX: 0, minY: 0, maxX: 400, maxY: 400 }, aniso),
             rMax: 10,

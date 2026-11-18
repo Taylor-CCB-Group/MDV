@@ -1,7 +1,7 @@
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import type DataStore from "@/datastore/DataStore";
 import { type AnalysisFrame, regionsScaleFrame } from "./analysisFrame";
-import type { CrossPcfRequest, CrossPcfResponse } from "./crossPcfCompute";
+import type { CodeArray, CrossPcfRequest, CrossPcfResponse, NumericArray } from "./crossPcfCompute";
 import type { DomainSource } from "./domainSource";
 import { readRegionStore } from "./regionSpatialData";
 import { spatialDataRegionFrame } from "./spatialDataFrame";
@@ -71,9 +71,9 @@ export async function computeCrossPCF(
     if (!labels) throw new Error(`${typeColumn} is not a categorical column`);
 
     const request: CrossPcfRequest = {
-        x: { buffer: xCol.data.buffer, datatype: xCol.datatype },
-        y: { buffer: yCol.data.buffer, datatype: yCol.datatype },
-        type: { buffer: typeCol.data.buffer, datatype: typeCol.datatype, nTypes: labels.length },
+        x: numericData(xCol),
+        y: numericData(yCol),
+        type: { codes: codeData(typeCol), nTypes: labels.length },
         frame,
         domain: await source.toDomain(frame),
         rMax: opts.rMax ?? 100,
@@ -83,7 +83,7 @@ export async function computeCrossPCF(
     if (regionCol && source.region !== undefined) {
         const code = regionCol.values?.indexOf(source.region) ?? -1;
         if (code < 0) throw new Error(`Region ${source.region} not found in ${regionField}`);
-        request.region = { buffer: regionCol.data.buffer, datatype: regionCol.datatype, code };
+        request.region = { codes: codeData(regionCol), code };
     }
 
     const worker = new Worker(new URL("./crossPcfWorker.ts", import.meta.url), { type: "module" });
@@ -100,6 +100,19 @@ export async function computeCrossPCF(
     } finally {
         worker.terminate();
     }
+}
+
+/** The array DataStore built for a numeric column, whatever its datatype maps to. */
+function numericData(col: { name: string; data?: unknown }): NumericArray {
+    const { data } = col;
+    if (data instanceof Float32Array || data instanceof Int32Array) return data;
+    throw new Error(`${col.name} is not a numeric column`);
+}
+
+function codeData(col: { name: string; data?: unknown }): CodeArray {
+    const { data } = col;
+    if (data instanceof Uint8Array || data instanceof Uint16Array) return data;
+    throw new Error(`${col.name} is not a categorical column`);
 }
 
 function defaultTypeColumn(dataStore: DataStore): string | undefined {
