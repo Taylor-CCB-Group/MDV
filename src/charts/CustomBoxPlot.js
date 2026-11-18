@@ -196,7 +196,7 @@ BaseChart.types["density_box_plot"] = {
         //work out area of each region
         for (const reg_name in ds.regions.all_regions) {
             const reg = ds.regions.all_regions[reg_name];
-            const area = (reg.roi.max_x - reg.roi.min_x) * (reg.roi.max_x - reg.roi.min_x);
+            const area = (reg.roi.max_x - reg.roi.min_x) * (reg.roi.max_y - reg.roi.min_y);
             config.denominators[reg_name] = area * (ds.regions.scale * ds.regions.scale);
         }
     },
