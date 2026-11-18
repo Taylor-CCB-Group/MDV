@@ -632,6 +632,7 @@ describe("render stack groups", () => {
         ]);
         expect(findRenderStackEntry(loaded, DATA_POINTS_GROUP_ID)).toMatchObject({
             props: { opacity: 0.5, isolate: true },
+            children: [{ id: "deck:grey_scatter" }, { id: "deck:scatter" }],
         });
         expect(findRenderStackEntry(loaded, "deck:scatter")?.visible).toBe(true);
         warn.mockRestore();
