@@ -1,6 +1,7 @@
 import type { Layer } from "@deck.gl/core";
 import type { SpatialData } from "@spatialdata/core";
 import {
+    findRenderStackEntry,
     getRenderStackEntryIds,
     RENDER_STACK_SCHEMA_VERSION,
     type RenderStack,
@@ -569,6 +570,33 @@ describe("render stack groups", () => {
 
         expect(loaded).toEqual({ ...before, schemaVersion: 2 });
         expect(normalizeRenderStack(loaded)).toEqual(loaded);
+    });
+
+    test("a stack re-saved by a build from before groups loads without the overlays it added twice", () => {
+        // An older build found the scatter overlays missing from the top level and added them
+        // there, after the data points' group that still holds them. (It also wrote
+        // schemaVersion 1; migration keeps a v1 group's entry children as they are.)
+        const saved = renderStack([
+            spatialEntry({ id: "image-a", elementKey: "imageA" }),
+            {
+                kind: "group",
+                id: DATA_POINTS_GROUP_ID,
+                visible: true,
+                props: { opacity: 0.5, isolate: true },
+                children: [hostEntry(deckHostLayerId("grey_scatter")), hostEntry(deckHostLayerId("scatter"))],
+            },
+            ...hostIds.slice(2).map((id) => hostEntry(id)),
+            hostEntry(deckHostLayerId("grey_scatter")),
+            hostEntry(deckHostLayerId("scatter"), false),
+        ]);
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const loaded = migrateSavedRenderStack(saved);
+
+        expect(getRenderStackEntryIds(loaded)).toEqual(["image-a", DATA_POINTS_GROUP_ID, ...hostIds]);
+        expect(findRenderStackEntry(loaded, deckHostLayerId("scatter"))?.visible).toBe(true);
+        expect(warn).toHaveBeenCalledTimes(2);
+        warn.mockRestore();
     });
 
     test("normalizing finds host entries inside groups, and migrates a v1 group", () => {

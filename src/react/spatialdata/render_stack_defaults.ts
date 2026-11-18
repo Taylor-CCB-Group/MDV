@@ -179,13 +179,46 @@ export function migrateSavedRenderStack(saved: RenderStackV1 | RenderStack): Ren
             `Render stack migration dropped '${notice.childId}' from group '${notice.groupId}' (${notice.reason})`,
         );
     }
+    for (const id of dropDuplicateEntries(stack)) {
+        console.warn(`Render stack had '${id}' more than once; kept the first`);
+    }
     return stack;
+}
+
+/**
+ * Remove every entry whose id an earlier one (depth-first, in draw order) already has,
+ * in place, and return their ids.
+ *
+ * Builds from before groups (sd.js 0.15 and older) read only the top level, and add any
+ * MDV overlay they don't find there. A stack they save after the data points were put
+ * in their group therefore holds those overlays twice: in the group, and again at the
+ * top level, after it.
+ */
+function dropDuplicateEntries(stack: RenderStack): string[] {
+    const seen = new Set<string>();
+    const dropped: string[] = [];
+    const prune = (list: RenderStackEntry[]) => {
+        for (let i = 0; i < list.length; ) {
+            const entry = list[i];
+            if (seen.has(entry.id)) {
+                dropped.push(entry.id);
+                list.splice(i, 1);
+                continue;
+            }
+            seen.add(entry.id);
+            if (entry.kind === "group") prune(entry.children);
+            i++;
+        }
+    };
+    prune(stack.entries);
+    return dropped;
 }
 
 /** `migrateSavedRenderStack` for a stack that is already observable: patched in place. */
 function migrateRenderStackInPlace(stack: RenderStack): boolean {
+    const countBefore = Array.from(walkRenderStackEntries(stack.entries)).length;
     const migrated = migrateSavedRenderStack(stack);
-    if (migrated === stack) return false;
+    if (migrated === stack) return Array.from(walkRenderStackEntries(stack.entries)).length !== countBefore;
     stack.schemaVersion = migrated.schemaVersion;
     stack.entries.splice(0, stack.entries.length, ...migrated.entries);
     return true;
