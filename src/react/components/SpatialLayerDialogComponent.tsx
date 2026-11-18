@@ -654,9 +654,11 @@ const SpatialLayerDialogComponent = observer(() => {
             mutateStack((current) => {
                 ungroupRenderStackEntry(current, groupId);
             });
+            // the group is gone; its layers keep any failures of their own
+            chart.clearLayerFailure(groupId);
             if (selectedEntryId === groupId) setSelectedEntryId(null);
         },
-        [mutateStack, selectedEntryId],
+        [chart, mutateStack, selectedEntryId],
     );
 
     const onInsert = useCallback(
@@ -722,7 +724,9 @@ const SpatialLayerDialogComponent = observer(() => {
         const state = drag;
         setDrag(null);
         if (!state || !event.over) return;
-        const drop = projectLayerTreeDrop(treeRows, state.activeId, String(event.over.id), state.depthOffset);
+        // from the release itself: the last move may not have reached `drag` yet
+        const depthOffset = Math.round(event.delta.x / TREE_INDENT_PX);
+        const drop = projectLayerTreeDrop(treeRows, state.activeId, String(event.over.id), depthOffset);
         if (!drop) return;
         const from = findRenderStackSiblings(stack, state.activeId);
         const unchanged =

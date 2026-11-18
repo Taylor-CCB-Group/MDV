@@ -11,13 +11,16 @@ export function getLayerLoadStateByElementKey(
     stack: RenderStack,
     getLayerLoadState: (layerId?: string) => LayerLoadState | undefined,
 ): LayerLoadState | undefined {
+    // The same element can be in several entries, some never loaded (e.g. in a hidden
+    // group): the first one with a load state answers.
     for (const entry of walkRenderStackEntries(stack.entries)) {
         if (
             entry.kind === "spatial" &&
             entry.source.elementType === "image" &&
             entry.source.elementKey === elementKey
         ) {
-            return getLayerLoadState(entry.id);
+            const state = getLayerLoadState(entry.id);
+            if (state) return state;
         }
     }
     return undefined;

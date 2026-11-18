@@ -55,6 +55,9 @@ export const DECK_OVERLAY_VISIBILITY_FOLLOWERS: Partial<Record<DeckOverlayId, De
  */
 export const DATA_POINTS_GROUP_ID = "group:data-points";
 
+/** What the data points' group holds, in drawing order. */
+export const DATA_POINTS_GROUP_MEMBERS = ["deck:grey_scatter", "deck:scatter"];
+
 export function deckHostLayerId(deckId: DeckOverlayId): string {
     return `deck:${deckId}`;
 }

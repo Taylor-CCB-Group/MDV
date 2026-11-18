@@ -2,6 +2,7 @@ import type { LayerChannelConfig } from "@spatialdata/avivatorish";
 import type { SpatialData, SpatialElement } from "@spatialdata/core";
 import {
     findRenderStackEntry,
+    getRenderStackEntryIds,
     migrateRenderStack,
     RENDER_STACK_SCHEMA_VERSION,
     type RenderStack,
@@ -13,7 +14,13 @@ import {
 
 import { getRandomString } from "@/utilities/Utilities";
 
-import { DECK_OVERLAY_IDS, DECK_OVERLAY_VISIBILITY_FOLLOWERS, deckHostLayerId } from "./host_overlay_ids";
+import {
+    DATA_POINTS_GROUP_ID,
+    DATA_POINTS_GROUP_MEMBERS,
+    DECK_OVERLAY_IDS,
+    DECK_OVERLAY_VISIBILITY_FOLLOWERS,
+    deckHostLayerId,
+} from "./host_overlay_ids";
 
 function elementsForCoordinateSystem<T extends SpatialElement>(
     elements: Record<string, T> | undefined,
@@ -179,31 +186,38 @@ export function migrateSavedRenderStack(saved: RenderStackV1 | RenderStack): Ren
             `Render stack migration dropped '${notice.childId}' from group '${notice.groupId}' (${notice.reason})`,
         );
     }
-    for (const id of dropDuplicateEntries(stack)) {
-        console.warn(`Render stack had '${id}' more than once; kept the first`);
+    for (const message of repairDuplicateEntries(stack)) {
+        console.warn(`Render stack: ${message}`);
     }
     return stack;
 }
 
 /**
- * Remove every entry whose id an earlier one (depth-first, in draw order) already has,
- * in place, and return their ids.
+ * Remove every layer whose id an earlier entry (depth-first, in draw order) already has,
+ * in place, and say what was done. A group with a repeated id is kept under a new id, so
+ * that layers only it holds are not lost.
  *
  * Builds from before groups (sd.js 0.15 and older) read only the top level, and add any
  * MDV overlay they don't find there. A stack they save after the data points were put
  * in their group therefore holds those overlays twice: in the group, and again at the
  * top level, after it.
  */
-function dropDuplicateEntries(stack: RenderStack): string[] {
+function repairDuplicateEntries(stack: RenderStack): string[] {
     const seen = new Set<string>();
-    const dropped: string[] = [];
+    const messages: string[] = [];
     const prune = (list: RenderStackEntry[]) => {
         for (let i = 0; i < list.length; ) {
             const entry = list[i];
             if (seen.has(entry.id)) {
-                dropped.push(entry.id);
-                list.splice(i, 1);
-                continue;
+                if (entry.kind !== "group") {
+                    messages.push(`dropped a second '${entry.id}'`);
+                    list.splice(i, 1);
+                    continue;
+                }
+                // a group may hold layers found nowhere else: keep it, under an id of its own
+                const id = `group-#${getRandomString()}`;
+                messages.push(`renamed a second group '${entry.id}' to '${id}'`);
+                entry.id = id;
             }
             seen.add(entry.id);
             if (entry.kind === "group") prune(entry.children);
@@ -211,14 +225,14 @@ function dropDuplicateEntries(stack: RenderStack): string[] {
         }
     };
     prune(stack.entries);
-    return dropped;
+    return messages;
 }
 
 /** `migrateSavedRenderStack` for a stack that is already observable: patched in place. */
 function migrateRenderStackInPlace(stack: RenderStack): boolean {
-    const countBefore = Array.from(walkRenderStackEntries(stack.entries)).length;
+    const idsBefore = getRenderStackEntryIds(stack).join("\0");
     const migrated = migrateSavedRenderStack(stack);
-    if (migrated === stack) return Array.from(walkRenderStackEntries(stack.entries)).length !== countBefore;
+    if (migrated === stack) return getRenderStackEntryIds(stack).join("\0") !== idsBefore;
     stack.schemaVersion = migrated.schemaVersion;
     stack.entries.splice(0, stack.entries.length, ...migrated.entries);
     return true;
@@ -263,6 +277,19 @@ export function normalizeRenderStack(stack: RenderStack | undefined): RenderStac
         }
     }
 
+    // A scatter overlay missing from the data points' group goes back into it, in member
+    // order: at the top level it would miss the group's visibility and compositing.
+    const dataPointsGroup = migrated.entries.find((entry) => entry.id === DATA_POINTS_GROUP_ID);
+    if (dataPointsGroup?.kind === "group") {
+        DATA_POINTS_GROUP_MEMBERS.forEach((id, index) => {
+            const entry = entriesById.get(id);
+            if (!entry || !added.delete(id)) return;
+            const earlier = DATA_POINTS_GROUP_MEMBERS.slice(0, index);
+            const at = dataPointsGroup.children.findLastIndex((child) => earlier.includes(child.id)) + 1;
+            dataPointsGroup.children.splice(at, 0, entry);
+        });
+    }
+
     // A missing overlay goes just above the overlay it follows in drawing order, so one
     // added to MDV later (e.g. density, above the data points) is not drawn over the rest.
     // An overlay inside a group stands for the group's top-level position.
@@ -298,9 +325,10 @@ export function normalizeRenderStack(stack: RenderStack | undefined): RenderStac
 
 export function mergeHostOverlayEntriesInPlace(stack: RenderStack): boolean {
     const migrated = migrateRenderStackInPlace(stack);
+    // normalizing can add to the data points' group in place, so compare the whole tree
+    const beforeIds = getRenderStackEntryIds(stack).join("\0");
     const normalized = normalizeRenderStack(stack);
-    const beforeIds = stack.entries.map((entry) => entry.id).join("\0");
-    const afterIds = normalized.entries.map((entry) => entry.id).join("\0");
+    const afterIds = getRenderStackEntryIds(normalized).join("\0");
     if (beforeIds === afterIds) {
         return migrated;
     }

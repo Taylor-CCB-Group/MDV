@@ -599,6 +599,107 @@ describe("render stack groups", () => {
         warn.mockRestore();
     });
 
+    test("a v1 stack saved by an older build, with inline group children, loads without its duplicates", () => {
+        // As written by a build from before groups: it keeps the group as it found it, adds
+        // the scatter overlays it couldn't find at the top level, and writes schemaVersion 1.
+        const saved = JSON.parse(`{
+            "schemaVersion": 1,
+            "entries": [
+                { "kind": "spatial", "id": "image-a", "visible": true,
+                  "source": { "elementType": "image", "elementKey": "imageA" }, "props": {} },
+                { "kind": "group", "id": "${DATA_POINTS_GROUP_ID}", "visible": true,
+                  "props": { "opacity": 0.5, "isolate": true },
+                  "children": [
+                    { "kind": "host", "id": "deck:grey_scatter", "visible": true, "source": { "hostLayerId": "deck:grey_scatter" }, "props": {} },
+                    { "kind": "host", "id": "deck:scatter", "visible": true, "source": { "hostLayerId": "deck:scatter" }, "props": {} }
+                  ] },
+                { "kind": "host", "id": "deck:density", "visible": true, "source": { "hostLayerId": "deck:density" }, "props": {} },
+                { "kind": "host", "id": "deck:grey_scatter", "visible": true, "source": { "hostLayerId": "deck:grey_scatter" }, "props": {} },
+                { "kind": "host", "id": "deck:scatter", "visible": false, "source": { "hostLayerId": "deck:scatter" }, "props": {} }
+            ]
+        }`);
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const loaded = migrateSavedRenderStack(saved);
+
+        expect(loaded.schemaVersion).toBe(2);
+        expect(getRenderStackEntryIds(loaded)).toEqual([
+            "image-a",
+            DATA_POINTS_GROUP_ID,
+            "deck:grey_scatter",
+            "deck:scatter",
+            "deck:density",
+        ]);
+        expect(findRenderStackEntry(loaded, DATA_POINTS_GROUP_ID)).toMatchObject({
+            props: { opacity: 0.5, isolate: true },
+        });
+        expect(findRenderStackEntry(loaded, "deck:scatter")?.visible).toBe(true);
+        warn.mockRestore();
+    });
+
+    test("a second group with a repeated id keeps its layers, under a new id", () => {
+        const stack = renderStack([
+            {
+                kind: "group",
+                id: "g",
+                visible: true,
+                props: {},
+                children: [spatialEntry({ id: "a", elementKey: "a" })],
+            },
+            {
+                kind: "group",
+                id: "g",
+                visible: true,
+                props: {},
+                children: [spatialEntry({ id: "b", elementKey: "b" })],
+            },
+        ]);
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const ids = getRenderStackEntryIds(migrateSavedRenderStack(stack));
+
+        expect(ids).toHaveLength(4);
+        expect(ids.filter((id) => id === "g")).toHaveLength(1);
+        expect(ids).toContain("b");
+        warn.mockRestore();
+    });
+
+    test("a scatter overlay missing from the data points' group goes back into it", () => {
+        const stack = createHostOnlyRenderStack();
+        setDataPointsCompositing(stack, { ...DEFAULT_COMPOSITING, isolate: true });
+        const group = stack.entries[0];
+        if (group.kind !== "group") throw new Error("expected the data points' group");
+        group.children.splice(0, 1); // lose the grey scatter
+
+        expect(mergeHostOverlayEntriesInPlace(stack)).toBe(true);
+        expect(group.children.map((child) => child.id)).toEqual([
+            deckHostLayerId("grey_scatter"),
+            deckHostLayerId("scatter"),
+        ]);
+        expect(getRenderStackEntryIds(stack).filter((id) => id === deckHostLayerId("grey_scatter"))).toHaveLength(1);
+    });
+
+    test("moving a layer out of a group changes the revision and its inherited opacity", () => {
+        const image = spatialEntry({ id: "image-a", elementKey: "imageA", props: { opacity: 1 } });
+        const group: RenderStackEntry = {
+            kind: "group",
+            id: "g",
+            visible: true,
+            props: { opacity: 0.25 },
+            children: [image],
+        };
+        const stack = renderStack([group]);
+        const cache = createRenderStackLayerInputsCache();
+        expect(syncRenderStackLayerInputs(stack, cache).layers["image-a"]?.opacity).toBe(0.25);
+        const before = renderStackSpatialRevision(stack);
+
+        // the only child moves to just after the group: same order, same props
+        expect(moveRenderStackEntry(stack, "image-a", null, "g")).toBe(true);
+
+        expect(renderStackSpatialRevision(stack)).not.toBe(before);
+        expect(syncRenderStackLayerInputs(stack, cache).layers["image-a"]?.opacity).toBe(1);
+    });
+
     test("normalizing finds host entries inside groups, and migrates a v1 group", () => {
         const stack = groupedStack();
         expect(getRenderStackEntryIds(normalizeRenderStack(stack))).toEqual(getRenderStackEntryIds(stack));

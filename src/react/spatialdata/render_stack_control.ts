@@ -16,7 +16,13 @@ import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "@/react/com
 import { useChart } from "@/react/context";
 import { useConfig } from "@/react/hooks";
 import { getRandomString } from "@/utilities/Utilities";
-import { DATA_POINTS_GROUP_ID, type DeckOverlayId, deckHostLayerId, deckIdFromHostLayerId } from "./host_overlay_ids";
+import {
+    DATA_POINTS_GROUP_ID,
+    DATA_POINTS_GROUP_MEMBERS,
+    type DeckOverlayId,
+    deckHostLayerId,
+    deckIdFromHostLayerId,
+} from "./host_overlay_ids";
 
 export { DATA_POINTS_GROUP_ID };
 
@@ -308,7 +314,6 @@ export function seedRenderStackFromSpatialData(
  * exists only while their compositing differs from the default, so stacks that never
  * use it carry no group and pay nothing for one.
  */
-const DATA_POINTS_GROUP_MEMBERS = [deckHostLayerId("grey_scatter"), deckHostLayerId("scatter")];
 
 export type CompositingProps = {
     opacity: number;

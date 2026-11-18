@@ -1,5 +1,6 @@
 import { Checkbox, FormControlLabel, MenuItem, Slider, TextField, Typography } from "@mui/material";
 import type { RenderStackGroupBlendMode } from "@spatialdata/layers";
+import { useId } from "react";
 
 import type { CompositingProps } from "@/react/spatialdata/render_stack_control";
 
@@ -30,10 +31,12 @@ export default function CompositingControls({
     onChange: (patch: Partial<CompositingProps>) => void;
 }) {
     const blended = value.blendMode !== "pass-through";
+    // several layer dialogs can be open in one document
+    const opacityLabelId = useId();
     return (
         <div className="grid gap-2">
             <div>
-                <Typography variant="body2" id="compositing-opacity">
+                <Typography variant="body2" id={opacityLabelId}>
                     Opacity
                 </Typography>
                 <Slider
@@ -42,7 +45,7 @@ export default function CompositingControls({
                     max={1}
                     step={0.01}
                     value={value.opacity}
-                    aria-labelledby="compositing-opacity"
+                    aria-labelledby={opacityLabelId}
                     valueLabelDisplay="auto"
                     onChange={(_, next) => {
                         if (typeof next === "number") onChange({ opacity: next });
