@@ -23,7 +23,7 @@ from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any, cast
 from pandas.api.types import is_bool_dtype, is_datetime64_any_dtype
 
-from mdvtools.column_types import NUMPY_STORAGE_DTYPES, infer_datatype
+from mdvtools.column_types import NUMPY_STORAGE_DTYPES, infer_datatype, integer_precision_warning
 import polars as pl
 # from mdvtools.charts.view import View 
 import time
@@ -3151,22 +3151,13 @@ def add_column_to_group(
                     errors="coerce"
                 )
         )  # this is slooooow?
-        # Check for precision loss when storing wide integers as float32
-        wide_int_types = {"int64", "uint32", "uint64", "Int64", "UInt32", "UInt64"}
-        if col["datatype"] == "integer" and col.get("original_dtype") in wide_int_types:
+        if col["datatype"] == "integer" and col.get("original_dtype"):
             try:
-                numeric = numpy.asarray(
-                    pandas.to_numeric(clean, errors="coerce"),
-                    dtype=numpy.float64,
+                warning = integer_precision_warning(
+                    col["original_dtype"], pandas.to_numeric(clean, errors="coerce")
                 )
-                finite_numeric = numeric[numpy.isfinite(numeric)]
-                out_of_range = finite_numeric[numpy.abs(finite_numeric) > 16_777_216]
-                if len(out_of_range) != 0:
-                    col.setdefault("storage_warnings", []).append(
-                        f"{col.get('original_dtype')} -> float32 (integer): "
-                        f"{len(out_of_range)} value(s) exceed exact-integer range "
-                        f"(max abs={float(numpy.abs(finite_numeric).max()):.0f}); precision loss possible."
-                    )
+                if warning:
+                    col.setdefault("storage_warnings", []).append(warning)
             except Exception:
                 pass
         # faster but non=numeric values have to be certain values
@@ -3335,18 +3326,14 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
                 # fillna is necessary because NaN cannot be cast to int
                 data = polars_series.fill_null(np.nan).to_numpy(zero_copy_only=False).astype(np.float32)
 
-            if col_info["datatype"] == "integer" and col_info.get("original_dtype") == "UInt32":
+            if col_info["datatype"] == "integer" and col_info.get("original_dtype"):
                 try:
-                    numeric = polars_series.cast(pl.Float64, strict=False).drop_nulls()
-                    arr = numeric.to_numpy()
-                    finite = arr[np.isfinite(arr)]
-                    out_of_range = finite[finite > 16_777_216]
-                    if len(out_of_range) != 0:
-                        col_info.setdefault("storage_warnings", []).append(
-                            "uint32 -> float32 (integer): "
-                            f"{len(out_of_range)} value(s) exceed exact-integer range "
-                            f"(max={float(finite.max()):.0f}); precision loss possible."
-                        )
+                    warning = integer_precision_warning(
+                        col_info["original_dtype"],
+                        polars_series.cast(pl.Float64, strict=False).drop_nulls().to_numpy(),
+                    )
+                    if warning:
+                        col_info.setdefault("storage_warnings", []).append(warning)
                 except Exception:
                     pass
 
