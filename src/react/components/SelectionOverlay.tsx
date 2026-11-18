@@ -1,13 +1,13 @@
 import { DrawPolygonByDraggingMode, type GeoJsonEditMode, TranslateMode } from "@deck.gl-community/editable-layers";
 import { TuneOutlined } from "@mui/icons-material";
 import AddCircleOutlinedIcon from "@mui/icons-material/AddCircleOutlined";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import DoneOutlinedIcon from "@mui/icons-material/DoneOutlined";
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
-import PhotoSizeSelectSmallIcon from "@mui/icons-material/PhotoSizeSelectSmall";
-import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
 import { ButtonGroup, Divider } from "@mui/material"; //check tree-shaking...
-import { LassoIcon, SplineIcon } from "lucide-react";
+import { LassoIcon, SplinePointerIcon, VectorSquareIcon } from "lucide-react";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditMode, PolygonMode, RectangleMode } from "@/editable-layers/selectionModes";
@@ -20,8 +20,17 @@ import GateNameDialog from "./GateNameDialog";
 import IconWithTooltip from "./IconWithTooltip";
 import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
 
-// material-ui icons, or font-awesome icons... or custom in some cases...
-// mui icons are hefty, not sure about this...
+/**
+ * Phosphor's `polygon` icon (regular weight), copied in to avoid a dependency for one icon.
+ * Phosphor Icons, MIT licence, Copyright (c) 2023 Phosphor Icons: https://phosphoricons.com
+ */
+const PolygonIcon = ({ size = 24 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+        <path d="M230.64,49.36a32,32,0,0,0-45.26,0h0a31.9,31.9,0,0,0-5.16,6.76L152,48.42A32,32,0,0,0,97.37,25.36h0a32.06,32.06,0,0,0-5.76,37.41L57.67,93.32a32.05,32.05,0,0,0-40.31,4.05h0a32,32,0,0,0,42.89,47.41l70,51.36a32,32,0,1,0,47.57-14.69l27.39-77.59q1.38.12,2.76.12a32,32,0,0,0,22.63-54.62Zm-122-12.69h0a16,16,0,1,1,0,22.64A16,16,0,0,1,108.68,36.67Zm-80,94.65a16,16,0,0,1,0-22.64h0a16,16,0,1,1,0,22.64Zm142.65,88a16,16,0,0,1-22.63-22.63h0a16,16,0,1,1,22.63,22.63Zm-8.55-43.18a32,32,0,0,0-23,7.08l-70-51.36a32.17,32.17,0,0,0-1.34-26.65l33.95-30.55a32,32,0,0,0,45.47-10.81L176,71.56a32,32,0,0,0,14.12,27Zm56.56-92.84A16,16,0,1,1,196.7,60.68h0a16,16,0,0,1,22.63,22.63Z" />
+    </svg>
+);
+
+// the conventional icon for each selection tool, from open-licence sets (lucide: ISC)
 export const Tools = {
     pan: {
         name: "Pan",
@@ -30,13 +39,13 @@ export const Tools = {
     },
     rectangle: {
         name: "Rectangle",
-        ToolIcon: PhotoSizeSelectSmallIcon,
+        ToolIcon: VectorSquareIcon,
         mode: RectangleMode,
     },
     // todo: add these back in once we have deck EditableGeoJsonLayer etc in place...
     polygon: {
         name: "Polygon",
-        ToolIcon: PolylineOutlinedIcon,
+        ToolIcon: PolygonIcon,
         mode: PolygonMode,
     },
     freehand: {
@@ -46,7 +55,7 @@ export const Tools = {
     },
     transform: {
         name: "Modify",
-        ToolIcon: SplineIcon,
+        ToolIcon: SplinePointerIcon,
         mode: EditMode,
     },
     // measure: {
@@ -109,6 +118,10 @@ export default observer(function SelectionOverlay() {
     const [cx, cy] = useParamColumns();
 
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
+    // the toolbar starts collapsed to the active tool, so it covers less of the plot
+    const [expanded, setExpanded] = useState(false);
+    // editing a gate needs the edit tools in view
+    const showAllTools = expanded || editingGateId != null;
     const manageGateByChartRef = useRef<Map<string, ManageGateDialogWrapper<DeckScatterConfigWithRegion>>>(new Map());
     const theme = useTheme();
 
@@ -161,7 +174,8 @@ export default observer(function SelectionOverlay() {
     // It would be good to have a poly-line tool with draggable points, though.
     // Also a brush tool for painting on masks with variable radius.
     const toolButtons = useMemo(() => {
-        return toolsToShow.map(({ name, ToolIcon }) => (
+        const tools = showAllTools ? toolsToShow : toolsToShow.filter((t) => t.name === selectedTool);
+        return tools.map(({ name, ToolIcon }) => (
             <ToolButton
                 key={name}
                 name={name}
@@ -170,7 +184,7 @@ export default observer(function SelectionOverlay() {
                 setSelectedTool={setSelectedTool}
             />
         ));
-    }, [selectedTool, setSelectedTool, toolsToShow]);
+    }, [selectedTool, setSelectedTool, toolsToShow, showAllTools]);
 
     const onManageGatesClick = useCallback(() => {
         if (manageGateByChartRef.current.get(chartId)) {
@@ -221,38 +235,55 @@ export default observer(function SelectionOverlay() {
                 variant="contained"
                 aria-label="choose tool for manipulating view or selection"
                 //moving this to the top right corner and absolute to avoid interfering with axes
-                className="z-[2] p-2 absolute top-0 right-0 opacity-90"
+                className={`z-[2] absolute top-0 right-0 opacity-90 ${showAllTools ? "p-2" : "p-1"}`}
                 sx={{
                     backgroundColor: theme === "dark" ? "rgba(37,37,37,0.92)" : "rgba(245,245,245,0.92)",
                     borderRadius: 0,
                     borderBottomLeftRadius: "5px",
                 }}
             >
+                {!editingGateId && (
+                    <IconWithTooltip
+                        tooltipText={expanded ? "Hide tools" : "Show tools"}
+                        onClick={() => setExpanded((e) => !e)}
+                        iconButtonProps={{
+                            sx: { color: "var(--text_color)", borderRadius: 10, zIndex: 2, px: 0.25 },
+                            "aria-label": expanded ? "Hide tools" : "Show tools",
+                            "aria-expanded": expanded,
+                        }}
+                    >
+                        {expanded ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+                    </IconWithTooltip>
+                )}
                 {toolButtons}
-                <Divider
-                    orientation="vertical"
-                    sx={{
-                        color: "inherit",
-                        width: "5px",
-                        height: "35px",
-                        padding: "2px",
-                    }}
-                />
-                <IconWithTooltip
-                    tooltipText={"Manage Gates"}
-                    onClick={onManageGatesClick}
-                    iconButtonProps={{
-                        sx: {
-                            color: "var(--text_color)",
-                            borderRadius: 10,
-                            zIndex: 2,
-                            ml: 1,
-                        },
-                        "aria-label": "Manage Gates",
-                    }}
-                >
-                    <TuneOutlined />
-                </IconWithTooltip>
+                {showAllTools && (
+                    <>
+                        <Divider
+                            orientation="vertical"
+                            sx={{
+                                color: "inherit",
+                                width: "5px",
+                                height: "35px",
+                                padding: "2px",
+                            }}
+                        />
+                        <IconWithTooltip
+                            tooltipText={"Manage Gates"}
+                            onClick={onManageGatesClick}
+                            iconButtonProps={{
+                                sx: {
+                                    color: "var(--text_color)",
+                                    borderRadius: 10,
+                                    zIndex: 2,
+                                    ml: 1,
+                                },
+                                "aria-label": "Manage Gates",
+                            }}
+                        >
+                            <TuneOutlined />
+                        </IconWithTooltip>
+                    </>
+                )}
                 {hasSelection && !editingGateId && (
                     <IconWithTooltip
                         tooltipText={"Save selection as Gate"}
