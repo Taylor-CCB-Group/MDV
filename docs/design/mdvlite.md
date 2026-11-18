@@ -30,7 +30,8 @@ avoid all three problems:
   "pattern B" (genuinely separate packages), not the subset build ADR-0001 rejected.
 - **Locked dependencies** (`uv.lock`), and as few of them as possible. Ideally none, like `sdjs`.
 - **Anything both packages need is shared as a contract, not as code.** The column-type table
-  (`column_types.json`, ADR-0024) and the project descriptor below are data both sides read.
+  proposed in ADR-0024 (#669 generates it as `column_types.json`) and the project descriptor
+  below are data both sides read.
 
 ## Why this only becomes neat once h5 goes
 
@@ -74,6 +75,13 @@ datasources should match what `convert-spatial` writes, apart from fields that o
 because of h5. This is testable: run both over the synthetic SpatialData fixtures and compare.
 Once it holds, `convert-spatial` itself could write the descriptor, and full projects and
 `mdvlite` would share one format. `datasources.json` would then be derived for both.
+
+The contract can only cover inputs where each table becomes its own datasource: `per-table`, or
+`by-region` when no region has more than one table. `convert-spatial` merges the tables in a group
+(`merge`, or `by-region` when tables share a region) into one datasource, which "one datasource per
+table" cannot reproduce. That is deliberate: ADR-0023 moves away from merged datasources, towards
+tables related through element relations (#555). Manifesting a merged group, as a virtual
+concatenation of its tables, is possible later if old projects need it.
 
 **`state.json` too.** It holds the view list and initial view (`all_views`, `initial_view`),
 which belong to the project, alongside `permission` and the display name, which belong to the

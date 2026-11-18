@@ -38,9 +38,10 @@ in TypeScript and its Python counterpart, ideally generated from one source.
 
 - **Stored type:** a zarr v3 data type (bool, int8 to int64, uint8 to uint64, float32, float64,
   string) at the source's precision. Missing values are part of the stored type, not a reason to
-  change type. A fill value marks them only where the type reserves a value that cannot be real
-  data, such as NaN for floats. Integer and boolean columns carry a validity mask, as AnnData's
-  nullable arrays do, because any integer could be a real value.
+  change type. Integer and boolean columns carry a validity mask, as AnnData's nullable arrays
+  do, because any integer could be a real value. Float columns use NaN for missing, as MDV always
+  has, only when the source does not tell a real NaN apart from a null. When it does (pandas
+  nullable `Float64`, which AnnData stores with a mask), they keep the mask too.
 - **Encoding:** plain, categorical (integer codes plus a categories array kept in the store beside
   them), or multi-valued.
 - **Column kind:** numeric, categorical, unique or multi-valued, which is what charts and filters
@@ -48,9 +49,13 @@ in TypeScript and its Python counterpart, ideally generated from one source.
 
 `datatype` stays as a legacy field derived from these, so existing code and h5 projects keep
 working, and it is what the upgrade and downgrade scripts translate. Any narrowing, such as
-float64 to float32 in the DataStore, happens at load time in one place and is reported. Client
-code asks about a column's type only through the existing predicates (`isColumnNumeric`,
-`isColumnText`), so the migration changes them and not their callers.
+float64 to float32 in the DataStore, happens at load time in one place and is reported.
+
+Client code should ask about a column's type through the contract: its kind, or the existing
+predicates (`isColumnNumeric`, `isColumnText`), which derive from it. Much of it does not yet.
+Around 46 source files branch on `datatype` names directly. Decoding, DataStore storage and sorting
+move onto the contract first, because their copies of the type table disagreed. The rest moves as
+those files are touched.
 
 ## Consequences
 

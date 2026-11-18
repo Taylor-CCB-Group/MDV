@@ -7,9 +7,11 @@ already use 0004–0022.
 ## Context
 
 Every column MDV shows is stored in `datafile.h5`. That includes SpatialData tables, which
-`convert-spatial` also leaves in the project's copy of the zarr store. The spatial viewer reads
-the columns it finds in the zarr table straight from zarr, and the DataStore reads everything else
-from h5 over `/get_data`; the two are joined by key
+`convert-spatial` also leaves in the project's copy of the zarr store, and both copies are read.
+The DataStore loads every column from h5 over `/get_data`, including those in the zarr table, for
+filtering and the other charts. To colour shapes and labels and fill their tooltips, the spatial
+viewer reads the columns it finds in the zarr table straight from zarr, and MDV supplies only the
+rest; the two are joined by key
 ([table_association.ts](../../src/react/spatialdata/table_association.ts)). The same table
 exists twice, with no rule for which copy wins.
 

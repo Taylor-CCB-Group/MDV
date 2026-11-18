@@ -49,6 +49,15 @@ describe("sortOrder", () => {
         expect(sorted(3, [{ datatype: "text16", buffer: text16, values, desc: true }])).toEqual([0, 2, 1]);
     });
 
+    // "\u00e9" and "e\u0301" are the same letter, so later columns must break the tie
+    test("gives values that collate equal the same rank", () => {
+        const columns: SortColumn[] = [
+            { datatype: "text", buffer: new Uint8Array([0, 1]).buffer, values: ["\u00e9", "e\u0301"] },
+            { datatype: "double", buffer: new Float32Array([2, 1]).buffer },
+        ];
+        expect(sorted(2, columns)).toEqual([1, 0]);
+    });
+
     test("sorts unique columns, ignoring padding", () => {
         const buffer = uniqueBuffer(["bob", "al", "cat"], 3);
         expect(sorted(3, [{ datatype: "unique", buffer, stringLength: 3 }])).toEqual([1, 0, 2]);

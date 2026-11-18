@@ -76,15 +76,18 @@ function getNumberComparator(data: Float32Array | Int32Array): RowComparator {
     return (a, b) => (data[a] > data[b] ? 1 : data[a] < data[b] ? -1 : 0);
 }
 
-/** Rank of each value code when the values are sorted alphabetically. */
+/**
+ * Rank of each value code when the values are sorted alphabetically. Values that collate equal
+ * (such as "\u00e9" and "e\u0301") share a rank, so a later sort column can break the tie.
+ */
 function getValueRanks(values: string[]) {
     const ranks = new Int32Array(values.length);
-    values
-        .map((value, code) => ({ value, code }))
-        .sort((x, y) => x.value.localeCompare(y.value))
-        .forEach(({ code }, rank) => {
-            ranks[code] = rank;
-        });
+    const sorted = values.map((value, code) => ({ value, code })).sort((x, y) => x.value.localeCompare(y.value));
+    let rank = 0;
+    sorted.forEach(({ value, code }, i) => {
+        if (i > 0 && sorted[i - 1].value.localeCompare(value) !== 0) rank = i;
+        ranks[code] = rank;
+    });
     return ranks;
 }
 
