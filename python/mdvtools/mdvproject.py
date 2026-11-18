@@ -1482,24 +1482,25 @@ class MDVProject:
             validate="many_to_one",
         )
 
-        # Fill missing values according to storage datatype
+        # Fill rows absent from `data` according to storage datatype
         for c in columns:
             field = c["field"]
             datatype = c.get("datatype", "text")
 
-            if datatype in ["text", "text16", "unique", "multitext"]:
-                # Text columns use the missing_value string
-                aligned[field] = aligned[field].fillna(missing_value)
-            elif datatype in ["double", "integer"]:
-                # Numeric columns use NaN, which is compatible with float32 storage
-                aligned[field] = aligned[field].fillna(float("nan"))
-            elif datatype == "int32":
-                # int32 storage uses numpy.int32, which cannot represent NaN
-                # Fill with 0 to keep column numeric (int32 storage expects no missing values)
-                aligned[field] = aligned[field].fillna(0)
-            else:
-                # Fallback for unknown types
-                aligned[field] = aligned[field].fillna(missing_value)
+            if datatype in ("double", "integer"):
+                # float32 storage; NaN already marks the missing rows
+                continue
+            values = aligned[field]
+            assert isinstance(values, pandas.Series)
+            if datatype == "int32":
+                # int32 storage cannot represent NaN, so store as float32 instead
+                if values.isna().to_numpy().any():
+                    c["datatype"] = "integer"
+                continue
+            if isinstance(values.dtype, pandas.CategoricalDtype):
+                # missing_value is usually not one of the categories
+                values = values.astype(object)
+            aligned[field] = values.fillna(missing_value)
 
         h5 = self._get_h5_handle()
         gr = h5[datasource]
@@ -2309,7 +2310,7 @@ class MDVProject:
         bytes_per_element = 4
         
         # Calculate how many elements we can process with available memory
-        # Use 25% of available memory to be very safe for large datasets
+        # Use 50% of available memory
         safe_memory_bytes = available_memory_mb * 1024 * 1024 * 0.5
         max_elements = safe_memory_bytes / bytes_per_element
         

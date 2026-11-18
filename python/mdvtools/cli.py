@@ -76,7 +76,7 @@ def cli():
 @click.option('--gene_identifier_column', default=None, help='Gene column for identification.')
 @click.option('--link-name-column', default=None, help='Variable datasource column used as the rows_as_columns name_column.')
 @click.option('--add-reverse-link', is_flag=True, help='Add a reverse link from the variable datasource to the observation datasource.')
-@click.option('--reverse-link-name-column', default='name', show_default=True, help='Column used for reverse link names.')
+@click.option('--reverse-link-name-column', default=None, help='Obs column used for reverse link names (defaults to the generated cell id column).')
 @click.option('--rows-as-columns-name-column', default=None, help='Column used for rows_as_columns dynamic column names.')
 @click.option('--x-data-name', default='Gene Expr', show_default=True, help='Name for the X data matrix.')
 @click.option('--x-data-transformation', default='Gene Score', show_default=True, help='Transformation name for the X data.')

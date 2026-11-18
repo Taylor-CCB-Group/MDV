@@ -128,10 +128,10 @@ def convert_scanpy_to_mdv(
     gene_identifier_column = None,
     link_name_column: str | None = None,
     add_reverse_link: bool = False,
-    reverse_link_name_column: str = "name",
+    reverse_link_name_column: str | None = None,
     rows_as_columns_name_column: str | None = None,
-    x_data_name  :str = "Gene Expr",
-    x_data_transformation = "Gene Score",
+    x_data_name: str = "Gene Expr",
+    x_data_transformation: str = "Gene Score",
     gene_columns: List[dict[str, Any]] | None = None,
     compute_x_umap: bool = False,
     leiden_resolution: float = 1.0,
@@ -167,13 +167,14 @@ def convert_scanpy_to_mdv(
         link_name_column (str, optional): Column in the variable datasource whose
             values should be used as the dynamic column names for the ``rows_as_columns`` link.
             Defaults to ``gene_identifier_column``.
-        add_reverse_link (bool, optional) : If True then then  var will be linked to obs 
-            e.g. you can select expression for every gene for a particular cell. Defaults to False
-        reverse_link_name_column (str,optional) : The obs (cell) column name whose values should
-           be used as the dynamic column nsames for the reverse link. Default is name
-        x_data_name (str,optional): The name of the type of data in the X matrix e.g. log counts,
-            log1p etc. Defaults to the generic "Gene Expr"
-        x_data_transformation (str,optional) : The type of transformation applied to X e.g. rae 
+        add_reverse_link (bool, optional): If True, also link var to obs, so that e.g. the
+            expression of every gene in a particular cell can be added as columns. Defaults to False.
+        reverse_link_name_column (str, optional): Obs (cell) column whose values are used as the
+            dynamic column names for the reverse link. Defaults to the generated cell id column.
+        x_data_name (str, optional): The kind of data in the X matrix, e.g. log counts or log1p.
+            Defaults to the generic "Gene Expr".
+        x_data_transformation (str, optional): Label for the transformation applied to X, e.g.
+            raw or normalised. Defaults to "Gene Score".
         rows_as_columns_name_column (str, optional): Deprecated alias for ``link_name_column``.
         gene_columns: (list[dict], optional) Column metadata overrides for the genes datasource.
         compute_x_umap (bool, optional): If True, compute neighbors, UMAP and Leiden clusters
@@ -307,6 +308,8 @@ def convert_scanpy_to_mdv(
 
     
     if add_reverse_link:
+        if reverse_link_name_column is None:
+            reverse_link_name_column = cell_identifier_column
         if reverse_link_name_column not in cell_table.columns:
             raise ValueError(
                 f" reverse_link_column_name '{reverse_link_name_column}' not found in obs data"
@@ -381,19 +384,14 @@ def convert_scanpy_to_mdv(
 def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False, chunk_data=False):
     md=mudata_object
     p= MDVProject(folder,delete_existing=delete_existing)
-    # get the modallites
-    mods = md.mod.keys()
- 
-    #try and work out redundant columns
+    mods = list(md.mod.keys())
+    # md.obs holds global columns plus "<mod>:<column>" copies pulled up from each
+    # modality; drop the copies of columns that already exist globally
+    mod_prefixes = tuple(f"{m}:" for m in mods)
+    global_cols = [x for x in md.obs.columns if not x.startswith(mod_prefixes)]
+    repeat_cols = [f"{m}:{c}" for m in mods for c in global_cols]
+    table = md.obs.drop(columns=repeat_cols, errors="ignore")
 
-    prefix= tuple(mods)
-
-    global_cols = [x for x in md.obs.columns if not x.startswith(prefix)]
-    repeat_cols = [f"{x}:{y}" for x in mods for y in global_cols]
- 
-
-    table = md.obs.drop(columns=repeat_cols,errors='ignore')
-     
     #are there any general drs
     table = _add_dims(table,md.obsm,max_dims)
     #add drs derived from modalities (cell clustering)
