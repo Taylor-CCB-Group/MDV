@@ -469,8 +469,6 @@ create_or_validate_env_file() {
         echo "$(prompt_variable "AUTH0_AUDIENCE" false)"
         echo "$(prompt_variable "AUTH0_DB_CONNECTION" false)"
         echo "$(prompt_variable "AUTH0_PUBLIC_KEY_URI" false)"
-        # Sync Auth0 users into the DB on app startup so the cache reflects them (no restart)
-        echo "RUN_AUTH0_SYNC_ON_START=1"
       else
         echo "$(prompt_variable "FLASK_SECRET_KEY" true "change-me-in-production")"
         echo "$(prompt_variable "LOGIN_REDIRECT_URL" false "/login_sso")"

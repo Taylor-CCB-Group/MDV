@@ -2,7 +2,7 @@
 import { createRoot } from "react-dom/client";
 import { CustomThemeProvider } from "@/ThemeProvider";
 import AccessDenied from "./AccessDenied";
-import { getAccessDenial, getDeniedAccount } from "./accessDenial";
+import { getAccessContact, getAccessDenial, getDeniedAccount, getDeniedSignInMethod } from "./accessDenial";
 import Login from "./login";
 
 const container = document.createElement("div");
@@ -15,6 +15,15 @@ const denial = getAccessDenial();
 
 root.render(
     <CustomThemeProvider>
-        {denial ? <AccessDenied denial={denial} account={getDeniedAccount()} /> : <Login />}
+        {denial ? (
+            <AccessDenied
+                denial={denial}
+                account={getDeniedAccount()}
+                signInMethod={getDeniedSignInMethod()}
+                contact={getAccessContact()}
+            />
+        ) : (
+            <Login />
+        )}
     </CustomThemeProvider>,
 );
