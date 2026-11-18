@@ -45,6 +45,10 @@ None of that needs h5, pandas or a codec library.
 
 ## A project descriptor instead of `datasources.json`
 
+Tracked in #671. The focus is SpatialData, but the descriptor shouldn't be specific to it:
+AnnData zarr should be simple, MuData not much harder (building on #537), and genomic projects
+(VCF, BED and bigWig tracks) need a closer look.
+
 Rather than persisting `datasources.json` in its current shape, `mdvlite` persists a small
 **project descriptor**: the list of input stores and a formal description of how they are
 interpreted. It amounts to the arguments `convert-spatial` would have been given. The browser
