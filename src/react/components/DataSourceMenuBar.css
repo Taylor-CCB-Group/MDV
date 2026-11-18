@@ -1,0 +1,170 @@
+/*
+ * The bar above each datasource's charts. `ds.menuBar` is created by ChartManager with the
+ * legacy `ciview-menu-bar` class; DataSourceMenuBar renders into a `display: contents` span
+ * inside it, so the component's elements and any icons `ChartManager.addMenuIcon` appends are
+ * all flex items of the bar.
+ */
+.ciview-menu-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 2px;
+    min-height: 40px;
+    padding: 4px 8px;
+}
+
+/* microtip wraps each icon in a span[role="tooltip"]: make it a box, not an inline run */
+.ciview-menu-bar span[role="tooltip"] {
+    display: inline-flex;
+    flex: none;
+}
+
+/*
+ * microtip lays its tooltips out even while they are invisible. Near the right edge of the
+ * page, those hidden boxes made it scroll sideways, so they are left out until they show.
+ */
+.ciview-menu-bar [role~="tooltip"]:not(:hover, :focus)::before,
+.ciview-menu-bar [role~="tooltip"]:not(:hover, :focus)::after {
+    display: none;
+}
+
+/* applies to the icons appended by addMenuIcon as well as the component's own */
+.ciview-menu-bar .ciview-menu-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    margin: 0;
+    border-radius: 6px;
+    transition: background-color 120ms;
+}
+
+.ciview-menu-bar .ciview-menu-icon:hover {
+    background-color: color-mix(in srgb, currentColor 16%, transparent);
+}
+
+/*
+ * Datasource name and row count. Laid out after every icon (order: 1) and right aligned. The
+ * 9rem basis is what the bar wraps on, not the full width of the name: the name is truncated
+ * first, and only when less than 9rem is left does the group move to a line of its own.
+ */
+.mdv-ds-menu-info {
+    order: 1;
+    display: flex;
+    flex: 1 1 9rem;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
+    margin-left: 6px;
+}
+
+/* the datasource name, with the rename button after it when the project is editable */
+.mdv-ds-name {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    /* lets the chip shrink, and with it the name, so the row count keeps its size */
+    min-width: 0;
+    max-width: 18rem;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, currentColor 6%, transparent);
+    font-size: 14px;
+    line-height: 1;
+}
+
+/*
+ * The name's tooltip wrapper has to shrink for the name to truncate. `span` matches the
+ * specificity of the `span[role="tooltip"]` rule above, which would otherwise keep it rigid.
+ */
+.mdv-ds-name--editable {
+    gap: 2px;
+    padding-right: 3px;
+}
+
+.mdv-ds-rename {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font-size: 11px;
+    opacity: 0.75;
+    cursor: pointer;
+    transition:
+        background-color 120ms,
+        opacity 120ms;
+}
+
+.mdv-ds-rename:hover {
+    background: color-mix(in srgb, currentColor 18%, transparent);
+    opacity: 1;
+}
+
+.mdv-ds-rename:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 1px;
+}
+
+.mdv-ds-name > span.mdv-ds-name-tooltip {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+/*
+ * Names are often file names with no spaces, which the tooltip cannot wrap, so the text would
+ * run past its box and widen the page. Let it break anywhere instead.
+ */
+.ciview-menu-bar .mdv-ds-name-tooltip::after {
+    overflow-wrap: anywhere;
+}
+
+.mdv-ds-name-text {
+    /* a flex item will not shrink below its content without this, so would never truncate */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* rows passing the filters: the count, with a bar along the bottom showing the share of rows */
+.mdv-ds-count {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 64px;
+    height: 28px;
+    padding: 0 10px 2px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    border-radius: 6px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.mdv-ds-count-track {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.mdv-ds-count-fill {
+    height: 100%;
+    background: #3b82f6;
+    transition: width 150ms;
+}

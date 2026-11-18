@@ -138,9 +138,9 @@
 }
 
 
+/* layout and padding: src/react/components/DataSourceMenuBar.css */
 .ciview-menu-bar {
   flex: 0 0 auto;
-  padding: 5px 25px;
   background-color: var(--menu_bar_color);
   color: var(--text_color);
   margin-top: 5px; /* Add a top margin */

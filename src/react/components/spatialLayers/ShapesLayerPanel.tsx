@@ -1,9 +1,10 @@
-import { Slider, Typography } from "@mui/material";
+import { Slider } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
 
 import type DataStore from "@/datastore/DataStore";
 import { mdvFieldSpecsOf, type WithMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import type { TableAssociation } from "@/react/spatialdata/table_association";
+import { ColorFields } from "./ColorFields";
 import TableAssociationControls, { FillColorByColumnControl } from "./TableAssociationControls";
 
 type ShapesLayerConfig = WithMdvFieldSpecs<Extract<LayerConfig, { type: "shapes" }>>;
@@ -14,56 +15,6 @@ type Props = {
     association: TableAssociation;
     dataStore: DataStore;
 };
-
-const toHex = (value: [number, number, number, number]) =>
-    `#${value
-        .slice(0, 3)
-        .map((channel) => Math.max(0, Math.min(255, channel)).toString(16).padStart(2, "0"))
-        .join("")}`;
-
-const fromHex = (hex: string): [number, number, number] => [
-    Number.parseInt(hex.slice(1, 3), 16),
-    Number.parseInt(hex.slice(3, 5), 16),
-    Number.parseInt(hex.slice(5, 7), 16),
-];
-
-function ColorFields({
-    label,
-    value,
-    onChange,
-}: {
-    label: string;
-    value: [number, number, number, number];
-    onChange: (next: [number, number, number, number]) => void;
-}) {
-    return (
-        <div className="grid gap-2">
-            <Typography variant="caption">{label}</Typography>
-            <div className="flex items-center gap-3">
-                <input
-                    type="color"
-                    value={toHex(value)}
-                    onChange={(event) => {
-                        const [r, g, b] = fromHex(event.target.value);
-                        onChange([r, g, b, value[3] ?? 255]);
-                    }}
-                />
-                <Slider
-                    size="small"
-                    min={0}
-                    max={255}
-                    step={1}
-                    value={value[3] ?? 255}
-                    onChange={(_, next) => {
-                        if (typeof next === "number") {
-                            onChange([value[0], value[1], value[2], next]);
-                        }
-                    }}
-                />
-            </div>
-        </div>
-    );
-}
 
 export default function ShapesLayerPanel({ config, updateLayer, association, dataStore }: Props) {
     const fillColor = config.fillColor ?? [200, 200, 200, 120];
@@ -116,11 +67,24 @@ export default function ShapesLayerPanel({ config, updateLayer, association, dat
                     }}
                 />
             </div>
-            <ColorFields label="Fill color" value={fillColor} onChange={(next) => updateLayer({ fillColor: next })} />
             <ColorFields
-                label="Stroke color"
-                value={strokeColor}
-                onChange={(next) => updateLayer({ strokeColor: next })}
+                label="Fill colour"
+                rgb={[fillColor[0], fillColor[1], fillColor[2]]}
+                alpha={fillColor[3] ?? 255}
+                caption={
+                    config.fillColorByColumn
+                        ? "Coloured by column; the opacity here still applies."
+                        : association.status === "resolved"
+                          ? "Choose a column above to colour by its values instead."
+                          : undefined
+                }
+                onChange={([r, g, b], a) => updateLayer({ fillColor: [r, g, b, a ?? 255] })}
+            />
+            <ColorFields
+                label="Stroke colour"
+                rgb={[strokeColor[0], strokeColor[1], strokeColor[2]]}
+                alpha={strokeColor[3] ?? 255}
+                onChange={([r, g, b], a) => updateLayer({ strokeColor: [r, g, b, a ?? 255] })}
             />
         </div>
     );

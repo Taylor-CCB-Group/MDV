@@ -6,6 +6,7 @@ import { useMemo, useRef } from "react";
 import { withoutMdvFieldSpecs } from "./field_spec_projection";
 import { type DeckOverlayId, deckIdFromHostLayerId } from "./host_overlay_ids";
 import { measureSpatial } from "./perf";
+import { DISPLAY_NAME_PROP } from "./render_stack_display";
 import { renderStackSpatialRevision, touchRenderStack } from "./render_stack_observe";
 
 export type MdvDeckOverlayLayers = Record<DeckOverlayId, Layer | null>;
@@ -39,6 +40,18 @@ export function spatialEntryAsLayerConfig(entry: Extract<RenderStackEntry, { kin
         },
         entry.props,
     );
+}
+
+/**
+ * Take MDV's own bookkeeping off a layer config on its way to the viewer: the field
+ * specs (see `withoutMdvFieldSpecs`) and the user's name for the layer, which only the
+ * layer dialog reads.
+ */
+export function withoutMdvOnlyProps<T extends object>(config: T): T {
+    const stripped = withoutMdvFieldSpecs(config);
+    if (!(DISPLAY_NAME_PROP in stripped)) return stripped;
+    const { [DISPLAY_NAME_PROP]: _removed, ...rest } = stripped as T & { [DISPLAY_NAME_PROP]?: unknown };
+    return rest as T;
 }
 
 function stableSignatureValue(value: unknown): unknown {
@@ -80,9 +93,9 @@ export function syncRenderStackLayerInputs(
     for (const entry of stack.entries) {
         if (entry.kind !== "spatial") continue;
         nextIds.add(entry.id);
-        // MDV's field specs stop here: past this point a layer config is the
-        // viewer's, and a `RowsAsColsQuery` is not something to hand it.
-        const nextConfig = withoutMdvFieldSpecs(spatialEntryAsLayerConfig(entry));
+        // MDV's field specs and layer names stop here: past this point a layer config
+        // is the viewer's, and a `RowsAsColsQuery` is not something to hand it.
+        const nextConfig = withoutMdvOnlyProps(spatialEntryAsLayerConfig(entry));
         const nextSignature = layerConfigReplacementSignature(nextConfig);
         const existing = cache.layers[entry.id];
         if (existing && cache.layerConfigSignatures[entry.id] === nextSignature) {

@@ -31,10 +31,14 @@ All notable changes to `mdvtools` are documented here. The format is based on
   CSC), points without a `feature_key` (for points-zarr) and points that are already
   Morton-indexed are left as they are. The presets will change as the formats do, and none
   of this works with `--link`.
+- SpatialData chart layers can be renamed (double-click a layer, or use the Name field
+  above its properties). Unnamed layers showing the same element are numbered.
+- SpatialData labels layers have colour, fill, fill opacity, outline opacity and outline
+  width controls, so a labels layer without an annotating table can still be coloured.
 
 ### Changed
 - Supported Python is now `>=3.12,<3.13`; Python 3.11 is no longer supported.
-- `mdvtools` now depends on `spatialdata-js-util` 0.2 (with its `write` extra), which needs
+- `mdvtools` now depends on `spatialdata-js-util` 0.4 (with its `write` extra), which needs
   `zarr` 3.3 or later and `imagecodecs` 2026.6.26 or later.
 - Upgraded `spatialdata` to 0.8 and `spatialdata-io` to 0.7.1 (from 0.7.2 and 0.6.0).
   `spatialdata-io` 0.7.1 indexes Xenium shapes by `cell_id`.
@@ -43,8 +47,14 @@ All notable changes to `mdvtools` are documented here. The format is based on
 - The SpatialData.js chart is now listed as "SpatialData.js viewer" in the add-chart menu.
 - React Compiler is now enabled by default for Vite builds; set
   `VITE_USE_REACT_COMPILER=0` or `VITE_USE_REACT_COMPILER=false` to opt out locally.
+- SpatialData chart: the data points' settings (colour, tooltip, point shape and size,
+  opacity, action on filter, density, category filters) moved from chart settings to the
+  "Data points" layer in the layer dialog, so every layer's appearance is edited in one
+  place. Chart settings keep chart-wide options and a button that opens the layer dialog.
 
 ### Fixed
+- SpatialData chart polygon shapes now draw their holes and every part of a MultiPolygon;
+  only the first part's exterior ring was drawn before, filled solid.
 - `pip install mdvtools` now installs `leidenalg` and `igraph`, so `--compute-x-umap` and
   `convert_scanpy_to_mdv(compute_x_umap=True)` can compute Leiden clusters. They were only in
   the `dev` dependency group before.
@@ -55,6 +65,9 @@ All notable changes to `mdvtools` are documented here. The format is based on
 - `add_datasource` accepts pandas `string` columns, such as the obs index of Atera stores
   from `spatialdata-io`, which failed with `KeyError: 'string'`. `unique` columns with
   non-ASCII values are now written instead of being dropped with a warning.
+- SpatialData chart: hovering a shapes, labels or points feature shows its tooltip;
+  the hover handler never reached the canvas. Tooltip fields from the datasource that are
+  not in the element's table (gene scores, computed columns) now show their values too.
 
 ## [1.3.0] - 2026-06-04
 

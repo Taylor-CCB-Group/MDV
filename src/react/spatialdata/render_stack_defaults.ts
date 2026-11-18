@@ -9,7 +9,7 @@ import {
 
 import { getRandomString } from "@/utilities/Utilities";
 
-import { DECK_OVERLAY_IDS, deckHostLayerId } from "./host_overlay_ids";
+import { DECK_OVERLAY_IDS, DECK_OVERLAY_VISIBILITY_FOLLOWERS, deckHostLayerId } from "./host_overlay_ids";
 
 function elementsForCoordinateSystem<T extends SpatialElement>(
     elements: Record<string, T> | undefined,
@@ -169,20 +169,44 @@ export function normalizeRenderStack(stack: RenderStack | undefined): RenderStac
     for (const entry of stack.entries) {
         entriesById.set(entry.id, entry);
     }
+    const added = new Set<string>();
     for (const deckId of DECK_OVERLAY_IDS) {
         const id = deckHostLayerId(deckId);
         if (!entriesById.has(id)) {
             entriesById.set(id, hostEntry(deckId));
+            added.add(id);
+        }
+    }
+    // An added follower (e.g. the grey scatter in a stack saved before it existed) takes its
+    // leader's visibility, since the layer dialog offers no checkbox of its own for it.
+    for (const leaderId of DECK_OVERLAY_IDS) {
+        const leader = entriesById.get(deckHostLayerId(leaderId));
+        if (!leader) continue;
+        for (const followerId of DECK_OVERLAY_VISIBILITY_FOLLOWERS[leaderId] ?? []) {
+            const follower = entriesById.get(deckHostLayerId(followerId));
+            if (follower && added.has(follower.id)) follower.visible = leader.visible;
         }
     }
 
+    // A missing overlay goes just above the overlay it follows in drawing order, so one
+    // added to MDV later (e.g. density, above the data points) is not drawn over the rest.
     const order = stack.entries.map((entry) => entry.id);
-    for (const deckId of DECK_OVERLAY_IDS) {
+    DECK_OVERLAY_IDS.forEach((deckId, index) => {
         const id = deckHostLayerId(deckId);
-        if (!order.includes(id)) {
-            order.push(id);
+        if (order.includes(id)) return;
+        const below = DECK_OVERLAY_IDS.slice(0, index)
+            .map((previous) => order.indexOf(deckHostLayerId(previous)))
+            .filter((position) => position >= 0);
+        if (below.length > 0) {
+            order.splice(Math.max(...below) + 1, 0, id);
+            return;
         }
-    }
+        const above = DECK_OVERLAY_IDS.slice(index + 1)
+            .map((next) => order.indexOf(deckHostLayerId(next)))
+            .filter((position) => position >= 0);
+        if (above.length > 0) order.splice(Math.min(...above), 0, id);
+        else order.push(id);
+    });
 
     return {
         schemaVersion: RENDER_STACK_SCHEMA_VERSION,
@@ -205,4 +229,22 @@ export function mergeHostOverlayEntriesInPlace(stack: RenderStack): boolean {
     stack.schemaVersion = normalized.schemaVersion;
     stack.entries.splice(0, stack.entries.length, ...mergedEntries);
     return true;
+}
+
+/**
+ * Give each following overlay its leader's visibility (the grey scatter follows the data
+ * points). The layer dialog only offers the leader's checkbox, so a saved stack where the
+ * two disagree would have no way to fix it. For a stack being restored only: during a
+ * session a follower can be turned off on its own by a render failure, which this would undo.
+ */
+export function syncOverlayFollowerVisibility(stack: RenderStack): void {
+    for (const leaderId of DECK_OVERLAY_IDS) {
+        const followers = DECK_OVERLAY_VISIBILITY_FOLLOWERS[leaderId];
+        const leader = stack.entries.find((entry) => entry.id === deckHostLayerId(leaderId));
+        if (!followers || !leader) continue;
+        for (const followerId of followers) {
+            const follower = stack.entries.find((entry) => entry.id === deckHostLayerId(followerId));
+            if (follower) follower.visible = leader.visible;
+        }
+    }
 }

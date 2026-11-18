@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = "==3.12.*"
 
 [[package]]
@@ -2046,7 +2046,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.11.3,<2" },
     { name = "spatialdata", specifier = ">=0.8.0,<0.9" },
     { name = "spatialdata-io", specifier = ">=0.7.1,<0.8" },
-    { name = "spatialdata-js-util", extras = ["write"], specifier = ">=0.2.0,<0.3" },
+    { name = "spatialdata-js-util", extras = ["write"], specifier = ">=0.4.0,<0.5" },
     { name = "tabulate", marker = "extra == 'app'", specifier = ">=0.9.0,<0.10" },
     { name = "werkzeug", specifier = ">=3.0.2,<4" },
 ]
@@ -3536,6 +3536,15 @@ wheels = [
 ]
 
 [[package]]
+name = "sdjs"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ac/1c/7d97ae324e9c004a94d18e565d14f14b587e9f093a31a248deef7c463266/sdjs-0.1.0.tar.gz", hash = "sha256:58ac2ff44b9fe41b0a000fe9c3d235a568d03a4a069f2bda488bec54427ee6e5", size = 3499369, upload-time = "2026-11-17T14:27:50.494Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cc/3b/92300794a28882b757418abfd0ebb95b68f06198ba0f95f5f3fea74ecd2c/sdjs-0.1.0-py3-none-any.whl", hash = "sha256:790edea04e940599a3cc548e5e20eeec23311aff08ef4a00b7653019aa590483", size = 3525433, upload-time = "2026-11-17T14:27:48.422Z" },
+]
+
+[[package]]
 name = "seaborn"
 version = "0.13.2"
 source = { registry = "https://pypi.org/simple" }
@@ -3763,7 +3772,7 @@ wheels = [
 
 [[package]]
 name = "spatialdata-js-util"
-version = "0.2.0"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "imagecodecs" },
@@ -3771,11 +3780,12 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "pyarrow" },
+    { name = "sdjs" },
     { name = "zarr" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7e/5a/f02212482c97ad26a34b1663088a9914c1da40466393f351558d02d701e0/spatialdata_js_util-0.2.0.tar.gz", hash = "sha256:3beeef13fc7e02b47ac583b5def6389b50810252fede022bdcf09609852fda7f", size = 312810, upload-time = "2026-11-03T10:49:16.288Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c8/d4/20417554d4f9733f279670a39ec8d6165d6705cab0fed096eb4e74977e58/spatialdata_js_util-0.4.0.tar.gz", hash = "sha256:2d388055fa95b9bc6e791043a5ea147f988078d3885b51fcb005512550dcebc0", size = 335804, upload-time = "2026-11-17T14:29:37.31Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/1c/6dcc3ec6f522916f0ae407e57e15d54f54040557048ca3ed46bef094c391/spatialdata_js_util-0.2.0-py3-none-any.whl", hash = "sha256:393839701716df75912e2b79b4f588b7c74138857090d3881c181b0421e73405", size = 281078, upload-time = "2026-11-03T10:49:14.674Z" },
+    { url = "https://files.pythonhosted.org/packages/59/0d/a3e9bb71345b154377afbbe112f63d4360af08a39e74d8f8e341939ca239/spatialdata_js_util-0.4.0-py3-none-any.whl", hash = "sha256:28b84c71ffefc8b38ca76389bcfc39f8d18ab936612d7e1c42d8abc56de37e8f", size = 299179, upload-time = "2026-11-17T14:29:35.967Z" },
 ]
 
 [package.optional-dependencies]
