@@ -107,6 +107,10 @@ ChatMDV's use of `.h5ad` and CSV files is out of scope and handled separately.
   (`{field, data}`) per column it loaded, and `ChartManager` retries any it left out.
 - A loader that reads zarr has to produce the typed arrays the DataStore expects, so it depends on
   the column-type contract (ADR-0024) rather than adding its own mapping.
+- **A minimal standalone server becomes possible.** Once the source store is the data, serving MDV
+  over a SpatialData store needs no project, no conversion and no Python data stack: just the
+  front end, the store's files and somewhere to save views. See
+  [`docs/design/mdvlite.md`](../design/mdvlite.md).
 - `icechunk` becomes a Python dependency. zarr is already on v3.
 - **Where a repository lives.** By default, local-filesystem storage in the project folder, which
   needs no S3 and works on macOS, Linux, and Windows through Docker or WSL2 (MDV's documented
