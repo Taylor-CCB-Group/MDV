@@ -37,8 +37,10 @@ A column's type has three parts. They are defined once and validated on both sid
 in TypeScript and its Python counterpart, ideally generated from one source.
 
 - **Stored type:** a zarr v3 data type (bool, int8 to int64, uint8 to uint64, float32, float64,
-  string) at the source's precision. Missing values are part of the stored type (a fill value or
-  mask), not a reason to change type.
+  string) at the source's precision. Missing values are part of the stored type, not a reason to
+  change type. A fill value marks them only where the type reserves a value that cannot be real
+  data, such as NaN for floats. Integer and boolean columns carry a validity mask, as AnnData's
+  nullable arrays do, because any integer could be a real value.
 - **Encoding:** plain, categorical (integer codes plus a categories array kept in the store beside
   them), or multi-valued.
 - **Column kind:** numeric, categorical, unique or multi-valued, which is what charts and filters

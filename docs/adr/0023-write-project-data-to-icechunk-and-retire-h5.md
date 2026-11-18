@@ -115,7 +115,9 @@ ChatMDV's use of `.h5ad` and CSV files is out of scope and handled separately.
 - **Where a repository lives.** By default, local-filesystem storage in the project folder, which
   needs no S3 and works on macOS, Linux, and Windows through Docker or WSL2 (MDV's documented
   install). Icechunk's local-filesystem storage does not work on native Windows, so a native
-  Windows install of `mdvtools` cannot open a repository; the downgrade script is its fallback.
+  Windows install of `mdvtools` cannot open a repository. Its fallback is an h5 copy made by the
+  downgrade script, which itself has to read the repository: run it through Docker, WSL2 or
+  another machine, then open the resulting h5 project on Windows.
 - **Serialising commits depends on the lock reaching every committer.** That holds for one server
   on one machine. On network filesystems (NFS, Lustre, GPFS, SMB), which Icechunk's docs do not
   cover, both Icechunk and the fcntl lock need testing before a project lives there. Job workers

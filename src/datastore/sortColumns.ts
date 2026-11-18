@@ -28,7 +28,23 @@ export function sortOrder(order: Uint32Array, columns: SortColumn[]) {
 
 function getRowComparator(column: SortColumn): RowComparator {
     const ascending = getAscendingComparator(column);
-    return column.desc ? (a, b) => -ascending(a, b) : ascending;
+    const ordered: RowComparator = column.desc ? (a, b) => -ascending(a, b) : ascending;
+    const isMissing = getMissingCheck(column);
+    if (!isMissing) return ordered;
+    // missing values sort last whichever way the column is sorted
+    return (a, b) => {
+        const ma = isMissing(a);
+        const mb = isMissing(b);
+        if (ma || mb) return ma === mb ? 0 : ma ? 1 : -1;
+        return ordered(a, b);
+    };
+}
+
+/** Which rows have no value: NaN in float32 columns. The other datatypes have no missing marker. */
+function getMissingCheck(column: SortColumn): ((row: number) => boolean) | undefined {
+    if (column.datatype !== "integer" && column.datatype !== "double") return undefined;
+    const data = new Float32Array(column.buffer);
+    return (row) => Number.isNaN(data[row]);
 }
 
 // Typed arrays here must match how `DataStore.setColumnData` holds each datatype:
@@ -55,13 +71,9 @@ function getAscendingComparator(column: SortColumn): RowComparator {
     }
 }
 
-/** Missing (NaN) values sort as if they were the largest value. */
+/** Missing (NaN) values never reach this: `getRowComparator` puts them last. */
 function getNumberComparator(data: Float32Array | Int32Array): RowComparator {
-    return (a, b) => {
-        const va = Number.isNaN(data[a]) ? Number.MAX_VALUE : data[a];
-        const vb = Number.isNaN(data[b]) ? Number.MAX_VALUE : data[b];
-        return va > vb ? 1 : va < vb ? -1 : 0;
-    };
+    return (a, b) => (data[a] > data[b] ? 1 : data[a] < data[b] ? -1 : 0);
 }
 
 /** Rank of each value code when the values are sorted alphabetically. */
@@ -82,6 +94,8 @@ function getTextComparator(data: Uint8Array | Uint16Array, values: string[]): Ro
 }
 
 function getUniqueComparator(data: Uint8Array, stringLength: number): RowComparator {
+    // a column of empty strings has width 0: every row is equal, and later columns break the tie
+    if (stringLength <= 0) return () => 0;
     const decoder = new TextDecoder();
     const rows = Math.floor(data.length / stringLength);
     const names: string[] = new Array(rows);
