@@ -1173,7 +1173,9 @@ def compute_treatment_deg(
     cells_group = h5_group(handle, CELLS)
     patient = np.asarray(h5_dataset(cells_group, PATIENT)[:]).astype(np.int64)
     in_stage = [in_comparison & (stage == name) for name in DEG_GROUPS]
-    paired = np.intersect1d(*(np.unique(patient[cells]) for cells in in_stage))
+    baseline_patients = np.unique(patient[in_stage[0]])
+    post_patients = np.unique(patient[in_stage[1]])
+    paired = np.intersect1d(baseline_patients, post_patients)
     sample = np.full(cells["size"], -1, dtype=np.int64)
     for k, code in enumerate(paired):
         for g, cells_in_stage in enumerate(in_stage):

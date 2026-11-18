@@ -115,7 +115,9 @@ def read_rows_from_excel(
     final_header = find_header(df, EXPECTED_HEADERS["Final Column Name"])
     new_header = find_header(df, EXPECTED_HEADERS["new_display_name"])
     if (
-        not all((project_header, datasource_header, displayed_header))
+        project_header is None
+        or datasource_header is None
+        or displayed_header is None
         or normalize_key(datasource_header) != "datasource"
         or not (final_header or new_header)
     ):
@@ -265,7 +267,7 @@ def build_plan(
     new_header = find_header(df, EXPECTED_HEADERS["new_display_name"])
     original_header = find_header(df, EXPECTED_HEADERS["original name"])
     raw_rows: list[dict[str, Any]] = []
-    for index, row in df.iterrows():
+    for offset, (_index, row) in enumerate(df.iterrows()):
         if project_name is not None and not project_matches(row.get(project_header), project_name):
             continue
         if normalize_text(row.get(datasource_header)) != datasource:
@@ -275,7 +277,7 @@ def build_plan(
         if not displayed_name and not original_name:
             continue
         raw_rows.append({
-            "row": index + 2,
+            "row": offset + 2,
             "displayed_name": displayed_name,
             "original_name": original_name,
             "final_name": normalize_text(row.get(final_header)) if final_header else "",
