@@ -67,7 +67,7 @@
             "storedType": "uint16",
             "encoding": "multi_valued",
             "kind": "multi_valued",
-            "rowWidth": "stringLength"
+            "rowWidth": "capacity"
         }
     }
 }

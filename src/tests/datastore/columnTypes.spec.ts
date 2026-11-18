@@ -52,6 +52,9 @@ describe("column-type contract", () => {
         expect(getValuesPerRow(column("multitext", 3))).toBe(3);
         // multitext saved by the client has no stringLength: one code per row
         expect(getValuesPerRow(column("multitext"))).toBe(1);
+        // a unique column of empty strings is really zero bytes wide
+        expect(getValuesPerRow(column("unique", 0))).toBe(0);
+        expect(getColumnByteLength(column("unique", 0), 10)).toBe(0);
 
         expect(getColumnByteLength(column("integer"), 10)).toBe(40);
         expect(getColumnByteLength(column("text"), 10)).toBe(10);
