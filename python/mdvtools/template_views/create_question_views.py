@@ -1033,9 +1033,24 @@ def resolve_feature_fields(
     return {n: feature_field(features, n, row_of[n]) for n in features.names}
 
 
+def h5_group(parent: h5py.Group, key: str) -> h5py.Group:
+    node = parent[key]
+    if not isinstance(node, h5py.Group):
+        raise TypeError(f"HDF5 path {key!r} is not a group")
+    return node
+
+
+def h5_dataset(parent: h5py.Group, key: str) -> h5py.Dataset:
+    node = parent[key]
+    if not isinstance(node, h5py.Dataset):
+        raise TypeError(f"HDF5 path {key!r} is not a dataset")
+    return node
+
+
 def row_names(handle: h5py.File, datasources: list[dict[str, Any]], ds_name: str) -> list[str]:
     values = text_values(datasources, ds_name, NAME_FIELD)
-    return [values[code] for code in handle[ds_name][NAME_FIELD][:]]
+    codes = h5_dataset(h5_group(handle, ds_name), NAME_FIELD)[:]
+    return [values[code] for code in codes]
 
 
 def feature_rows(
@@ -1056,17 +1071,20 @@ def compute_collection_scores(
     """Per cell, the mean over a collection's genes of log1p(counts per 10k)."""
     cells = datasource(datasources, CELLS)
     subgroup = cells["links"][GENES.datasource]["rows_as_columns"]["subgroups"][GENES.subgroup]
-    matrix = handle[CELLS][subgroup["name"]]
-    pointers = matrix["p"][:]
+    cells_group = h5_group(handle, CELLS)
+    matrix = h5_group(cells_group, str(subgroup["name"]))
+    pointers = np.asarray(h5_dataset(matrix, "p")[:])
+    index = h5_dataset(matrix, "i")
+    data = h5_dataset(matrix, "x")
     rows = feature_rows(handle, datasources, GENES)
-    scale = 1e4 / handle[CELLS][TOTAL_COUNTS][:]
+    scale = 1e4 / np.asarray(h5_dataset(cells_group, TOTAL_COUNTS)[:])
     scores: dict[str, np.ndarray] = {}
     for collection, genes in GENE_COLLECTIONS.items():
         total = np.zeros(cells["size"], dtype=np.float64)
         for gene in genes:
             start, end = pointers[rows[gene]], pointers[rows[gene] + 1]
-            expressing = matrix["i"][start:end]
-            total[expressing] += np.log1p(matrix["x"][start:end] * scale[expressing])
+            expressing = index[start:end]
+            total[expressing] += np.log1p(data[start:end] * scale[expressing])
         scores[collection] = (total / len(genes)).astype(np.float32)
     return scores
 
@@ -1105,7 +1123,11 @@ def has_columns(
     """
     described = {(ds["name"], c["field"]) for ds in datasources for c in ds.get("columns", [])}
     with h5py.File(project_path / "datafile.h5", "r") as handle:
-        return all(key in described and key[1] in handle[key[0]] for key in wanted)
+        def stored(key: tuple[str, str]) -> bool:
+            node = handle[key[0]]
+            return isinstance(node, h5py.Group) and key[1] in node
+
+        return all(key in described and stored(key) for key in wanted)
 
 
 def add_response_columns(project_path: Path, datasources: list[dict[str, Any]]) -> list[str]:
@@ -1113,7 +1135,8 @@ def add_response_columns(project_path: Path, datasources: list[dict[str, Any]]) 
     if has_columns(project_path, datasources, [(CELLS, f) for f in RESPONSE_COLUMN_NAMES]):
         return []
     with h5py.File(project_path / "datafile.h5", "r") as handle:
-        codes = {f: handle[CELLS][f][:] for f in (RESPONSE, TREATMENT)}
+        cells_group = h5_group(handle, CELLS)
+        codes = {f: np.asarray(h5_dataset(cells_group, f)[:]) for f in (RESPONSE, TREATMENT)}
     labels = {f: text_values(datasources, CELLS, f) for f in (RESPONSE, TREATMENT)}
     columns = response_columns(
         [labels[RESPONSE][c] for c in codes[RESPONSE]],
@@ -1129,7 +1152,8 @@ def add_response_columns(project_path: Path, datasources: list[dict[str, Any]]) 
 
 
 def cell_labels(handle: h5py.File, datasources: list[dict[str, Any]], field: str) -> np.ndarray:
-    return np.array(text_values(datasources, CELLS, field), dtype=object)[handle[CELLS][field][:]]
+    codes = np.asarray(h5_dataset(h5_group(handle, CELLS), field)[:])
+    return np.array(text_values(datasources, CELLS, field), dtype=object)[codes]
 
 
 def compute_treatment_deg(
@@ -1146,7 +1170,8 @@ def compute_treatment_deg(
     for field, values in DEG_COMPARISON.items():
         in_comparison &= np.isin(cell_labels(handle, datasources, field), values)
     stage = cell_labels(handle, datasources, TREATMENT_STAGE)
-    patient = handle[CELLS][PATIENT][:].astype(np.int64)
+    cells_group = h5_group(handle, CELLS)
+    patient = np.asarray(h5_dataset(cells_group, PATIENT)[:]).astype(np.int64)
     in_stage = [in_comparison & (stage == name) for name in DEG_GROUPS]
     paired = np.intersect1d(*(np.unique(patient[cells]) for cells in in_stage))
     sample = np.full(cells["size"], -1, dtype=np.int64)
@@ -1158,21 +1183,23 @@ def compute_treatment_deg(
     groups = np.arange(n_samples) % 2
 
     subgroup = cells["links"][GENES.datasource]["rows_as_columns"]["subgroups"][GENES.subgroup]
-    matrix = handle[CELLS][subgroup["name"]]
-    pointers = matrix["p"][:]
+    matrix = h5_group(cells_group, str(subgroup["name"]))
+    pointers = np.asarray(h5_dataset(matrix, "p")[:])
+    index = h5_dataset(matrix, "i")
+    data = h5_dataset(matrix, "x")
     n_genes = len(pointers) - 1
-    scale = 1e4 / handle[CELLS][TOTAL_COUNTS][:]
+    scale = 1e4 / np.asarray(h5_dataset(cells_group, TOTAL_COUNTS)[:])
     sample_sums = np.zeros((n_genes, n_samples))
     sample_expressing = np.zeros((n_genes, n_samples))
     block = 500
     for first in range(0, n_genes, block):
         last = min(first + block, n_genes)
         start, end = pointers[first], pointers[last]
-        cell_index = matrix["i"][start:end]
+        cell_index = index[start:end]
         gene = np.repeat(np.arange(first, last), np.diff(pointers[first : last + 1]))
         s = sample[cell_index]
         keep = s >= 0
-        value = np.log1p(matrix["x"][start:end][keep] * scale[cell_index[keep]])
+        value = np.log1p(data[start:end][keep] * scale[cell_index[keep]])
         bins = (gene[keep] - first) * n_samples + s[keep]
         size = (last - first) * n_samples
         sample_sums[first:last] = np.bincount(bins, value, size).reshape(-1, n_samples)
@@ -1188,7 +1215,8 @@ def compute_treatment_deg(
     tested = fraction.max(axis=1) >= DEG_MIN_FRACTION
     tested &= difference.std(axis=1) > 0
     p = np.full(n_genes, np.nan)
-    p[tested] = stats.ttest_1samp(difference[tested], 0, axis=1).pvalue
+    # pvalue is set dynamically on scipy's TtestResult, so the attribute is not visible to pyright.
+    p[tested] = getattr(stats.ttest_1samp(difference[tested], 0, axis=1), "pvalue")
     adjusted = np.full(n_genes, np.nan)
     adjusted[tested] = stats.false_discovery_control(p[tested])
     fold = np.log2(np.expm1(post.mean(axis=1)) + 1e-9) - np.log2(np.expm1(baseline.mean(axis=1)) + 1e-9)
@@ -1273,8 +1301,9 @@ def add_gene_collections(project_path: Path, datasources: list[dict[str, Any]]) 
 def resolve_protein_batches(handle: h5py.File, datasources: list[dict[str, Any]]) -> list[str]:
     """Batches containing any cell with protein data (a protein UMAP coordinate)."""
     values = text_values(datasources, CELLS, BATCH)
-    has_protein = np.isfinite(handle[CELLS][PROTEIN_UMAP_X][:])
-    codes = np.unique(handle[CELLS][BATCH][:][has_protein])
+    cells_group = h5_group(handle, CELLS)
+    has_protein = np.isfinite(np.asarray(h5_dataset(cells_group, PROTEIN_UMAP_X)[:]))
+    codes = np.unique(np.asarray(h5_dataset(cells_group, BATCH)[:])[has_protein])
     return [values[c] for c in codes]
 
 
