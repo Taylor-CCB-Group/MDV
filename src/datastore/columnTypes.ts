@@ -38,8 +38,15 @@ export type Encoding = (typeof ENCODINGS)[number];
 export const COLUMN_KINDS = ["numeric", "categorical", "unique", "multi_valued"] as const;
 export type ColumnKind = (typeof COLUMN_KINDS)[number];
 
-/** How many stored values each row has: one, or the column's `stringLength` (at least one). */
-export type RowWidth = "one" | "stringLength";
+/**
+ * How many stored values each row has:
+ * - `one`;
+ * - `stringLength`: exactly the column's `stringLength`, which can be 0 (`unique` bytes; a column of
+ *   empty strings has width 0);
+ * - `capacity`: the column's `stringLength`, at least 1 (`multitext` codes; multitext saved by
+ *   the client has no `stringLength` and one code per row).
+ */
+export type RowWidth = "one" | "stringLength" | "capacity";
 
 export type LegacyDatatype = {
     storedType: StoredType;
@@ -59,7 +66,7 @@ export const LEGACY_DATATYPES = {
     text: { storedType: "uint8", encoding: "categorical", kind: "categorical", rowWidth: "one" },
     text16: { storedType: "uint16", encoding: "categorical", kind: "categorical", rowWidth: "one" },
     unique: { storedType: "null_terminated_bytes", encoding: "plain", kind: "unique", rowWidth: "stringLength" },
-    multitext: { storedType: "uint16", encoding: "multi_valued", kind: "multi_valued", rowWidth: "stringLength" },
+    multitext: { storedType: "uint16", encoding: "multi_valued", kind: "multi_valued", rowWidth: "capacity" },
 } as const satisfies Record<DataType, LegacyDatatype>;
 
 /** The stored types the DataStore holds legacy columns in, and the bytes per value of each. */
@@ -81,9 +88,16 @@ export function getColumnKind(datatype: DataType): ColumnKind | undefined {
     return LEGACY_DATATYPES[datatype]?.kind;
 }
 
-/** Stored values per row: 1, or `stringLength` for `unique` (bytes) and `multitext` (codes). */
+/** Stored values per row, per {@link RowWidth}: `unique` counts bytes, `multitext` codes. */
 export function getValuesPerRow(column: ColumnShape): number {
-    return LEGACY_DATATYPES[column.datatype].rowWidth === "one" ? 1 : getMultitextCapacity(column);
+    switch (LEGACY_DATATYPES[column.datatype].rowWidth) {
+        case "one":
+            return 1;
+        case "stringLength":
+            return column.stringLength ?? 0;
+        case "capacity":
+            return getMultitextCapacity(column);
+    }
 }
 
 /** Bytes a column of `size` rows occupies in the DataStore, and in `/get_data` responses. */
