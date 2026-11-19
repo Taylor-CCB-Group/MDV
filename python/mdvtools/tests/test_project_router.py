@@ -304,6 +304,7 @@ def test_request_reports_the_project_route_that_matched():
     def tracks(path):
         assert request.url_rule is not None
         seen["rule"] = request.url_rule.rule
+        seen["endpoint"] = request.endpoint
         return "ok"
 
     try:
@@ -313,3 +314,4 @@ def test_request_reports_the_project_route_that_matched():
 
     assert response.status_code == 200
     assert seen["rule"] == "/project/<project_id>/tracks/<path:path>"
+    assert seen["endpoint"] == "project_route"

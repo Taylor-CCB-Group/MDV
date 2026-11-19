@@ -220,7 +220,9 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
                 # Flask only knows the catch-all project route. Report the rule
                 # that matched, so request metrics and traces name each project
                 # route separately, without the project's id.
-                request.url_rule = Rule(f"/project/<project_id>{self.rules[rule]}")
+                # Keep the catch-all's endpoint, which Flask reads from url_rule.
+                endpoint = request.url_rule.endpoint if request.url_rule else None
+                request.url_rule = Rule(f"/project/<project_id>{self.rules[rule]}", endpoint=endpoint)
                 # Run all before_request functions (used for auth, logging, etc.)
                 for func in self.before_request_funcs:
                     # Hooks receive project_id and route options (e.g., access_level)
