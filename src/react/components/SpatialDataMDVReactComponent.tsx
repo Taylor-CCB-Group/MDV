@@ -27,6 +27,7 @@ import {
 } from "@/react/spatialdata/deck_backend";
 import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
+import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
@@ -529,14 +530,14 @@ const SpatialDataViewer = observer(
         );
 
         const getTooltipContent = useCallback(
-            (info: PickingInfo) => {
-                return getCombinedScatterTooltip(info, {
-                    gateDisplayLayerId: gateDisplayLayer?.id,
-                    gateLabelLayerId: gateLabelLayer?.id,
+            (info: PickingInfo) =>
+                getCombinedScatterTooltip(info, {
+                    // the render stack draws the gate layers under its own ids, not the layers'
+                    gateDisplayLayerId: gateDisplayLayer ? deckHostLayerId("gate_display") : undefined,
+                    gateLabelLayerId: gateLabelLayer ? deckHostLayerId("gate_labels") : undefined,
                     getPointTooltip: getTooltip,
-                });
-            },
-            [gateDisplayLayer?.id, gateLabelLayer?.id, getTooltip],
+                }),
+            [gateDisplayLayer, gateLabelLayer, getTooltip],
         );
 
         const {

@@ -4,6 +4,7 @@ import { IsolatedGroupLayer } from "@spatialdata/layers";
 import { describe, expect, it } from "vitest";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { combineTooltipContent, getCombinedScatterTooltip } from "@/lib/scatterTooltip";
+import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 
 function layer(id: string) {
     return new ScatterplotLayer({ id, data: [] });
@@ -49,6 +50,22 @@ describe("scatterTooltip", () => {
         expect(tooltip).toMatchObject({
             html: expect.stringContaining("<strong>Gene:</strong> CD4"),
         });
+    });
+
+    it("finds a gate the SpatialData render stack draws, by the stack's id for it", () => {
+        // the stack draws the chart's gate layer as `deck:gate_display`, not under the layer's own
+        // id, and SpatialData.js's viewer draws a copy of that as `deck:gate_display-#<viewer>#`
+        const gateId = deckHostLayerId("gate_display");
+        const tooltipFor = (pickedLayerId: string) =>
+            getCombinedScatterTooltip(pickingInfo(pickedLayerId, 0, { properties: { gateName: "g1" } }), {
+                gateDisplayLayerId: gateId,
+                getPointTooltip: () => null,
+            });
+        expect(tooltipFor(gateId)).toMatchObject({ html: expect.stringContaining("<strong>g1</strong>") });
+        expect(tooltipFor(`${gateId}-#spatial-detail-x1#`)).toMatchObject({
+            html: expect.stringContaining("<strong>g1</strong>"),
+        });
+        expect(tooltipFor(`${gateId}_other`)).toBeNull();
     });
 
     it("escapes text tooltip parts when combining", () => {
