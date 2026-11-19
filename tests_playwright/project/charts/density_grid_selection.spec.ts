@@ -159,6 +159,8 @@ test.describe("Density grid", () => {
                 .poll(async () => await cellCanvases.first().evaluate((canvas: HTMLCanvasElement) => canvas.width))
                 .toBeGreaterThan(50);
 
+            // the toolbar starts collapsed to the active tool
+            await scope.locator('button[aria-label="Show tools"]').click();
             await scope.locator('button[aria-label="Rectangle"]').click();
             // the last cell is in another row and column (a 2 x 2 grid at this size)
             const last = fields.length - 1;
