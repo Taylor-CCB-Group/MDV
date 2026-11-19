@@ -30,7 +30,7 @@ import { getDensitySettings } from "../contour_state";
 import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
 import { createVivStores, type VivContextType } from "./avivatorish/state";
 import { BaseReactChart } from "./BaseReactChart";
-import { densityGridConfig, withGridCrosshair } from "./densityGridUtils";
+import { getDensityGridSettingsFolder } from "./densityGridSettings";
 import type { ElementIssues } from "./RasterIssues";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
@@ -352,26 +352,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 current_value: "Edit layers and data display…",
                 func: () => this.openLayerDialog(),
             }),
-            g({
-                type: "check",
-                label: "Show density fields as a grid",
-                current_value: config.grid?.by === "densityFields",
-                func: (x) => {
-                    config.grid = densityGridConfig(x, config.grid);
-                },
-            }),
-            ...(config.grid
-                ? [
-                      g({
-                          type: "check",
-                          label: "Mark the pointer in every grid cell",
-                          current_value: config.grid.crosshair ?? false,
-                          func: (x) => {
-                              config.grid = withGridCrosshair(config.grid, x);
-                          },
-                      }),
-                  ]
-                : []),
+            getDensityGridSettingsFolder(config),
             g({
                 type: "dropdown",
                 label: `SpatialData (${dataStore.getColumnName(dataStore.regions?.region_field)})`,

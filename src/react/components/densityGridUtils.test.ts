@@ -3,6 +3,7 @@ import {
     densityGridConfig,
     getDensityGridViewId,
     isDensityGridShown,
+    isGridCrosshairShown,
     shouldDrawInDensityGridCell,
     supportsDensityGridMode,
     withGridCrosshair,
@@ -41,6 +42,12 @@ describe("densityGridUtils", () => {
             crosshair: true,
         });
         expect(densityGridConfig(false, { by: "densityFields", crosshair: true })).toBeNull();
+    });
+
+    test("marks the pointer unless the grid turns it off", () => {
+        expect(isGridCrosshairShown({ by: "densityFields" })).toBe(true);
+        expect(isGridCrosshairShown({ by: "densityFields", crosshair: false })).toBe(false);
+        expect(isGridCrosshairShown({ by: "densityFields", crosshair: true })).toBe(true);
     });
 
     test("sets the crosshair with a new grid object, and only on a grid", () => {

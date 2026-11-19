@@ -28,6 +28,11 @@ export function densityGridConfig(shown: boolean, current?: ChartGridConfig | nu
     return shown ? { ...current, by: "densityFields" } : null;
 }
 
+/** Whether the grid marks the pointer in every cell: on unless turned off. */
+export function isGridCrosshairShown(grid: ChartGridConfig | null | undefined) {
+    return grid?.crosshair ?? true;
+}
+
 /**
  * The `grid` config with its crosshair on or off. A new object: setting a key the config
  * object did not have would not be seen by MobX.

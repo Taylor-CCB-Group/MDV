@@ -17,7 +17,7 @@ import { type ChartArrayCell, useChartArrayGrid } from "../hooks/useChartArrayGr
 import type { DensityGridCells } from "../hooks/useDensityGridCells";
 import type { TooltipContent } from "../hooks/useOuterContainerDeckTooltip";
 import DeckCellGrid from "./DeckCellGrid";
-import { getDensityGridViewId } from "./densityGridUtils";
+import { getDensityGridViewId, isGridCrosshairShown } from "./densityGridUtils";
 import { useLayersForDevice } from "./scatterDeckShared";
 import { useDensityGridCellLayers } from "./useDensityGridCellLayers";
 
@@ -150,7 +150,7 @@ export default observer(function SpatialDensityGrid({
             onHover={onHover}
             setKeyboardActive={host.setKeyboardActive}
             onPointerLeave={host.onPointerLeave}
-            crosshair={config.grid?.crosshair}
+            crosshair={isGridCrosshairShown(config.grid)}
         />
     );
 });

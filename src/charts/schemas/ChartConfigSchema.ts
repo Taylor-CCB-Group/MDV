@@ -187,7 +187,7 @@ export const ChartGridConfigSchema = z
         crosshair: z
             .boolean()
             .optional()
-            .describe("Mark the pointer's position in every cell with a horizontal and a vertical line"),
+            .describe("Mark the pointer's position in every cell with a horizontal and a vertical line (default true)"),
     })
     .describe("Show the chart as a grid of cells, one per value of a config property");
 
