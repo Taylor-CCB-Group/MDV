@@ -443,9 +443,10 @@ def _sent_by_this_site() -> bool:
 
 
 def _client_address() -> str:
-    # Behind the reverse proxy, the browser's address is the first entry.
+    # The reverse proxy appends the address it saw, so only the last entry is
+    # trusted. Earlier entries come from the client and can be anything.
     forwarded = request.headers.get("X-Forwarded-For", "")
-    return forwarded.split(",")[0].strip() or request.remote_addr or ""
+    return forwarded.split(",")[-1].strip() or request.remote_addr or ""
 
 
 def _take_token(buckets: dict[str, tuple[float, float]], address: str) -> bool:

@@ -156,6 +156,23 @@ def test_one_address_cannot_post_beyond_its_burst(browser_app, monkeypatch):
     assert other.status_code == 202
 
 
+def test_a_client_cannot_reset_its_limit_by_spoofing_forwarded_for(browser_app, monkeypatch):
+    client, _ = browser_app
+    monkeypatch.setattr(telemetry, "time", SimpleNamespace(monotonic=lambda: 1000.0))
+
+    # The reverse proxy appends the address it saw, so only the last entry is trusted.
+    statuses = [
+        client.post(
+            "/telemetry/faro",
+            data="{}",
+            headers={**SAME_SITE, "X-Forwarded-For": f"198.51.100.{i % 250}, 203.0.113.9"},
+        ).status_code
+        for i in range(101)
+    ]
+
+    assert statuses[100] == 429
+
+
 def test_operations_run_untouched_while_telemetry_is_off(monkeypatch):
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
 
