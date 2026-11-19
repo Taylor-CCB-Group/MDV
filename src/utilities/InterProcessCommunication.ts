@@ -14,9 +14,6 @@ import { DataModel } from "../table/DataModel";
  */
 const LEGACY_IPC_ENABLED = false;
 
-/** Retries after a dropped or failed connection before giving up. Socket.IO's default is unlimited. */
-const RECONNECTION_ATTEMPTS = 5;
-
 type VuplexCallback = (event: { data: MDVMessage }) => void;
 
 declare global {
@@ -66,9 +63,6 @@ type SendMessage = (msg: MDVMessage) => void;
  *    - could be useful for other things, like syncing views, or receiving updates from a server
  *      e.g. about new data (e.g. from some kind of data pipeline), or about new views to load.
  * - when `LEGACY_IPC_ENABLED`, also set up the Unity/VR prototype messages (see `setupLegacyIPC`)
- *
- * Resolves once connected. Rejects, and closes the socket, if the server refuses the namespace
- * or the retries run out, so a failed connection stops instead of polling forever.
  */
 export default async function connectIPC(cm: ChartManager) {
     const { projectName, mainApiRoute } = getProjectInfoBase();
@@ -83,7 +77,6 @@ export default async function connectIPC(cm: ChartManager) {
 
     const socket = io(`${projectOrigin}${projectNamespace}`, {
         path: socketPath,
-        reconnectionAttempts: RECONNECTION_ATTEMPTS,
         // auth: { token: "your_auth_token" } // Example for token-based auth if you implement it
     });
 
@@ -92,24 +85,13 @@ export default async function connectIPC(cm: ChartManager) {
         if (window.vuplex) window.vuplex.postMessage(msg);
     }
 
-    await new Promise<void>((resolve, reject) => {
-        const fail = (error: Error) => {
-            socket.close();
-            reject(error);
-        };
-        socket.once("connect", () => {
+    await new Promise<void>((resolve) => {
+        socket.connect();
+        socket.on("connect", () => {
             console.log("socket connected");
+            // this is probably not the right design - what about disconnects?
             resolve();
         });
-        // `active` is false when the server refused the namespace; the client will not retry that.
-        socket.on("connect_error", (error) => {
-            if (!socket.active) fail(error);
-        });
-        socket.io.once("reconnect_failed", () =>
-            fail(
-                new Error(`Socket.IO connection to ${projectNamespace} failed after ${RECONNECTION_ATTEMPTS} retries`),
-            ),
-        );
     });
 
     if (LEGACY_IPC_ENABLED) setupLegacyIPC(cm, socket, sendMessage);

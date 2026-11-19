@@ -241,6 +241,8 @@ export class ChartManager {
                 // and we had disabled websocket on server.
                 // started experimenting with socketio for chatMDV - mechanism is working, to an extent...
                 // but actually, REST is probably best for this (maybe a protocol agnostic abstraction).
+                // try/catch doesn't help when it gets stuck in await...
+                // console.warn('websocket is not currently supported but used as flag for chat experiment - will be fixed very soon')
                 try {
                     const { socket, sendMessage } = await connectIPC(this);
                     console.log("connected to socketio");
