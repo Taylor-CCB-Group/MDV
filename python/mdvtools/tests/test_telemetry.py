@@ -246,25 +246,27 @@ def test_a_blocking_report_names_the_mdv_code_innermost_first():
     assert telemetry._blocked_frames(report) == "mdvproject.py:2575 get_byte_data < server.py:362 get_data"
 
 
-def test_each_greenlet_keeps_its_outermost_open_span_until_it_ends():
+def test_each_greenlet_keeps_its_latest_request_span_until_the_next_one():
     pytest.importorskip("opentelemetry.sdk")
     greenlet = pytest.importorskip("greenlet")
     from opentelemetry.sdk.trace import TracerProvider
 
     provider = TracerProvider()
-    telemetry._remember_open_spans(provider)
+    telemetry._remember_request_spans(provider)
     tracer = provider.get_tracer(__name__)
     current = greenlet.getcurrent()
 
     with tracer.start_as_current_span("request") as request_span:
         with tracer.start_as_current_span("mdv.get_byte_data"):
-            during = telemetry._open_spans.get(current)
-        after_inner = telemetry._open_spans.get(current)
-    after = telemetry._open_spans.get(current)
+            during = telemetry._request_spans.get(current)
+    # gunicorn sends a file response after the request's span has ended.
+    while_sending = telemetry._request_spans.get(current)
+    with tracer.start_as_current_span("next request") as next_span:
+        pass
 
     assert during == request_span.get_span_context()
-    assert after_inner == request_span.get_span_context()
-    assert after is None
+    assert while_sending == request_span.get_span_context()
+    assert telemetry._request_spans.get(current) == next_span.get_span_context()
 
 
 def test_a_blocked_loop_warning_carries_the_blocked_requests_trace_id(caplog):

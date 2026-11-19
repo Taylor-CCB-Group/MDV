@@ -254,7 +254,7 @@ def _watch_event_loop(tracer_provider: "TracerProvider") -> None:
     # about 40 lines. The one-line warning below replaces it.
     setattr(monitor, "_show_blocking_report", lambda *args: None)
 
-    _remember_open_spans(tracer_provider)
+    _remember_request_spans(tracer_provider)
     blocked_time = metrics.get_meter("mdvtools").create_counter(
         "mdv.event_loop.blocked_time",
         unit="s",
@@ -269,33 +269,30 @@ def _watch_event_loop(tracer_provider: "TracerProvider") -> None:
         # This runs in gevent's monitor thread. Logging there would take
         # monkey-patched locks and start a second hub in that thread, so the
         # report waits for the main loop, which runs it once it is free again.
-        # By then the request may have finished, so its span is looked up now.
+        # By then the greenlet may have moved on, so its span is looked up now.
         if isinstance(event, EventLoopBlocked) and event.hub is hub:
-            span_context = _open_spans.get(event.greenlet)
+            span_context = _request_spans.get(event.greenlet)
             hub.loop.run_callback_threadsafe(report, event.blocking_time, list(event.info), span_context)
 
     subscribers.append(on_event)
 
 
-# The outermost open span of each greenlet. gevent's monitor thread reads it to find the request that blocked the loop, because a running greenlet's context cannot be read from another thread.
-_open_spans: "weakref.WeakKeyDictionary[object, SpanContext]" = weakref.WeakKeyDictionary()
+# The span of the latest request each greenlet served
+_request_spans: "weakref.WeakKeyDictionary[object, SpanContext]" = weakref.WeakKeyDictionary()
 
 
-def _remember_open_spans(tracer_provider: "TracerProvider") -> None:
+def _remember_request_spans(tracer_provider: "TracerProvider") -> None:
     from greenlet import getcurrent
     from opentelemetry.sdk.trace import SpanProcessor
 
-    class RememberOpenSpans(SpanProcessor):
+    class RememberRequestSpans(SpanProcessor):
         def on_start(self, span, parent_context=None) -> None:
-            _open_spans.setdefault(getcurrent(), span.get_span_context())
+            # A span with no parent in this process starts a request, or other
+            # work, such as a job. A browser's trace makes the parent remote.
+            if span.parent is None or span.parent.is_remote:
+                _request_spans[getcurrent()] = span.get_span_context()
 
-        def on_end(self, span) -> None:
-            current = getcurrent()
-            remembered = _open_spans.get(current)
-            if span.context is not None and remembered is not None and remembered.span_id == span.context.span_id:
-                del _open_spans[current]
-
-    tracer_provider.add_span_processor(RememberOpenSpans())
+    tracer_provider.add_span_processor(RememberRequestSpans())
 
 
 def _log_blocked_loop(blocking_time: float, info: Sequence[str], span_context: "SpanContext | None") -> None:
