@@ -15,6 +15,7 @@ import {
     useFieldContourLegend,
 } from "../contour_state";
 import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
+import { useDensityGridCells } from "../hooks/useDensityGridCells";
 import useGateLayers from "../hooks/useGateLayers";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
@@ -282,13 +283,16 @@ const DeckScatter = observer(function DeckScatterComponent({
 export default observer(function DeckScatterChart() {
     const chart = useChart<DeckScatterConfig, DeckScatterReact>();
     const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
+    const grid = useDensityGridCells();
     // in order for SelectionOverlay to work, we need to review how our implementation works
     // vs useScatterplotLayer in spatial_context.tsx
     return (
         <SpatialAnnotationProvider chart={chart} hoveredContour={hoveredContour} setHoveredContour={setHoveredContour}>
             <SelectionOverlay />
-            {isDensityGridShown(chart.config) ? (
-                <DeckDensityGridComponent />
+            {/* with no field to make a cell of (none chosen, nothing highlighted for an active link,
+                or still loading) the grid would be empty, so show the one plot, without an overlay */}
+            {isDensityGridShown(chart.config) && grid.cells.length > 0 ? (
+                <DeckDensityGridComponent {...grid} />
             ) : (
                 <DeckScatter setHoveredContour={setHoveredContour} />
             )}

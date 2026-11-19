@@ -1,20 +1,26 @@
 import { useMemo } from "react";
+import type { LoadedDataColumn } from "@/charts/charts";
+import { isDensityGridShown } from "../components/densityGridUtils";
 import { type DualContourLegacyConfig, isLoadedDoubleColumn } from "../contour_state";
 import { useConfig, useFieldSpecs } from "../hooks";
 import type { ChartArrayCell } from "./useChartArrayGrid";
 
-/** One grid cell per density field that has loaded; a field still loading has no cell yet. */
-export function useDensityGridCells() {
+export type DensityGridCells = {
+    cells: ChartArrayCell[];
+    densityFields: LoadedDataColumn<"double">[];
+};
+
+/**
+ * One grid cell per density field that has loaded as a `double` column; a field still loading,
+ * or of another type, has no cell. Loads nothing unless the chart is in grid mode.
+ */
+export function useDensityGridCells(): DensityGridCells {
     const config = useConfig<DualContourLegacyConfig>();
-    const loadedFields = useFieldSpecs(config.densityFields);
+    const loadedFields = useFieldSpecs(isDensityGridShown(config) ? config.densityFields : undefined);
     const densityFields = useMemo(() => loadedFields.filter(isLoadedDoubleColumn), [loadedFields]);
     const cells: ChartArrayCell[] = useMemo(
         () => densityFields.map((field) => ({ key: field.field, label: field.name || field.field })),
         [densityFields],
     );
-    return {
-        cells,
-        densityFields,
-        configuredFieldCount: config.densityFields?.length ?? 0,
-    };
+    return { cells, densityFields };
 }

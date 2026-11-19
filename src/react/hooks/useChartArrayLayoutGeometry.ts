@@ -5,8 +5,7 @@
 import { type RefObject, useLayoutEffect, useState } from "react";
 import {
     type ChartArrayLayoutMode,
-    chartArrayGridFitsViewport,
-    getPreferredGridColumnCount,
+    chooseChartArrayGrid,
     readChartArraySizingFromRoot,
 } from "../components/chartArrayLayoutUtils";
 
@@ -44,11 +43,9 @@ export function useChartArrayLayoutGeometry(
 
             const sizing = readChartArraySizingFromRoot(root);
             const innerWidth = Math.max(0, root.clientWidth - sizing.paddingX);
-            const viewportHeight = scrollRoot.clientHeight;
-            setGeometry({
-                gridColumns: getPreferredGridColumnCount(cellCount, innerWidth, sizing),
-                gridFillsViewport: chartArrayGridFitsViewport(cellCount, viewportHeight, innerWidth, sizing),
-            });
+            const innerHeight = Math.max(0, scrollRoot.clientHeight - sizing.paddingY);
+            const { columns, fillsViewport } = chooseChartArrayGrid(cellCount, innerWidth, innerHeight, sizing);
+            setGeometry({ gridColumns: columns, gridFillsViewport: fillsViewport });
         };
 
         let setupAttempts = 0;

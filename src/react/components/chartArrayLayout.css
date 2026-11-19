@@ -24,23 +24,14 @@
 }
 
 /* Fill the scrollport; one cell uses the full inner area (padding aside). */
-.mdv-chart-array[data-layout="single"],
-.mdv-chart-array[data-layout="pair"] {
+.mdv-chart-array[data-layout="single"] {
     height: 100%;
     min-height: 100%;
-}
-
-.mdv-chart-array[data-layout="single"] {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
 }
 
-.mdv-chart-array[data-layout="pair"] {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr;
-}
-
-/* Three or more: flex rows; each item grows to an even share of the row width. */
+/* Two or more: flex rows; each item grows to an even share of the row width. */
 .mdv-chart-array[data-layout="grid"] {
     display: flex;
     flex-wrap: wrap;
