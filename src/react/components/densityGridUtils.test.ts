@@ -5,6 +5,7 @@ import {
     isDensityGridShown,
     shouldDrawInDensityGridCell,
     supportsDensityGridMode,
+    withGridCrosshair,
 } from "./densityGridUtils";
 
 describe("densityGridUtils", () => {
@@ -12,9 +13,10 @@ describe("densityGridUtils", () => {
         expect(getDensityGridViewId("chart:#1", "marker/a", 2)).toBe("density-grid-chart__1-2-marker_a");
     });
 
-    test("supports the deck scatter types with density fields", () => {
+    test("supports the deck scatter and SpatialData charts", () => {
         expect(supportsDensityGridMode("DeckContourScatter")).toBe(true);
         expect(supportsDensityGridMode("DeckDensity")).toBe(true);
+        expect(supportsDensityGridMode("SpatialDataMdvRegionReact")).toBe(true);
         expect(supportsDensityGridMode("VivMdvRegionReact")).toBe(false);
         expect(supportsDensityGridMode("wgl_scatter_plot")).toBe(false);
         expect(supportsDensityGridMode(undefined)).toBe(false);
@@ -26,12 +28,28 @@ describe("densityGridUtils", () => {
         expect(isDensityGridShown({ ...config, grid: null })).toBe(false);
         expect(isDensityGridShown({ ...config, grid: undefined })).toBe(false);
         expect(isDensityGridShown({ ...config, dimension: "3d" })).toBe(false);
+        expect(isDensityGridShown({ ...config, dimension: undefined })).toBe(true);
         expect(isDensityGridShown({ ...config, type: "wgl_scatter_plot" })).toBe(false);
     });
 
     test("turns the grid on and off", () => {
         expect(densityGridConfig(true)).toEqual({ by: "densityFields" });
         expect(densityGridConfig(false)).toBeNull();
+        // the grid's other options stay while it is on
+        expect(densityGridConfig(true, { by: "densityFields", crosshair: true })).toEqual({
+            by: "densityFields",
+            crosshair: true,
+        });
+        expect(densityGridConfig(false, { by: "densityFields", crosshair: true })).toBeNull();
+    });
+
+    test("sets the crosshair with a new grid object, and only on a grid", () => {
+        const grid = { by: "densityFields" } as const;
+        const next = withGridCrosshair(grid, true);
+        expect(next).toEqual({ by: "densityFields", crosshair: true });
+        expect(next).not.toBe(grid);
+        expect(withGridCrosshair(null, true)).toBeNull();
+        expect(withGridCrosshair(undefined, true)).toBeUndefined();
     });
 
     test("draws a cell's layers and their sublayers only in that cell", () => {

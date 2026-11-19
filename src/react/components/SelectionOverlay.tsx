@@ -102,11 +102,11 @@ export default observer(function SelectionOverlay() {
     const chart = useChart<DeckScatterConfigWithRegion>();
     const chartId = useChartID();
     const config = useConfig<DeckScatterConfigWithRegion & DualContourLegacyConfig>();
-    const canShowDensityGrid = supportsDensityGridMode(config.type) && config.dimension === "2d";
+    const canShowDensityGrid = supportsDensityGridMode(config.type) && config.dimension !== "3d";
     const densityGridShown = isDensityGridShown(config);
     const toggleDensityGrid = useCallback(() => {
         action(() => {
-            config.grid = densityGridConfig(!isDensityGridShown(config));
+            config.grid = densityGridConfig(!isDensityGridShown(config), config.grid);
         })();
     }, [config]);
     const {

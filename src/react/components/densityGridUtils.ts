@@ -3,7 +3,7 @@ import type { DualContourLegacyConfig } from "../contour_state";
 import { getChartArrayViewId } from "./chartArrayUtils";
 
 /** Chart types that can show their density fields as a grid. */
-const DENSITY_GRID_CHART_TYPES = new Set(["DeckContourScatter", "DeckDensity"]);
+const DENSITY_GRID_CHART_TYPES = new Set(["DeckContourScatter", "DeckDensity", "SpatialDataMdvRegionReact"]);
 
 export function supportsDensityGridMode(chartType: string | undefined) {
     return typeof chartType === "string" && DENSITY_GRID_CHART_TYPES.has(chartType);
@@ -16,12 +16,24 @@ export type DensityGridModeConfig = Pick<DualContourLegacyConfig, "grid"> & {
 
 /** Whether the chart draws its density fields as a grid of cells rather than over its points. */
 export function isDensityGridShown(config: DensityGridModeConfig) {
-    return supportsDensityGridMode(config.type) && config.dimension === "2d" && config.grid?.by === "densityFields";
+    // a chart with no dimension is 2D
+    return supportsDensityGridMode(config.type) && config.dimension !== "3d" && config.grid?.by === "densityFields";
 }
 
-/** The `grid` config that shows one cell per density field, or null for a single plot. */
-export function densityGridConfig(shown: boolean): ChartGridConfig | null {
-    return shown ? { by: "densityFields" } : null;
+/**
+ * The `grid` config that shows one cell per density field, or null for a single plot. The
+ * current grid's other options are kept.
+ */
+export function densityGridConfig(shown: boolean, current?: ChartGridConfig | null): ChartGridConfig | null {
+    return shown ? { ...current, by: "densityFields" } : null;
+}
+
+/**
+ * The `grid` config with its crosshair on or off. A new object: setting a key the config
+ * object did not have would not be seen by MobX.
+ */
+export function withGridCrosshair(grid: ChartGridConfig | null | undefined, crosshair: boolean) {
+    return grid ? { ...grid, crosshair } : grid;
 }
 
 const DENSITY_GRID_PREFIX = "density-grid";

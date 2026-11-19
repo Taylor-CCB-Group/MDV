@@ -184,6 +184,10 @@ export const ChartGridConfigSchema = z
         by: z
             .enum(["densityFields"])
             .describe("The config property whose values make the cells, e.g. one cell per density field"),
+        crosshair: z
+            .boolean()
+            .optional()
+            .describe("Mark the pointer's position in every cell with a horizontal and a vertical line"),
     })
     .describe("Show the chart as a grid of cells, one per value of a config property");
 

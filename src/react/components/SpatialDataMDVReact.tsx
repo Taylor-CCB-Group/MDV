@@ -30,6 +30,7 @@ import { getDensitySettings } from "../contour_state";
 import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
 import { createVivStores, type VivContextType } from "./avivatorish/state";
 import { BaseReactChart } from "./BaseReactChart";
+import { densityGridConfig, withGridCrosshair } from "./densityGridUtils";
 import type { ElementIssues } from "./RasterIssues";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
@@ -67,6 +68,7 @@ function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataS
     // Must exist before makeAutoObservable(config) for later changes to be observed, and
     // survive initialiseChartConfig's JSON copy, so null rather than undefined.
     config.render_backend = config.render_backend ?? null;
+    config.grid = config.grid ?? null;
     config.param = [...dataStore.regions.position_fields];
     if (typeof config.contourParameter === "string") {
         const column = dataStore.columnIndex[config.contourParameter];
@@ -351,6 +353,26 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 func: () => this.openLayerDialog(),
             }),
             g({
+                type: "check",
+                label: "Show density fields as a grid",
+                current_value: config.grid?.by === "densityFields",
+                func: (x) => {
+                    config.grid = densityGridConfig(x, config.grid);
+                },
+            }),
+            ...(config.grid
+                ? [
+                      g({
+                          type: "check",
+                          label: "Mark the pointer in every grid cell",
+                          current_value: config.grid.crosshair ?? false,
+                          func: (x) => {
+                              config.grid = withGridCrosshair(config.grid, x);
+                          },
+                      }),
+                  ]
+                : []),
+            g({
                 type: "dropdown",
                 label: `SpatialData (${dataStore.getColumnName(dataStore.regions?.region_field)})`,
                 current_value: config.region,
@@ -417,6 +439,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         }
         // null only exists to keep the key observable; leave it out of saved views
         if (config.render_backend === null) config.render_backend = undefined;
+        if (config.grid === null) config.grid = undefined;
         return config;
     }
 }

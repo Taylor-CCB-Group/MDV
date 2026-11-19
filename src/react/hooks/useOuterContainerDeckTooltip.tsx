@@ -3,7 +3,7 @@ import { type RefObject, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOuterContainer } from "../screen_state";
 
-type TooltipContent =
+export type TooltipContent =
     | null
     | string
     | {

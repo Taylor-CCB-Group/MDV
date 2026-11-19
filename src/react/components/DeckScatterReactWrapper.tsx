@@ -17,7 +17,7 @@ import {
 } from "../scatter_state";
 import { BaseReactChart } from "./BaseReactChart";
 import DeckScatterComponent from "./DeckScatterComponent";
-import { densityGridConfig, supportsDensityGridMode } from "./densityGridUtils";
+import { densityGridConfig, supportsDensityGridMode, withGridCrosshair } from "./densityGridUtils";
 import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 
 const MainChart = observer(() => {
@@ -319,10 +319,22 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                         label: "Show density fields as a grid",
                         current_value: c.grid?.by === "densityFields",
                         func: (x) => {
-                            c.grid = densityGridConfig(x);
+                            c.grid = densityGridConfig(x, c.grid);
                         },
                     }),
                 );
+                if (c.grid) {
+                    settings.push(
+                        g({
+                            type: "check",
+                            label: "Mark the pointer in every grid cell",
+                            current_value: c.grid.crosshair ?? false,
+                            func: (x) => {
+                                c.grid = withGridCrosshair(c.grid, x);
+                            },
+                        }),
+                    );
+                }
             }
         }
         return settings.concat([
