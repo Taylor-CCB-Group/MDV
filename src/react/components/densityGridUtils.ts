@@ -1,3 +1,4 @@
+import type { ChartGridConfig } from "@/charts/schemas/ChartConfigSchema";
 import type { DualContourLegacyConfig } from "../contour_state";
 import { getChartArrayViewId } from "./chartArrayUtils";
 
@@ -8,14 +9,19 @@ export function supportsDensityGridMode(chartType: string | undefined) {
     return typeof chartType === "string" && DENSITY_GRID_CHART_TYPES.has(chartType);
 }
 
-export type DensityGridModeConfig = Pick<DualContourLegacyConfig, "density_mode"> & {
+export type DensityGridModeConfig = Pick<DualContourLegacyConfig, "grid"> & {
     type?: string;
     dimension?: "2d" | "3d";
 };
 
 /** Whether the chart draws its density fields as a grid of cells rather than over its points. */
 export function isDensityGridShown(config: DensityGridModeConfig) {
-    return supportsDensityGridMode(config.type) && config.dimension === "2d" && config.density_mode === "grid";
+    return supportsDensityGridMode(config.type) && config.dimension === "2d" && config.grid?.by === "densityFields";
+}
+
+/** The `grid` config that shows one cell per density field, or null for a single plot. */
+export function densityGridConfig(shown: boolean): ChartGridConfig | null {
+    return shown ? { by: "densityFields" } : null;
 }
 
 const DENSITY_GRID_PREFIX = "density-grid";

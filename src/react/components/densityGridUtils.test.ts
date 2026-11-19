@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+    densityGridConfig,
     getDensityGridViewId,
     isDensityGridShown,
     shouldDrawInDensityGridCell,
@@ -19,13 +20,18 @@ describe("densityGridUtils", () => {
         expect(supportsDensityGridMode(undefined)).toBe(false);
     });
 
-    test("shows the grid only for a 2D chart set to grid", () => {
-        const config = { type: "DeckContourScatter", dimension: "2d", density_mode: "grid" } as const;
+    test("shows the grid only for a 2D chart with a grid by density fields", () => {
+        const config = { type: "DeckContourScatter", dimension: "2d", grid: { by: "densityFields" } } as const;
         expect(isDensityGridShown(config)).toBe(true);
-        expect(isDensityGridShown({ ...config, density_mode: "overlay" })).toBe(false);
-        expect(isDensityGridShown({ ...config, density_mode: undefined })).toBe(false);
+        expect(isDensityGridShown({ ...config, grid: null })).toBe(false);
+        expect(isDensityGridShown({ ...config, grid: undefined })).toBe(false);
         expect(isDensityGridShown({ ...config, dimension: "3d" })).toBe(false);
         expect(isDensityGridShown({ ...config, type: "wgl_scatter_plot" })).toBe(false);
+    });
+
+    test("turns the grid on and off", () => {
+        expect(densityGridConfig(true)).toEqual({ by: "densityFields" });
+        expect(densityGridConfig(false)).toBeNull();
     });
 
     test("draws a cell's layers and their sublayers only in that cell", () => {
