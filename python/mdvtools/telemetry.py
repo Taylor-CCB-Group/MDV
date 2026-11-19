@@ -25,9 +25,10 @@ import logging
 import os
 import re
 import time
+import weakref
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
-from typing import ParamSpec, TypeVar
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
 
 from flask import Flask, Response, request
 
@@ -39,6 +40,10 @@ try:
 except ImportError:  # a slim install of mdvtools, without the app extra
     otel_metrics = None
     otel_trace = None
+
+if TYPE_CHECKING:
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.trace import SpanContext
 
 logger = get_logger(__name__)
 
@@ -108,7 +113,7 @@ def init_telemetry(app: Flask) -> bool:
         SQLAlchemyInstrumentor().instrument()
         SystemMetricsInstrumentor(config=_PROCESS_METRICS).instrument()
         _add_trace_ids_to_log_records()
-        _watch_event_loop()
+        _watch_event_loop(tracer_provider)
         _initialised = True
 
     FlaskInstrumentor().instrument_app(app, excluded_urls=_EXCLUDED_URLS)
@@ -214,7 +219,7 @@ def traced(name: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
 # ---------------------------------------------------------------------------
 
 
-def _watch_event_loop() -> None:
+def _watch_event_loop(tracer_provider: "TracerProvider") -> None:
     """Report whenever one request holds up the gevent event loop.
 
     MDV serves every request from one gevent worker, so CPU-bound work, such
@@ -223,7 +228,7 @@ def _watch_event_loop() -> None:
     for ``GEVENT_MAX_BLOCKING_TIME`` seconds (gevent's default is 0.1) and
     reports again for each further period it stays blocked. Each report
     adds that period to ``mdv.event_loop.blocked_time`` and logs one warning
-    naming the MDV code that was running.
+    naming the MDV code that was running, with the trace ID of its request.
     """
     try:
         from gevent import monkey
@@ -249,24 +254,56 @@ def _watch_event_loop() -> None:
     # about 40 lines. The one-line warning below replaces it.
     setattr(monitor, "_show_blocking_report", lambda *args: None)
 
+    _remember_open_spans(tracer_provider)
     blocked_time = metrics.get_meter("mdvtools").create_counter(
         "mdv.event_loop.blocked_time",
         unit="s",
         description="Time the gevent event loop spent blocked, in steps of GEVENT_MAX_BLOCKING_TIME",
     )
 
-    def report(blocking_time: float, info: list[str]) -> None:
+    def report(blocking_time: float, info: list[str], span_context: "SpanContext | None") -> None:
         blocked_time.add(blocking_time)
-        logger.warning("Event loop blocked for over %ss in %s", blocking_time, _blocked_frames(info))
+        _log_blocked_loop(blocking_time, info, span_context)
 
     def on_event(event) -> None:
         # This runs in gevent's monitor thread. Logging there would take
         # monkey-patched locks and start a second hub in that thread, so the
         # report waits for the main loop, which runs it once it is free again.
+        # By then the request may have finished, so its span is looked up now.
         if isinstance(event, EventLoopBlocked) and event.hub is hub:
-            hub.loop.run_callback_threadsafe(report, event.blocking_time, list(event.info))
+            span_context = _open_spans.get(event.greenlet)
+            hub.loop.run_callback_threadsafe(report, event.blocking_time, list(event.info), span_context)
 
     subscribers.append(on_event)
+
+
+# The outermost open span of each greenlet. gevent's monitor thread reads it to find the request that blocked the loop, because a running greenlet's context cannot be read from another thread.
+_open_spans: "weakref.WeakKeyDictionary[object, SpanContext]" = weakref.WeakKeyDictionary()
+
+
+def _remember_open_spans(tracer_provider: "TracerProvider") -> None:
+    from greenlet import getcurrent
+    from opentelemetry.sdk.trace import SpanProcessor
+
+    class RememberOpenSpans(SpanProcessor):
+        def on_start(self, span, parent_context=None) -> None:
+            _open_spans.setdefault(getcurrent(), span.get_span_context())
+
+        def on_end(self, span) -> None:
+            current = getcurrent()
+            remembered = _open_spans.get(current)
+            if span.context is not None and remembered is not None and remembered.span_id == span.context.span_id:
+                del _open_spans[current]
+
+    tracer_provider.add_span_processor(RememberOpenSpans())
+
+
+def _log_blocked_loop(blocking_time: float, info: Sequence[str], span_context: "SpanContext | None") -> None:
+    from opentelemetry import trace
+
+    span = trace.NonRecordingSpan(span_context) if span_context else trace.INVALID_SPAN
+    with trace.use_span(span, end_on_exit=False):
+        logger.warning("Event loop blocked for over %ss in %s", blocking_time, _blocked_frames(info))
 
 
 _FRAME = re.compile(r'File "([^"]+)", line (\d+), in (\S+)')

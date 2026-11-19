@@ -244,3 +244,41 @@ def test_a_blocking_report_names_the_mdv_code_innermost_first():
     ]
 
     assert telemetry._blocked_frames(report) == "mdvproject.py:2575 get_byte_data < server.py:362 get_data"
+
+
+def test_each_greenlet_keeps_its_outermost_open_span_until_it_ends():
+    pytest.importorskip("opentelemetry.sdk")
+    greenlet = pytest.importorskip("greenlet")
+    from opentelemetry.sdk.trace import TracerProvider
+
+    provider = TracerProvider()
+    telemetry._remember_open_spans(provider)
+    tracer = provider.get_tracer(__name__)
+    current = greenlet.getcurrent()
+
+    with tracer.start_as_current_span("request") as request_span:
+        with tracer.start_as_current_span("mdv.get_byte_data"):
+            during = telemetry._open_spans.get(current)
+        after_inner = telemetry._open_spans.get(current)
+    after = telemetry._open_spans.get(current)
+
+    assert during == request_span.get_span_context()
+    assert after_inner == request_span.get_span_context()
+    assert after is None
+
+
+def test_a_blocked_loop_warning_carries_the_blocked_requests_trace_id(caplog):
+    pytest.importorskip("opentelemetry.sdk")
+    from opentelemetry.trace import SpanContext
+
+    span_context = SpanContext(trace_id=0xAB, span_id=0xCD, is_remote=False)
+    original_factory = logging.getLogRecordFactory()
+    try:
+        telemetry._add_trace_ids_to_log_records()
+        with caplog.at_level(logging.WARNING, logger=telemetry.logger.name):
+            telemetry._log_blocked_loop(0.1, [], span_context)
+            telemetry._log_blocked_loop(0.1, [], None)
+    finally:
+        logging.setLogRecordFactory(original_factory)
+
+    assert [getattr(r, "trace_id") for r in caplog.records] == [format(0xAB, "032x"), ""]

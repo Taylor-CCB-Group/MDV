@@ -79,7 +79,7 @@ For anything the dashboards do not show, use **Explore** in Grafana's menu:
   - `mdv.get_byte_data`, which reads columns from the h5 file for `get_data`
   - `mdv.upload.datasource`, `mdv.upload.anndata` and `mdv.upload.project`, which process uploaded files
   - `mdv.convert_anndata` and `mdv.convert_spatialdata`, which convert data into a project
-- Prometheus, the event loop: `mdv_event_loop_blocked_time_seconds_total` counts the time one request held up MDV's single gevent worker, in steps of `GEVENT_MAX_BLOCKING_TIME` (0.1 seconds unless set). Each step also logs a warning, `Event loop blocked for over 0.1s in ...`, that names the MDV functions that were running, innermost first.
+- Prometheus, the event loop: `mdv_event_loop_blocked_time_seconds_total` counts the time one request held up MDV's single gevent worker, in steps of `GEVENT_MAX_BLOCKING_TIME` (0.1 seconds unless set). Each step also logs a warning, `Event loop blocked for over 0.1s in ...`, that names the MDV functions that were running, innermost first, and ends in the `trace_id` of the request that blocked the loop.
 - Tempo: one trace for each request to MDV, with a span for each database query and each MDV operation. The `mdv.get_byte_data` span carries `mdv.datasource`, `mdv.columns` and `mdv.bytes`. Log lines written during a request end in `trace_id=...`, and Grafana links them to their trace.
 
 ## Leave a container out
