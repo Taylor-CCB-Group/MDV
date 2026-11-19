@@ -469,10 +469,19 @@ export const SelectionDialogConfigSchema = BaseConfigSchema.extend({
 }).describe("Configuration for selection dialogs allowing user interaction");
 
 export const GeneInfoSchema = BaseConfigSchema.extend({
-    type: z.literal("geneNetwork").describe("Gene information from genenetwork.nl API"),
+    type: z.literal("geneNetwork").describe("Gene or protein information from genenetwork.nl or UniProt"),
     autoScroll: z.boolean().optional().describe("Automatically scroll to highlighted items"),
+    source: z.enum(["genenetwork", "uniprot"]).optional().describe("Where card details come from"),
+    organism: z.enum(["human", "mouse"]).optional().describe("Species to look identifiers up in (UniProt)"),
+    search: z
+        .object({
+            query: z.string().optional().describe("Substring the identifiers are filtered by"),
+            terms: z.array(z.string()).optional().describe("Identifiers the view is limited to"),
+        })
+        .optional()
+        .describe("Search that filters the whole view"),
 }).describe(
-    "Configuration for chart allowing for selection of genes with information retrieved from genenetwork.nl API",
+    "Configuration for chart allowing for selection of genes or proteins with information from genenetwork.nl or UniProt",
 );
 
 // Register all chart-specific schemas with the registry
