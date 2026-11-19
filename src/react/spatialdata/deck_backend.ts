@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type RenderBackend, renderBackendSetting } from "@/lib/browserSettings";
 // Side effect: when "WebGPU call tracing" is on, wrap the WebGPU API before any device exists.
 import "./webgpu_trace";
+import { applyWebGPUViewportClamp } from "./webgpu_viewport_clamp";
 
 /**
  * Which deck.gl device backend the SpatialData chart and the deck scatter plot render with. WebGPU is the
@@ -176,6 +177,8 @@ export function useDeckDeviceProps(
         (created: Device) => {
             initializedBackend.current = created.type;
             currentDevice.current = created;
+            // before deck's first frame: Safari rejects a viewport outside the canvas
+            applyWebGPUViewportClamp(created);
             handlers.initialized?.(created);
             // deck only watches for a lost WebGL context; a lost GPUDevice (GPU process
             // crash or reset) would leave the canvas dark. "destroyed" is our own teardown.
