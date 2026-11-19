@@ -252,8 +252,10 @@ For a TCM layer and a TCM grid, in order:
 3. **A `TcmLayer` in `@intraspatial/deck`**, mirroring `DensityLayer` (props: A / B weights over one
    point set, `radius`, `sigma`, `alpha`, kernel, diverging colour range). Weights over a shared point
    set, not two clouds, fits MDV's columns and makes per-pair layers cheap.
-4. **Batched pairs**: one pass B-density per distinct B type, reused by every pair sharing it; an
-   array-texture output for N pairs (the grid).
+4. **Batched pairs (optimisation)**: one B-density pass per distinct B type, reused by every pair
+   sharing it; an array-texture output for N pairs. Nothing waits on it: a TCM grid stays interactive
+   mainly because it is lazy (only the cells on screen compute), static layers are drawn once into a
+   shared FBO, and TCM is cheap per pair.
 5. **TCM on domains** (slice 4): ρ_B·|disk∩W| in place of ρ_B·πr².
 6. Already listed for cross-PCF: typed-array `LabelledCells`, `indices?`.
 
@@ -270,7 +272,8 @@ Each step lands on its own and is usable.
 3. **Legacy adapter**: legacy heatmap highlight ↔ focus; legacy stat columns as `column` measures.
 4. **intraspatial TCM asks 1–3**, then a TCM overlay bound to a set (focused pair first).
 5. **TCM grid**: re-implement the chart-array idea on WebGPU (deck views per cell + shared static
-   pass), cells = chosen pairs; needs ask 4 for speed. Coordinate with whoever picks up #476.
+   pass), cells = chosen pairs. Asks 1–2 are what it needs; ask 4 is a later optimisation.
+   Coordinate with whoever picks up #476.
 6. **Dataflow graph, first cut**: per-view extra source nodes and chart bindings to them (two chart
    groups in one view on different sets), then derived nodes. See
    [dataflow-graph.md](dataflow-graph.md); this note only fixes the seam.

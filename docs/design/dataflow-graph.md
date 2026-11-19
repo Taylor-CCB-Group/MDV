@@ -61,6 +61,32 @@ a second one coexist in a view.
   such as `log1p(CD8) − log1p(CD4)`, or a score over a gene set).
 - `ParamSpec` metadata on parameters, which the composer already turns into controls.
 
+### In luma.gl / deck.gl v10 — a GPU graph upstream (to evaluate)
+
+luma.gl's v10 alphas (MDV is on 9.4) are growing a GPU compute graph in `@luma.gl/gpgpu`, and deck.gl
+v10 is starting to build layers on it. Not evaluated yet; recorded so it is weighed before MDV or
+intraspatial grows more of its own. As of 2026-11:
+
+- **luma.gl**: `GPUCommandGraph` and graph operations (grouped aggregation and reduction, scatter /
+  sparse ops, FFT, convolution, grid binning and index), compiled graph programs separated from
+  mutable state instances ([#3639](https://github.com/visgl/luma.gl/pull/3639)), caller-owned
+  encoding ([#3628](https://github.com/visgl/luma.gl/pull/3628)), `GPUDataFrame` expressions compiled
+  to WGSL ([#3730](https://github.com/visgl/luma.gl/pull/3730)) and Arrow column streams
+  ([#3667](https://github.com/visgl/luma.gl/pull/3667)). The design is audited against CUDA Graphs,
+  SYCL Graph and Daxa TaskGraph in [#3084](https://github.com/visgl/luma.gl/pull/3084); a downstream
+  consumer's API audit is [#3761](https://github.com/visgl/luma.gl/issues/3761); the release tracker
+  is [#2550](https://github.com/visgl/luma.gl/issues/2550).
+- **deck.gl**: an opt-in graph aggregator for `ScreenGridLayer`
+  ([#11084](https://github.com/visgl/deck.gl/pull/11084)), `ContourLayer` aggregating on WebGPU
+  ([#11079](https://github.com/visgl/deck.gl/pull/11079)), private Arrow + GPU graph modules
+  ([#10840](https://github.com/visgl/deck.gl/pull/10840)); tracker
+  [#10712](https://github.com/visgl/deck.gl/issues/10712).
+
+Questions for the evaluation: does it overlap intraspatial's op graph (typed ports, memo, lazy pull)
+or sit below it as an execution layer? Does it have change notification or on-demand evaluation, or
+is it an explicitly run command graph? Would its DataFrame expressions serve MDV's columnar
+expressions (ADR-0007's role)? And what does adopting it cost, given MDV's deck / luma upgrade path?
+
 ## Proposal
 
 ### Evaluation: change propagates, work is on demand (runtime undecided)
@@ -96,6 +122,9 @@ Options for where the graph lives:
 - **C — no op graph in MDV.** MobX throughout, with compute nodes as async computeds calling
   intraspatial functions directly (as the cross-PCF chart does now). This is the simplest, but it gives
   up the memo's cross-consumer sharing unless MDV rebuilds it.
+
+A fourth possibility, after evaluation: luma.gl's GPU graph (above) as the execution layer under
+A or B, if it covers enough of the heavy nodes.
 
 Whichever is chosen, the shared part is the **vocabulary**: value types, port typing, serialisation
 shape, `ParamSpec`. Use intraspatial's where it exists rather than inventing MDV-local ones, and add
@@ -170,7 +199,8 @@ No big bang; each step should be useful alone and falsifiable.
 
 ## Open questions
 
-- **Which runtime** (A / B / C above), and so who owns which graph. Values cross as GPU buffers or
+- **Which runtime** (A / B / C above, and where luma.gl's GPU graph fits), and so who owns which
+  graph. Values cross as GPU buffers or
   SAB-backed arrays either way (ADR-0005's zero-copy claim, still to test with one real selection).
   The first steps below don't depend on the answer: refs and resolvers sit in front of any of them.
 - **Authored vs inferred.** Most users never see a graph: wiring comes from chart menus ("follow…",
