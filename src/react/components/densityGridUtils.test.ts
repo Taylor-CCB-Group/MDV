@@ -3,10 +3,8 @@ import {
     densityGridConfig,
     getDensityGridViewId,
     isDensityGridShown,
-    isGridCrosshairShown,
     shouldDrawInDensityGridCell,
     supportsDensityGridMode,
-    withGridCrosshair,
 } from "./densityGridUtils";
 
 describe("densityGridUtils", () => {
@@ -36,27 +34,6 @@ describe("densityGridUtils", () => {
     test("turns the grid on and off", () => {
         expect(densityGridConfig(true)).toEqual({ by: "densityFields" });
         expect(densityGridConfig(false)).toBeNull();
-        // the grid's other options stay while it is on
-        expect(densityGridConfig(true, { by: "densityFields", crosshair: true })).toEqual({
-            by: "densityFields",
-            crosshair: true,
-        });
-        expect(densityGridConfig(false, { by: "densityFields", crosshair: true })).toBeNull();
-    });
-
-    test("marks the pointer unless the grid turns it off", () => {
-        expect(isGridCrosshairShown({ by: "densityFields" })).toBe(true);
-        expect(isGridCrosshairShown({ by: "densityFields", crosshair: false })).toBe(false);
-        expect(isGridCrosshairShown({ by: "densityFields", crosshair: true })).toBe(true);
-    });
-
-    test("sets the crosshair with a new grid object, and only on a grid", () => {
-        const grid = { by: "densityFields" } as const;
-        const next = withGridCrosshair(grid, true);
-        expect(next).toEqual({ by: "densityFields", crosshair: true });
-        expect(next).not.toBe(grid);
-        expect(withGridCrosshair(null, true)).toBeNull();
-        expect(withGridCrosshair(undefined, true)).toBeUndefined();
     });
 
     test("draws a cell's layers and their sublayers only in that cell", () => {

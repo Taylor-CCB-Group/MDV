@@ -184,10 +184,6 @@ export const ChartGridConfigSchema = z
         by: z
             .enum(["densityFields"])
             .describe("The config property whose values make the cells, e.g. one cell per density field"),
-        crosshair: z
-            .boolean()
-            .optional()
-            .describe("Mark the pointer's position in every cell with a horizontal and a vertical line (default true)"),
     })
     .describe("Show the chart as a grid of cells, one per value of a config property");
 
@@ -277,6 +273,12 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
         .describe("Hides rows outside the selected categories from this chart only"),
     on_filter: z.enum(["hide", "grey"]).optional().describe("How filtered-out points should be rendered"),
     zoom_on_filter: z.boolean().optional().describe("Whether filtering should auto-fit the current view"),
+    crosshair: z
+        .boolean()
+        .optional()
+        .describe(
+            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a grid (default true)",
+        ),
     point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
     axis_scaling: z
         .enum(["equal", "fit"])

@@ -13,7 +13,8 @@ import useGateLayers from "../hooks/useGateLayers";
 import { useSpatialLayers } from "../spatial_context";
 import DeckCellGrid from "./DeckCellGrid";
 import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
-import { getDensityGridViewId, isGridCrosshairShown } from "./densityGridUtils";
+import { getDensityGridViewId } from "./densityGridUtils";
+import { isCrosshairShown } from "./pointerCrosshair";
 import { useLayersForDevice, useScatterDeckDevice, useZoomOnFilter } from "./scatterDeckShared";
 import { useDensityGridCellLayers } from "./useDensityGridCellLayers";
 
@@ -92,7 +93,7 @@ export default observer(function DeckDensityGridComponent({ cells, densityFields
             getTooltipContent={getTooltipContent}
             setKeyboardActive={setScatterKeyboardActive}
             exportTarget={chart}
-            crosshair={isGridCrosshairShown(config.grid)}
+            crosshair={isCrosshairShown(config)}
         />
     );
 });

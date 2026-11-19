@@ -22,10 +22,12 @@ import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import { useScatterRadius } from "../scatter_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import AxisComponent from "./AxisComponent";
+import { CrosshairArea } from "./CrosshairArea";
 import DeckDensityGridComponent from "./DeckDensityGridComponent";
 import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
 import { isDensityGridShown } from "./densityGridUtils";
 import FieldContourLegend from "./FieldContourLegend";
+import { isCrosshairShown } from "./pointerCrosshair";
 import SelectionOverlay from "./SelectionOverlay";
 import { ScatterDeckBoundary, useLayersForDevice, useScatterDeckDevice, useZoomOnFilter } from "./scatterDeckShared";
 
@@ -239,31 +241,33 @@ const DeckScatter = observer(function DeckScatterComponent({
                         setScatterKeyboardActive(false);
                     }}
                 >
-                    <ScatterDeckBoundary device={device} failedOnWebGPU={failedOnWebGPU}>
-                        <DeckGL
-                            ref={deckRef}
-                            layers={deckLayers}
-                            {...(deviceProps && { deviceProps })}
-                            onDeviceInitialized={onDeviceInitialized}
-                            onError={onError}
-                            useDevicePixels={true}
-                            controller={{
-                                // double-click finishes polygons / removes vertices in selection tools
-                                doubleClickZoom: false,
-                                dragPan: controllerOptions.dragPan,
-                            }}
-                            viewState={viewState}
-                            // initialViewState={viewState} //consider not using react state for this
-                            views={view}
-                            onViewStateChange={(v) => {
-                                action(() => (config.viewState = v.viewState))();
-                            }}
-                            getTooltip={getPortalTooltip}
-                            getCursor={({ isDragging }) => {
-                                return isDragging ? "grabbing" : "crosshair";
-                            }}
-                        />
-                    </ScatterDeckBoundary>
+                    <CrosshairArea enabled={isCrosshairShown(config)}>
+                        <ScatterDeckBoundary device={device} failedOnWebGPU={failedOnWebGPU}>
+                            <DeckGL
+                                ref={deckRef}
+                                layers={deckLayers}
+                                {...(deviceProps && { deviceProps })}
+                                onDeviceInitialized={onDeviceInitialized}
+                                onError={onError}
+                                useDevicePixels={true}
+                                controller={{
+                                    // double-click finishes polygons / removes vertices in selection tools
+                                    doubleClickZoom: false,
+                                    dragPan: controllerOptions.dragPan,
+                                }}
+                                viewState={viewState}
+                                // initialViewState={viewState} //consider not using react state for this
+                                views={view}
+                                onViewStateChange={(v) => {
+                                    action(() => (config.viewState = v.viewState))();
+                                }}
+                                getTooltip={getPortalTooltip}
+                                getCursor={({ isDragging }) => {
+                                    return isDragging ? "grabbing" : "crosshair";
+                                }}
+                            />
+                        </ScatterDeckBoundary>
+                    </CrosshairArea>
                 </div>
             </AxisComponent>
             {tooltipPortal}

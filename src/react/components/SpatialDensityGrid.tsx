@@ -17,7 +17,8 @@ import { type ChartArrayCell, useChartArrayGrid } from "../hooks/useChartArrayGr
 import type { DensityGridCells } from "../hooks/useDensityGridCells";
 import type { TooltipContent } from "../hooks/useOuterContainerDeckTooltip";
 import DeckCellGrid from "./DeckCellGrid";
-import { getDensityGridViewId, isGridCrosshairShown } from "./densityGridUtils";
+import { getDensityGridViewId } from "./densityGridUtils";
+import { type CrosshairConfig, isCrosshairShown } from "./pointerCrosshair";
 import { useLayersForDevice } from "./scatterDeckShared";
 import { useDensityGridCellLayers } from "./useDensityGridCellLayers";
 
@@ -100,7 +101,7 @@ export default observer(function SpatialDensityGrid({
     onHover: (info: PickingInfo, canvas: HTMLCanvasElement | undefined) => void;
 }) {
     const chartId = useChartID();
-    const config = useConfig<DualContourLegacyConfig>();
+    const config = useConfig<DualContourLegacyConfig & CrosshairConfig>();
     const grid = useChartArrayGrid({ chartId, cells: host.cells, getViewId: getCellViewId });
     const { visibleCells, densityLayers, labels } = useDensityGridCellLayers(grid, host.densityFields);
 
@@ -150,7 +151,7 @@ export default observer(function SpatialDensityGrid({
             onHover={onHover}
             setKeyboardActive={host.setKeyboardActive}
             onPointerLeave={host.onPointerLeave}
-            crosshair={isGridCrosshairShown(config.grid)}
+            crosshair={isCrosshairShown(config)}
         />
     );
 });

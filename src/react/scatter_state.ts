@@ -90,6 +90,8 @@ export type ScatterPlotConfig = {
     background_filter?: BackgroundFilter | null;
     on_filter: "hide" | "grey"; //todo...
     zoom_on_filter: boolean;
+    /** 2D only: mark the pointer with a crosshair; absent is on. null only keeps the key observable. */
+    crosshair?: boolean | null;
     point_shape: "circle" | "square" | "gaussian";
     /** 2D only; absent is `equal`. See `AxisScaling`. */
     axis_scaling?: AxisScaling;

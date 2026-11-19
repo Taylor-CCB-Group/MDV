@@ -8,7 +8,9 @@ import type { UseChartArrayGridResult } from "../hooks/useChartArrayGrid";
 import { type TooltipContent, useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import ChartArrayLayout from "./ChartArrayLayout";
+import { CrosshairLines } from "./CrosshairArea";
 import { shouldDrawInDensityGridCell } from "./densityGridUtils";
+import { hideCrosshair, placeCrosshair } from "./pointerCrosshair";
 
 export type DeckCellLabel = { text: string; color: readonly number[] };
 
@@ -73,22 +75,6 @@ export type DeckCellGridProps = {
     /** Mark the pointer's position in every cell with a horizontal and a vertical line. */
     crosshair?: boolean;
 };
-
-/**
- * Moves the crosshair to the pointer, or hides it when the pointer is not over a cell's canvas.
- * Written straight to the grid's style, as a re-render per pointer move would also set every
- * prop of the deck again.
- */
-function placeCrosshair(root: HTMLElement, canvas: HTMLCanvasElement | undefined, x: number, y: number) {
-    if (!canvas) {
-        delete root.dataset.crosshair;
-        return;
-    }
-    const rect = canvas.getBoundingClientRect();
-    root.style.setProperty("--mdv-crosshair-dx", `${x - rect.left - rect.width / 2}px`);
-    root.style.setProperty("--mdv-crosshair-dy", `${y - rect.top - rect.height / 2}px`);
-    root.dataset.crosshair = "on";
-}
 
 /**
  * A cell's canvas, made with this window's `document` even when the chart is popped out. deck and
@@ -284,13 +270,7 @@ export default function DeckCellGrid({
                     >
                         {label.text}
                     </div>
-                    {crosshair && (
-                        <>
-                            {/* the line at the pointer's x, and the one at its y */}
-                            <div className="mdv-chart-array__crosshair" data-axis="x" />
-                            <div className="mdv-chart-array__crosshair" data-axis="y" />
-                        </>
-                    )}
+                    {crosshair && <CrosshairLines />}
                 </>
             );
         },
@@ -322,7 +302,7 @@ export default function DeckCellGrid({
                 onMouseDown={() => setKeyboardActive(true)}
                 onMouseEnter={() => setKeyboardActive(true)}
                 onMouseLeave={(event) => {
-                    delete event.currentTarget.dataset.crosshair;
+                    hideCrosshair(event.currentTarget);
                     clearTooltip();
                     setKeyboardActive(false);
                     onPointerLeave?.();

@@ -19,6 +19,7 @@ import { BaseReactChart } from "./BaseReactChart";
 import DeckScatterComponent from "./DeckScatterComponent";
 import { getDensityGridSettingsFolder } from "./densityGridSettings";
 import { supportsDensityGridMode } from "./densityGridUtils";
+import { getCrosshairSetting } from "./pointerCrosshair";
 import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 
 const MainChart = observer(() => {
@@ -72,6 +73,8 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     config.background_filter = config.background_filter ?? null;
     // and the grid, which its toggle sets and clears
     config.grid = config.grid ?? null;
+    // and the crosshair, which is on unless turned off
+    config.crosshair = config.crosshair ?? null;
     // charts saved before this setting kept both axes at one scale
     if (config.dimension !== "3d") config.axis_scaling = config.axis_scaling ?? "equal";
     const legacyContourParameter = originalConfig.param?.[2];
@@ -258,7 +261,8 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         const render_backend = c.render_backend ?? undefined;
         const background_filter = c.background_filter ?? undefined;
         const grid = c.grid ?? undefined;
-        return { ...c, viewState, render_backend, background_filter, grid };
+        const crosshair = c.crosshair ?? undefined;
+        return { ...c, viewState, render_backend, background_filter, grid, crosshair };
     }
 
     /** Choose a column and the categories of it to keep; other rows are hidden from this chart only. */
@@ -313,6 +317,7 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                     },
                 }),
             );
+            settings.push(getCrosshairSetting(c));
             if (supportsDensityGridMode(c.type)) settings.push(getDensityGridSettingsFolder(c));
         }
         return settings.concat([

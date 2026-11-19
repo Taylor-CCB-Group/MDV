@@ -106,7 +106,7 @@ export default observer(function SelectionOverlay() {
     const densityGridShown = isDensityGridShown(config);
     const toggleDensityGrid = useCallback(() => {
         action(() => {
-            config.grid = densityGridConfig(!isDensityGridShown(config), config.grid);
+            config.grid = densityGridConfig(!isDensityGridShown(config));
         })();
     }, [config]);
     const {

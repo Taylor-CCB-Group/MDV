@@ -20,25 +20,9 @@ export function isDensityGridShown(config: DensityGridModeConfig) {
     return supportsDensityGridMode(config.type) && config.dimension !== "3d" && config.grid?.by === "densityFields";
 }
 
-/**
- * The `grid` config that shows one cell per density field, or null for a single plot. The
- * current grid's other options are kept.
- */
-export function densityGridConfig(shown: boolean, current?: ChartGridConfig | null): ChartGridConfig | null {
-    return shown ? { ...current, by: "densityFields" } : null;
-}
-
-/** Whether the grid marks the pointer in every cell: on unless turned off. */
-export function isGridCrosshairShown(grid: ChartGridConfig | null | undefined) {
-    return grid?.crosshair ?? true;
-}
-
-/**
- * The `grid` config with its crosshair on or off. A new object: setting a key the config
- * object did not have would not be seen by MobX.
- */
-export function withGridCrosshair(grid: ChartGridConfig | null | undefined, crosshair: boolean) {
-    return grid ? { ...grid, crosshair } : grid;
+/** The `grid` config that shows one cell per density field, or null for a single plot. */
+export function densityGridConfig(shown: boolean): ChartGridConfig | null {
+    return shown ? { by: "densityFields" } : null;
 }
 
 const DENSITY_GRID_PREFIX = "density-grid";
