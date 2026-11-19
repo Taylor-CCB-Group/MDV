@@ -58,8 +58,7 @@ postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}
 1. **Wait for Database**: `wait_for_database()` ensures PostgreSQL is ready
 2. **Create Database**: Automatically creates the database if it doesn't exist
 3. **Create Tables**: `db.create_all()` creates all tables defined in models
-4. **Sync Users**: If authentication is enabled, syncs users from Auth provider
-5. **Cache Setup**: Initializes Redis cache for user-project mappings (if auth enabled)
+4. **Cache Setup**: Initializes Redis cache for user-project mappings (if auth enabled)
 
 ---
 
@@ -980,7 +979,6 @@ Removes a user from a project.
    - Waits for database to be ready
    - Creates database if it doesn't exist
    - Creates all tables
-   - Syncs users (if auth enabled)
 
 ### Application Initialization Flow
 
@@ -996,8 +994,7 @@ Removes a user from a project.
    - Initializes SQLAlchemy
    - Creates tables via `db.create_all()`
 
-3. **Sync Users** (if auth enabled):
-   - Syncs users from Auth provider
+3. **Cache Users** (if auth enabled):
    - Caches user-project mappings
 
 4. **Serve Projects**:
@@ -1071,13 +1068,10 @@ File synchronization maintains a database record of all files within project dir
 
 ## Authentication Integration
 
-### User Synchronization
+### Users
 
-When authentication is enabled, users are synchronized from the Auth provider (e.g., Auth0) to the database:
-
-1. **On Startup**: `auth_provider.sync_users_to_db()`
-2. **After Project Creation**: Users are synced to ensure database consistency
-3. **User Service**: `UserService.add_or_update_user()` handles user creation/updates
+On Auth0 sites, MDV creates a User when someone accepts an Invitation at sign-in, and the
+first Admin comes from `MDV_BOOTSTRAP_ADMIN_EMAIL` (ADR 0019). Nothing copies users from Auth0.
 
 ### Permission Caching
 
@@ -1162,9 +1156,8 @@ This section summarizes how project-related endpoints and WebSockets are protect
 
 ### Authentication
 
-1. **User Sync**: Ensure users are synced before assigning permissions
-2. **Cache Updates**: Update permission cache after permission changes
-3. **Permission Checks**: Always verify permissions in API endpoints
+1. **Cache Updates**: Update permission cache after permission changes
+2. **Permission Checks**: Always verify permissions in API endpoints
 
 ### Configuration
 

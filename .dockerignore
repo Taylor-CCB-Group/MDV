@@ -45,3 +45,11 @@ dmypy.json
 
 # Observability stack: runs beside MDV, not inside the image
 observability/
+
+# Test data and sample files that the app never reads at runtime. The dev
+# container and the Playwright CI job mount the repository, so they still see them.
+# Keep the rest of python/mdvtools/test_projects: chat reads RAG_examples/ at runtime.
+python/mdvtools/test_projects/data/
+tests_playwright/test-data/
+uploads/
+examples/data/

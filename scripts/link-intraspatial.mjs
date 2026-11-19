@@ -33,7 +33,7 @@ const PACKAGE_DIRS = {
  * override. Keep in step with package.json: this is a separate copy of the range.
  */
 const PUBLISHED_RANGES = {
-    "@intraspatial/deck": "^0.1.0",
+    "@intraspatial/deck": "^0.1.2",
 };
 
 function expandHome(p) {

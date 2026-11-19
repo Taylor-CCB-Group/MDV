@@ -1,4 +1,4 @@
-import { CompositeLayer, type Layer, type LayersList } from "@deck.gl/core";
+import { CompositeLayer, type Layer, type LayerProps, type LayersList } from "@deck.gl/core";
 import type { ScatterplotLayerProps } from "@deck.gl/layers";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import { DensityLayer } from "@intraspatial/deck";
@@ -18,6 +18,59 @@ export type SpatialLayerProps = ScatterplotLayerProps & {
     highlightLineColor?: [number, number, number];
 };
 
+/**
+ * The density sublayers for `contourLayers`. `subLayerProps` is the parent composite's
+ * `getSubLayerProps`, which supplies the model matrix and the other props deck forwards.
+ *
+ * TriangleLayerContours is GLSL-only. On WebGPU, contours are @intraspatial/deck's
+ * DensityLayer instead: KDE splatting in data units with a WGSL presentation shader,
+ * converted from the heatmap props in `intraspatialDensity.ts`.
+ */
+function densitySubLayers(
+    contourLayers: ContourLayerProps[],
+    isWebGPU: boolean,
+    // biome-ignore lint/suspicious/noExplicitAny: deck types getSubLayerProps' result as any.
+    subLayerProps: (props: ContourLayerProps) => any,
+): Layer[] {
+    const contourSubLayerProps = {
+        triangle: {
+            type: TriangleLayerContours,
+        },
+    };
+    return contourLayers
+        .filter((l) => l)
+        .map((props) => {
+            const { extensions, ...p } = subLayerProps(props);
+            if (isWebGPU) return new DensityLayer(contourToDensityProps(p));
+            return new HeatmapLayer({
+                ...p,
+                _subLayerProps: {
+                    ...contourSubLayerProps,
+                    "triangle-layer": {
+                        contourOpacity: p.contourOpacity,
+                        contourFill: p.contourFill,
+                        fillOpacity: p.fillOpacity,
+                    },
+                },
+            });
+        });
+}
+
+export type DensityOverlayLayerProps = Pick<LayerProps, "id" | "modelMatrix" | "pickable"> & {
+    contourLayers: ContourLayerProps[];
+};
+
+/**
+ * Density contours on their own, for a chart that lists them as a layer apart from the
+ * points (the SpatialData chart's "Density"). Other charts draw them inside `SpatialLayer`.
+ */
+export class DensityOverlayLayer extends CompositeLayer<DensityOverlayLayerProps> {
+    static layerName = "DensityOverlayLayer";
+    renderLayers(): LayersList {
+        return densitySubLayers(this.props.contourLayers, isWebGPULayer(this), (p) => this.getSubLayerProps(p));
+    }
+}
+
 export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     static layerName = "SpatialLayer";
     static defaultProps = ScatterplotLayer.defaultProps;
@@ -34,32 +87,7 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
             highlightRadiusScale,
             highlightLineColor = [255, 255, 255],
         } = this.props;
-        // TriangleLayerContours is GLSL-only. On WebGPU, contours are @intraspatial/deck's
-        // DensityLayer instead: KDE splatting in data units with a WGSL presentation shader,
-        // converted from the heatmap props in `intraspatialDensity.ts`.
-        const isWebGPU = isWebGPULayer(this);
-        const contourSubLayerProps = {
-            triangle: {
-                type: TriangleLayerContours,
-            },
-        };
-        const densityLayers = contourLayers
-            .filter((l) => l)
-            .map((props) => {
-                const { extensions, ...p } = this.getSubLayerProps(props);
-                if (isWebGPU) return new DensityLayer(contourToDensityProps(p));
-                return new HeatmapLayer({
-                    ...p,
-                    _subLayerProps: {
-                        ...contourSubLayerProps,
-                        "triangle-layer": {
-                            contourOpacity: p.contourOpacity,
-                            contourFill: p.contourFill,
-                            fillOpacity: p.fillOpacity,
-                        },
-                    },
-                });
-            });
+        const densityLayers = densitySubLayers(contourLayers, isWebGPULayer(this), (p) => this.getSubLayerProps(p));
         return [
             // add 'grey-out' layer here... that implies a different type of data being passed.
             // it might want to know about background_filter...

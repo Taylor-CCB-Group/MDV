@@ -1,11 +1,9 @@
 import { csv, json, tsv } from "d3-fetch";
 import DataStore from "../datastore/DataStore.js";
 import { ContextMenu } from "../utilities/ContextMenu";
-import { BaseDialog } from "../utilities/Dialog.js";
 import {
     createEl,
     createMenuIcon,
-    MDVProgress,
     makeDraggable,
     makeResizable,
     removeDraggable,
@@ -14,7 +12,6 @@ import {
 } from "../utilities/Elements";
 import { getRandomString } from "../utilities/Utilities";
 import BaseChart from "./BaseChart";
-import ColorPaletteWrapper from "./dialogs/ColorPaletteWrapper";
 import CustomDialog from "./dialogs/CustomDialog.js";
 // this is added as a side-effect of importing registerChartModules,
 // then we get the actual class from BaseDialog.experiment
@@ -25,7 +22,9 @@ import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts
 import "./registerChartModules";
 import { action, makeObservable, observable } from "mobx";
 import { createElement } from "react";
+import { flushSync } from "react-dom";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
+import DataSourceMenuBar from "@/react/components/DataSourceMenuBar";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import MenuBarWrapper from "@/react/components/MenuBarComponent";
 import { getOrCreateGateManager } from "@/react/gates/useGateManager";
@@ -34,7 +33,6 @@ import popoutChart from "@/utilities/Popout";
 import { addChartLink } from "../links/link_utils";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { deserialiseParam, getConcreteFieldNames, withLoadedColumns } from "./chartConfigUtils";
-import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 import ViewManager from "./ViewManager";
@@ -150,7 +148,8 @@ export class ChartManager {
 
         this.listeners = {};
         this.infoAlerts = {};
-        this.progressBars = {};
+        /** @type {Set<string>} names of the datasources that have been shown in a view */
+        this.dataSourcesShown = new Set();
         this.setTheme(getPreferredColorScheme());
         //maybe better to stop listening once explicit option has been set
         //or to allow the user to explicitly say 'system default'
@@ -272,8 +271,8 @@ export class ChartManager {
         this.dataLoader = dataLoader.function; // || async function defaultDataLoaderFunction() { console.warn(`ceci n'est pas une dataLoader`) };
         this.viewLoader = dataLoader.viewLoader;
 
+        /** @type {Record<string, ContextMenu>} the "Change layout" menu of each datasource */
         this.layoutMenus = {};
-        this.isFullscreen = false;
 
         if (dataLoader.files) {
             this.filesToLoad = dataLoader.files.length;
@@ -666,6 +665,8 @@ export class ChartManager {
         }
 
         for (const ds of this.dataSources) {
+            ds.menuBarRoot?.unmount();
+            ds.menuBarRoot = undefined;
             ds.contentDiv = undefined;
             ds.menuBar = undefined;
         }
@@ -833,13 +834,11 @@ export class ChartManager {
                 data.dataStore = ds.dataStore;
                 this._callListeners(type, data);
             } else if (type === "filtered") {
-                if (!this.progressBars[ds.name]) {
+                // kept from when this listener updated the datasource's progress bar, which only
+                // existed once the datasource had been in a view; the menu bar now tracks the count itself
+                if (!this.dataSourcesShown.has(ds.name)) {
                     return;
                 }
-                const n1 = ds.dataStore.size;
-                const n2 = ds.dataStore.filterSize;
-                this.progressBars[ds.name].setValue(n2);
-                this.progressBars[ds.name].setText(n2);
                 this._callListeners(type, data);
             }
         });
@@ -1479,178 +1478,25 @@ export class ChartManager {
     }
 
     /**
-     * @param {{dataStore: DataStore}} ds
+     * Mounts the React menu bar for a datasource; `_init` unmounts it when the view is rebuilt.
+     * @param {DataSource} ds
      */
     _setUpMenu(ds) {
-        const dataStore = ds.dataStore;
-        createMenuIcon(
-            "fas fa-chart-bar",
-            {
-                tooltip: {
-                    text: "Add Chart",
-                    position: "bottom-right",
-                },
-                func: () => {
-                    // new AddChartDialog(ds, (config) =>
-                    //     this.addChart(ds.name, config, true),
-                    // );
-                    // if (import.meta.env.DEV) new BaseDialog.experiment["AddChartDialogReact"](dataStore);
-                    new AddChartDialogReact(dataStore);
-                },
-            },
-            ds.menuBar,
-        );
-
-        createMenuIcon(
-            "fas fa-sync-alt",
-            {
-                tooltip: {
-                    text: "Reset All Filters",
-                    position: "bottom-right",
-                },
-                func: () => {
-                    dataStore.removeAllFilters();
-                },
-            },
-            ds.menuBar,
-        );
-        createMenuIcon(
-            "fas fa-palette",
-            {
-                tooltip: {
-                    text: "Change Color Scheme",
-                    position: "bottom-right",
-                },
-                func: () => {
-                    try {
-                        new ColorPaletteWrapper(this, ds);
-                    } catch (error) {
-                        console.error("error making ColorPalette", error);
-                        this.createInfoAlert("Error making Color Palette", {
-                            type: "warning",
-                            duration: 2000,
-                        });
-                    }
-                },
-            },
-            ds.menuBar,
-        );
-        createMenuIcon(
-            "fas fa-th",
-            {
-                tooltip: {
-                    text: "Change layout",
-                    position: "bottom-right",
-                },
-                func: (e) => {
-                    this.layoutMenus[ds.name].show(e);
-                },
-            },
-            ds.menuBar,
-        );
-        //previously we shared a TagModel between invocations of the annotation dialog
-        //but they should be able to change columns - not sure if the sharing had any benefits
-        this.addMenuIcon(ds.name, "fas fa-tags", "Tag Annotation", () => {
-            //todo - check whether we have a reason for hacky import here
-            new BaseDialog.experiment["AnnotationDialogReact"](ds.dataStore);
+        // React gets its own element, so that addMenuIcon can go on appending icons to ds.menuBar
+        const container = createEl("span", { styles: { display: "contents" } }, ds.menuBar);
+        // Render now rather than on React's schedule: the charts added next measure the space
+        // left under the bar (GridstackManager.getGrid caches cellHeight from it), and a bar
+        // that wraps onto a second line is taller than the empty one.
+        flushSync(() => {
+            ds.menuBarRoot = createMdvPortal(
+                createElement(DataSourceMenuBar, { dataSource: ds }),
+                container,
+                undefined,
+                this,
+            );
         });
-
-        const idiv = createEl(
-            "div",
-            {
-                styles: {
-                    float: "right",
-                    lineHeight: "1.0",
-                },
-            },
-            ds.menuBar,
-        );
-        createEl(
-            "span",
-            {
-                text: ds.name,
-                styles: {
-                    verticalAlign: "top",
-                    fontSize: "16px",
-                    marginRight: "4px",
-                },
-            },
-            idiv,
-        );
-        const size = ds.dataStore.size;
-        ds.filterBar = createEl(
-            "progress",
-            {
-                value: size,
-            },
-            ds.menBar,
-        );
-        const pb = createEl(
-            "div",
-            {
-                styles: {
-                    width: "100px",
-                    display: "inline-block",
-                    marginTop: "2px",
-                },
-            },
-            idiv,
-        );
-        const pbConf = {
-            max: size,
-            value: size,
-            text: `${size}`,
-        };
-        this.progressBars[ds.name] = new MDVProgress(pb, pbConf);
-        this._addFullscreenIcon(ds);
-    }
-
-    _addFullscreenIcon(ds) {
-        const iconElement = createMenuIcon(
-            "fas fa-expand",
-            {
-                tooltip: {
-                    text: "Full Screen",
-                    position: "bottom-right",
-                },
-                func: async () => {
-                    //nb, not sure best way to access the actual div I want here
-                    //this could easily break if the layout structure changes
-                    // ds.contentDiv.parentElement.requestFullscreen();
-                    try {
-                        if (!this.isFullscreen) {
-                            await ds.menuBar.parentElement.requestFullscreen();
-                        } else {
-                            await document.exitFullscreen();
-                        }
-                    } catch (error) {
-                        console.error("fullscreen error caused: ", error);
-                    }
-                },
-            },
-            ds.menuBar,
-        );
-
-        document.addEventListener("fullscreenchange", () => {
-            const iconEl = iconElement.querySelector("i");
-            if (document.fullscreenElement) {
-                if (ds.menuBar.parentElement === document.fullscreenElement) {
-                    if (iconEl) {
-                        iconEl.classList.remove("fa-expand");
-                        iconEl.classList.add("fa-compress");
-                    }
-                    iconElement.setAttribute("aria-label", "Exit Full Screen");
-                    this.isFullscreen = true;
-                }
-            } else {
-                if (iconEl) {
-                    iconEl.classList.remove("fa-compress");
-                    iconEl.classList.add("fa-expand");
-                }
-                iconElement.setAttribute("aria-label", "Full Screen");
-                this.isFullscreen = false;
-            }
-        });
+        // a datasource that has never had a menu bar does not pass on "filtered" events: see _addDSListeners
+        this.dataSourcesShown.add(ds.name);
     }
 
     /**

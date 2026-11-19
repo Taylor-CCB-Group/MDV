@@ -86,8 +86,8 @@ importers:
         specifier: 0.23.0
         version: 0.23.0(ed0d233fb9efaa5b1ba8511931f32921)
       '@intraspatial/deck':
-        specifier: ^0.1.0
-        version: 0.1.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))))(@luma.gl/core@9.4.2)(@luma.gl/engine@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))(typegpu@0.11.9)
+        specifier: ^0.1.2
+        version: 0.1.2(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))))(@luma.gl/core@9.4.2)(@luma.gl/engine@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))(typegpu@0.11.9)
       '@luma.gl/constants':
         specifier: 9.4.2
         version: 9.4.2
@@ -134,20 +134,20 @@ importers:
         specifier: 10.6.0
         version: 10.6.0
       '@spatialdata/avivatorish':
-        specifier: ^0.15.1
-        version: 0.15.1(e4bea2acd8db7a7ca06bf617c7d3a0f3)
+        specifier: ^0.16.1
+        version: 0.16.1(e4bea2acd8db7a7ca06bf617c7d3a0f3)
       '@spatialdata/core':
-        specifier: ^0.15.1
-        version: 0.15.1
+        specifier: ^0.16.1
+        version: 0.16.1
       '@spatialdata/layers':
-        specifier: ^0.15.1
-        version: 0.15.1(e7f8cebde3e11ec1588ca409120e6853)
+        specifier: ^0.16.1
+        version: 0.16.1(e7f8cebde3e11ec1588ca409120e6853)
       '@spatialdata/react':
-        specifier: ^0.15.1
-        version: 0.15.1(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.5)
+        specifier: ^0.16.1
+        version: 0.16.1(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.5)
       '@spatialdata/vis':
-        specifier: ^0.15.1
-        version: 0.15.1(121ba8625c9580156c762805ee09f693)
+        specifier: ^0.16.1
+        version: 0.16.1(121ba8625c9580156c762805ee09f693)
       '@tanstack/react-query':
         specifier: ^5.80.0
         version: 5.80.6(react@19.2.6)
@@ -1351,8 +1351,8 @@ packages:
   '@interactjs/types@1.10.27':
     resolution: {integrity: sha512-BUdv0cvs4H5ODuwft2Xp4eL8Vmi3LcihK42z0Ft/FbVJZoRioBsxH+LlsBdK4tAie7PqlKGy+1oyOncu1nQ6eA==}
 
-  '@intraspatial/deck@0.1.0':
-    resolution: {integrity: sha512-zcsH64t7G3JQ/Ln1yVUIn4vkTXv1Rvqxsc4K5oqqBqUaRDFAyCjCvQtQl5bLG0hTTPfcfVnmI3CFjXhlEQXKFA==}
+  '@intraspatial/deck@0.1.2':
+    resolution: {integrity: sha512-IOGh32Ve5ci5icSPbne3fsMU4HbDNbTesyd6Gw49xkWjODqO793k8twPgDFKEaA8ZwHWRwv63DNzoFWl0+gp9A==}
     peerDependencies:
       '@deck.gl/core': ~9.4.0
       '@luma.gl/core': ~9.4.2
@@ -2437,17 +2437,17 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
-  '@spatialdata/avivatorish@0.15.1':
-    resolution: {integrity: sha512-Px/yF8UVkza75HU3yXBQHttPCR4LClPuw1cQW26Zx3261h90gYjMpQcxl39S41ulGa1gW72HqzF6F9EFf7cGbQ==}
+  '@spatialdata/avivatorish@0.16.1':
+    resolution: {integrity: sha512-8igpDDC6Qv2odFfaupy5/RAY/Gd4E7t4DAQt9dcv5CdALIO8JeI3uMenEjAWIhxgjAJ0/jeNR8QAa/C9pC1CKA==}
     peerDependencies:
       react: '>=18 <20'
       react-dom: '>=18 <20'
 
-  '@spatialdata/core@0.15.1':
-    resolution: {integrity: sha512-qKrmic0Upd36RT1cxmTfqcRno+5Am2F1a0GO/C4mRXNhwDV/XEWT5YUX6bXzl4Y9jT5SNrR39kWsjLwU+HLu0A==}
+  '@spatialdata/core@0.16.1':
+    resolution: {integrity: sha512-nWoIdzoyO34kWu5+WImN41KgooUnDfb6GTFmzWZ8Et1oEWQ0S3ZeEcFxR563lIx3UuxTXc3BfQlunzO6mDokOw==}
 
-  '@spatialdata/layers@0.15.1':
-    resolution: {integrity: sha512-Lq04biYKqRuzt2TBjxcYSp7gYECJHyLAX2TKSB+4Gdvhh01R/5oj1nfCjsVdzeVcxavju9NV9A1nRrMgvKGOHw==}
+  '@spatialdata/layers@0.16.1':
+    resolution: {integrity: sha512-KD47cz5eaRm36tk+TPfPOXkOGYwuZMF9RBbQfaZsS8leixXrXh1A7kUmb8FEqyLxnZtGM+GQ0SAFU3/Rn394+Q==}
     peerDependencies:
       '@deck.gl/core': ~9.4.0
       '@deck.gl/geo-layers': ~9.4.0
@@ -2455,16 +2455,16 @@ packages:
       '@deck.gl/react': ~9.4.0
       '@deck.gl/widgets': ~9.4.0
 
-  '@spatialdata/react@0.15.1':
-    resolution: {integrity: sha512-S5pzsNLiQ6FGLit5AVThkDwv6Y+6h7YTv5/cMvmsXTVNILPMir5CT5QbN3L9T9V/hdLgRBtSQEdZruos3sN9bQ==}
+  '@spatialdata/react@0.16.1':
+    resolution: {integrity: sha512-mdZGeW73NJf6yZeH13yW56lO2N2A0hm2RzbQpQU9DFpnZA2LL9cZBux8JDOCKzrnt8+rSDkiBVY4MVQS9YXJ2g==}
     peerDependencies:
       anndata.js: ^0.0.2
       react: '>=18 <20'
       react-dom: '>=18 <20'
       zarrita: ^0.7.1
 
-  '@spatialdata/vis@0.15.1':
-    resolution: {integrity: sha512-ggcb/69X4nPRafPr/yQBVCsoPZQnPObq1nxlkLuvjBAAW6j6QWapHBZzb5cDOhntzN5cAXa5M2Ap1c68gb7MAQ==}
+  '@spatialdata/vis@0.16.1':
+    resolution: {integrity: sha512-q9eAQHGpTJBK7+fJ0SvWqqau3QO3v9AEK1ONhXT20dJb0DxS03DT9f8d3+wHf4jd3UwrYO3SLqoSrbRN6qSKSQ==}
     peerDependencies:
       '@deck.gl/core': ~9.4.0
       '@deck.gl/geo-layers': ~9.4.0
@@ -4764,8 +4764,8 @@ packages:
     resolution: {integrity: sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==}
     engines: {node: '>=12'}
 
-  intraspatial@0.1.0:
-    resolution: {integrity: sha512-LgC1EOB60rZ/dcLjXgM5cvrslkeffpfFrqu5KctzxYzsw6FLYh+1/cwCSGBMZy5nC1334F0DoduejbINhQQAyg==}
+  intraspatial@0.2.0:
+    resolution: {integrity: sha512-kvaVo8yCsCl/0E7oam4+qIOIQyLiNFngX/ByhgQfLl9qvughttVflUNBOrxHrdiMt72jSPPLSO8DNIwCASnJ+Q==}
     engines: {node: '>=20.11'}
     peerDependencies:
       typegpu: ^0.11.9
@@ -7744,13 +7744,13 @@ snapshots:
 
   '@interactjs/types@1.10.27': {}
 
-  '@intraspatial/deck@0.1.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))))(@luma.gl/core@9.4.2)(@luma.gl/engine@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))(typegpu@0.11.9)':
+  '@intraspatial/deck@0.1.2(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))))(@luma.gl/core@9.4.2)(@luma.gl/engine@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))(typegpu@0.11.9)':
     dependencies:
       '@deck.gl/core': 9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))
       '@luma.gl/core': 9.4.2
       '@luma.gl/engine': 9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))
       '@luma.gl/shadertools': 9.4.2(@luma.gl/core@9.4.2)
-      intraspatial: 0.1.0(typegpu@0.11.9)
+      intraspatial: 0.2.0(typegpu@0.11.9)
       typegpu: 0.11.9
     transitivePeerDependencies:
       - webgpu
@@ -9059,7 +9059,7 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@spatialdata/avivatorish@0.15.1(e4bea2acd8db7a7ca06bf617c7d3a0f3)':
+  '@spatialdata/avivatorish@0.16.1(e4bea2acd8db7a7ca06bf617c7d3a0f3)':
     dependencies:
       '@hms-dbmi/viv': 0.23.0(ed0d233fb9efaa5b1ba8511931f32921)
       '@math.gl/core': 4.1.0
@@ -9082,7 +9082,7 @@ snapshots:
       - immer
       - use-sync-external-store
 
-  '@spatialdata/core@0.15.1':
+  '@spatialdata/core@0.16.1':
     dependencies:
       '@math.gl/core': 4.1.0
       '@zarrita/storage': 0.2.0
@@ -9094,7 +9094,7 @@ snapshots:
       zarrita: 0.7.5
       zod: 4.4.3
 
-  '@spatialdata/layers@0.15.1(e7f8cebde3e11ec1588ca409120e6853)':
+  '@spatialdata/layers@0.16.1(e7f8cebde3e11ec1588ca409120e6853)':
     dependencies:
       '@deck.gl/core': 9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))
       '@deck.gl/geo-layers': 9.4.0(46ae1f768e6c29027c21cd6e3e19c265)
@@ -9105,7 +9105,7 @@ snapshots:
       '@luma.gl/core': 9.4.2
       '@luma.gl/engine': 9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))
       '@math.gl/core': 4.1.0
-      '@spatialdata/core': 0.15.1
+      '@spatialdata/core': 0.16.1
       zod: 4.4.3
     transitivePeerDependencies:
       - '@luma.gl/constants'
@@ -9113,15 +9113,15 @@ snapshots:
       - '@luma.gl/webgl'
       - react
 
-  '@spatialdata/react@0.15.1(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.5)':
+  '@spatialdata/react@0.16.1(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.5)':
     dependencies:
-      '@spatialdata/core': 0.15.1
+      '@spatialdata/core': 0.16.1
       anndata.js: 0.0.2
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
       zarrita: 0.7.5
 
-  '@spatialdata/vis@0.15.1(121ba8625c9580156c762805ee09f693)':
+  '@spatialdata/vis@0.16.1(121ba8625c9580156c762805ee09f693)':
     dependencies:
       '@deck.gl/core': 9.4.0(@luma.gl/webgpu@9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2)))
       '@deck.gl/geo-layers': 9.4.0(46ae1f768e6c29027c21cd6e3e19c265)
@@ -9132,10 +9132,10 @@ snapshots:
       '@luma.gl/core': 9.4.2
       '@luma.gl/webgpu': 9.4.2(@luma.gl/core@9.4.2)(@luma.gl/shadertools@9.4.2(@luma.gl/core@9.4.2))
       '@math.gl/core': 4.1.0
-      '@spatialdata/avivatorish': 0.15.1(e4bea2acd8db7a7ca06bf617c7d3a0f3)
-      '@spatialdata/core': 0.15.1
-      '@spatialdata/layers': 0.15.1(e7f8cebde3e11ec1588ca409120e6853)
-      '@spatialdata/react': 0.15.1(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.5)
+      '@spatialdata/avivatorish': 0.16.1(e4bea2acd8db7a7ca06bf617c7d3a0f3)
+      '@spatialdata/core': 0.16.1
+      '@spatialdata/layers': 0.16.1(e7f8cebde3e11ec1588ca409120e6853)
+      '@spatialdata/react': 0.16.1(anndata.js@0.0.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(zarrita@0.7.5)
       '@tanstack/react-virtual': 3.14.10(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@uidotdev/usehooks': 2.4.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@uiw/react-json-view': 2.0.0-alpha.43(@babel/runtime@7.29.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -11928,7 +11928,7 @@ snapshots:
 
   internmap@2.0.3: {}
 
-  intraspatial@0.1.0(typegpu@0.11.9):
+  intraspatial@0.2.0(typegpu@0.11.9):
     dependencies:
       '@zarrita/storage': 0.2.0
       geotiff: 3.0.5

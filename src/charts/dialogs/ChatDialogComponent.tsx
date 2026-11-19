@@ -42,6 +42,7 @@ import JsonView from "react18-json-view";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { getDataSourceDisplayName } from "@/datastore/dataSourceDisplayName";
 import {
     type ChatDatasourceOption,
     type ChatMessage,
@@ -56,6 +57,12 @@ export type MessageType = {
     updateInput: (text: string) => void;
     suggestedQuestions: string[];
 };
+
+/** The chat lists datasources by identifier; show each under the name users know it by. */
+function chatDatasourceLabel(name: string) {
+    const dataStore = window.mdv?.chartManager?.dsIndex[name]?.dataStore;
+    return dataStore ? getDataSourceDisplayName(dataStore) : name;
+}
 
 /**
  * prototype for new ways of handling project state...
@@ -714,7 +721,7 @@ const Chatbot = ({
                                                         }}
                                                     />
                                                 }
-                                                label={`${ds.name} (${datasourceRoleLabel(ds.role)})`}
+                                                label={`${chatDatasourceLabel(ds.name)} (${datasourceRoleLabel(ds.role)})`}
                                                 sx={{ mr: 1 }}
                                             />
                                         );
@@ -725,7 +732,7 @@ const Chatbot = ({
                     </Box>
                 ) : availableDatasources.length === 1 ? (
                     <Typography variant="caption" color="text.secondary">
-                        Datasource: {availableDatasources[0].name}
+                        Datasource: {chatDatasourceLabel(availableDatasources[0].name)}
                     </Typography>
                 ) : null}
                 <Box className="flex w-full">
