@@ -67,8 +67,9 @@
     min-height: 0;
 }
 
-/* A cell's own canvas fills it (a deck canvas per cell, see DeckDensityGridComponent). */
-.mdv-chart-array__cell > canvas {
+/* A cell's own canvas, in its holder, fills it (a deck canvas per cell, see DeckCellGrid). */
+.mdv-chart-array__canvas,
+.mdv-chart-array__canvas > canvas {
     position: absolute;
     inset: 0;
     width: 100%;

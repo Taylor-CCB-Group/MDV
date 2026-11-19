@@ -1,7 +1,7 @@
 import { Deck, type Layer, OrthographicView, type OrthographicViewState, type PickingInfo } from "@deck.gl/core";
 import type { Device } from "@luma.gl/core";
 import { applyWebGPUPickingFix, applyWebGPUPresentationAlphaFix } from "@spatialdata/layers";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { syncEditableLayerEvents } from "@/lib/deckMonkeypatch";
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
 import type { UseChartArrayGridResult } from "../hooks/useChartArrayGrid";
@@ -79,15 +79,45 @@ export type DeckCellGridProps = {
  * Written straight to the grid's style, as a re-render per pointer move would also set every
  * prop of the deck again.
  */
-function placeCrosshair(root: HTMLElement, target: EventTarget | null, x: number, y: number) {
-    if (!(target instanceof HTMLCanvasElement)) {
+function placeCrosshair(root: HTMLElement, canvas: HTMLCanvasElement | undefined, x: number, y: number) {
+    if (!canvas) {
         delete root.dataset.crosshair;
         return;
     }
-    const rect = target.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     root.style.setProperty("--mdv-crosshair-dx", `${x - rect.left - rect.width / 2}px`);
     root.style.setProperty("--mdv-crosshair-dy", `${y - rect.top - rect.height / 2}px`);
     root.dataset.crosshair = "on";
+}
+
+/**
+ * A cell's canvas, made with this window's `document` even when the chart is popped out. deck and
+ * luma recognise a canvas with `instanceof HTMLCanvasElement`, against this window's class, and a
+ * canvas React makes in a popout's document is the popout window's: luma takes it for something
+ * else and never sizes it, so it keeps the default 300 × 150 drawing buffer and its view takes
+ * input only in that corner.
+ */
+function CellCanvas({
+    id,
+    onCanvas,
+}: {
+    id: string;
+    onCanvas: (id: string, canvas: HTMLCanvasElement | null) => void;
+}) {
+    const hostRef = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => {
+        const host = hostRef.current;
+        if (!host) return;
+        const canvas = document.createElement("canvas");
+        canvas.id = id;
+        host.appendChild(canvas);
+        onCanvas(id, canvas);
+        return () => {
+            onCanvas(id, null);
+            canvas.remove();
+        };
+    }, [id, onCanvas]);
+    return <div ref={hostRef} className="mdv-chart-array__canvas" />;
 }
 
 /**
@@ -137,6 +167,10 @@ export default function DeckCellGrid({
 
     /** Each cell's canvas, by view id. */
     const canvases = useRef(new Map<string, HTMLCanvasElement>());
+    const onCanvas = useCallback((id: string, canvas: HTMLCanvasElement | null) => {
+        if (canvas) canvases.current.set(id, canvas);
+        else canvases.current.delete(id);
+    }, []);
     const deckHolder = useRef<{ deck: Deck<OrthographicView[]> | null }>({ deck: null });
     useRebindDeckEvents(deckHolder);
 
@@ -237,14 +271,11 @@ export default function DeckCellGrid({
             const [r, g, b] = label.color;
             return (
                 <>
-                    <canvas
+                    <CellCanvas
                         // a canvas holds one kind of context for good: a new one for another backend
                         key={backend ?? "pending"}
                         id={viewId}
-                        ref={(canvas) => {
-                            if (canvas) canvases.current.set(viewId, canvas);
-                            else canvases.current.delete(viewId);
-                        }}
+                        onCanvas={onCanvas}
                     />
                     <div
                         className="pointer-events-none absolute top-2 left-2 z-10 max-w-[calc(100%-16px)] truncate rounded-sm px-2 py-1 text-xs"
@@ -263,7 +294,7 @@ export default function DeckCellGrid({
                 </>
             );
         },
-        [labels, grid.viewIds, backend, crosshair],
+        [labels, grid.viewIds, backend, crosshair, onCanvas],
     );
 
     if (device.status === "pending") {
@@ -279,7 +310,13 @@ export default function DeckCellGrid({
                 onPointerDown={suppressTooltipUntilPointerUp}
                 onPointerMove={
                     crosshair
-                        ? (event) => placeCrosshair(event.currentTarget, event.target, event.clientX, event.clientY)
+                        ? (event) =>
+                              placeCrosshair(
+                                  event.currentTarget,
+                                  [...canvases.current.values()].find((canvas) => canvas === event.target),
+                                  event.clientX,
+                                  event.clientY,
+                              )
                         : undefined
                 }
                 onMouseDown={() => setKeyboardActive(true)}

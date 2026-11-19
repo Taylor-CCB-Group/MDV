@@ -152,7 +152,7 @@ test.describe("Density grid", () => {
                 await expect(scope.locator(".mdv-chart-array__cell", { hasText: field })).toHaveCount(1);
             }
             // a canvas of its own in every cell, drawn at the cell's size
-            const cellCanvases = scope.locator(".mdv-chart-array__cell > canvas");
+            const cellCanvases = scope.locator(".mdv-chart-array__canvas > canvas");
             await expect(cellCanvases).toHaveCount(fields.length);
             await expect(cellCanvases.first()).toBeVisible({ timeout: 30_000 });
             await expect
