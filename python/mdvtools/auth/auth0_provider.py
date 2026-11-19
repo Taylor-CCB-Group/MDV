@@ -454,14 +454,8 @@ class Auth0Provider(AuthProvider):
     def _accept_invitation(self, user_info: Dict[str, Any]):
         """The User made or moved by accepting an open Invitation, or None."""
         from mdvtools.dbutils.dbservice import InvitationService
-        from mdvtools.auth.authutils import cache_user_projects
 
-        user = InvitationService.accept_for_sign_in(user_info)
-        if user is not None:
-            # Project routes read grants from the cache, so the new User would
-            # otherwise see no projects until something else refreshed it.
-            cache_user_projects()
-        return user
+        return InvitationService.accept_for_sign_in(user_info)
 
     def _bootstrap_refusal(
         self, user_info: Dict[str, Any], auth0_id: Optional[str], email: str
@@ -545,10 +539,8 @@ class Auth0Provider(AuthProvider):
         # Without this the first administrator logs in to an empty project list.
         try:
             from mdvtools.dbutils.dbservice import UserProjectService
-            from mdvtools.auth.authutils import cache_user_projects
 
             granted = UserProjectService.grant_all_projects_to_admins()
-            cache_user_projects()
             logger.info(f"Granted the bootstrap administrator access to {granted} project(s).")
         except Exception:
             # To rollback the session if the failure occurs in the querying of grant_all_projects_to_admins()

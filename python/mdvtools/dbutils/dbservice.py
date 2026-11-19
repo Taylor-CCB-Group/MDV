@@ -64,13 +64,18 @@ class ProjectService:
     failed_projects: list[tuple[int, str | Exception]] = []
     
     @staticmethod
-    def get_active_projects():
+    def get_active_projects(project_ids: Optional[list[int]] = None):
         """
         Retrieve all active (non-deleted) projects with their metadata.
         
         Returns a list of dictionaries containing project information including
         ID, name, last modified timestamp, thumbnail image, and README content.
         Projects that are in the failed_projects list are excluded from results.
+
+        Args:
+            project_ids (list[int] | None): Only these projects, when given. Each
+                entry reads the project's README from disk, so a caller that
+                needs a few projects should name them.
         
         Returns:
             list[dict]: List of project dictionaries, each containing:
@@ -92,7 +97,10 @@ class ProjectService:
         """
         try:
             failed_project_ids = {f[0] for f in ProjectService.failed_projects}  
-            projects = Project.query.filter(~Project.is_deleted).all()
+            query = Project.query.filter(~Project.is_deleted)
+            if project_ids is not None:
+                query = query.filter(Project.id.in_(project_ids))
+            projects = query.all()
             return [
                 ProjectService._project_entry(p)
                 for p in projects if p.id not in failed_project_ids

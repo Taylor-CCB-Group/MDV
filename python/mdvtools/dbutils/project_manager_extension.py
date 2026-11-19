@@ -7,17 +7,16 @@ import zipfile
 import io
 import tempfile
 from mdvtools.server_extension import MDVProjectServerExtension
-from mdvtools.mdvproject import MDVProject, forget_project_thumbnail, get_json, get_project_thumbnail
+from mdvtools.mdvproject import MDVProject, forget_project_thumbnail, get_json
 from mdvtools.project_router import ProjectBlueprintProtocol
 from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
 from mdvtools.dbutils.dbmodels import User, db
 from mdvtools.dbutils.project_manager_service import (
     get_current_user_id,
-    refresh_auth_cache,
     restore_deleted_project,
     soft_delete_projects,
 )
-from mdvtools.auth.authutils import update_cache
+from mdvtools.auth.permissions import project_role
 from mdvtools.logging_config import get_logger
 
 from mdvtools.project_router import ProjectBlueprint
@@ -43,7 +42,7 @@ def find_root_prefix(names):
 def is_owner_or_admin(user, permissions):
     """Whether a signed-in user may manage a project.
 
-    `permissions` is that user's cached entry for the project, or None when they
+    `permissions` is that user's role on the project, or None when they
     hold none. Administrators are included because a project that arrives by file
     copy can reach a deployment with no owner at all.
     """
@@ -88,19 +87,14 @@ class ProjectManagerExtension(MDVProjectServerExtension):
         # nb - would probably prefer this to be declared a bit differently here so we could have better type
         # not risking changing without proper testing etc.
         session = None
-        user_cache = None
-        active_projects_cache = []
-        user_project_cache = {}
-        all_users_cache = []
 
         if ENABLE_AUTH:
             from flask import session
-            from mdvtools.auth.authutils import user_cache, active_projects_cache, user_project_cache, all_users_cache
 
         @app.route("/create_project", methods=["POST"])
         def create_project() -> Union[Response, Tuple[Response, int]]:
             """
-            Creates a new project and updates the caches and database accordingly.
+            Creates a new project in the database and serves it.
             """
             project_path = None
             assigned_id = None
@@ -134,7 +128,6 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     # Step 5: Associate the admin user with the new project and grant all permissions
                     if ENABLE_AUTH:
                         assert session is not None
-                        assert user_cache is not None
                         user_data = session.get('user')
                         if not user_data:
                             raise ValueError("User not found in session.")
@@ -143,29 +136,6 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                             user_id=current_user_id,
                             project_id=new_project.id,
                             is_owner=True
-                        )
-                        auth_id = user_data["auth_id"]
-                        owner_email = user_cache.get(auth_id, {}).get("email", "unknown")
-                        # Generate thumbnail
-                        thumbnail = get_project_thumbnail(project_path)
-
-                        # Step 6: Update caches for the admin user and new project
-                        update_cache(
-                            user_id=current_user_id,
-                            project_id=new_project.id,
-                            permissions={
-                                "can_read": True,
-                                "can_write": True,
-                                "is_owner": True
-                            },
-                            project_data={
-                                "id": new_project.id,
-                                "name": new_project.name,
-                                "path": new_project.path,
-                                "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                                "thumbnail": thumbnail,
-                                "owner": [owner_email]
-                            }
                         )
 
                     db.session.commit()
@@ -299,7 +269,6 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 if new_project:
                     if ENABLE_AUTH:
                         assert session is not None
-                        assert user_cache is not None
                         user_data = session.get("user")
                         if not user_data:
                             raise ValueError("User not found in session.")
@@ -309,28 +278,6 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                             user_id=current_user_id,
                             project_id=new_project.id,
                             is_owner=True
-                        )
-                        auth_id = user_data["auth_id"]
-                        owner_email = user_cache.get(auth_id, {}).get("email", "unknown")
-                        thumbnail = get_project_thumbnail(project_path)
-
-                        # Update cache with the new project data and user id
-                        update_cache(
-                            user_id=current_user_id,
-                            project_id=new_project.id,
-                            permissions={
-                                "can_read": True,
-                                "can_write": True,
-                                "is_owner": True
-                            },
-                            project_data={
-                                "id": new_project.id,
-                                "name": new_project.name,
-                                "path": new_project.path,
-                                "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                                "thumbnail": thumbnail,
-                                "owners": [owner_email]
-                            }
                         )
                 db.session.commit()
                 logger.info(f"Imported project {new_project.id} into {project_path}")
@@ -392,8 +339,8 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     if not user:
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
-                    user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
-                    if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
+                    role = project_role(user_id, int(project_id))
+                    if not role or not role["is_owner"]:
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can export the project."}), 403
 
@@ -532,7 +479,6 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                         )
                     else:
                         failures.append({"projectId": project.id, "message": message})
-                refresh_auth_cache(ENABLE_AUTH)
                 return jsonify({"deletedProjectIds": deleted_project_ids, "failures": failures})
             except PermissionError as e:
                 return jsonify({"error": str(e)}), 401
@@ -569,13 +515,13 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 return jsonify({"error": "New name not provided"}), 400
 
             try:
-                # Step 1: Check if project exists in active cache
+                # Step 1: Check if project exists
                 project = ProjectService.get_project_by_id(project_id)
                 if not project:
                     logger.error(f"Project with ID {project_id} not found in db")
                     return jsonify({"error": f"Project with ID {project_id} not found"}), 404
 
-                # Step 2: Check ownership using cache
+                # Step 2: Check ownership
                 if ENABLE_AUTH:
                     if session is None:
                         raise ValueError("Session not available.")
@@ -583,8 +529,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     if not user:
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
-                    user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
-                    permissions = user_projects.get(int(project_id)) if user_projects else None
+                    permissions = project_role(user_id, int(project_id))
                     if not is_owner_or_admin(user, permissions):
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner or an administrator can rename the project."}), 403
@@ -622,14 +567,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 except Exception as state_error:
                     logger.exception(f"In register_routes - /rename_project : Renamed project '{project_id}' in db but could not write state.json: {state_error}")
 
-                # Step 6: Update the name in active_projects_cache
-                if ENABLE_AUTH:
-                    for proj in active_projects_cache:
-                        if proj["id"] == project_id:
-                            proj["name"] = new_name
-                            break
-
-                logger.info(f"In rename_project: Updated cache for active projects, renamed project '{project_id}'.")
+                logger.info(f"In rename_project: Renamed project '{project_id}'.")
 
                 # Step 7: Return success response
                 return jsonify({"status": "success", "id": project_id, "new_name": new_name}), 200
@@ -652,7 +590,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     return jsonify({"error": "Invalid access level. Must be 'read-only' or 'editable'."}), 400
 
 
-                # Step 3: Check ownership from the user_project_cache
+                # Step 3: Check ownership
                 if ENABLE_AUTH:
                     if session is None:
                         raise ValueError("Session not available.")
@@ -660,8 +598,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     if not user:
                         raise ValueError("User not found in session.")
                     user_id = user["id"]
-                    user_projects = user_project_cache.get(user_id) if user_project_cache is not None else None
-                    permissions = user_projects.get(int(project_id)) if user_projects else None
+                    permissions = project_role(user_id, int(project_id))
                     if not is_owner_or_admin(user, permissions):
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner or an administrator can change the access level."}), 403
@@ -709,20 +646,11 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     raise ValueError("User not found in session.")
                 user_id = user["id"]
 
-                user_permissions = user_project_cache.get(user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
+                user_permissions = project_role(user_id, int(project_id))
                 # An administrator is let through so a project with no owner, or
                 # one whose owner has gone, can still be handed to someone.
                 if not is_owner_or_admin(user, user_permissions):
                     return jsonify({"error": "Only the project owner or an administrator can share the project"}), 403
-
-                # Refresh the cache so the dialog shows roles written outside this process.
-                try:
-                    from mdvtools.auth.authutils import cache_user_projects
-                    logger.info("Refreshing user and permission cache...")
-                    cache_user_projects()
-                    logger.info("Cache refresh completed.")
-                except Exception as e:
-                    logger.warning(f"Could not refresh cache: {e}. Continuing with existing cache.")
 
                 # Step 3: Compile shared users list
                 # Read directly from database to ensure we have the latest permissions
@@ -787,7 +715,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 user_id = user["id"]
 
                 # Step 2: Check if current user is owner of the project, or an administrator
-                user_permissions = user_project_cache.get(user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
+                user_permissions = project_role(user_id, int(project_id))
                 if not is_owner_or_admin(user, user_permissions):
                     return jsonify({"error": "Only the project owner or an administrator can share the project"}), 403
 
@@ -819,16 +747,6 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     can_write=can_write
                 )
 
-                # Update user_project_cache
-                if target_user_id not in user_project_cache:
-                    user_project_cache[target_user_id] = {}
-
-                user_project_cache[target_user_id][project_id] = {
-                    "can_read": (permission in ["view", "edit", "owner"]),
-                    "can_write": (permission in ["edit", "owner"]),
-                    "is_owner": (permission == "owner")
-                }
-
                 logger.info(f"User {target_user_id} added to project {project_id} with '{permission}' permission.")
 
                 return jsonify({"message": f"User {target_user_id} added to project {project_id} with {permission} permission."}), 200
@@ -859,7 +777,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 current_user_id = user["id"]
 
                 # Step 2: Validate if current user is the owner, or an administrator
-                user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
+                user_permissions = project_role(current_user_id, int(project_id))
                 if not is_owner_or_admin(user, user_permissions):
                     return jsonify({"error": "Only the project owner or an administrator can edit permissions"}), 403
 
@@ -878,7 +796,6 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
                 is_owner = new_permission == "owner"
                 can_write = new_permission in ["edit", "owner"]
-                can_read = True  # Always true for project access
 
                 # Step 4: Update DB via service
                 UserProjectService.add_or_update_user_project(
@@ -887,17 +804,6 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                     is_owner=is_owner,
                     can_write=can_write
                 )
-
-                # Step 5: Update cache
-                if user_project_cache is not None:
-                    if user_id not in user_project_cache:
-                        user_project_cache[user_id] = {}
-
-                    user_project_cache[user_id][project_id] = {
-                        "can_read": can_read,
-                        "can_write": can_write,
-                        "is_owner": is_owner
-                    }
 
                 logger.info(f"Updated permissions for user {user_id} in project {project_id}: {new_permission}")
                 return jsonify({"message": "Permissions updated successfully"}), 200
@@ -927,7 +833,7 @@ class ProjectManagerExtension(MDVProjectServerExtension):
                 current_user_id = user["id"]
 
                 # Step 2: Validate ownership, or administrator status
-                user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id)) if user_project_cache is not None else {}
+                user_permissions = project_role(current_user_id, int(project_id))
                 if not is_owner_or_admin(user, user_permissions):
                     return jsonify({"error": "Only the project owner or an administrator can remove users"}), 403
 
@@ -937,15 +843,6 @@ class ProjectManagerExtension(MDVProjectServerExtension):
 
                 # Step 4: Remove the user from the project using the service method
                 UserProjectService.remove_user_from_project(user_id, project_id)
-
-                # Step 5: Check if the user is part of the project
-                # Step 5: Check if the user is part of the project
-                user_permissions_cache = user_project_cache.get(user_id) if user_project_cache is not None else None
-                if user_permissions_cache:
-                    if user_project_cache is not None and user_id in user_project_cache and project_id in user_project_cache[user_id]:
-                        del user_project_cache[user_id][project_id]
-                    else:
-                        logger.warning(f"Project {project_id} not found in cache for user {user_id}")
                 return jsonify({"message": "User removed successfully"}), 200
 
             except Exception as e:
