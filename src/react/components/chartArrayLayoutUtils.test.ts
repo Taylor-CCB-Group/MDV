@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
     CHART_ARRAY_LAYOUT_DEFAULT_SIZING,
+    chartArrayCellSize,
     chooseChartArrayGrid,
     estimateGridColumnCount,
     getChartArrayLayoutMode,
@@ -69,5 +70,28 @@ describe("chooseChartArrayGrid", () => {
     test("no cells, or no width yet, is one column that fills", () => {
         expect(chooseChartArrayGrid(0, 800, 800, sizing)).toEqual({ columns: 1, fillsViewport: true });
         expect(chooseChartArrayGrid(4, 0, 800, sizing)).toEqual({ columns: 1, fillsViewport: true });
+    });
+});
+
+describe("chartArrayCellSize", () => {
+    test("rounds a filling cell down to whole device pixels each way", () => {
+        // (1117 - 8) / 2 = 554.5 CSS px, 1109 device px at 2x; (563 - 8) / 2 = 277.5
+        const size = chartArrayCellSize(4, { columns: 2, fillsViewport: true }, 1117, 563, 2, sizing);
+        expect(size).toEqual({ width: 554.5, height: 277.5 });
+        const odd = chartArrayCellSize(3, { columns: 3, fillsViewport: true }, 1000, 600, 1.5, sizing);
+        expect(odd.width * 1.5).toBe(Math.floor(((1000 - 16) / 3) * 1.5));
+        expect(Number.isInteger(odd.height * 1.5)).toBe(true);
+    });
+
+    test("makes a scrolling cell square", () => {
+        const size = chartArrayCellSize(9, { columns: 2, fillsViewport: false }, 601, 300, 1, sizing);
+        expect(size).toEqual({ width: 296, height: 296 });
+    });
+
+    test("treats a missing pixel ratio as 1", () => {
+        expect(chartArrayCellSize(2, { columns: 2, fillsViewport: true }, 601, 400, 0, sizing)).toEqual({
+            width: 296,
+            height: 400,
+        });
     });
 });

@@ -6,7 +6,17 @@
 import { type CSSProperties, type ReactNode, type Ref, useCallback, useImperativeHandle, useRef } from "react";
 import "./chartArrayLayout.css";
 import { useChartArrayLayoutGeometry } from "../hooks/useChartArrayLayoutGeometry";
-import { type ChartArrayLayoutMode, getChartArrayLayoutMode } from "./chartArrayLayoutUtils";
+import { type ChartArrayCellSize, type ChartArrayLayoutMode, getChartArrayLayoutMode } from "./chartArrayLayoutUtils";
+
+/** The grid's CSS variables (see chartArrayLayout.css). */
+function gridVariables(columns: number, cellSize: ChartArrayCellSize | null): Record<string, string> {
+    const variables: Record<string, string> = { "--mdv-chart-array-columns": String(columns) };
+    if (cellSize) {
+        variables["--mdv-chart-array-cell-width"] = `${cellSize.width}px`;
+        variables["--mdv-chart-array-cell-height"] = `${cellSize.height}px`;
+    }
+    return variables;
+}
 
 export type ChartArrayLayoutHandle = {
     root: HTMLDivElement | null;
@@ -36,7 +46,7 @@ export default function ChartArrayLayout({
 }: ChartArrayLayoutProps) {
     const layoutMode = layout ?? getChartArrayLayoutMode(cellCount);
     const rootRef = useRef<HTMLDivElement>(null);
-    const { gridFillsViewport, gridColumns } = useChartArrayLayoutGeometry(rootRef, cellCount, layoutMode);
+    const { gridFillsViewport, gridColumns, cellSize } = useChartArrayLayoutGeometry(rootRef, cellCount, layoutMode);
     const cellRefs = useRef<(HTMLDivElement | null)[]>([]);
 
     const setCellRef = useCallback((index: number, element: HTMLDivElement | null) => {
@@ -62,14 +72,8 @@ export default function ChartArrayLayout({
             className={["mdv-chart-array", className].filter(Boolean).join(" ")}
             data-layout={layoutMode}
             data-grid-fill={layoutMode === "grid" && gridFillsViewport ? "true" : undefined}
-            style={
-                layoutMode === "grid"
-                    ? {
-                          ...style,
-                          ["--mdv-chart-array-columns" as string]: String(gridColumns),
-                      }
-                    : style
-            }
+            data-cell-size={layoutMode === "grid" && cellSize ? "fixed" : undefined}
+            style={layoutMode === "grid" ? { ...style, ...gridVariables(gridColumns, cellSize) } : style}
         >
             {Array.from({ length: cellCount }, (_, index) => (
                 <div

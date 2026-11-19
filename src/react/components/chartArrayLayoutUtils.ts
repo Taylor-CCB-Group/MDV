@@ -116,3 +116,34 @@ export function chooseChartArrayGrid(
     if (best) return { columns: best.columns, fillsViewport: true };
     return { columns: getPreferredGridColumnCount(cellCount, innerWidth, sizing), fillsViewport: false };
 }
+
+/** A cell's size in CSS pixels. */
+export type ChartArrayCellSize = { width: number; height: number };
+
+/** `length` CSS pixels, rounded down to a whole number of device pixels. */
+function floorToDevicePixels(length: number, devicePixelRatio: number) {
+    const ratio = devicePixelRatio > 0 ? devicePixelRatio : 1;
+    return Math.max(0, Math.floor(length * ratio + 1e-6)) / ratio;
+}
+
+/**
+ * Every cell's size for a grid chosen by {@link chooseChartArrayGrid}, a whole number of device
+ * pixels each way. Left to flex, cells share the width to a fraction of a pixel, so their canvases
+ * differ by one device pixel; an isolated layer group shares its offscreen target only between
+ * viewports of exactly the same size, so cells must match to the pixel. Filling cells split the
+ * height too; the others are square.
+ */
+export function chartArrayCellSize(
+    cellCount: number,
+    { columns, fillsViewport }: ChartArrayGridChoice,
+    innerWidth: number,
+    innerHeight: number,
+    devicePixelRatio: number,
+    sizing: ChartArrayLayoutSizing = CHART_ARRAY_LAYOUT_DEFAULT_SIZING,
+): ChartArrayCellSize {
+    const width = floorToDevicePixels((innerWidth - (columns - 1) * sizing.gap) / columns, devicePixelRatio);
+    if (!fillsViewport) return { width, height: width };
+    const rows = Math.ceil(cellCount / columns);
+    const height = floorToDevicePixels((innerHeight - (rows - 1) * sizing.gap) / rows, devicePixelRatio);
+    return { width, height };
+}
