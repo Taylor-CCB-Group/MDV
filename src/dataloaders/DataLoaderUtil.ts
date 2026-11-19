@@ -4,7 +4,12 @@ import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import { createMdvPortal } from "@/react/react_utils";
 import { describeAnswer, htmlTitle } from "@/utils/importFailure";
-import { decompressData, getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader } from "./DataLoaders";
+import {
+    type ColumnDataLoader,
+    decompressData,
+    getArrayBufferDataLoader,
+    getLocalCompressedBinaryDataLoader,
+} from "./DataLoaders";
 
 let projectRoot = "";
 /**
@@ -89,13 +94,13 @@ export function getProjectURL(url: string, trailingSlash = true) {
     return p;
 }
 export type DataLoader = {
-    function: (columns: DataColumn<any>[], dataSource: string, size: number) => Promise<ArrayBufferLike>;
+    function: ColumnDataLoader;
     viewLoader: (view: string) => Promise<any>;
     rowDataLoader: (dataSource: string, index: string) => Promise<any>;
     binaryDataLoader: (dataSource: string, name: string) => Promise<ArrayBufferLike>;
 };
 
-export function getDataLoader(isStaticFolder: boolean, datasources: DataSource[], views: any, url: string) {
+export function getDataLoader(isStaticFolder: boolean, datasources: DataSource[], views: any, url: string): DataLoader {
     const root = url.endsWith("/") ? url.substring(0, url.length - 1) : url;
     const loader = isStaticFolder
         ? {
