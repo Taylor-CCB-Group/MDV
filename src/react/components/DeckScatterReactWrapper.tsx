@@ -1,5 +1,5 @@
 import type { OrbitViewState } from "deck.gl";
-import { action, makeObservable, observable } from "mobx";
+import { action, makeObservable, observable, reaction } from "mobx";
 import { observer } from "mobx-react-lite";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import type DataStore from "@/datastore/DataStore";
@@ -18,7 +18,7 @@ import {
 import { BaseReactChart } from "./BaseReactChart";
 import DeckScatterComponent from "./DeckScatterComponent";
 import { getDensityGridSettingsFolder } from "./densityGridSettings";
-import { supportsDensityGridMode } from "./densityGridUtils";
+import { isDensityGridShown, supportsDensityGridMode } from "./densityGridUtils";
 import { getCrosshairSetting } from "./pointerCrosshair";
 import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 
@@ -106,10 +106,23 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
     pendingRecenter = false;
+    /**
+     * The density grid was turned on since the chart was made, so it fits its cells when it
+     * first shows (see `DeckDensityGridComponent`). A grid restored with a view keeps its view.
+     */
+    fitDensityGridOnShow = false;
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: DeckScatterConfig) {
         const config = adaptConfig(originalConfig);
         super(dataStore, div, config, MainChart);
         if (!originalConfig.viewState) this.pendingRecenter = true;
+        this.reactionDisposers.push(
+            reaction(
+                () => isDensityGridShown(this.config),
+                (shown) => {
+                    if (shown) this.fitDensityGridOnShow = true;
+                },
+            ),
+        );
         //@ts-expect-error - pending colorBy type fix
         this.colorByColumn(config.color_by);
         makeObservable(this, {

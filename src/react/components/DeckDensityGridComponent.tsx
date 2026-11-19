@@ -1,7 +1,7 @@
 import type { Deck, Layer, OrthographicView, OrthographicViewState, PickingInfo } from "@deck.gl/core";
 import { action } from "mobx";
 import { observer } from "mobx-react-lite";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { useChart } from "../context";
@@ -37,6 +37,15 @@ export default observer(function DeckDensityGridComponent({ cells, densityFields
     const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
     const grid = useChartArrayGrid({ chartId, cells, getViewId: getCellViewId });
 
+    // turned on just now (not restored with a view): fit the cells, which are smaller than the
+    // single plot whose view the chart still has; once measured, `useZoomOnFilter` does it
+    useEffect(() => {
+        if (!chart.fitDensityGridOnShow) return;
+        chart.fitDensityGridOnShow = false;
+        action(() => {
+            chart.pendingRecenter = true;
+        })();
+    }, [chart]);
     // every cell is the same size, so the first stands for them all
     const cellWidth = grid.metrics.cellBounds[0]?.width ?? 0;
     const cellHeight = grid.metrics.cellBounds[0]?.height ?? 0;

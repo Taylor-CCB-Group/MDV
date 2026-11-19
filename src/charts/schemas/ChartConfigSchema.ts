@@ -275,6 +275,7 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
     zoom_on_filter: z.boolean().optional().describe("Whether filtering should auto-fit the current view"),
     crosshair: z
         .boolean()
+        .nullable()
         .optional()
         .describe(
             "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a grid (default true)",

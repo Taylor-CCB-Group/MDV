@@ -5,15 +5,22 @@ function allCellIndices(cellCount: number) {
     return Array.from({ length: cellCount }, (_, index) => index);
 }
 
+/**
+ * The indices of the cells in or near view, from an IntersectionObserver. `cellsKey` names the
+ * cells (their keys joined): a new cell in a slot is a new element, so a change of key observes
+ * the cells again, from a clean slate, even when their number is the same.
+ */
 export function useChartArrayVisibleIndices(
     scrollRootRef: RefObject<HTMLElement | null>,
     layoutRef: RefObject<ChartArrayLayoutHandle | null>,
     cellCount: number,
+    cellsKey: string,
 ): number[] {
     const [visibleIndices, setVisibleIndices] = useState<number[]>(() =>
         cellCount > 0 ? allCellIndices(cellCount) : [],
     );
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: cellsKey is the trigger for new cell elements
     useLayoutEffect(() => {
         if (cellCount === 0) {
             setVisibleIndices([]);
@@ -38,10 +45,9 @@ export function useChartArrayVisibleIndices(
             if (cancelled) return;
             const scrollRoot = scrollRootRef.current;
             if (!scrollRoot) {
-                if (setupAttempts < 20) {
-                    setupAttempts += 1;
-                    requestAnimationFrame(setup);
-                }
+                // the grid can mount well after this (it shows a placeholder until its device
+                // is ready), and nothing else would set this up then
+                requestAnimationFrame(setup);
                 return;
             }
 
@@ -49,8 +55,9 @@ export function useChartArrayVisibleIndices(
                 observer = new IntersectionObserver(
                     (entries) => {
                         for (const entry of entries) {
-                            if (!(entry.target instanceof HTMLElement)) continue;
-                            const index = Number(entry.target.dataset.chartArrayIndex);
+                            // not `instanceof HTMLElement`: a cell made in a popout's document
+                            // is that window's, and would fail it
+                            const index = Number(entry.target.getAttribute("data-chart-array-index"));
                             if (!Number.isInteger(index) || index < 0 || index >= cellCount) continue;
                             intersectionByIndex.set(index, entry.isIntersecting);
                         }
@@ -85,7 +92,7 @@ export function useChartArrayVisibleIndices(
             cancelled = true;
             observer?.disconnect();
         };
-    }, [scrollRootRef, layoutRef, cellCount]);
+    }, [scrollRootRef, layoutRef, cellCount, cellsKey]);
 
     return visibleIndices;
 }

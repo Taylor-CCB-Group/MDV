@@ -12,12 +12,19 @@ const EMPTY_METRICS: ChartArrayMetrics = {
     cellBounds: [],
 };
 
+/**
+ * The size of the layout and of each cell, kept current by a ResizeObserver. `cellsKey` names the
+ * cells (their keys joined): a new cell in a slot is a new element, so a change of key observes
+ * the cells again, even when their number is the same.
+ */
 export function useChartArrayMetrics(
     layoutRef: RefObject<ChartArrayLayoutHandle | null>,
     cellCount: number,
+    cellsKey: string,
 ): ChartArrayMetrics {
     const [metrics, setMetrics] = useState<ChartArrayMetrics>(EMPTY_METRICS);
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: cellsKey is the trigger for new cell elements
     useLayoutEffect(() => {
         if (cellCount === 0) {
             setMetrics(EMPTY_METRICS);
@@ -38,15 +45,13 @@ export function useChartArrayMetrics(
             });
         };
 
-        let setupAttempts = 0;
         const setup = () => {
             if (cancelled) return;
             const root = layoutRef.current?.root;
             if (!root) {
-                if (setupAttempts < 20) {
-                    setupAttempts += 1;
-                    requestAnimationFrame(setup);
-                }
+                // the layout can mount well after this (a grid shows a placeholder until its
+                // device is ready), and nothing else would set this up then
+                requestAnimationFrame(setup);
                 return;
             }
 
@@ -69,7 +74,7 @@ export function useChartArrayMetrics(
             resizeObserver?.disconnect();
             window.removeEventListener("resize", measure);
         };
-    }, [layoutRef, cellCount]);
+    }, [layoutRef, cellCount, cellsKey]);
 
     return metrics;
 }

@@ -44,8 +44,11 @@ export function useChartArrayGrid({
     const cellCount = cells.length;
     const configuredCellCount = cellCount;
 
-    const metrics = useChartArrayMetrics(layoutRef, cellCount);
-    const visibleCellIndices = useChartArrayVisibleIndices(scrollContainerRef, layoutRef, cellCount);
+    const cellKeys = useMemo(() => cells.map((cell) => cell.key), [cells]);
+    // a new cell in a slot is a new element to observe, even with the same number of cells
+    const cellsKey = cellKeys.join("\u0000");
+    const metrics = useChartArrayMetrics(layoutRef, cellCount, cellsKey);
+    const visibleCellIndices = useChartArrayVisibleIndices(scrollContainerRef, layoutRef, cellCount, cellsKey);
     const visibleCellIndicesKey = visibleCellIndices.join("\u0000");
     // biome-ignore lint/correctness/useExhaustiveDependencies: a new array only when the indices change
     const stableVisibleCellIndices = useMemo(() => visibleCellIndices, [visibleCellIndicesKey]);
@@ -62,8 +65,6 @@ export function useChartArrayGrid({
                 .filter((viewId): viewId is string => Boolean(viewId)),
         [stableVisibleCellIndices, viewIds],
     );
-
-    const cellKeys = useMemo(() => cells.map((cell) => cell.key), [cells]);
 
     const getCellBounds = useCallback((index: number) => metrics.cellBounds[index], [metrics.cellBounds]);
 

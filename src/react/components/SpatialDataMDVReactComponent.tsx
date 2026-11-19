@@ -285,8 +285,9 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
                 vivLayerProps={renderer.vivLayerProps.length > 0 ? renderer.vivLayerProps : undefined}
                 // A prop, not part of `deckProps`: `SpatialViewer` spreads `deckProps` and then
                 // sets `onHover` from this prop, so one passed inside `deckProps` is overwritten
-                // with `undefined` and feature tooltips never appear.
-                onHover={handleHover}
+                // with `undefined` and feature tooltips never appear. Only `info`: deck also
+                // passes its event, which `handleHover` would take for the tooltip's anchor.
+                onHover={(info) => handleHover(info)}
                 deckProps={deckProps}
                 deckRef={deckRef}
             />
