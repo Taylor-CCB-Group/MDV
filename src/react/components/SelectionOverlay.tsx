@@ -19,7 +19,7 @@ import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
 import useGateActions from "../hooks/useGateActions";
 import { useSpatialLayers } from "../spatial_context";
 import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
-import { isDensityGridShown, supportsDensityGridMode } from "./densityGridUtils";
+import { densityGridConfig, isDensityGridShown, supportsDensityGridMode } from "./densityGridUtils";
 import GateNameDialog from "./GateNameDialog";
 import IconWithTooltip from "./IconWithTooltip";
 import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
@@ -106,7 +106,7 @@ export default observer(function SelectionOverlay() {
     const densityGridShown = isDensityGridShown(config);
     const toggleDensityGrid = useCallback(() => {
         action(() => {
-            config.density_mode = config.density_mode === "grid" ? "overlay" : "grid";
+            config.grid = densityGridConfig(!isDensityGridShown(config));
         })();
     }, [config]);
     const {

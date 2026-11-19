@@ -175,13 +175,24 @@ const ContourVisualConfigSchema = z
     })
     .describe("Visual contour configuration shared by density-style charts");
 
+/**
+ * Draw a chart as a grid of small multiples, one cell per value of a property of its config.
+ * Layout options (cell size, columns) belong here too; for now the defaults apply.
+ */
+export const ChartGridConfigSchema = z
+    .object({
+        by: z
+            .enum(["densityFields"])
+            .describe("The config property whose values make the cells, e.g. one cell per density field"),
+    })
+    .describe("Show the chart as a grid of cells, one per value of a config property");
+
+export type ChartGridConfig = z.infer<typeof ChartGridConfigSchema>;
+
 const DensityFieldsConfigSchema = z
     .object({
         densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),
-        density_mode: z
-            .enum(["overlay", "grid"])
-            .optional()
-            .describe("Whether density fields are drawn over one plot or each in its own cell of a grid"),
+        grid: ChartGridConfigSchema.nullable().optional(),
     })
     .describe("Density field selection shared by contour-based charts");
 

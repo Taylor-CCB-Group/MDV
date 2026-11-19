@@ -60,7 +60,7 @@ describe("chart config schema registration", () => {
             contourParameter: "cluster",
             category1: ["A"],
             densityFields: ["marker_a", "marker_b"],
-            density_mode: "grid",
+            grid: { by: "densityFields" },
             field_legend: {
                 display: true,
             },
@@ -80,7 +80,7 @@ describe("chart config schema registration", () => {
             type: "DeckContourScatter",
             contourParameter: "cluster",
             densityFields: ["marker_a", "marker_b"],
-            density_mode: "grid",
+            grid: { by: "densityFields" },
         });
     });
 

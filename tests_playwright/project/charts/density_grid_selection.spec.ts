@@ -55,7 +55,7 @@ async function addDensityGridChart(page: Page, title: string) {
                 title,
                 param,
                 densityFields,
-                density_mode: "grid",
+                grid: { by: "densityFields" },
                 size: [700, 700],
                 position: [10, 10],
             });

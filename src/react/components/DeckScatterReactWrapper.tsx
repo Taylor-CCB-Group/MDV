@@ -17,7 +17,7 @@ import {
 } from "../scatter_state";
 import { BaseReactChart } from "./BaseReactChart";
 import DeckScatterComponent from "./DeckScatterComponent";
-import { supportsDensityGridMode } from "./densityGridUtils";
+import { densityGridConfig, supportsDensityGridMode } from "./densityGridUtils";
 import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 
 const MainChart = observer(() => {
@@ -69,6 +69,8 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     config.render_backend = config.render_backend ?? null;
     // same for the background filter, which is replaced as a whole by its settings
     config.background_filter = config.background_filter ?? null;
+    // and the grid, which its toggle sets and clears
+    config.grid = config.grid ?? null;
     // charts saved before this setting kept both axes at one scale
     if (config.dimension !== "3d") config.axis_scaling = config.axis_scaling ?? "equal";
     const legacyContourParameter = originalConfig.param?.[2];
@@ -254,7 +256,8 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         // null only exists to keep the key observable; leave it out of saved views
         const render_backend = c.render_backend ?? undefined;
         const background_filter = c.background_filter ?? undefined;
-        return { ...c, viewState, render_backend, background_filter };
+        const grid = c.grid ?? undefined;
+        return { ...c, viewState, render_backend, background_filter, grid };
     }
 
     /** Choose a column and the categories of it to keep; other rows are hidden from this chart only. */
@@ -314,9 +317,9 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                     g({
                         type: "check",
                         label: "Show density fields as a grid",
-                        current_value: c.density_mode === "grid",
+                        current_value: c.grid?.by === "densityFields",
                         func: (x) => {
-                            c.density_mode = x ? "grid" : "overlay";
+                            c.grid = densityGridConfig(x);
                         },
                     }),
                 );
