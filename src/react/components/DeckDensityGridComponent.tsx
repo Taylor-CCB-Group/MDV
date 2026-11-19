@@ -12,7 +12,7 @@ import { type DualContourLegacyConfig, useFieldContour } from "../contour_state"
 import { getFieldColor } from "../fieldColorManager";
 import { useChartID, useConfig, useFilteredIndices } from "../hooks";
 import { type ChartArrayCell, useChartArrayGrid } from "../hooks/useChartArrayGrid";
-import { useDensityGridCells } from "../hooks/useDensityGridCells";
+import type { DensityGridCells } from "../hooks/useDensityGridCells";
 import useGateLayers from "../hooks/useGateLayers";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
@@ -66,7 +66,7 @@ function composeGridImage(root: HTMLElement, cells: readonly ExportCell[]) {
  * all. The points, gates and selection are drawn in every cell; a cell's density layer only
  * in its own (see `shouldDrawInDensityGridCell`).
  */
-export default observer(function DeckDensityGridComponent() {
+export default observer(function DeckDensityGridComponent({ cells, densityFields }: DensityGridCells) {
     const chartId = useChartID();
     const chart = useChart<DeckScatterConfig, DeckScatterReact>();
     const config = useConfig<DeckScatterConfig & DualContourLegacyConfig>();
@@ -77,7 +77,6 @@ export default observer(function DeckDensityGridComponent() {
         selectionLayer,
     } = useSpatialLayers();
     const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
-    const { cells, densityFields, configuredFieldCount } = useDensityGridCells();
     const grid = useChartArrayGrid({ chartId, cells, getViewId: getCellViewId });
 
     // every cell is the same size, so the first stands for them all
@@ -277,8 +276,6 @@ export default observer(function DeckDensityGridComponent() {
         [densityFields, grid.viewIds, backend],
     );
 
-    if (configuredFieldCount === 0) return centred("Choose density fields to build the grid.");
-    if (densityFields.length === 0) return centred("Loading density fields…");
     if (device.status === "pending") return centred("Starting WebGPU…");
 
     return (

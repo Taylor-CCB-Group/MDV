@@ -3,7 +3,7 @@
  */
 
 /** Layout mode for {@link ChartArrayLayout}; overridable later for user prefs. */
-export type ChartArrayLayoutMode = "single" | "pair" | "grid";
+export type ChartArrayLayoutMode = "single" | "grid";
 
 /** Mirrors defaults in chartArrayLayout.css. */
 export type ChartArrayLayoutSizing = {
@@ -21,9 +21,8 @@ export const CHART_ARRAY_LAYOUT_DEFAULT_SIZING: ChartArrayLayoutSizing = {
 };
 
 export function getChartArrayLayoutMode(cellCount: number): ChartArrayLayoutMode {
-    if (cellCount <= 1) return "single";
-    if (cellCount === 2) return "pair";
-    return "grid";
+    // two cells go through the grid too, so a tall panel stacks them rather than splitting it in two
+    return cellCount <= 1 ? "single" : "grid";
 }
 
 function parseCssPx(value: string): number {
@@ -82,25 +81,38 @@ export function getPreferredGridColumnCount(
     return Math.max(1, Math.ceil(cellCount / rowsIfMaxColumns));
 }
 
-export function estimateSquareGridContentHeight(
-    cellCount: number,
-    innerWidth: number,
-    sizing: ChartArrayLayoutSizing = CHART_ARRAY_LAYOUT_DEFAULT_SIZING,
-): number {
-    if (cellCount <= 0) return 0;
-    const columns = getPreferredGridColumnCount(cellCount, innerWidth, sizing);
-    const rows = Math.ceil(cellCount / columns);
-    const cellWidth = (innerWidth - (columns - 1) * sizing.gap) / columns;
-    return rows * cellWidth + (rows - 1) * sizing.gap + sizing.paddingY;
-}
+export type ChartArrayGridChoice = {
+    columns: number;
+    /** True when the cells fill the scrollport (no scrolling); otherwise they are square and scroll. */
+    fillsViewport: boolean;
+};
 
-/** True when square cells at the current width would fit inside the scrollport without scrolling. */
-export function chartArrayGridFitsViewport(
+/**
+ * Columns for a grid of `cellCount` cells in an `innerWidth` x `innerHeight` area (padding excluded).
+ *
+ * When every cell can be at least {@link ChartArrayLayoutSizing.minCell} in both directions without
+ * scrolling, picks the column count that makes cells as large as possible in their *smaller*
+ * dimension, so a wide panel gets a row and a tall one a column rather than a few tall columns.
+ * Otherwise the cells are square and scroll, wrapping as {@link getPreferredGridColumnCount} does.
+ */
+export function chooseChartArrayGrid(
     cellCount: number,
-    viewportHeight: number,
     innerWidth: number,
+    innerHeight: number,
     sizing: ChartArrayLayoutSizing = CHART_ARRAY_LAYOUT_DEFAULT_SIZING,
-): boolean {
-    if (cellCount <= 0 || viewportHeight <= 0 || innerWidth <= 0) return true;
-    return estimateSquareGridContentHeight(cellCount, innerWidth, sizing) <= viewportHeight;
+): ChartArrayGridChoice {
+    if (cellCount <= 0 || innerWidth <= 0) return { columns: 1, fillsViewport: true };
+    const maxColumns = Math.min(estimateGridColumnCount(innerWidth, sizing), cellCount);
+    let best: { columns: number; side: number } | undefined;
+    for (let columns = 1; columns <= maxColumns; columns++) {
+        const rows = Math.ceil(cellCount / columns);
+        const width = (innerWidth - (columns - 1) * sizing.gap) / columns;
+        const height = (innerHeight - (rows - 1) * sizing.gap) / rows;
+        const side = Math.min(width, height);
+        if (side < sizing.minCell) continue;
+        // more than half a pixel better; on a tie the fewer columns (and fewer empty slots) win
+        if (!best || side > best.side + 0.5) best = { columns, side };
+    }
+    if (best) return { columns: best.columns, fillsViewport: true };
+    return { columns: getPreferredGridColumnCount(cellCount, innerWidth, sizing), fillsViewport: false };
 }
