@@ -95,4 +95,29 @@ describe("scatterTooltip", () => {
             }),
         ).toEqual({ html: "row 4" });
     });
+
+    it("finds a gate outline drawn in a group with the points", () => {
+        const group = new IsolatedGroupLayer({
+            id: "shared-cell-layers",
+            layers: [layer("scatter_1"), layer("gate-display")],
+        });
+        const gateMember = group.renderLayers().flat()[1];
+        if (!(gateMember instanceof ScatterplotLayer)) throw new Error("expected the gate member");
+        const info = group.getPickingInfo({
+            info: {
+                ...pickingInfo("shared-cell-layers", 0, { properties: { gateName: "Gate B" } }),
+                layer: group,
+                sourceLayer: gateMember,
+            },
+            mode: "hover",
+            sourceLayer: gateMember,
+        });
+
+        expect(
+            getCombinedScatterTooltip(info, {
+                gateDisplayLayerId: "gate-display",
+                getPointTooltip: () => null,
+            }),
+        ).toMatchObject({ html: expect.stringContaining("<strong>Gate B</strong>") });
+    });
 });

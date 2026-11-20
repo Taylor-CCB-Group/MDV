@@ -67,6 +67,16 @@
     min-height: 0;
 }
 
+/* Once measured, every cell is the same whole number of device pixels (see chartArrayCellSize). */
+.mdv-chart-array[data-layout="grid"][data-cell-size="fixed"] .mdv-chart-array__cell {
+    flex: 0 0 var(--mdv-chart-array-cell-width);
+    width: var(--mdv-chart-array-cell-width);
+    max-width: none;
+    min-width: 0;
+    height: var(--mdv-chart-array-cell-height);
+    aspect-ratio: auto;
+}
+
 /* A cell's own canvas, in its holder, fills it (a deck canvas per cell, see DeckCellGrid). */
 .mdv-chart-array__canvas,
 .mdv-chart-array__canvas > canvas {

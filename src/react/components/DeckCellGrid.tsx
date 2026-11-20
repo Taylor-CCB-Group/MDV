@@ -5,6 +5,7 @@ import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { syncEditableLayerEvents } from "@/lib/deckMonkeypatch";
 import { GatedOrthographicController } from "@/lib/wheelZoomGate";
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
+import { registerSpatialPerfDeck } from "@/react/spatialdata/perf";
 import type { UseChartArrayGridResult } from "../hooks/useChartArrayGrid";
 import { type TooltipContent, useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
@@ -152,6 +153,8 @@ export default function DeckCellGrid({
         [visibleCells, grid.viewIds, dragPan],
     );
     const viewStates = useMemo(() => Object.fromEntries(views.map((view) => [view.id, viewState])), [views, viewState]);
+    const latestViewStates = useRef(viewStates);
+    latestViewStates.current = viewStates;
 
     /** Each cell's canvas, by view id. */
     const canvases = useRef(new Map<string, HTMLCanvasElement>());
@@ -191,7 +194,21 @@ export default function DeckCellGrid({
             onLoad: () => syncEditableLayerEvents(deck),
         });
         deckHolder.current.deck = deck;
+        // for timing frames (see `perf.ts`): moves every cell's view `step` device pixels
+        const unregisterPerf = registerSpatialPerfDeck("densityGrid", deck, (step) => {
+            const scale = globalThis.devicePixelRatio || 1;
+            deck.setProps({
+                viewState: Object.fromEntries(
+                    Object.entries(latestViewStates.current).map(([id, state]) => {
+                        const zoom = typeof state.zoom === "number" ? state.zoom : 0;
+                        const [x = 0, y = 0, z = 0] = state.target ?? [];
+                        return [id, { ...state, target: [x + step / scale / 2 ** zoom, y, z] }];
+                    }),
+                ),
+            });
+        });
         return () => {
+            unregisterPerf();
             deckHolder.current.deck = null;
             deck.finalize();
         };
