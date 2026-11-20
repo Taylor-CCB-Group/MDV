@@ -26,7 +26,7 @@ import {
     DEFAULT_AXIS_SCALES,
     type OrbitSelectionView,
     orbitSelectionViewOf,
-    projectRowsToScreen,
+    screenProjectionMatrix,
     validAxisScales,
 } from "./orbitView";
 import { type ScatterPlotConfig, type ScatterPlotConfig3D, useRegionScale, useScatterplotLayer } from "./scatter_state";
@@ -153,10 +153,11 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     );
     const [cx, cy, cz] = useParamColumns();
     const filterOnScreen = useCallback(
-        (screenCoords: [number, number][], view: OrbitSelectionView) => {
-            if (!rangeDimension || !cx?.data || !cy?.data || !cz?.data) return;
-            const screen = projectRowsToScreen([cx.data, cy.data, cz.data], modelMatrix, view);
-            rangeDimension.filter("filterPoly", screen, screenCoords);
+        (points: [number, number][], view: OrbitSelectionView) => {
+            if (!rangeDimension || !cx || !cy || !cz) return;
+            const matrix = screenProjectionMatrix(view, modelMatrix);
+            // projected and tested on the dimension's filter worker
+            rangeDimension.filter("filterScreenPoly", [cx.field, cy.field, cz.field], { matrix, points });
         },
         [rangeDimension, cx, cy, cz, modelMatrix],
     );

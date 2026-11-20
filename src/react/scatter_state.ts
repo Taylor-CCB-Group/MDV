@@ -332,29 +332,27 @@ export function useScatterRadius() {
 /** How visible the rows a 3D selection left out are, relative to the points it caught. */
 const UNSELECTED_OPACITY = 0.08;
 
-const NO_ROWS = new Uint32Array(0);
-
 /**
- * `rows` split into those the chart's own filter (`owner`) keeps and those only it leaves out.
- * A chart draws the rows its own filter leaves out (so a selection can be redrawn); this tells
- * them apart, for a chart that shows its selection by fading the rest. Without an active filter,
- * every row is selected.
+ * Which of `rows` the chart's own filter (`owner`) leaves out, as a mask over every row (1: left
+ * out), or null without an active filter. A chart draws the rows its own filter leaves out (so a
+ * selection can be redrawn); this tells them apart, for a chart that shows its selection by fading
+ * the rest. A mask rather than two lists of rows, so the layers keep their `data` (and deck its
+ * attributes) and only the filter values change.
  */
-export function splitBySelection(rows: Uint32Array, owner?: FilterOwner | null) {
-    if (!owner?.filterMethod) return { selectedRows: rows, unselectedRows: NO_ROWS };
+export function ownSelectionMask(rows: Uint32Array, size: number, owner?: FilterOwner | null) {
+    if (!owner?.filterMethod) return null;
     const local = owner.getLocalFilter();
-    const selected = new Uint32Array(rows.length);
-    const unselected = new Uint32Array(rows.length);
-    let s = 0;
-    let u = 0;
+    const mask = new Uint8Array(size);
+    let any = false;
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         // bit 1: left out by this filter (2 is the background filter)
-        if (local[row] & 1) unselected[u++] = row;
-        else selected[s++] = row;
+        if (local[row] & 1) {
+            mask[row] = 1;
+            any = true;
+        }
     }
-    if (u === 0) return { selectedRows: rows, unselectedRows: NO_ROWS };
-    return { selectedRows: selected.slice(0, s), unselectedRows: unselected.slice(0, u) };
+    return any ? mask : null;
 }
 
 // type Tooltip = (PickingInfo) => string;
@@ -422,12 +420,14 @@ export function useScatterplotLayer(
     const { aggregateFilteredRows, ownerVisibleRows, isExternallyFiltered } = useOwnedFilteredIndices(filterOwner);
     // a 3D selection's outline is only shown from where it was drawn, so its rows are what show it
     const is3d = config.dimension === "3d";
-    const { selectedRows: data, unselectedRows } = useMemo(() => {
+    const data = ownerVisibleRows;
+    const params = useParamColumns();
+    const rowCount = params[0].data.length;
+    const leftOut = useMemo(() => {
         // `aggregateFilteredRows` changes with every filter, this chart's own included
         aggregateFilteredRows;
-        return splitBySelection(ownerVisibleRows, is3d ? filterOwner : null);
-    }, [ownerVisibleRows, aggregateFilteredRows, is3d, filterOwner]);
-    const params = useParamColumns();
+        return is3d ? ownSelectionMask(ownerVisibleRows, rowCount, filterOwner) : null;
+    }, [ownerVisibleRows, aggregateFilteredRows, is3d, filterOwner, rowCount]);
     const [cx, cy, cz] = params;
     const scale = useRegionScale();
     const hoverInfoRef = useRef<PickingInfo | null>(null);
@@ -621,13 +621,13 @@ export function useScatterplotLayer(
                 //currently useFieldSpec is typed as DataColumn|undefined,
                 //if not undefined is guaranteed to be loaded but we may change how we manage lazy-loading.
                 getFilterValue: (i: number) =>
-                    getMissingColorFilterValue(i, colorColumn, shouldFilterMissing, fallbackOnZero),
+                    leftOut?.[i] ? 0 : getMissingColorFilterValue(i, colorColumn, shouldFilterMissing, fallbackOnZero),
                 filterRange: [0.5, 1],
             } as any),
             updateTriggers: {
                 getFillColor: colorBy,
                 getPosition: [cx, cy, cz],
-                getFilterValue: [colorColumn, shouldFilterMissing, fallbackOnZero],
+                getFilterValue: [colorColumn, shouldFilterMissing, fallbackOnZero, leftOut],
             },
             pickable: true,
             onHover: (info) => {
@@ -677,6 +677,7 @@ export function useScatterplotLayer(
         shouldFilterMissing,
         colorColumn,
         fallbackOnZero,
+        leftOut,
         getModifierState,
         updateHighlightedRows,
         paintHoveredRow,
@@ -699,7 +700,6 @@ export function useScatterplotLayer(
     const greyOnFilter = config.on_filter === "grey";
     // deck.gl regenerates every attribute when `data` changes identity (and updates hidden
     // layers too), so this must not be a fresh object each time the layer is rebuilt
-    const rowCount = cx.data.length;
     const greyData = useMemo(() => ({ length: rowCount }), [rowCount]);
     const greyScatterplotLayer = useMemo(
         () =>
@@ -771,17 +771,17 @@ export function useScatterplotLayer(
         () =>
             new MdvScatterplotLayer({
                 id: `scatter-unselected_${getVivId(`${id}detail-react`)}`,
-                data: unselectedRows,
+                // every row, so a new selection changes only the filter values
+                data: greyData,
                 opacity: opacity * UNSELECTED_OPACITY,
                 stroked: false,
                 filled: true,
                 radiusScale,
                 radiusMinPixels: SCATTER_RADIUS_MIN_PIXELS,
-                getPosition: (i: unknown, { target }: { target: number[] }) => {
-                    if (typeof i !== "number") throw new Error("expected index");
-                    target[0] = cx.data[i];
-                    target[1] = cy.data[i];
-                    target[2] = cz?.minMax ? cz.data[i] : 0;
+                getPosition: (_: unknown, { target, index }: { target: number[]; index: number }) => {
+                    target[0] = cx.data[index];
+                    target[1] = cy.data[index];
+                    target[2] = cz?.minMax ? cz.data[index] : 0;
                     return target as unknown as [number, number];
                 },
                 // grey, as for "Gray Out Points": colour is what the selection caught
@@ -789,20 +789,24 @@ export function useScatterplotLayer(
                 billboard: true,
                 modelMatrix,
                 parameters: { depthWriteEnabled: false },
-                getFilterValue: (i: number) =>
-                    getMissingColorFilterValue(i, colorColumn, shouldFilterMissing, fallbackOnZero),
+                getFilterValue: (_: unknown, { index }: { index: number }) =>
+                    leftOut?.[index]
+                        ? getMissingColorFilterValue(index, colorColumn, shouldFilterMissing, fallbackOnZero)
+                        : 0,
                 filterRange: [0.5, 1],
                 updateTriggers: {
                     getPosition: [cx, cy, cz],
-                    getFilterValue: [colorColumn, shouldFilterMissing, fallbackOnZero],
+                    // a full pass over every row; only worth redoing while the layer is shown
+                    getFilterValue: leftOut ? [colorColumn, shouldFilterMissing, fallbackOnZero, leftOut] : false,
                 },
                 extensions: [new MdvDataFilterExtension()],
                 // deck prefers a layer hidden to one removed
-                visible: unselectedRows.length > 0,
+                visible: leftOut !== null,
             }),
         [
             id,
-            unselectedRows,
+            greyData,
+            leftOut,
             opacity,
             radiusScale,
             cx,

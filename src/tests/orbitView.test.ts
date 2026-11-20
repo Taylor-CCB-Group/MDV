@@ -1,6 +1,7 @@
 import { Matrix4 } from "@math.gl/core";
 import * as glMatrix from "gl-matrix";
 import { describe, expect, test } from "vitest";
+import { evaluateFilterSpec } from "@/datastore/rangeFilterEval";
 import {
     fitOrbitView,
     isSameOrbitView,
@@ -8,6 +9,7 @@ import {
     orbitViewFromLegacyCamera,
     orbitViewport,
     projectRowsToScreen,
+    screenProjectionMatrix,
 } from "@/react/orbitView";
 
 /**
@@ -139,4 +141,52 @@ describe("the view a selection was drawn in", () => {
         expect(isSameOrbitView(view, { ...view, target: [1, 2.1, 3] })).toBe(false);
         expect(isSameOrbitView(view, { ...view, orbitAxis: "Z" })).toBe(false);
     });
+});
+
+test("the filter worker selects what is inside an outline on screen", () => {
+    const view: OrbitSelectionView = {
+        target: [0, 0, 0],
+        zoom: 3,
+        rotationOrbit: 30,
+        rotationX: 15,
+        width: 400,
+        height: 300,
+        orbitAxis: "Y",
+    };
+    const modelMatrix = new Matrix4().scale([1, 2, 0.5]);
+    // a deterministic spread of points, with a missing value and some behind the camera
+    const n = 2000;
+    const columns = [0, 1, 2].map((axis) =>
+        Float32Array.from({ length: n }, (_, i) => Math.sin(i * (axis + 1) * 12.9898) * 20),
+    );
+    columns[0][7] = Number.NaN;
+    columns[2][11] = 1e6;
+    const points: [number, number][] = [
+        [120, 80],
+        [300, 90],
+        [260, 240],
+        [140, 200],
+        [120, 80],
+    ];
+    const onWorker = new Uint8Array(n);
+    evaluateFilterSpec(
+        {
+            kind: "screenPoly",
+            data1: columns[0],
+            data2: columns[1],
+            data3: columns[2],
+            matrix: Array.from(screenProjectionMatrix(view, modelMatrix)),
+            points,
+        },
+        n,
+        onWorker,
+    );
+    const [px, py] = projectRowsToScreen([columns[0], columns[1], columns[2]], modelMatrix, view);
+    const expected = new Uint8Array(n);
+    evaluateFilterSpec({ kind: "poly", data1: px, data2: py, points }, n, expected);
+    expect(onWorker).toEqual(expected);
+    expect(onWorker[7]).toBe(0);
+    const selected = onWorker.reduce((a, b) => a + b, 0);
+    expect(selected).toBeGreaterThan(50);
+    expect(selected).toBeLessThan(n);
 });

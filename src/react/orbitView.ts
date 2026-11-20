@@ -132,6 +132,15 @@ export function orbitViewport(view: OrbitSelectionView) {
 }
 
 /**
+ * The matrix that takes a data position to pixels from the top left of the plot, as drawn in
+ * `view`: deck's own (`Viewport.project`), after the layer's model matrix. Column-major; divide
+ * x and y by w, and a point with w <= 0 is behind the camera.
+ */
+export function screenProjectionMatrix(view: OrbitSelectionView, modelMatrix: ArrayLike<number>) {
+    return multiply(orbitViewport(view).pixelProjectionMatrix, modelMatrix);
+}
+
+/**
  * Where each row's point is drawn in `view`, in pixels from the top left of the plot; NaN for a
  * point behind the camera. `modelMatrix` takes data to world units (axis and region scaling).
  */
@@ -144,8 +153,7 @@ export function projectRowsToScreen(
     const n = xs.length;
     const px = new Float32Array(n);
     const py = new Float32Array(n);
-    // the matrix deck projects with (`Viewport.project`), after the layer's model matrix; column-major
-    const m = multiply(orbitViewport(view).pixelProjectionMatrix, modelMatrix);
+    const m = screenProjectionMatrix(view, modelMatrix);
     for (let i = 0; i < n; i++) {
         const x = xs[i];
         const y = ys[i];
