@@ -31,6 +31,7 @@ import { entryStatusForDisplay } from "@/react/spatialdata/entry_status";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
+import { applyIsolatedGroupFix } from "@/react/spatialdata/isolated_group_fix";
 import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
 import { createPointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
@@ -71,6 +72,9 @@ import SelectionOverlay from "./SelectionOverlay";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import SpatialDensityGrid, { type SpatialDensityGridHost } from "./SpatialDensityGrid";
 import ViewGestureHint from "./ViewGestureHint";
+
+// before any isolated group draws, in the single view or the density grid
+applyIsolatedGroupFix();
 
 type SpatialRegionMetadata = {
     spatial?: {

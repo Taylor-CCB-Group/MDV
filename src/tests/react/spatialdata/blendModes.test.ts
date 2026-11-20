@@ -13,6 +13,7 @@ import {
     setLeafBlendMode,
 } from "@/react/spatialdata/blend_modes";
 import { DATA_POINTS_GROUP_ID, deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
+import { applyIsolatedGroupFix, BLEND_WRAPPER_SUFFIX } from "@/react/spatialdata/isolated_group_fix";
 import { renderStackStructure } from "@/react/spatialdata/render_stack_adapter";
 
 function spatial(id: string, props: Record<string, unknown> = {}): RenderStackEntry {
@@ -137,5 +138,23 @@ describe("renderStackStructure", () => {
         const mask: unknown = Array.isArray(members) ? members[1] : undefined;
         expect(layerName(mask)).toBe(IsolatedGroupLayer.layerName);
         expect(mask instanceof Object && Reflect.get(Reflect.get(mask, "props"), "blendMode")).toBe("cut-out");
+    });
+});
+
+describe("applyIsolatedGroupFix", () => {
+    test("gives a blended layer's one-member wrapper a sublayer id apart from the layer's", () => {
+        applyIsolatedGroupFix();
+        const member = new ScatterplotLayer({ id: "shapes", data: [] });
+        const wrapper = new IsolatedGroupLayer({ id: "shapes", layers: [member], blendMode: "cut-out" });
+        const plain = new ScatterplotLayer({ id: "image", data: [] });
+        const outer = new IsolatedGroupLayer({ id: "outer", layers: [plain, wrapper] });
+        const sublayers = outer.renderLayers();
+        const ids: unknown[] = [];
+        const collect = (item: unknown): void => {
+            if (Array.isArray(item)) item.forEach(collect);
+            else if (item) ids.push(Reflect.get(Object(item), "id"));
+        };
+        collect(sublayers);
+        expect(ids).toEqual(["outer/image", `outer/shapes${BLEND_WRAPPER_SUFFIX}`, "outer-composite"]);
     });
 });
