@@ -193,6 +193,38 @@ def test_add_annotations_missing_values():
         assert annotation_data[3] == 'MISSING'  # ID 3 missing
 
 
+def test_add_annotations_categorical_missing_values():
+    """Categorical annotations must accept a missing_value that is not one of their categories."""
+    with temp_mdv_project() as test_dir:
+        mdv = MDVProject(test_dir, delete_existing=True)
+        mdv.add_datasource("test", pd.DataFrame({'id': range(4), 'value': list(range(4))}))
+
+        annotation_df = pd.DataFrame({
+            'id': [0, 2],
+            'annotation': pd.Categorical(['A', 'B']),
+        })
+        mdv.add_annotations("test", annotation_df, missing_value="MISSING")
+
+        annotation_data = mdv.get_column("test", "annotation")
+        assert list(annotation_data) == ['A', 'MISSING', 'B', 'MISSING']
+
+
+def test_add_annotations_small_int_missing_values_stay_missing():
+    """int32 storage can't hold NaN, so missing rows must not silently become 0."""
+    with temp_mdv_project() as test_dir:
+        mdv = MDVProject(test_dir, delete_existing=True)
+        mdv.add_datasource("test", pd.DataFrame({'id': range(3), 'value': list(range(3))}))
+
+        annotation_df = pd.DataFrame({'id': [0, 2], 'count': np.array([5, 0], dtype=np.int16)})
+        mdv.add_annotations("test", annotation_df)
+
+        columns = {c['field']: c for c in mdv.get_datasource_metadata("test")['columns']}
+        assert columns['count']['datatype'] == 'integer'
+        counts = mdv.get_column("test", "count")
+        assert counts[0] == 5 and counts[2] == 0
+        assert np.isnan(counts[1])
+
+
 def test_categorical_missing_values():
     """Test categorical data with missing values."""
     adata = create_minimal_anndata(add_missing=True)
