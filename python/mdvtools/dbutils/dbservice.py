@@ -890,7 +890,7 @@ class UserProjectService:
             recalculated based on the provided is_owner and can_write values.
         """
         try:
-            user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+            user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).order_by(UserProject.id).first()
 
             if user_project:
                 user_project.is_owner = is_owner
@@ -984,7 +984,7 @@ class UserProjectService:
             Exception: If database query fails. The exception is logged and re-raised.
         """
         try:
-            user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+            user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).order_by(UserProject.id).first()
             if not user_project:
                 return {"can_read": False, "can_write": False, "is_owner": False}
 
@@ -1025,7 +1025,7 @@ class UserProjectService:
         """
         try:
             # Fetch the UserProject record
-            user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+            user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).order_by(UserProject.id).first()
             if not user_project:
                 return None  # User is not part of the project
             

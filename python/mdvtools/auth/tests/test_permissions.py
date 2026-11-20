@@ -57,6 +57,16 @@ def test_project_roles_lists_every_project_the_user_holds_a_role_on(app):
     assert project_roles(99) == {}
 
 
+def test_with_2_rows_for_one_project_both_helpers_use_the_lowest_id(app):
+    db.session.add(UserProject(7, 2, can_read=True))
+    db.session.add(UserProject(7, 2, is_owner=True))
+    db.session.commit()
+
+    viewer = {"can_read": True, "can_write": False, "is_owner": False}
+    assert project_role(7, 2) == viewer
+    assert project_roles(7)[2] == viewer
+
+
 def test_can_view_needs_read_write_or_owner(app):
     assert not can_view(None)
     assert not can_view({"can_read": False, "can_write": False, "is_owner": False})

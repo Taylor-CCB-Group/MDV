@@ -4,6 +4,10 @@ Every check queries the user_projects table, so a role written by any process
 applies on the next request: this app, MDV-Admin on a shared database, or a
 script run with `docker exec`. No copy is kept between requests, so there is
 nothing to rebuild or keep in step with the database.
+
+`user_projects` does not stop a user holding 2 rows for one project. When they
+do, the row with the lowest ID is their role, here and in UserProjectService,
+which updates and removes that same row.
 """
 
 from typing import Iterable, Optional, TypedDict
@@ -27,14 +31,21 @@ def _role(row: UserProject) -> ProjectRole:
 
 def project_role(user_id: int, project_id: int) -> Optional[ProjectRole]:
     """The user's role on one project, or None when they hold no role on it."""
-    row = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+    row = (
+        UserProject.query.filter_by(user_id=user_id, project_id=project_id)
+        .order_by(UserProject.id)
+        .first()
+    )
     return _role(row) if row else None
 
 
 def project_roles(user_id: int) -> dict[int, ProjectRole]:
     """The user's role on every project they hold one on, keyed by project ID."""
-    rows = UserProject.query.filter_by(user_id=user_id).all()
-    return {row.project_id: _role(row) for row in rows}
+    rows = UserProject.query.filter_by(user_id=user_id).order_by(UserProject.id).all()
+    roles: dict[int, ProjectRole] = {}
+    for row in rows:
+        roles.setdefault(row.project_id, _role(row))
+    return roles
 
 
 def can_view(role: Optional[ProjectRole]) -> bool:
