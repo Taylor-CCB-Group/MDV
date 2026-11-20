@@ -49,4 +49,17 @@ describe("defineChoiceSetting", () => {
         dispose();
         expect(seen).toEqual(["a", "b"]);
     });
+
+    test("is not chosen while the default applies, and is once set", () => {
+        const setting = define();
+        expect(setting.isChosen()).toBe(false);
+        setting.set("a");
+        expect(setting.isChosen()).toBe(true);
+    });
+
+    test("a value stored earlier counts as chosen, a legacy one doesn't", () => {
+        expect(define(() => "b").isChosen()).toBe(false);
+        localStorage.setItem(KEY, "b");
+        expect(define().isChosen()).toBe(true);
+    });
 });

@@ -3,8 +3,8 @@ import { action, observable } from "mobx";
 /**
  * Settings for this browser rather than for a project: stored in localStorage, so they
  * apply to every project opened here and are never saved with a project or view. They are
- * observable, so anything reading them in an `observer` updates when one changes. The Debug
- * dialog lists every setting in `browserSettings`.
+ * observable, so anything reading them in an `observer` updates when one changes. The Settings
+ * dialog lists every setting in `browserSettings`, under Preferences.
  *
  * Only choice settings exist so far; add other kinds alongside `defineChoiceSetting` when a
  * setting needs one.
@@ -26,6 +26,8 @@ export type ChoiceSettingDefinition<T extends string> = {
 export type BrowserSetting<T extends string = string> = ChoiceSettingDefinition<T> & {
     get(): T;
     set(value: T): void;
+    /** Whether a value has been chosen in this browser, rather than the default applying. */
+    isChosen(): boolean;
 };
 
 function readStorage(key: string): string | null {
@@ -48,14 +50,17 @@ export function defineChoiceSetting<T extends string>(definition: ChoiceSettingD
     const isChoice = (value: string | null): value is T => definition.choices.some((choice) => choice.value === value);
     const stored = readStorage(definition.key);
     const box = observable.box<T>(isChoice(stored) ? stored : (definition.legacy?.() ?? definition.defaultValue));
+    const chosen = observable.box(isChoice(stored));
     return {
         ...definition,
         get: () => box.get(),
         set: action((value: T) => {
             if (!isChoice(value)) return;
             box.set(value);
+            chosen.set(true);
             writeStorage(definition.key, value);
         }),
+        isChosen: () => chosen.get(),
     };
 }
 
@@ -124,8 +129,29 @@ export const convertLegacyChartsSetting = defineChoiceSetting<"off" | "on">({
     defaultValue: "off",
 });
 
+/**
+ * What a plain drag does on the charts with a selection toolbar (scatter plots, SpatialData): the
+ * tool a chart starts with. Either way, ⌘-drag (Ctrl-drag off a Mac) or a right-button drag moves
+ * the view, and the toolbar's drawing tools draw. Offered in a chart the first time a plain drag
+ * moves its view (see `ViewGestureHint`).
+ */
+export const chartDragSetting = defineChoiceSetting<"view" | "select">({
+    key: "mdv.settings.chartDrag",
+    label: "Dragging on charts",
+    description:
+        "What a plain drag does on scatter plots and spatial charts, until another tool is chosen " +
+        "in the chart's toolbar. Either way, ⌘-drag (Ctrl-drag off a Mac) or a right-button drag " +
+        "moves the view, and a click on empty space clears a selection.",
+    choices: [
+        { value: "view", label: "Move the view" },
+        { value: "select", label: "Draw a selection" },
+    ],
+    defaultValue: "view",
+});
+
 /** Every browser setting, in the order the Settings dialog lists them. */
 export const browserSettings: readonly BrowserSetting[] = [
+    chartDragSetting,
     renderBackendSetting,
     webgpuTraceSetting,
     legacyChartsSetting,

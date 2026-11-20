@@ -3,17 +3,18 @@ import type { Device } from "@luma.gl/core";
 import { applyWebGPUPickingFix, applyWebGPUPresentationAlphaFix } from "@spatialdata/layers";
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { syncEditableLayerEvents } from "@/lib/deckMonkeypatch";
-import { GatedOrthographicController } from "@/lib/wheelZoomGate";
+import { GatedOrthographicController } from "@/lib/viewGestureGate";
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
 import { registerSpatialPerfDeck } from "@/react/spatialdata/perf";
 import type { UseChartArrayGridResult } from "../hooks/useChartArrayGrid";
+import type { ViewControllerOptions } from "../hooks/useGateLayers";
 import { type TooltipContent, useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import ChartArrayLayout from "./ChartArrayLayout";
 import { CrosshairLines } from "./CrosshairArea";
 import { shouldDrawInDensityGridCell } from "./densityGridUtils";
 import { hideCrosshair, placeCrosshair } from "./pointerCrosshair";
-import WheelZoomHint from "./WheelZoomHint";
+import ViewGestureHint from "./ViewGestureHint";
 
 export type DeckCellLabel = { text: string; color: readonly number[] };
 
@@ -66,7 +67,7 @@ export type DeckCellGridProps = {
     /** Shared by every cell. */
     viewState: OrthographicViewState;
     onViewStateChange: (next: OrthographicViewState) => void;
-    dragPan: boolean;
+    controllerOptions: ViewControllerOptions;
     /** The tooltip for a pick; `deck` is there to pick again (for overlapping layers). */
     getTooltipContent: (info: PickingInfo, deck: Deck<OrthographicView[]> | null) => TooltipContent | undefined;
     /** A hover, with the canvas it was made in (`info.x` / `info.y` are relative to it). */
@@ -126,7 +127,7 @@ export default function DeckCellGrid({
     onError,
     viewState,
     onViewStateChange,
-    dragPan,
+    controllerOptions,
     getTooltipContent,
     onHover,
     setKeyboardActive,
@@ -146,11 +147,11 @@ export default function DeckCellGrid({
                         id,
                         canvasId: id,
                         flipY: false,
-                        controller: { type: GatedOrthographicController, doubleClickZoom: false, dragPan },
+                        controller: { type: GatedOrthographicController, doubleClickZoom: false, ...controllerOptions },
                     }),
                 ];
             }),
-        [visibleCells, grid.viewIds, dragPan],
+        [visibleCells, grid.viewIds, controllerOptions],
     );
     const viewStates = useMemo(() => Object.fromEntries(views.map((view) => [view.id, viewState])), [views, viewState]);
     const latestViewStates = useRef(viewStates);
@@ -339,7 +340,7 @@ export default function DeckCellGrid({
                     renderCell={renderCell}
                 />
             </div>
-            <WheelZoomHint />
+            <ViewGestureHint />
             {tooltipPortal}
         </>
     );

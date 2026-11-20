@@ -102,7 +102,7 @@ export default observer(function DeckDensityGridComponent({ cells, densityFields
             onError={onError}
             viewState={config.viewState}
             onViewStateChange={onViewStateChange}
-            dragPan={controllerOptions.dragPan}
+            controllerOptions={controllerOptions}
             getTooltipContent={getTooltipContent}
             setKeyboardActive={setScatterKeyboardActive}
             exportTarget={chart}

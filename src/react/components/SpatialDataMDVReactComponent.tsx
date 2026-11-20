@@ -19,7 +19,7 @@ import { createPortal } from "react-dom";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
-import { GatedOrthographicController } from "@/lib/wheelZoomGate";
+import { GatedOrthographicController } from "@/lib/viewGestureGate";
 import {
     type DeckErrorHandlers,
     resolveDeckBackend,
@@ -70,7 +70,7 @@ import { rasterEntriesKey, useRasterIssues } from "./RasterIssues";
 import SelectionOverlay from "./SelectionOverlay";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import SpatialDensityGrid, { type SpatialDensityGridHost } from "./SpatialDensityGrid";
-import WheelZoomHint from "./WheelZoomHint";
+import ViewGestureHint from "./ViewGestureHint";
 
 type SpatialRegionMetadata = {
     spatial?: {
@@ -614,7 +614,7 @@ const SpatialDataViewer = observer(
                 controller: {
                     type: GatedOrthographicController,
                     doubleClickZoom: false,
-                    dragPan: controllerOptions.dragPan,
+                    ...controllerOptions,
                 },
                 ...(deviceProps && { deviceProps }),
                 onDeviceInitialized,
@@ -635,7 +635,7 @@ const SpatialDataViewer = observer(
                           deviceProps,
                           onDeviceInitialized,
                           onError: onDeckError,
-                          dragPan: controllerOptions.dragPan,
+                          controllerOptions,
                           getTooltipContent,
                           setKeyboardActive: setScatterKeyboardActive,
                           onPointerLeave: onFeatureHoverEnd,
@@ -648,7 +648,7 @@ const SpatialDataViewer = observer(
                 deviceProps,
                 onDeviceInitialized,
                 onDeckError,
-                controllerOptions.dragPan,
+                controllerOptions,
                 getTooltipContent,
                 setScatterKeyboardActive,
                 onFeatureHoverEnd,
@@ -756,7 +756,7 @@ const SpatialDataViewer = observer(
                     </div>
                 </div>
                 {/* the grid has its own, over its scrolling cells */}
-                {!densityGrid && <WheelZoomHint />}
+                {!densityGrid && <ViewGestureHint />}
                 {tooltipPortal}
                 {featureTooltipPortal}
             </Profiler>

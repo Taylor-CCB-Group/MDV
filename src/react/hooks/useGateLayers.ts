@@ -1,6 +1,8 @@
 import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LoadedDataColumn } from "@/charts/charts";
+import { textLabelAt } from "@/lib/textLayerHit";
+import type { ViewDragProps } from "@/lib/viewGestureGate";
 import { truncateWithEllipsis } from "@/utilities/Utilities";
 import { getVivId } from "../components/avivatorish/MDVivViewer";
 import type { DeckScatterConfigWithRegion } from "../components/DeckScatterReactWrapper";
@@ -11,6 +13,16 @@ import { useSpatialLayers } from "../spatial_context";
 import useGateActions from "./useGateActions";
 
 const MAX_LABEL_LENGTH = 18;
+
+/**
+ * What a chart with a selection toolbar gives its deck controller (`viewGestureGate`), beside the
+ * controller's type: whether a plain drag moves the view (the Pan tool's lock, and not while a
+ * gate label is dragged or hovered), and what two fingers do on a touch screen.
+ */
+export type ViewControllerOptions = ViewDragProps & {
+    dragPan: boolean;
+    multiTouchDrag: "pan" | "rotate";
+};
 
 const useGateLayers = () => {
     const chartId = useChartID();
@@ -210,11 +222,36 @@ const useGateLayers = () => {
 
     // To disable drag pan for the deck controller when label is being dragged or hovered
     const dragPan = !(draggingId || isHoveringLabel);
+    // and a drag pressed on a label moves it rather than drawing a selection. Decided from where the
+    // button went down, as a quick press can beat the hover pick (and touch has no hover).
+    const { yieldDragRef } = selectionProps;
+    useEffect(() => {
+        if (!is2d || !gateLabelLayer || editingGateId) {
+            yieldDragRef.current = null;
+            return;
+        }
+        yieldDragRef.current = (point, viewport, layers) => {
+            // the instance deck draws, which has the font laid out: charts can hand deck a copy
+            // (`useLayersForDevice`), which keeps the id
+            const live = layers.find((layer) => layer.id === gateLabelLayer.id) ?? gateLabelLayer;
+            const hit = textLabelAt(live, point, viewport);
+            // the label's font isn't laid out yet: go by the hover
+            return hit === null ? isHoveringLabel : hit >= 0;
+        };
+        return () => {
+            yieldDragRef.current = null;
+        };
+    }, [yieldDragRef, is2d, gateLabelLayer, editingGateId, isHoveringLabel]);
+    const dragMovesView = selectionProps.selectedTool === "Pan";
+    const controllerOptions = useMemo<ViewControllerOptions>(
+        () => ({ dragPan, dragMovesView, multiTouchDrag: is2d ? "pan" : "rotate" }),
+        [dragPan, dragMovesView, is2d],
+    );
 
     return {
         gateLabelLayer,
         gateDisplayLayer,
-        controllerOptions: { dragPan },
+        controllerOptions,
     };
 };
 

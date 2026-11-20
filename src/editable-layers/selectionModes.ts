@@ -32,6 +32,11 @@ function compositeModes(modes: unknown[]) {
     return modes as GeoJsonEditMode[];
 }
 
+/** The Pan tool's mode: drags the selection, and otherwise leaves a drag to move the view. */
+export function panMode(): GeoJsonEditMode {
+    return compositeModes([new TranslateMode()])[0];
+}
+
 /**
  * Upstream `CompositeMode` (as of editable-layers 9.4.5) forwards click / move / drag to its
  * modes but not double-click, so a double-click falls through to the no-op in `GeoJsonEditMode`.
