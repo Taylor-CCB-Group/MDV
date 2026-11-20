@@ -1,6 +1,7 @@
 import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LoadedDataColumn } from "@/charts/charts";
+import { textLabelAt } from "@/lib/textLayerHit";
 import type { ViewDragProps } from "@/lib/viewGestureGate";
 import { truncateWithEllipsis } from "@/utilities/Utilities";
 import { getVivId } from "../components/avivatorish/MDVivViewer";
@@ -221,11 +222,23 @@ const useGateLayers = () => {
 
     // To disable drag pan for the deck controller when label is being dragged or hovered
     const dragPan = !(draggingId || isHoveringLabel);
-    // and so that dragging a label moves it rather than drawing a selection
+    // and a drag pressed on a label moves it rather than drawing a selection. Decided from where the
+    // button went down, as a quick press can beat the hover pick (and touch has no hover).
     const { yieldDragRef } = selectionProps;
     useEffect(() => {
-        yieldDragRef.current = !dragPan;
-    }, [yieldDragRef, dragPan]);
+        if (!is2d || !gateLabelLayer || editingGateId) {
+            yieldDragRef.current = null;
+            return;
+        }
+        yieldDragRef.current = (point, viewport) => {
+            const hit = textLabelAt(gateLabelLayer, point, viewport);
+            // the label's font isn't laid out yet: go by the hover
+            return hit === null ? isHoveringLabel : hit >= 0;
+        };
+        return () => {
+            yieldDragRef.current = null;
+        };
+    }, [yieldDragRef, is2d, gateLabelLayer, editingGateId, isHoveringLabel]);
     const dragMovesView = selectionProps.selectedTool === "Pan";
     const controllerOptions = useMemo<ViewControllerOptions>(
         () => ({ dragPan, dragMovesView, multiTouchDrag: is2d ? "pan" : "rotate" }),

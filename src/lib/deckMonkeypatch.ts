@@ -56,8 +56,11 @@ const subscribedManagers = new WeakMap<object, EventManager[]>();
 const viewDrags = new WeakSet<object>();
 
 type SelectionLayerProps = ConstructorParameters<typeof EditableGeoJsonLayer>[0] & {
-    /** True when a drag that starts now belongs to another layer (e.g. a gate label being moved). */
-    yieldDrag?: () => boolean;
+    /**
+     * True when a drag pressed at `point` (canvas pixels, in `viewport`) belongs to another layer,
+     * e.g. a gate label being moved.
+     */
+    yieldDrag?: (point: [number, number], viewport: Viewport) => boolean;
 };
 
 export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
@@ -66,9 +69,17 @@ export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
     }
 
     /** Whether the layer leaves a drag that starts now alone: see `yieldDrag`. */
-    private yieldsDrag() {
+    private yieldsDrag(event: MjolnirGestureEvent) {
         const yieldDrag: unknown = Reflect.get(this.props, "yieldDrag");
-        return typeof yieldDrag === "function" && Boolean(yieldDrag());
+        if (typeof yieldDrag !== "function") return false;
+        // where the button went down: panstart comes once the pointer has moved a little
+        const point: [number, number] = [
+            event.offsetCenter.x - (event.deltaX ?? 0),
+            event.offsetCenter.y - (event.deltaY ?? 0),
+        ];
+        const viewport = this.viewportAt(point) ?? this.context.viewport;
+        const local: [number, number] = [point[0] - (viewport.x ?? 0), point[1] - (viewport.y ?? 0)];
+        return Boolean(yieldDrag(local, viewport));
     }
 
     /**
@@ -79,7 +90,7 @@ export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
      */
     _onpanstart(event: MjolnirGestureEvent) {
         const handler = this.state._editableLayerState.eventHandler;
-        if (isViewDrag(event) || this.yieldsDrag()) {
+        if (isViewDrag(event) || this.yieldsDrag(event)) {
             viewDrags.add(handler);
             return;
         }

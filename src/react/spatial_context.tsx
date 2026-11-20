@@ -1,3 +1,4 @@
+import type { Viewport } from "@deck.gl/core";
 import type {
     GeoJsonEditMode,
     Position,
@@ -52,10 +53,10 @@ export type RangeState = {
     setSelectedTool: (tool: Tool) => void;
     modelMatrix: Matrix4;
     /**
-     * Set while a drag should go to another layer rather than draw a selection: a gate label under
-     * the pointer, which drags to move (see `useGateLayers`).
+     * Whether a drag pressed at a point should go to another layer rather than draw a selection: a
+     * gate label there, which drags to move (see `useGateLayers`). Null for none.
      */
-    yieldDragRef: { current: boolean };
+    yieldDragRef: { current: ((point: [number, number], viewport: Viewport) => boolean) | null };
 };
 export type MeasureState = {
     startPixels: P;
@@ -147,7 +148,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(() => new RectangleMode());
     const [selectedTool, setSelectedTool] = useState<Tool>("Rectangle");
     const [editingGateId, setEditingGateId] = useState<string | null>(null);
-    const yieldDragRef = useRef(false);
+    const yieldDragRef = useRef<RangeState["yieldDragRef"]["current"]>(null);
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
     const is3d = chart.config.dimension === "3d";
@@ -271,7 +272,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection,
             mode: selectionMode,
-            yieldDrag: () => yieldDragRef.current,
+            yieldDrag: (point, viewport) => yieldDragRef.current?.(point, viewport) ?? false,
             coordinateSystem: SELECTION_COORDINATE_SYSTEM,
             getFillColor,
             getLineColor,
