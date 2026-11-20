@@ -1,11 +1,14 @@
 import { Button, Typography } from "@mui/material";
 import { observer } from "mobx-react-lite";
 
+import { isInsideIsolatedGroup } from "@/react/spatialdata/blend_modes";
 import {
     type CompositingProps,
     DEFAULT_COMPOSITING,
     useRenderStackEntry,
 } from "@/react/spatialdata/render_stack_control";
+import { useConfig } from "../../hooks";
+import type { SpatialDataMdvReactConfig } from "../SpatialDataMDVReact";
 import CompositingControls from "./CompositingControls";
 
 /** A layer group: how its layers are composited, and taking them back out of it. */
@@ -16,8 +19,9 @@ const GroupLayerPanel = observer(function GroupLayerPanel({
     entryId: string;
     onUngroup: (entryId: string) => void;
 }) {
+    const config = useConfig<SpatialDataMdvReactConfig>();
     const { entry, patchProps } = useRenderStackEntry(entryId);
-    if (entry?.kind !== "group") return null;
+    if (entry?.kind !== "group" || !config.renderStack) return null;
     const value: CompositingProps = {
         opacity: entry.props.opacity ?? DEFAULT_COMPOSITING.opacity,
         blendMode: entry.props.blendMode ?? DEFAULT_COMPOSITING.blendMode,
@@ -30,7 +34,11 @@ const GroupLayerPanel = observer(function GroupLayerPanel({
                     ? "Empty. Drag layers onto it in the list above to add them."
                     : `${entry.children.length} ${entry.children.length === 1 ? "layer" : "layers"}. Drag layers in or out in the list above; drag sideways to change how deep they sit.`}
             </Typography>
-            <CompositingControls value={value} onChange={(patch) => patchProps(patch)} />
+            <CompositingControls
+                value={value}
+                onChange={(patch) => patchProps(patch)}
+                insideIsolatedGroup={isInsideIsolatedGroup(config.renderStack, entryId)}
+            />
             <div>
                 <Button size="small" variant="outlined" onClick={() => onUngroup(entryId)}>
                     Ungroup
