@@ -114,7 +114,7 @@ describe("DebugJsonDialogComponent", () => {
 
         render(<DebugJsonDialogComponent json={{ chartTypes: [] }} showValidationSection />);
 
-        fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+        fireEvent.click(screen.getByRole("button", { name: "Clear", hidden: true }));
 
         expect(store.hasAny).toBe(false);
     });
