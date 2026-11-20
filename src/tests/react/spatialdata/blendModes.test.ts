@@ -157,4 +157,23 @@ describe("applyIsolatedGroupFix", () => {
         collect(sublayers);
         expect(ids).toEqual(["outer/image", `outer/shapes${BLEND_WRAPPER_SUFFIX}`, "outer-composite"]);
     });
+
+    test("never gives the wrapper a sibling's id", () => {
+        applyIsolatedGroupFix();
+        const wrapper = new IsolatedGroupLayer({
+            id: "shapes",
+            layers: [new ScatterplotLayer({ id: "shapes", data: [] })],
+            blendMode: "multiply",
+        });
+        const sibling = new ScatterplotLayer({ id: "shapes-blend", data: [] });
+        const outer = new IsolatedGroupLayer({ id: "outer", layers: [sibling, wrapper] });
+        const ids: unknown[] = [];
+        const collect = (item: unknown): void => {
+            if (Array.isArray(item)) item.forEach(collect);
+            else if (item) ids.push(Reflect.get(Object(item), "id"));
+        };
+        collect(outer.renderLayers());
+        expect(ids).toEqual(["outer/shapes-blend", "outer/shapes-blend-2", "outer-composite"]);
+        expect(new Set(ids).size).toBe(ids.length);
+    });
 });

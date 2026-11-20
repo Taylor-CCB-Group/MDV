@@ -14,7 +14,8 @@ import { IsolatedGroupLayer } from "@spatialdata/layers";
  * only member ids, so it sees no change of contents either. It happened to draw correctly in
  * testing; this keeps it from depending on that.
  *
- * The fix gives such a wrapper a sublayer id of its own (`<scoped id>-blend`: `-` keeps
+ * The fix gives such a wrapper a sublayer id of its own (`<scoped id>-blend`, numbered on if a
+ * sibling already has that id; the `-` keeps
  * `entryForLabel` attributing its labels to the entry), and treats a member that changes
  * class as a change of contents. Picks are unaffected: the wrapper, innermost, records the
  * member's own id. Remove once sd.js scopes the wrapper's id itself.
@@ -63,11 +64,17 @@ export function applyIsolatedGroupFix(): void {
     const updateState = proto.updateState;
     proto.renderLayers = function (this: IsolatedGroupLayer): LayersList {
         const scope = memberScope(this.props.id);
-        return flatten(renderLayers.call(this)).map((sublayer) =>
-            isBlendWrapper(sublayer, scope)
-                ? sublayer.clone({ id: `${sublayer.id}${BLEND_WRAPPER_SUFFIX}` })
-                : sublayer,
-        );
+        const sublayers = flatten(renderLayers.call(this));
+        // Never the id of another sublayer here (a sibling member could be called `<id>-blend`),
+        // or deck would hand that one's state over in just the way this fix is to avoid.
+        const taken = new Set(sublayers.map((sublayer) => sublayer.id));
+        return sublayers.map((sublayer) => {
+            if (!isBlendWrapper(sublayer, scope)) return sublayer;
+            let id = `${sublayer.id}${BLEND_WRAPPER_SUFFIX}`;
+            for (let n = 2; taken.has(id); n++) id = `${sublayer.id}${BLEND_WRAPPER_SUFFIX}-${n}`;
+            taken.add(id);
+            return sublayer.clone({ id });
+        });
     };
     proto.updateState = function (this: IsolatedGroupLayer, params: UpdateParameters<IsolatedGroupLayer>): void {
         updateState.call(this, params);

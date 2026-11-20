@@ -54,30 +54,40 @@ function useStoreRead(url: string) {
     return useSyncExternalStore(reader.subscribe, () => reader.peek(url)?.state);
 }
 
+/**
+ * `assessIssues()` for a store once it is read, and a retry for when that fails: the store
+ * read stays as it is, only the assessment runs again.
+ */
 function useStoreIssues(spatialData: SpatialData | null) {
-    const [result, setResult] = useState<{ spatialData: SpatialData; issues: StoreIssue[] | Error }>();
+    const [attempt, setAttempt] = useState(0);
+    const [result, setResult] = useState<{ spatialData: SpatialData; attempt: number; issues: StoreIssue[] | Error }>();
     useEffect(() => {
         if (!spatialData) return;
         let cancelled = false;
         spatialData.assessIssues().then(
             (issues) => {
-                if (!cancelled) setResult({ spatialData, issues: [...issues] });
+                if (!cancelled) setResult({ spatialData, attempt, issues: [...issues] });
             },
             (error) => {
                 if (!cancelled)
-                    setResult({ spatialData, issues: error instanceof Error ? error : new Error(String(error)) });
+                    setResult({
+                        spatialData,
+                        attempt,
+                        issues: error instanceof Error ? error : new Error(String(error)),
+                    });
             },
         );
         return () => {
             cancelled = true;
         };
-    }, [spatialData]);
-    return result && result.spatialData === spatialData ? result.issues : undefined;
+    }, [spatialData, attempt]);
+    const current = result && result.spatialData === spatialData && result.attempt === attempt;
+    return { issues: current ? result.issues : undefined, retry: () => setAttempt((n) => n + 1) };
 }
 
 function StoreQuality({ url, dataSources }: { url: string; dataSources: string[] }) {
     const state = useStoreRead(url);
-    const issues = useStoreIssues(state?.spatialData ?? null);
+    const { issues, retry: retryCheck } = useStoreIssues(state?.spatialData ?? null);
     const reader = sharedSpatialDataReader();
     return (
         <section className="grid gap-1">
@@ -94,7 +104,7 @@ function StoreQuality({ url, dataSources }: { url: string; dataSources: string[]
                     <Typography variant="body2" color="text.secondary">
                         Not opened by any chart yet.
                     </Typography>
-                    <Button size="small" variant="outlined" onClick={() => reader.read(url)}>
+                    <Button size="small" variant="outlined" onClick={() => reader.open(url)}>
                         Check
                     </Button>
                 </div>
@@ -112,9 +122,14 @@ function StoreQuality({ url, dataSources }: { url: string; dataSources: string[]
                     Checking…
                 </Typography>
             ) : issues instanceof Error ? (
-                <Typography variant="body2" color="error">
-                    Could not check the store: {issues.message}
-                </Typography>
+                <div className="flex items-center gap-2">
+                    <Typography variant="body2" color="error">
+                        Could not check the store: {issues.message}
+                    </Typography>
+                    <Button size="small" variant="outlined" onClick={retryCheck}>
+                        Retry
+                    </Button>
+                </div>
             ) : issues.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                     No issues found.

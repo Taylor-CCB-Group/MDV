@@ -36,6 +36,7 @@ const SpatialStatusPanel = observer(function SpatialStatusPanel({ chart }: { cha
             url: window.location.href,
             failures: failures.map(({ name, failure }) => ({ name, failure })),
             canvasErrors,
+            loadErrors: failedToLoad.map(({ name, status }) => ({ name, errors: status.errors })),
             trace: webgpuTraceReport(),
         });
         try {
