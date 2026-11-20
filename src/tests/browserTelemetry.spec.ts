@@ -54,6 +54,22 @@ describe("startBrowserTelemetry", () => {
         expect(config.sessionTracking).toEqual({ samplingRate: 0.5 });
     });
 
+    it("sends timings recorded while Faro was still starting", async () => {
+        serverSays({ enabled: true, app_name: "mdv-test-browser", sample_rate: 1 });
+        const pushMeasurement = vi.fn();
+        initializeFaro.mockReturnValueOnce({ api: { pushMeasurement } });
+        const { recordBrowserTiming, startBrowserTelemetry } = await import("@/utils/browserTelemetry");
+
+        const starting = startBrowserTelemetry();
+        recordBrowserTiming("mdv_spatial_first_load", { duration_ms: 420 }, { chart: "c1" });
+        await starting;
+
+        expect(pushMeasurement).toHaveBeenCalledWith(
+            { type: "mdv_spatial_first_load", values: { duration_ms: 420 } },
+            { context: { chart: "c1" } },
+        );
+    });
+
     it("never starts when the API is on another origin", async () => {
         window.history.replaceState(null, "", "/?dir=https://elsewhere.example/project/1");
         const fetchMock = serverSays({ enabled: true, app_name: "x", sample_rate: 1 });

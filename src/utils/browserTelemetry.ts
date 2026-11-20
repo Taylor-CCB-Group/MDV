@@ -17,8 +17,15 @@ import { buildApiUrl } from "@/utils/mdvRouting";
 
 type TelemetryConfig = { enabled: false } | { enabled: true; app_name: string; sample_rate: number };
 
+type Timing = { type: string; values: Record<string, number>; context?: Record<string, string> };
+
 let started = false;
+let settled = false;
 let faro: Faro | null = null;
+// Timings recorded before startup has finished, such as a spatial chart that
+// loads while the config request is still out. Sent once Faro starts.
+const pending: Timing[] = [];
+const MAX_PENDING = 50;
 
 /**
  * Send a named timing, such as how long the spatial canvas took to load, as a Faro
@@ -26,7 +33,11 @@ let faro: Faro | null = null;
  * with `type=<type>`. Does nothing while browser telemetry is off.
  */
 export function recordBrowserTiming(type: string, values: Record<string, number>, context?: Record<string, string>) {
-    faro?.api.pushMeasurement({ type, values }, { context });
+    if (faro) {
+        faro.api.pushMeasurement({ type, values }, { context });
+    } else if (!settled && pending.length < MAX_PENDING) {
+        pending.push({ type, values, context });
+    }
 }
 
 export async function startBrowserTelemetry() {
@@ -55,8 +66,14 @@ export async function startBrowserTelemetry() {
             // MDV writes a lot to the console. Uncaught errors are still recorded.
             instrumentations: [...getWebInstrumentations({ captureConsole: false }), new TracingInstrumentation()],
         });
+        for (const { type, values, context } of pending) {
+            faro.api.pushMeasurement({ type, values }, { context });
+        }
     } catch (error) {
         // Telemetry must never get in the way of using MDV.
         console.warn("Browser telemetry did not start", error);
+    } finally {
+        settled = true;
+        pending.length = 0;
     }
 }
