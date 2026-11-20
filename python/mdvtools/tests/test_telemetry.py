@@ -32,7 +32,7 @@ def test_log_lines_carry_the_trace_id_only_when_there_is_one():
     assert formatter.format(_record()) == "hello"
 
 
-def test_an_exception_log_carries_the_trace_id_on_its_message_line():
+def test_every_line_of_an_exception_log_carries_the_trace_id():
     formatter = _Formatter(fmt="%(message)s")
     try:
         raise ValueError("bad file")
@@ -41,10 +41,11 @@ def test_an_exception_log_carries_the_trace_id_on_its_message_line():
 
         record = _record(trace_id="ab" * 16, exc_info=sys.exc_info())
 
-    first_line, *traceback_lines = formatter.format(record).splitlines()
+    lines = formatter.format(record).splitlines()
 
-    assert first_line == f"hello trace_id={'ab' * 16}"
-    assert traceback_lines[-1] == "ValueError: bad file"
+    assert lines[0] == f"hello trace_id={'ab' * 16}"
+    assert lines[-1] == f"ValueError: bad file trace_id={'ab' * 16}"
+    assert all(line.endswith(f" trace_id={'ab' * 16}") for line in lines)
 
 
 def test_log_records_get_the_current_trace_id():

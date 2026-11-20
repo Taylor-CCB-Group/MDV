@@ -14,10 +14,8 @@ class _Formatter(logging.Formatter):
         trace_id = getattr(record, "trace_id", "")
         if not trace_id:
             return text
-        # Docker splits a traceback into one log line per line, so the ID goes
-        # on the message line, where Grafana looks for it.
-        first, newline, rest = text.partition("\n")
-        return f"{first} trace_id={trace_id}{newline}{rest}"
+        # Docker sends each line of a traceback to Loki as its own entry.
+        return "\n".join(f"{line} trace_id={trace_id}" for line in text.split("\n"))
 
 
 def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
