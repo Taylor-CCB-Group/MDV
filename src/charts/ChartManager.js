@@ -233,7 +233,8 @@ export class ChartManager {
         //let's have a think. we may have websocket, but not chat...
         //we *do* anticipate finding out about chat with a similar mechanism (flag as part of state.json)
         //but websocket should be ubiquitous
-        if (config.websocket) {
+        // Chat is the only feature using the socket today, so don't open it (and keep it polling) without chat.
+        if (config.websocket && config.chat_enabled) {
             console.log("websocket is enabled");
             const fn = async () => {
                 // previously, we were always calling connectIPC - but it was only relevant to earlier experiment with Unity

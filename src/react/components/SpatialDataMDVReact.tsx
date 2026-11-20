@@ -30,6 +30,8 @@ import { getDensitySettings } from "../contour_state";
 import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
 import { createVivStores, type VivContextType } from "./avivatorish/state";
 import { BaseReactChart } from "./BaseReactChart";
+import { getDensityGridSettingsFolder } from "./densityGridSettings";
+import { getCrosshairSetting } from "./pointerCrosshair";
 import type { ElementIssues } from "./RasterIssues";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
@@ -67,6 +69,8 @@ function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataS
     // Must exist before makeAutoObservable(config) for later changes to be observed, and
     // survive initialiseChartConfig's JSON copy, so null rather than undefined.
     config.render_backend = config.render_backend ?? null;
+    config.grid = config.grid ?? null;
+    config.crosshair = config.crosshair ?? null;
     config.param = [...dataStore.regions.position_fields];
     if (typeof config.contourParameter === "string") {
         const column = dataStore.columnIndex[config.contourParameter];
@@ -350,6 +354,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 current_value: "Edit layers and data display…",
                 func: () => this.openLayerDialog(),
             }),
+            getCrosshairSetting(config),
+            getDensityGridSettingsFolder(config),
             g({
                 type: "dropdown",
                 label: `SpatialData (${dataStore.getColumnName(dataStore.regions?.region_field)})`,
@@ -417,6 +423,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         }
         // null only exists to keep the key observable; leave it out of saved views
         if (config.render_backend === null) config.render_backend = undefined;
+        if (config.grid === null) config.grid = undefined;
+        if (config.crosshair === null) config.crosshair = undefined;
         return config;
     }
 }

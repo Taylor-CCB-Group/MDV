@@ -1,0 +1,30 @@
+/*
+ * The pointer's position, marked with a horizontal and a vertical line (see pointerCrosshair.ts).
+ * The position is an offset from the centre of the area the lines are in, set on an ancestor, so
+ * the cells of a grid, which share a view centred in each, all mark the same point.
+ */
+.mdv-crosshair {
+    position: absolute;
+    z-index: 5;
+    display: none;
+    pointer-events: none;
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.35);
+}
+[data-crosshair="on"] .mdv-crosshair {
+    display: block;
+}
+/* the line at the pointer's x */
+.mdv-crosshair[data-axis="x"] {
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    left: calc(50% + var(--mdv-crosshair-dx, 0px));
+}
+/* the line at the pointer's y */
+.mdv-crosshair[data-axis="y"] {
+    left: 0;
+    right: 0;
+    height: 1px;
+    top: calc(50% + var(--mdv-crosshair-dy, 0px));
+}

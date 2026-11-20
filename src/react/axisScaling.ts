@@ -81,8 +81,31 @@ export function serialisableZoom(viewState: ZoomState, scaling: AxisScaling) {
 export function deckRadiusForClassicRadius(classicRadius: number, size: [number, number]) {
     const plotSide = Math.min(...size);
     // at the fitted view a deck radius of r is about r / 10000 * 2^-FIT_PADDING_ZOOM * plotSide pixels
-    const total = ((classicRadius / 2) * 10000) / (2 ** -FIT_PADDING_ZOOM * plotSide);
+    return deckRadiusSetting(((classicRadius / 2) * 10000) / (2 ** -FIT_PADDING_ZOOM * plotSide));
+}
+
+/**
+ * The deck setting that draws points `pixelRadius` pixels across where a data unit is `pixelsPerUnit`
+ * pixels, for data whose larger x / y range (what the deck chart sizes points by, with `equal`
+ * scaling) is `referenceRange`.
+ */
+export function deckRadiusForPixelRadius(pixelRadius: number, pixelsPerUnit: number, referenceRange: number) {
+    return deckRadiusSetting((pixelRadius * 10000) / (referenceRange * pixelsPerUnit));
+}
+
+/**
+ * The data range that a 3D chart's point radius is proportional to: the largest of its x, y and z
+ * ranges, so data that only varies along one axis still has points of a size.
+ */
+export function radiusReferenceRange3D(ranges: readonly number[]) {
+    return Math.max(...ranges.map(Math.abs));
+}
+
+/** `radius * course_radius` as the two settings. The slider tops out at 20, so larger values use `course_radius`. */
+function deckRadiusSetting(total: number) {
     if (!(total > 0) || !Number.isFinite(total)) return undefined;
     if (total <= 20) return { radius: Math.round(total * 10) / 10, course_radius: 1 };
-    return { radius: Math.round(total) / 10, course_radius: 10 };
+    if (total <= 200) return { radius: Math.round(total) / 10, course_radius: 10 };
+    // past what the slider shows, as larger classic sizes always were; the size is what matters
+    return { radius: Math.round(total / 10) / 10, course_radius: 100 };
 }

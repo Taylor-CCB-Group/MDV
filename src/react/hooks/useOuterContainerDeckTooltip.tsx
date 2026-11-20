@@ -3,7 +3,7 @@ import { type RefObject, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOuterContainer } from "../screen_state";
 
-type TooltipContent =
+export type TooltipContent =
     | null
     | string
     | {
@@ -40,7 +40,8 @@ function renderTooltipContent(content: Exclude<TooltipContent, null>) {
 
 export function useOuterContainerDeckTooltip(
     getTooltipContent: (info: PickingInfo) => TooltipContent | undefined,
-    anchorRef: RefObject<HTMLElement | null>,
+    /** What `info.x` / `info.y` are relative to: the deck's canvas, or for a deck with several, the one picked in. */
+    anchor: RefObject<HTMLElement | null> | ((info: PickingInfo) => HTMLElement | null | undefined),
 ) {
     const outerContainer = useOuterContainer();
     const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -87,13 +88,14 @@ export function useOuterContainerDeckTooltip(
                 return null;
             }
 
-            const anchorRect = anchorRef.current?.getBoundingClientRect();
+            const anchorElement = typeof anchor === "function" ? anchor(info) : anchor.current;
+            const anchorRect = anchorElement?.getBoundingClientRect();
             const x = (anchorRect?.left ?? 0) + info.x + TOOLTIP_OFFSET;
             const y = (anchorRect?.top ?? 0) + info.y + TOOLTIP_OFFSET;
             setTooltip({ content, x, y });
             return null;
         },
-        [anchorRef, clearTooltip, getTooltipContent, suppressed],
+        [anchor, clearTooltip, getTooltipContent, suppressed],
     );
 
     const tooltipPortal = tooltip
