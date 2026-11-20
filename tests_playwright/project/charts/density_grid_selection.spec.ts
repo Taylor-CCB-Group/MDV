@@ -161,8 +161,10 @@ test.describe("Density grid", () => {
                 .poll(async () => await cellCanvases.first().evaluate((canvas: HTMLCanvasElement) => canvas.width))
                 .toBeGreaterThan(50);
 
-            // the toolbar starts collapsed to the active tool, Rectangle, as a plain drag draws in this browser
-            await expect(scope.locator('button[aria-label="Rectangle"]')).toBeVisible();
+            // a plain drag draws in this browser, so cells start with Rectangle, and the collapsed
+            // toolbar offers the other tool, Pan
+            await expect(scope.locator('button[aria-label="Pan"]')).toBeVisible();
+            await expect(scope.locator('button[aria-label="Rectangle"]')).toHaveCount(0);
             await scope.locator('button[aria-label="Show tools"]').click();
             // the last cell is in another row and column (a 2 x 2 grid at this size)
             const last = fields.length - 1;

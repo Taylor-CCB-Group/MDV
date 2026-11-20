@@ -57,6 +57,8 @@ export type RangeState = {
     setSelectionMode: (mode: GeoJsonEditMode) => void;
     selectedTool: Tool;
     setSelectedTool: (tool: Tool) => void;
+    /** The drawing tool (Rectangle, Freehand or Polygon) last chosen, which the toolbar offers to switch back to. */
+    lastDrawTool: Tool;
     modelMatrix: Matrix4;
     /**
      * Whether a drag pressed at a point should go to another layer rather than draw a selection: a
@@ -97,6 +99,9 @@ function useSelectionCoords(selection: SimpleFeatureCollection) {
     }, [feature]);
     return coords as [number, number][];
 }
+
+/** The tools that draw a selection, as opposed to moving the view (Pan) or editing one (Modify). */
+const DRAW_TOOLS: readonly Tool[] = ["Rectangle", "Freehand", "Polygon"];
 
 /** The tool a chart starts with (see `chartDragSetting`): Pan moves the view, Rectangle draws. */
 function defaultTool(): Tool {
@@ -164,9 +169,11 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(() => defaultToolMode());
     const [selectedTool, setSelectedToolState] = useState<Tool>(() => defaultTool());
     const toolPicked = useRef(false);
+    const [lastDrawTool, setLastDrawTool] = useState<Tool>("Rectangle");
     const setSelectedTool = useCallback((tool: Tool) => {
         toolPicked.current = true;
         setSelectedToolState(tool);
+        if (DRAW_TOOLS.includes(tool)) setLastDrawTool(tool);
     }, []);
     // a chart whose tool nobody has picked follows the setting when it changes (as when it is first chosen)
     useEffect(
@@ -360,6 +367,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         setEditingGateId,
         selectedTool,
         setSelectedTool,
+        lastDrawTool,
     };
 }
 function useCreateMeasure() {

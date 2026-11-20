@@ -69,9 +69,11 @@ type ToolButtonProps = {
     ToolIcon: ToolIcon;
     selectedTool: Tool;
     setSelectedTool: (tool: Tool) => void;
+    /** Defaults to the tool's name. */
+    tooltipText?: string;
 };
 
-const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButtonProps) => {
+const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool, tooltipText }: ToolButtonProps) => {
     const theme = useTheme();
     const selectedBackgroundColor = theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(48, 46, 46, 0.18)";
     const style = useMemo(
@@ -85,7 +87,7 @@ const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: 
     );
     return (
         <IconWithTooltip
-            tooltipText={name}
+            tooltipText={tooltipText ?? name}
             onClick={() => setSelectedTool(name)}
             iconButtonProps={{
                 sx: style,
@@ -118,11 +120,13 @@ export default observer(function SelectionOverlay() {
         setSelectionFeatureCollection,
         selectedTool,
         setSelectedTool: setSelectedToolX,
+        lastDrawTool,
     } = selectionProps;
     const [cx, cy] = useParamColumns();
 
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
-    // the toolbar starts collapsed to the active tool, so it covers less of the plot
+    // the toolbar starts collapsed to one button that switches between Pan and the last drawing
+    // tool, so it covers less of the plot and either is a click away
     const [expanded, setExpanded] = useState(false);
     // editing a gate needs the edit tools in view
     const showAllTools = expanded || editingGateId != null;
@@ -178,8 +182,23 @@ export default observer(function SelectionOverlay() {
     // It would be good to have a poly-line tool with draggable points, though.
     // Also a brush tool for painting on masks with variable radius.
     const toolButtons = useMemo(() => {
-        const tools = showAllTools ? toolsToShow : toolsToShow.filter((t) => t.name === selectedTool);
-        return tools.map(({ name, ToolIcon }) => (
+        if (!showAllTools) {
+            // collapsed: one button that switches between moving the view and the last drawing tool
+            const other = toolsToShow.find((t) => t.name === (selectedTool === "Pan" ? lastDrawTool : "Pan"));
+            if (!other) return [];
+            const tooltipText = other.name === "Pan" ? "Move the view" : `Select with ${other.name}`;
+            return [
+                <ToolButton
+                    key={other.name}
+                    name={other.name}
+                    ToolIcon={other.ToolIcon}
+                    selectedTool={selectedTool}
+                    setSelectedTool={setSelectedTool}
+                    tooltipText={tooltipText}
+                />,
+            ];
+        }
+        return toolsToShow.map(({ name, ToolIcon }) => (
             <ToolButton
                 key={name}
                 name={name}
@@ -188,7 +207,7 @@ export default observer(function SelectionOverlay() {
                 setSelectedTool={setSelectedTool}
             />
         ));
-    }, [selectedTool, setSelectedTool, toolsToShow, showAllTools]);
+    }, [selectedTool, setSelectedTool, toolsToShow, showAllTools, lastDrawTool]);
 
     const onManageGatesClick = useCallback(() => {
         if (manageGateByChartRef.current.get(chartId)) {

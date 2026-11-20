@@ -82,7 +82,7 @@ function chartScope(ui: Page, id: string): Locator {
     return ui.locator(`[${CHART_ATTR}="${id}"]`);
 }
 
-/** The selection toolbar, which starts collapsed to the active tool. */
+/** The selection toolbar, which starts collapsed to one button that switches to the other tool. */
 function toolbar(ui: Page, id: string): Locator {
     return chartScope(ui, id).getByRole("group", { name: "choose tool for manipulating view or selection" });
 }
@@ -535,11 +535,15 @@ test.describe("Scatter selection tools", () => {
                 await dragWith(page, at(box, 0.3, 0.3), at(box, 0.45, 0.4));
                 await expect.poll(async () => (await readState(page, id)).viewState?.target).not.toEqual(start.target);
                 expect((await readState(page, id)).rings).toHaveLength(0);
+                // collapsed, the toolbar offers drawing as the other tool
+                await expect(toolbar(page, id).locator('button[aria-label="Rectangle"]')).toBeVisible();
                 const choice = chartScope(page, id).getByRole("dialog", { name: "What dragging does on charts" });
                 await expect(choice).toBeVisible();
                 await choice.getByRole("button", { name: "Draw a selection" }).click();
                 await expect(choice).toBeHidden();
                 expect(await page.evaluate(() => localStorage.getItem("mdv.settings.chartDrag"))).toBe("select");
+                // the chart now draws, and its toolbar offers moving the view instead
+                await expect(toolbar(page, id).locator('button[aria-label="Pan"]')).toBeVisible();
                 start = await waitForViewState(page, id);
             });
 
