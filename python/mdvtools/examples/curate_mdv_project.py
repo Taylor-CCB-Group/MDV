@@ -330,6 +330,24 @@ def present_names(table: dict[str, Any], wanted: list[str]) -> list[str]:
     return [name for name in wanted if name in available]
 
 
+def column_names(table: dict[str, Any]) -> set[str]:
+    column = next((item for item in table.get("columns", []) if item.get("field") == NAME_FIELD), None)
+    if column is None:
+        return set()
+    return set(text_column_values(column))
+
+
+def stored_name(available: set[str], wanted: str) -> str | None:
+    """Return the stored spelling, treating a hyphen and an underscore as the same."""
+    folded = {name.casefold(): name for name in available}
+    spellings = [wanted, wanted.replace("_", "-"), wanted.replace("-", "_")]
+    for spelling in dict.fromkeys(spellings):
+        found = folded.get(spelling.casefold())
+        if found is not None:
+            return found
+    return None
+
+
 def preferred_values(values: list[str], preferred: list[str], limit: int) -> list[str]:
     chosen = [value for value in preferred if value in values]
     if chosen:
@@ -661,14 +679,26 @@ def plan_question_views(
     protein_failed = False
     if protein_tables and dot_field:
         protein_name, protein_subgroup, protein_table = protein_tables[0]
-        pairs = [
-            (gene, protein)
-            for gene, protein in Q3_MATCHING
-            if gene in fields and protein in set(present_names(protein_table, [protein]))
-        ]
+        pairs = []
+        missing_genes: list[str] = []
+        for gene, protein in Q3_MATCHING:
+            stored = stored_name(column_names(protein_table), protein)
+            if stored is None or not present_names(gene_table, [gene]):
+                continue
+            pairs.append((gene, stored))
+            if gene not in fields:
+                missing_genes.append(gene)
         if pairs:
             try:
                 with h5py.File(project / "datafile.h5", "r") as handle:
+                    if missing_genes:
+                        fields.update(
+                            resolve_feature_fields(
+                                handle,
+                                datasources,
+                                LinkedFeatures(gene_name, subgroup, missing_genes),
+                            )
+                        )
                     resolve_feature_fields(
                         handle,
                         datasources,
@@ -679,6 +709,8 @@ def plan_question_views(
                 skipped.append({"question": PROTEIN_VIEW_NAME, "reason": f"could not read protein rows: {exc}"})
                 protein_failed = True
                 pairs = []
+            else:
+                pairs = [(gene, protein) for gene, protein in pairs if gene in fields]
             require_same_h5(before, h5_stamp(project), "Reading")
         if pairs and umap_x and umap_y and group_field:
             one_protein = feature_query(LinkedFeatures(protein_name, protein_subgroup, [pairs[0][1]]), 1)

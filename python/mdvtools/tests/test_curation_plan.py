@@ -11,6 +11,7 @@ from mdvtools.examples.curate_mdv_project import (
     opening_names,
     plan_question_views,
     split_category_values,
+    stored_name,
 )
 from mdvtools.examples.rename_softdelete_mdv_project_fields import (
     apply_plan,
@@ -151,6 +152,14 @@ def test_derm_and_taurus_column_names_get_roles():
     assert column_role({"name": "Biopsy Site"}) == "tissue"
     assert column_role({"name": "Remission Status"}) == "response"
     assert column_role({"name": "Major Cell Type"}) == "cell_type"
+
+
+def test_protein_names_match_hyphen_or_underscore():
+    available = {"adt-CD14", "adt-CD1c", "adt-PD-L1"}
+    assert stored_name(available, "adt_CD14") == "adt-CD14"
+    assert stored_name(available, "adt_CD1c") == "adt-CD1c"
+    assert stored_name(available, "adt_PD-L1") == "adt-PD-L1"
+    assert stored_name(available, "adt_CD99") is None
 
 
 def test_signature_view_is_not_created(tmp_path):
