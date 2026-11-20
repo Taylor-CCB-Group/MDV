@@ -13,74 +13,96 @@ import {
 } from "@/react/spatialdata/blend_modes";
 import type { CompositingProps } from "@/react/spatialdata/render_stack_control";
 
-const NOT_ISOLATED =
-    "Drawn as Normal here: it acts on what is beneath it inside a group that is drawn as one layer (one with a blend mode, or isolated), and this is not in one.";
+/** Why a layer's mode or a mask does nothing where it is: said the same way everywhere. */
+export const ONLY_IN_ONE_LAYER_GROUP = "Only works inside a group drawn as one layer";
 
 /**
  * The options of a blend mode select: pass-through for groups, the colour modes, and the
- * compositing operators under a heading of their own. A MUI select takes its options as
- * direct children, so this returns an array rather than a fragment.
+ * masks under a heading of their own. A MUI select takes its options as direct children, so
+ * this returns an array rather than a fragment.
  */
-function blendModeOptions(modes: readonly RenderStackGroupBlendMode[], operators: boolean) {
+function blendModeOptions(modes: readonly RenderStackGroupBlendMode[], masks: boolean) {
     const items = modes.map((mode) => (
-        <MenuItem key={mode} value={mode}>
+        <MenuItem key={mode} value={mode} dense>
             {BLEND_MODE_LABELS[mode]}
         </MenuItem>
     ));
-    if (!operators) return items;
+    if (!masks) return items;
     return [
         ...items,
-        <ListSubheader key="operators">Masks (inside an isolated group)</ListSubheader>,
+        <ListSubheader key="masks">Masks</ListSubheader>,
         ...COMPOSITING_OPERATORS.map((mode) => (
-            <MenuItem key={mode} value={mode}>
+            <MenuItem key={mode} value={mode} dense>
                 {BLEND_MODE_LABELS[mode]}
             </MenuItem>
         )),
     ];
 }
 
+function Hint({ children, warn = false }: { children: string; warn?: boolean }) {
+    return (
+        <Typography variant="caption" color={warn ? "warning.main" : "text.secondary"} sx={{ display: "block" }}>
+            {children}
+        </Typography>
+    );
+}
+
+/** One plain line on what a group's settings do, or why they do nothing where it is. */
+export function groupCompositingHint(value: CompositingProps, insideOneLayerGroup: boolean | undefined) {
+    const mode = value.blendMode;
+    if (isCompositingOperator(mode)) {
+        return insideOneLayerGroup
+            ? { text: `Drawn as one layer, then masks what is below it in the outer group: ${blendModeEffect(mode)}.` }
+            : { text: `${ONLY_IN_ONE_LAYER_GROUP}; here it draws as Normal.`, warn: true };
+    }
+    if (mode !== "pass-through") return { text: `Drawn as one layer, then ${blendModeEffect(mode)}.` };
+    return value.isolate
+        ? { text: "Drawn as one layer, then over what is below it, so overlaps inside do not add up." }
+        : { text: "Each layer blends with what is below it on its own." };
+}
+
 /**
- * Opacity, blend mode and isolation for layers drawn together: a group, or the data
- * points. Any blend mode but pass-through draws the layers as one image first, so it
- * implies isolation.
+ * How a group, or the data points, are drawn over what is below them: blend mode, and whether
+ * they are drawn as one layer first (implied by any mode but pass-through). Opacity only where
+ * the row has no slider for it (the data points).
  */
 export default function CompositingControls({
     value,
     onChange,
-    insideIsolatedGroup,
+    insideOneLayerGroup,
+    showOpacity = false,
 }: {
     value: CompositingProps;
     onChange: (patch: Partial<CompositingProps>) => void;
-    /**
-     * Whether these layers sit inside an isolated group, where the compositing operators act.
-     * Leave out where they can never be (the data points), and the operators are not offered.
-     */
-    insideIsolatedGroup?: boolean;
+    /** Whether masks act here. Leave out where they never can (the data points) to not offer them. */
+    insideOneLayerGroup?: boolean;
+    showOpacity?: boolean;
 }) {
     const blended = value.blendMode !== "pass-through";
-    const operator = isCompositingOperator(value.blendMode);
-    const offerOperators = insideIsolatedGroup !== undefined || operator;
-    // several layer dialogs can be open in one document
+    const masks = insideOneLayerGroup !== undefined || isCompositingOperator(value.blendMode);
     const opacityLabelId = useId();
+    const hint = groupCompositingHint(value, insideOneLayerGroup);
     return (
-        <div className="grid gap-2">
-            <div>
-                <Typography variant="body2" id={opacityLabelId}>
-                    Opacity
-                </Typography>
-                <Slider
-                    size="small"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={value.opacity}
-                    aria-labelledby={opacityLabelId}
-                    valueLabelDisplay="auto"
-                    onChange={(_, next) => {
-                        if (typeof next === "number") onChange({ opacity: next });
-                    }}
-                />
-            </div>
+        <div className="grid gap-1">
+            {showOpacity && (
+                <div>
+                    <Typography variant="caption" id={opacityLabelId}>
+                        Opacity
+                    </Typography>
+                    <Slider
+                        size="small"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={value.opacity}
+                        aria-labelledby={opacityLabelId}
+                        valueLabelDisplay="auto"
+                        onChange={(_, next) => {
+                            if (typeof next === "number") onChange({ opacity: next });
+                        }}
+                    />
+                </div>
+            )}
             <TextField
                 select
                 size="small"
@@ -90,7 +112,7 @@ export default function CompositingControls({
                     if (isGroupBlendMode(e.target.value)) onChange({ blendMode: e.target.value });
                 }}
             >
-                {blendModeOptions(["pass-through", ...COLOR_BLEND_MODES], offerOperators)}
+                {blendModeOptions(["pass-through", ...COLOR_BLEND_MODES], masks)}
             </TextField>
             <FormControlLabel
                 control={
@@ -101,37 +123,35 @@ export default function CompositingControls({
                         onChange={(e) => onChange({ isolate: e.target.checked })}
                     />
                 }
-                label={<Typography variant="body2">Draw as one layer (isolate)</Typography>}
+                label={<Typography variant="body2">Draw as one layer</Typography>}
             />
-            <Typography variant="caption" color={operator && !insideIsolatedGroup ? "warning" : "text.secondary"}>
-                {operator
-                    ? insideIsolatedGroup
-                        ? `Drawn as one image, then composited in the group around it: ${blendModeEffect(value.blendMode)}.`
-                        : NOT_ISOLATED
-                    : blended
-                      ? "A blend mode draws these layers as one image, then blends it with what is below."
-                      : value.isolate
-                        ? "Drawn as one image first, so where layers overlap they don't add up; the opacity applies once."
-                        : "Each layer draws on its own, with this opacity applied to it; overlaps add up."}
-            </Typography>
+            <Hint warn={hint.warn}>{hint.text}</Hint>
         </div>
     );
 }
 
-/**
- * A layer's own blend mode: how it blends with the layers beneath it in its group. It acts
- * only inside an isolated group; elsewhere the layer draws normally, and this says so.
- */
+/** One plain line on what a layer's own mode does, or why it does nothing where it is. */
+export function layerBlendHint(value: RenderStackBlendMode, insideOneLayerGroup: boolean) {
+    if (!insideOneLayerGroup) {
+        return value === "normal"
+            ? { text: `${ONLY_IN_ONE_LAYER_GROUP}.` }
+            : { text: `${ONLY_IN_ONE_LAYER_GROUP}; here it draws as Normal.`, warn: true };
+    }
+    if (value === "normal") return { text: "Drawn over the layers below it in its group." };
+    return { text: `In its group, ${blendModeEffect(value)}.` };
+}
+
+/** A layer's own blend mode: how it blends with the layers below it in its group. */
 export function LayerBlendModeControl({
     value,
     onChange,
-    insideIsolatedGroup,
+    insideOneLayerGroup,
 }: {
     value: RenderStackBlendMode;
     onChange: (mode: RenderStackBlendMode) => void;
-    insideIsolatedGroup: boolean;
+    insideOneLayerGroup: boolean;
 }) {
-    const inactive = !insideIsolatedGroup && value !== "normal";
+    const hint = layerBlendHint(value, insideOneLayerGroup);
     return (
         <div className="grid gap-1">
             <TextField
@@ -145,15 +165,7 @@ export function LayerBlendModeControl({
             >
                 {blendModeOptions(COLOR_BLEND_MODES, true)}
             </TextField>
-            <Typography variant="caption" color={inactive ? "warning" : "text.secondary"}>
-                {inactive
-                    ? NOT_ISOLATED
-                    : !insideIsolatedGroup
-                      ? "Takes effect inside a group drawn as one layer: one with a blend mode, or isolated. Put this layer in such a group to blend it with the layers beneath it there."
-                      : value === "normal"
-                        ? "Drawn over the layers beneath it in its group."
-                        : `In its group: ${blendModeEffect(value)}.`}
-            </Typography>
+            <Hint warn={hint.warn}>{hint.text}</Hint>
         </div>
     );
 }

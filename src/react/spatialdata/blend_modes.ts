@@ -16,9 +16,9 @@ import { DATA_POINTS_GROUP_ID, deckHostLayerId } from "./host_overlay_ids";
  * How render-stack entries blend, as sd.js draws them (`renderStackToDeckLayers`, ADR 0007):
  *
  * - A group with any mode but pass-through, or with `isolate`, draws its layers into a target
- *   of its own and composites that onto what is beneath it, with its opacity and mode.
+ *   of its own and composites that onto what is below it, with its opacity and mode.
  * - A layer's own mode, and a group's compositing operator, act only inside such a group: they
- *   blend with what is beneath them *in that group*. Anywhere else they draw as normal.
+ *   blend with what is below them *in that group*. Anywhere else they draw as normal.
  */
 
 export const COLOR_BLEND_MODES = [
@@ -49,16 +49,16 @@ export const BLEND_MODE_LABELS: Record<RenderStackGroupBlendMode, string> = {
 /** What a mode does, with "this" for the layer or group it is set on. */
 const BLEND_MODE_EFFECTS: Record<RenderStackGroupBlendMode, string> = {
     "pass-through": "each layer drawn as if not grouped",
-    normal: "drawn over what is beneath",
-    multiply: "multiplied with what is beneath, which darkens it; white leaves it unchanged",
-    screen: "screened over what is beneath, which lightens it; black leaves it unchanged",
-    additive: "added to what is beneath",
-    max: "the lighter of this and what is beneath, per colour channel",
-    min: "the darker of this and what is beneath, per colour channel",
-    intersect: "what is beneath is kept only where this covers it",
-    "cut-out": "what is beneath is kept only where this does not cover it",
-    xor: "this and what is beneath are each kept only where the other is absent",
-    clip: "this is drawn only where something is beneath it",
+    normal: "drawn over what is below",
+    multiply: "multiplied with what is below, which darkens it; white leaves it unchanged",
+    screen: "screened over what is below, which lightens it; black leaves it unchanged",
+    additive: "added to what is below",
+    max: "the lighter of this and what is below, per colour channel",
+    min: "the darker of this and what is below, per colour channel",
+    intersect: "what is below is kept only where this covers it",
+    "cut-out": "what is below is kept only where this does not cover it",
+    xor: "this and what is below are each kept only where the other is absent",
+    clip: "this is drawn only where something is below it",
 };
 
 export function blendModeEffect(mode: RenderStackGroupBlendMode): string {
@@ -152,8 +152,7 @@ export type CompositingBadge = {
     inactive: boolean;
 };
 
-const NOT_ISOLATED_NOTE =
-    "Drawn as Normal here: it acts only inside a group with a blend mode, or one drawn as one layer.";
+const NOT_ISOLATED_NOTE = "only works inside a group drawn as one layer; here it draws as Normal";
 
 /**
  * How a layer list row shows an entry's compositing, when it is not the default: a group's
@@ -171,8 +170,8 @@ export function compositingBadge(stack: RenderStack, entry: RenderStackEntry): C
     return {
         label: BLEND_MODE_LABELS[mode],
         title: inactive
-            ? `Blend mode: ${BLEND_MODE_LABELS[mode]}. ${NOT_ISOLATED_NOTE}`
-            : `Blend mode: ${BLEND_MODE_LABELS[mode]}. In its group: ${blendModeEffect(mode)}.`,
+            ? `${BLEND_MODE_LABELS[mode]}: ${NOT_ISOLATED_NOTE}.`
+            : `${BLEND_MODE_LABELS[mode]}: in its group, ${blendModeEffect(mode)}.`,
         inactive,
     };
 }
@@ -181,15 +180,15 @@ function groupBadge(stack: RenderStack, group: RenderStackGroupEntry): Compositi
     const { blendMode, isolate } = resolveRenderStackGroupProps(group);
     if (blendMode === "pass-through") {
         return isolate
-            ? { label: "Isolated", title: "Drawn as one layer, then composited normally.", inactive: false }
+            ? { label: "One layer", title: "Drawn as one layer, then over what is below it.", inactive: false }
             : null;
     }
     const inactive = isGroupCompositingOperator(blendMode) && !isInsideIsolatedGroup(stack, group.id);
     return {
         label: BLEND_MODE_LABELS[blendMode],
         title: inactive
-            ? `Blend mode: ${BLEND_MODE_LABELS[blendMode]}. ${NOT_ISOLATED_NOTE}`
-            : `Drawn as one layer, then composited: ${blendModeEffect(blendMode)}.`,
+            ? `${BLEND_MODE_LABELS[blendMode]}: ${NOT_ISOLATED_NOTE}.`
+            : `${BLEND_MODE_LABELS[blendMode]}: drawn as one layer, then ${blendModeEffect(blendMode)}.`,
         inactive,
     };
 }

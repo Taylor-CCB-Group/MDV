@@ -80,7 +80,7 @@ describe("compositingBadge", () => {
     test("shows group modes, isolation and leaf modes, marking those drawn as normal", () => {
         const s = stack({ blendMode: "clip" });
         const [, outer, loose] = s.entries;
-        expect(compositingBadge(s, outer)).toMatchObject({ label: "Isolated", inactive: false });
+        expect(compositingBadge(s, outer)).toMatchObject({ label: "One layer", inactive: false });
         expect(compositingBadge(s, loose)).toMatchObject({ label: "Multiply", inactive: true });
         const mask =
             outer.kind === "group" && outer.children[1].kind === "group" ? outer.children[1].children[0] : loose;

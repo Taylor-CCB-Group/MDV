@@ -41,7 +41,6 @@ import { observer } from "mobx-react-lite";
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { dataQualityNotesSetting } from "@/lib/browserSettings";
-import { compositingBadge } from "@/react/spatialdata/blend_modes";
 import {
     DECK_OVERLAY_VISIBILITY_FOLLOWERS,
     type DeckOverlayId,
@@ -78,11 +77,11 @@ import { useConfig, useDataSources } from "../hooks";
 import EntryStatusDetails from "./EntryStatusDetails";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
+import { CompositingButton, hasCompositing } from "./spatialLayers/CompositingButton";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
 import GroupLayerPanel from "./spatialLayers/GroupLayerPanel";
 import ImageLayerPanel from "./spatialLayers/ImageLayerPanel";
 import LabelsLayerPanel from "./spatialLayers/LabelsLayerPanel";
-import LayerBlendModePanel from "./spatialLayers/LayerBlendModePanel";
 import PointsLayerPanel from "./spatialLayers/PointsLayerPanel";
 import ShapesLayerPanel from "./spatialLayers/ShapesLayerPanel";
 
@@ -398,7 +397,6 @@ const LayerTreeRow = observer(function LayerTreeRow({
     const layerOpacity = typeof entry.props.opacity === "number" ? entry.props.opacity : 1;
     const supportsOpacity = entry.kind === "spatial" || entry.kind === "group";
     const name = renderStackEntryDisplayName(entry, config.renderStack);
-    const badge = config.renderStack && compositingBadge(config.renderStack, entry);
 
     return (
         <div
@@ -492,16 +490,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
                     {name}
                 </Typography>
             )}
-            {badge && (
-                <Typography
-                    variant="caption"
-                    className={`flex-shrink-0 rounded border px-1 leading-4 select-none ${badge.inactive ? "border-dashed opacity-60" : "border-current"}`}
-                    color={badge.inactive ? "text.secondary" : "primary"}
-                    title={badge.title}
-                >
-                    {badge.label}
-                </Typography>
-            )}
+            {hasCompositing(entry.kind, entryId) && <CompositingButton entryId={entryId} name={name} />}
             {entry.kind === "group" && onAddInto && (
                 <IconButton
                     size="small"
@@ -971,7 +960,6 @@ const SpatialLayerDialogComponent = observer(() => {
                         <LayerFailureDetails entryId={selectedEntryId} />
                         <LayerStatusDetails entryId={selectedEntryId} />
                         <LayerDetails entryId={selectedEntryId} />
-                        <LayerBlendModePanel entryId={selectedEntryId} />
                         <GroupLayerPanel entryId={selectedEntryId} onUngroup={onUngroup} />
                     </ErrorBoundary>
                 ) : (

@@ -184,25 +184,31 @@ single view (`VivSpatialViewer`, given `useRenderStackStructure`) and in the den
 - **A group** has `opacity`, `blendMode` and `isolate`. Pass-through (the default) multiplies
   its opacity into each child. Any other mode, or `isolate`, draws the children into a
   target of their own (`IsolatedGroupLayer`) and composites that with the group's opacity
-  and mode. The group panel (`GroupLayerPanel`, `CompositingControls`) edits these in place.
-  Opacity and mode change layer inputs, so they bump `renderStackPropsGeneration`, never
+  and mode. Opacity is the row's slider; mode and "Draw as one layer" are in the row's
+  blending popover (below). Both are edited in place. Opacity and mode change layer inputs, so they bump `renderStackPropsGeneration`, never
   `renderStackGeneration`.
-- **A layer's own blend mode** (`props.blendMode` on a spatial entry; `LayerBlendModePanel`)
+- **A layer's own blend mode** (`props.blendMode` on a spatial entry)
   takes effect only inside an isolated group, at any depth. There sd.js draws the layer as a
-  one-member isolated group with that mode. Elsewhere it draws as normal, and the panel and
+  one-member isolated group with that mode. Elsewhere it draws as normal, and the popover and
   the row badge say so. `normal` is stored as no mode. The mode is placement, not
   appearance: only `useRenderStackStructure` carries it to the viewer, and
   `renderStackSpatialRevision` ignores it. So `setLeafBlendMode` writes it with no
   generation bump, and a change re-renders through the structure key alone. A capture
   with `perf.ts` shows two `adapter.sync` and no `shapes.loadRenderData` per change.
 - **Compositing operators** (`intersect`, `cut-out`, `xor`, `clip`) make a layer or group
-  a mask on what is beneath it *inside its isolated group*. A top-level group with one draws
-  as normal. The select lists them under their own heading and warns when they are inactive.
-- **Rows** show a group's or layer's non-default compositing as a badge
-  (`compositingBadge`); dashed means "saved, but drawn as normal here".
+  a mask on what is below it *inside its isolated group*. A top-level group with one draws
+  as normal. The select lists them under "Masks" and warns when they are inactive.
+- **Set from the layer list, not the properties pane** (`CompositingButton`). Each row that
+  can blend (SpatialData layers, groups, the data points) has one control: a faint icon
+  while the compositing is the default, or a badge naming it (`compositingBadge`; dashed
+  means "saved, but drawn as normal here"). Clicking it opens a small popover by the row
+  (`CompositingControls`), with one plain line on what the setting does. It is one element
+  whichever it shows, because the popover is anchored to it while a change turns the icon
+  into a badge.
 - **The data points** are composited through `group:data-points` (`setDataPointsCompositing`),
   which exists only while their compositing is not the default. It is always top-level, so
-  it does not offer the operators.
+  it does not offer the operators. Its popover also has opacity, as the data points row has
+  no slider.
 - **Runtime fix.** `isolated_group_fix.ts` gives a blended layer's one-member group a
   sublayer id of its own (`-blend`). sd.js gives the wrapper the layer's id, and deck 9.4
   transfers state between same-id sublayers whatever their class. Remove the fix once sd.js
