@@ -433,12 +433,7 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                 </DebugSection>
             )}
             {showDebugGroup && (
-                <DebugSection
-                    id="debug"
-                    title={DEBUG_GROUP_TITLE}
-                    defaultExpanded={showValidationSection && hasAnyFindings}
-                    {...sectionProps}
-                >
+                <DebugSection id="debug" title={DEBUG_GROUP_TITLE} {...sectionProps}>
                     {showReport && (
                         <DebugSection id="report" title="Report an issue or a bug" {...sectionProps}>
                             <Typography>
