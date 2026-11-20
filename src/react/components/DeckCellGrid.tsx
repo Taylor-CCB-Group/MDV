@@ -1,7 +1,7 @@
 import { Deck, type Layer, OrthographicView, type OrthographicViewState, type PickingInfo } from "@deck.gl/core";
 import type { Device } from "@luma.gl/core";
 import { applyWebGPUPickingFix, applyWebGPUPresentationAlphaFix } from "@spatialdata/layers";
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { syncEditableLayerEvents } from "@/lib/deckMonkeypatch";
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
 import type { UseChartArrayGridResult } from "../hooks/useChartArrayGrid";
@@ -153,9 +153,14 @@ export default function DeckCellGrid({
 
     /** Each cell's canvas, by view id. */
     const canvases = useRef(new Map<string, HTMLCanvasElement>());
+    // The deck gets the canvases when this renders, so a cell that replaces its canvas has to
+    // render it again; otherwise the deck keeps drawing to the old one, out of the page. A cell
+    // does so whenever its effect re-runs: under StrictMode, right after a backend switch.
+    const [, setCanvasesChanged] = useState(0);
     const onCanvas = useCallback((id: string, canvas: HTMLCanvasElement | null) => {
         if (canvas) canvases.current.set(id, canvas);
         else canvases.current.delete(id);
+        setCanvasesChanged((n) => n + 1);
     }, []);
     const deckHolder = useRef<{ deck: Deck<OrthographicView[]> | null }>({ deck: null });
     useRebindDeckEvents(deckHolder);
