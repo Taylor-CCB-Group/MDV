@@ -4,7 +4,7 @@ Status: plan (2026-11-20). Spread over several PRs; each one stands on its own. 
 
 ## Why
 
-`/project/20?view=MarkersQC` has 13 `multi_line_chart`s, one per marker, each with
+A marker QC view we have in use has 13 `multi_line_chart`s, one per marker, each with
 `param: ["zscore_clipped_<marker>", "sample_id"]` and identical settings
 (`scaletrim: "0.05"`, `band_width: 0.1`, `intervals: 100`). That is one chart with 13 values
 drawn as small multiples, which is what `grid: { by }` (#683) was made for. The same view also has
@@ -73,7 +73,7 @@ now "Multi Line Chart (Classic)", marked legacy, and converts to it (`legacyChar
 - Cells through `ChartArrayLayout` / `useChartArrayGrid`, which the density grid already uses
   and which already reports `visibleCellIndices`.
 - One category legend for the chart, not one per cell.
-- Acceptance: MarkersQC's 13 charts as one chart, matching the old ones by eye.
+- Acceptance: the marker QC view's 13 charts as one chart, matching the old ones by eye.
 
 ### 3. Take over `multi_line_chart` — #692
 
@@ -101,7 +101,7 @@ data, so labels, layout and x scales are ready at once. Cells without data show 
 ### 5. Column groups as a `values` source (#413)
 
 `DataStore.columnGroups` exists (and `ChooseColumnDialog` reads it) but nothing else uses it, and
-conversion rarely writes any (project 20 has none).
+conversion rarely writes any (the marker QC project above has none).
 
 - A `FieldSpec` variant naming a group, resolved live like `RowsAsColsQuery`, so `values` can be
   "the markers" and pick up columns added to the group.
