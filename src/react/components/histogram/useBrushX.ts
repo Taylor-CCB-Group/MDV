@@ -28,6 +28,11 @@ export type BrushXOptions = {
     layout: BrushXLayout;
     style?: BrushXStyle;
     updateOn?: "brush" | "end";
+    /**
+     * Put the brush beneath the SVG's other content rather than over it, so marks drawn over the
+     * brush area (such as lines with tooltips) still get pointer events.
+     */
+    below?: boolean;
 };
 
 export const createBrushScale = (scaleType: BrushXScaleType, domain: Range, range: Range) =>
@@ -50,6 +55,7 @@ export function useBrushX(
         handleFill = "rgba(15, 23, 42, 0.88)",
     } = options.style ?? {};
     const updateOn = options.updateOn ?? "brush";
+    const below = options.below ?? false;
 
     useEffect(() => {
         if (!ref.current || !minMax || !setValue) return;
@@ -82,7 +88,9 @@ export function useBrushX(
             });
 
         brushRef.current = brush;
-        const brushGroup = svg.append("g").attr("class", "brush").call(brush);
+        const brushGroup = (below ? svg.insert("g", ":first-child") : svg.append("g"))
+            .attr("class", "brush")
+            .call(brush);
         brushGroup
             .selectAll(".selection")
             .attr("fill", selectionFill)
@@ -108,6 +116,7 @@ export function useBrushX(
         selectionStroke,
         setValue,
         updateOn,
+        below,
         width,
         x,
         xScaleType,
@@ -123,14 +132,14 @@ export function useBrushX(
             const xScale = createBrushScale(xScaleType, minMax, [x, x + width]);
 
             if (!value) {
-                // @ts-ignore d3 brush typings are not worth fighting here
+                // @ts-expect-error d3 brush typings are not worth fighting here
                 svg.select(".brush").call(brushRef.current.move, null);
                 return;
             }
             const [start, end] = value;
             const x0 = xScale(start);
             const x1 = xScale(end);
-            // @ts-ignore d3 brush typings are not worth fighting here
+            // @ts-expect-error d3 brush typings are not worth fighting here
             svg.select(".brush").call(brushRef.current.move, [x0, x1]);
         },
         [minMax, ref, width, x, xScaleType],
