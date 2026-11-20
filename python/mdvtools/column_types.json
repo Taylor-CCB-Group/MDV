@@ -1,0 +1,73 @@
+{
+    "_generated_from": "src/datastore/columnTypes.ts; regenerate with `pnpm vitest -u src/tests/datastore/columnTypes.spec.ts`",
+    "storedTypes": [
+        "bool",
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "uint8",
+        "uint16",
+        "uint32",
+        "uint64",
+        "float32",
+        "float64",
+        "string",
+        "null_terminated_bytes"
+    ],
+    "encodings": [
+        "plain",
+        "categorical",
+        "multi_valued"
+    ],
+    "kinds": [
+        "numeric",
+        "categorical",
+        "unique",
+        "multi_valued"
+    ],
+    "datatypes": {
+        "integer": {
+            "storedType": "float32",
+            "encoding": "plain",
+            "kind": "numeric",
+            "rowWidth": "one"
+        },
+        "double": {
+            "storedType": "float32",
+            "encoding": "plain",
+            "kind": "numeric",
+            "rowWidth": "one"
+        },
+        "int32": {
+            "storedType": "int32",
+            "encoding": "plain",
+            "kind": "numeric",
+            "rowWidth": "one"
+        },
+        "text": {
+            "storedType": "uint8",
+            "encoding": "categorical",
+            "kind": "categorical",
+            "rowWidth": "one"
+        },
+        "text16": {
+            "storedType": "uint16",
+            "encoding": "categorical",
+            "kind": "categorical",
+            "rowWidth": "one"
+        },
+        "unique": {
+            "storedType": "null_terminated_bytes",
+            "encoding": "plain",
+            "kind": "unique",
+            "rowWidth": "stringLength"
+        },
+        "multitext": {
+            "storedType": "uint16",
+            "encoding": "multi_valued",
+            "kind": "multi_valued",
+            "rowWidth": "capacity"
+        }
+    }
+}

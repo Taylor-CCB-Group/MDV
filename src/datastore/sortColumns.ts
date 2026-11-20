@@ -1,5 +1,5 @@
 import type { DataType } from "@/charts/charts";
-import { getMultitextCapacity } from "@/lib/multitext";
+import { getColumnKind, getValuesPerRow, LEGACY_DATATYPES, type StorageArray, viewColumnStorage } from "./columnTypes";
 
 /** What `SortableDimension` sends the sort worker for each column it sorts by. */
 export type SortColumn = {
@@ -40,39 +40,33 @@ function getRowComparator(column: SortColumn): RowComparator {
     };
 }
 
-/** Which rows have no value: NaN in float32 columns. The other datatypes have no missing marker. */
+/** Which rows have no value: NaN in float32 columns. The other stored types have no missing marker. */
 function getMissingCheck(column: SortColumn): ((row: number) => boolean) | undefined {
-    if (column.datatype !== "integer" && column.datatype !== "double") return undefined;
-    const data = new Float32Array(column.buffer);
+    if (LEGACY_DATATYPES[column.datatype]?.storedType !== "float32") return undefined;
+    const data = viewColumnStorage(column.datatype, column.buffer);
     return (row) => Number.isNaN(data[row]);
 }
 
-// Typed arrays here must match how `DataStore.setColumnData` holds each datatype:
-// `integer` and `double` are both float32.
+// Views the buffer the way the DataStore holds it, per the column-type contract.
 function getAscendingComparator(column: SortColumn): RowComparator {
-    switch (column.datatype) {
-        case "integer":
-        case "double":
-            return getNumberComparator(new Float32Array(column.buffer));
-        case "int32":
-            return getNumberComparator(new Int32Array(column.buffer));
-        case "text":
-            return getTextComparator(new Uint8Array(column.buffer), column.values ?? []);
-        case "text16":
-            return getTextComparator(new Uint16Array(column.buffer), column.values ?? []);
+    const data = viewColumnStorage(column.datatype, column.buffer);
+    const kind = getColumnKind(column.datatype);
+    switch (kind) {
+        case "numeric":
+            return getNumberComparator(data);
+        case "categorical":
+            return getTextComparator(data, column.values ?? []);
         case "unique":
-            return getUniqueComparator(new Uint8Array(column.buffer), column.stringLength ?? 1);
-        case "multitext":
-            return getMultiTextComparator(
-                new Uint16Array(column.buffer),
-                column.values ?? [],
-                getMultitextCapacity(column),
-            );
+            return getUniqueComparator(data, getValuesPerRow(column));
+        case "multi_valued":
+            return getMultiTextComparator(data, column.values ?? [], getValuesPerRow(column));
+        default:
+            throw new Error(`Cannot sort column of unknown datatype '${column.datatype}'`);
     }
 }
 
 /** Missing (NaN) values never reach this: `getRowComparator` puts them last. */
-function getNumberComparator(data: Float32Array | Int32Array): RowComparator {
+function getNumberComparator(data: StorageArray): RowComparator {
     return (a, b) => (data[a] > data[b] ? 1 : data[a] < data[b] ? -1 : 0);
 }
 
@@ -91,12 +85,12 @@ function getValueRanks(values: string[]) {
     return ranks;
 }
 
-function getTextComparator(data: Uint8Array | Uint16Array, values: string[]): RowComparator {
+function getTextComparator(data: StorageArray, values: string[]): RowComparator {
     const ranks = getValueRanks(values);
     return (a, b) => ranks[data[a]] - ranks[data[b]];
 }
 
-function getUniqueComparator(data: Uint8Array, stringLength: number): RowComparator {
+function getUniqueComparator(data: StorageArray, stringLength: number): RowComparator {
     // a column of empty strings has width 0: every row is equal, and later columns break the tie
     if (stringLength <= 0) return () => 0;
     const decoder = new TextDecoder();
@@ -111,7 +105,7 @@ function getUniqueComparator(data: Uint8Array, stringLength: number): RowCompara
 }
 
 /** Compares item by item; a row that runs out of items first sorts first. */
-function getMultiTextComparator(data: Uint16Array, values: string[], capacity: number): RowComparator {
+function getMultiTextComparator(data: StorageArray, values: string[], capacity: number): RowComparator {
     const ranks = getValueRanks(values);
     const rank = (code: number) => (code === MULTITEXT_EMPTY ? -1 : ranks[code]);
     return (a, b) => {
