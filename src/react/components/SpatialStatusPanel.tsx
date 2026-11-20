@@ -3,7 +3,7 @@ import { observer } from "mobx-react-lite";
 import { type ReactNode, useState } from "react";
 import { formatRenderReport } from "@/react/spatialdata/render_report";
 import { webgpuTraceReport } from "@/react/spatialdata/webgpu_trace";
-import { RasterIssueList } from "./RasterIssues";
+import EntryStatusDetails from "./EntryStatusDetails";
 import type { SpatialDataMdvReact } from "./SpatialDataMDVReact";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -17,13 +17,16 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 /**
  * The chart's status, in its debug dialog (`getDebugPanel`): failed layers, render errors
- * that could not be tied to a layer, slow image data, and which renderer is in use. The
- * chart's menu pip (`statusPip`) points here.
+ * that could not be tied to a layer, what sd.js reports about each layer (load errors, and
+ * notices such as slow image data), and which renderer is in use. The chart's menu pip
+ * (`statusPip`) points here.
  */
 const SpatialStatusPanel = observer(function SpatialStatusPanel({ chart }: { chart: SpatialDataMdvReact }) {
     const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
-    const { failures, errorCount } = chart.renderStatus;
-    const { canvasErrors, rasterIssues, spatialDataUrl } = chart;
+    const { failures, statuses, errorCount } = chart.renderStatus;
+    const { canvasErrors, spatialDataUrl, retryEntry } = chart;
+    const failedToLoad = statuses.filter(({ status }) => status.errors.length > 0);
+    const withNotices = statuses.filter(({ status }) => status.notices.length > 0);
 
     const copyDetails = async () => {
         const report = formatRenderReport({
@@ -33,6 +36,7 @@ const SpatialStatusPanel = observer(function SpatialStatusPanel({ chart }: { cha
             url: window.location.href,
             failures: failures.map(({ name, failure }) => ({ name, failure })),
             canvasErrors,
+            loadErrors: failedToLoad.map(({ name, status }) => ({ name, errors: status.errors })),
             trace: webgpuTraceReport(),
         });
         try {
@@ -94,9 +98,27 @@ const SpatialStatusPanel = observer(function SpatialStatusPanel({ chart }: { cha
                     )}
                 </div>
             )}
-            {rasterIssues.length > 0 && (
-                <Section title="Slow image data">
-                    <RasterIssueList issues={rasterIssues} />
+            {failedToLoad.length > 0 && (
+                <Section title="Layers that could not load">
+                    {failedToLoad.map(({ entryId, status, name }) => (
+                        <div key={entryId}>
+                            <div className="font-medium">{name}</div>
+                            <EntryStatusDetails
+                                status={{ errors: status.errors, notices: [] }}
+                                onRetry={retryEntry && (() => void retryEntry(entryId))}
+                            />
+                        </div>
+                    ))}
+                </Section>
+            )}
+            {withNotices.length > 0 && (
+                <Section title="Layer notices">
+                    {withNotices.map(({ entryId, status, name }) => (
+                        <div key={entryId}>
+                            <div className="font-medium">{name}</div>
+                            <EntryStatusDetails status={{ errors: [], notices: status.notices }} />
+                        </div>
+                    ))}
                 </Section>
             )}
             <Section title="Renderer">
