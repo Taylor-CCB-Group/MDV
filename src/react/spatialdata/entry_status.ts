@@ -68,10 +68,3 @@ export function entryStatusForDisplay(
 export function entryStatusErrorKey(entryId: string, error: EntryStatusError): string {
     return `${entryId}\0${error.resource}\0${error.error.kind}\0${error.error.message}`;
 }
-
-/** Whether a status says the element is stored in a way that makes it slow. */
-export function hasLayoutIssues(status: EntryStatus): boolean {
-    return status.notices.some(
-        (notice) => notice.kind === "element-issues" && notice.issues.some((issue) => issue.kind !== "no-length-unit"),
-    );
-}

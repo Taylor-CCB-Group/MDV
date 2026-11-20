@@ -4,9 +4,9 @@ import { action, comparer, computed, makeObservable, observable, reaction } from
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
-import { elementPath, withoutDismissed } from "@/react/spatialdata/data_quality";
+import { splitStorageIssues } from "@/react/spatialdata/data_quality";
 import type { DeckBackend } from "@/react/spatialdata/deck_backend";
-import { entryStatusErrorKey, hasLayoutIssues } from "@/react/spatialdata/entry_status";
+import { entryStatusErrorKey } from "@/react/spatialdata/entry_status";
 import {
     DATA_POINTS_GROUP_ID,
     DECK_OVERLAY_VISIBILITY_FOLLOWERS,
@@ -23,7 +23,6 @@ import {
     syncOverlayFollowerVisibility,
 } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
-import { spatialDataUrlForRegion } from "@/react/spatialdata/shared_spatial_data";
 import { sharedSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import {
     type SpatialDataSerializableViewState,
@@ -231,20 +230,12 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
      */
     readonly spatialDataReader = sharedSpatialDataReader();
 
-    /** The URL the chart reads its store from: what data quality dismissals are keyed by. */
-    get spatialStoreUrl(): string | null {
-        return spatialDataUrlForRegion(this.dataStore.regions?.all_regions?.[this.config.region]);
-    }
-
     /**
-     * A layer's status without the notices dismissed for its element (`data_quality.ts`),
-     * and how many were. Errors always stay.
+     * A layer's status without its element's storage issues, which stay quiet outside
+     * Settings › Data quality (`data_quality.ts`), and those issues.
      */
     visibleEntryStatus(entryId: string) {
-        const stack = this.config.renderStack;
-        const entry = stack && findRenderStackEntry(stack, entryId);
-        const path = entry?.kind === "spatial" ? elementPath(entry.source.elementType, entry.source.elementKey) : null;
-        return withoutDismissed(this.entryStatuses.get(entryId), this.spatialStoreUrl, path);
+        return splitStorageIssues(this.entryStatuses.get(entryId));
     }
 
     /** The store the canvas is showing, for linking to it. Runtime only. */
@@ -268,7 +259,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             failure,
             name: nameOf(entryId),
         }));
-        // dismissed notices (Settings › Data quality) neither count nor show here
+        // storage issues are for Settings › Data quality: they neither count nor show here
         const statuses = [...this.entryStatuses.keys()].flatMap((entryId) => {
             const { status } = this.visibleEntryStatus(entryId);
             return status ? [{ entryId, status, name: nameOf(entryId) }] : [];
@@ -278,7 +269,6 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         const loadErrorCount = failedToLoad.filter(({ entryId, status }) =>
             status.errors.some((error) => !this.dismissedLoadErrors.has(entryStatusErrorKey(entryId, error))),
         ).length;
-        const slowData = statuses.some(({ status }) => hasLayoutIssues(status));
         const noticeCount = statuses.filter(({ status }) => status.notices.length > 0).length;
         const summary = [
             renderErrorCount > 0 && `${renderErrorCount} rendering ${renderErrorCount === 1 ? "problem" : "problems"}`,
@@ -287,8 +277,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 `${failures.length} ${failures.length === 1 ? "layer" : "layers"} turned off`,
             failedToLoad.length > 0 &&
                 `${failedToLoad.length} ${failedToLoad.length === 1 ? "layer" : "layers"} could not load`,
-            slowData && "slow image data",
-            !slowData && noticeCount > 0 && `${noticeCount} layer ${noticeCount === 1 ? "notice" : "notices"}`,
+            noticeCount > 0 && `${noticeCount} layer ${noticeCount === 1 ? "notice" : "notices"}`,
         ]
             .filter(Boolean)
             .join(" · ");

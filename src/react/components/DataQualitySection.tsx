@@ -3,22 +3,15 @@ import type { ElementIssue, SpatialData, StoreIssue } from "@spatialdata/core";
 import { observer } from "mobx-react-lite";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import {
-    dataQualityKey,
-    elementIssueId,
-    isDataQualityDismissed,
-    issuesByElement,
-    projectSpatialStores,
-    setDataQualityDismissed,
-} from "@/react/spatialdata/data_quality";
+import { elementIssueId, issuesByElement, projectSpatialStores } from "@/react/spatialdata/data_quality";
 import { describeElementIssue, remediesFor } from "@/react/spatialdata/entry_status";
 import { sharedSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import { useChartManager } from "../hooks";
 
 /**
  * Settings › Data quality: how each of the project's SpatialData stores is written, as sd.js
- * judges it (`SpatialData.assessIssues`), and what to do about it. Issues dismissed in a layer
- * dialog are listed too, marked, and can be shown there again.
+ * judges it (`SpatialData.assessIssues`), and what to do about it. The one place these are
+ * listed in full: the layer dialog notes them on a collapsed line at most (`data_quality.ts`).
  *
  * Stores are read through the page's shared reader. One a chart has already opened is listed
  * at once; any other waits for "Check", so opening Settings never starts reading a remote store.
@@ -127,7 +120,7 @@ function StoreQuality({ url, dataSources }: { url: string; dataSources: string[]
                     No issues found.
                 </Typography>
             ) : (
-                <StoreIssueList url={url} issues={issues} />
+                <StoreIssueList issues={issues} />
             )}
         </section>
     );
@@ -167,50 +160,16 @@ function issueRows(issues: readonly StoreIssue[]): IssueRow[] {
     return rows;
 }
 
-const StoreIssueList = observer(function StoreIssueList({ url, issues }: { url: string; issues: StoreIssue[] }) {
-    const rows = issueRows(issues);
+function StoreIssueList({ issues }: { issues: StoreIssue[] }) {
     return (
         <ul className="grid gap-2">
-            {rows.map((row) => {
-                // dismissed per element: a coordinate system's row can be dismissed for some of its elements
-                const dismissedPaths = row.paths.filter((path) =>
-                    isDataQualityDismissed(dataQualityKey(url, path, row.id)),
-                );
-                const all = dismissedPaths.length === row.paths.length;
-                const some = dismissedPaths.length > 0;
-                const setAll = (value: boolean) => {
-                    for (const path of row.paths) setDataQualityDismissed(dataQualityKey(url, path, row.id), value);
-                };
+            {issueRows(issues).map((row) => {
                 const grouped = row.paths.length > 1 || row.label !== row.paths[0];
                 return (
-                    <li key={`${row.label}:${row.id}`} className={`grid gap-0.5 ${all ? "opacity-60" : ""}`}>
-                        <div className="flex items-start gap-2">
-                            <Typography variant="body2" className="grow">
-                                <span className="font-medium">{row.label}</span>
-                                {all ? " (dismissed)" : some ? ` (dismissed for ${dismissedPaths.join(", ")})` : ""}:{" "}
-                                {describeElementIssue(row.issue)}
-                            </Typography>
-                            {!all && (
-                                <Button
-                                    size="small"
-                                    sx={{ flexShrink: 0 }}
-                                    onClick={() => setAll(true)}
-                                    title="Stop showing it in the layer dialog and the chart status, in this browser"
-                                >
-                                    Dismiss
-                                </Button>
-                            )}
-                            {some && (
-                                <Button
-                                    size="small"
-                                    sx={{ flexShrink: 0 }}
-                                    onClick={() => setAll(false)}
-                                    title="Show it in the layer dialog and the chart status again"
-                                >
-                                    Show again
-                                </Button>
-                            )}
-                        </div>
+                    <li key={`${row.label}:${row.id}`} className="grid gap-0.5">
+                        <Typography variant="body2">
+                            <span className="font-medium">{row.label}</span>: {describeElementIssue(row.issue)}
+                        </Typography>
                         {grouped && (
                             <Typography variant="caption" color="text.secondary">
                                 {row.paths.join(", ")}
@@ -224,4 +183,4 @@ const StoreIssueList = observer(function StoreIssueList({ url, issues }: { url: 
             })}
         </ul>
     );
-});
+}

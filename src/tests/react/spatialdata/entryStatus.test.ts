@@ -6,7 +6,6 @@ import {
     describeRemedy,
     entryStatusErrorKey,
     entryStatusForDisplay,
-    hasLayoutIssues,
     remediesFor,
 } from "@/react/spatialdata/entry_status";
 
@@ -54,7 +53,6 @@ describe("entryStatusForDisplay", () => {
         const notice = shown?.notices[0];
         expect(notice?.kind === "element-issues" && notice.issues).toEqual([noPyramid, unitIssue("aligned")]);
         expect(notice?.message).not.toBe("issues");
-        expect(shown && hasLayoutIssues(shown)).toBe(true);
     });
 
     test("drops a notice whose issues are all about other coordinate systems, and empty statuses", () => {
@@ -74,10 +72,5 @@ describe("entryStatusForDisplay", () => {
             notices: [],
         });
         expect(entryStatusErrorKey("p", error)).toBe("p\0element\0element-not-found\0gone");
-    });
-
-    test("a unit issue alone is not slow data", () => {
-        const status: EntryStatus = { errors: [], notices: [elementIssues([unitIssue("global")])] };
-        expect(hasLayoutIssues(status)).toBe(false);
     });
 });

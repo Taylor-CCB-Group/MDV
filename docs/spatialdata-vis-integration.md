@@ -218,23 +218,25 @@ errors, and notices such as `element-issues` (slow raster layout, or a coordinat
 with no length unit), `table-rows-unmatched` and `preload-truncated`. The chart keeps them
 in `entryStatuses` (`entry_status.ts`).
 
-- They are shown in the layer dialog (an alert above the layer's properties, and an icon on
-  its row), the status panel and the menu pip.
+- Errors and notices, other than storage issues (below), are shown in the layer dialog (an
+  alert above the layer's properties, and an icon on its row), the status panel and the menu
+  pip.
 - Retryable errors offer **Retry** (the renderer's `retryEntry`).
 - `entryStatusForDisplay` keeps only the shown coordinate system's unit issue. It also drops
   points notices, as sd.js's own viewer does, because the points panel reports truncation.
 - MDV words each issue's `Remedy` itself (`describeRemedy`).
 
-- **Dismissing.** A notice, or one issue of an element's storage, can be dismissed in the
-  layer dialog. The dismissal belongs to this browser (localStorage), like Preferences. It is
-  keyed by store URL, element path (`images/he`) and issue (`data_quality.ts`), so it holds
-  for every chart and layer showing that element. Dismissed notices no longer show in the
-  layer dialog, the row icon, the status panel or the menu pip. Errors cannot be dismissed
-  there; the pip's own Dismiss covers them.
-- **Settings › Data quality** (`DataQualitySection`) lists every SpatialData store the
-  project's regions point at, with `SpatialData.assessIssues()` per element. A missing length
-  unit is one row per coordinate system, naming its elements. Each issue shows its remedy,
-  and can be dismissed or shown again.
+- **Storage issues stay quiet.** An element's `element-issues` (no pyramid, oversized chunks,
+  no length unit) describe the data, not the layer (`splitStorageIssues` in
+  `data_quality.ts`). They never light the row icon or the menu pip. The layer dialog notes
+  them on one muted, collapsed line, or not at all with the "Data quality notes in layer
+  dialog" preference (`dataQualityNotesSetting`). Load errors and other notices keep their
+  alert.
+- **Settings › Data quality** (`DataQualitySection`) is the one place they are listed in full.
+  It covers every SpatialData store the project's regions point at, with
+  `SpatialData.assessIssues()` per element. A missing length unit is one row per coordinate
+  system, naming its elements. Each issue shows its remedy. It is a listing only: nothing
+  there is dismissed or hidden.
   - Stores are read through the page's shared reader (`sharedSpatialDataReader`), the one the
     charts use. A store a chart has opened is listed at once; any other waits for **Check**,
     so opening Settings never starts reading a remote store.

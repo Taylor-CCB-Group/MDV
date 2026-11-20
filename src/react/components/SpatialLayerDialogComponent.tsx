@@ -34,13 +34,14 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
+import type { ElementIssue } from "@spatialdata/core";
 import { findRenderStackEntry, type RenderStackSpatialElementType, walkRenderStackEntries } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { observer } from "mobx-react-lite";
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
+import { dataQualityNotesSetting } from "@/lib/browserSettings";
 import { compositingBadge } from "@/react/spatialdata/blend_modes";
-import { dataQualityKey, elementPath, setDataQualityDismissed } from "@/react/spatialdata/data_quality";
 import {
     DECK_OVERLAY_VISIBILITY_FOLLOWERS,
     type DeckOverlayId,
@@ -108,41 +109,47 @@ function isLayerConfigOfType<TType extends LayerConfig["type"]>(
  */
 const LayerStatusDetails = observer(function LayerStatusDetails({ entryId }: { entryId: string }) {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
-    const config = useConfig<SpatialDataMdvReactConfig>();
-    const { status, dismissed } = chart.visibleEntryStatus(entryId);
-    const dismissedNote = dismissed > 0 && (
-        <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
-            {dismissed} dismissed {dismissed === 1 ? "note" : "notes"}: see Settings › Data quality to show again.
-        </Typography>
-    );
-    if (!status) return dismissedNote || null;
-    const { retryEntry, spatialStoreUrl } = chart;
-    const entry = config.renderStack && findRenderStackEntry(config.renderStack, entryId);
-    const path = entry?.kind === "spatial" ? elementPath(entry.source.elementType, entry.source.elementKey) : null;
-    // dismissed for this element in this browser, wherever it is shown (`data_quality.ts`)
-    const onDismiss =
-        spatialStoreUrl && path
-            ? (id: string) => setDataQualityDismissed(dataQualityKey(spatialStoreUrl, path, id), true)
-            : undefined;
+    const { status, storageIssues } = chart.visibleEntryStatus(entryId);
+    const { retryEntry } = chart;
     return (
         <>
-            <Alert
-                severity={status.errors.length > 0 ? "error" : "info"}
-                sx={{ mb: 1, "& .MuiAlert-message": { minWidth: 0, width: "100%" } }}
-            >
-                <AlertTitle>
-                    {status.errors.length > 0 ? "This layer could not load" : "Notes on this layer"}
-                </AlertTitle>
-                <Typography variant="body2" component="div">
-                    <EntryStatusDetails
-                        status={status}
-                        onRetry={retryEntry && (() => void retryEntry(entryId))}
-                        onDismiss={onDismiss}
-                    />
-                </Typography>
-            </Alert>
-            {dismissedNote}
+            {status && (
+                <Alert
+                    severity={status.errors.length > 0 ? "error" : "info"}
+                    sx={{ mb: 1, "& .MuiAlert-message": { minWidth: 0, width: "100%" } }}
+                >
+                    <AlertTitle>
+                        {status.errors.length > 0 ? "This layer could not load" : "Notes on this layer"}
+                    </AlertTitle>
+                    <Typography variant="body2" component="div">
+                        <EntryStatusDetails status={status} onRetry={retryEntry && (() => void retryEntry(entryId))} />
+                    </Typography>
+                </Alert>
+            )}
+            <StorageIssuesNote issues={storageIssues} />
         </>
+    );
+});
+
+/**
+ * How the layer's element is stored, when that makes it slow or leaves its scale unknown: one
+ * muted, collapsed line, as it is about the data rather than the layer, and Settings › Data
+ * quality lists it for every store. Not shown at all with `dataQualityNotesSetting` hidden.
+ */
+const StorageIssuesNote = observer(function StorageIssuesNote({ issues }: { issues: readonly ElementIssue[] }) {
+    if (issues.length === 0 || dataQualityNotesSetting.get() === "hidden") return null;
+    return (
+        <Typography variant="caption" color="text.secondary" component="details" sx={{ display: "block", mb: 1 }}>
+            <summary className="cursor-pointer select-none">
+                Data quality: {issues.length} {issues.length === 1 ? "note" : "notes"} on how this element is stored
+            </summary>
+            <EntryStatusDetails
+                status={{ errors: [], notices: [{ kind: "element-issues", message: "", issues: [...issues] }] }}
+            />
+            <span className="block mt-1">
+                Listed for every store in Settings › Data quality. Hide these notes in Settings › Preferences.
+            </span>
+        </Typography>
     );
 });
 

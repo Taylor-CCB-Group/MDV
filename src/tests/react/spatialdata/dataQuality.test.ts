@@ -1,17 +1,8 @@
 import type { ElementIssue, EntryNotice } from "@spatialdata/core";
 import type { EntryStatus } from "@spatialdata/vis";
-import { afterEach, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 
-import {
-    dataQualityKey,
-    elementIssueId,
-    elementPath,
-    isDataQualityDismissed,
-    issuesByElement,
-    projectSpatialStores,
-    setDataQualityDismissed,
-    withoutDismissed,
-} from "@/react/spatialdata/data_quality";
+import { issuesByElement, projectSpatialStores, splitStorageIssues } from "@/react/spatialdata/data_quality";
 
 const STORE = "https://example.org/store.zarr";
 const noPyramid: ElementIssue = {
@@ -28,56 +19,36 @@ const unit = (coordinateSystem: string): ElementIssue => ({
 const elementIssues = (issues: ElementIssue[]): EntryNotice => ({ kind: "element-issues", message: "m", issues });
 const unmatched: EntryNotice = { kind: "table-rows-unmatched", message: "no rows", tableName: "t", instanceKey: "k" };
 
-const touched: string[] = [];
-function dismiss(path: string, id: string) {
-    const key = dataQualityKey(STORE, path, id);
-    touched.push(key);
-    setDataQualityDismissed(key, true);
-}
-
-afterEach(() => {
-    for (const key of touched.splice(0)) setDataQualityDismissed(key, false);
-});
-
-describe("withoutDismissed", () => {
-    const status: EntryStatus = { errors: [], notices: [elementIssues([noPyramid, unit("global")]), unmatched] };
-
-    test("takes out dismissed issues one by one, and other notices whole", () => {
-        dismiss("images/he", elementIssueId(noPyramid));
-        const { status: left, dismissed } = withoutDismissed(status, STORE, "images/he");
-        expect(dismissed).toBe(1);
-        expect(left?.notices).toEqual([elementIssues([unit("global")]), unmatched]);
-
-        dismiss("images/he", "no-length-unit:global");
-        dismiss("images/he", "table-rows-unmatched");
-        expect(withoutDismissed(status, STORE, "images/he")).toEqual({ status: undefined, dismissed: 3 });
+describe("splitStorageIssues", () => {
+    test("takes an element's storage issues out of a layer's status, keeping the rest", () => {
+        const status: EntryStatus = { errors: [], notices: [elementIssues([noPyramid, unit("global")]), unmatched] };
+        expect(splitStorageIssues(status)).toEqual({
+            status: { errors: [], notices: [unmatched] },
+            storageIssues: [noPyramid, unit("global")],
+        });
     });
 
-    test("is keyed by store and element, and keeps errors", () => {
-        dismiss("images/he", "table-rows-unmatched");
-        expect(withoutDismissed(status, STORE, "images/other").dismissed).toBe(0);
-        expect(withoutDismissed(status, "https://elsewhere/store.zarr", "images/he").dismissed).toBe(0);
+    test("leaves nothing when storage issues were all there was, and keeps errors", () => {
+        expect(splitStorageIssues({ errors: [], notices: [elementIssues([noPyramid])] })).toEqual({
+            status: undefined,
+            storageIssues: [noPyramid],
+        });
         const error = {
             resource: "element",
             error: { kind: "element-not-found", message: "gone", retryable: false, elementKey: "he" },
         } satisfies EntryStatus["errors"][number];
-        dismiss("images/he", elementIssueId(noPyramid));
-        dismiss("images/he", "no-length-unit:global");
-        const { status: left } = withoutDismissed({ errors: [error], notices: status.notices }, STORE, "images/he");
-        expect(left).toEqual({ errors: [error], notices: [] });
-    });
-
-    test("persists in this browser", () => {
-        dismiss("images/he", "table-rows-unmatched");
-        expect(isDataQualityDismissed(dataQualityKey(STORE, "images/he", "table-rows-unmatched"))).toBe(true);
-        expect(localStorage.getItem("mdv.dataQuality.dismissed")).toContain("table-rows-unmatched");
+        expect(splitStorageIssues({ errors: [error], notices: [elementIssues([noPyramid])] }).status).toEqual({
+            errors: [error],
+            notices: [],
+        });
+        const plain: EntryStatus = { errors: [], notices: [unmatched] };
+        expect(splitStorageIssues(plain)).toEqual({ status: plain, storageIssues: [] });
+        expect(splitStorageIssues(undefined)).toEqual({ status: undefined, storageIssues: [] });
     });
 });
 
 describe("store issues", () => {
-    test("names elements as sd.js does and groups issues by element", () => {
-        expect(elementPath("image", "he")).toBe("images/he");
-        expect(elementPath("labels", "cells")).toBe("labels/cells");
+    test("groups issues by element", () => {
         const grouped = issuesByElement([
             { path: "images/he", issue: noPyramid },
             { path: "shapes/cells", issue: unit("global") },
