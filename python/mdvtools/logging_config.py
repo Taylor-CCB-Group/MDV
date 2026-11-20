@@ -10,9 +10,14 @@ class _Formatter(logging.Formatter):
     """
 
     def format(self, record: logging.LogRecord) -> str:
-        line = super().format(record)
+        text = super().format(record)
         trace_id = getattr(record, "trace_id", "")
-        return f"{line} trace_id={trace_id}" if trace_id else line
+        if not trace_id:
+            return text
+        # Docker splits a traceback into one log line per line, so the ID goes
+        # on the message line, where Grafana looks for it.
+        first, newline, rest = text.partition("\n")
+        return f"{first} trace_id={trace_id}{newline}{rest}"
 
 
 def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
