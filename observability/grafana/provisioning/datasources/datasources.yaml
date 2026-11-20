@@ -36,11 +36,14 @@ datasources:
     jsonData:
       serviceMap:
         datasourceUid: prometheus
+      # Server log streams carry no service label, so find a span's logs by the
+      # trace ID that MDV writes into each log line.
       tracesToLogsV2:
         datasourceUid: loki
         spanStartTimeShift: "-5m"
         spanEndTimeShift: "5m"
-        filterByTraceID: true
+        customQuery: true
+        query: '{container=~".+"} |= "$${__trace.traceId}"'
       streamingEnabled:
         search: true
         metrics: true
