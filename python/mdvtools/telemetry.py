@@ -117,6 +117,7 @@ def init_telemetry(app: Flask) -> bool:
         _initialised = True
 
     FlaskInstrumentor().instrument_app(app, excluded_urls=_EXCLUDED_URLS)
+    app.before_request(_remember_request_span)
     app.after_request(_name_span_after_project_route)
     logger.info(
         "Telemetry on: sending to %s as service %s",
@@ -293,6 +294,17 @@ def _remember_request_spans(tracer_provider: "TracerProvider") -> None:
                 _request_spans[getcurrent()] = span.get_span_context()
 
     tracer_provider.add_span_processor(RememberRequestSpans())
+
+
+def _remember_request_span() -> None:
+    from greenlet import getcurrent
+    from opentelemetry import trace
+
+    span_context = trace.get_current_span().get_span_context()
+    if span_context.is_valid:
+        _request_spans[getcurrent()] = span_context
+    else:
+        _request_spans.pop(getcurrent(), None)
 
 
 def _log_blocked_loop(blocking_time: float, info: Sequence[str], span_context: "SpanContext | None") -> None:

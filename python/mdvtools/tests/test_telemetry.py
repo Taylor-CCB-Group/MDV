@@ -316,3 +316,32 @@ def test_a_blocked_loop_warning_carries_the_blocked_requests_trace_id(caplog):
         logging.setLogRecordFactory(original_factory)
 
     assert [getattr(r, "trace_id") for r in caplog.records] == [format(0xAB, "032x"), ""]
+
+
+def test_an_unsampled_request_replaces_the_previous_requests_span():
+    pytest.importorskip("opentelemetry.instrumentation.flask")
+    greenlet = pytest.importorskip("greenlet")
+    from opentelemetry import trace
+    from opentelemetry.instrumentation.flask import FlaskInstrumentor
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.sampling import ALWAYS_OFF
+    from opentelemetry.trace import SpanContext
+
+    app = Flask(__name__)
+    FlaskInstrumentor().instrument_app(app, tracer_provider=TracerProvider(sampler=ALWAYS_OFF))
+    app.before_request(telemetry._remember_request_span)
+    seen = {}
+
+    @app.get("/")
+    def index():
+        seen["request"] = trace.get_current_span().get_span_context()
+        seen["remembered"] = telemetry._request_spans.get(greenlet.getcurrent())
+        return ""
+
+    telemetry._request_spans[greenlet.getcurrent()] = SpanContext(trace_id=0xAB, span_id=0xCD, is_remote=False)
+    try:
+        app.test_client().get("/")
+    finally:
+        FlaskInstrumentor().uninstrument_app(app)
+
+    assert seen["remembered"] == seen["request"]
