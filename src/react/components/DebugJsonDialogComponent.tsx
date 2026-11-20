@@ -367,7 +367,9 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                 : browserSettings.filter((setting) => browserSettingMatchesQuery(setting, query)),
         [query],
     );
-    const hasAnyFindings = Boolean(validationFindings?.hasAny);
+    // If there are validation issues when the dialog opens, lead with them instead of Preferences. Captured once,
+    // so that clearing the findings doesn't rearrange the dialog under the user.
+    const [showFindingsFirst] = useState(() => showValidationSection && Boolean(validationFindings?.hasAny));
     const injectFaultAndReload = (mode: DataLoaderFaultMode) => {
         if (setDataLoaderFaultMode(mode)) {
             window.location.reload();
@@ -431,12 +433,22 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                 </DebugSection>
             )}
             {showBrowserSettings && (
-                <DebugSection id="preferences" title={PREFERENCES_TITLE} defaultExpanded {...sectionProps}>
+                <DebugSection
+                    id="preferences"
+                    title={PREFERENCES_TITLE}
+                    defaultExpanded={!showFindingsFirst}
+                    {...sectionProps}
+                >
                     <BrowserSettingsSection settings={filteredBrowserSettings} />
                 </DebugSection>
             )}
             {showDebugGroup && (
-                <DebugSection id="debug" title={DEBUG_GROUP_TITLE} {...sectionProps}>
+                <DebugSection
+                    id="debug"
+                    title={DEBUG_GROUP_TITLE}
+                    defaultExpanded={showFindingsFirst}
+                    {...sectionProps}
+                >
                     {showReport && (
                         <DebugSection id="report" title="Report an issue or a bug" {...sectionProps}>
                             <Typography>
@@ -496,7 +508,7 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                         <DebugSection
                             id="validation-issues"
                             title="Validation issues"
-                            defaultExpanded={hasAnyFindings}
+                            defaultExpanded={showFindingsFirst}
                             {...sectionProps}
                         >
                             <ValidationIssuesSection validationFindings={validationFindings} />

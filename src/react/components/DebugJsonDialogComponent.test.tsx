@@ -119,6 +119,30 @@ describe("DebugJsonDialogComponent", () => {
         expect(store.hasAny).toBe(false);
     });
 
+    describe("initial layout", () => {
+        const expandedOf = (title: string) =>
+            screen.getByRole("button", { name: title, hidden: true }).getAttribute("aria-expanded");
+
+        test("opens Preferences when there are no validation issues", () => {
+            render(<DebugJsonDialogComponent json={{ chartTypes: [] }} showValidationSection />);
+
+            expect(expandedOf("Preferences")).toBe("true");
+            expect(expandedOf("Debug and diagnostics")).toBe("false");
+        });
+
+        test("opens the validation issues instead when there are some, and keeps that after clearing", () => {
+            mocks.chartManager.validationFindings = buildStoreWithFindings();
+            render(<DebugJsonDialogComponent json={{ chartTypes: [] }} showValidationSection />);
+
+            expect(expandedOf("Preferences")).toBe("false");
+            expect(expandedOf("Debug and diagnostics")).toBe("true");
+            expect(expandedOf("Validation issues")).toBe("true");
+
+            fireEvent.click(screen.getByRole("button", { name: "Clear", hidden: true }));
+            expect(expandedOf("Debug and diagnostics")).toBe("true");
+        });
+    });
+
     describe("search", () => {
         const json = {
             buildInfo: { version: "1.2.3", commit: "abc" },
