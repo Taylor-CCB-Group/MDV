@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 import numpy as np
 from ..serverlite import serve_project
+from ..telemetry import traced
 from .browser_store import (
     BrowserStoreOptions,
     check_browser_store_encoders,
@@ -1409,6 +1410,7 @@ def _attach_table_group_metadata(
         ds_metadata["spatialdata_tables"] = provenance
         mdv.set_datasource_metadata(ds_metadata)
 
+@traced("mdv.convert_spatialdata")
 def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
     """
     Convert all SpatialData objects in a folder to MDV format.

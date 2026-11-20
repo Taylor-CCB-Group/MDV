@@ -2,6 +2,22 @@ import logging
 import sys
 
 
+class _Formatter(logging.Formatter):
+    """Appends ``trace_id=...`` when telemetry has given the record one.
+
+    ``mdvtools.telemetry`` sets ``trace_id`` on every record while telemetry is
+    on, and only lines written inside a traced request get a non-empty value.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        text = super().format(record)
+        trace_id = getattr(record, "trace_id", "")
+        if not trace_id:
+            return text
+        # Docker sends each line of a traceback to Loki as its own entry.
+        return "\n".join(f"{line} trace_id={trace_id}" for line in text.split("\n"))
+
+
 def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     """
     Set up a logger with consistent formatting across all mdvtools modules.
@@ -18,7 +34,7 @@ def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     # Only configure if not already configured
     if not logger.handlers:
         # Create a formatter with the desired format
-        formatter = logging.Formatter(
+        formatter = _Formatter(
             fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S"
         )

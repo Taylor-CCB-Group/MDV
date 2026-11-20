@@ -40,11 +40,12 @@ TESTS NEEDED BEFORE REFACTORING:
 - Integration tests for auth hooks with route options
 """
 
-from flask import Flask
+from flask import Flask, request
 from flask.typing import ResponseReturnValue as Response
 from typing import Dict, Any, Callable, Tuple, List
 import re
 from urllib.parse import urlparse
+from werkzeug.routing import Rule
 import functools
 from typing import Protocol
 from mdvtools.logging_config import get_logger
@@ -113,6 +114,8 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
         self.name = name
         self.url_prefix = url_prefix  # i.e. /project/<project_id>/
         self.routes: Dict[re.Pattern[str], Tuple[Callable, Dict[str, Any]]] = {}
+        # The Flask-style rule each pattern came from, such as '/get_data'.
+        self.rules: Dict[re.Pattern[str], str] = {}
         self.before_request_funcs: List[Callable] = []
         ProjectBlueprint.blueprints[name] = self
 
@@ -187,6 +190,7 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
             
             # Store route with handler and options (options may contain access_level, methods, etc.)
             self.routes[rule_re] = (f, options)
+            self.rules[rule_re] = rule
             return f
 
         return decorator
@@ -213,6 +217,12 @@ class ProjectBlueprint(ProjectBlueprintProtocol):
         for rule, (method, options) in self.routes.items():
             match = rule.match(subpath)
             if match:
+                # Flask only knows the catch-all project route. Report the rule
+                # that matched, so request metrics and traces name each project
+                # route separately, without the project's id.
+                # Keep the catch-all's endpoint, which Flask reads from url_rule.
+                endpoint = request.url_rule.endpoint if request.url_rule else None
+                request.url_rule = Rule(f"/project/<project_id>{self.rules[rule]}", endpoint=endpoint)
                 # Run all before_request functions (used for auth, logging, etc.)
                 for func in self.before_request_funcs:
                     # Hooks receive project_id and route options (e.g., access_level)

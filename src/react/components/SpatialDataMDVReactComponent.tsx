@@ -31,6 +31,7 @@ import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projecti
 import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
+import { useMarkSpatialChartOpened, useSpatialLoadTiming } from "@/react/spatialdata/load_timing";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
 import { createPointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import { describeGpu } from "@/react/spatialdata/render_report";
@@ -124,6 +125,13 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
 
     const deckRef = useRef<DeckGLRef | null>(null);
     useRebindDeckEvents(deckRef);
+
+    const describeLoad = useCallback(() => {
+        const entries = stack?.entries ?? [];
+        const images = entries.filter((entry) => entry.kind === "spatial" && entry.source.elementType === "image");
+        return { layers: String(entries.length), image_layers: String(images.length) };
+    }, [stack]);
+    const onAfterRenderTiming = useSpatialLoadTiming(deckRef, chart, describeLoad);
 
     const extensions = useMemo(() => [new ColorPaletteExtension(), new VivContrastExtension()], []);
 
@@ -250,6 +258,17 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
         [coordinateSystem, onFeatureHover, onFeatureHoverEnd, renderer, spatialData],
     );
 
+    const timedDeckProps = useMemo(
+        () => ({
+            ...deckProps,
+            onAfterRender: (context: Parameters<NonNullable<DeckGLProps["onAfterRender"]>>[0]) => {
+                deckProps.onAfterRender?.(context);
+                onAfterRenderTiming();
+            },
+        }),
+        [deckProps, onAfterRenderTiming],
+    );
+
     if (!stack?.entries.length) {
         return <div className="h-full w-full p-2">Preparing layer stack…</div>;
     }
@@ -291,7 +310,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
                 // with `undefined` and feature tooltips never appear. Only `info`: deck also
                 // passes its event, which `handleHover` would take for the tooltip's anchor.
                 onHover={(info) => handleHover(info)}
-                deckProps={deckProps}
+                deckProps={timedDeckProps}
                 deckRef={deckRef}
             />
         </CrosshairArea>
@@ -300,6 +319,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
 
 function SpatialDataChartRoot() {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    useMarkSpatialChartOpened(chart);
     const { vivStores } = chart;
     return (
         <VivProvider vivStores={vivStores}>
