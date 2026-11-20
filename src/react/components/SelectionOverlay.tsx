@@ -13,6 +13,8 @@ import { action } from "mobx";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditMode, PolygonMode, RectangleMode } from "@/editable-layers/selectionModes";
+// Debug: registers `__crossPcf.selection(chart)` until cross-PCF has a real consumer.
+import "@/spatial_stats/crossPcfDebug";
 import { useChart } from "../context";
 import type { DualContourLegacyConfig } from "../contour_state";
 import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";

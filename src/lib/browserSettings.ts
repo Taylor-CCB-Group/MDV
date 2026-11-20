@@ -21,6 +21,8 @@ export type ChoiceSettingDefinition<T extends string> = {
     defaultValue: T;
     /** A value stored by an older form of this setting, read when there is no current value. */
     legacy?: () => T | undefined;
+    /** A feature preview: listed only while "Feature previews" is on, or while it is not at its default. */
+    preview?: boolean;
 };
 
 export type BrowserSetting<T extends string = string> = ChoiceSettingDefinition<T> & {
@@ -108,10 +110,30 @@ export const legacyChartsSetting = defineChoiceSetting<"hide" | "show">({
     defaultValue: "hide",
 });
 
+/**
+ * Whether features still taking shape are offered: chart types marked `preview` in their `BaseChart.types`
+ * entry, and settings marked `preview` here.
+ */
+export const featurePreviewsSetting = defineChoiceSetting<"hide" | "show">({
+    key: "mdv.settings.featurePreviews",
+    label: "Feature previews",
+    description:
+        "Offer features that are still taking shape, marked Preview where they appear. Their behaviour " +
+        "and saved settings may change. Existing charts of a preview type load either way.",
+    choices: [
+        { value: "hide", label: "Hide" },
+        { value: "show", label: "Show" },
+    ],
+    defaultValue: "hide",
+});
+
+export const showFeaturePreviews = () => featurePreviewsSetting.get() === "show";
+
 /** Whether charts of a `legacy` type are loaded as their current equivalent; see `src/charts/legacyCharts.ts`. */
 export const convertLegacyChartsSetting = defineChoiceSetting<"off" | "on">({
     key: "mdv.settings.convertLegacyCharts",
-    label: "Convert legacy charts (experimental)",
+    label: "Convert legacy charts",
+    preview: true,
     description:
         "For developers; the behaviour is likely to change. Load charts of a legacy type (such as the classic scatter plots) as their current " +
         "equivalent; turning this on also converts the charts already open. The conversion is saved if the view is saved, " +
@@ -129,5 +151,10 @@ export const browserSettings: readonly BrowserSetting[] = [
     renderBackendSetting,
     webgpuTraceSetting,
     legacyChartsSetting,
+    featurePreviewsSetting,
     convertLegacyChartsSetting,
 ];
+
+/** A setting is listed unless it is a preview, previews are hidden, and it is at its default (so it can always be turned back). */
+export const isSettingListed = (setting: BrowserSetting) =>
+    !setting.preview || showFeaturePreviews() || setting.get() !== setting.defaultValue;

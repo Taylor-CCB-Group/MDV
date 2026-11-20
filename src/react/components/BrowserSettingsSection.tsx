@@ -1,6 +1,11 @@
-import { FormControl, FormHelperText, InputLabel, MenuItem, Select, Typography } from "@mui/material";
+import { Chip, FormControl, FormHelperText, InputLabel, MenuItem, Select, Typography } from "@mui/material";
 import { observer } from "mobx-react-lite";
-import { type BrowserSetting, browserSettings } from "@/lib/browserSettings";
+import { type BrowserSetting, browserSettings, isSettingListed } from "@/lib/browserSettings";
+
+/** Marks a feature preview wherever one is offered (Add Chart, Browser settings). */
+export function PreviewChip() {
+    return <Chip label="Preview" size="small" color="info" variant="outlined" sx={{ ml: 1, height: 20 }} />;
+}
 
 const ChoiceSettingControl = observer(function ChoiceSettingControl({ setting }: { setting: BrowserSetting }) {
     const labelId = `browser-setting-${setting.key}`;
@@ -19,21 +24,26 @@ const ChoiceSettingControl = observer(function ChoiceSettingControl({ setting }:
                     </MenuItem>
                 ))}
             </Select>
-            {setting.description && <FormHelperText>{setting.description}</FormHelperText>}
+            {(setting.description || setting.preview) && (
+                <FormHelperText component="div">
+                    {setting.preview && <PreviewChip />} {setting.description}
+                </FormHelperText>
+            )}
         </FormControl>
     );
 });
 
-/** Every setting in `browserSettings`; changes apply at once and are kept in this browser. */
-export default function BrowserSettingsSection() {
+/** Every listed setting in `browserSettings`; changes apply at once and are kept in this browser. */
+const BrowserSettingsSection = observer(function BrowserSettingsSection() {
     return (
         <>
             <Typography>
                 These apply to every project opened in this browser, and are not saved with projects or views.
             </Typography>
-            {browserSettings.map((setting) => (
+            {browserSettings.filter(isSettingListed).map((setting) => (
                 <ChoiceSettingControl key={setting.key} setting={setting} />
             ))}
         </>
     );
-}
+});
+export default BrowserSettingsSection;
