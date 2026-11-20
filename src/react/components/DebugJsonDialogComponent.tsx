@@ -325,10 +325,16 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     showValidationSection = false,
     chartPanel,
     groupKeys,
+    jsonTitle,
 }: {
     json: any;
     header?: string;
     showValidationSection?: boolean;
+    /**
+     * Show `json` whole, as one JSON view under this title, open and just below the chart status, instead of
+     * splitting it into a section per top-level key under Debug and diagnostics. For a chart's config.
+     */
+    jsonTitle?: string;
     /** Top-level keys of `json` to show as groups of sections (e.g. `project: { datasources, views, state }`). */
     groupKeys?: readonly string[];
     /** The chart's own status and problems (`BaseChart.getDebugPanel`), shown first. */
@@ -351,7 +357,14 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     const debugQuery = matchesQuery(query, DEBUG_GROUP_TITLE) ? "" : query;
 
     const { validationFindings } = useChartManager();
-    const jsonSections = useMemo(() => splitJsonSections(omitValidationFindings(json), groupKeys), [json, groupKeys]);
+    const jsonSections = useMemo(
+        () => (jsonTitle ? [] : splitJsonSections(omitValidationFindings(json), groupKeys)),
+        [json, groupKeys, jsonTitle],
+    );
+    const wholeJson = useMemo(
+        () => (jsonTitle ? filterJsonSection({ title: jsonTitle, json: omitValidationFindings(json) }, query) : null),
+        [json, jsonTitle, query],
+    );
     const filteredJsonSections = useMemo(
         () =>
             jsonSections.flatMap((section) => {
@@ -388,7 +401,7 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
         showValidationSection && matchesQuery(debugQuery, "Validation issues", "validation findings");
     const showBrowserSettings = filteredBrowserSettings.length > 0;
     const showDebugGroup = showReport || showFaultInjection || showValidation || filteredJsonSections.length > 0;
-    const nothingMatches = searching && !showChartPanel && !showBrowserSettings && !showDebugGroup;
+    const nothingMatches = searching && !showChartPanel && !wholeJson && !showBrowserSettings && !showDebugGroup;
 
     return (
         <div className="w-full max-h-[80vh] overflow-auto" style={{ userSelect: "text" }}>
@@ -430,6 +443,11 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
             {showChartPanel && (
                 <DebugSection id="chart-status" title="Chart status" defaultExpanded {...sectionProps}>
                     {chartPanel}
+                </DebugSection>
+            )}
+            {wholeJson && (
+                <DebugSection id="json" title={wholeJson.title} defaultExpanded {...sectionProps}>
+                    <FilteredJson json={wholeJson.json} />
                 </DebugSection>
             )}
             {showBrowserSettings && (

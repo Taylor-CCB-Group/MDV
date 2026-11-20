@@ -18,6 +18,7 @@ type DebugDialogContent = {
     showValidationSection?: boolean;
     chartPanel?: ReactNode;
     groupKeys?: readonly string[];
+    jsonTitle?: string;
 };
 
 const DebugChart = observer(
@@ -27,12 +28,14 @@ const DebugChart = observer(
         showValidationSection = false,
         chartPanel,
         groupKeys,
+        jsonTitle,
     }: {
         chart: any;
         header?: string;
         showValidationSection?: boolean;
         chartPanel?: ReactNode;
         groupKeys?: readonly string[];
+        jsonTitle?: string;
     }) => {
         return (
             <>
@@ -42,6 +45,7 @@ const DebugChart = observer(
                     showValidationSection={showValidationSection}
                     chartPanel={chartPanel}
                     groupKeys={groupKeys}
+                    jsonTitle={jsonTitle}
                 />
                 <ReactQueryDevtools initialIsOpen={false} />
             </>
@@ -77,6 +81,8 @@ class DebugChartReactWrapper extends BaseDialog {
             showValidationSection: options.showValidationSection,
             chartPanel: chart?.getDebugPanel?.(),
             groupKeys: options.groupKeys,
+            // a chart's config reads best whole, not split by key
+            jsonTitle: chart ? "Chart config" : undefined,
         });
     }
     init(content: DebugDialogContent) {
@@ -87,6 +93,7 @@ class DebugChartReactWrapper extends BaseDialog {
                 showValidationSection={content.showValidationSection}
                 chartPanel={content.chartPanel}
                 groupKeys={content.groupKeys}
+                jsonTitle={content.jsonTitle}
             />,
             div,
             this,

@@ -211,6 +211,34 @@ describe("DebugJsonDialogComponent", () => {
             expect(headings.indexOf("buildInfo")).toBeGreaterThan(1);
         });
 
+        test("shows a chart's config whole, open, after its status", async () => {
+            const config = { id: "c1", type: "SpatialDataChart", param: ["x", "y"], renderStack: [{ id: "a" }] };
+            render(
+                <DebugJsonDialogComponent
+                    json={config}
+                    jsonTitle="Chart config"
+                    chartPanel={<p>WebGPU device lost</p>}
+                />,
+            );
+
+            const headings = screen.getAllByRole("heading", { level: 3, hidden: true }).map((h) => h.textContent);
+            expect(headings.slice(0, 2)).toEqual(["Chart status", "Chart config"]);
+            expect(screen.getByText("WebGPU device lost")).toBeTruthy();
+            for (const key of ["General", "param", "renderStack"]) expect(screen.queryByText(key)).toBeNull();
+            expect(
+                screen.getByRole("button", { name: "Chart config", hidden: true }).getAttribute("aria-expanded"),
+            ).toBe("true");
+            const rendered = screen.getAllByTestId("json-view").map((node) => node.textContent);
+            expect(rendered).toEqual([JSON.stringify(config)]);
+
+            search("renderstack");
+            await waitFor(() =>
+                expect(screen.getAllByTestId("json-view").map((node) => node.textContent)).toEqual([
+                    JSON.stringify({ renderStack: config.renderStack }),
+                ]),
+            );
+        });
+
         test("every browser setting appears in Preferences", () => {
             render(<DebugJsonDialogComponent json={json} />);
 
