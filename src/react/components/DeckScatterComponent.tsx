@@ -1,10 +1,11 @@
-import { OrbitView, OrthographicView, type PickingInfo } from "@deck.gl/core";
+import { type FilterContext, OrbitView, OrthographicView, type PickingInfo } from "@deck.gl/core";
 import { LineLayer } from "@deck.gl/layers";
 import DeckGL, { type DeckGLRef } from "@deck.gl/react";
-import { action } from "mobx";
+import { action, toJS } from "mobx";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { LoadedDataColumn } from "@/charts/charts";
+import type { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { GatedOrbitController, GatedOrthographicController } from "@/lib/wheelZoomGate";
@@ -15,11 +16,13 @@ import {
     useCategoryContourLegend,
     useFieldContourLegend,
 } from "../contour_state";
+import { getEmptyFeatureCollection } from "../deck_state";
 import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
 import { useDensityGridCells } from "../hooks/useDensityGridCells";
 import useGateLayers from "../hooks/useGateLayers";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
+import { isSameOrbitView, ORBIT_FOVY, type OrbitSelectionView, orbitSelectionViewOf } from "../orbitView";
 import { useScatterRadius } from "../scatter_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import AxisComponent from "./AxisComponent";
@@ -50,6 +53,73 @@ import WheelZoomHint from "./WheelZoomHint";
  *   - enhanced version with more info (in general for all charts, or at least new ones)
  * - axis configuration (including via direct manipulation)
  */
+const EMPTY_SELECTION = getEmptyFeatureCollection();
+
+const selectionViewId = (id: string) => `selection-screen-${id}`;
+
+/**
+ * In 3D, selections are drawn on the screen rather than in the data: a view in pixels over the orbit
+ * view holds the selection layer, and nothing else. A selection is what was inside its outline from
+ * the camera it was drawn with, so its outline is only shown while the camera is still there; it
+ * stays applied (and saved) when the camera moves, until it is cleared or another is drawn.
+ */
+function useScreenSelection(
+    id: string,
+    selectionLayer: MonkeyPatchEditableGeoJsonLayer,
+    width: number,
+    height: number,
+) {
+    const chart = useChart<DeckScatterConfig, DeckScatterReact>();
+    const config = useConfig<DeckScatterConfig>();
+    const is3d = config.dimension === "3d";
+    const orbitViewState = config.dimension === "3d" ? config.viewState : null;
+    const orbitAxis = config.dimension === "3d" ? (config.orbit_axis ?? "Z") : "Z";
+    const current = useMemo<OrbitSelectionView | null>(() => {
+        if (!orbitViewState) return null;
+        const { target, zoom, rotationOrbit = 0, rotationX = 0 } = orbitViewState;
+        return {
+            target: [target[0], target[1], target[2] ?? 0],
+            zoom,
+            rotationOrbit,
+            rotationX,
+            width,
+            height,
+            orbitAxis,
+        };
+    }, [orbitViewState, width, height, orbitAxis]);
+    useEffect(() => {
+        chart.getOrbitSelectionView = () => current;
+        return () => {
+            chart.getOrbitSelectionView = undefined;
+        };
+    }, [chart, current]);
+
+    const feature = config.selectionFeatureCollection.features[0];
+    const drawnIn = useMemo(() => orbitSelectionViewOf(toJS(feature?.properties)), [feature]);
+    const shown = !is3d || (current && drawnIn && isSameOrbitView(drawnIn, current));
+    const layer = useMemo(
+        () => (shown ? selectionLayer : selectionLayer.clone({ data: EMPTY_SELECTION, selectedFeatureIndexes: [] })),
+        [shown, selectionLayer],
+    );
+    const screenViewId = selectionViewId(id);
+    const layerFilter = useCallback(
+        ({ layer: l, viewport }: FilterContext) =>
+            viewport.id === screenViewId ? l.id === selectionLayer.id : l.id !== selectionLayer.id,
+        [screenViewId, selectionLayer.id],
+    );
+    return {
+        selectionLayer: layer,
+        layerFilter: is3d ? layerFilter : undefined,
+        viewState: orbitViewState
+            ? {
+                  [`scatterplot-view-${id}`]: orbitViewState,
+                  // world units are pixels from the top left
+                  [screenViewId]: { target: [width / 2, height / 2, 0], zoom: 0 },
+              }
+            : undefined,
+    };
+}
+
 const DeckScatter = observer(function DeckScatterComponent({
     setHoveredContour,
 }: {
@@ -100,10 +170,11 @@ const DeckScatter = observer(function DeckScatterComponent({
     const chartHeight = Math.max(0, height - margin.top - margin.bottom - 3.5);
     useZoomOnFilter(data, plotWidth, plotHeight);
 
-    const { scatterProps, selectionLayer } = useSpatialLayers();
+    const { scatterProps, selectionLayer, selectionProps } = useSpatialLayers();
     // this is now somewhat able to render for "2d", pending further tweaks
     //! beware unproject from here is not what we want, should review
-    const { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
+    const { scatterplotLayer, greyScatterplotLayer, unselectedScatterplotLayer, getTooltip, setScatterKeyboardActive } =
+        scatterProps;
 
     const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
 
@@ -112,29 +183,32 @@ const DeckScatter = observer(function DeckScatterComponent({
     const showLegend = contourConfig.field_legend.display;
     const legendPosition = { x: 10, y: 10 };
 
+    const { modelMatrix } = selectionProps;
+    // as the classic 3D scatter drew them: each axis across its column's range, through the middle of the data
     const axisLinesLayer = useMemo(() => {
-        if (is2d) return null;
+        if (is2d || !cz) return null;
+        const ranges = [cx.minMax, cy.minMax, cz.minMax];
+        const mid = ranges.map(([lo, hi]) => (lo + hi) / 2);
+        const axisLine = (axis: number) => ({
+            sourcePosition: mid.map((m, i) => (i === axis ? ranges[i][0] : m)),
+            targetPosition: mid.map((m, i) => (i === axis ? ranges[i][1] : m)),
+            color: [0, 1, 2].map((i) => (i === axis ? 255 : 0)),
+        });
         return new LineLayer({
             id: `axis-lines-${id}`,
-            data: [
-                { sourcePosition: [0, 0, 0], targetPosition: [cx.minMax[1], 0, 0], color: [255, 0, 0] },
-                { sourcePosition: [0, 0, 0], targetPosition: [0, cy.minMax[1], 0], color: [0, 255, 0] },
-                { sourcePosition: [0, 0, 0], targetPosition: [0, 0, cz.minMax[1]], color: [0, 0, 255] },
-            ],
+            data: [axisLine(0), axisLine(1), axisLine(2)],
             getSourcePosition: (d: any) => d.sourcePosition,
             getTargetPosition: (d: any) => d.targetPosition,
             getColor: (d: any) => d.color,
             getWidth: 1,
-            updateTriggers: {
-                getSourcePosition: [cx.minMax, cy.minMax, cz.minMax],
-                getTargetPosition: [cx.minMax, cy.minMax, cz.minMax],
-            },
+            modelMatrix,
         });
-    }, [is2d, id, cx.minMax, cy.minMax, cz?.minMax]);
+    }, [is2d, id, cx.minMax, cy.minMax, cz?.minMax, cz, modelMatrix]);
 
     // we need an OrthographicView to prevent wrapping etc...
     // if in future we have subgraphs sharing a canvas, we will need to
     // make sure that the view is set up correctly for each subgraph.
+    const orbitAxis = config.dimension === "3d" ? (config.orbit_axis ?? "Z") : "Z";
     const view = useMemo(() => {
         return config.dimension === "2d"
             ? new OrthographicView({
@@ -146,23 +220,40 @@ const DeckScatter = observer(function DeckScatterComponent({
                   y: 0,
                   flipY: false,
               })
-            : new OrbitView({
-                  id: `scatterplot-view-${id}`,
-                  // controller: true,
-                  width: chartWidth,
-                  height: chartHeight,
-                  x: 0,
-                  y: 0,
-              });
-    }, [chartWidth, chartHeight, config.dimension, id]);
+            : [
+                  // first, so deck gives it the controller
+                  new OrbitView({
+                      id: `scatterplot-view-${id}`,
+                      width: chartWidth,
+                      height: chartHeight,
+                      x: 0,
+                      y: 0,
+                      orbitAxis,
+                      fovy: ORBIT_FOVY,
+                  }),
+                  // over it, in pixels, for drawing selections on (see `useScreenSelection`)
+                  new OrthographicView({
+                      id: selectionViewId(id),
+                      width: chartWidth,
+                      height: chartHeight,
+                      x: 0,
+                      y: 0,
+                      controller: false,
+                  }),
+              ];
+    }, [chartWidth, chartHeight, config.dimension, id, orbitAxis]);
+    const screenSelection = useScreenSelection(id, selectionLayer, chartWidth, chartHeight);
 
     //! deck doesn't like it if we change the layers array - better to toggle visibility
+    // gates are x / y outlines, which don't say what they enclose in 3D
     const layers = [
         greyScatterplotLayer,
+        // drawn first and leaving no depth behind, so what a 3D selection caught shows through the rest
+        unselectedScatterplotLayer,
         scatterplotLayer,
-        gateDisplayLayer,
-        selectionLayer,
-        gateLabelLayer,
+        is2d ? gateDisplayLayer : null,
+        screenSelection.selectionLayer,
+        is2d ? gateLabelLayer : null,
         axisLinesLayer,
     ].filter((layer): layer is NonNullable<typeof layer> => layer != null);
     const { device, failedOnWebGPU, deviceProps, onDeviceInitialized, onError } = useScatterDeckDevice(
@@ -258,10 +349,13 @@ const DeckScatter = observer(function DeckScatterComponent({
                                     doubleClickZoom: false,
                                     dragPan: controllerOptions.dragPan,
                                 }}
-                                viewState={viewState}
+                                viewState={screenSelection.viewState ?? viewState}
                                 // initialViewState={viewState} //consider not using react state for this
                                 views={view}
+                                layerFilter={screenSelection.layerFilter}
                                 onViewStateChange={(v) => {
+                                    // the selection view does not move
+                                    if (v.viewId === selectionViewId(id)) return;
                                     action(() => (config.viewState = v.viewState))();
                                 }}
                                 getTooltip={getPortalTooltip}

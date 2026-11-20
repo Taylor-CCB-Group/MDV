@@ -2,7 +2,6 @@ import type { Layer } from "@deck.gl/core";
 import { action } from "mobx";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import type { DataColumn, NumberDataType } from "@/charts/charts";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import {
     type DeckDevice,
@@ -15,6 +14,7 @@ import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
 import { fitOrthographicView } from "../axisScaling";
 import { useChart } from "../context";
 import { useConfig, useParamColumns } from "../hooks";
+import { fitOrbitView, validAxisScales } from "../orbitView";
 import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
@@ -25,8 +25,30 @@ import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 export const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-//todo this should be in a common place etc.
-const colMid = ({ minMax }: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
+/** The smallest and largest finite value of each column among `rows`; undefined if there are none. */
+function filteredBounds(rows: Uint32Array, columns: readonly ArrayLike<number>[]) {
+    const n = columns.length;
+    const min = new Array<number>(n).fill(Number.POSITIVE_INFINITY);
+    const max = new Array<number>(n).fill(Number.NEGATIVE_INFINITY);
+    let skipped = 0;
+    nextRow: for (let r = 0; r < rows.length; r++) {
+        const row = rows[r];
+        for (let c = 0; c < n; c++) {
+            if (!Number.isFinite(columns[c][row])) {
+                skipped++;
+                continue nextRow;
+            }
+        }
+        for (let c = 0; c < n; c++) {
+            const v = columns[c][row];
+            if (v < min[c]) min[c] = v;
+            if (v > max[c]) max[c] = v;
+        }
+    }
+    if (skipped) console.warn(`${skipped} rows with missing coordinates in scatterplot`);
+    if (!Number.isFinite(min[0])) return undefined;
+    return { min, max };
+}
 
 // const margin = { top: 10, right: 10, bottom: 40, left: 60 };
 /** todo this should be common for viv / scatter_state, pending refactor
@@ -65,54 +87,53 @@ export function useZoomOnFilter(
             fit.viewState === config.viewState &&
             (fit.width !== width || fit.height !== height);
         if (!pendingRecenter && !config.zoom_on_filter && !resized) return;
-        //there is also cx.minMax, cy.minMax - but not for filtered indices
-        let minX = Number.POSITIVE_INFINITY;
-        let maxX = Number.NEGATIVE_INFINITY;
-        let minY = Number.POSITIVE_INFINITY;
-        let maxY = Number.NEGATIVE_INFINITY;
-        // todo z... probably refactor for less repetition
-        // ^ maybe we could have properties on the columns that are the min/max of the filtered data
-        for (let i = 0; i < data.length; i++) {
-            const d = data[i];
-            const x = cx.data[d];
-            const y = cy.data[d];
-            if (!Number.isFinite(x) || !Number.isFinite(y)) {
-                console.warn("undefined data in scatterplot");
-                continue;
+        if (config.dimension === "3d") {
+            if (!cz || !allNumeric([cx, cy, cz])) {
+                console.warn("3D viewState requires numeric x, y and z columns");
+                return;
             }
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
+            const scales = validAxisScales(config.axis_scales);
+            const bounds = filteredBounds(data, [cx.data, cy.data, cz.data]);
+            if (!bounds) return;
+            // zoom on filter frames the rows where they are, from where the camera is
+            const previous = config.viewState;
+            const rotation = pendingRecenter
+                ? undefined
+                : { rotationOrbit: previous.rotationOrbit ?? 0, rotationX: previous.rotationX ?? 0 };
+            action(() => {
+                chart.ignoreStateUpdate = true;
+                try {
+                    chart.pendingRecenter = false;
+                    config.viewState = fitOrbitView(
+                        {
+                            min: bounds.min.map((v, i) => v * scales[i]),
+                            max: bounds.max.map((v, i) => v * scales[i]),
+                        },
+                        width,
+                        height,
+                        rotation,
+                    );
+                    lastFit.current = { width, height, viewState: config.viewState };
+                } finally {
+                    chart.ignoreStateUpdate = false;
+                }
+            })();
+            return;
         }
+        const bounds = filteredBounds(data, [cx.data, cy.data]);
+        if (!bounds) return;
+        const [minX, minY] = bounds.min;
+        const [maxX, maxY] = bounds.max;
         action(() => {
             chart.ignoreStateUpdate = true;
-            // the 3D branch can return or throw early: never leave updates suppressed
             try {
                 chart.pendingRecenter = false;
-
                 const scaling = config.dimension === "2d" ? (config.axis_scaling ?? "equal") : "equal";
                 config.viewState = fitOrthographicView({ minX, maxX, minY, maxY }, width, height, scaling);
                 // the stored view (mobx's copy), to tell later whether anyone has moved it
                 lastFit.current = { width, height, viewState: config.viewState };
                 // any kind of interpolator would probably mean changing how we handle viewState
                 // transitionInterpolator: new FlyToInterpolator({speed: 1.2}),
-                if (config.dimension === "3d") {
-                    const vs = config.viewState;
-                    vs.rotationOrbit = vs.rotationOrbit || 0;
-                    vs.rotationX = vs.rotationX || 0;
-                    if (!config.zoom_on_filter) {
-                        if (!cz) {
-                            console.warn("3D viewState requires z coordinate");
-                            return;
-                        }
-                        const params = [cx, cy, cz];
-                        if (!allNumeric(params)) {
-                            throw new Error("3D viewState requires numeric coordinates");
-                        }
-                        vs.target = params.map(colMid) as [number, number, number];
-                    }
-                }
             } finally {
                 chart.ignoreStateUpdate = false;
             }
