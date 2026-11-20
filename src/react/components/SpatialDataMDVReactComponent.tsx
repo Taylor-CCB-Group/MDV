@@ -2,7 +2,7 @@ import { ColorPaletteExtension } from "@hms-dbmi/viv";
 import { Button } from "@mui/material";
 import { viewStateFromBounds } from "@spatialdata/core";
 import { findRenderStackEntry, getRenderStackEntryIds } from "@spatialdata/layers";
-import type { RenderStackLayerInputs } from "@spatialdata/vis";
+import type { EntryStatus, RenderStackLayerInputs } from "@spatialdata/vis";
 import {
     resolvePickedEntryId,
     type ViewState as SpatialCanvasViewState,
@@ -27,6 +27,7 @@ import {
     useDeckDeviceProps,
 } from "@/react/spatialdata/deck_backend";
 import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
+import { entryStatusForDisplay } from "@/react/spatialdata/entry_status";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
@@ -66,7 +67,6 @@ import { isDensityGridShown } from "./densityGridUtils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import FieldContourLegend from "./FieldContourLegend";
 import { isCrosshairShown } from "./pointerCrosshair";
-import { rasterEntriesKey, useRasterIssues } from "./RasterIssues";
 import SelectionOverlay from "./SelectionOverlay";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import SpatialDensityGrid, { type SpatialDensityGridHost } from "./SpatialDensityGrid";
@@ -142,9 +142,22 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
         [extensions, vivImagePropsResolver],
     );
 
+    // What sd.js reports about each layer, for the chart's status and the layer dialog, which
+    // live outside this tree. Called from an effect, with each layer's status as it changes.
+    const onEntryStatusChange = useCallback(
+        (layerId: string, status: EntryStatus | undefined) => {
+            const entry = stack && findRenderStackEntry(stack, layerId);
+            const elementType = entry?.kind === "spatial" ? entry.source.elementType : undefined;
+            chart.setEntryStatus(layerId, entryStatusForDisplay(status, coordinateSystem, elementType));
+        },
+        [chart, stack, coordinateSystem],
+    );
+    useEffect(() => () => chart.clearEntryStatuses(), [chart]);
+
     const renderer = useSpatialCanvasRendererFromLayerInputs({
         spatialData,
         coordinateSystem,
+        onEntryStatusChange,
         layerInputs: { layers, layerOrder },
         renderOrder: layerOrder,
         viewState: spatialViewState,
@@ -207,6 +220,11 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     // it cannot reach the renderer result. No render-stack dependency: the engine is
     // stable for the life of the renderer and owns its own notifications, so this
     // publishes once rather than on every generation bump.
+    useEffect(() => {
+        chart.setRetryEntry(renderer.retryEntry);
+        return () => chart.setRetryEntry(undefined);
+    }, [chart, renderer.retryEntry]);
+
     useEffect(() => {
         chart.setPointsLayerRegistry(createPointsLayerRegistry(renderer.pointsEngine, renderer.resolvePointsTarget));
         return () => chart.setPointsLayerRegistry(undefined);
@@ -472,12 +490,6 @@ const SpatialDataViewer = observer(
             seedRenderStackFromSpatialData(config, spatialData, coordinateSystem, chart);
         }, [chart, config, coordinateSystem, loading, spatialData]);
 
-        // For the chart's status (its menu pip and debug dialog), which live outside this tree.
-        const rasterIssues = useRasterIssues(spatialData, rasterEntriesKey(config.renderStack));
-        useEffect(() => {
-            chart.setRasterIssues(rasterIssues);
-            return () => chart.setRasterIssues([]);
-        }, [chart, rasterIssues]);
         const storeUrl = spatialData?.url ?? null;
         useEffect(() => {
             chart.setSpatialDataUrl(storeUrl);
