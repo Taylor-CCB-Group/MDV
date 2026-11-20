@@ -1,6 +1,8 @@
 import { scaleBand, scaleLinear } from "@visx/scale";
-import { type PointerEvent, useMemo } from "react";
+import { type PointerEvent, useMemo, useRef } from "react";
 import { canvasMeasureText } from "@/charts/dotplot/xAxisLabels";
+import BrushRangeChip, { useBrushStyle } from "../histogram/BrushRangeChip";
+import { type BrushXConfig, useBrushX } from "../histogram/useBrushX";
 import type { MultiLineAxis } from "./multiLineConfig";
 import { AXIS_FONT_FAMILY, getMultiLineLayout, LABEL_GAP, LINE_HEIGHT, TICK_LENGTH } from "./multiLineLayout";
 import type { DensityCurve } from "./multiLineStats";
@@ -36,6 +38,8 @@ export type MultiLinePanelProps = {
     yLabel: string;
     onCurveHover?: (event: PointerEvent<SVGPathElement>, category: number) => void;
     onCurveLeave?: () => void;
+    /** A brush across the plot: the brushed x range in data units, or null; omit for no brush. */
+    brush?: Pick<BrushXConfig, "value" | "setValue">;
 };
 
 /**
@@ -59,7 +63,9 @@ export default function MultiLinePanel({
     yLabel,
     onCurveHover,
     onCurveLeave,
+    brush,
 }: MultiLinePanelProps) {
+    const svgRef = useRef<SVGSVGElement>(null);
     const fullRowLabels = useMemo(
         () => (stacked ? curves.map((c) => categoryLabels[c.category] ?? "") : null),
         [stacked, curves, categoryLabels],
@@ -107,90 +113,109 @@ export default function MultiLinePanel({
         });
     }, [curves, ticks, xScale, rowScale, stacked, fill, plotHeight]);
 
+    const brushValue = brush?.value ?? null;
+    const setBrushValue = brush?.setValue;
+    const brushConfig = useMemo(
+        () => (setBrushValue ? { value: brushValue, setValue: setBrushValue, minMax: domain } : undefined),
+        [brushValue, setBrushValue, domain],
+    );
+    const brushStyle = useBrushStyle();
+    useBrushX(svgRef, plotWidth > 0 && plotHeight > 0 ? brushConfig : undefined, "linear", {
+        layout: { x: left, y: top, width: plotWidth, height: plotHeight },
+        style: brushStyle,
+        below: true,
+    });
+
     if (plotWidth === 0 || plotHeight === 0) return null;
     const tickLabelTop = TICK_LENGTH + LABEL_GAP;
     const { rowLabels } = layout;
     return (
-        <svg width={width} height={height} className="block" fontFamily={AXIS_FONT_FAMILY}>
-            <g transform={`translate(${left},${top})`}>
-                {paths.map(
-                    (p) =>
-                        p.area && (
-                            <path
-                                key={`area-${p.category}`}
-                                d={p.area}
-                                fill={colors[p.category]}
-                                opacity={0.5}
-                                pointerEvents="none"
-                            />
-                        ),
-                )}
-                {paths.map((p) => (
-                    <path
-                        key={p.category}
-                        d={p.line}
-                        fill="none"
-                        stroke={colors[p.category]}
-                        strokeWidth={2}
-                        strokeLinejoin="round"
-                        onPointerMove={onCurveHover && ((e) => onCurveHover(e, p.category))}
-                        onPointerLeave={onCurveLeave}
-                    />
-                ))}
-
-                <g transform={`translate(0,${plotHeight})`} fill={TEXT} fontSize={xFont}>
-                    <line x2={plotWidth} stroke={TEXT} />
-                    {layout.xTicks.map((t) => (
-                        <g key={t} transform={`translate(${xScale(t)},0)`}>
-                            <line y2={TICK_LENGTH} stroke={TEXT} />
-                            <text y={tickLabelTop} textAnchor="middle" dominantBaseline="hanging">
-                                {layout.xTickFormat(t)}
-                            </text>
-                        </g>
+        <div className="relative">
+            {/* top right: the colour legend starts at the top left */}
+            {brushValue && <BrushRangeChip range={brushValue} right={width - left - plotWidth + 2} top={top + 2} />}
+            <svg ref={svgRef} width={width} height={height} className="block" fontFamily={AXIS_FONT_FAMILY}>
+                <g transform={`translate(${left},${top})`}>
+                    {paths.map(
+                        (p) =>
+                            p.area && (
+                                <path
+                                    key={`area-${p.category}`}
+                                    d={p.area}
+                                    fill={colors[p.category]}
+                                    opacity={0.5}
+                                    pointerEvents="none"
+                                />
+                            ),
+                    )}
+                    {paths.map((p) => (
+                        <path
+                            key={p.category}
+                            d={p.line}
+                            fill="none"
+                            stroke={colors[p.category]}
+                            strokeWidth={2}
+                            strokeLinejoin="round"
+                            // only the line itself, so the brush beneath gets the rest of the plot
+                            pointerEvents="visibleStroke"
+                            onPointerMove={onCurveHover && ((e) => onCurveHover(e, p.category))}
+                            onPointerLeave={onCurveLeave}
+                        />
                     ))}
-                    <text
-                        x={plotWidth / 2}
-                        y={tickLabelTop + xFont * LINE_HEIGHT + LABEL_GAP}
-                        textAnchor="middle"
-                        dominantBaseline="hanging"
-                    >
-                        {layout.xLabel !== xLabel && <title>{xLabel}</title>}
-                        {layout.xLabel}
-                    </text>
-                </g>
 
-                <g fill={TEXT}>
-                    <line y2={plotHeight} stroke={TEXT} />
-                    {rowLabels && fullRowLabels ? (
-                        curves.map((c, i) => (
-                            <g
-                                key={c.category}
-                                transform={`translate(0,${(rowScale(c.category) ?? 0) + rowScale.bandwidth() / 2})`}
-                            >
-                                <line x2={-TICK_LENGTH} stroke={TEXT} />
-                                <text
-                                    x={-TICK_LENGTH - LABEL_GAP}
-                                    textAnchor="end"
-                                    dominantBaseline="central"
-                                    fontSize={layout.rowFontSize}
-                                >
-                                    {rowLabels[i] !== fullRowLabels[i] && <title>{fullRowLabels[i]}</title>}
-                                    {rowLabels[i]}
+                    <g transform={`translate(0,${plotHeight})`} fill={TEXT} fontSize={xFont}>
+                        <line x2={plotWidth} stroke={TEXT} />
+                        {layout.xTicks.map((t) => (
+                            <g key={t} transform={`translate(${xScale(t)},0)`}>
+                                <line y2={TICK_LENGTH} stroke={TEXT} />
+                                <text y={tickLabelTop} textAnchor="middle" dominantBaseline="hanging">
+                                    {layout.xTickFormat(t)}
                                 </text>
                             </g>
-                        ))
-                    ) : (
-                        // each curve is scaled to its own peak, so a density scale would mean nothing
+                        ))}
                         <text
-                            transform={`translate(${-LABEL_GAP - 1},${plotHeight / 2}) rotate(-90)`}
+                            x={plotWidth / 2}
+                            y={tickLabelTop + xFont * LINE_HEIGHT + LABEL_GAP}
                             textAnchor="middle"
-                            fontSize={yFont}
+                            dominantBaseline="hanging"
                         >
-                            {layout.yLabel}
+                            {layout.xLabel !== xLabel && <title>{xLabel}</title>}
+                            {layout.xLabel}
                         </text>
-                    )}
+                    </g>
+
+                    <g fill={TEXT}>
+                        <line y2={plotHeight} stroke={TEXT} />
+                        {rowLabels && fullRowLabels ? (
+                            curves.map((c, i) => (
+                                <g
+                                    key={c.category}
+                                    transform={`translate(0,${(rowScale(c.category) ?? 0) + rowScale.bandwidth() / 2})`}
+                                >
+                                    <line x2={-TICK_LENGTH} stroke={TEXT} />
+                                    <text
+                                        x={-TICK_LENGTH - LABEL_GAP}
+                                        textAnchor="end"
+                                        dominantBaseline="central"
+                                        fontSize={layout.rowFontSize}
+                                    >
+                                        {rowLabels[i] !== fullRowLabels[i] && <title>{fullRowLabels[i]}</title>}
+                                        {rowLabels[i]}
+                                    </text>
+                                </g>
+                            ))
+                        ) : (
+                            // each curve is scaled to its own peak, so a density scale would mean nothing
+                            <text
+                                transform={`translate(${-LABEL_GAP - 1},${plotHeight / 2}) rotate(-90)`}
+                                textAnchor="middle"
+                                fontSize={yFont}
+                            >
+                                {layout.yLabel}
+                            </text>
+                        )}
+                    </g>
                 </g>
-            </g>
-        </svg>
+            </svg>
+        </div>
     );
 }

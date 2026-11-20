@@ -1,9 +1,9 @@
 import { scaleLinear } from "d3-scale";
 import { observer } from "mobx-react-lite";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DataColumn, DataType, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { useChart, useDataStore } from "@/react/context";
-import { useChartSize, useConfig, useFieldSpec, useFilteredIndices } from "@/react/hooks";
+import { useChartSize, useConfig, useFieldSpec, useOwnedFilteredIndices } from "@/react/hooks";
 import { escapeHtml } from "@/utilities/Utilities";
 import MultiLinePanel from "./MultiLinePanel";
 import type { MultiLineReact } from "./MultiLineReactWrapper";
@@ -76,7 +76,8 @@ const MultiLineComponent = observer(function MultiLineComponent() {
     const config = useConfig<MultiLineConfig>();
     const dataStore = useDataStore();
     const [width, height] = useChartSize();
-    const rows = useFilteredIndices();
+    // rows passing every filter but this chart's own brush, so its curves stay whole while brushing
+    const { ownerVisibleRows: rows } = useOwnedFilteredIndices(chart.dim);
     const categorySpec = useFieldSpec(config.categories ?? undefined);
     // one value for now; several, as a grid, come later
     const valueSpec = useFieldSpec(config.values[0]);
@@ -99,6 +100,16 @@ const MultiLineComponent = observer(function MultiLineComponent() {
         };
     }, [categoryColumn, valueColumn, xDomain, intervals, band_width]);
     const state = useDensities(inputs, rows, chart.dataVersion);
+
+    // the brush filters the other charts; applied from the config, so a saved brush filters on load
+    const brushKey = JSON.stringify(config.brush);
+    const valueField = valueColumn?.field;
+    const domain = xDomain?.domain;
+    // biome-ignore lint/correctness/useExhaustiveDependencies: config.brush is read by applyBrushFilter, keyed by value
+    useEffect(() => {
+        chart.applyBrushFilter(valueField, domain);
+    }, [chart, brushKey, valueField, domain]);
+    const setBrush = useCallback((range: [number, number] | null) => chart.setBrush(range), [chart]);
 
     const colors = useMemo(
         () => (categoryColumn ? dataStore.getColumnColors(categoryColumn.field).map(String) : []),
@@ -133,6 +144,7 @@ const MultiLineComponent = observer(function MultiLineComponent() {
             yLabel={axis.y.label ?? "density"}
             onCurveHover={(event, category) => chart.showToolTip(event.nativeEvent, escapeHtml(labels[category] ?? ""))}
             onCurveLeave={() => chart.hideToolTip()}
+            brush={{ value: config.brush, setValue: setBrush }}
         />
     );
 });

@@ -448,6 +448,11 @@ export const MultiLineReactConfigSchema = BaseConfigSchema.extend({
         ),
     intervals: z.number().int().positive().optional().describe("Roughly how many points each line has"),
     fit_labels: z.boolean().optional().describe("Fit the axis margins to the labels; off, the axis sizes are used"),
+    brush: z
+        .tuple([z.number(), z.number()])
+        .nullable()
+        .optional()
+        .describe("The brushed range of the value, in data units, which filters other charts; null for none"),
 }).describe("Configuration for density curves of numeric values, one per category; `param` is unused");
 
 export const MultiBoxPlotConfigSchema = BaseConfigSchema.extend({

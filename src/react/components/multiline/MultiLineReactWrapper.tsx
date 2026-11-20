@@ -3,6 +3,7 @@ import BaseChart, { type ColumnChangeEvent } from "@/charts/BaseChart";
 import type { FieldName } from "@/charts/charts";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import type DataStore from "@/datastore/DataStore";
+import type Dimension from "@/datastore/Dimension";
 import { flattenFields } from "@/lib/columnTypeHelpers";
 import { g, isArray } from "@/lib/utils";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
@@ -13,6 +14,7 @@ import MultiLineComponent from "./MultiLineComponent";
 import {
     adaptMultiLineConfig,
     getBandWidthSetting,
+    getBrushFilterRange,
     getXDomain,
     MULTI_LINE_REACT_TYPE,
     type MultiLineConfig,
@@ -23,6 +25,8 @@ import {
 export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
     /** Bumped when the data of a column this chart draws is edited in place, so it recomputes. */
     dataVersion = 0;
+    /** Filters the other charts to the brushed range; this chart keeps drawing every row it would without it. */
+    dim: Dimension;
 
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: SavedMultiLineConfig) {
         const config = adaptMultiLineConfig(originalConfig);
@@ -31,7 +35,45 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
             config.title = dataStore.getColumnName(valueField) ?? valueField;
         }
         super(dataStore, div, config, MultiLineComponent);
-        makeObservable(this, { dataVersion: observable, bumpDataVersion: action });
+        this.dim = this.dataStore.getDimension("range_dimension");
+        makeObservable(this, { dataVersion: observable, bumpDataVersion: action, setBrush: action });
+    }
+
+    /** Called by the brush; the component applies the filter, so a saved brush filters on load too. */
+    setBrush(range: [number, number] | null) {
+        this.config.brush = range;
+    }
+
+    /** Filters the other charts to the rows whose `field` is in the brushed range, or lifts the filter. */
+    applyBrushFilter(field: FieldName | undefined, domain: [number, number] | undefined) {
+        const { brush } = this.config;
+        if (!brush || !field || !domain) {
+            this.dim.removeFilter();
+            this.resetButton.style.display = "none";
+            return;
+        }
+        this.dim.filter("filterRange", [field], getBrushFilterRange(brush, domain));
+        this.resetButton.style.display = "inline";
+    }
+
+    /** The chart menu's reset button. */
+    removeFilter() {
+        this.dim.removeFilter();
+        this.setBrush(null);
+    }
+
+    onDataFiltered(dim?: unknown) {
+        // "remove all filters" has already lifted this chart's filter
+        if (dim === "all_removed" && this.config.brush) {
+            this.setBrush(null);
+            this.resetButton.style.display = "none";
+        }
+    }
+
+    remove() {
+        // also lifts the brush filter from the other charts
+        this.dim.destroy();
+        super.remove();
     }
 
     bumpDataVersion() {
@@ -98,6 +140,8 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
                 columnType: "number",
                 func: (v) => {
                     c.values = [isArray(v) ? v[0] : v];
+                    // the brushed range was of the old column
+                    c.brush = null;
                     // a saved label named the old column
                     c.axis.x.label = null;
                     // in data units: the old column's band width means nothing for the new one

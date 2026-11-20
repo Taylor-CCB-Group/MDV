@@ -3,6 +3,7 @@ import { MultiLineChartConfigSchema, MultiLineReactConfigSchema } from "@/charts
 import {
     adaptMultiLineConfig,
     getBandwidth,
+    getBrushFilterRange,
     getXDomain,
     type SavedMultiLineConfig,
 } from "@/react/components/multiline/multiLineConfig";
@@ -72,5 +73,23 @@ describe("x domain and bandwidth", () => {
         expect(getBandwidth({ band_width: null }, [0, 4], true)).toBeCloseTo(0.4);
         expect(getBandwidth({ band_width: 0.5 }, [-2, 8], false)).toBe(0.5);
         expect(getBandwidth({ band_width: null }, [-2, 8], false)).toBeCloseTo(0.1);
+    });
+});
+
+describe("brush", () => {
+    it("is read from a saved config, and left unset otherwise", () => {
+        expect(adaptMultiLineConfig(legacy).brush).toBeNull();
+        expect(adaptMultiLineConfig({ ...legacy, brush: [0.2, 1.5] }).brush).toEqual([0.2, 1.5]);
+        expect(adaptMultiLineConfig({ ...legacy, brush: [0.2] as never }).brush).toBeNull();
+    });
+
+    it("filters the brushed range, in either direction", () => {
+        expect(getBrushFilterRange([0.5, 1.5], [0, 4])).toEqual({ min: 0.5, max: 1.5 });
+        expect(getBrushFilterRange([1.5, 0.5], [0, 4])).toEqual({ min: 0.5, max: 1.5 });
+    });
+
+    it("takes in everything beyond an end of the axis that the brush reaches", () => {
+        expect(getBrushFilterRange([0, 1.5], [0, 4])).toEqual({ min: Number.NEGATIVE_INFINITY, max: 1.5 });
+        expect(getBrushFilterRange([2, 4], [0, 4])).toEqual({ min: 2, max: Number.POSITIVE_INFINITY });
     });
 });

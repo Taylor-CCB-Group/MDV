@@ -42,6 +42,8 @@ export type MultiLineConfig = BaseConfig & {
     axis: { x: MultiLineAxis; y: MultiLineAxis };
     /** Fit the axis margins to the labels; off, the axis sizes are used, as in the legacy chart. */
     fit_labels: boolean;
+    /** The brushed range of the value, in data units, which filters other charts; null for none. */
+    brush: [number, number] | null;
 };
 
 /** `label` replaces the default axis label (the value's name, or "density"); legacy charts saved one. */
@@ -59,6 +61,10 @@ export type SavedMultiLineConfig = BaseConfig &
         scaletrim?: string | boolean | null;
         axis?: { x?: LegacyAxis; y?: LegacyAxis };
     };
+
+function isRange(value: unknown): value is [number, number] {
+    return Array.isArray(value) && value.length === 2 && value.every(Number.isFinite);
+}
 
 function toScaleTrim(value: unknown): ScaleTrim | null {
     return SCALE_TRIMS.find((t) => t === value) ?? null;
@@ -101,6 +107,7 @@ export function adaptMultiLineConfig(original: SavedMultiLineConfig): MultiLineC
         color_legend: { ...original.color_legend, display: original.color_legend?.display ?? !stacked },
         axis: { x: toAxis(original.axis?.x, 30), y: toAxis(original.axis?.y, 45) },
         fit_labels: original.fit_labels ?? true,
+        brush: isRange(original.brush) ? original.brush : null,
     };
 }
 
@@ -140,4 +147,19 @@ export function getBandWidthSetting(
     }
     const span = domain[1] - domain[0] || 1;
     return { min: span / 1000, max: span / 10, step: span / 1000, value: getBandwidth(config, domain, clamp) };
+}
+
+/**
+ * The rows a brush selects, as a value range. Values beyond a trimmed axis are drawn at its ends,
+ * so a brush that reaches an end takes in everything beyond it; so does one reaching the end of an
+ * untrimmed axis, where the brush can stop a rounding error short of the last value.
+ */
+export function getBrushFilterRange(brush: [number, number], domain: [number, number]): { min: number; max: number } {
+    const lo = Math.min(brush[0], brush[1]);
+    const hi = Math.max(brush[0], brush[1]);
+    const tolerance = (domain[1] - domain[0]) * 1e-6;
+    return {
+        min: lo <= domain[0] + tolerance ? Number.NEGATIVE_INFINITY : lo,
+        max: hi >= domain[1] - tolerance ? Number.POSITIVE_INFINITY : hi,
+    };
 }
