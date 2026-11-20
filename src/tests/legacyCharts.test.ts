@@ -419,6 +419,25 @@ describe("the classic 3D scatter plot", () => {
         expect(deckPixelRadius).toBeCloseTo(2.5, 0);
     });
 
+    test("does not start hiding rows with filters the classic chart never applied", () => {
+        const config: Record<string, unknown> & { type: string } = {
+            ...classic(),
+            background_filter: { column: "cell_type", categories: ["T", "B"], category: "T" },
+            category_filters: [{ column: "sample", category: ["a"] }],
+        };
+        convertLegacyChartConfigNow(config);
+        expect(config).not.toHaveProperty("background_filter");
+        expect(config).not.toHaveProperty("category_filters");
+    });
+
+    test("sizes points for data that only varies along z", () => {
+        const config: { type: string; radius: number; course_radius?: number; viewState?: any } = classic();
+        convertLegacyChartConfigNow(config, withRanges({ pc1: [2, 2], pc2: [3, 3], pc3: [-8, 8] }));
+        const deckPixelRadius =
+            ((config.radius * (config.course_radius ?? 1)) / 10000) * 16 * 2 ** config.viewState.zoom;
+        expect(deckPixelRadius).toBeCloseTo(2.5, 0);
+    });
+
     test("keeps its point size when the column ranges are not known", () => {
         const config = classic();
         convertLegacyChartConfigNow(config);

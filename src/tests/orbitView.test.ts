@@ -119,6 +119,16 @@ test("a fitted view keeps the whole box in the chart however it turns", () => {
     expect(Math.hypot(10, 20, 5) * 2 ** view.zoom).toBeLessThan(300);
 });
 
+test("a fitted view frames a very small cloud, and a single point", () => {
+    const tiny = fitOrbitView({ min: [0, 0, 0], max: [1e-12, 1e-12, 1e-12] }, 300, 300);
+    const diagonalPixels = Math.hypot(1e-12, 1e-12, 1e-12) * 2 ** tiny.zoom;
+    expect(diagonalPixels).toBeGreaterThan(150);
+    expect(diagonalPixels).toBeLessThan(300);
+    const point = fitOrbitView({ min: [5, 5, 5], max: [5, 5, 5] }, 300, 300);
+    expect(Number.isFinite(point.zoom)).toBe(true);
+    expect(point.target).toEqual([5, 5, 5]);
+});
+
 describe("the view a selection was drawn in", () => {
     const view: OrbitSelectionView = {
         target: [1, 2, 3],

@@ -71,8 +71,11 @@ export function fitOrbitView(
     const mid = (i: number) => (min[i] + max[i]) / 2;
     const target: [number, number, number] = [mid(0), mid(1), mid(2)];
     const diameter = Math.hypot(...[0, 1, 2].map((i) => max[i] - min[i]));
+    // a single point (or one place repeated) has no size to fit: show a millionth of its distance
+    // from the origin across the chart, as the 2D fit does
+    const span = diameter > 0 ? diameter : Math.max(1e-9, Math.hypot(...target) * 1e-6);
     const side = Math.min(width, height);
-    let zoom = Math.log2(side / Math.max(diameter, 1e-9)) - FIT_PADDING_ZOOM;
+    let zoom = Math.log2(side / span) - FIT_PADDING_ZOOM;
     if (!Number.isFinite(zoom)) zoom = 0;
     return { target, zoom, ...rotation };
 }

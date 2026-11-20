@@ -87,14 +87,12 @@ function useScreenSelection(
             orbitAxis,
         };
     }, [orbitViewState, width, height, orbitAxis]);
-    const currentRef = useRef(current);
-    currentRef.current = current;
     useEffect(() => {
-        chart.getOrbitSelectionView = () => currentRef.current;
+        chart.getOrbitSelectionView = () => current;
         return () => {
             chart.getOrbitSelectionView = undefined;
         };
-    }, [chart]);
+    }, [chart, current]);
 
     const feature = config.selectionFeatureCollection.features[0];
     const drawnIn = useMemo(() => orbitSelectionViewOf(toJS(feature?.properties)), [feature]);

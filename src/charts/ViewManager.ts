@@ -88,16 +88,20 @@ class ViewManager {
     }
 
     /**
-     * Tells the user that a chart was loaded as its current equivalent. A view loads its charts
-     * together, so they share one alert whose count is updated as each is converted.
+     * Tells the user that a chart was loaded as its current equivalent, which is a change to the view
+     * they may want to save. A view loads its charts together, so they share one alert whose count
+     * is updated as each is converted.
      */
     reportLegacyConversion() {
         const alert = this.legacyConversionAlert;
         const count = alert && alert.id in this.cm.infoAlerts ? alert.count + 1 : 1;
+        // only the setting's own conversions are worth pointing at it for; others always happen
+        const setting =
+            convertLegacyChartsSetting.get() === "on" ? " (see Convert legacy charts in Browser settings)" : "";
         const msg =
             count === 1
-                ? "A legacy chart was converted to its current equivalent (see Convert legacy charts in Browser settings)"
-                : `${count} legacy charts were converted to their current equivalents (see Convert legacy charts in Browser settings)`;
+                ? `A legacy chart was converted to its current equivalent; save the view to keep the change${setting}`
+                : `${count} legacy charts were converted to their current equivalents; save the view to keep the changes${setting}`;
         if (alert && count > 1) {
             this.cm.updateInfoAlert(alert.id, msg);
             alert.count = count;
@@ -109,14 +113,13 @@ class ViewManager {
 
     /**
      * Converts the config of a chart that a view is loading, if the browser setting for that is on, or
-     * its type always converts (which is not announced: the replacement is simply that chart now).
-     * Charts the user adds themselves are not passed through here.
+     * its type always converts. Charts the user adds themselves are not passed through here.
      */
     convertLegacyChartOnLoad(dataSource: string, config: { type: string; title?: string }) {
         const convertedFrom = convertLegacyChartConfig(config, this.cm.dsIndex[dataSource]?.dataStore);
         if (!convertedFrom) return;
         console.log(`Loading legacy chart '${config.title}' (${convertedFrom}) as ${config.type}`);
-        if (convertLegacyChartsSetting.get() === "on") this.reportLegacyConversion();
+        this.reportLegacyConversion();
     }
 
     /** Converts each open chart that has a current equivalent, one at a time, sharing one alert. */

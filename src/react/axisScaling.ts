@@ -93,10 +93,19 @@ export function deckRadiusForPixelRadius(pixelRadius: number, pixelsPerUnit: num
     return deckRadiusSetting((pixelRadius * 10000) / (referenceRange * pixelsPerUnit));
 }
 
+/**
+ * The data range that a 3D chart's point radius is proportional to: the largest of its x, y and z
+ * ranges, so data that only varies along one axis still has points of a size.
+ */
+export function radiusReferenceRange3D(ranges: readonly number[]) {
+    return Math.max(...ranges.map(Math.abs));
+}
+
 /** `radius * course_radius` as the two settings. The slider tops out at 20, so larger values use `course_radius`. */
 function deckRadiusSetting(total: number) {
     if (!(total > 0) || !Number.isFinite(total)) return undefined;
     if (total <= 20) return { radius: Math.round(total * 10) / 10, course_radius: 1 };
     if (total <= 200) return { radius: Math.round(total) / 10, course_radius: 10 };
-    return { radius: Math.min(20, Math.round(total / 10) / 10), course_radius: 100 };
+    // past what the slider shows, as larger classic sizes always were; the size is what matters
+    return { radius: Math.round(total / 10) / 10, course_radius: 100 };
 }

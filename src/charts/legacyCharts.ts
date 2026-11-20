@@ -1,6 +1,6 @@
 import type DataStore from "@/datastore/DataStore";
 import { convertLegacyChartsSetting } from "@/lib/browserSettings";
-import { deckRadiusForClassicRadius, deckRadiusForPixelRadius } from "@/react/axisScaling";
+import { deckRadiusForClassicRadius, deckRadiusForPixelRadius, radiusReferenceRange3D } from "@/react/axisScaling";
 import { fitOrbitView, orbitViewFromLegacyCamera, validAxisScales } from "@/react/orbitView";
 import type { ChartType } from "./ChartTypes";
 
@@ -98,7 +98,11 @@ const adaptClassic3DScatter = (config: any, dataStore?: DataStore) => {
         camera && Array.isArray(c) && c.length === 3
             ? orbitViewFromLegacyCamera(camera, [c[0], c[1], c[2]], plotHeight)
             : undefined;
-    for (const key of ["camera", "center", "brush", "viewState"]) delete config[key];
+    // the classic 3D chart never applied a background or category filter (only the classic 2D one
+    // did), so one carried over in its config would start hiding rows the chart showed
+    for (const key of ["camera", "center", "brush", "viewState", "background_filter", "category_filters"]) {
+        delete config[key];
+    }
     config.dimension = "3d";
     config.orbit_axis = "Y";
     config.axis_scales = scales;
@@ -117,7 +121,8 @@ const adaptClassic3DScatter = (config: any, dataStore?: DataStore) => {
             plotWidth,
             plotHeight,
         ).zoom;
-    const referenceRange = Math.max(ranges[0][1] - ranges[0][0], ranges[1][1] - ranges[1][0]);
+    const referenceRange = radiusReferenceRange3D(ranges.map(([lo, hi]) => hi - lo));
+    if (!(referenceRange > 0)) return;
     const sizing = deckRadiusForPixelRadius((config.radius ?? 5) / 2, 2 ** zoom, referenceRange);
     if (sizing) Object.assign(config, sizing);
 };

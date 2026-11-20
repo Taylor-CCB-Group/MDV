@@ -11,7 +11,7 @@ import { MdvDataFilterExtension } from "@/webgl/MdvDataFilterExtension";
 import { MdvScatterplotLayer } from "@/webgl/MdvScatterplotLayer";
 import SpatialLayer, { DensityOverlayLayer } from "@/webgl/SpatialLayer";
 import { ScatterDensityExension, ScatterSquareExtension } from "../webgl/ScatterDeckExtension";
-import { type AxisScaling, radiusReferenceRange } from "./axisScaling";
+import { type AxisScaling, radiusReferenceRange, radiusReferenceRange3D } from "./axisScaling";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import type { ViewState } from "./components/VivScatterComponent";
@@ -303,7 +303,7 @@ export function useScatterRadius() {
     const [width, height] = useChartSize();
     const scaling = dimension === "2d" ? (axis_scaling ?? "equal") : "equal";
     const params = useParamColumns();
-    const [cx, cy] = params;
+    const [cx, cy, cz] = params;
     const scale = useRegionScale();
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     // this is reasonably ok looking, but even for abstract data it should really relate to axis labels
@@ -322,11 +322,15 @@ export function useScatterRadius() {
             // how does this come to be? is it a spatial conversion thing?
             const xRange = Math.abs(cx.minMax[1] - cx.minMax[0]);
             const yRange = Math.abs(cy.minMax[1] - cy.minMax[0]);
-            const r = 10000 / radiusReferenceRange(xRange, yRange, { width, height }, scaling);
+            const reference =
+                dimension === "3d" && cz?.minMax
+                    ? radiusReferenceRange3D([xRange, yRange, cz.minMax[1] - cz.minMax[0]])
+                    : radiusReferenceRange(xRange, yRange, { width, height }, scaling);
+            const r = 10000 / reference;
             return radiusScale / r;
         }
         return radiusScale;
-    }, [cx.minMax, cy.minMax, radiusScale, cx, cy, width, height, scaling]);
+    }, [cx.minMax, cy.minMax, cz?.minMax, radiusScale, cx, cy, width, height, scaling, dimension]);
 }
 
 /** How visible the rows a 3D selection left out are, relative to the points it caught. */
