@@ -1,4 +1,4 @@
-import type { Viewport } from "@deck.gl/core";
+import type { Layer, Viewport } from "@deck.gl/core";
 import type {
     GeoJsonEditMode,
     Position,
@@ -64,7 +64,9 @@ export type RangeState = {
      * Whether a drag pressed at a point should go to another layer rather than draw a selection: a
      * gate label there, which drags to move (see `useGateLayers`). Null for none.
      */
-    yieldDragRef: { current: ((point: [number, number], viewport: Viewport) => boolean) | null };
+    yieldDragRef: {
+        current: ((point: [number, number], viewport: Viewport, layers: readonly Layer[]) => boolean) | null;
+    };
 };
 export type MeasureState = {
     startPixels: P;
@@ -313,7 +315,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection,
             mode: selectionMode,
-            yieldDrag: (point, viewport) => yieldDragRef.current?.(point, viewport) ?? false,
+            yieldDrag: (point, viewport, layers) => yieldDragRef.current?.(point, viewport, layers) ?? false,
             onEmptyClick: clearSelection,
             coordinateSystem: SELECTION_COORDINATE_SYSTEM,
             getFillColor,

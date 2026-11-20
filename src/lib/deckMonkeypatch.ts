@@ -1,4 +1,4 @@
-import { Deck, type Viewport } from "@deck.gl/core";
+import { Deck, type Layer, type Viewport } from "@deck.gl/core";
 import { EditableGeoJsonLayer, TranslateMode } from "@deck.gl-community/editable-layers";
 import type { EventManager, MjolnirGestureEvent } from "mjolnir.js";
 import { cpuEditablePicks } from "@/editable-layers/cpuPicks";
@@ -59,9 +59,9 @@ const viewDrags = new WeakSet<object>();
 type SelectionLayerProps = ConstructorParameters<typeof EditableGeoJsonLayer>[0] & {
     /**
      * True when a drag pressed at `point` (canvas pixels, in `viewport`) belongs to another layer,
-     * e.g. a gate label being moved.
+     * e.g. a gate label being moved. `layers` are the ones deck draws (charts may hand deck copies).
      */
-    yieldDrag?: (point: [number, number], viewport: Viewport) => boolean;
+    yieldDrag?: (point: [number, number], viewport: Viewport, layers: readonly Layer[]) => boolean;
     /** Called for a click on empty space (no data point, gate or label, nor the selection) with a tool that doesn't use clicks. */
     onEmptyClick?: () => void;
 };
@@ -82,7 +82,8 @@ export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
         ];
         const viewport = this.viewportAt(point) ?? this.context.viewport;
         const local: [number, number] = [point[0] - (viewport.x ?? 0), point[1] - (viewport.y ?? 0)];
-        return Boolean(yieldDrag(local, viewport));
+        const layers: readonly Layer[] = this.patchDeck?.layerManager?.getLayers() ?? [];
+        return Boolean(yieldDrag(local, viewport, layers));
     }
 
     /**

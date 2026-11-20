@@ -230,8 +230,11 @@ const useGateLayers = () => {
             yieldDragRef.current = null;
             return;
         }
-        yieldDragRef.current = (point, viewport) => {
-            const hit = textLabelAt(gateLabelLayer, point, viewport);
+        yieldDragRef.current = (point, viewport, layers) => {
+            // the instance deck draws, which has the font laid out: charts can hand deck a copy
+            // (`useLayersForDevice`), which keeps the id
+            const live = layers.find((layer) => layer.id === gateLabelLayer.id) ?? gateLabelLayer;
+            const hit = textLabelAt(live, point, viewport);
             // the label's font isn't laid out yet: go by the hover
             return hit === null ? isHoveringLabel : hit >= 0;
         };
