@@ -1,4 +1,4 @@
-import { type RefObject, useCallback, useMemo, useRef } from "react";
+import { type RefObject, useCallback, useMemo, useRef, useState } from "react";
 import type { ChartArrayLayoutHandle } from "../components/ChartArrayLayout";
 import type { ChartArrayRect } from "../components/chartArrayUtils";
 import { getChartArrayViewId } from "../components/chartArrayUtils";
@@ -17,7 +17,9 @@ export type UseChartArrayGridOptions = {
 };
 
 export type UseChartArrayGridResult = {
+    /** The layout, to read; give `ChartArrayLayout` `setLayout` as its ref. */
     layoutRef: RefObject<ChartArrayLayoutHandle | null>;
+    setLayout: (handle: ChartArrayLayoutHandle | null) => void;
     scrollContainerRef: RefObject<HTMLDivElement | null>;
     metrics: ChartArrayMetrics;
     visibleCellIndices: number[];
@@ -44,9 +46,18 @@ export function useChartArrayGrid({
     const cellCount = cells.length;
     const configuredCellCount = cellCount;
 
+    // The layout can be replaced while this hook stays mounted (a grid shows a placeholder
+    // while its device changes), so count its mounts: the observers follow the new elements.
+    const [layoutMounts, setLayoutMounts] = useState(0);
+    const setLayout = useCallback((handle: ChartArrayLayoutHandle | null) => {
+        layoutRef.current = handle;
+        if (handle) setLayoutMounts((n) => n + 1);
+    }, []);
+
     const cellKeys = useMemo(() => cells.map((cell) => cell.key), [cells]);
-    // a new cell in a slot is a new element to observe, even with the same number of cells
-    const cellsKey = cellKeys.join("\u0000");
+    // what the observers watch: a new layout, or a new cell in a slot (a new element even with
+    // the same number of cells), means observing again
+    const cellsKey = `${layoutMounts}\u0001${cellKeys.join("\u0000")}`;
     const metrics = useChartArrayMetrics(layoutRef, cellCount, cellsKey);
     const visibleCellIndices = useChartArrayVisibleIndices(scrollContainerRef, layoutRef, cellCount, cellsKey);
     const visibleCellIndicesKey = visibleCellIndices.join("\u0000");
@@ -85,6 +96,7 @@ export function useChartArrayGrid({
 
     return {
         layoutRef,
+        setLayout,
         scrollContainerRef,
         metrics,
         visibleCellIndices: stableVisibleCellIndices,

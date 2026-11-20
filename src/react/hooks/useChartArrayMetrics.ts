@@ -13,9 +13,9 @@ const EMPTY_METRICS: ChartArrayMetrics = {
 };
 
 /**
- * The size of the layout and of each cell, kept current by a ResizeObserver. `cellsKey` names the
- * cells (their keys joined): a new cell in a slot is a new element, so a change of key observes
- * the cells again, even when their number is the same.
+ * The size of the layout and of each cell, kept current by a ResizeObserver. `cellsKey` changes
+ * whenever the layout or a cell is a new element (a remounted layout; a new cell in a slot, even
+ * with the same number of cells), and a change observes them again.
  */
 export function useChartArrayMetrics(
     layoutRef: RefObject<ChartArrayLayoutHandle | null>,

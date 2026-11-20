@@ -6,9 +6,10 @@ function allCellIndices(cellCount: number) {
 }
 
 /**
- * The indices of the cells in or near view, from an IntersectionObserver. `cellsKey` names the
- * cells (their keys joined): a new cell in a slot is a new element, so a change of key observes
- * the cells again, from a clean slate, even when their number is the same.
+ * The indices of the cells in or near view, from an IntersectionObserver. `cellsKey` changes
+ * whenever the layout or a cell is a new element (a remounted layout and scroll container; a new
+ * cell in a slot, even with the same number of cells), and a change observes them again, from a
+ * clean slate.
  */
 export function useChartArrayVisibleIndices(
     scrollRootRef: RefObject<HTMLElement | null>,

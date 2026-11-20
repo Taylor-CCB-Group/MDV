@@ -311,7 +311,7 @@ export default function DeckCellGrid({
                 <ChartArrayLayout
                     cellCount={grid.cellCount}
                     cellKeys={grid.cellKeys}
-                    layoutRef={grid.layoutRef}
+                    layoutRef={grid.setLayout}
                     renderCell={renderCell}
                 />
             </div>
