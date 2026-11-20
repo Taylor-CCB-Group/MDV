@@ -249,7 +249,10 @@ function DebugSection({
             >
                 <AccordionItem value={id} className="border-b-0">
                     <AccordionTrigger>{title}</AccordionTrigger>
-                    <AccordionContent forceMount>{children}</AccordionContent>
+                    {/* forceMount keeps the content (and its state) mounted while closed; Radix doesn't hide it then, so do it here. */}
+                    <AccordionContent forceMount hidden={!expanded}>
+                        {children}
+                    </AccordionContent>
                 </AccordionItem>
             </Accordion>
         </Paper>

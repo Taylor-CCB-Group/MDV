@@ -53,6 +53,7 @@ const DebugChart = observer(
 // this will be more consistent / less work in short-term, and a basis for refactoring later.
 class DebugChartReactWrapper extends BaseDialog {
     _root?: ReturnType<typeof createMdvPortal>;
+    _resizeObserver?: ResizeObserver;
     get root() {
         return this._root;
     }
@@ -90,8 +91,27 @@ class DebugChartReactWrapper extends BaseDialog {
             div,
             this,
         );
+        this.repositionWhileContentSettles(div);
+    }
+    /**
+     * BaseDialog positions itself once, in its constructor, before the React content has rendered; a tall dialog
+     * then ends up hanging off the bottom of the window, so the page scrolls as well as the dialog.
+     * Re-position as the content first takes shape (not afterwards, so we don't fight the user dragging it).
+     */
+    private repositionWhileContentSettles(content: HTMLElement) {
+        if (typeof ResizeObserver === "undefined") return;
+        let settleTimer: ReturnType<typeof setTimeout> | undefined;
+        const observer = new ResizeObserver(() => {
+            if (content.offsetHeight === 0) return;
+            this._setDialogPosition();
+            clearTimeout(settleTimer);
+            settleTimer = setTimeout(() => observer.disconnect(), 500);
+        });
+        observer.observe(content);
+        this._resizeObserver = observer;
     }
     close() {
+        this._resizeObserver?.disconnect();
         super.close();
         // this.root is undefined; wtf?
         // tried adding getter/setter for it - it doesn't got re-assigned.
