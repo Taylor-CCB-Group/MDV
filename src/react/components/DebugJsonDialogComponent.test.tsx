@@ -195,8 +195,11 @@ describe("DebugJsonDialogComponent", () => {
             expect(screen.getAllByLabelText("Filter")).toHaveLength(2);
 
             fireEvent.change(screen.getAllByLabelText("Filter")[0], { target: { value: "genes" } });
-            await waitFor(() => expect(JSON.stringify(mocks.jsonViewSources.at(-2))).not.toContain("cells"));
-            expect(JSON.stringify(mocks.jsonViewSources)).toContain("genes");
+            // assert on what is rendered now, not on the history of renders
+            await waitFor(() => {
+                const rendered = screen.getAllByTestId("json-view").map((node) => node.textContent ?? "");
+                expect(rendered.filter((text) => text.includes("genes") && !text.includes("cells"))).toHaveLength(1);
+            });
         });
 
         test("shows Preferences first and groups debug content under Debug and diagnostics", () => {

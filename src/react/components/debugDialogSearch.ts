@@ -18,7 +18,7 @@ export function matchesQuery(query: string, ...texts: (string | undefined)[]): b
  * A node is included if all (case insensitive) words of the filter appear somewhere in the node or its path;
  * a matching node is included with its whole subtree.
  */
-export function filterJSON(obj: JSONObject, filter: string): JSONObject {
+export function filterJSON(obj: JSONObject, filter: string, ancestors: readonly string[] = []): JSONObject {
     const words = queryWords(filter);
     if (words.length === 0) return obj;
 
@@ -48,7 +48,7 @@ export function filterJSON(obj: JSONObject, filter: string): JSONObject {
         return null;
     }
 
-    return recursiveFilter(obj, []) || {};
+    return recursiveFilter(obj, [...ancestors]) || {};
 }
 
 export type JsonSection = {
@@ -87,15 +87,21 @@ export function splitJsonSections(json: unknown, groupKeys: readonly string[] = 
  * Apply `query` to a JSON section. A matching title keeps the whole section; otherwise only matching
  * descendants (by key path or string value) are kept. Returns null if nothing in the section matches.
  */
-export function filterJsonSection(section: JsonSection, query: string): JsonSection | null {
-    if (queryWords(query).length === 0 || matchesQuery(query, section.title)) return section;
+export function filterJsonSection(
+    section: JsonSection,
+    query: string,
+    /** Titles of the groups this section is nested in; they count as part of its path when matching. */
+    ancestors: readonly string[] = [],
+): JsonSection | null {
+    if (queryWords(query).length === 0 || matchesQuery(query, ...ancestors, section.title)) return section;
     if (section.children) {
+        const path = [...ancestors, section.title];
         const children = section.children.flatMap((child) => {
-            const filtered = filterJsonSection(child, query);
+            const filtered = filterJsonSection(child, query, path);
             return filtered ? [filtered] : [];
         });
         return children.length > 0 ? { ...section, children } : null;
     }
-    const filtered = filterJSON({ [section.title]: section.json }, query)[section.title];
+    const filtered = filterJSON({ [section.title]: section.json }, query, ancestors)[section.title];
     return filtered === undefined ? null : { title: section.title, json: filtered };
 }

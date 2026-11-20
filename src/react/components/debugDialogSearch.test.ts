@@ -39,5 +39,9 @@ describe("debugDialogSearch", () => {
         expect(filterJsonSection(project as never, "views")?.children?.map((c) => c.title)).toEqual(["views"]);
         expect(filterJsonSection(project as never, "cells")?.children?.map((c) => c.title)).toEqual(["datasources"]);
         expect(filterJsonSection(project as never, "nope")).toBeNull();
+        // the group's title counts as part of the path of what's inside it
+        const both = filterJsonSection(project as never, "project cells");
+        expect(both?.children?.map((c) => c.title)).toEqual(["datasources"]);
+        expect(filterJsonSection(project as never, "project views")?.children?.map((c) => c.title)).toEqual(["views"]);
     });
 });
