@@ -166,6 +166,14 @@ options (name, region, rendering backend) and a button that opens the dialog.
   so its key list covers the labels fields as well as the image ones; without them those edits
   would be dropped once a layer had any saved channels.
 
+- **Opacity from brightness** (image layers; `AlphaFromIntensityControls`) is sd.js's
+  `alphaFromIntensity` (`threshold`, `gain`) on the entry's props. It makes dark pixels
+  transparent, so a fluorescence image can be drawn over brightfield. WebGPU's raster layer
+  reads the prop itself. On WebGL it needs `AlphaFromIntensityExtension`, which MDV's
+  `vivImageExtensionResolver` adds to that layer only: the extension is not neutral when the
+  option is off (threshold 0, gain 1 discards black). The two extension lists keep their
+  identity, so deck sees a change of extensions only when the option is switched.
+
 ### Groups and compositing
 
 The stack is a tree (schema v2). sd.js draws it with `renderStackToDeckLayers`, in the

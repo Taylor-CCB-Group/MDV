@@ -1,7 +1,7 @@
 import { ColorPaletteExtension } from "@hms-dbmi/viv";
 import { Button } from "@mui/material";
 import { viewStateFromBounds } from "@spatialdata/core";
-import { findRenderStackEntry, getRenderStackEntryIds } from "@spatialdata/layers";
+import { AlphaFromIntensityExtension, findRenderStackEntry, getRenderStackEntryIds } from "@spatialdata/layers";
 import type { EntryStatus, RenderStackLayerInputs } from "@spatialdata/vis";
 import {
     resolvePickedEntryId,
@@ -49,7 +49,7 @@ import type { SpatialDataState } from "@/react/spatialdata/spatial_data_reader";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
-import { vivImageLayerProps } from "@/react/spatialdata/viv_image_props";
+import { imageAlphaFromIntensity, vivImageLayerProps } from "@/react/spatialdata/viv_image_props";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
@@ -131,6 +131,10 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     useRebindDeckEvents(deckRef);
 
     const extensions = useMemo(() => [new ColorPaletteExtension(), new VivContrastExtension()], []);
+    // For image layers with "opacity from brightness" on, and only those (see
+    // `imageAlphaFromIntensity`). Both lists keep their identity, so deck sees no change of
+    // extensions until the option is turned on or off.
+    const extensionsWithAlpha = useMemo(() => [...extensions, new AlphaFromIntensityExtension()], [extensions]);
 
     const vivImagePropsResolver = useCallback<VivImagePropsResolver>(
         (ctx: VivImageLayerContext) => vivImageLayerProps(stack, ctx.layerId),
@@ -140,10 +144,11 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     const vivPassthrough = useMemo(
         () => ({
             vivImageExtensions: extensions,
-            vivImageExtensionResolver: () => extensions,
+            vivImageExtensionResolver: (ctx: VivImageLayerContext) =>
+                imageAlphaFromIntensity(stack, ctx.layerId) ? extensionsWithAlpha : extensions,
             vivImagePropsResolver,
         }),
-        [extensions, vivImagePropsResolver],
+        [extensions, extensionsWithAlpha, stack, vivImagePropsResolver],
     );
 
     // What sd.js reports about each layer, for the chart's status and the layer dialog, which
