@@ -1,6 +1,7 @@
 import { GeoJsonLayer, TextLayer } from "deck.gl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LoadedDataColumn } from "@/charts/charts";
+import type { ViewDragProps } from "@/lib/viewGestureGate";
 import { truncateWithEllipsis } from "@/utilities/Utilities";
 import { getVivId } from "../components/avivatorish/MDVivViewer";
 import type { DeckScatterConfigWithRegion } from "../components/DeckScatterReactWrapper";
@@ -11,6 +12,16 @@ import { useSpatialLayers } from "../spatial_context";
 import useGateActions from "./useGateActions";
 
 const MAX_LABEL_LENGTH = 18;
+
+/**
+ * What a chart with a selection toolbar gives its deck controller (`viewGestureGate`), beside the
+ * controller's type: whether a plain drag moves the view (the Pan tool's lock, and not while a
+ * gate label is dragged or hovered), and what two fingers do on a touch screen.
+ */
+export type ViewControllerOptions = ViewDragProps & {
+    dragPan: boolean;
+    multiTouchDrag: "pan" | "rotate";
+};
 
 const useGateLayers = () => {
     const chartId = useChartID();
@@ -210,11 +221,21 @@ const useGateLayers = () => {
 
     // To disable drag pan for the deck controller when label is being dragged or hovered
     const dragPan = !(draggingId || isHoveringLabel);
+    // and so that dragging a label moves it rather than drawing a selection
+    const { yieldDragRef } = selectionProps;
+    useEffect(() => {
+        yieldDragRef.current = !dragPan;
+    }, [yieldDragRef, dragPan]);
+    const dragMovesView = selectionProps.selectedTool === "Pan";
+    const controllerOptions = useMemo<ViewControllerOptions>(
+        () => ({ dragPan, dragMovesView, multiTouchDrag: is2d ? "pan" : "rotate" }),
+        [dragPan, dragMovesView, is2d],
+    );
 
     return {
         gateLabelLayer,
         gateDisplayLayer,
-        controllerOptions: { dragPan },
+        controllerOptions,
     };
 };
 

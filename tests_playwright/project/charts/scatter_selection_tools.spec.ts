@@ -2,7 +2,9 @@
  * End-to-end guard for the deck scatter selection tools (issues #577, #578):
  * - a double-click finishes a Polygon with the double-clicked point as its last vertex, and doesn't zoom;
  * - Freehand, Modify (vertex removal) and Pan (translate selection / controller pan + zoom) work;
- * - all of that still works after the chart is popped out into another window, and after it comes back.
+ * - all of that still works after the chart is popped out into another window, and after it comes back;
+ * - a plain drag draws a rectangle with no tool chosen, while ⌘-drag (Ctrl-drag off a Mac) and a
+ *   right-button drag move the view, with a hint until the view has been moved that way.
  *
  * Runs against whichever frontend TEST_BASE_URL serves; to test a branch's UI, use Vite from that checkout, e.g.
  *   PORT=5171 pnpm run dev
@@ -204,7 +206,7 @@ async function drawFreehandSquare(ui: Page, page: Page, id: string, box: Box) {
     return rings[0];
 }
 
-/** (f): with no selection, Pan drags the view and the wheel zooms. */
+/** (f): with no selection, Pan (the lock) drags the view, and the wheel zooms with the view key held. */
 async function checkController(ui: Page, page: Page, id: string, box: Box) {
     await clearSelection(page, id);
     await selectTool(ui, id, "Pan");
@@ -220,8 +222,18 @@ async function checkController(ui: Page, page: Page, id: string, box: Box) {
 
     const [cx, cy] = at(box, 0.5, 0.5);
     await ui.mouse.move(cx, cy, { steps: 3 });
+    // a plain wheel is left to scroll the page; Ctrl / ⌘ + wheel zooms
+    const viewKey = await viewKeyOf(ui);
+    await ui.keyboard.down(viewKey);
     await ui.mouse.wheel(0, -400);
+    await ui.keyboard.up(viewKey);
     await expect.poll(async () => (await readState(page, id)).viewState?.zoom).not.toBe(before.zoom);
+}
+
+/** The key the app reads to move the view: ⌘ on a Mac (where Ctrl-click is a right-click), Ctrl elsewhere. */
+async function viewKeyOf(ui: Page) {
+    const mac = await ui.evaluate(() => /Mac|iPhone|iPad/.test(navigator.userAgent));
+    return mac ? "Meta" : "Control";
 }
 
 type DataToScreen = (p: Point) => Point;
@@ -287,6 +299,42 @@ async function checkAllTools(ui: Page, page: Page, id: string, box: Box, where: 
     await test.step(`${where}: (f) pan and wheel move the view`, async () => {
         await checkController(ui, page, id, box);
     });
+}
+
+/**
+ * Starts recording what the chart's gesture hint shows. The hint is only up for about a second,
+ * which a slow first drag (software rendering) can outlast, so it is watched rather than polled.
+ */
+async function watchHint(page: Page, id: string) {
+    await page.evaluate((id) => {
+        const content: HTMLElement = (window as any).mdv.chartManager.charts[id].chart.contentDiv;
+        const hint = content.querySelector<HTMLElement>("[data-view-gesture-hint]");
+        if (!hint) throw new Error("no gesture hint in the chart");
+        const shown: string[] = [];
+        (window as any).__hintShown = shown;
+        (window as any).__hintObserver?.disconnect();
+        const observer = new MutationObserver(() => {
+            if (hint.style.opacity === "1") shown.push(hint.textContent ?? "");
+        });
+        observer.observe(hint, { attributes: true, attributeFilter: ["style"], subtree: true, characterData: true });
+        (window as any).__hintObserver = observer;
+    }, id);
+}
+
+/** What the hint has shown since `watchHint`. */
+async function hintShown(page: Page): Promise<string[]> {
+    return await page.evaluate(() => [...((window as any).__hintShown ?? [])]);
+}
+
+/** A drag from one point to another, with a button and keys held (as a real mouse and keyboard). */
+async function dragWith(ui: Page, from: Point, to: Point, { button = "left", keys = [] as string[] } = {}) {
+    for (const key of keys) await ui.keyboard.down(key);
+    await ui.mouse.move(...from, { steps: 3 });
+    await ui.mouse.down({ button: button as "left" | "right" });
+    await ui.mouse.move(...to, { steps: 10 });
+    await ui.mouse.up({ button: button as "left" | "right" });
+    for (const key of keys) await ui.keyboard.up(key);
+    await settle(ui);
 }
 
 /** Let deck and React catch up: two animation frames in the chart's window, then a short wait. */
@@ -448,6 +496,75 @@ test.describe("Scatter selection tools", () => {
             box = await measureCanvas(page, id);
 
             await checkAllTools(page, page, id, box, "(h) popped back in");
+        } finally {
+            if (handle !== undefined) {
+                await handle.cleanup();
+            }
+        }
+    });
+
+    test("a plain drag draws, and ⌘-drag or a right-button drag moves the view", async ({ page }) => {
+        const title = `Drag To Select ${Date.now()}`;
+        let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
+        try {
+            handle = await createTemporaryProjectViaSyntheticAnndata(page, {
+                nameSegment: `scatter-drag-to-select--${Date.now()}`,
+                synthetic: { profile: "realistic", nCells: 200, nGenes: 12, force: true },
+            });
+            const id = await addScatterChart(page, title);
+            const box = await measureCanvas(page, id);
+            const viewKey = await viewKeyOf(page);
+            const mac = viewKey === "Meta";
+            await page.evaluate(() => localStorage.removeItem("mdv.viewDragLearned"));
+            const start = await waitForViewState(page, id);
+
+            await test.step("a plain drag draws a rectangle with no tool chosen, and says how to move the view", async () => {
+                await watchHint(page, id);
+                await page.mouse.move(...at(box, 0.3, 0.3), { steps: 3 });
+                await page.mouse.down();
+                await page.mouse.move(...at(box, 0.6, 0.6), { steps: 10 });
+                await page.mouse.up();
+                const ring = await settledRing(page, page, id);
+                await expect
+                    .poll(() => hintShown(page))
+                    .toContainEqual(`Hold ${mac ? "⌘" : "Ctrl"} and drag to move the view`);
+                expect(ring).toHaveLength(5);
+                expect((await readState(page, id)).viewState?.target).toEqual(start.target);
+            });
+
+            const drawn = (await readState(page, id)).rings[0];
+            let view = await waitForViewState(page, id);
+
+            await test.step(`${viewKey}-drag moves the view and leaves the selection`, async () => {
+                await dragWith(page, at(box, 0.7, 0.2), at(box, 0.8, 0.35), { keys: [viewKey] });
+                const { rings, viewState } = await readState(page, id);
+                expect(viewState?.target).not.toEqual(view.target);
+                expect(rings).toEqual([drawn]);
+                expect(await page.evaluate(() => localStorage.getItem("mdv.viewDragLearned"))).toBe("1");
+                view = await waitForViewState(page, id);
+            });
+
+            await test.step("a right-button drag moves the view too", async () => {
+                await dragWith(page, at(box, 0.7, 0.2), at(box, 0.6, 0.3), { button: "right" });
+                const { rings, viewState } = await readState(page, id);
+                expect(viewState?.target).not.toEqual(view.target);
+                expect(rings).toEqual([drawn]);
+                view = await waitForViewState(page, id);
+            });
+
+            await test.step("Shift-drag still draws, and the hint has stopped", async () => {
+                await watchHint(page, id);
+                await page.keyboard.down("Shift");
+                await page.mouse.move(...at(box, 0.2, 0.6), { steps: 3 });
+                await page.mouse.down();
+                await page.mouse.move(...at(box, 0.4, 0.8), { steps: 10 });
+                await page.mouse.up();
+                await page.keyboard.up("Shift");
+                const ring = await settledRing(page, page, id);
+                expect(await hintShown(page)).toEqual([]);
+                expect(ring).not.toEqual(drawn);
+                expect((await readState(page, id)).viewState?.target).toEqual(view.target);
+            });
         } finally {
             if (handle !== undefined) {
                 await handle.cleanup();

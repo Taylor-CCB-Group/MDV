@@ -15,6 +15,7 @@ import type { DualContourLegacyConfig } from "../contour_state";
 import { useChartID, useConfig } from "../hooks";
 import { type ChartArrayCell, useChartArrayGrid } from "../hooks/useChartArrayGrid";
 import type { DensityGridCells } from "../hooks/useDensityGridCells";
+import type { ViewControllerOptions } from "../hooks/useGateLayers";
 import type { TooltipContent } from "../hooks/useOuterContainerDeckTooltip";
 import DeckCellGrid from "./DeckCellGrid";
 import { getDensityGridViewId } from "./densityGridUtils";
@@ -30,7 +31,7 @@ export type SpatialDensityGridHost = DensityGridCells & {
     deviceProps?: Record<string, unknown>;
     onDeviceInitialized: (device: Device) => void;
     onError: (error: Error, layer?: Layer | null) => void;
-    dragPan: boolean;
+    controllerOptions: ViewControllerOptions;
     getTooltipContent: (info: PickingInfo) => TooltipContent | undefined;
     setKeyboardActive: (active: boolean) => void;
     onPointerLeave: () => void;
@@ -146,7 +147,7 @@ export default observer(function SpatialDensityGrid({
             onError={host.onError}
             viewState={deckViewState}
             onViewStateChange={onDeckViewStateChange}
-            dragPan={host.dragPan}
+            controllerOptions={host.controllerOptions}
             getTooltipContent={tooltipContent}
             onHover={onHover}
             setKeyboardActive={host.setKeyboardActive}

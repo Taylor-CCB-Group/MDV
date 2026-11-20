@@ -1,18 +1,17 @@
-import {
-    CompositeMode,
-    type GeoJsonEditMode,
-    type Position,
-    type SimpleFeatureCollection,
-    type SimpleGeometry,
+import type {
+    GeoJsonEditMode,
+    Position,
+    SimpleFeatureCollection,
+    SimpleGeometry,
 } from "@deck.gl-community/editable-layers";
 import { Matrix4 } from "@math.gl/core";
 import { action, toJS } from "mobx";
 import { observer } from "mobx-react-lite";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
-import { SELECTION_COORDINATE_SYSTEM, selectionFromEdit } from "@/editable-layers/selectionModes";
+import { RectangleMode, SELECTION_COORDINATE_SYSTEM, selectionFromEdit } from "@/editable-layers/selectionModes";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import type RangeDimension from "../datastore/RangeDimension";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
@@ -52,6 +51,11 @@ export type RangeState = {
     selectedTool: Tool;
     setSelectedTool: (tool: Tool) => void;
     modelMatrix: Matrix4;
+    /**
+     * Set while a drag should go to another layer rather than draw a selection: a gate label under
+     * the pointer, which drags to move (see `useGateLayers`).
+     */
+    yieldDragRef: { current: boolean };
 };
 export type MeasureState = {
     startPixels: P;
@@ -139,9 +143,11 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         }),
         [],
     );
-    const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
-    const [selectedTool, setSelectedTool] = useState<Tool>("Pan");
+    // a plain drag draws a rectangle until another tool is chosen; ⌘-drag moves the view (`viewGestureGate`)
+    const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(() => new RectangleMode());
+    const [selectedTool, setSelectedTool] = useState<Tool>("Rectangle");
     const [editingGateId, setEditingGateId] = useState<string | null>(null);
+    const yieldDragRef = useRef(false);
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
     const is3d = chart.config.dimension === "3d";
@@ -265,6 +271,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection,
             mode: selectionMode,
+            yieldDrag: () => yieldDragRef.current,
             coordinateSystem: SELECTION_COORDINATE_SYSTEM,
             getFillColor,
             getLineColor,
@@ -305,6 +312,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
 
     return {
         editableLayer,
+        yieldDragRef,
         rangeDimension,
         selectionFeatureCollection,
         selectionMode,

@@ -1,8 +1,9 @@
 import { Deck, type Viewport } from "@deck.gl/core";
-import { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
-import type { EventManager } from "mjolnir.js";
+import { EditableGeoJsonLayer, TranslateMode } from "@deck.gl-community/editable-layers";
+import type { EventManager, MjolnirGestureEvent } from "mjolnir.js";
 import { cpuEditablePicks } from "@/editable-layers/cpuPicks";
 import { getViewportAtCanvasPoint } from "./deckViewports";
+import { isViewDrag, VIEW_DRAG_PASSED_EVENT } from "./viewGestureGate";
 
 // we aren't really using this as an actual subclass, just declaring things as public so we can access them.
 //! we don't want to keep this around for future maintenance, hopefully deck can be patched so this is less necessary
@@ -51,7 +52,58 @@ function canvasIdOfEvent(deck: MonkeyPatchDeck, event: MjolnirEvent): string | u
  */
 const subscribedManagers = new WeakMap<object, EventManager[]>();
 
+/** Handlers (see `subscribedManagers`) whose current drag the layer leaves to others. */
+const viewDrags = new WeakSet<object>();
+
+type SelectionLayerProps = ConstructorParameters<typeof EditableGeoJsonLayer>[0] & {
+    /** True when a drag that starts now belongs to another layer (e.g. a gate label being moved). */
+    yieldDrag?: () => boolean;
+};
+
 export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
+    constructor(props: SelectionLayerProps) {
+        super(props);
+    }
+
+    /** Whether the layer leaves a drag that starts now alone: see `yieldDrag`. */
+    private yieldsDrag() {
+        const yieldDrag: unknown = Reflect.get(this.props, "yieldDrag");
+        return typeof yieldDrag === "function" && Boolean(yieldDrag());
+    }
+
+    /**
+     * A drag that moves the view (`isViewDrag`: ⌘ / Ctrl, or the right or middle button) is left
+     * to the controller whatever the tool, and one another layer claims (`yieldDrag`) to that layer.
+     * A plain one draws, so the chart says how to move the view instead, unless the Pan tool
+     * (plain `TranslateMode`) is the lock that moves it.
+     */
+    _onpanstart(event: MjolnirGestureEvent) {
+        const handler = this.state._editableLayerState.eventHandler;
+        if (isViewDrag(event) || this.yieldsDrag()) {
+            viewDrags.add(handler);
+            return;
+        }
+        viewDrags.delete(handler);
+        super._onpanstart(event);
+        if (!(this.props.mode instanceof TranslateMode)) {
+            event.srcEvent.target?.dispatchEvent(new CustomEvent(VIEW_DRAG_PASSED_EVENT, { bubbles: true }));
+        }
+    }
+
+    _onpanmove(event: MjolnirGestureEvent) {
+        if (viewDrags.has(this.state._editableLayerState.eventHandler)) return;
+        super._onpanmove(event);
+    }
+
+    _onpanend(event: MjolnirGestureEvent) {
+        const handler = this.state._editableLayerState.eventHandler;
+        if (viewDrags.has(handler)) {
+            viewDrags.delete(handler);
+            return;
+        }
+        super._onpanend(event);
+    }
+
     /** The canvas the event being handled came from, in a multi-canvas deck. */
     private eventCanvasId: string | undefined;
 
