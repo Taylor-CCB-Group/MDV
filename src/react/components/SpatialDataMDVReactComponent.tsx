@@ -19,6 +19,7 @@ import { createPortal } from "react-dom";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
+import { GatedOrthographicController } from "@/lib/wheelZoomGate";
 import {
     type DeckErrorHandlers,
     resolveDeckBackend,
@@ -68,6 +69,7 @@ import { rasterEntriesKey, useRasterIssues } from "./RasterIssues";
 import SelectionOverlay from "./SelectionOverlay";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import SpatialDensityGrid, { type SpatialDensityGridHost } from "./SpatialDensityGrid";
+import WheelZoomHint from "./WheelZoomHint";
 
 type SpatialRegionMetadata = {
     spatial?: {
@@ -616,6 +618,7 @@ const SpatialDataViewer = observer(
                 getTooltip: getPortalTooltip,
                 id: `${id}spatialdata-deck`,
                 controller: {
+                    type: GatedOrthographicController,
                     doubleClickZoom: false,
                     dragPan: controllerOptions.dragPan,
                 },
@@ -758,6 +761,8 @@ const SpatialDataViewer = observer(
                         </Profiler>
                     </div>
                 </div>
+                {/* the grid has its own, over its scrolling cells */}
+                {!densityGrid && <WheelZoomHint />}
                 {tooltipPortal}
                 {featureTooltipPortal}
             </Profiler>

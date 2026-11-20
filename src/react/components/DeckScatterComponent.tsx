@@ -7,6 +7,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import type { LoadedDataColumn } from "@/charts/charts";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
+import { GatedOrbitController, GatedOrthographicController } from "@/lib/wheelZoomGate";
 import { useChart } from "../context";
 import {
     type DualContourLegacyConfig,
@@ -30,6 +31,7 @@ import FieldContourLegend from "./FieldContourLegend";
 import { isCrosshairShown } from "./pointerCrosshair";
 import SelectionOverlay from "./SelectionOverlay";
 import { ScatterDeckBoundary, useLayersForDevice, useScatterDeckDevice, useZoomOnFilter } from "./scatterDeckShared";
+import WheelZoomHint from "./WheelZoomHint";
 
 /**
  * Currently this implementation is somewhat separate from VivMDVReact / scatter_state,
@@ -251,6 +253,7 @@ const DeckScatter = observer(function DeckScatterComponent({
                                 onError={onError}
                                 useDevicePixels={true}
                                 controller={{
+                                    type: is2d ? GatedOrthographicController : GatedOrbitController,
                                     // double-click finishes polygons / removes vertices in selection tools
                                     doubleClickZoom: false,
                                     dragPan: controllerOptions.dragPan,
@@ -270,6 +273,7 @@ const DeckScatter = observer(function DeckScatterComponent({
                     </CrosshairArea>
                 </div>
             </AxisComponent>
+            <WheelZoomHint />
             {tooltipPortal}
             {showLegend && (
                 <FieldContourLegend

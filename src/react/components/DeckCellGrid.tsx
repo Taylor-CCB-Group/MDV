@@ -3,6 +3,7 @@ import type { Device } from "@luma.gl/core";
 import { applyWebGPUPickingFix, applyWebGPUPresentationAlphaFix } from "@spatialdata/layers";
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { syncEditableLayerEvents } from "@/lib/deckMonkeypatch";
+import { GatedOrthographicController } from "@/lib/wheelZoomGate";
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
 import type { UseChartArrayGridResult } from "../hooks/useChartArrayGrid";
 import { type TooltipContent, useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
@@ -11,6 +12,7 @@ import ChartArrayLayout from "./ChartArrayLayout";
 import { CrosshairLines } from "./CrosshairArea";
 import { shouldDrawInDensityGridCell } from "./densityGridUtils";
 import { hideCrosshair, placeCrosshair } from "./pointerCrosshair";
+import WheelZoomHint from "./WheelZoomHint";
 
 export type DeckCellLabel = { text: string; color: readonly number[] };
 
@@ -143,7 +145,7 @@ export default function DeckCellGrid({
                         id,
                         canvasId: id,
                         flipY: false,
-                        controller: { doubleClickZoom: false, dragPan },
+                        controller: { type: GatedOrthographicController, doubleClickZoom: false, dragPan },
                     }),
                 ];
             }),
@@ -320,6 +322,7 @@ export default function DeckCellGrid({
                     renderCell={renderCell}
                 />
             </div>
+            <WheelZoomHint />
             {tooltipPortal}
         </>
     );
