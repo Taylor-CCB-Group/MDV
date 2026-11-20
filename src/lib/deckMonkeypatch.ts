@@ -2,6 +2,7 @@ import { Deck, type Viewport } from "@deck.gl/core";
 import { EditableGeoJsonLayer, TranslateMode } from "@deck.gl-community/editable-layers";
 import type { EventManager, MjolnirGestureEvent } from "mjolnir.js";
 import { cpuEditablePicks } from "@/editable-layers/cpuPicks";
+import { FreehandMode, RectangleMode } from "@/editable-layers/selectionModes";
 import { getViewportAtCanvasPoint } from "./deckViewports";
 import { isViewDrag, VIEW_DRAG_PASSED_EVENT } from "./viewGestureGate";
 
@@ -61,6 +62,8 @@ type SelectionLayerProps = ConstructorParameters<typeof EditableGeoJsonLayer>[0]
      * e.g. a gate label being moved.
      */
     yieldDrag?: (point: [number, number], viewport: Viewport) => boolean;
+    /** Called for a click on empty space (no data point, gate or label, nor the selection) with a tool that doesn't use clicks. */
+    onEmptyClick?: () => void;
 };
 
 export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
@@ -99,6 +102,35 @@ export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
         if (!(this.props.mode instanceof TranslateMode)) {
             event.srcEvent.target?.dispatchEvent(new CustomEvent(VIEW_DRAG_PASSED_EVENT, { bubbles: true }));
         }
+    }
+
+    /**
+     * A click on empty space clears the selection, with the tools that don't use clicks themselves
+     * (not Polygon, which adds a vertex, nor Modify). What is under the click is picked
+     * asynchronously, which works on WebGPU too: anything picked with an index (a point, a gate,
+     * a label) keeps the selection, while an image or nothing doesn't.
+     */
+    _onclick(event: MjolnirGestureEvent) {
+        super._onclick(event);
+        const onEmptyClick: unknown = Reflect.get(this.props, "onEmptyClick");
+        const { mode, data } = this.props;
+        const clearable =
+            mode instanceof TranslateMode || mode instanceof RectangleMode || mode instanceof FreehandMode;
+        if (typeof onEmptyClick !== "function" || !clearable || data.features.length === 0) return;
+        const point: [number, number] = [event.offsetCenter.x, event.offsetCenter.y];
+        // on the selection's own outline or fill
+        if (this.getPicks(point).some((pick) => pick.index >= 0 && !Reflect.get(pick, "isGuide"))) return;
+        const deck = this.patchDeck;
+        if (!deck?.layerManager) return;
+        const layerIds = deck.layerManager
+            .getLayers()
+            .filter((layer: { parent: unknown; id: string }) => !layer.parent && layer.id !== this.props.id)
+            .map((layer: { id: string }) => layer.id);
+        deck.pickObjectAsync({ x: point[0], y: point[1], radius: 2, layerIds, canvasId: this.eventCanvasId })
+            .then((info) => {
+                if (!info || info.index < 0) onEmptyClick();
+            })
+            .catch((error) => console.warn("Could not pick under a click", error));
     }
 
     _onpanmove(event: MjolnirGestureEvent) {

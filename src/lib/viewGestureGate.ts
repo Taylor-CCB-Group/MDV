@@ -1,5 +1,6 @@
 import { OrbitController, OrthographicController } from "@deck.gl/core";
 import type { MjolnirGestureEvent, MjolnirWheelEvent } from "mjolnir.js";
+import { chartDragSetting } from "./browserSettings";
 
 /**
  * Which pointer gestures move a chart's view, for the deck charts with a selection toolbar.
@@ -21,6 +22,12 @@ export const WHEEL_ZOOM_PASSED_EVENT = "mdv-wheel-zoom-passed";
 
 /** Dispatched (bubbling) from the canvas when a plain drag draws a selection rather than moving the view. */
 export const VIEW_DRAG_PASSED_EVENT = "mdv-view-drag-passed";
+
+/**
+ * Dispatched (bubbling) from the canvas when a plain drag moves the view before this browser has
+ * chosen what a plain drag should do (`chartDragSetting`), so the chart can offer the choice.
+ */
+export const DRAG_CHOICE_EVENT = "mdv-drag-choice";
 
 export const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
 
@@ -110,6 +117,9 @@ function viewDragMode(event: MjolnirGestureEvent, dragMovesView: boolean, orbit:
     const explicit = isViewDrag(event);
     if (!explicit && !dragMovesView) return null;
     if (explicit) learnViewDrag();
+    else if (!chartDragSetting.isChosen()) {
+        event.srcEvent.target?.dispatchEvent(new CustomEvent(DRAG_CHOICE_EVENT, { bubbles: true }));
+    }
     return orbit && !sourceOf(event).shiftKey ? "rotate" : "pan";
 }
 

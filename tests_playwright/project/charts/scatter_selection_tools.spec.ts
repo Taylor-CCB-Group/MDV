@@ -3,8 +3,10 @@
  * - a double-click finishes a Polygon with the double-clicked point as its last vertex, and doesn't zoom;
  * - Freehand, Modify (vertex removal) and Pan (translate selection / controller pan + zoom) work;
  * - all of that still works after the chart is popped out into another window, and after it comes back;
- * - a plain drag draws a rectangle with no tool chosen, while ⌘-drag (Ctrl-drag off a Mac) and a
- *   right-button drag move the view, with a hint until the view has been moved that way.
+ * - with nothing chosen in this browser, a plain drag moves the view and asks what dragging should
+ *   do; once "Draw a selection" is chosen, a plain drag draws a rectangle, while ⌘-drag (Ctrl-drag
+ *   off a Mac) and a right-button drag move the view (with a hint until the view has been moved
+ *   that way), and a click on empty space clears the selection.
  *
  * Runs against whichever frontend TEST_BASE_URL serves; to test a branch's UI, use Vite from that checkout, e.g.
  *   PORT=5171 pnpm run dev
@@ -134,6 +136,14 @@ async function waitForViewState(page: Page, id: string): Promise<SelectionViewSt
     const { viewState } = await readState(page, id);
     if (!viewState) throw new Error("no viewState");
     return viewState;
+}
+
+/**
+ * What a plain drag does in charts, for this test's browser context (`chartDragSetting`), set before
+ * the app loads so that its prompt doesn't come up in tests about something else.
+ */
+async function chooseChartDrag(page: Page, value: "view" | "select") {
+    await page.addInitScript((value) => localStorage.setItem("mdv.settings.chartDrag", value), value);
 }
 
 /** A point in the canvas given as fractions of its width / height. */
@@ -454,6 +464,7 @@ test.describe("Scatter selection tools", () => {
     test("polygon, freehand, modify and pan work in place, popped out and popped back in", async ({ page }) => {
         const title = `Selection Tools ${Date.now()}`;
         let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
+        await chooseChartDrag(page, "view");
         try {
             handle = await createTemporaryProjectViaSyntheticAnndata(page, {
                 nameSegment: `scatter-selection-tools--${Date.now()}`,
@@ -503,7 +514,9 @@ test.describe("Scatter selection tools", () => {
         }
     });
 
-    test("a plain drag draws, and ⌘-drag or a right-button drag moves the view", async ({ page }) => {
+    test("dragging moves the view until drawing is chosen; then ⌘-drag or a right-button drag moves it", async ({
+        page,
+    }) => {
         const title = `Drag To Select ${Date.now()}`;
         let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
         try {
@@ -515,10 +528,22 @@ test.describe("Scatter selection tools", () => {
             const box = await measureCanvas(page, id);
             const viewKey = await viewKeyOf(page);
             const mac = viewKey === "Meta";
-            await page.evaluate(() => localStorage.removeItem("mdv.viewDragLearned"));
-            const start = await waitForViewState(page, id);
+            // a fresh browser context: nothing chosen, and no view moved with a modifier yet
+            let start = await waitForViewState(page, id);
 
-            await test.step("a plain drag draws a rectangle with no tool chosen, and says how to move the view", async () => {
+            await test.step("with nothing chosen, a plain drag moves the view and asks what dragging should do", async () => {
+                await dragWith(page, at(box, 0.3, 0.3), at(box, 0.45, 0.4));
+                await expect.poll(async () => (await readState(page, id)).viewState?.target).not.toEqual(start.target);
+                expect((await readState(page, id)).rings).toHaveLength(0);
+                const choice = chartScope(page, id).getByRole("dialog", { name: "What dragging does on charts" });
+                await expect(choice).toBeVisible();
+                await choice.getByRole("button", { name: "Draw a selection" }).click();
+                await expect(choice).toBeHidden();
+                expect(await page.evaluate(() => localStorage.getItem("mdv.settings.chartDrag"))).toBe("select");
+                start = await waitForViewState(page, id);
+            });
+
+            await test.step("then a plain drag draws a rectangle, and says how to move the view", async () => {
                 await watchHint(page, id);
                 await page.mouse.move(...at(box, 0.3, 0.3), { steps: 3 });
                 await page.mouse.down();
@@ -565,6 +590,21 @@ test.describe("Scatter selection tools", () => {
                 expect(ring).not.toEqual(drawn);
                 expect((await readState(page, id)).viewState?.target).toEqual(view.target);
             });
+
+            await test.step("a click on empty space clears the selection", async () => {
+                // zoomed well out, the data and the selection shrink to the middle and leave the edges empty
+                await page.evaluate((id) => {
+                    const config = (window as any).mdv.chartManager.charts[id].chart.config;
+                    const vs = config.viewState;
+                    const out = (z: number | undefined) => (z === undefined ? undefined : z - 3);
+                    config.viewState = { ...vs, zoom: out(vs.zoom), zoomX: out(vs.zoomX), zoomY: out(vs.zoomY) };
+                }, id);
+                await settle(page);
+                expect((await readState(page, id)).rings).toHaveLength(1);
+                // the left edge, half way down (the bottom of a 700px chart is out of the window)
+                await page.mouse.click(...at(box, 0.02, 0.5));
+                await expect.poll(async () => (await readState(page, id)).rings.length).toBe(0);
+            });
         } finally {
             if (handle !== undefined) {
                 await handle.cleanup();
@@ -579,6 +619,7 @@ test.describe("Scatter selection tools", () => {
     test("a shape drawn over an existing selection stays selected when the pointer moves on", async ({ page }) => {
         const title = `Selection Persistence ${Date.now()}`;
         let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
+        await chooseChartDrag(page, "view");
         try {
             handle = await createTemporaryProjectViaSyntheticAnndata(page, {
                 nameSegment: `scatter-selection-persistence--${Date.now()}`,

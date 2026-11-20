@@ -6,13 +6,19 @@ import type {
     SimpleGeometry,
 } from "@deck.gl-community/editable-layers";
 import { Matrix4 } from "@math.gl/core";
-import { action, toJS } from "mobx";
+import { action, reaction, toJS } from "mobx";
 import { observer } from "mobx-react-lite";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
-import { RectangleMode, SELECTION_COORDINATE_SYSTEM, selectionFromEdit } from "@/editable-layers/selectionModes";
+import {
+    panMode,
+    RectangleMode,
+    SELECTION_COORDINATE_SYSTEM,
+    selectionFromEdit,
+} from "@/editable-layers/selectionModes";
+import { chartDragSetting } from "@/lib/browserSettings";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import type RangeDimension from "../datastore/RangeDimension";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
@@ -92,6 +98,15 @@ function useSelectionCoords(selection: SimpleFeatureCollection) {
     return coords as [number, number][];
 }
 
+/** The tool a chart starts with (see `chartDragSetting`): Pan moves the view, Rectangle draws. */
+function defaultTool(): Tool {
+    return chartDragSetting.get() === "select" ? "Rectangle" : "Pan";
+}
+
+function defaultToolMode(): GeoJsonEditMode {
+    return chartDragSetting.get() === "select" ? new RectangleMode() : panMode();
+}
+
 /** A chart that draws in 3D says what its camera is, for a selection drawn on it to record. */
 function getOrbitSelectionView(chart: BaseChart<any>): OrbitSelectionView | null {
     if (!("getOrbitSelectionView" in chart) || typeof chart.getOrbitSelectionView !== "function") return null;
@@ -144,9 +159,28 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         }),
         [],
     );
-    // a plain drag draws a rectangle until another tool is chosen; ⌘-drag moves the view (`viewGestureGate`)
-    const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(() => new RectangleMode());
-    const [selectedTool, setSelectedTool] = useState<Tool>("Rectangle");
+    // what a plain drag does until a tool is picked: move the view (Pan) or draw a rectangle, as
+    // chosen in this browser (`chartDragSetting`); ⌘-drag moves the view either way (`viewGestureGate`)
+    const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(() => defaultToolMode());
+    const [selectedTool, setSelectedToolState] = useState<Tool>(() => defaultTool());
+    const toolPicked = useRef(false);
+    const setSelectedTool = useCallback((tool: Tool) => {
+        toolPicked.current = true;
+        setSelectedToolState(tool);
+    }, []);
+    // a chart whose tool nobody has picked follows the setting when it changes (as when it is first chosen)
+    useEffect(
+        () =>
+            reaction(
+                () => chartDragSetting.get(),
+                () => {
+                    if (toolPicked.current) return;
+                    setSelectionMode(defaultToolMode());
+                    setSelectedToolState(defaultTool());
+                },
+            ),
+        [],
+    );
     const [editingGateId, setEditingGateId] = useState<string | null>(null);
     const yieldDragRef = useRef<RangeState["yieldDragRef"]["current"]>(null);
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
@@ -273,6 +307,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             data: selectionFeatureCollection,
             mode: selectionMode,
             yieldDrag: (point, viewport) => yieldDragRef.current?.(point, viewport) ?? false,
+            onEmptyClick: clearSelection,
             coordinateSystem: SELECTION_COORDINATE_SYSTEM,
             getFillColor,
             getLineColor,
@@ -309,6 +344,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         getFillColor,
         getLineColor,
         chart,
+        clearSelection,
     ]);
 
     return {

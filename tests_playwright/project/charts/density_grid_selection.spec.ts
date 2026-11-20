@@ -135,6 +135,8 @@ test.describe("Density grid", () => {
     test.setTimeout(180_000);
 
     test("draws a cell per field, selects through any cell, and toggles back to one plot", async ({ page }) => {
+        // a plain drag draws (the "Draw a selection" choice), so Rectangle is the tool cells start with
+        await page.addInitScript(() => localStorage.setItem("mdv.settings.chartDrag", "select"));
         const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
             // "realistic" has several numeric obs columns and the X_umap / X_pca reductions
             synthetic: { profile: "realistic", nCells: 500, nGenes: 50, force: true },
@@ -159,7 +161,7 @@ test.describe("Density grid", () => {
                 .poll(async () => await cellCanvases.first().evaluate((canvas: HTMLCanvasElement) => canvas.width))
                 .toBeGreaterThan(50);
 
-            // the toolbar starts collapsed to the active tool, Rectangle, which a plain drag uses
+            // the toolbar starts collapsed to the active tool, Rectangle, as a plain drag draws in this browser
             await expect(scope.locator('button[aria-label="Rectangle"]')).toBeVisible();
             await scope.locator('button[aria-label="Show tools"]').click();
             // the last cell is in another row and column (a 2 x 2 grid at this size)
