@@ -548,6 +548,13 @@ class BaseChart<T extends BaseConfig> {
     getDebugPanel?(): ReactNode;
 
     /**
+     * Technical settings, offered in the chart's debug dialog rather than the regular settings dialog: things
+     * that matter when diagnosing a problem (such as the rendering backend) more than when using the chart.
+     * Optional.
+     */
+    getDebugSettings?(): GuiSpecs;
+
+    /**
      * needs to be implemented by subclasses
      */
     removeFilter() {}

@@ -19,7 +19,7 @@ import { applyWebGPUViewportClamp } from "./webgpu_viewport_clamp";
  * (see `SpatialDataMDVReactComponent` and `DeckScatterComponent`). A chart set to WebGPU
  * explicitly keeps it for those.
  *
- * The default is the "Default rendering backend" browser setting (Debug dialog; see
+ * The default is the "Default rendering backend" browser setting (Settings dialog; see
  * `renderBackendSetting` in `src/lib/browserSettings.ts`); a chart's own `render_backend`
  * setting overrides it, and `?webgpu` / `?webgpu=0` in the URL overrides the default for
  * one page load. The setting is observable, so charts following the default switch as
