@@ -1,17 +1,9 @@
-import { AxisBottom, AxisLeft } from "@visx/axis";
 import { scaleBand, scaleLinear } from "@visx/scale";
 import { type PointerEvent, useMemo } from "react";
+import { canvasMeasureText } from "@/charts/dotplot/xAxisLabels";
 import type { MultiLineAxis } from "./multiLineConfig";
+import { AXIS_FONT_FAMILY, getMultiLineLayout, LABEL_GAP, LINE_HEIGHT, TICK_LENGTH } from "./multiLineLayout";
 import type { DensityCurve } from "./multiLineStats";
-
-/** Space kept free above and to the right of the plot, for the last tick labels. */
-const PAD_TOP = 10;
-const PAD_RIGHT = 15;
-/** Short ticks, so that the tick labels and the axis label fit in the legacy chart's 30px. */
-const TICK_LENGTH = 4;
-const LABEL_OFFSET = 2;
-/** Room each x tick label needs. */
-const X_TICK_SPACING = 50;
 
 const linePath = (points: [number, number][]) =>
     points.length ? `M${points.map(([x, y]) => `${x},${y}`).join("L")}` : "";
@@ -19,6 +11,8 @@ const linePath = (points: [number, number][]) =>
 /** The line closed down to `bottom`, for the fill under it. */
 const areaPath = (points: [number, number][], bottom: number) =>
     points.length ? `${linePath(points)}L${points[points.length - 1][0]},${bottom}L${points[0][0]},${bottom}Z` : "";
+
+const TEXT = "var(--text_color)";
 
 export type MultiLinePanelProps = {
     width: number;
@@ -35,6 +29,8 @@ export type MultiLinePanelProps = {
     stacked: boolean;
     fill: boolean;
     axis: { x: MultiLineAxis; y: MultiLineAxis };
+    /** Fit the margins to the labels; off, the axis sizes are used. */
+    fitLabels: boolean;
     xLabel: string;
     /** Shown beside the y axis when not stacked; stacked, the rows are labelled instead. */
     yLabel: string;
@@ -58,22 +54,41 @@ export default function MultiLinePanel({
     stacked,
     fill,
     axis,
+    fitLabels,
     xLabel,
     yLabel,
     onCurveHover,
     onCurveLeave,
 }: MultiLinePanelProps) {
-    const left = axis.y.size;
-    const plotWidth = Math.max(0, width - left - PAD_RIGHT);
-    const plotHeight = Math.max(0, height - axis.x.size - PAD_TOP);
+    const fullRowLabels = useMemo(
+        () => (stacked ? curves.map((c) => categoryLabels[c.category] ?? "") : null),
+        [stacked, curves, categoryLabels],
+    );
+    const { size: xSize, tickfont: xFont } = axis.x;
+    const { size: ySize, tickfont: yFont } = axis.y;
+    const layout = useMemo(
+        () =>
+            getMultiLineLayout(
+                {
+                    width,
+                    height,
+                    // axis is mutated in place by its settings, so it's rebuilt from its values
+                    axis: { x: { size: xSize, tickfont: xFont }, y: { size: ySize, tickfont: yFont } },
+                    fitLabels,
+                    domain,
+                    xLabel,
+                    yLabel,
+                    rowLabels: fullRowLabels,
+                },
+                canvasMeasureText,
+            ),
+        [width, height, xSize, xFont, ySize, yFont, fitLabels, domain, xLabel, yLabel, fullRowLabels],
+    );
+    const { left, top, plotWidth, plotHeight } = layout;
 
     const xScale = useMemo(() => scaleLinear({ domain, range: [0, plotWidth] }), [domain, plotWidth]);
     const rowScale = useMemo(
-        () =>
-            scaleBand({
-                domain: curves.map((c) => c.category),
-                range: [0, plotHeight],
-            }),
+        () => scaleBand({ domain: curves.map((c) => c.category), range: [0, plotHeight] }),
         [curves, plotHeight],
     );
 
@@ -83,8 +98,7 @@ export default function MultiLinePanel({
         return curves.map((curve) => {
             const bottom = stacked ? (rowScale(curve.category) ?? 0) + rowHeight : plotHeight;
             const scale = rowHeight / curve.max;
-            const ys = Array.from(curve.density, (d) => bottom - d * scale);
-            const points = ys.map((y, i) => [xs[i], y] as [number, number]);
+            const points = Array.from(curve.density, (d, i) => [xs[i], bottom - d * scale] as [number, number]);
             return {
                 category: curve.category,
                 line: linePath(points),
@@ -94,10 +108,11 @@ export default function MultiLinePanel({
     }, [curves, ticks, xScale, rowScale, stacked, fill, plotHeight]);
 
     if (plotWidth === 0 || plotHeight === 0) return null;
-    const tickLabelProps = (fontSize: number) => ({ fill: "var(--text_color)", fontSize });
+    const tickLabelTop = TICK_LENGTH + LABEL_GAP;
+    const { rowLabels } = layout;
     return (
-        <svg width={width} height={height} className="block">
-            <g transform={`translate(${left},${PAD_TOP})`}>
+        <svg width={width} height={height} className="block" fontFamily={AXIS_FONT_FAMILY}>
+            <g transform={`translate(${left},${top})`}>
                 {paths.map(
                     (p) =>
                         p.area && (
@@ -122,38 +137,59 @@ export default function MultiLinePanel({
                         onPointerLeave={onCurveLeave}
                     />
                 ))}
-                <AxisBottom
-                    top={plotHeight}
-                    scale={xScale}
-                    numTicks={Math.max(3, Math.floor(plotWidth / X_TICK_SPACING))}
-                    tickLength={TICK_LENGTH}
-                    stroke="var(--text_color)"
-                    tickStroke="var(--text_color)"
-                    tickLabelProps={tickLabelProps(axis.x.tickfont)}
-                    label={xLabel}
-                    labelOffset={LABEL_OFFSET}
-                    labelProps={{ ...tickLabelProps(axis.x.tickfont), textAnchor: "middle" }}
-                />
-                {stacked ? (
-                    <AxisLeft
-                        scale={rowScale}
-                        tickFormat={(code) => categoryLabels[code] ?? ""}
-                        stroke="var(--text_color)"
-                        tickStroke="var(--text_color)"
-                        tickLabelProps={{ ...tickLabelProps(axis.y.tickfont), textAnchor: "end", dy: "0.33em" }}
-                    />
-                ) : (
-                    // each curve is scaled to its own peak, so a density scale would mean nothing
-                    <AxisLeft
-                        scale={scaleLinear({ domain: [0, 1], range: [plotHeight, 0] })}
-                        numTicks={0}
-                        hideTicks
-                        stroke="var(--text_color)"
-                        label={yLabel}
-                        labelOffset={LABEL_OFFSET}
-                        labelProps={{ ...tickLabelProps(axis.y.tickfont), textAnchor: "middle" }}
-                    />
-                )}
+
+                <g transform={`translate(0,${plotHeight})`} fill={TEXT} fontSize={xFont}>
+                    <line x2={plotWidth} stroke={TEXT} />
+                    {layout.xTicks.map((t) => (
+                        <g key={t} transform={`translate(${xScale(t)},0)`}>
+                            <line y2={TICK_LENGTH} stroke={TEXT} />
+                            <text y={tickLabelTop} textAnchor="middle" dominantBaseline="hanging">
+                                {layout.xTickFormat(t)}
+                            </text>
+                        </g>
+                    ))}
+                    <text
+                        x={plotWidth / 2}
+                        y={tickLabelTop + xFont * LINE_HEIGHT + LABEL_GAP}
+                        textAnchor="middle"
+                        dominantBaseline="hanging"
+                    >
+                        {layout.xLabel !== xLabel && <title>{xLabel}</title>}
+                        {layout.xLabel}
+                    </text>
+                </g>
+
+                <g fill={TEXT}>
+                    <line y2={plotHeight} stroke={TEXT} />
+                    {rowLabels && fullRowLabels ? (
+                        curves.map((c, i) => (
+                            <g
+                                key={c.category}
+                                transform={`translate(0,${(rowScale(c.category) ?? 0) + rowScale.bandwidth() / 2})`}
+                            >
+                                <line x2={-TICK_LENGTH} stroke={TEXT} />
+                                <text
+                                    x={-TICK_LENGTH - LABEL_GAP}
+                                    textAnchor="end"
+                                    dominantBaseline="central"
+                                    fontSize={layout.rowFontSize}
+                                >
+                                    {rowLabels[i] !== fullRowLabels[i] && <title>{fullRowLabels[i]}</title>}
+                                    {rowLabels[i]}
+                                </text>
+                            </g>
+                        ))
+                    ) : (
+                        // each curve is scaled to its own peak, so a density scale would mean nothing
+                        <text
+                            transform={`translate(${-LABEL_GAP - 1},${plotHeight / 2}) rotate(-90)`}
+                            textAnchor="middle"
+                            fontSize={yFont}
+                        >
+                            {layout.yLabel}
+                        </text>
+                    )}
+                </g>
             </g>
         </svg>
     );

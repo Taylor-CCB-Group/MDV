@@ -126,6 +126,23 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
         return settings;
     }
 
+    /** The shared axis controls; their sizes apply when labels aren't fitted. */
+    getAxisSettings() {
+        const c = this.config;
+        const folder = getAxisGuiSpec(c);
+        folder.current_value.unshift(
+            g({
+                type: "check",
+                label: "Fit margins to axis labels",
+                current_value: c.fit_labels,
+                func: (v) => {
+                    c.fit_labels = v;
+                },
+            }),
+        );
+        return folder;
+    }
+
     getSettings() {
         const c = this.config;
         const domain = this.getValueDomain();
@@ -195,7 +212,7 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
                     this.setColorLegend();
                 },
             }),
-            getAxisGuiSpec(c),
+            this.getAxisSettings(),
         ];
     }
 }

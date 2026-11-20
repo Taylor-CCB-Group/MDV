@@ -40,6 +40,8 @@ export type MultiLineConfig = BaseConfig & {
     intervals: number;
     color_legend: { display: boolean; pos?: [number, number] };
     axis: { x: MultiLineAxis; y: MultiLineAxis };
+    /** Fit the axis margins to the labels; off, the axis sizes are used, as in the legacy chart. */
+    fit_labels: boolean;
 };
 
 /** `label` replaces the default axis label (the value's name, or "density"); legacy charts saved one. */
@@ -98,6 +100,7 @@ export function adaptMultiLineConfig(original: SavedMultiLineConfig): MultiLineC
         // the legacy chart hides the legend when stacked, as the rows are labelled
         color_legend: { ...original.color_legend, display: original.color_legend?.display ?? !stacked },
         axis: { x: toAxis(original.axis?.x, 30), y: toAxis(original.axis?.y, 45) },
+        fit_labels: original.fit_labels ?? true,
     };
 }
 

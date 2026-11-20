@@ -128,6 +128,7 @@ const MultiLineComponent = observer(function MultiLineComponent() {
             stacked={stacked}
             fill={fill}
             axis={axis}
+            fitLabels={config.fit_labels}
             xLabel={axis.x.label ?? valueColumn.name}
             yLabel={axis.y.label ?? "density"}
             onCurveHover={(event, category) => chart.showToolTip(event.nativeEvent, escapeHtml(labels[category] ?? ""))}
