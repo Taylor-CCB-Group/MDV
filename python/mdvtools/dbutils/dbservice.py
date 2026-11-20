@@ -1004,7 +1004,7 @@ class UserProjectService:
         """
         Remove a user from a project by deleting the user-project relationship.
         
-        Permanently removes the UserProject record, effectively revoking all
+        Permanently removes the UserProject records, effectively revoking all
         permissions for the user on the specified project.
         
         Args:
@@ -1024,13 +1024,14 @@ class UserProjectService:
             add_or_update_user_project() must be called to recreate the relationship.
         """
         try:
-            # Fetch the UserProject record
-            user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).order_by(UserProject.id).first()
-            if not user_project:
+            # Every row goes: user_projects allows duplicates, and a row left
+            # behind would become the user's role.
+            user_projects = UserProject.query.filter_by(user_id=user_id, project_id=project_id).all()
+            if not user_projects:
                 return None  # User is not part of the project
-            
-            # Delete the record from the database
-            db.session.delete(user_project)
+
+            for user_project in user_projects:
+                db.session.delete(user_project)
             db.session.commit()
             
             logger.info(f"User {user_id} removed from project {project_id}")

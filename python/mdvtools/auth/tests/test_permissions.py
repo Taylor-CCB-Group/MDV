@@ -12,6 +12,7 @@ from flask import Flask
 
 from mdvtools.auth.permissions import can_view, project_owner_emails, project_role, project_roles
 from mdvtools.dbutils.dbmodels import Project, User, UserProject, db
+from mdvtools.dbutils.dbservice import UserProjectService
 
 
 @pytest.fixture()
@@ -65,6 +66,24 @@ def test_with_2_rows_for_one_project_both_helpers_use_the_lowest_id(app):
     viewer = {"can_read": True, "can_write": False, "is_owner": False}
     assert project_role(7, 2) == viewer
     assert project_roles(7)[2] == viewer
+
+
+def test_a_later_owner_row_does_not_make_a_viewer_an_owner(app):
+    db.session.add(UserProject(7, 2, can_read=True))
+    db.session.add(UserProject(7, 2, is_owner=True))
+    db.session.commit()
+
+    assert project_owner_emails([2]) == {}
+
+
+def test_removing_a_user_deletes_every_row_for_the_project(app):
+    db.session.add(UserProject(7, 2, can_read=True))
+    db.session.add(UserProject(7, 2, is_owner=True))
+    db.session.commit()
+
+    UserProjectService.remove_user_from_project(7, 2)
+
+    assert project_role(7, 2) is None
 
 
 def test_can_view_needs_read_write_or_owner(app):

@@ -7,7 +7,7 @@ nothing to rebuild or keep in step with the database.
 
 `user_projects` does not stop a user holding 2 rows for one project. When they
 do, the row with the lowest ID is their role, here and in UserProjectService,
-which updates and removes that same row.
+which updates that same row. Removing a user deletes all of their rows.
 """
 
 from typing import Iterable, Optional, TypedDict
@@ -56,20 +56,26 @@ def can_view(role: Optional[ProjectRole]) -> bool:
 def project_owner_emails(project_ids: Iterable[int]) -> dict[int, list[str]]:
     """The sorted email addresses of each project's owners, keyed by project ID.
 
-    A project with no owner has no key.
+    A project with no owner has no key. Only a user's lowest-ID row counts, so
+    a later duplicate row cannot make them an owner.
     """
     ids = list(project_ids)
     if not ids:
         return {}
     rows = (
-        db.session.query(UserProject.project_id, User.email)
+        db.session.query(UserProject.project_id, UserProject.user_id, UserProject.is_owner, User.email)
         .join(User, User.id == UserProject.user_id)
-        .filter(UserProject.is_owner, UserProject.project_id.in_(ids))
+        .filter(UserProject.project_id.in_(ids))
+        .order_by(UserProject.id)
         .all()
     )
+    roles: dict[tuple[int, int], tuple[bool, str]] = {}
+    for project_id, user_id, is_owner, email in rows:
+        roles.setdefault((project_id, user_id), (bool(is_owner), email))
     owners: dict[int, list[str]] = {}
-    for project_id, email in rows:
-        owners.setdefault(project_id, []).append(email)
+    for (project_id, _user_id), (is_owner, email) in roles.items():
+        if is_owner:
+            owners.setdefault(project_id, []).append(email)
     for emails in owners.values():
         emails.sort()
     return owners
