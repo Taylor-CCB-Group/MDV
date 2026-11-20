@@ -1,6 +1,6 @@
 # Observability stack for one server: Alloy collects, Loki stores logs,
 # Prometheus stores metrics, Tempo stores traces and Grafana shows them.
-# See README.md in this folder and docs/adr/0023-self-hosted-grafana-observability.md.
+# See README.md in this folder and docs/adr/0025-self-hosted-grafana-observability.md.
 #
 # Only Grafana and the Alloy UI are published, and only on 127.0.0.1.
 # MDV containers reach Alloy over the `mdv-telemetry` network.

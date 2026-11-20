@@ -5,7 +5,7 @@
  * `FARO_COLLECTOR_URL` set, the page loads Faro, which records page loads,
  * Web Vitals, how long each request takes and uncaught errors, and posts them to
  * `telemetry/faro` on the same deployment. The server forwards them to Alloy
- * (ADR 0023). Faro's tracing also adds a `traceparent` header to MDV's own
+ * (ADR 0025). Faro's tracing also adds a `traceparent` header to MDV's own
  * requests, so a slow request in the browser links to its trace on the server.
  *
  * Faro is only downloaded when telemetry is on. A page whose API is on another

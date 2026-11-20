@@ -129,7 +129,7 @@ export function measureSpatial<T>(label: string, fn: () => T): T {
  * `load_timing.ts` for how the end is found.
  *
  * Unlike the labels above, these also go to browser telemetry when the deployment has it
- * on (ADR 0023), because they are what people wait for, rather than what the code does.
+ * on (ADR 0025), because they are what people wait for, rather than what the code does.
  */
 export function recordSpatialLoaded(kind: "first" | "settle", ms: number, context: Record<string, string>) {
     if (ENABLED) bump(`loaded:${kind}`, ms);

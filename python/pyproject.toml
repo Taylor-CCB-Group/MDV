@@ -83,7 +83,7 @@ app = [
     "flask-jwt-extended>=4.7.1,<5",
     "redis>=5.2.1,<6",
     # observability: sends traces and metrics only when
-    # OTEL_EXPORTER_OTLP_ENDPOINT is set (mdvtools/telemetry.py, ADR 0023).
+    # OTEL_EXPORTER_OTLP_ENDPOINT is set (mdvtools/telemetry.py, ADR 0025).
     # The instrumentation packages are released in step with the SDK.
     "opentelemetry-sdk>=1.45.2,<2",
     "opentelemetry-exporter-otlp-proto-http>=1.45.2,<2",

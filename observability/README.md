@@ -1,6 +1,6 @@
 # MDV observability stack
 
-This folder runs Grafana with Loki, Prometheus, Tempo and Alloy beside MDV on one server. It collects every container's logs, CPU and memory figures for each container and for the server, and the traces, metrics and browser timings that MDV sends. [ADR 0023](../docs/adr/0023-self-hosted-grafana-observability.md) explains why it is built this way.
+This folder runs Grafana with Loki, Prometheus, Tempo and Alloy beside MDV on one server. It collects every container's logs, CPU and memory figures for each container and for the server, and the traces, metrics and browser timings that MDV sends. [ADR 0025](../docs/adr/0025-self-hosted-grafana-observability.md) explains why it is built this way.
 
 | Service | What it does | Kept for |
 |---|---|---|

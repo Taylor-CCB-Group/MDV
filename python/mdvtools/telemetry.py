@@ -2,7 +2,7 @@
 
 ``init_telemetry(app)`` does nothing unless ``OTEL_EXPORTER_OTLP_ENDPOINT`` is
 set. When it is set, the server sends traces and metrics over OTLP/HTTP to that
-address, normally the Alloy collector in ``observability/`` (ADR 0023):
+address, normally the Alloy collector in ``observability/`` (ADR 0025):
 
 - a trace for every Flask request, with a span for each database query
 - process CPU, memory, open files, threads and garbage collection
