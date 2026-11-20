@@ -166,6 +166,61 @@ options (name, region, rendering backend) and a button that opens the dialog.
   so its key list covers the labels fields as well as the image ones; without them those edits
   would be dropped once a layer had any saved channels.
 
+### Groups and compositing
+
+The stack is a tree (schema v2). sd.js draws it with `renderStackToDeckLayers`, in the
+single view (`VivSpatialViewer`, given `useRenderStackStructure`) and in the density grid
+(`SpatialDensityGrid`, whose shared layers are then wrapped once more by
+`sharedCellLayersGroup`). MDV edits it, and sd.js decides how it draws (ADR 0007 upstream):
+
+- **A group** has `opacity`, `blendMode` and `isolate`. Pass-through (the default) multiplies
+  its opacity into each child. Any other mode, or `isolate`, draws the children into a
+  target of their own (`IsolatedGroupLayer`) and composites that with the group's opacity
+  and mode. The group panel (`GroupLayerPanel`, `CompositingControls`) edits these in place.
+  Opacity and mode change layer inputs, so they bump `renderStackPropsGeneration`, never
+  `renderStackGeneration`.
+- **A layer's own blend mode** (`props.blendMode` on a spatial entry; `LayerBlendModePanel`)
+  takes effect only inside an isolated group, at any depth. There sd.js draws the layer as a
+  one-member isolated group with that mode. Elsewhere it draws as normal, and the panel and
+  the row badge say so. `normal` is stored as no mode. The mode is placement, not
+  appearance: only `useRenderStackStructure` carries it to the viewer, and
+  `renderStackSpatialRevision` ignores it. So `setLeafBlendMode` writes it with no
+  generation bump, and a change re-renders through the structure key alone. A capture
+  with `perf.ts` shows two `adapter.sync` and no `shapes.loadRenderData` per change.
+- **Compositing operators** (`intersect`, `cut-out`, `xor`, `clip`) make a layer or group
+  a mask on what is beneath it *inside its isolated group*. A top-level group with one draws
+  as normal. The select lists them under their own heading and warns when they are inactive.
+- **Rows** show a group's or layer's non-default compositing as a badge
+  (`compositingBadge`); dashed means "saved, but drawn as normal here".
+- **The data points** are composited through `group:data-points` (`setDataPointsCompositing`),
+  which exists only while their compositing is not the default. It is always top-level, so
+  it does not offer the operators.
+- **Runtime fix.** `isolated_group_fix.ts` gives a blended layer's one-member group a
+  sublayer id of its own (`-blend`). sd.js gives the wrapper the layer's id, and deck 9.4
+  transfers state between same-id sublayers whatever their class. Remove the fix once sd.js
+  scopes the wrapper's id itself.
+- MDV overlays (data points, density, gates) cannot be moved into user groups: they stay
+  above SpatialData layers, and the grid takes the selection, gate labels and density out of
+  the shared stack.
+
+### Layer status
+
+The renderer reports each SpatialData layer's `EntryStatus` (`onEntryStatusChange`): load
+errors, and notices such as `element-issues` (slow raster layout, or a coordinate system
+with no length unit), `table-rows-unmatched` and `preload-truncated`. The chart keeps them
+in `entryStatuses` (`entry_status.ts`).
+
+- They are shown in the layer dialog (an alert above the layer's properties, and an icon on
+  its row), the status panel and the menu pip.
+- Retryable errors offer **Retry** (the renderer's `retryEntry`).
+- `entryStatusForDisplay` keeps only the shown coordinate system's unit issue. It also drops
+  points notices, as sd.js's own viewer does, because the points panel reports truncation.
+- MDV words each issue's `Remedy` itself (`describeRemedy`).
+
+This replaced MDV's own raster-layout check (`raster_health.ts`), which moved into
+`@spatialdata/core` 0.17. It is distinct from `layer_failures.ts`, which turns off layers
+that fail while *drawing*.
+
 ## The points layer panel
 
 `PointsLayerPanel` is a bridge, not a leaf. The layer dialog is a portal with its own
