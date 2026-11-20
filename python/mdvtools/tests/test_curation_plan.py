@@ -3,7 +3,15 @@
 import json
 from pathlib import Path
 
-from mdvtools.examples.curate_mdv_project import column_role, gene_panel
+from mdvtools.examples.curate_mdv_project import (
+    Q7_VIEW_NAME,
+    choose_roles,
+    column_role,
+    gene_panel,
+    opening_names,
+    plan_question_views,
+    split_category_values,
+)
 from mdvtools.examples.rename_softdelete_mdv_project_fields import (
     apply_plan,
     build_soft_delete_plan,
@@ -89,6 +97,66 @@ def test_genes_pane_uses_the_gene_info_chart():
     charts = gene_panel("genes", ["CD14"])
     assert [chart["type"] for chart in charts] == ["selection_dialog", "geneNetwork"]
     assert charts[1]["param"] == ["name"]
+
+
+def test_gene_prompt_sits_above_the_list():
+    charts = gene_panel("genes", ["PTPRC"], "Select gene(s) to view")
+    assert [chart["type"] for chart in charts] == ["text_box_chart", "selection_dialog", "geneNetwork"]
+    assert charts[0]["title"] == "Select gene(s) to view"
+    assert charts[0]["text"] == "Select gene(s) to view"
+    assert charts[1]["filters"]["name"]["category"] == ["PTPRC"]
+
+
+def test_comparison_lists_start_on_five_genes():
+    names = ["TNF", "TNFRSF1A", "TNFRSF1B", "IFNG", "CXCL9", "CXCL10"]
+    assert opening_names(names, 5) == names[:5]
+    assert opening_names(names, 1) == ["TNF"]
+    assert opening_names(["CD14"], 5) == ["CD14"]
+
+
+def test_split_uses_two_to_five_category_values():
+    assert split_category_values({"values": ["UC", "CD", "Healthy"]}) == ["UC", "CD", "Healthy"]
+    assert split_category_values({"values": ["skin"]}) is None
+    assert split_category_values({"values": [f"type-{i}" for i in range(21)]}) is None
+
+
+def test_a_short_category_becomes_a_split_dot_plot():
+    values = split_category_values({"values": ["UC", "CD"]})
+    chart = compound_dot_plot(
+        "Cell Group, split by Diagnosis",
+        "bucket",
+        {"type": "RowsAsColsQuery"},
+        split=("Disease", values or []),
+    )
+    assert chart["split_by"] == "Disease"
+    assert chart["split_values"] == ["UC", "CD"]
+    assert "pos" not in chart["color_legend"]
+
+
+def test_major_cell_type_is_preferred_over_a_long_cell_state():
+    roles = choose_roles(
+        [
+            {"name": "Cell State", "field": "final", "values": [str(index) for index in range(40)]},
+            {"name": "Major Cell Type", "field": "major", "values": ["A", "B", "C"]},
+        ]
+    )
+    assert roles["cell_type"]["field"] == "major"
+
+
+def test_derm_and_taurus_column_names_get_roles():
+    assert column_role({"name": "Diagnosed Disease"}) == "diagnosis"
+    assert column_role({"name": "Condition"}) == "condition"
+    assert column_role({"name": "Treatment"}) == "treatment"
+    assert column_role({"name": "Presence of Inflammation"}) == "inflammation"
+    assert column_role({"name": "Biopsy Site"}) == "tissue"
+    assert column_role({"name": "Remission Status"}) == "response"
+    assert column_role({"name": "Major Cell Type"}) == "cell_type"
+
+
+def test_signature_view_is_not_created(tmp_path):
+    plan = plan_question_views(tmp_path, [], {})
+    assert Q7_VIEW_NAME not in plan["views"]
+    assert any(item["question"] == Q7_VIEW_NAME for item in plan["skipped"])
 
 
 def test_myeloid_genes_pane_uses_the_gene_info_chart():

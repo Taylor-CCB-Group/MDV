@@ -8,9 +8,10 @@ writing. ``--write`` copies the project to ``--output`` and applies the plan
 there. datafile.h5 is never modified; size and mtime are checked before and
 after.
 
-Question views use columns and gene rows that already exist. Protein
-concordance is added only when a protein table is already linked. Spatial
-localisation, collection-score columns, and DEG columns are left out.
+Question views use columns and gene rows that already exist. A protein
+view and protein concordance are added only when a protein table is already
+linked. The signature-collection view is not created. Spatial localisation,
+collection-score columns, and DEG columns are left out.
 """
 
 from __future__ import annotations
@@ -41,7 +42,6 @@ from mdvtools.examples.rename_softdelete_mdv_project_fields import (
 from mdvtools.template_views.create_question_views import (
     GENE_COLLECTIONS,
     GENES,
-    HEAT_MAP_FEATURES,
     NAME_FIELD,
     Q1_VIEW_NAME,
     Q2_VIEW_NAME,
@@ -65,21 +65,35 @@ from mdvtools.template_views.create_question_views import (
     placed,
     resolve_feature_fields,
     scatter,
-    spread_layout,
     text_box,
 )
 from mdvtools.template_views.create_synovial_question_views import MARKER_GENES
 
 Q8_VIEW_NAME = "Contrasting responders and non-responders"
 Q9_VIEW_NAME = "Comparing groups: is the UMAP different between responders and non-responders?"
+PROTEIN_VIEW_NAME = "Where is my protein of interest expressed across cell populations?"
 
-LAYOUT_WIDTH = 1590
-DOT_PLOT_FEATURES = 5
+# Charts are sized for a 1440px-wide window so two of them fit in the cells pane
+# and are not covered by the gene or protein list.
+DESIGN_WIDTH = 1440
+CHART_GAP = 12
+CELLS_SHARE = 85
+CONCORD_SHARE = 70
+SIDE_SHARE = 15
+SPLIT_MAX = 5
+OPENING_COMPARISON_GENES = 5
+CONCORD_MAX_ITEMS = 10
+COMPARE_ROLES = ("diagnosis", "condition", "treatment", "tissue", "inflammation")
 PREFERRED_DIAGNOSES = ["Crohns disease", "Ulcerative colitis", "RA", "PsA"]
 PREFERRED_RESPONSE_GROUPS = (
     ["responder", "non_responder"],
     ["R", "NR"],
     ["responsive", "non-responsive"],
+    ["Remission", "Non_Remission"],
+)
+TREATMENT_STAGE_PAIRS = (
+    ["Pre", "Post"],
+    ["baseline", "post-treatment"],
 )
 ROLE_BY_NAME = {
     "cell group": "cell_group",
@@ -88,13 +102,20 @@ ROLE_BY_NAME = {
     "cell state": "cell_type",
     "cell subgroup": "cell_subgroup",
     "diagnosis": "diagnosis",
+    "diagnosed disease": "diagnosis",
+    "disease": "diagnosis",
+    "condition": "condition",
     "tissue": "tissue",
     "biopsy site": "tissue",
     "inflammation": "inflammation",
     "inflammation status": "inflammation",
+    "presence of inflammation": "inflammation",
+    "treatment": "treatment",
+    "major cell type": "cell_type",
     "tnf treatment response": "response",
     "responder (r/nr)": "response",
     "response": "response",
+    "remission status": "response",
     "prior tnf inhibitor": "prior_tnf",
     "umap 1": "umap_x",
     "umap 2": "umap_y",
@@ -244,16 +265,61 @@ def is_patient_column(column: dict[str, Any]) -> bool:
 
 
 def choose_roles(columns: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    roles: dict[str, dict[str, Any]] = {}
+    found: dict[str, list[dict[str, Any]]] = {}
     for column in columns:
         role = column_role(column)
-        if role and role not in {"umap_x", "umap_y"} and role not in roles:
-            roles[role] = column
+        if role is None or role in {"umap_x", "umap_y"}:
+            continue
+        found.setdefault(role, []).append(column)
+    roles: dict[str, dict[str, Any]] = {}
+    for role, candidates in found.items():
+        if role == "cell_type" and len(candidates) > 1:
+            # Prefer a readable cell-type column over a fine cell-state list.
+            roles[role] = min(candidates, key=_cell_type_rank)
+        else:
+            roles[role] = candidates[0]
     if "patient" not in roles:
         patient = next((column for column in columns if is_patient_column(column)), None)
         if patient is not None:
             roles["patient"] = patient
     return roles
+
+
+def _cell_type_rank(column: dict[str, Any]) -> tuple[int, int]:
+    count = len(text_column_values(column))
+    return (count > SPLIT_MAX or count == 0, count or 999)
+
+
+def opening_names(names: list[str], count: int) -> list[str]:
+    """The names a list starts on. Charts follow whatever the user picks after that."""
+    return names[:count]
+
+
+def split_category_values(column: dict[str, Any]) -> list[str] | None:
+    """Values for a split dot plot. One value is not split, and neither is a long list."""
+    values = [value for value in text_column_values(column) if value.strip()]
+    if 2 <= len(values) <= SPLIT_MAX:
+        return values
+    return None
+
+
+def treatment_stages(column: dict[str, Any] | None) -> list[str]:
+    """Baseline and post-treatment labels, when the column has that pair."""
+    if column is None:
+        return []
+    folded = {value.casefold(): value for value in text_column_values(column)}
+    for pair in TREATMENT_STAGE_PAIRS:
+        if all(label.casefold() in folded for label in pair):
+            return [folded[label.casefold()] for label in pair]
+    return []
+
+
+def content_width(share: int) -> int:
+    return int(DESIGN_WIDTH * share / 100) - 8
+
+
+def pair_width(share: int) -> int:
+    return (content_width(share) - CHART_GAP) // 2
 
 
 def present_names(table: dict[str, Any], wanted: list[str]) -> list[str]:
@@ -384,13 +450,35 @@ def umap_chart(
     return chart
 
 
-def gene_panel(datasource: str, names: list[str]) -> list[dict[str, Any]]:
-    """`names` are the genes the list starts on; charts follow the genes picked in it."""
+def gene_panel(datasource: str, names: list[str], prompt: str | None = None) -> list[dict[str, Any]]:
+    """`names` are the genes the list starts on; charts follow the genes picked in it.
+
+    `prompt` adds a text box above the list, used on the gene, protein, and concordance views.
+    """
     del datasource
-    return [
-        placed(feature_list("Marker genes", names), [0, 0], [270, 400]),
-        placed(gene_info("Click a gene to plot it"), [0, 405], [270, 455]),
-    ]
+    return side_panel(names, prompt=prompt)
+
+
+def side_panel(
+    names: list[str],
+    *,
+    prompt: str | None = None,
+    list_title: str = "Marker genes",
+    kind: str = "gene",
+) -> list[dict[str, Any]]:
+    width = int(DESIGN_WIDTH * SIDE_SHARE / 100) - 16
+    charts: list[dict[str, Any]] = []
+    y = 0
+    if prompt:
+        charts.append(placed(text_box(prompt, prompt), [0, y], [width, 64]))
+        y += 72
+    charts.append(placed(feature_list(list_title, names), [0, y], [width, 280]))
+    y += 288
+    if kind == "protein":
+        charts.append(placed(feature_table("Click a protein to plot it"), [0, y], [width, 240]))
+    else:
+        charts.append(placed(gene_info("Click a gene to plot it"), [0, y], [width, 240]))
+    return charts
 
 
 def question_view(
@@ -398,11 +486,38 @@ def question_view(
     gene_name: str,
     cells: list[dict[str, Any]],
     panel: list[dict[str, Any]],
+    *,
+    cells_share: int = CELLS_SHARE,
+    side_share: int = SIDE_SHARE,
 ) -> dict[str, Any]:
     return {
-        "dataSources": {cells_name: {"panelWidth": 85}, gene_name: {"panelWidth": 15}},
+        "dataSources": {
+            cells_name: {"layout": "absolute", "panelWidth": cells_share},
+            gene_name: {"layout": "absolute", "panelWidth": side_share},
+        },
         "initialCharts": {cells_name: cells, gene_name: panel},
     }
+
+
+class _Rows:
+    """Place at most two charts on each row, inside the cells pane."""
+
+    def __init__(self, share: int) -> None:
+        self.share = share
+        self.width = content_width(share)
+        self.column = pair_width(share)
+        self.y = 0
+        self.charts: list[dict[str, Any]] = []
+
+    def full(self, chart: dict[str, Any], height: int) -> None:
+        self.charts.append(placed(chart, [0, self.y], [self.width, height]))
+        self.y += height + CHART_GAP
+
+    def pair(self, left: dict[str, Any], right: dict[str, Any] | None, height: int) -> None:
+        self.charts.append(placed(left, [0, self.y], [self.column, height]))
+        if right is not None:
+            self.charts.append(placed(right, [self.column + CHART_GAP, self.y], [self.column, height]))
+        self.y += height + CHART_GAP
 
 
 def column_label(column: dict[str, Any] | None, fallback: str) -> str:
@@ -423,6 +538,7 @@ def plan_question_views(
         {"question": "spatial localisation", "reason": "spatial charts are omitted"},
         {"question": "collection scores", "reason": "score columns are not created"},
         {"question": "DEG", "reason": "DEG columns are not created"},
+        {"question": Q7_VIEW_NAME, "reason": "signature collection view is not created"},
     ]
     cells = find_cells(datasources)
     if cells is None:
@@ -466,452 +582,436 @@ def plan_question_views(
     dot_field = str(dot_category.get("field")) if dot_category else ""
     dot_label = column_label(dot_category, group_label)
     gene_features = LinkedFeatures(gene_name, subgroup, markers)
-    selected = feature_query(gene_features, DOT_PLOT_FEATURES)
-    start_gene = markers[0]
+    one_gene = feature_query(gene_features, 1)
+    many_genes = feature_query(gene_features, max(len(markers), 1))
+    comparison_genes = opening_names(markers, OPENING_COMPARISON_GENES)
     counts = category_counts(datasources)
+    y_field = group_field or dot_field
+    axis_label = group_label if group_field else dot_label
 
     def accept(name: str, view: dict[str, Any]) -> None:
         if name in views:
             skipped.append({"question": name, "reason": "already in the project"})
             return
-        built[name] = place_legends(spread_layout(view), counts)
+        laid = place_legends(view, counts)
+        for charts in laid.get("initialCharts", {}).values():
+            for chart in charts:
+                if chart.get("type") != "heat_map":
+                    continue
+                legend = chart.get("color_legend")
+                size = chart.get("size")
+                if isinstance(legend, dict) and legend.get("display") and isinstance(size, list) and len(size) == 2:
+                    width, height = size
+                    legend["pos"] = [max(8, int(width) - 180), max(8, int(height) - 120)]
+        built[name] = laid
 
-    if umap_x and umap_y and group_field:
+    def split_chart(column: dict[str, Any], query: dict[str, Any]) -> dict[str, Any] | None:
+        values = split_category_values(column)
+        if values is None or not y_field:
+            return None
+        label = column_label(column, str(column.get("field")))
+        return compound_dot_plot(
+            f"{axis_label}, split by {label}",
+            y_field,
+            query,
+            split=(str(column["field"]), values),
+            y_label_size=110,
+        )
+
+    comparisons = [roles[role] for role in COMPARE_ROLES if role in roles]
+
+    if umap_x and umap_y and group_field and dot_field:
+        rows = _Rows(CELLS_SHARE)
+        rows.full(
+            text_box(
+                "About this page",
+                f"**Where is my gene of interest expressed across cell populations?** "
+                f"The first map shows **{group_label}**. The second map is the selected gene "
+                f"(darker = higher). The **dot plot** and **heat map** show that one gene, by "
+                f"**{dot_label}** and by **{group_label}**.\n\n"
+                f"**To look at another gene:** click one name under **Select gene(s) to view**.",
+            ),
+            100,
+        )
+        rows.pair(
+            umap_chart(group_label, umap_x, umap_y, group_field, dot_field),
+            umap_chart("Selected Gene Expression", umap_x, umap_y, one_gene, dot_field),
+            320,
+        )
+        rows.pair(
+            compound_dot_plot(f"Selected gene by {dot_label}", dot_field, one_gene, y_label_size=110),
+            heat_map(f"Selected gene by {group_label}", group_field, one_gene),
+            380,
+        )
         accept(
             Q1_VIEW_NAME,
             question_view(
                 cells_name,
                 gene_name,
-                [
-                    placed(
-                        text_box(
-                            "About this page",
-                            f"**Where is my gene of interest expressed across cell populations?** "
-                            f"The first map shows **{group_label}**. The second map shows where the "
-                            f"selected gene is expressed (darker = higher). In the **dot plot**, a bigger "
-                            f"dot means more cells express the gene, and a darker dot means a higher average "
-                            f"level. The **heat map** shows the average level of the selected genes (up to "
-                            f"{HEAT_MAP_FEATURES}) in each {group_label}.\n\n"
-                            f"**To look at other genes:** click a gene in the list on the right "
-                            f"(Ctrl/Cmd-click to pick several) and the charts update; the map shows the "
-                            f"first gene picked.",
-                        ),
-                        [0, 0],
-                        [LAYOUT_WIDTH, 120],
-                    ),
-                    placed(umap_chart(group_label, umap_x, umap_y, group_field, dot_field or group_field), [0, 125], [790, 340]),
-                    placed(
-                        umap_chart(
-                            "Selected Gene Expression",
-                            umap_x,
-                            umap_y,
-                            feature_query(gene_features, 1),
-                            dot_field or group_field,
-                        ),
-                        [795, 125],
-                        [795, 340],
-                    ),
-                    placed(
-                        compound_dot_plot(f"Selected genes by {dot_label}", dot_field, selected),
-                        [0, 470],
-                        [930, 640],
-                    ),
-                    placed(
-                        heat_map(group_label, group_field, feature_query(gene_features, HEAT_MAP_FEATURES)),
-                        [935, 470],
-                        [655, 640],
-                    ),
-                ],
-                gene_panel(gene_name, [start_gene]),
+                rows.charts,
+                gene_panel(gene_name, [markers[0]], "Select gene(s) to view"),
             ),
         )
     else:
         skipped.append({"question": Q1_VIEW_NAME, "reason": "needs a UMAP pair, a grouping column, and marker genes"})
 
-    comparisons = [
-        roles[role]
-        for role in ("diagnosis", "tissue", "inflammation", "patient", "cell_type")
-        if role in roles
-    ]
-    if comparisons and dot_field:
-        comparison_fields = [str(column["field"]) for column in comparisons]
-        charts = [
-            placed(
-                text_box(
-                    "About this page",
-                    "**Is the expression different between disease stages, patient groups, and tissue types?** "
-                    "The **dot plots** compare the selected genes in the groups on this page. A bigger dot "
-                    "means more cells express the gene, and a darker dot means a higher average level.\n\n"
-                    "**To compare groups:** pick categories in **Choose groups to compare**. "
-                    "**To change genes:** click genes in the list on the right.",
-                ),
-                [0, 0],
-                [1100, 160],
-            ),
-            placed(cell_filter("Choose groups to compare", comparison_fields), [1105, 0], [485, 160]),
-        ]
-        for index, column in enumerate(comparisons[:4]):
-            field = str(column["field"])
-            label = column_label(column, field)
-            chart = compound_dot_plot(f"Selected genes by {label}", field, selected, y_label_size=110)
-            if roles.get("patient") is column:
-                # The React dot plot can't limit its rows to a few patients, so it has a panel
-                # per example patient instead, by cell group.
-                chosen = preferred_values(text_column_values(column), [], 5)
-                if chosen:
-                    chart = compound_dot_plot(
-                        f"Selected genes by {label}",
-                        group_field or dot_field,
-                        selected,
-                        split=(field, chosen),
-                        y_label_size=110,
-                    )
-            # Tall enough to leave room for the legends above the plot.
-            charts.append(placed(chart, [(index % 2) * 795, 170 + (index // 2) * 440], [790, 435]))
-        accept(Q2_VIEW_NAME, question_view(cells_name, gene_name, charts, gene_panel(gene_name, markers)))
-    else:
-        skipped.append({"question": Q2_VIEW_NAME, "reason": "needs a grouping column and marker genes"})
-
-    if protein_tables:
+    pairs: list[tuple[str, str]] = []
+    protein_name = ""
+    protein_subgroup = ""
+    protein_failed = False
+    if protein_tables and dot_field:
         protein_name, protein_subgroup, protein_table = protein_tables[0]
         pairs = [
             (gene, protein)
             for gene, protein in Q3_MATCHING
             if gene in fields and protein in set(present_names(protein_table, [protein]))
         ]
-        protein_failed = False
-        protein_features = LinkedFeatures(protein_name, protein_subgroup, [protein for _, protein in pairs])
-        if pairs and dot_field:
+        if pairs:
             try:
                 with h5py.File(project / "datafile.h5", "r") as handle:
-                    resolve_feature_fields(handle, datasources, protein_features)
+                    resolve_feature_fields(
+                        handle,
+                        datasources,
+                        LinkedFeatures(protein_name, protein_subgroup, [protein for _, protein in pairs]),
+                    )
             except (OSError, ValueError, KeyError, IndexError) as exc:
                 skipped.append({"question": Q3_VIEW_NAME, "reason": f"could not read protein rows: {exc}"})
+                skipped.append({"question": PROTEIN_VIEW_NAME, "reason": f"could not read protein rows: {exc}"})
                 protein_failed = True
                 pairs = []
             require_same_h5(before, h5_stamp(project), "Reading")
-        if pairs and dot_field:
-            accept(
-                Q3_VIEW_NAME,
-                {
-                    "dataSources": {
-                        cells_name: {"panelWidth": 70},
-                        gene_name: {"panelWidth": 15},
-                        protein_name: {"panelWidth": 15},
-                    },
-                    "initialCharts": {
-                        cells_name: [
-                            placed(
-                                text_box(
-                                    "About this page",
-                                    "**Is the expression concordant with protein expression?** "
-                                    "The left dot plot shows **RNA** and the right one shows **protein** "
-                                    "for the pairs already measured in this project. The maps below show "
-                                    "the selected gene's RNA and the selected protein: similar colour "
-                                    "patterns mean RNA and protein agree. **To compare a gene with its "
-                                    "protein:** click the gene in the genes list and its protein in the "
-                                    "proteins list.",
-                                ),
-                                [0, 0],
-                                [LAYOUT_WIDTH, 120],
-                            ),
-                            placed(
-                                compound_dot_plot(
-                                    f"RNA by {dot_label}",
-                                    dot_field,
-                                    feature_query(
-                                        LinkedFeatures(gene_name, subgroup, [gene for gene, _ in pairs]),
-                                        DOT_PLOT_FEATURES,
-                                    ),
-                                ),
-                                [0, 130],
-                                [790, 500],
-                            ),
-                            placed(
-                                compound_dot_plot(
-                                    f"Protein by {dot_label}",
-                                    dot_field,
-                                    feature_query(protein_features, DOT_PLOT_FEATURES),
-                                ),
-                                [800, 130],
-                                [790, 500],
-                            ),
-                            *(
-                                [
-                                    placed(
-                                        umap_chart(
-                                            "Selected Gene Expression",
-                                            umap_x,
-                                            umap_y,
-                                            feature_query(LinkedFeatures(gene_name, subgroup, [pairs[0][0]]), 1),
-                                            dot_field,
-                                        ),
-                                        [0, 635],
-                                        [790, 360],
-                                    ),
-                                    placed(
-                                        umap_chart(
-                                            "Selected Protein",
-                                            umap_x,
-                                            umap_y,
-                                            feature_query(protein_features, 1),
-                                            dot_field,
-                                        ),
-                                        [800, 635],
-                                        [790, 360],
-                                    ),
-                                ]
-                                if umap_x and umap_y
-                                else []
-                            ),
-                        ],
-                        gene_name: gene_panel(gene_name, [pairs[0][0]]),
-                        protein_name: [
-                            placed(feature_list("Marker proteins", [pairs[0][1]]), [0, 0], [270, 400]),
-                            placed(feature_table("Click a protein to plot it"), [0, 405], [270, 455]),
-                        ],
-                    },
-                },
+        if pairs and umap_x and umap_y and group_field:
+            one_protein = feature_query(LinkedFeatures(protein_name, protein_subgroup, [pairs[0][1]]), 1)
+            protein_rows = _Rows(CELLS_SHARE)
+            protein_rows.full(
+                text_box(
+                    "About this page",
+                    f"**Where is my protein of interest expressed across cell populations?** "
+                    f"The first map shows **{group_label}**. The second map is the selected protein "
+                    f"(darker = higher). The **dot plot** and **heat map** show that one protein, by "
+                    f"**{dot_label}** and by **{group_label}**.\n\n"
+                    f"**To look at another protein:** click one name under **Select protein(s) to view**.",
+                ),
+                100,
             )
+            protein_rows.pair(
+                umap_chart(group_label, umap_x, umap_y, group_field, dot_field),
+                umap_chart("Selected Protein Expression", umap_x, umap_y, one_protein, dot_field),
+                320,
+            )
+            protein_rows.pair(
+                compound_dot_plot(f"Selected protein by {dot_label}", dot_field, one_protein, y_label_size=110),
+                heat_map(f"Selected protein by {group_label}", group_field, one_protein),
+                380,
+            )
+            accept(
+                PROTEIN_VIEW_NAME,
+                question_view(
+                    cells_name,
+                    protein_name,
+                    protein_rows.charts,
+                    side_panel(
+                        [pairs[0][1]],
+                        prompt="Select protein(s) to view",
+                        list_title="Marker proteins",
+                        kind="protein",
+                    ),
+                ),
+            )
+        elif pairs and not protein_failed:
+            skipped.append({
+                "question": PROTEIN_VIEW_NAME,
+                "reason": "needs a UMAP pair and a grouping column",
+            })
         elif not protein_failed:
-            skipped.append({"question": Q3_VIEW_NAME, "reason": "protein table has none of the expected gene/protein pairs"})
+            skipped.append({
+                "question": PROTEIN_VIEW_NAME,
+                "reason": "protein table has none of the expected gene/protein pairs",
+            })
+    elif protein_tables:
+        skipped.append({"question": PROTEIN_VIEW_NAME, "reason": "needs a grouping column"})
     else:
-        skipped.append({"question": Q3_VIEW_NAME, "reason": "no protein table"})
+        skipped.append({"question": PROTEIN_VIEW_NAME, "reason": "no protein table"})
 
-    diagnosis = roles.get("diagnosis")
-    if diagnosis and dot_field:
-        diagnosis_field = str(diagnosis["field"])
-        diagnosis_values = preferred_values(text_column_values(diagnosis), PREFERRED_DIAGNOSES, 2)
-        diagnosis_label = column_label(diagnosis, "Diagnosis")
-        per_disease = placed(
-            compound_dot_plot(
-                f"Selected genes in {' and '.join(diagnosis_values)}",
-                dot_field,
-                selected,
-                split=(diagnosis_field, diagnosis_values),
+    if comparisons and y_field:
+        rows = _Rows(CELLS_SHARE)
+        rows.full(
+            text_box(
+                "About this page",
+                "**Is the expression different between disease stages, patient groups, and tissue types?** "
+                "A category with several groups is a **split dot plot**: one panel per group, on one colour "
+                "and size scale. A category with only one value stays a single panel. Cell type stays one "
+                "panel when there are many types.\n\n"
+                "The page starts on five genes. **To plot more:** click further genes in the list on the right.",
             ),
-            [795, 505],
-            [795, 355],
+            120,
         )
+        filter_fields = [str(column["field"]) for column in comparisons]
+        patient = roles.get("patient")
+        if patient is not None:
+            filter_fields.append(str(patient["field"]))
+        response_column = roles.get("response")
+        if response_column is not None:
+            filter_fields.append(str(response_column["field"]))
+        rows.full(cell_filter("Choose groups to compare", filter_fields), 88)
+        pending: list[dict[str, Any]] = []
+        for column in comparisons:
+            chart = split_chart(column, many_genes)
+            if chart is None and len([value for value in text_column_values(column) if value.strip()]) == 1:
+                label = column_label(column, str(column.get("field")))
+                chart = compound_dot_plot(
+                    f"Selected genes by {label}",
+                    str(column["field"]),
+                    many_genes,
+                    y_label_size=110,
+                )
+            if chart is not None:
+                pending.append(chart)
+        if dot_field:
+            pending.append(
+                compound_dot_plot(f"Selected genes by {dot_label}", dot_field, many_genes, y_label_size=110)
+            )
+        while pending:
+            left = pending.pop(0)
+            right = pending.pop(0) if pending else None
+            rows.pair(left, right, 360)
+        accept(Q2_VIEW_NAME, question_view(cells_name, gene_name, rows.charts, gene_panel(gene_name, comparison_genes)))
+    else:
+        skipped.append({"question": Q2_VIEW_NAME, "reason": "needs a grouping column and marker genes"})
+
+    if pairs and dot_field and not protein_failed:
+        concord = _Rows(CONCORD_SHARE)
+        concord.full(
+            text_box(
+                "About this page",
+                "**Is the gene expression concordant with protein expression?** "
+                f"The charts start on one pair, **{pairs[0][0]}** and **{pairs[0][1]}**. "
+                "The left side is RNA and the right side is protein. Similar patterns mean RNA and protein agree.\n\n"
+                "**To compare another pair:** click that gene and its protein. The maps follow the first name in each list.",
+            ),
+            120,
+        )
+        concord.full(cell_filter(f"Focus on {dot_label}", [dot_field]), 88)
+        gene_query = feature_query(LinkedFeatures(gene_name, subgroup, [pairs[0][0]]), CONCORD_MAX_ITEMS)
+        protein_query = feature_query(
+            LinkedFeatures(protein_name, protein_subgroup, [pairs[0][1]]),
+            CONCORD_MAX_ITEMS,
+        )
+        concord.pair(
+            compound_dot_plot(f"RNA by {dot_label}", dot_field, gene_query, y_label_size=110),
+            compound_dot_plot(f"Protein by {dot_label}", dot_field, protein_query, y_label_size=110),
+            360,
+        )
+        if umap_x and umap_y:
+            concord.pair(
+                umap_chart(
+                    "Selected Gene Expression",
+                    umap_x,
+                    umap_y,
+                    feature_query(LinkedFeatures(gene_name, subgroup, [pairs[0][0]]), 1),
+                    dot_field,
+                ),
+                umap_chart(
+                    "Selected Protein Expression",
+                    umap_x,
+                    umap_y,
+                    feature_query(LinkedFeatures(protein_name, protein_subgroup, [pairs[0][1]]), 1),
+                    dot_field,
+                ),
+                300,
+            )
         accept(
-            Q6_VIEW_NAME,
-            question_view(
-                cells_name,
-                gene_name,
-                [
-                    placed(
-                        text_box(
-                            "About this page",
-                            f"**How comparable is the expression across different diseases?** "
-                            f"The **heat map** shows the average level of the selected genes (up to "
-                            f"{HEAT_MAP_FEATURES}) by **{diagnosis_label}**. The **box plot** shows how the "
-                            f"first selected gene varies within each group. **To change genes:** click genes "
-                            f"in the list on the right (Ctrl/Cmd-click to pick several).",
-                        ),
-                        [0, 0],
-                        [1100, 140],
+            Q3_VIEW_NAME,
+            {
+                "dataSources": {
+                    cells_name: {"layout": "absolute", "panelWidth": CONCORD_SHARE},
+                    gene_name: {"layout": "absolute", "panelWidth": SIDE_SHARE},
+                    protein_name: {"layout": "absolute", "panelWidth": SIDE_SHARE},
+                },
+                "initialCharts": {
+                    cells_name: concord.charts,
+                    gene_name: side_panel([pairs[0][0]], prompt="Select gene(s) to view"),
+                    protein_name: side_panel(
+                        [pairs[0][1]],
+                        prompt="Select protein(s) to view",
+                        list_title="Marker proteins",
+                        kind="protein",
                     ),
-                    placed(cell_filter(f"Focus on {dot_label}", [dot_field]), [1105, 0], [485, 140]),
-                    placed(
-                        heat_map(diagnosis_label, diagnosis_field, feature_query(gene_features, HEAT_MAP_FEATURES)),
-                        [0, 150],
-                        [790, 710],
-                    ),
-                    placed(
-                        box_plot(
-                            f"Gene Expression by {diagnosis_label}",
-                            diagnosis_field,
-                            feature_query(gene_features, 1),
-                            x_label=diagnosis_label,
-                        ),
-                        [795, 150],
-                        [795, 345],
-                    ),
-                    per_disease,
-                ],
-                gene_panel(gene_name, markers),
-            ),
+                },
+            },
         )
+    elif not protein_tables:
+        skipped.append({"question": Q3_VIEW_NAME, "reason": "no protein table"})
+    elif not protein_failed:
+        skipped.append({"question": Q3_VIEW_NAME, "reason": "protein table has none of the expected gene/protein pairs"})
+
+    split_columns = [column for column in comparisons if split_category_values(column)]
+    if split_columns and y_field:
+        rows = _Rows(CELLS_SHARE)
+        rows.full(
+            text_box(
+                "About this page",
+                "**How comparable is the expression across different diseases?** "
+                "Each row is one comparison. The **split dot plot** has a panel per group, and the **heat map** "
+                "shows the average of the selected genes in that same grouping.\n\n"
+                "The page starts on five genes. **To plot more:** click further genes in the list on the right.",
+            ),
+            120,
+        )
+        rows.full(
+            cell_filter("Choose groups to compare", [str(column["field"]) for column in split_columns]),
+            88,
+        )
+        for column in split_columns:
+            label = column_label(column, str(column.get("field")))
+            chart = split_chart(column, many_genes)
+            if chart is None:
+                continue
+            rows.pair(chart, heat_map(f"Selected genes by {label}", str(column["field"]), many_genes), 360)
+        accept(Q6_VIEW_NAME, question_view(cells_name, gene_name, rows.charts, gene_panel(gene_name, comparison_genes)))
     else:
         skipped.append({"question": Q6_VIEW_NAME, "reason": "needs a diagnosis column and marker genes"})
 
-    if diagnosis and len(collections) >= 2 and dot_field:
-        diagnosis_field = str(diagnosis["field"])
-        diagnosis_values = preferred_values(text_column_values(diagnosis), PREFERRED_DIAGNOSES, 2)
-        diagnosis_label = column_label(diagnosis, "Diagnosis")
-        collection_query = feature_query(
-            LinkedFeatures(gene_name, subgroup, collections),
-            len(collections),
-        )
-        per_disease = placed(
-            compound_dot_plot(
-                f"Collection genes in {' and '.join(diagnosis_values)}",
-                dot_field,
-                collection_query,
-                split=(diagnosis_field, diagnosis_values),
-            ),
-            [800, 150],
-            [790, 710],
-        )
-        accept(
-            Q7_VIEW_NAME,
-            question_view(
-                cells_name,
-                gene_name,
-                [
-                    placed(
-                        text_box(
-                            "About this page",
-                            "**How comparable is the expression of gene collections across diseases?** "
-                            "This page plots the **member genes** that are already in the project. "
-                            "It does not add collection-score columns. A bigger dot means more cells "
-                            "express the gene, and a darker dot means a higher average level.",
-                        ),
-                        [0, 0],
-                        [1100, 140],
-                    ),
-                    placed(cell_filter(f"Focus on {dot_label}", [dot_field]), [1105, 0], [485, 140]),
-                    placed(
-                        heat_map(
-                            f"Collection genes by {diagnosis_label} (average expression)",
-                            diagnosis_field,
-                            [fields[gene] for gene in collections],
-                            y_label_size=150,
-                        ),
-                        [0, 150],
-                        [790, 710],
-                    ),
-                    per_disease,
-                ],
-                gene_panel(gene_name, collections),
-            ),
-        )
-    else:
-        skipped.append({"question": Q7_VIEW_NAME, "reason": "needs a diagnosis column and at least two collection genes"})
-
     response = roles.get("response")
+    treatment = roles.get("treatment")
     groups = response_groups(text_column_values(response)) if response else []
-    if response and groups and dot_field:
+    stages = treatment_stages(treatment)
+    if response and groups and y_field:
         response_field = str(response["field"])
         response_label = column_label(response, "Response")
         filters = [response_field]
         selected_filters: dict[str, list[str]] = {response_field: groups}
-        if diagnosis:
-            filters.insert(0, str(diagnosis["field"]))
-            diagnosis_choice = preferred_values(text_column_values(diagnosis), PREFERRED_DIAGNOSES, 1)
-            if diagnosis_choice:
-                selected_filters[str(diagnosis["field"])] = diagnosis_choice
-        prior = roles.get("prior_tnf")
-        if prior and "Yes" in text_column_values(prior):
-            filters.append(str(prior["field"]))
-            selected_filters[str(prior["field"])] = ["Yes"]
-        by_response = placed(
-            compound_dot_plot(
-                f"Selected genes by {response_label}",
-                group_field or dot_field,
-                selected,
-                split=(response_field, [str(value) for value in groups[:2]]),
-                y_label_size=110,
-            ),
-            [0, 200],
-            [1590, 390],
-        )
-        box_gene = "TNF" if "TNF" in fields else markers[0]
-        accept(
-            Q8_VIEW_NAME,
-            question_view(
-                cells_name,
-                gene_name,
-                [
-                    placed(
-                        text_box(
-                            "About this page",
-                            f"**Contrasting response groups.** The **dot plot** shows the selected genes, "
-                            f"with a panel for each value of **{response_label}**. The **bar** shows the mix of "
-                            f"**{group_label}**, and the **box plot** shows how {box_gene} varies.",
-                        ),
-                        [0, 0],
-                        [1100, 180],
-                    ),
-                    placed(
-                        cell_filter("Choose patients to compare", filters, selected_filters),
-                        [1105, 0],
-                        [485, 180],
-                    ),
-                    by_response,
-                    placed(
-                        composition_bar(
-                            f"{group_label} mix by {response_label}",
-                            response_field,
-                            group_field or dot_field,
-                        ),
-                        [0, 600],
-                        [790, 260],
-                    ),
-                    placed(
-                        box_plot(f"{box_gene} by {response_label}", response_field, fields[box_gene]),
-                        [795, 600],
-                        [795, 260],
-                    ),
-                ],
-                gene_panel(gene_name, markers),
-            ),
-        )
+        if roles.get("diagnosis") is not None:
+            filters.insert(0, str(roles["diagnosis"]["field"]))
+        if treatment is not None:
+            filters.append(str(treatment["field"]))
+        rows = _Rows(CELLS_SHARE)
+        if stages and treatment is not None:
+            treatment_field = str(treatment["field"])
+            treatment_label = column_label(treatment, "Treatment")
+            rows.full(
+                text_box(
+                    "About this page",
+                    f"**Contrasting {response_label} before and after treatment.** "
+                    f"Each **dot plot** is limited to one **{treatment_label}** time and has a panel per "
+                    f"**{response_label}** group, on a shared colour and size scale.\n\n"
+                    "The page starts on five genes. **To plot more:** click further genes in the list on the right.",
+                ),
+                140,
+            )
+            rows.full(cell_filter("Choose groups to compare", filters, selected_filters), 88)
+            stage_charts = []
+            for stage in stages[:2]:
+                chart = compound_dot_plot(
+                    f"{stage}: {response_label}",
+                    y_field,
+                    many_genes,
+                    split=(response_field, [str(value) for value in groups[:2]]),
+                    y_label_size=110,
+                )
+                chart["category_filters"] = [{"column": treatment_field, "category": [stage]}]
+                stage_charts.append(chart)
+            rows.pair(stage_charts[0], stage_charts[1] if len(stage_charts) > 1 else None, 380)
+            q8_name = "Contrasting responders and non-responders at baseline and post treatment"
+        else:
+            rows.full(
+                text_box(
+                    "About this page",
+                    f"**Contrasting response groups.** The **dot plot** shows the selected genes, with a panel "
+                    f"for each value of **{response_label}**. The **bar** shows the mix of **{axis_label}**, "
+                    f"and the **box plot** shows how {('TNF' if 'TNF' in fields else markers[0])} varies.\n\n"
+                    "The page starts on five genes. **To plot more:** click further genes in the list on the right.",
+                ),
+                140,
+            )
+            rows.full(cell_filter("Choose groups to compare", filters, selected_filters), 88)
+            rows.full(
+                compound_dot_plot(
+                    f"{axis_label}, split by {response_label}",
+                    y_field,
+                    many_genes,
+                    split=(response_field, [str(value) for value in groups[:2]]),
+                    y_label_size=110,
+                ),
+                380,
+            )
+            box_gene = "TNF" if "TNF" in fields else markers[0]
+            rows.pair(
+                composition_bar(f"{axis_label} mix by {response_label}", response_field, y_field),
+                box_plot(f"{box_gene} by {response_label}", response_field, fields[box_gene]),
+                280,
+            )
+            q8_name = Q8_VIEW_NAME
+        accept(q8_name, question_view(cells_name, gene_name, rows.charts, gene_panel(gene_name, comparison_genes)))
     else:
         skipped.append({"question": Q8_VIEW_NAME, "reason": "needs an existing response column and marker genes"})
 
-    if response and groups and umap_x and umap_y and group_field:
-        response_field = str(response["field"])
-        response_label = column_label(response, "Response")
-        maps = [
-            placed(
-                umap_chart(
-                    f"{group_label}: {group_value}",
-                    umap_x,
-                    umap_y,
-                    group_field,
-                    dot_field or group_field,
-                    only=(response_field, group_value),
-                ),
-                [index * 530, 185],
-                [520, 370],
-            )
-            for index, group_value in enumerate(groups[:2])
-        ]
-        accept(
-            Q9_VIEW_NAME,
-            question_view(
-                cells_name,
-                gene_name,
-                [
-                    placed(
-                        text_box(
-                            "About this page",
-                            f"**Is the UMAP different between response groups?** The maps show each "
-                            f"**{response_label}** group, coloured by **{group_label}**. A region that "
-                            f"fills or empties points to a shift in cell composition. No DEG columns are added.",
-                        ),
-                        [0, 0],
-                        [1100, 160],
-                    ),
-                    *maps,
-                    placed(
-                        composition_bar(
-                            f"{group_label} mix by {response_label}",
-                            response_field,
-                            group_field,
-                        ),
-                        [1060, 185],
-                        [530, 370],
-                    ),
-                ],
-                gene_panel(gene_name, markers),
+    stage_column = treatment if stages else response if groups else None
+    stage_values = stages if stages else groups[:2]
+    if stage_column is not None and len(stage_values) >= 2 and umap_x and umap_y and group_field and y_field:
+        stage_field = str(stage_column["field"])
+        stage_label = column_label(stage_column, "Treatment" if stages else "Response")
+        rows = _Rows(CELLS_SHARE)
+        rows.full(
+            text_box(
+                "About this page",
+                f"**Is the UMAP different between {stage_label} groups?** The two maps show "
+                f"**{stage_values[0]}** and **{stage_values[1]}**, coloured by **{group_label}**. "
+                f"The bar shows that mix. The **dot plot** has a panel for each group.\n\n"
+                "**Differentially expressed genes** are not added, so there is no volcano plot. "
+                "The page starts on five genes. **To plot more:** click further genes in the list on the right.",
             ),
+            150,
         )
+        filter_fields = [stage_field]
+        if response is not None and str(response["field"]) not in filter_fields:
+            filter_fields.append(str(response["field"]))
+        rows.full(cell_filter("Choose groups to compare", filter_fields), 88)
+        rows.pair(
+            umap_chart(
+                str(stage_values[0]),
+                umap_x,
+                umap_y,
+                group_field,
+                dot_field or group_field,
+                only=(stage_field, str(stage_values[0])),
+            ),
+            umap_chart(
+                str(stage_values[1]),
+                umap_x,
+                umap_y,
+                group_field,
+                dot_field or group_field,
+                only=(stage_field, str(stage_values[1])),
+            ),
+            320,
+        )
+        box_gene = "TNF" if "TNF" in fields else markers[0]
+        rows.pair(
+            composition_bar(f"{group_label} mix by {stage_label}", stage_field, group_field),
+            box_plot(f"{box_gene} by {stage_label}", stage_field, fields[box_gene]),
+            280,
+        )
+        rows.full(
+            compound_dot_plot(
+                f"{axis_label}, split by {stage_label}",
+                y_field,
+                many_genes,
+                split=(stage_field, [str(value) for value in stage_values[:2]]),
+                y_label_size=110,
+            ),
+            360,
+        )
+        q9_name = (
+            "Comparing groups: is the UMAP different between treatment states? DEG?"
+            if stages
+            else Q9_VIEW_NAME
+        )
+        accept(q9_name, question_view(cells_name, gene_name, rows.charts, gene_panel(gene_name, comparison_genes)))
     else:
         skipped.append({
             "question": Q9_VIEW_NAME,
-            "reason": "needs a UMAP pair, a grouping column, and an existing response column",
+            "reason": "needs a UMAP pair, a grouping column, and an existing response or treatment column",
         })
 
     return {
