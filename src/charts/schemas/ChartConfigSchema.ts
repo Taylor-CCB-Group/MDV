@@ -175,9 +175,24 @@ const ContourVisualConfigSchema = z
     })
     .describe("Visual contour configuration shared by density-style charts");
 
+/**
+ * Draw a chart as a grid of small multiples, one cell per value of a property of its config.
+ * Layout options (cell size, columns) belong here too; for now the defaults apply.
+ */
+export const ChartGridConfigSchema = z
+    .object({
+        by: z
+            .enum(["densityFields"])
+            .describe("The config property whose values make the cells, e.g. one cell per density field"),
+    })
+    .describe("Show the chart as a grid of cells, one per value of a config property");
+
+export type ChartGridConfig = z.infer<typeof ChartGridConfigSchema>;
+
 const DensityFieldsConfigSchema = z
     .object({
         densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),
+        grid: ChartGridConfigSchema.nullable().optional(),
     })
     .describe("Density field selection shared by contour-based charts");
 
@@ -258,6 +273,13 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
         .describe("Hides rows outside the selected categories from this chart only"),
     on_filter: z.enum(["hide", "grey"]).optional().describe("How filtered-out points should be rendered"),
     zoom_on_filter: z.boolean().optional().describe("Whether filtering should auto-fit the current view"),
+    crosshair: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe(
+            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a grid (default true)",
+        ),
     point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
     axis_scaling: z
         .enum(["equal", "fit"])

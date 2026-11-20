@@ -1,5 +1,5 @@
 import type { OrbitViewState } from "deck.gl";
-import { action, makeObservable, observable } from "mobx";
+import { action, makeObservable, observable, reaction } from "mobx";
 import { observer } from "mobx-react-lite";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import type DataStore from "@/datastore/DataStore";
@@ -17,6 +17,9 @@ import {
 } from "../scatter_state";
 import { BaseReactChart } from "./BaseReactChart";
 import DeckScatterComponent from "./DeckScatterComponent";
+import { getDensityGridSettingsFolder } from "./densityGridSettings";
+import { isDensityGridShown, supportsDensityGridMode } from "./densityGridUtils";
+import { getCrosshairSetting } from "./pointerCrosshair";
 import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 
 const MainChart = observer(() => {
@@ -68,6 +71,10 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     config.render_backend = config.render_backend ?? null;
     // same for the background filter, which is replaced as a whole by its settings
     config.background_filter = config.background_filter ?? null;
+    // and the grid, which its toggle sets and clears
+    config.grid = config.grid ?? null;
+    // and the crosshair, which is on unless turned off
+    config.crosshair = config.crosshair ?? null;
     // charts saved before this setting kept both axes at one scale
     if (config.dimension !== "3d") config.axis_scaling = config.axis_scaling ?? "equal";
     const legacyContourParameter = originalConfig.param?.[2];
@@ -99,10 +106,23 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
     pendingRecenter = false;
+    /**
+     * The density grid was turned on since the chart was made, so it fits its cells when it
+     * first shows (see `DeckDensityGridComponent`). A grid restored with a view keeps its view.
+     */
+    fitDensityGridOnShow = false;
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: DeckScatterConfig) {
         const config = adaptConfig(originalConfig);
         super(dataStore, div, config, MainChart);
         if (!originalConfig.viewState) this.pendingRecenter = true;
+        this.reactionDisposers.push(
+            reaction(
+                () => isDensityGridShown(this.config),
+                (shown) => {
+                    if (shown) this.fitDensityGridOnShow = true;
+                },
+            ),
+        );
         //@ts-expect-error - pending colorBy type fix
         this.colorByColumn(config.color_by);
         makeObservable(this, {
@@ -253,7 +273,9 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         // null only exists to keep the key observable; leave it out of saved views
         const render_backend = c.render_backend ?? undefined;
         const background_filter = c.background_filter ?? undefined;
-        return { ...c, viewState, render_backend, background_filter };
+        const grid = c.grid ?? undefined;
+        const crosshair = c.crosshair ?? undefined;
+        return { ...c, viewState, render_backend, background_filter, grid, crosshair };
     }
 
     /** Choose a column and the categories of it to keep; other rows are hidden from this chart only. */
@@ -308,6 +330,8 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                     },
                 }),
             );
+            settings.push(getCrosshairSetting(c));
+            if (supportsDensityGridMode(c.type)) settings.push(getDensityGridSettingsFolder(c));
         }
         return settings.concat([
             ...this.getBackgroundFilterSettings(),

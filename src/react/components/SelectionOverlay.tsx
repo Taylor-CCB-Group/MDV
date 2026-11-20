@@ -1,21 +1,25 @@
 import { DrawPolygonByDraggingMode, type GeoJsonEditMode, TranslateMode } from "@deck.gl-community/editable-layers";
-import { TuneOutlined } from "@mui/icons-material";
+import { GridViewOutlined, TuneOutlined } from "@mui/icons-material";
 import AddCircleOutlinedIcon from "@mui/icons-material/AddCircleOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import DoneOutlinedIcon from "@mui/icons-material/DoneOutlined";
+import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
 import { ButtonGroup, Divider } from "@mui/material"; //check tree-shaking...
 import { LassoIcon, SplinePointerIcon, VectorSquareIcon } from "lucide-react";
+import { action } from "mobx";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditMode, PolygonMode, RectangleMode } from "@/editable-layers/selectionModes";
 import { useChart } from "../context";
+import type { DualContourLegacyConfig } from "../contour_state";
 import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
 import useGateActions from "../hooks/useGateActions";
 import { useSpatialLayers } from "../spatial_context";
 import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
+import { densityGridConfig, isDensityGridShown, supportsDensityGridMode } from "./densityGridUtils";
 import GateNameDialog from "./GateNameDialog";
 import IconWithTooltip from "./IconWithTooltip";
 import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
@@ -97,7 +101,14 @@ export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
     const chart = useChart<DeckScatterConfigWithRegion>();
     const chartId = useChartID();
-    const config = useConfig<DeckScatterConfigWithRegion>();
+    const config = useConfig<DeckScatterConfigWithRegion & DualContourLegacyConfig>();
+    const canShowDensityGrid = supportsDensityGridMode(config.type) && config.dimension !== "3d";
+    const densityGridShown = isDensityGridShown(config);
+    const toggleDensityGrid = useCallback(() => {
+        action(() => {
+            config.grid = densityGridConfig(!isDensityGridShown(config));
+        })();
+    }, [config]);
     const {
         setSelectionMode,
         selectionFeatureCollection,
@@ -249,6 +260,22 @@ export default observer(function SelectionOverlay() {
                 {toolButtons}
                 {showAllTools && (
                     <>
+                        {canShowDensityGrid && (
+                            <IconWithTooltip
+                                tooltipText={
+                                    densityGridShown
+                                        ? "Show density fields on one plot"
+                                        : "Show density fields as a grid"
+                                }
+                                onClick={toggleDensityGrid}
+                                iconButtonProps={{
+                                    sx: { color: "var(--text_color)", borderRadius: 10, zIndex: 2 },
+                                    "aria-label": densityGridShown ? "Density overlay" : "Density grid",
+                                }}
+                            >
+                                {densityGridShown ? <LayersOutlinedIcon /> : <GridViewOutlined />}
+                            </IconWithTooltip>
+                        )}
                         <Divider
                             orientation="vertical"
                             sx={{

@@ -1,4 +1,5 @@
 import type { CreateDeviceProps, Device } from "@luma.gl/core";
+import { applyWebGPUViewFix } from "@spatialdata/layers";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type RenderBackend, renderBackendSetting } from "@/lib/browserSettings";
 // Side effect: when "WebGPU call tracing" is on, wrap the WebGPU API before any device exists.
@@ -180,6 +181,10 @@ export function useDeckDeviceProps(
             // before deck's first frame: Safari rejects a viewport outside the canvas
             applyWebGPUViewportClamp(created);
             handlers.initialized?.(created);
+            // deck 9.4 places a view on a WebGPU canvas from the bottom, as on WebGL, so any
+            // view not centred vertically draws in the wrong place (a density grid's rows swap).
+            // Fixed in deck 10 (visgl/deck.gl#11018); a no-op on WebGL.
+            applyWebGPUViewFix(created);
             // deck only watches for a lost WebGL context; a lost GPUDevice (GPU process
             // crash or reset) would leave the canvas dark. "destroyed" is our own teardown.
             if (created.type !== "webgpu" || !(created.handle instanceof GPUDevice)) return;
