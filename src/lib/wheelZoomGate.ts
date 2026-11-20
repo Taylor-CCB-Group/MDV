@@ -2,12 +2,10 @@ import { OrbitController, OrthographicController } from "@deck.gl/core";
 import type { MjolnirWheelEvent } from "mjolnir.js";
 
 /**
- * Wheel zoom that shares the wheel with the page.
- *
- * When a chart sits in something that scrolls (the dashboard, or a grid of cells), a plain wheel
- * scrolls it and only Ctrl / ⌘ + wheel zooms the chart; the chart shows a hint saying so (see
- * `WheelZoomHint`). A trackpad pinch arrives as Ctrl + wheel, so it zooms either way. With nothing
- * to scroll (a chart popped out or full screen, or a dashboard that fits) a plain wheel zooms.
+ * Wheel zoom behind a modifier: Ctrl / ⌘ + wheel zooms the chart, and a plain wheel is left to
+ * scroll whatever is around it, with a hint saying how to zoom (see `WheelZoomHint`). A trackpad
+ * pinch arrives as Ctrl + wheel, so it zooms too. This holds wherever the chart is (dashboard,
+ * grid of cells, popout, full screen), so there is one habit to learn.
  */
 
 /** Dispatched (bubbling) from the canvas when a plain wheel is left to scroll the page. */
@@ -16,33 +14,9 @@ export const WHEEL_ZOOM_PASSED_EVENT = "mdv-wheel-zoom-passed";
 /** Wheel events closer together than this belong to one gesture, momentum included. */
 const GESTURE_GAP_MS = 200;
 
-const SCROLLING_OVERFLOW = new Set(["auto", "scroll", "overlay"]);
-
-/** Whether something between `element` and the top of its document (or full-screen element) scrolls vertically. */
-export function hasScrollableAncestor(element: Element | null): boolean {
-    const doc = element?.ownerDocument;
-    const view = doc?.defaultView;
-    if (!doc || !view) return false;
-    for (let el = element.parentElement; el; el = el.parentElement) {
-        if (el.scrollHeight > el.clientHeight + 1) {
-            const { overflowY } = view.getComputedStyle(el);
-            // the root scrolls the viewport unless it hides its overflow
-            if (el === doc.scrollingElement ? overflowY !== "hidden" : SCROLLING_OVERFLOW.has(overflowY)) {
-                return true;
-            }
-        }
-        if (el === doc.fullscreenElement) return false;
-    }
-    return false;
-}
-
-function hasZoomModifier(event: WheelEvent) {
-    return event.ctrlKey || event.metaKey;
-}
-
 /**
  * Whether a wheel event zooms, decided once per gesture so a zoom keeps going when the modifier
- * is let go mid-swipe, and a scroll keeps scrolling when the pointer comes onto the chart.
+ * is let go mid-swipe, rather than the rest of the swipe scrolling the page.
  */
 class WheelGestureGate {
     private lastTime = Number.NEGATIVE_INFINITY;
@@ -50,16 +24,15 @@ class WheelGestureGate {
 
     shouldZoom(event: MjolnirWheelEvent): boolean {
         const src = event.srcEvent;
-        const now = src.timeStamp;
+        // this window's clock: event time stamps count from their own window's start, which
+        // differs in a popout
+        const now = performance.now();
         const continuing = now - this.lastTime < GESTURE_GAP_MS;
         this.lastTime = now;
-        // a modifier starts zooming at any point; without one, carry on as the gesture began
-        if (hasZoomModifier(src)) this.zooming = true;
+        if (src.ctrlKey || src.metaKey) this.zooming = true;
         else if (!continuing) {
-            this.zooming = !hasScrollableAncestor(src.target instanceof Element ? src.target : null);
-        }
-        if (!this.zooming && !continuing && src.target instanceof EventTarget) {
-            src.target.dispatchEvent(new CustomEvent(WHEEL_ZOOM_PASSED_EVENT, { bubbles: true }));
+            this.zooming = false;
+            src.target?.dispatchEvent(new CustomEvent(WHEEL_ZOOM_PASSED_EVENT, { bubbles: true }));
         }
         return this.zooming;
     }
