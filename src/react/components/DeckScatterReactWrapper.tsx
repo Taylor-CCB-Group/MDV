@@ -8,6 +8,7 @@ import type { DeckBackend } from "@/react/spatialdata/deck_backend";
 import BaseChart, { copyStylesInline } from "../../charts/BaseChart";
 import type { ColumnName } from "../../charts/charts";
 import { serialisableZoom } from "../axisScaling";
+import { type AxisScales, type OrbitSelectionView, validAxisScales } from "../orbitView";
 import {
     type ScatterPlotConfig,
     type ScatterPlotConfig2D,
@@ -53,14 +54,6 @@ function shouldMigrateLegacyContourParameter(originalConfig: DeckScatterConfig) 
 }
 
 function adaptConfig(originalConfig: DeckScatterConfig) {
-    if (originalConfig.type === "wgl_3d_scatter_plot") {
-        //! charts loaded from other configs may not have a dimension set
-        originalConfig.dimension = "3d";
-        if (originalConfig.course_radius === undefined) {
-            originalConfig.course_radius = 10;
-        }
-    }
-
     // there is probably a less confusing way of writing this...
     //! originalConfig.dimension may be undefined, which lead to a bug with axis settings & broken charts
     // so if it is explicitly "3d", we have no axis settings, otherwise it will be "2d" | undefined
@@ -77,6 +70,11 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     config.crosshair = config.crosshair ?? null;
     // charts saved before this setting kept both axes at one scale
     if (config.dimension !== "3d") config.axis_scaling = config.axis_scaling ?? "equal";
+    else {
+        // must exist before the config is made observable; charts saved before these were Z up and unscaled
+        config.orbit_axis = config.orbit_axis ?? "Z";
+        config.axis_scales = validAxisScales(config.axis_scales);
+    }
     const legacyContourParameter = originalConfig.param?.[2];
     if (
         !config.contourParameter &&
@@ -135,6 +133,8 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             setActiveBackend: action,
         });
     }
+    /** Set by the component in 3D: the camera a selection drawn now would be drawn with. */
+    getOrbitSelectionView?: () => OrbitSelectionView | null;
     /** Set by the component: draws the deck canvas again and returns it, for exporting an image. */
     getPlotCanvas?: () => HTMLCanvasElement | null;
     /**
@@ -278,6 +278,42 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         return { ...c, viewState, render_backend, background_filter, grid, crosshair };
     }
 
+    /** Which way is up, and how much to stretch each axis (as the classic 3D scatter could). */
+    get3DSettings(c: ScatterPlotConfig3D) {
+        const axisNames = ["X", "Y", "Z"];
+        return [
+            g({
+                type: "radiobuttons",
+                label: "Up axis",
+                choices: [
+                    ["Y", "Y"],
+                    ["Z", "Z"],
+                ],
+                current_value: c.orbit_axis ?? "Z",
+                func: (value) => {
+                    c.orbit_axis = value === "Y" ? "Y" : "Z";
+                    // the current view was turned for the other axis
+                    this.pendingRecenter = true;
+                },
+            }),
+            ...axisNames.map((name, i) =>
+                g({
+                    type: "slider",
+                    label: `${name} Axis Scale`,
+                    min: 0.5,
+                    max: 3,
+                    continuous: true,
+                    current_value: validAxisScales(c.axis_scales)[i],
+                    func: (value) => {
+                        const scales = [...validAxisScales(c.axis_scales)] as AxisScales;
+                        scales[i] = value;
+                        c.axis_scales = scales;
+                    },
+                }),
+            ),
+        ];
+    }
+
     /** Choose a column and the categories of it to keep; other rows are hidden from this chart only. */
     getBackgroundFilterSettings() {
         const c = this.config;
@@ -332,6 +368,8 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             );
             settings.push(getCrosshairSetting(c));
             if (supportsDensityGridMode(c.type)) settings.push(getDensityGridSettingsFolder(c));
+        } else {
+            settings.push(...this.get3DSettings(c));
         }
         return settings.concat([
             ...this.getBackgroundFilterSettings(),
@@ -401,10 +439,11 @@ BaseChart.types[DECK_CONTOUR_SCATTER_TYPE] = {
         config.axis_scaling = "fit";
     },
 };
+// The 3D scatter plot offered in the Add Chart dialog; saved classic 3D scatters load as this
+// (`wgl_3d_scatter_plot`, see `legacyCharts.ts`).
 BaseChart.types["DeckScatter3D"] = {
-    name: "3D Scatter Plot (new)",
+    name: "3D Scatter Plot",
     class: DeckScatterReact,
-    allow_user_add: false,
     params: [
         {
             type: "number",
@@ -422,6 +461,8 @@ BaseChart.types["DeckScatter3D"] = {
     ],
     init: (config: ScatterPlotConfig) => {
         config.dimension = "3d";
+        // y up, as the classic 3D scatter had it
+        (config as ScatterPlotConfig3D).orbit_axis = "Y";
     },
 };
 BaseChart.types["wgl_scatter_plot_dev"] = {
@@ -439,11 +480,12 @@ BaseChart.types["wgl_scatter_plot_dev"] = {
         },
     ],
 };
+// an older name for `DeckScatter3D`, which saved charts of this type load as
 BaseChart.types["wgl_3d_scatter_plot_dev"] = {
-    // todo: remove (Deck) later, added to differentiate it with the existing 3d scatter plot
     name: "3D Scatter Plot (Deck)",
     class: DeckScatterReact,
     allow_user_add: false,
+    legacy: true,
     params: [
         {
             type: "number",

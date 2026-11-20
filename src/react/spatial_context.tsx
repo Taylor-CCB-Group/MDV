@@ -21,8 +21,15 @@ import type { HoveredContour } from "./contour_state";
 import { getEmptyFeatureCollection } from "./deck_state";
 import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "./gates/gateUtils";
 import { useGateManager } from "./gates/useGateManager";
-import { type FilterPolyRegionOpts, useChartID, useRangeDimension2D } from "./hooks";
-import { type ScatterPlotConfig, useRegionScale, useScatterplotLayer } from "./scatter_state";
+import { type FilterPolyRegionOpts, useChartID, useConfig, useParamColumns, useRangeDimension2D } from "./hooks";
+import {
+    DEFAULT_AXIS_SCALES,
+    type OrbitSelectionView,
+    orbitSelectionViewOf,
+    projectRowsToScreen,
+    validAxisScales,
+} from "./orbitView";
+import { type ScatterPlotConfig, type ScatterPlotConfig3D, useRegionScale, useScatterplotLayer } from "./scatter_state";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -80,6 +87,25 @@ function useSelectionCoords(selection: SimpleFeatureCollection) {
     return coords as [number, number][];
 }
 
+/** A chart that draws in 3D says what its camera is, for a selection drawn on it to record. */
+function getOrbitSelectionView(chart: BaseChart<any>): OrbitSelectionView | null {
+    if (!("getOrbitSelectionView" in chart) || typeof chart.getOrbitSelectionView !== "function") return null;
+    return orbitSelectionViewOf({ view: chart.getOrbitSelectionView() }) ?? null;
+}
+
+/** In 3D, the selection with the camera it was drawn in (see `projectRowsToScreen`). */
+function withSelectionView(chart: BaseChart<any>, selection: SimpleFeatureCollection): SimpleFeatureCollection {
+    if (chart.config.dimension !== "3d") return selection;
+    const view = getOrbitSelectionView(chart);
+    return {
+        ...selection,
+        features: selection.features.map((feature) => ({
+            ...feature,
+            properties: { ...feature.properties, view: view ?? undefined },
+        })),
+    };
+}
+
 /**
  * for this to be more useful as a hook will depend on state/context...
  * and with proper spatialdata support we should review this so we have proper coordinate system.
@@ -87,13 +113,13 @@ function useSelectionCoords(selection: SimpleFeatureCollection) {
  */
 function useScatterModelMatrix() {
     const scale = useRegionScale();
-    const s = 1 / scale;
-    const [modelMatrix, setModelMatrix] = useState(new Matrix4().scale(s));
-    useEffect(() => {
-        const m = new Matrix4().scale(s);
-        setModelMatrix(m);
-    }, [s]);
-    return { modelMatrix, setModelMatrix };
+    const config = useConfig<ScatterPlotConfig & Partial<ScatterPlotConfig3D>>();
+    const is3d = config.dimension === "3d";
+    // a 3D chart can stretch each axis (`axis_scales`), and its axes need not be the region's x / y
+    const [ax, ay, az] = is3d ? validAxisScales(config.axis_scales) : DEFAULT_AXIS_SCALES;
+    const s = is3d ? 1 : 1 / scale;
+    const modelMatrix = useMemo(() => new Matrix4().scale([s * ax, s * ay, s * az]), [s, ax, ay, az]);
+    return { modelMatrix };
 }
 
 function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
@@ -118,6 +144,22 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const [editingGateId, setEditingGateId] = useState<string | null>(null);
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
+    const is3d = chart.config.dimension === "3d";
+    // a 3D selection is an outline on the screen, and selects what was inside it from where it was drawn
+    const selectionProperties = selectionFeatureCollection.features[0]?.properties;
+    const selectionView = useMemo(
+        () => (is3d ? orbitSelectionViewOf(toJS(selectionProperties)) : undefined),
+        [is3d, selectionProperties],
+    );
+    const [cx, cy, cz] = useParamColumns();
+    const filterOnScreen = useCallback(
+        (screenCoords: [number, number][], view: OrbitSelectionView) => {
+            if (!rangeDimension || !cx?.data || !cy?.data || !cz?.data) return;
+            const screen = projectRowsToScreen([cx.data, cy.data, cz.data], modelMatrix, view);
+            rangeDimension.filter("filterPoly", screen, screenCoords);
+        },
+        [rangeDimension, cx, cy, cz, modelMatrix],
+    );
 
     const getFillColor = useCallback((): [number, number, number, number] => {
         if (!editingGateId) return SELECTION_FILL_COLOR; // Neutral grey fill
@@ -165,6 +207,13 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         }
         chart.resetButton.style.display = "inline";
 
+        if (is3d) {
+            // a shape drawn before this chart knew its camera (or not in 3D) can't say what it selected
+            if (selectionView) filterOnScreen(coords, selectionView);
+            else removeFilter();
+            return;
+        }
+
         const ds = chart.dataStore;
         const regionField = ds.regions?.region_field;
         // Get the region value of the gate if it exists
@@ -198,7 +247,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         return () => {
             cancelled = true;
         };
-    }, [coords, filterPoly, removeFilter, chart, gateManager, editingGateId]);
+    }, [coords, filterPoly, removeFilter, chart, gateManager, editingGateId, is3d, selectionView, filterOnScreen]);
     // The collection holds at most one shape (see `onEdit`), and it is always the one being
     // edited. Selecting it on hover made translate-vs-draw depend on whether a hover pick had
     // landed before the press, which on WebGPU (async picking) it often had not.
@@ -232,7 +281,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             // adding `action` here gets rid of warnings but doesn't help with performance.
             onEdit: action((edit) => {
                 const selection = selectionFromEdit(edit);
-                if (selection) setSelectionFeatureCollection(selection);
+                if (selection) setSelectionFeatureCollection(withSelectionView(chart, selection));
             }),
             modeConfig: {
                 // dragToDraw: true,
@@ -250,6 +299,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         setSelectionFeatureCollection,
         getFillColor,
         getLineColor,
+        chart,
     ]);
 
     return {

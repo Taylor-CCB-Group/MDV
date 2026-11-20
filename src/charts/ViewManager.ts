@@ -108,14 +108,15 @@ class ViewManager {
     }
 
     /**
-     * Converts the config of a chart that a view is loading, if the browser setting for that is on.
+     * Converts the config of a chart that a view is loading, if the browser setting for that is on, or
+     * its type always converts (which is not announced: the replacement is simply that chart now).
      * Charts the user adds themselves are not passed through here.
      */
     convertLegacyChartOnLoad(dataSource: string, config: { type: string; title?: string }) {
         const convertedFrom = convertLegacyChartConfig(config, this.cm.dsIndex[dataSource]?.dataStore);
         if (!convertedFrom) return;
         console.log(`Loading legacy chart '${config.title}' (${convertedFrom}) as ${config.type}`);
-        this.reportLegacyConversion();
+        if (convertLegacyChartsSetting.get() === "on") this.reportLegacyConversion();
     }
 
     /** Converts each open chart that has a current equivalent, one at a time, sharing one alert. */

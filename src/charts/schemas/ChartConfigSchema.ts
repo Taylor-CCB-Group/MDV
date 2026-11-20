@@ -461,6 +461,14 @@ export const DeckScatter3DConfigSchema = DeckScatterSharedConfigSchema.extend({
     type: z.literal("DeckScatter3D").describe("Deck.gl 3D scatter plot chart type"),
     dimension: z.literal("3d").optional().describe("3D deck scatter plots render in orbit view"),
     viewState: OrbitViewStateSchema.optional().describe("Current deck.gl orbit view state"),
+    orbit_axis: z
+        .enum(["Y", "Z"])
+        .optional()
+        .describe("The data axis that points up and that the view orbits round; absent is Z"),
+    axis_scales: z
+        .tuple([z.number().positive(), z.number().positive(), z.number().positive()])
+        .optional()
+        .describe("How much to stretch the x, y and z axes; absent is [1, 1, 1]"),
 }).describe("Configuration for the deck.gl 3D scatter plot");
 
 export const DeckSplatterConfigSchema = BaseConfigSchema.extend({

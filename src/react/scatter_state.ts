@@ -33,6 +33,7 @@ import {
     useOwnedFilteredIndices,
     useParamColumns,
 } from "./hooks";
+import type { AxisScales, OrbitAxis } from "./orbitView";
 import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
 
 //!!! temporary fix for tsgo preview compatibility
@@ -109,6 +110,10 @@ export type ScatterPlotConfig2D = ScatterPlotConfig & {
 export type ScatterPlotConfig3D = ScatterPlotConfig & {
     dimension: "3d";
     viewState: OrbitViewState;
+    /** The data axis that points up and that the view orbits round; absent is Z. */
+    orbit_axis?: OrbitAxis;
+    /** How much to stretch the x, y and z axes, as the classic 3D scatter did; absent is [1, 1, 1]. */
+    axis_scales?: AxisScales;
 };
 
 export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" | "title" | "type" | "param"> = {
@@ -307,7 +312,9 @@ export function useScatterRadius() {
     // y_scale = [0, 400 / whRatio];
     // x_scale = [0, 400];
 
-    const safeScale = scale || 1; // avoid /0 (although - I don't _think_ useRegionScale() would return 0).
+    // avoid /0 (although - I don't _think_ useRegionScale() would return 0). A 3D chart's axes need
+    // not be the region's x / y, so it is not drawn at the region's scale (see `useScatterModelMatrix`).
+    const safeScale = dimension === "3d" ? 1 : scale || 1;
     const radiusScale = (radius * course_radius) / safeScale;
     return useMemo(() => {
         if (cx.minMax && cy.minMax) {

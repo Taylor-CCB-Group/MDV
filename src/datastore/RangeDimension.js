@@ -15,7 +15,7 @@ class RangeDimension extends Dimension {
         return this._commitSpec({
             kind: "square",
             data1: this._columnData(columns[0]),
-            data2: this.parent.columnIndex[columns[1]].data,
+            data2: this._columnData(columns[1]),
             // plain copies: args may be observable proxies, which can't be posted to a worker
             range1: [args.range1[0], args.range1[1]],
             range2: [args.range2[0], args.range2[1]],
@@ -41,7 +41,7 @@ class RangeDimension extends Dimension {
         const spec = {
             kind: "poly",
             data1: this._columnData(columns[0]),
-            data2: this.parent.columnIndex[columns[1]].data,
+            data2: this._columnData(columns[1]),
             points: points.map((pt) => [pt[0], pt[1]]),
         };
         // for region-scoped gates, resolve the wanted region value's index once, up front
@@ -64,7 +64,7 @@ class RangeDimension extends Dimension {
         });
     }
 
-    /** filterSquare and filterPoly accept a typed array in place of the first column name */
+    /** filterSquare and filterPoly accept typed arrays in place of column names (e.g. screen positions) */
     _columnData(column) {
         return typeof column === "string" ? this.parent.columnIndex[column].data : column;
     }

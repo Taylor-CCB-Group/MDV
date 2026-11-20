@@ -103,6 +103,8 @@ export default observer(function SelectionOverlay() {
     const chartId = useChartID();
     const config = useConfig<DeckScatterConfigWithRegion & DualContourLegacyConfig>();
     const canShowDensityGrid = supportsDensityGridMode(config.type) && config.dimension !== "3d";
+    // gates are x / y outlines in the data; a 3D selection is an outline on the screen
+    const canUseGates = config.dimension !== "3d";
     const densityGridShown = isDensityGridShown(config);
     const toggleDensityGrid = useCallback(() => {
         action(() => {
@@ -276,33 +278,37 @@ export default observer(function SelectionOverlay() {
                                 {densityGridShown ? <LayersOutlinedIcon /> : <GridViewOutlined />}
                             </IconWithTooltip>
                         )}
-                        <Divider
-                            orientation="vertical"
-                            sx={{
-                                color: "inherit",
-                                width: "5px",
-                                height: "35px",
-                                padding: "2px",
-                            }}
-                        />
-                        <IconWithTooltip
-                            tooltipText={"Manage Gates"}
-                            onClick={onManageGatesClick}
-                            iconButtonProps={{
-                                sx: {
-                                    color: "var(--text_color)",
-                                    borderRadius: 10,
-                                    zIndex: 2,
-                                    ml: 1,
-                                },
-                                "aria-label": "Manage Gates",
-                            }}
-                        >
-                            <TuneOutlined />
-                        </IconWithTooltip>
+                        {canUseGates && (
+                            <Divider
+                                orientation="vertical"
+                                sx={{
+                                    color: "inherit",
+                                    width: "5px",
+                                    height: "35px",
+                                    padding: "2px",
+                                }}
+                            />
+                        )}
+                        {canUseGates && (
+                            <IconWithTooltip
+                                tooltipText={"Manage Gates"}
+                                onClick={onManageGatesClick}
+                                iconButtonProps={{
+                                    sx: {
+                                        color: "var(--text_color)",
+                                        borderRadius: 10,
+                                        zIndex: 2,
+                                        ml: 1,
+                                    },
+                                    "aria-label": "Manage Gates",
+                                }}
+                            >
+                                <TuneOutlined />
+                            </IconWithTooltip>
+                        )}
                     </>
                 )}
-                {hasSelection && !editingGateId && (
+                {canUseGates && hasSelection && !editingGateId && (
                     <IconWithTooltip
                         tooltipText={"Save selection as Gate"}
                         onClick={() => setGateDialogOpen(true)}

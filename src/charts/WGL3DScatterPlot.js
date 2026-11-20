@@ -167,9 +167,11 @@ class WGL3DScatterPlot extends WGLChart {
     }
 }
 
+// saved charts of this type load as the deck "3D Scatter Plot" (`DeckScatter3D`), see `legacyCharts.ts`
 BaseChart.types["wgl_3d_scatter_plot"] = {
-    name: "3D Scatter Plot",
+    name: "3D Scatter Plot (classic)",
     class: WGL3DScatterPlot,
+    legacy: true,
     params: [
         {
             type: "number",
