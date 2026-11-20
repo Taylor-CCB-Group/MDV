@@ -36,7 +36,9 @@ function getUniquePickedInfos(primary: PickingInfo, pickedInfos: PickingInfo[]) 
     for (const info of [primary, ...pickedInfos]) {
         const layerId = getPickingInfoLayerId(info);
         const sourceLayerId = getPickingInfoSourceLayerId(info);
-        const key = `${layerId}|${sourceLayerId}|${info.index}`;
+        // inside an isolated group, `layer` is the group: the member tells its layers apart
+        const memberId = getIsolatedGroupMemberId(info) ?? "";
+        const key = `${layerId}|${memberId}|${sourceLayerId}|${info.index}`;
         if (keys.has(key)) continue;
         keys.add(key);
         uniqueInfos.push(info);

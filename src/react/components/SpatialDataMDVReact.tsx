@@ -249,6 +249,10 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         return <SpatialStatusPanel chart={this} />;
     }
 
+    getDebugSettings() {
+        return getRenderBackendSettings(this.config);
+    }
+
     /** Clear the error count on the menu pip; failing layers stay marked in the layer dialog. */
     dismissRenderErrors() {
         for (const failure of this.layerFailures.values()) failure.dismissed = true;
@@ -369,7 +373,6 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                     config.background_filter.category = value;
                 },
             }),
-            ...getRenderBackendSettings(config),
         ]);
     }
 

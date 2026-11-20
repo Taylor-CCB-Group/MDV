@@ -37,7 +37,7 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
                 current_value: config.point_shape,
                 values: [["circle", "square", "gaussian"]],
                 func: (value) => {
-                    // @ts-ignore existing GuiSpec dropdowns are stringly typed
+                    // @ts-expect-error existing GuiSpec dropdowns are stringly typed
                     config.point_shape = value;
                 },
             }),
@@ -116,7 +116,7 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
     return settings;
 }
 
-/** "Default" names what the default currently is; it is set in the Debug dialog, per browser. */
+/** "Default" names what the default currently is; it is set in the Settings dialog, per browser. */
 function renderBackendOptions() {
     const current = defaultDeckBackend() === "webgpu" ? "WebGPU" : "WebGL";
     return [

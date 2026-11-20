@@ -9,12 +9,17 @@ import Gui from "./DebugJsonDialogComponent";
 
 type DebugChartReactWrapperOptions = {
     showValidationSection?: boolean;
+    /** Top-level keys of the json to show as groups of sections. */
+    groupKeys?: readonly string[];
 };
 
 type DebugDialogContent = {
     json: any;
     showValidationSection?: boolean;
     chartPanel?: ReactNode;
+    groupKeys?: readonly string[];
+    jsonTitle?: string;
+    chart?: BaseChart<any>;
 };
 
 const DebugChart = observer(
@@ -23,11 +28,18 @@ const DebugChart = observer(
         header,
         showValidationSection = false,
         chartPanel,
+        groupKeys,
+        jsonTitle,
+        forChart,
     }: {
         chart: any;
         header?: string;
         showValidationSection?: boolean;
         chartPanel?: ReactNode;
+        groupKeys?: readonly string[];
+        jsonTitle?: string;
+        /** The chart this is the dialog for, if any (`chart` above is the json to show). */
+        forChart?: BaseChart<any>;
     }) => {
         return (
             <>
@@ -36,6 +48,9 @@ const DebugChart = observer(
                     header={header}
                     showValidationSection={showValidationSection}
                     chartPanel={chartPanel}
+                    groupKeys={groupKeys}
+                    jsonTitle={jsonTitle}
+                    chart={forChart}
                 />
                 <ReactQueryDevtools initialIsOpen={false} />
             </>
@@ -47,6 +62,7 @@ const DebugChart = observer(
 // this will be more consistent / less work in short-term, and a basis for refactoring later.
 class DebugChartReactWrapper extends BaseDialog {
     _root?: ReturnType<typeof createMdvPortal>;
+    _resizeObserver?: ResizeObserver;
     get root() {
         return this._root;
     }
@@ -59,7 +75,7 @@ class DebugChartReactWrapper extends BaseDialog {
         const config = {
             //TODO review popout behavior, use `__doc` or whatever here instead of `document` when appropriate
             width: 500,
-            title: `Debug / Report ${name}`,
+            title: chart ? `Debug / Report ${name}` : "Settings",
             doc,
             onclose: () => {
                 chart?.dialogs.splice(chart.dialogs.indexOf(this), 1);
@@ -69,6 +85,10 @@ class DebugChartReactWrapper extends BaseDialog {
             json,
             showValidationSection: options.showValidationSection,
             chartPanel: chart?.getDebugPanel?.(),
+            groupKeys: options.groupKeys,
+            // a chart's config reads best whole, not split by key
+            jsonTitle: chart ? "Chart config" : undefined,
+            chart,
         });
     }
     init(content: DebugDialogContent) {
@@ -78,12 +98,34 @@ class DebugChartReactWrapper extends BaseDialog {
                 chart={content.json}
                 showValidationSection={content.showValidationSection}
                 chartPanel={content.chartPanel}
+                groupKeys={content.groupKeys}
+                jsonTitle={content.jsonTitle}
+                forChart={content.chart}
             />,
             div,
             this,
         );
+        this.repositionWhileContentSettles(div);
+    }
+    /**
+     * BaseDialog positions itself once, in its constructor, before the React content has rendered; a tall dialog
+     * then ends up hanging off the bottom of the window, so the page scrolls as well as the dialog.
+     * Re-position as the content first takes shape (not afterwards, so we don't fight the user dragging it).
+     */
+    private repositionWhileContentSettles(content: HTMLElement) {
+        if (typeof ResizeObserver === "undefined") return;
+        let settleTimer: ReturnType<typeof setTimeout> | undefined;
+        const observer = new ResizeObserver(() => {
+            if (content.offsetHeight === 0) return;
+            this._setDialogPosition();
+            clearTimeout(settleTimer);
+            settleTimer = setTimeout(() => observer.disconnect(), 500);
+        });
+        observer.observe(content);
+        this._resizeObserver = observer;
     }
     close() {
+        this._resizeObserver?.disconnect();
         super.close();
         // this.root is undefined; wtf?
         // tried adding getter/setter for it - it doesn't got re-assigned.

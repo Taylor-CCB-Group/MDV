@@ -11,6 +11,7 @@ import type { Layer, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
 import { useCallback, useMemo } from "react";
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
+import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 import type { DualContourLegacyConfig } from "../contour_state";
 import { useChartID, useConfig } from "../hooks";
 import { type ChartArrayCell, useChartArrayGrid } from "../hooks/useChartArrayGrid";
@@ -18,6 +19,7 @@ import type { DensityGridCells } from "../hooks/useDensityGridCells";
 import type { ViewControllerOptions } from "../hooks/useGateLayers";
 import type { TooltipContent } from "../hooks/useOuterContainerDeckTooltip";
 import DeckCellGrid from "./DeckCellGrid";
+import { sharedCellLayersGroup } from "./densityGridSharedLayers";
 import { getDensityGridViewId } from "./densityGridUtils";
 import { type CrosshairConfig, isCrosshairShown } from "./pointerCrosshair";
 import { useLayersForDevice } from "./scatterDeckShared";
@@ -47,20 +49,38 @@ const getCellViewId = (chartId: string, cell: ChartArrayCell, index: number) =>
     getDensityGridViewId(chartId, cell.key, index);
 
 /**
+ * MDV overlays drawn over the shared stack rather than in it: the selection layer listens on each
+ * cell's canvas, and the gate labels are dragged and clicked.
+ */
+const CELL_OVERLAY_ENTRY_IDS = new Set([deckHostLayerId("selection"), deckHostLayerId("gate_labels")]);
+
+/**
  * The stack's layers in the stack's order, with its groups built, as `VivSpatialViewer` places
  * them: the renderer's deck layers and the image layers, each under the entry it belongs to.
- * Layers no entry claims go on top.
+ * Layers no entry claims go on top. The `CELL_OVERLAY_ENTRY_IDS` overlays are left out, as
+ * `overlays`, in the order the renderer gave them.
  */
 function composeStackLayers(
     deckLayers: readonly Layer[],
     images: Map<string, Layer[]>,
     renderStack: RenderStack | undefined,
     layerOrder: readonly string[],
-): Layer[] {
+): { shared: Layer[]; overlays: Layer[] } {
+    const overlays = deckLayers.filter((layer) => CELL_OVERLAY_ENTRY_IDS.has(layer.id));
     const records = [
-        ...deckLayers.map((layer) => ({ layer, entryId: layer.id })),
+        ...deckLayers
+            .filter((layer) => !CELL_OVERLAY_ENTRY_IDS.has(layer.id))
+            .map((layer) => ({ layer, entryId: layer.id })),
         ...[...images].flatMap(([entryId, layers]) => layers.map((layer) => ({ layer, entryId }))),
     ];
+    return { shared: composeRecords(records, renderStack, layerOrder), overlays };
+}
+
+function composeRecords(
+    records: { layer: Layer; entryId: string }[],
+    renderStack: RenderStack | undefined,
+    layerOrder: readonly string[],
+): Layer[] {
     if (renderStack) {
         const stackIds = new Set(renderStackOrder(renderStack, []));
         const entryLayers = new Map<string, Layer[]>();
@@ -110,15 +130,17 @@ export default observer(function SpatialDensityGrid({
         () => vivImageLayers(renderer.vivLayerProps, { viewId: SHARED_IMAGE_VIEW }),
         [renderer.vivLayerProps],
     );
-    const stackLayers = useMemo(
+    const { shared, overlays } = useMemo(
         () => composeStackLayers(renderer.deckLayers, imageLayers, renderStack, renderer.layerOrder),
         [renderer.deckLayers, imageLayers, renderStack, renderer.layerOrder],
     );
-    // the density cells go over the stack, gates and selection included, for now
-    const allLayers = useMemo(() => [...stackLayers, ...densityLayers], [stackLayers, densityLayers]);
     // The chart drew these on its single canvas until the fields loaded, and a layer belongs to
     // the first deck that draws it: this deck gets copies.
-    const layers = useLayersForDevice(allLayers, host.device);
+    const sharedLayers = useLayersForDevice(shared, host.device);
+    // each cell's density over the stack (gate outlines included, for now), and the overlays over that
+    const cellLayers = useLayersForDevice([...densityLayers, ...overlays], host.device);
+    // drawn once a frame for all the cells (see `sharedCellLayersGroup`)
+    const layers = [sharedCellLayersGroup(sharedLayers), ...cellLayers];
 
     const deckViewState = useMemo<OrthographicViewState>(
         () => ({ target: [viewState.target[0], viewState.target[1], 0], zoom: viewState.zoom }),

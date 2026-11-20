@@ -47,6 +47,7 @@ import type { SpatialDataState } from "@/react/spatialdata/spatial_data_reader";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
+import { vivImageLayerProps } from "@/react/spatialdata/viv_image_props";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
@@ -128,14 +129,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     const extensions = useMemo(() => [new ColorPaletteExtension(), new VivContrastExtension()], []);
 
     const vivImagePropsResolver = useCallback<VivImagePropsResolver>(
-        (ctx: VivImageLayerContext) => {
-            if (!stack) return undefined;
-            const entry = findRenderStackEntry(stack, ctx.layerId);
-            if (!entry || entry.kind !== "spatial") return undefined;
-            const saved = entry.props.vivLayerProps;
-            if (!saved || typeof saved !== "object") return undefined;
-            return saved as Record<string, unknown>;
-        },
+        (ctx: VivImageLayerContext) => vivImageLayerProps(stack, ctx.layerId),
         [stack],
     );
 

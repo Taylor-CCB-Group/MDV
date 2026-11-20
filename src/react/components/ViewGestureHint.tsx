@@ -46,7 +46,8 @@ const DragChoice = observer(function DragChoice({ onDone }: { onDone: () => void
                 </button>
             </div>
             <div className="text-xs opacity-80">
-                Either way, {VIEW_MODIFIER_NAME}-drag moves the view. You can change this later in Settings.
+                Either way, {VIEW_MODIFIER_NAME}-drag moves the view. You can change this later in Settings, under
+                Preferences.
             </div>
         </div>
     );

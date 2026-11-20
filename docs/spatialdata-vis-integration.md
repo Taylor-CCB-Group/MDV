@@ -312,8 +312,8 @@ The pins in `package.json` are the enforcement; keep them at or above these.
 SpatialData.js 0.12 renders images, labels, shapes and points on WebGPU when the canvas
 is given `deckProps.deviceProps = { type: "webgpu", adapters: [webgpuAdapter] }`.
 **WebGPU is the default** for SpatialData charts wherever the browser has it. A chart can
-choose its own backend (`render_backend`, "Rendering backend" in its settings); charts
-left at the default follow the "Default rendering backend" browser setting in the Debug
+choose its own backend (`render_backend`, "Rendering backend" under "Technical settings" in its debug dialog); charts
+left at the default follow the "Default rendering backend" browser setting in the Settings
 dialog (`src/lib/browserSettings.ts`, stored in localStorage; it replaced the old
 `MDV_WEBGPU` flag, which it still reads), and `?webgpu` / `?webgpu=0` overrides that for
 one page load — see `src/react/spatialdata/deck_backend.ts`. deck picks its device once,
@@ -342,7 +342,7 @@ debug dialog (`BaseChart.setMenuPip` / `getDebugPanel`; `SpatialStatusPanel`).
 **Diagnosing WebGPU errors.** A chart's "Chart status" has "Copy details": a plain-text
 report of the renderer, GPU, browser and each failure. Validation errors arrive
 asynchronously, so their own stack never shows the caller. For those, turn on "WebGPU call
-tracing" in the Debug dialog's browser settings and reload: `webgpu_trace.ts` then wraps
+tracing" in the Settings dialog's preferences and reload: `webgpu_trace.ts` then wraps
 the WebGPU encoder API before any device exists, reports a pass still open when its
 encoder is finished (with both stacks), logs the recent encoder calls before each
 uncaptured error, and adds both to "Copy details". Turn it off when done; it slows
