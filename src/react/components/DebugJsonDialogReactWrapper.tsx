@@ -9,12 +9,15 @@ import Gui from "./DebugJsonDialogComponent";
 
 type DebugChartReactWrapperOptions = {
     showValidationSection?: boolean;
+    /** Top-level keys of the json to show as groups of sections. */
+    groupKeys?: readonly string[];
 };
 
 type DebugDialogContent = {
     json: any;
     showValidationSection?: boolean;
     chartPanel?: ReactNode;
+    groupKeys?: readonly string[];
 };
 
 const DebugChart = observer(
@@ -23,11 +26,13 @@ const DebugChart = observer(
         header,
         showValidationSection = false,
         chartPanel,
+        groupKeys,
     }: {
         chart: any;
         header?: string;
         showValidationSection?: boolean;
         chartPanel?: ReactNode;
+        groupKeys?: readonly string[];
     }) => {
         return (
             <>
@@ -36,6 +41,7 @@ const DebugChart = observer(
                     header={header}
                     showValidationSection={showValidationSection}
                     chartPanel={chartPanel}
+                    groupKeys={groupKeys}
                 />
                 <ReactQueryDevtools initialIsOpen={false} />
             </>
@@ -59,7 +65,7 @@ class DebugChartReactWrapper extends BaseDialog {
         const config = {
             //TODO review popout behavior, use `__doc` or whatever here instead of `document` when appropriate
             width: 500,
-            title: `Debug / Report ${name}`,
+            title: chart ? `Debug / Report ${name}` : "Settings",
             doc,
             onclose: () => {
                 chart?.dialogs.splice(chart.dialogs.indexOf(this), 1);
@@ -69,6 +75,7 @@ class DebugChartReactWrapper extends BaseDialog {
             json,
             showValidationSection: options.showValidationSection,
             chartPanel: chart?.getDebugPanel?.(),
+            groupKeys: options.groupKeys,
         });
     }
     init(content: DebugDialogContent) {
@@ -78,6 +85,7 @@ class DebugChartReactWrapper extends BaseDialog {
                 chart={content.json}
                 showValidationSection={content.showValidationSection}
                 chartPanel={content.chartPanel}
+                groupKeys={content.groupKeys}
             />,
             div,
             this,

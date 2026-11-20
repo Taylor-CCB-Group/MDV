@@ -1,4 +1,4 @@
-import { PestControl as PestControlIcon } from "@mui/icons-material";
+import { Settings as SettingsIcon } from "@mui/icons-material";
 import { Box } from "@mui/material";
 import { observer } from "mobx-react-lite";
 import { useState } from "react";
@@ -36,13 +36,11 @@ const DebugButton = observer(() => {
             new DebugChartReactWrapper(
                 {
                     chartTypes,
-                    datasources,
-                    views,
-                    state,
+                    project: { datasources, views, state },
                     buildInfo,
                 },
                 undefined,
-                { showValidationSection: true },
+                { showValidationSection: true, groupKeys: ["project"] },
             );
         } catch (err) {
             setError(
@@ -65,9 +63,9 @@ const DebugButton = observer(() => {
 
     return (
         <>
-            <IconWithTooltip tooltipText="Debug / Report issue" onClick={handleDebugButtonClick}>
+            <IconWithTooltip tooltipText="Settings" onClick={handleDebugButtonClick}>
                 <Box sx={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-                    <PestControlIcon sx={{ height: "1.5rem", width: "1.5rem" }} />
+                    <SettingsIcon sx={{ height: "1.5rem", width: "1.5rem" }} />
                     {showDot && (
                         <Box
                             sx={{

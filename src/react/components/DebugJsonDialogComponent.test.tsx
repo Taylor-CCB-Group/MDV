@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { browserSettings } from "@/lib/browserSettings";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import DebugJsonDialogComponent from "./DebugJsonDialogComponent";
 
@@ -95,11 +96,10 @@ describe("DebugJsonDialogComponent", () => {
         expect(screen.getAllByText("Raw config")).toHaveLength(2);
         expect(screen.getByText("Details")).toBeTruthy();
 
-        const topLevelJsonSource = mocks.jsonViewSources.at(-1);
-        expect(topLevelJsonSource).toMatchObject({
-            chartTypes: [],
-        });
-        expect(topLevelJsonSource).not.toHaveProperty("validationFindings");
+        // each top-level key is its own section; the supplied validationFindings payload is omitted
+        expect(mocks.jsonViewSources).toContainEqual([]);
+        expect(screen.queryByText("validationFindings")).toBeNull();
+        expect(JSON.stringify(mocks.jsonViewSources)).not.toContain("payload should not be supplied here");
     });
 
     test("renders the empty validation state", () => {
@@ -117,5 +117,79 @@ describe("DebugJsonDialogComponent", () => {
         fireEvent.click(screen.getByRole("button", { name: "Clear" }));
 
         expect(store.hasAny).toBe(false);
+    });
+
+    describe("search", () => {
+        const json = {
+            buildInfo: { version: "1.2.3", commit: "abc" },
+            datasources: [{ name: "cells" }],
+        };
+        const search = (value: string) =>
+            fireEvent.change(screen.getByLabelText("Search sections, settings and data"), { target: { value } });
+
+        test("splits json into a section per top-level key", () => {
+            render(<DebugJsonDialogComponent json={json} />);
+
+            expect(screen.getByText("buildInfo")).toBeTruthy();
+            expect(screen.getByText("datasources")).toBeTruthy();
+        });
+
+        test("finds a section by title and a setting by label", async () => {
+            render(<DebugJsonDialogComponent json={json} />);
+
+            search("convert legacy");
+            // the search is debounced
+            await waitFor(() => expect(screen.queryByText("buildInfo")).toBeNull());
+            expect(screen.getByText("Preferences")).toBeTruthy();
+            expect(screen.queryByText("Fault Injection")).toBeNull();
+
+            search("buildinfo");
+            await waitFor(() => expect(screen.queryByText("Preferences")).toBeNull());
+            expect(screen.getByText("buildInfo")).toBeTruthy();
+            expect(screen.queryByText("datasources")).toBeNull();
+            expect(screen.queryByText("Preferences")).toBeNull();
+        });
+
+        test("reports when nothing matches", async () => {
+            render(<DebugJsonDialogComponent json={json} />);
+
+            search("zzz-no-such-thing");
+            expect(await screen.findByText("Nothing matches your search.")).toBeTruthy();
+        });
+
+        test("groups nested sections and gives each json its own filter", async () => {
+            render(
+                <DebugJsonDialogComponent
+                    json={{ project: { datasources: [{ name: "cells" }, { name: "genes" }], views: { a: 1 } } }}
+                    groupKeys={["project"]}
+                />,
+            );
+
+            expect(screen.getByText("project")).toBeTruthy();
+            expect(screen.getByText("datasources")).toBeTruthy();
+            expect(screen.getByText("views")).toBeTruthy();
+            expect(screen.getAllByLabelText("Filter")).toHaveLength(2);
+
+            fireEvent.change(screen.getAllByLabelText("Filter")[0], { target: { value: "genes" } });
+            await waitFor(() => expect(JSON.stringify(mocks.jsonViewSources.at(-2))).not.toContain("cells"));
+            expect(JSON.stringify(mocks.jsonViewSources)).toContain("genes");
+        });
+
+        test("shows Preferences first and groups debug content under Debug and diagnostics", () => {
+            render(<DebugJsonDialogComponent json={json} showValidationSection />);
+
+            const headings = screen.getAllByRole("heading", { level: 6, hidden: true }).map((h) => h.textContent);
+            expect(headings[0]).toBe("Preferences");
+            expect(headings[1]).toBe("Debug and diagnostics");
+            expect(headings.indexOf("buildInfo")).toBeGreaterThan(1);
+        });
+
+        test("every browser setting appears in Preferences", () => {
+            render(<DebugJsonDialogComponent json={json} />);
+
+            for (const setting of browserSettings) {
+                expect(screen.getAllByText(setting.label).length).toBeGreaterThan(0);
+            }
+        });
     });
 });
