@@ -238,6 +238,9 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
     getDebugPanel() {
         return <RendererStatus chart={this} />;
     }
+    getDebugSettings() {
+        return getRenderBackendSettings(this.config);
+    }
     colorBy?: (i: number) => [r: number, g: number, b: number];
     colorByColumn(col?: ColumnName) {
         if (!col) return this.colorByDefault();
@@ -378,7 +381,6 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                 includeDensitySettings: deckContourScatterTypes.has(c.type),
                 includePointShape: true,
             }),
-            ...getRenderBackendSettings(c),
             g({
                 type: "button",
                 label: "Center Plot",

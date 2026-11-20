@@ -4,20 +4,23 @@ import "react18-json-view/src/style.css";
 // If dark mode is needed, import `dark.css`.
 import "react18-json-view/src/dark.css";
 import { observer } from "mobx-react-lite";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
 import "../../utilities/css/JsonDialogStyles.css";
 import ClearIcon from "@mui/icons-material/Clear";
 import { Box, Button, Divider, IconButton, InputAdornment, Link, Paper, TextField, Typography } from "@mui/material";
+import type BaseChart from "@/charts/BaseChart";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { browserSettings } from "@/lib/browserSettings";
 import type ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import type { ValidationFinding } from "@/lib/ValidationFindingsStore";
 import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
+import { ChartProvider } from "../context";
 import { useChartManager } from "../hooks";
 import BrowserSettingsSection, { browserSettingMatchesQuery } from "./BrowserSettingsSection";
 import CustomTooltip from "./CustomTooltip";
 import { filterJSON, filterJsonSection, type JsonSection, matchesQuery, splitJsonSections } from "./debugDialogSearch";
+import { AbstractComponent, collectDisposers } from "./SettingsDialogComponent";
 
 type DataLoaderFaultMode = "empty" | "corrupt" | "timeout";
 
@@ -202,6 +205,7 @@ export function ValidationIssuesSection({ validationFindings }: { validationFind
 
 const PREFERENCES_TITLE = "Preferences";
 const DEBUG_GROUP_TITLE = "Debug and diagnostics";
+const TECHNICAL_SETTINGS_TITLE = "Technical settings";
 
 /**
  * An accordion section of the dialog, styled like the folders in the chart settings dialog. While a search
@@ -326,6 +330,7 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     chartPanel,
     groupKeys,
     jsonTitle,
+    chart,
 }: {
     json: any;
     header?: string;
@@ -339,6 +344,11 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     groupKeys?: readonly string[];
     /** The chart's own status and problems (`BaseChart.getDebugPanel`), shown first. */
     chartPanel?: ReactNode;
+    /**
+     * Set for a chart's dialog. That shows the chart's status, its technical settings (`getDebugSettings`) and
+     * its config; not the project-wide Preferences or Debug and diagnostics.
+     */
+    chart?: BaseChart<any>;
 }) {
     const [search, setSearch] = useState("");
     const [debouncedSearch] = useDebounce(search, 300); //why is this returning a tuple?
@@ -380,6 +390,20 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                 : browserSettings.filter((setting) => browserSettingMatchesQuery(setting, query)),
         [query],
     );
+    const technicalSettings = useMemo(() => chart?.getDebugSettings?.() ?? [], [chart]);
+    useEffect(() => {
+        const disposers = collectDisposers(technicalSettings);
+        return () => {
+            for (const dispose of disposers) dispose();
+        };
+    }, [technicalSettings]);
+    const filteredTechnicalSettings = useMemo(
+        () =>
+            matchesQuery(query, TECHNICAL_SETTINGS_TITLE)
+                ? technicalSettings
+                : technicalSettings.filter((setting) => matchesQuery(query, setting.label)),
+        [technicalSettings, query],
+    );
     // If there are validation issues when the dialog opens, lead with them instead of Preferences. Captured once,
     // so that clearing the findings doesn't rearrange the dialog under the user.
     const [showFindingsFirst] = useState(() => showValidationSection && Boolean(validationFindings?.hasAny));
@@ -399,9 +423,13 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     );
     const showValidation =
         showValidationSection && matchesQuery(debugQuery, "Validation issues", "validation findings");
-    const showBrowserSettings = filteredBrowserSettings.length > 0;
-    const showDebugGroup = showReport || showFaultInjection || showValidation || filteredJsonSections.length > 0;
-    const nothingMatches = searching && !showChartPanel && !wholeJson && !showBrowserSettings && !showDebugGroup;
+    // a chart's dialog is about that chart; the project-wide sections are in the main Settings dialog
+    const showBrowserSettings = !chart && filteredBrowserSettings.length > 0;
+    const showTechnicalSettings = filteredTechnicalSettings.length > 0;
+    const showDebugGroup =
+        !chart && (showReport || showFaultInjection || showValidation || filteredJsonSections.length > 0);
+    const nothingMatches =
+        searching && !showChartPanel && !showTechnicalSettings && !wholeJson && !showBrowserSettings && !showDebugGroup;
 
     return (
         <div className="w-full max-h-[80vh] overflow-auto" style={{ userSelect: "text" }}>
@@ -443,6 +471,20 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
             {showChartPanel && (
                 <DebugSection id="chart-status" title="Chart status" defaultExpanded {...sectionProps}>
                     {chartPanel}
+                </DebugSection>
+            )}
+            {chart && showTechnicalSettings && (
+                <DebugSection
+                    id="technical-settings"
+                    title={TECHNICAL_SETTINGS_TITLE}
+                    defaultExpanded
+                    {...sectionProps}
+                >
+                    <ChartProvider chart={chart}>
+                        {filteredTechnicalSettings.map((setting) => (
+                            <AbstractComponent key={`${setting.type}:${setting.label}`} props={setting} />
+                        ))}
+                    </ChartProvider>
                 </DebugSection>
             )}
             {wholeJson && (

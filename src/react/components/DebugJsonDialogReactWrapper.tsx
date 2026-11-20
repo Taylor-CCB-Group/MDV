@@ -19,6 +19,7 @@ type DebugDialogContent = {
     chartPanel?: ReactNode;
     groupKeys?: readonly string[];
     jsonTitle?: string;
+    chart?: BaseChart<any>;
 };
 
 const DebugChart = observer(
@@ -29,6 +30,7 @@ const DebugChart = observer(
         chartPanel,
         groupKeys,
         jsonTitle,
+        forChart,
     }: {
         chart: any;
         header?: string;
@@ -36,6 +38,8 @@ const DebugChart = observer(
         chartPanel?: ReactNode;
         groupKeys?: readonly string[];
         jsonTitle?: string;
+        /** The chart this is the dialog for, if any (`chart` above is the json to show). */
+        forChart?: BaseChart<any>;
     }) => {
         return (
             <>
@@ -46,6 +50,7 @@ const DebugChart = observer(
                     chartPanel={chartPanel}
                     groupKeys={groupKeys}
                     jsonTitle={jsonTitle}
+                    chart={forChart}
                 />
                 <ReactQueryDevtools initialIsOpen={false} />
             </>
@@ -83,6 +88,7 @@ class DebugChartReactWrapper extends BaseDialog {
             groupKeys: options.groupKeys,
             // a chart's config reads best whole, not split by key
             jsonTitle: chart ? "Chart config" : undefined,
+            chart,
         });
     }
     init(content: DebugDialogContent) {
@@ -94,6 +100,7 @@ class DebugChartReactWrapper extends BaseDialog {
                 chartPanel={content.chartPanel}
                 groupKeys={content.groupKeys}
                 jsonTitle={content.jsonTitle}
+                forChart={content.chart}
             />,
             div,
             this,

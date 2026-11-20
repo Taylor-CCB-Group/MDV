@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import type BaseChart from "@/charts/BaseChart";
 import { browserSettings } from "@/lib/browserSettings";
+import { g } from "@/lib/utils";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import DebugJsonDialogComponent from "./DebugJsonDialogComponent";
 
@@ -237,6 +239,35 @@ describe("DebugJsonDialogComponent", () => {
                     JSON.stringify({ renderStack: config.renderStack }),
                 ]),
             );
+        });
+
+        test("a chart's dialog has technical settings, and not the project-wide sections", async () => {
+            const chart = {
+                dataStore: {},
+                getDebugSettings: () => [
+                    g({ type: "check", label: "Rendering backend", current_value: false, func: () => {} }),
+                ],
+            } as unknown as BaseChart<any>;
+            render(
+                <DebugJsonDialogComponent
+                    json={{ id: "c1" }}
+                    jsonTitle="Chart config"
+                    chartPanel={<p>status</p>}
+                    chart={chart}
+                    showValidationSection
+                />,
+            );
+
+            const headings = screen.getAllByRole("heading", { level: 3, hidden: true }).map((h) => h.textContent);
+            expect(headings).toEqual(["Chart status", "Technical settings", "Chart config"]);
+            expect(screen.getByText("Rendering backend")).toBeTruthy();
+
+            search("rendering");
+            await waitFor(() => expect(screen.queryByText("Chart config")).toBeNull());
+            expect(screen.getByText("Technical settings")).toBeTruthy();
+
+            search("fault injection");
+            expect(await screen.findByText("Nothing matches your search.")).toBeTruthy();
         });
 
         test("every browser setting appears in Preferences", () => {

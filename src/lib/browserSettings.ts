@@ -66,7 +66,7 @@ export const renderBackendSetting = defineChoiceSetting<RenderBackend>({
     key: "mdv.settings.renderBackend",
     label: "Default rendering backend",
     description:
-        "Used by SpatialData charts and scatter plots whose own Rendering backend setting is left " +
+        "Used by SpatialData charts and scatter plots whose own Rendering backend setting (in the chart's debug dialog) is left " +
         "at the default. Where WebGPU is unavailable or fails, those charts use WebGL. On " +
         "WebGPU, image contrast and brightness are not yet supported. ?webgpu or ?webgpu=0 " +
         "in the URL overrides this for one page load.",
@@ -124,7 +124,7 @@ export const convertLegacyChartsSetting = defineChoiceSetting<"off" | "on">({
     defaultValue: "off",
 });
 
-/** Every browser setting, in the order the Debug dialog lists them. */
+/** Every browser setting, in the order the Settings dialog lists them. */
 export const browserSettings: readonly BrowserSetting[] = [
     renderBackendSetting,
     webgpuTraceSetting,
