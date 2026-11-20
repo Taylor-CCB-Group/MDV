@@ -225,6 +225,22 @@ in `entryStatuses` (`entry_status.ts`).
   points notices, as sd.js's own viewer does, because the points panel reports truncation.
 - MDV words each issue's `Remedy` itself (`describeRemedy`).
 
+- **Dismissing.** A notice, or one issue of an element's storage, can be dismissed in the
+  layer dialog. The dismissal belongs to this browser (localStorage), like Preferences. It is
+  keyed by store URL, element path (`images/he`) and issue (`data_quality.ts`), so it holds
+  for every chart and layer showing that element. Dismissed notices no longer show in the
+  layer dialog, the row icon, the status panel or the menu pip. Errors cannot be dismissed
+  there; the pip's own Dismiss covers them.
+- **Settings › Data quality** (`DataQualitySection`) lists every SpatialData store the
+  project's regions point at, with `SpatialData.assessIssues()` per element. A missing length
+  unit is one row per coordinate system, naming its elements. Each issue shows its remedy,
+  and can be dismissed or shown again.
+  - Stores are read through the page's shared reader (`sharedSpatialDataReader`), the one the
+    charts use. A store a chart has opened is listed at once; any other waits for **Check**,
+    so opening Settings never starts reading a remote store.
+  - The remedy is data (`Remedy`). That is what a future fix from here would act on: asking
+    the server to rewrite the store with spatialdata-js-util.
+
 This replaced MDV's own raster-layout check (`raster_health.ts`), which moved into
 `@spatialdata/core` 0.17. It is distinct from `layer_failures.ts`, which turns off layers
 that fail while *drawing*.

@@ -4,6 +4,7 @@ import { action, comparer, computed, makeObservable, observable, reaction } from
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
+import { elementPath, withoutDismissed } from "@/react/spatialdata/data_quality";
 import type { DeckBackend } from "@/react/spatialdata/deck_backend";
 import { entryStatusErrorKey, hasLayoutIssues } from "@/react/spatialdata/entry_status";
 import {
@@ -22,7 +23,8 @@ import {
     syncOverlayFollowerVisibility,
 } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
-import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
+import { spatialDataUrlForRegion } from "@/react/spatialdata/shared_spatial_data";
+import { sharedSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import {
     type SpatialDataSerializableViewState,
     toSerializableSpatialDataViewState,
@@ -223,10 +225,27 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     }
 
     /**
-     * The chart's read of its store, shared by the canvas and the layer dialog
-     * (`useChartSpatialData`). Not observable: the hook subscribes to the reader itself.
+     * The chart's read of its store, for the canvas and the layer dialog (`useChartSpatialData`).
+     * The page's reader, so charts on one store and Settings › Data quality share one read.
+     * Not observable: the hook subscribes to the reader itself.
      */
-    readonly spatialDataReader = createSpatialDataReader();
+    readonly spatialDataReader = sharedSpatialDataReader();
+
+    /** The URL the chart reads its store from: what data quality dismissals are keyed by. */
+    get spatialStoreUrl(): string | null {
+        return spatialDataUrlForRegion(this.dataStore.regions?.all_regions?.[this.config.region]);
+    }
+
+    /**
+     * A layer's status without the notices dismissed for its element (`data_quality.ts`),
+     * and how many were. Errors always stay.
+     */
+    visibleEntryStatus(entryId: string) {
+        const stack = this.config.renderStack;
+        const entry = stack && findRenderStackEntry(stack, entryId);
+        const path = entry?.kind === "spatial" ? elementPath(entry.source.elementType, entry.source.elementKey) : null;
+        return withoutDismissed(this.entryStatuses.get(entryId), this.spatialStoreUrl, path);
+    }
 
     /** The store the canvas is showing, for linking to it. Runtime only. */
     spatialDataUrl: string | null = null;
@@ -249,11 +268,11 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             failure,
             name: nameOf(entryId),
         }));
-        const statuses = [...this.entryStatuses].map(([entryId, status]) => ({
-            entryId,
-            status,
-            name: nameOf(entryId),
-        }));
+        // dismissed notices (Settings › Data quality) neither count nor show here
+        const statuses = [...this.entryStatuses.keys()].flatMap((entryId) => {
+            const { status } = this.visibleEntryStatus(entryId);
+            return status ? [{ entryId, status, name: nameOf(entryId) }] : [];
+        });
         const renderErrorCount = failures.filter((item) => !item.failure.dismissed).length + this.canvasErrors.length;
         const failedToLoad = statuses.filter(({ status }) => status.errors.length > 0);
         const loadErrorCount = failedToLoad.filter(({ entryId, status }) =>

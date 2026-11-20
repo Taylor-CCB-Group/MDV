@@ -40,6 +40,7 @@ import { observer } from "mobx-react-lite";
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { compositingBadge } from "@/react/spatialdata/blend_modes";
+import { dataQualityKey, elementPath, setDataQualityDismissed } from "@/react/spatialdata/data_quality";
 import {
     DECK_OVERLAY_VISIBILITY_FOLLOWERS,
     type DeckOverlayId,
@@ -107,19 +108,41 @@ function isLayerConfigOfType<TType extends LayerConfig["type"]>(
  */
 const LayerStatusDetails = observer(function LayerStatusDetails({ entryId }: { entryId: string }) {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
-    const status = chart.entryStatuses.get(entryId);
-    if (!status) return null;
-    const { retryEntry } = chart;
+    const config = useConfig<SpatialDataMdvReactConfig>();
+    const { status, dismissed } = chart.visibleEntryStatus(entryId);
+    const dismissedNote = dismissed > 0 && (
+        <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
+            {dismissed} dismissed {dismissed === 1 ? "note" : "notes"}: see Settings › Data quality to show again.
+        </Typography>
+    );
+    if (!status) return dismissedNote || null;
+    const { retryEntry, spatialStoreUrl } = chart;
+    const entry = config.renderStack && findRenderStackEntry(config.renderStack, entryId);
+    const path = entry?.kind === "spatial" ? elementPath(entry.source.elementType, entry.source.elementKey) : null;
+    // dismissed for this element in this browser, wherever it is shown (`data_quality.ts`)
+    const onDismiss =
+        spatialStoreUrl && path
+            ? (id: string) => setDataQualityDismissed(dataQualityKey(spatialStoreUrl, path, id), true)
+            : undefined;
     return (
-        <Alert
-            severity={status.errors.length > 0 ? "error" : "info"}
-            sx={{ mb: 1, "& .MuiAlert-message": { minWidth: 0, width: "100%" } }}
-        >
-            <AlertTitle>{status.errors.length > 0 ? "This layer could not load" : "Notes on this layer"}</AlertTitle>
-            <Typography variant="body2" component="div">
-                <EntryStatusDetails status={status} onRetry={retryEntry && (() => void retryEntry(entryId))} />
-            </Typography>
-        </Alert>
+        <>
+            <Alert
+                severity={status.errors.length > 0 ? "error" : "info"}
+                sx={{ mb: 1, "& .MuiAlert-message": { minWidth: 0, width: "100%" } }}
+            >
+                <AlertTitle>
+                    {status.errors.length > 0 ? "This layer could not load" : "Notes on this layer"}
+                </AlertTitle>
+                <Typography variant="body2" component="div">
+                    <EntryStatusDetails
+                        status={status}
+                        onRetry={retryEntry && (() => void retryEntry(entryId))}
+                        onDismiss={onDismiss}
+                    />
+                </Typography>
+            </Alert>
+            {dismissedNote}
+        </>
     );
 });
 
@@ -361,7 +384,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
     const { entry, patchProps } = useRenderStackEntry(entryId);
     const [renaming, setRenaming] = useState(false);
     const failure = chart.layerFailures.get(entryId);
-    const status = chart.entryStatuses.get(entryId);
+    const { status } = chart.visibleEntryStatus(entryId);
 
     if (!entry) return null;
 
