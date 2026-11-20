@@ -491,6 +491,7 @@
             "uid": "prometheus"
           },
           "expr": "topk(10, sum by (http_route) (rate(http_server_request_duration_seconds_count{job=~\"$job\"}[$__rate_interval])))",
+          "interval": "1m",
           "refId": "A",
           "legendFormat": "{{http_route}}",
           "range": true,
@@ -555,6 +556,7 @@
             "uid": "prometheus"
           },
           "expr": "topk(10, histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval]))))",
+          "interval": "1m",
           "refId": "A",
           "legendFormat": "{{http_route}}",
           "range": true,
@@ -679,6 +681,7 @@
             "uid": "prometheus"
           },
           "expr": "sum by (http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count{job=~\"$job\", http_response_status_code=~\"[45]..\"}[$__rate_interval]))",
+          "interval": "1m",
           "refId": "A",
           "legendFormat": "{{http_response_status_code}} {{http_route}}",
           "range": true,
@@ -756,6 +759,7 @@
             "uid": "prometheus"
           },
           "expr": "sum(rate(mdv_event_loop_blocked_time_seconds_total{job=~\"$job\"}[$__rate_interval])) * 60",
+          "interval": "1m",
           "refId": "A",
           "legendFormat": "blocked",
           "range": true,
@@ -817,6 +821,7 @@
             "uid": "prometheus"
           },
           "expr": "histogram_quantile(0.95, sum by (le, mdv_operation) (rate(mdv_operation_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
+          "interval": "1m",
           "refId": "A",
           "legendFormat": "{{mdv_operation}}",
           "range": true,
@@ -942,6 +947,7 @@
             "uid": "prometheus"
           },
           "expr": "histogram_quantile(0.95, sum by (le, mdv_operation) (rate(mdv_operation_memory_growth_bytes_bucket{job=~\"$job\"}[$__rate_interval])))",
+          "interval": "1m",
           "refId": "A",
           "legendFormat": "{{mdv_operation}}",
           "range": true,
@@ -1083,6 +1089,7 @@
             "uid": "prometheus"
           },
           "expr": "sum by (job) (rate(process_cpu_time_seconds_total{job=~\"$job\"}[$__rate_interval]))",
+          "interval": "1m",
           "refId": "A",
           "legendFormat": "{{job}}",
           "range": true,
