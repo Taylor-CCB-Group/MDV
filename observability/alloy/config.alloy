@@ -79,13 +79,40 @@ prometheus.scrape "containers" {
 }
 
 prometheus.exporter.unix "host" {
-  procfs_path = "/rootproc"
-  sysfs_path  = "/sys"
-  rootfs_path = "/rootfs"
+  procfs_path        = "/rootproc"
+  sysfs_path         = "/sys"
+  rootfs_path        = "/rootfs"
+  disable_collectors = ["netdev"]
+}
+
+// /rootproc/net/dev resolves to Alloy's own network namespace, so read the
+// host's interfaces through the host's first process instead.
+prometheus.exporter.unix "host_network" {
+  procfs_path    = "/rootproc/1"
+  sysfs_path     = "/sys"
+  rootfs_path    = "/rootfs"
+  set_collectors = ["netdev"]
 }
 
 prometheus.scrape "host" {
   targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.remote_write.default.receiver]
+  scrape_interval = "15s"
+}
+
+// A job label of its own keeps this target's `up` and `scrape_*` series apart
+// from the main host target's.
+discovery.relabel "host_network" {
+  targets = prometheus.exporter.unix.host_network.targets
+
+  rule {
+    target_label = "job"
+    replacement  = "integrations/unix_network"
+  }
+}
+
+prometheus.scrape "host_network" {
+  targets         = discovery.relabel.host_network.output
   forward_to      = [prometheus.remote_write.default.receiver]
   scrape_interval = "15s"
 }
