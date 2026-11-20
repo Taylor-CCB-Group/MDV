@@ -411,14 +411,43 @@ export const SankeyConfigSchema = BaseConfigSchema.extend({
     // Additional sankey specific properties
 }).describe("Configuration for Sankey diagrams showing flow between categories");
 
+const ScaleTrimSchema = z
+    .enum(["0.001", "0.01", "0.05"])
+    .describe("Trim the x axis to this percentile of the values (a key of the column's quantiles)");
+
 export const MultiLineChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("multi_line_chart").describe("Multi-line chart type"),
-    stacked: z.boolean().optional().describe("Whether to stack multiple lines on top of each other"),
-    band_width: z.number().positive().optional().describe("Width of confidence bands around lines"),
-    intervals: z.number().int().positive().optional().describe("Number of intervals for data aggregation"),
-    scaletrim: z.boolean().optional().describe("Whether to trim the scale to focus on data range"),
-    // Additional multi-line chart specific properties
-}).describe("Configuration for multi-line charts showing multiple time series or categories");
+    stacked: z.boolean().optional().describe("One row per category instead of overlaid lines"),
+    fill: z.boolean().optional().describe("Fill under each line"),
+    band_width: z
+        .number()
+        .positive()
+        .optional()
+        .describe("Kernel half-width: in data units, or a fraction of the trimmed range when trimmed"),
+    intervals: z.number().int().positive().optional().describe("Roughly how many points each line has"),
+    scaletrim: z
+        .union([ScaleTrimSchema, z.literal("none")])
+        .optional()
+        .describe("Trim the x axis to a percentile; absent or 'none' for the full range"),
+}).describe("Configuration for multi-line charts: a density curve of `param[0]` per category of `param[1]`");
+
+export const MultiLineReactConfigSchema = BaseConfigSchema.extend({
+    type: z.literal("multi_line_chart_react").describe("React multi-line chart type"),
+    categories: z.string().nullable().optional().describe("Category column: one line per value of it"),
+    values: FieldSpecsSchema.optional().describe("Numeric fields: one density curve per category, per field"),
+    stacked: z.boolean().optional().describe("One row per category instead of overlaid lines"),
+    fill: z.boolean().optional().describe("Fill under each line"),
+    scaletrim: ScaleTrimSchema.nullable().optional(),
+    band_width: z
+        .number()
+        .positive()
+        .nullable()
+        .optional()
+        .describe(
+            "Kernel half-width: in data units, or a fraction of the trimmed range when trimmed; null for the default",
+        ),
+    intervals: z.number().int().positive().optional().describe("Roughly how many points each line has"),
+}).describe("Configuration for density curves of numeric values, one per category; `param` is unused");
 
 export const MultiBoxPlotConfigSchema = BaseConfigSchema.extend({
     type: z.literal("multi_box_plot").describe("Multi-box plot chart type"),
@@ -533,6 +562,7 @@ registerChartConfigSchema("text_box", TextBoxConfigSchema, { version: "1" });
 registerChartConfigSchema("wordcloud", WordcloudConfigSchema, { version: "1" });
 registerChartConfigSchema("sankey", SankeyConfigSchema, { version: "1" });
 registerChartConfigSchema("multi_line_chart", MultiLineChartConfigSchema, { version: "1" });
+registerChartConfigSchema("multi_line_chart_react", MultiLineReactConfigSchema, { version: "1" });
 registerChartConfigSchema("multi_box_plot", MultiBoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("abundance_box_plot", AbundanceBoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("density_scatter", DensityScatterConfigSchema, { version: "1" });
