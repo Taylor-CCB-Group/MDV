@@ -329,6 +329,34 @@ export function useScatterRadius() {
     }, [cx.minMax, cy.minMax, radiusScale, cx, cy, width, height, scaling]);
 }
 
+/** How visible the rows a 3D selection left out are, relative to the points it caught. */
+const UNSELECTED_OPACITY = 0.08;
+
+const NO_ROWS = new Uint32Array(0);
+
+/**
+ * `rows` split into those the chart's own filter (`owner`) keeps and those only it leaves out.
+ * A chart draws the rows its own filter leaves out (so a selection can be redrawn); this tells
+ * them apart, for a chart that shows its selection by fading the rest. Without an active filter,
+ * every row is selected.
+ */
+export function splitBySelection(rows: Uint32Array, owner?: FilterOwner | null) {
+    if (!owner?.filterMethod) return { selectedRows: rows, unselectedRows: NO_ROWS };
+    const local = owner.getLocalFilter();
+    const selected = new Uint32Array(rows.length);
+    const unselected = new Uint32Array(rows.length);
+    let s = 0;
+    let u = 0;
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        // bit 1: left out by this filter (2 is the background filter)
+        if (local[row] & 1) unselected[u++] = row;
+        else selected[s++] = row;
+    }
+    if (u === 0) return { selectedRows: rows, unselectedRows: NO_ROWS };
+    return { selectedRows: selected.slice(0, s), unselectedRows: unselected.slice(0, u) };
+}
+
 // type Tooltip = (PickingInfo) => string;
 export type P = [number, number];
 
@@ -392,7 +420,13 @@ export function useScatterplotLayer(
     const radiusScale = useScatterRadius();
 
     const { aggregateFilteredRows, ownerVisibleRows, isExternallyFiltered } = useOwnedFilteredIndices(filterOwner);
-    const data = ownerVisibleRows;
+    // a 3D selection's outline is only shown from where it was drawn, so its rows are what show it
+    const is3d = config.dimension === "3d";
+    const { selectedRows: data, unselectedRows } = useMemo(() => {
+        // `aggregateFilteredRows` changes with every filter, this chart's own included
+        aggregateFilteredRows;
+        return splitBySelection(ownerVisibleRows, is3d ? filterOwner : null);
+    }, [ownerVisibleRows, aggregateFilteredRows, is3d, filterOwner]);
     const params = useParamColumns();
     const [cx, cy, cz] = params;
     const scale = useRegionScale();
@@ -731,6 +765,56 @@ export function useScatterplotLayer(
         ],
     );
 
+    // the rows a 3D selection left out, faint grey; drawn first, and leaving no depth behind, so the
+    // points the selection caught show through them
+    const unselectedScatterplotLayer = useMemo(
+        () =>
+            new MdvScatterplotLayer({
+                id: `scatter-unselected_${getVivId(`${id}detail-react`)}`,
+                data: unselectedRows,
+                opacity: opacity * UNSELECTED_OPACITY,
+                stroked: false,
+                filled: true,
+                radiusScale,
+                radiusMinPixels: SCATTER_RADIUS_MIN_PIXELS,
+                getPosition: (i: unknown, { target }: { target: number[] }) => {
+                    if (typeof i !== "number") throw new Error("expected index");
+                    target[0] = cx.data[i];
+                    target[1] = cy.data[i];
+                    target[2] = cz?.minMax ? cz.data[i] : 0;
+                    return target as unknown as [number, number];
+                },
+                // grey, as for "Gray Out Points": colour is what the selection caught
+                getFillColor: [200, 200, 200],
+                billboard: true,
+                modelMatrix,
+                parameters: { depthWriteEnabled: false },
+                getFilterValue: (i: number) =>
+                    getMissingColorFilterValue(i, colorColumn, shouldFilterMissing, fallbackOnZero),
+                filterRange: [0.5, 1],
+                updateTriggers: {
+                    getPosition: [cx, cy, cz],
+                    getFilterValue: [colorColumn, shouldFilterMissing, fallbackOnZero],
+                },
+                extensions: [new MdvDataFilterExtension()],
+                // deck prefers a layer hidden to one removed
+                visible: unselectedRows.length > 0,
+            }),
+        [
+            id,
+            unselectedRows,
+            opacity,
+            radiusScale,
+            cx,
+            cy,
+            cz,
+            modelMatrix,
+            colorColumn,
+            shouldFilterMissing,
+            fallbackOnZero,
+        ],
+    );
+
     const onScatterGlobalKeyDown = useCallback(
         (event: KeyboardEvent) => {
             if (!scatterKeyboardActiveRef.current) return;
@@ -820,6 +904,7 @@ export function useScatterplotLayer(
         () => ({
             scatterplotLayer,
             greyScatterplotLayer,
+            unselectedScatterplotLayer,
             densityLayer,
             getTooltip,
             modelMatrix,
@@ -830,6 +915,7 @@ export function useScatterplotLayer(
         [
             scatterplotLayer,
             greyScatterplotLayer,
+            unselectedScatterplotLayer,
             densityLayer,
             getTooltip,
             modelMatrix,

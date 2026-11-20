@@ -173,7 +173,8 @@ const DeckScatter = observer(function DeckScatterComponent({
     const { scatterProps, selectionLayer, selectionProps } = useSpatialLayers();
     // this is now somewhat able to render for "2d", pending further tweaks
     //! beware unproject from here is not what we want, should review
-    const { scatterplotLayer, greyScatterplotLayer, getTooltip, setScatterKeyboardActive } = scatterProps;
+    const { scatterplotLayer, greyScatterplotLayer, unselectedScatterplotLayer, getTooltip, setScatterKeyboardActive } =
+        scatterProps;
 
     const { gateLabelLayer, gateDisplayLayer, controllerOptions } = useGateLayers();
 
@@ -247,6 +248,8 @@ const DeckScatter = observer(function DeckScatterComponent({
     // gates are x / y outlines, which don't say what they enclose in 3D
     const layers = [
         greyScatterplotLayer,
+        // drawn first and leaving no depth behind, so what a 3D selection caught shows through the rest
+        unselectedScatterplotLayer,
         scatterplotLayer,
         is2d ? gateDisplayLayer : null,
         screenSelection.selectionLayer,
