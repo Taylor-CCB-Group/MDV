@@ -23,7 +23,7 @@ services:
       - alloy-data:/var/lib/alloy/data
       # The Docker socket and containerd socket both live here.
       - /var/run:/var/run:rw
-      - /:/rootfs:ro
+      - /:/rootfs:ro,rslave
       - /proc:/rootproc:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
