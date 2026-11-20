@@ -125,7 +125,7 @@ describe("DebugJsonDialogComponent", () => {
             datasources: [{ name: "cells" }],
         };
         const search = (value: string) =>
-            fireEvent.change(screen.getByLabelText("Search sections, settings and data"), { target: { value } });
+            fireEvent.change(screen.getByLabelText("Search Settings, Sections and Data"), { target: { value } });
 
         test("splits json into a section per top-level key", () => {
             render(<DebugJsonDialogComponent json={json} />);
@@ -178,7 +178,7 @@ describe("DebugJsonDialogComponent", () => {
         test("shows Preferences first and groups debug content under Debug and diagnostics", () => {
             render(<DebugJsonDialogComponent json={json} showValidationSection />);
 
-            const headings = screen.getAllByRole("heading", { level: 6, hidden: true }).map((h) => h.textContent);
+            const headings = screen.getAllByRole("heading", { level: 3, hidden: true }).map((h) => h.textContent);
             expect(headings[0]).toBe("Preferences");
             expect(headings[1]).toBe("Debug and diagnostics");
             expect(headings.indexOf("buildInfo")).toBeGreaterThan(1);

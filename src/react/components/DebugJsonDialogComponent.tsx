@@ -8,20 +8,8 @@ import { type ReactNode, useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
 import "../../utilities/css/JsonDialogStyles.css";
 import ClearIcon from "@mui/icons-material/Clear";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import {
-    Accordion,
-    AccordionDetails,
-    AccordionSummary,
-    Box,
-    Button,
-    Divider,
-    IconButton,
-    InputAdornment,
-    Link,
-    TextField,
-    Typography,
-} from "@mui/material";
+import { Box, Button, Divider, IconButton, InputAdornment, Link, Paper, TextField, Typography } from "@mui/material";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { browserSettings } from "@/lib/browserSettings";
 import type ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import type { ValidationFinding } from "@/lib/ValidationFindingsStore";
@@ -215,14 +203,10 @@ export function ValidationIssuesSection({ validationFindings }: { validationFind
 const PREFERENCES_TITLE = "Preferences";
 const DEBUG_GROUP_TITLE = "Debug and diagnostics";
 
-const SECTION_SX = {
-    border: "1px solid var(--border_menu_bar_color)",
-    mb: 2,
-};
-
 /**
- * An accordion section of the debug dialog. While a search is active it opens by default (so matches are
- * visible); the user can still toggle it, and those choices are reset when the search changes.
+ * An accordion section of the dialog, styled like the folders in the chart settings dialog. While a search
+ * is active it opens by default (so matches are visible); the user can still toggle it, and those choices
+ * are reset when the search changes. Content stays mounted while closed.
  */
 function DebugSection({
     id,
@@ -238,18 +222,37 @@ function DebugSection({
     defaultExpanded?: boolean;
     children: ReactNode;
 } & SectionControlProps) {
+    const expanded = expandedById[id] ?? (searching || defaultExpanded);
     return (
-        <Accordion
-            expanded={expandedById[id] ?? (searching || defaultExpanded)}
-            onChange={(_e, expanded) => setExpanded(id, expanded)}
-            sx={SECTION_SX}
+        <Paper
+            variant="outlined"
+            className="w-full"
+            sx={{
+                backgroundColor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+                borderColor: (theme) => theme.palette.divider,
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderRadius: 1,
+                overflow: "hidden",
+                paddingX: 2,
+                paddingBottom: 0,
+                mb: 1,
+            }}
         >
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="h6">{title}</Typography>
-            </AccordionSummary>
-            <Divider />
-            <AccordionDetails sx={{ mt: 1 }}>{children}</AccordionDetails>
-        </Accordion>
+            <Accordion
+                type="single"
+                collapsible
+                className="w-full"
+                value={expanded ? id : ""}
+                onValueChange={(value) => setExpanded(id, value === id)}
+            >
+                <AccordionItem value={id} className="border-b-0">
+                    <AccordionTrigger>{title}</AccordionTrigger>
+                    <AccordionContent forceMount>{children}</AccordionContent>
+                </AccordionItem>
+            </Accordion>
+        </Paper>
     );
 }
 
@@ -383,39 +386,42 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     const nothingMatches = searching && !showChartPanel && !showBrowserSettings && !showDebugGroup;
 
     return (
-        <div className="overflow-auto p-4" style={{ userSelect: "text" }}>
+        <div className="w-full max-h-[80vh] overflow-auto" style={{ userSelect: "text" }}>
             {header && <h2 className="text-lg font-semibold mb-4">{header}</h2>}
-            <TextField
-                autoFocus
-                fullWidth
-                size="small"
-                variant="outlined"
-                label="Search sections, settings and data"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                sx={{ mb: 2 }}
-                slotProps={{
-                    input: {
-                        endAdornment:
-                            search.length > 0 ? (
-                                <InputAdornment position="end">
-                                    <IconButton
-                                        aria-label="clear search"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => setSearch("")}
-                                    >
-                                        <ClearIcon />
-                                    </IconButton>
-                                </InputAdornment>
-                            ) : null,
-                    },
-                }}
-            />
+            <Box sx={{ p: 1 }}>
+                <TextField
+                    autoFocus
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    label="Search Settings, Sections and Data"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    sx={{ backgroundColor: "transparent" }}
+                    slotProps={{
+                        input: {
+                            endAdornment:
+                                search.length > 0 ? (
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            aria-label="clear search"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => setSearch("")}
+                                        >
+                                            <ClearIcon />
+                                        </IconButton>
+                                    </InputAdornment>
+                                ) : null,
+                        },
+                    }}
+                />
+            </Box>
             {nothingMatches && (
-                <Typography color="text.secondary" sx={{ mb: 2 }}>
+                <Typography variant="body1" color="text.secondary" sx={{ marginTop: 1, p: 1 }}>
                     Nothing matches your search.
                 </Typography>
             )}
+            <Divider sx={{ marginY: 0.75, opacity: 0.6 }} />
             {showChartPanel && (
                 <DebugSection id="chart-status" title="Chart status" defaultExpanded {...sectionProps}>
                     {chartPanel}
