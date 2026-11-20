@@ -2,15 +2,10 @@ import os
 
 from flask import session
 
-from mdvtools.auth import authutils
+from mdvtools.auth.permissions import project_roles
 from mdvtools.mdvproject import MDVProject
 from mdvtools.dbutils.dbservice import ProjectService
 from mdvtools.project_router import ProjectBlueprint
-
-
-def refresh_auth_cache(enable_auth: bool):
-    if enable_auth:
-        authutils.cache_user_projects()
 
 
 def get_current_user_id(enable_auth: bool):
@@ -26,7 +21,7 @@ def validate_owned_projects(project_ids: list[int], enable_auth: bool):
     if not enable_auth:
         return
     user_id = get_current_user_id(enable_auth)
-    user_projects = authutils.user_project_cache.get(user_id, {})
+    user_projects = project_roles(user_id)
     unauthorized_ids = [
         project_id
         for project_id in project_ids
@@ -41,7 +36,6 @@ def soft_delete_projects(project_ids: list[int], enable_auth: bool):
     deleted_projects = ProjectService.soft_delete_projects(project_ids)
     for project in deleted_projects:
         ProjectBlueprint.blueprints.pop(str(project.id), None)
-    refresh_auth_cache(enable_auth)
     return deleted_projects
 
 
@@ -59,7 +53,6 @@ def restore_deleted_project(project_id: int, enable_auth: bool, app):
         mdv_project = MDVProject(dir=project.path, id=str(project.id), backend_db=True)
         mdv_project.serve(app=app, open_browser=False, backend_db=True)
         restored_project = ProjectService.restore_deleted_project(project_id)
-        refresh_auth_cache(enable_auth)
         return restored_project
     except Exception:
         ProjectBlueprint.blueprints.pop(str(project_id), None)
