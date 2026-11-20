@@ -1,5 +1,6 @@
 import BaseChart from "@/charts/BaseChart";
 import "@/charts/DensityScatterPlot";
+import "@/charts/MultiLineChart.js";
 import "@/charts/TableChart";
 import "@/charts/WGLScatterPlot";
 import "@/react/components/DeckScatterReactWrapper";
@@ -56,6 +57,27 @@ describe("convertLegacyChartConfig", () => {
             expect(config).toEqual({ type: "table_chart_react" });
         });
 
+        test("converts a classic multi-line chart, moving param to categories and values", () => {
+            convertLegacyChartsSetting.set("on");
+            const config = {
+                type: "multi_line_chart",
+                param: ["zscore_clipped_CD3", "sample_id"],
+                scaletrim: "0.05",
+                band_width: 0.1,
+                intervals: 100,
+            };
+            expect(convertLegacyChartConfig(config)).toBe("multi_line_chart");
+            expect(config).toMatchObject({
+                type: "multi_line_chart_react",
+                param: [],
+                categories: "sample_id",
+                values: ["zscore_clipped_CD3"],
+                scaletrim: "0.05",
+                band_width: 0.1,
+                intervals: 100,
+            });
+        });
+
         test("converts a background filter, keeping the selected categories", () => {
             convertLegacyChartsSetting.set("on");
             const config = {
@@ -110,6 +132,10 @@ test("the classic table is legacy", () => {
     expect(BaseChart.types.table_chart.legacy).toBe(true);
 });
 
+test("the classic multi-line chart is legacy", () => {
+    expect(BaseChart.types.multi_line_chart.legacy).toBe(true);
+});
+
 describe("the Spatial Image Viewer", () => {
     const viewer = BaseChart.types.VivMdvRegionReact;
 
@@ -129,6 +155,7 @@ describe("converting a chart on request", () => {
         convertLegacyChartsSetting.set("off");
         expect(getLegacyConversionTarget({ type: "wgl_scatter_plot" })).toBe("DeckContourScatter");
         expect(getLegacyConversionTarget({ type: "table_chart" })).toBe("table_chart_react");
+        expect(getLegacyConversionTarget({ type: "multi_line_chart" })).toBe("multi_line_chart_react");
     });
 
     test("has no replacement for current charts or ones that cannot be converted", () => {

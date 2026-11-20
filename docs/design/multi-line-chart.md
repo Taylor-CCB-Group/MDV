@@ -64,7 +64,9 @@ Same three layers as the compound dot plot ([compound-dot-plot.md](compound-dot-
 3. **Chart**: `BaseReactChart` with `categories` / `values`, settings at parity (categories,
    stack, fill, trim, band width, intervals, legend), tooltip, export.
 
-Registered under a new type name until 3; `adaptConfig` reads legacy `param` from the start.
+Registered as `multi_line_chart_react`, named "Multi Line Chart". The legacy `multi_line_chart` is
+now "Multi Line Chart (Classic)", marked legacy, and converts to it (`legacyCharts.ts`), moving
+`param` to `categories` and `values`.
 
 ### 2. Several values, and `grid: { by: "values" | "categories" }` — #691
 
@@ -75,8 +77,9 @@ Registered under a new type name until 3; `adaptConfig` reads legacy `param` fro
 
 ### 3. Take over `multi_line_chart` — #692
 
-Register the React class under the legacy type (the `DeckScatterReact` precedent), so saved views
-open in it. Optionally a view upgrade that merges sibling charts with the same `categories` and
+The legacy conversion landed with 1. It runs with the "Convert legacy charts" setting or on request,
+like the classic table's. Left: whether it should always run (`always: true`, as for the classic 3D
+scatter), removing `MultiLineChart.js`, and optionally a view upgrade that merges sibling charts with the same `categories` and
 settings into one grid chart; not automatic.
 
 ### 4. Lazy `values` — #693

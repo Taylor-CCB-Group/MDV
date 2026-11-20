@@ -3,7 +3,7 @@ import type { FieldName, Quantiles } from "@/charts/charts";
 import type { FieldSpecs } from "@/lib/columnTypeHelpers";
 import type { AxisConfig } from "@/react/scatter_state";
 
-/** Type name while the legacy `multi_line_chart` is still registered. */
+/** The legacy `multi_line_chart` converts to this (see `legacyCharts.ts`). */
 export const MULTI_LINE_REACT_TYPE = "multi_line_chart_react";
 
 /** A percentile to trim the x axis to, as a key of a column's `quantiles`. */

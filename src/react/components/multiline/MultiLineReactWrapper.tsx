@@ -218,7 +218,7 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
 }
 
 BaseChart.types[MULTI_LINE_REACT_TYPE] = {
-    name: "Multi Line Chart (React)",
+    name: "Multi Line Chart",
     class: MultiLineReact,
     // only for the add-chart dialog's pickers: the chart moves them to `values` and `categories`
     params: [
