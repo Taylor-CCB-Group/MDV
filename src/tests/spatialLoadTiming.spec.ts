@@ -19,6 +19,7 @@ const describeLoad = () => ({ layers: "1", image_layers: "1" });
 describe("useSpatialLoadTiming", () => {
     let now: number;
     let deckRef: { current: DeckGLRef | null };
+    let chart: object;
     let afterRender: () => void;
 
     beforeEach(() => {
@@ -26,7 +27,7 @@ describe("useSpatialLoadTiming", () => {
         now = 1000;
         vi.spyOn(performance, "now").mockImplementation(() => now);
         deckRef = { current: null };
-        const chart = {};
+        chart = {};
         renderHook(() => useMarkSpatialChartOpened(chart));
         afterRender = renderHook(() => useSpatialLoadTiming(deckRef, chart, describeLoad)).result.current;
     });
@@ -47,6 +48,17 @@ describe("useSpatialLoadTiming", () => {
 
         expect(recordSpatialLoaded).toHaveBeenCalledTimes(1);
         expect(recordSpatialLoaded).toHaveBeenCalledWith("first", 1500, describeLoad());
+    });
+
+    it("does not report a second first load when the canvas remounts", () => {
+        frame(2500, deckAt(0, true));
+        recordSpatialLoaded.mockClear();
+
+        afterRender = renderHook(() => useSpatialLoadTiming(deckRef, chart, describeLoad)).result.current;
+        frame(10000, deckAt(0, false));
+        frame(10500, deckAt(0, true));
+
+        expect(recordSpatialLoaded).not.toHaveBeenCalled();
     });
 
     it("reports a settle from the last frame that moved, when tiles had to load", () => {

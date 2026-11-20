@@ -19,6 +19,8 @@ import { recordSpatialLoaded } from "./perf";
  */
 
 const openedAt = new WeakMap<object, number>();
+/** Charts whose first load is recorded, so a canvas remount does not report it again. */
+const firstLoaded = new WeakSet<object>();
 
 /** Call in the chart's root component, so `first` includes opening the store. */
 export function useMarkSpatialChartOpened(chart: object) {
@@ -43,11 +45,11 @@ export function useSpatialLoadTiming(
     chart: object,
     describe: () => Record<string, string>,
 ) {
-    const pending = useRef<Pending | null>({
-        kind: "first",
-        since: openedAt.get(chart) ?? performance.now(),
-        waited: true,
-    });
+    const pending = useRef<Pending | null>(
+        firstLoaded.has(chart)
+            ? null
+            : { kind: "first", since: openedAt.get(chart) ?? performance.now(), waited: true },
+    );
     const lastViewport = useRef<string | null>(null);
 
     // Runs after every frame, and checks even while nothing records, so a timing that
@@ -78,6 +80,7 @@ export function useSpatialLoadTiming(
             return;
         }
         pending.current = null;
+        if (current.kind === "first") firstLoaded.add(chart);
         if (current.waited) recordSpatialLoaded(current.kind, now - current.since, describe());
-    }, [deckRef, describe]);
+    }, [deckRef, chart, describe]);
 }
