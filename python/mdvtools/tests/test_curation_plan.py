@@ -4,7 +4,10 @@ import json
 from pathlib import Path
 
 from mdvtools.examples.curate_mdv_project import (
+    CONCORD_VIEW_NAME,
+    PROTEIN_VIEW_NAME,
     Q7_VIEW_NAME,
+    arrange_views,
     choose_roles,
     column_role,
     gene_panel,
@@ -18,7 +21,12 @@ from mdvtools.examples.rename_softdelete_mdv_project_fields import (
     build_soft_delete_plan,
     planned_soft_deletes,
 )
-from mdvtools.template_views.create_question_views import compound_dot_plot, genes_panel
+from mdvtools.template_views.create_question_views import (
+    Q1_VIEW_NAME,
+    Q3_VIEW_NAME,
+    compound_dot_plot,
+    genes_panel,
+)
 
 
 def write_project(tmp_path: Path, columns: list[dict]) -> Path:
@@ -160,6 +168,25 @@ def test_protein_names_match_hyphen_or_underscore():
     assert stored_name(available, "adt_CD1c") == "adt-CD1c"
     assert stored_name(available, "adt_PD-L1") == "adt-PD-L1"
     assert stored_name(available, "adt_CD99") is None
+
+
+def test_protein_view_follows_the_gene_view_and_omitted_views_are_dropped():
+    ordered = arrange_views(
+        [
+            "Cell atlas",
+            Q1_VIEW_NAME,
+            "Is the expression different between disease stages/patient groups/tissue types?",
+            CONCORD_VIEW_NAME,
+            Q7_VIEW_NAME,
+            "MNP cell signatures",
+        ],
+        {PROTEIN_VIEW_NAME: {}, CONCORD_VIEW_NAME: {}, Q1_VIEW_NAME: {}},
+    )
+    assert Q7_VIEW_NAME not in ordered
+    assert Q3_VIEW_NAME not in ordered
+    assert ordered[ordered.index(Q1_VIEW_NAME) + 1] == PROTEIN_VIEW_NAME
+    assert CONCORD_VIEW_NAME in ordered
+    assert ordered.index(CONCORD_VIEW_NAME) < ordered.index("MNP cell signatures")
 
 
 def test_signature_view_is_not_created(tmp_path):

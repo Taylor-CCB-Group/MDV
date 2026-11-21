@@ -5,12 +5,16 @@ The default is a dry run: it plans renames, soft-deletes, a views backup, and
 question views, then writes a JSON report beside ``--output``. It does not
 create the output project, edit the input project, or open datafile.h5 for
 writing. ``--write`` copies the project to ``--output`` and applies the plan
-there. datafile.h5 is never modified; size and mtime are checked before and
-after.
+there. ``--no-copy`` applies the plan to ``--project`` instead. ``--link-heavy``
+hard-links each top-level ``*.h5`` and symlinks ``spatial/`` and ``images/``
+instead of copying those bytes. datafile.h5 is never modified; size and mtime
+are checked before and after.
 
 Question views use columns and gene rows that already exist. A protein
-view and protein concordance are added only when a protein table is already
-linked. The signature-collection view is not created. Spatial localisation,
+view is added only when a protein table is already linked, and it is placed
+after the gene view. An existing gene-protein concordance view is resized and
+limited to one matching pair. The CITE-seq concordance view and the
+signature-collection view are left out. Spatial localisation,
 collection-score columns, and DEG columns are left out.
 """
 
@@ -72,17 +76,33 @@ from mdvtools.template_views.create_synovial_question_views import MARKER_GENES
 Q8_VIEW_NAME = "Contrasting responders and non-responders"
 Q9_VIEW_NAME = "Comparing groups: is the UMAP different between responders and non-responders?"
 PROTEIN_VIEW_NAME = "Where is my protein of interest expressed across cell populations?"
+CONCORD_VIEW_NAME = "Is the gene expression concordant with protein expression?"
+# These stay out of the project: the signature view has no collection column,
+# and the CITE-seq view is a duplicate of CONCORD_VIEW_NAME.
+OMITTED_VIEW_NAMES = (Q7_VIEW_NAME, Q3_VIEW_NAME)
 
-# Charts are sized for a 1440px-wide window so two of them fit in the cells pane
-# and are not covered by the gene or protein list.
+# Chart sizes follow the hand-tuned Derm views on a laptop window about 1440px wide.
+# One side list leaves the cells pane at 78%. Gene and protein lists together leave 66%.
 DESIGN_WIDTH = 1440
 CHART_GAP = 12
-CELLS_SHARE = 85
-CONCORD_SHARE = 70
-SIDE_SHARE = 15
+CELLS_SHARE = 78
+CONCORD_SHARE = 66
+SIDE_SHARE = 22
+CONCORD_SIDE_SHARE = 17
+TEXT_HEIGHT = 150
+TEXT_TALL = 215
+UMAP_HEIGHT = 400
+DOT_HEIGHT = 620
+HEAT_HEIGHT = 430
+FILTER_WIDTH = 420
+FILTER_HEIGHT = 360
+BAR_HEIGHT = 400
+PROMPT_HEIGHT = 140
+LIST_HEIGHT = 560
+DETAIL_HEIGHT = 700
 SPLIT_MAX = 5
 OPENING_COMPARISON_GENES = 5
-CONCORD_MAX_ITEMS = 10
+CONCORD_MAX_ITEMS = 1
 COMPARE_ROLES = ("diagnosis", "condition", "treatment", "tissue", "inflammation")
 PREFERRED_DIAGNOSES = ["Crohns disease", "Ulcerative colitis", "RA", "PsA"]
 PREFERRED_RESPONSE_GROUPS = (
@@ -471,7 +491,7 @@ def umap_chart(
 def gene_panel(datasource: str, names: list[str], prompt: str | None = None) -> list[dict[str, Any]]:
     """`names` are the genes the list starts on; charts follow the genes picked in it.
 
-    `prompt` adds a text box above the list, used on the gene, protein, and concordance views.
+    `prompt` adds a text box above the list. The gene view does not use one.
     """
     del datasource
     return side_panel(names, prompt=prompt)
@@ -483,19 +503,20 @@ def side_panel(
     prompt: str | None = None,
     list_title: str = "Marker genes",
     kind: str = "gene",
+    share: int = SIDE_SHARE,
 ) -> list[dict[str, Any]]:
-    width = int(DESIGN_WIDTH * SIDE_SHARE / 100) - 16
+    width = int(DESIGN_WIDTH * share / 100) - 16
     charts: list[dict[str, Any]] = []
     y = 0
     if prompt:
-        charts.append(placed(text_box(prompt, prompt), [0, y], [width, 64]))
-        y += 72
-    charts.append(placed(feature_list(list_title, names), [0, y], [width, 280]))
-    y += 288
+        charts.append(placed(text_box(prompt, prompt), [0, y], [width, PROMPT_HEIGHT]))
+        y += PROMPT_HEIGHT + CHART_GAP
+    charts.append(placed(feature_list(list_title, names), [0, y], [width, LIST_HEIGHT]))
+    y += LIST_HEIGHT + CHART_GAP
     if kind == "protein":
-        charts.append(placed(feature_table("Click a protein to plot it"), [0, y], [width, 240]))
+        charts.append(placed(feature_table("Click a protein to plot it"), [0, y], [width, DETAIL_HEIGHT]))
     else:
-        charts.append(placed(gene_info("Click a gene to plot it"), [0, y], [width, 240]))
+        charts.append(placed(gene_info("Click a gene to plot it"), [0, y], [width, DETAIL_HEIGHT]))
     return charts
 
 
@@ -536,6 +557,12 @@ class _Rows:
         if right is not None:
             self.charts.append(placed(right, [self.column + CHART_GAP, self.y], [self.column, height]))
         self.y += height + CHART_GAP
+
+    def selector(self, chart: dict[str, Any]) -> None:
+        """Group selector after the other charts: narrower than the pane, and tall."""
+        width = min(FILTER_WIDTH, self.width)
+        self.charts.append(placed(chart, [0, self.y], [width, FILTER_HEIGHT]))
+        self.y += FILTER_HEIGHT + CHART_GAP
 
 
 def column_label(column: dict[str, Any] | None, fallback: str) -> str:
@@ -608,9 +635,6 @@ def plan_question_views(
     axis_label = group_label if group_field else dot_label
 
     def accept(name: str, view: dict[str, Any]) -> None:
-        if name in views:
-            skipped.append({"question": name, "reason": "already in the project"})
-            return
         laid = place_legends(view, counts)
         for charts in laid.get("initialCharts", {}).values():
             for chart in charts:
@@ -647,19 +671,19 @@ def plan_question_views(
                 f"The first map shows **{group_label}**. The second map is the selected gene "
                 f"(darker = higher). The **dot plot** and **heat map** show that one gene, by "
                 f"**{dot_label}** and by **{group_label}**.\n\n"
-                f"**To look at another gene:** click one name under **Select gene(s) to view**.",
+                "**To look at another gene:** click one name in the gene list on the right.",
             ),
-            100,
+            TEXT_HEIGHT,
         )
         rows.pair(
             umap_chart(group_label, umap_x, umap_y, group_field, dot_field),
             umap_chart("Selected Gene Expression", umap_x, umap_y, one_gene, dot_field),
-            320,
+            UMAP_HEIGHT,
         )
-        rows.pair(
+        rows.full(heat_map(f"Selected gene by {group_label}", group_field, one_gene), HEAT_HEIGHT)
+        rows.full(
             compound_dot_plot(f"Selected gene by {dot_label}", dot_field, one_gene, y_label_size=110),
-            heat_map(f"Selected gene by {group_label}", group_field, one_gene),
-            380,
+            DOT_HEIGHT,
         )
         accept(
             Q1_VIEW_NAME,
@@ -667,7 +691,7 @@ def plan_question_views(
                 cells_name,
                 gene_name,
                 rows.charts,
-                gene_panel(gene_name, [markers[0]], "Select gene(s) to view"),
+                gene_panel(gene_name, [markers[0]]),
             ),
         )
     else:
@@ -705,7 +729,7 @@ def plan_question_views(
                         LinkedFeatures(protein_name, protein_subgroup, [protein for _, protein in pairs]),
                     )
             except (OSError, ValueError, KeyError, IndexError) as exc:
-                skipped.append({"question": Q3_VIEW_NAME, "reason": f"could not read protein rows: {exc}"})
+                skipped.append({"question": CONCORD_VIEW_NAME, "reason": f"could not read protein rows: {exc}"})
                 skipped.append({"question": PROTEIN_VIEW_NAME, "reason": f"could not read protein rows: {exc}"})
                 protein_failed = True
                 pairs = []
@@ -724,17 +748,20 @@ def plan_question_views(
                     f"**{dot_label}** and by **{group_label}**.\n\n"
                     f"**To look at another protein:** click one name under **Select protein(s) to view**.",
                 ),
-                100,
+                TEXT_HEIGHT,
             )
             protein_rows.pair(
                 umap_chart(group_label, umap_x, umap_y, group_field, dot_field),
                 umap_chart("Selected Protein Expression", umap_x, umap_y, one_protein, dot_field),
-                320,
+                UMAP_HEIGHT,
             )
-            protein_rows.pair(
-                compound_dot_plot(f"Selected protein by {dot_label}", dot_field, one_protein, y_label_size=110),
+            protein_rows.full(
                 heat_map(f"Selected protein by {group_label}", group_field, one_protein),
-                380,
+                HEAT_HEIGHT,
+            )
+            protein_rows.full(
+                compound_dot_plot(f"Selected protein by {dot_label}", dot_field, one_protein, y_label_size=110),
+                DOT_HEIGHT,
             )
             accept(
                 PROTEIN_VIEW_NAME,
@@ -776,7 +803,7 @@ def plan_question_views(
                 "panel when there are many types.\n\n"
                 "The page starts on five genes. **To plot more:** click further genes in the list on the right.",
             ),
-            120,
+            TEXT_TALL,
         )
         filter_fields = [str(column["field"]) for column in comparisons]
         patient = roles.get("patient")
@@ -785,7 +812,7 @@ def plan_question_views(
         response_column = roles.get("response")
         if response_column is not None:
             filter_fields.append(str(response_column["field"]))
-        rows.full(cell_filter("Choose groups to compare", filter_fields), 88)
+        group_filter = cell_filter("Choose groups to compare", filter_fields)
         pending: list[dict[str, Any]] = []
         for column in comparisons:
             chart = split_chart(column, many_genes)
@@ -806,7 +833,8 @@ def plan_question_views(
         while pending:
             left = pending.pop(0)
             right = pending.pop(0) if pending else None
-            rows.pair(left, right, 360)
+            rows.pair(left, right, DOT_HEIGHT)
+        rows.selector(group_filter)
         accept(Q2_VIEW_NAME, question_view(cells_name, gene_name, rows.charts, gene_panel(gene_name, comparison_genes)))
     else:
         skipped.append({"question": Q2_VIEW_NAME, "reason": "needs a grouping column and marker genes"})
@@ -819,11 +847,12 @@ def plan_question_views(
                 "**Is the gene expression concordant with protein expression?** "
                 f"The charts start on one pair, **{pairs[0][0]}** and **{pairs[0][1]}**. "
                 "The left side is RNA and the right side is protein. Similar patterns mean RNA and protein agree.\n\n"
-                "**To compare another pair:** click that gene and its protein. The maps follow the first name in each list.",
+                "**To compare another pair:** click that gene and its matching protein. "
+                "The charts follow the one name selected in each list.",
             ),
-            120,
+            TEXT_HEIGHT,
         )
-        concord.full(cell_filter(f"Focus on {dot_label}", [dot_field]), 88)
+        focus_filter = cell_filter(f"Focus on {dot_label}", [dot_field])
         gene_query = feature_query(LinkedFeatures(gene_name, subgroup, [pairs[0][0]]), CONCORD_MAX_ITEMS)
         protein_query = feature_query(
             LinkedFeatures(protein_name, protein_subgroup, [pairs[0][1]]),
@@ -832,7 +861,7 @@ def plan_question_views(
         concord.pair(
             compound_dot_plot(f"RNA by {dot_label}", dot_field, gene_query, y_label_size=110),
             compound_dot_plot(f"Protein by {dot_label}", dot_field, protein_query, y_label_size=110),
-            360,
+            DOT_HEIGHT,
         )
         if umap_x and umap_y:
             concord.pair(
@@ -850,32 +879,38 @@ def plan_question_views(
                     feature_query(LinkedFeatures(protein_name, protein_subgroup, [pairs[0][1]]), 1),
                     dot_field,
                 ),
-                300,
+                UMAP_HEIGHT,
             )
+        concord.selector(focus_filter)
         accept(
-            Q3_VIEW_NAME,
+            CONCORD_VIEW_NAME,
             {
                 "dataSources": {
                     cells_name: {"layout": "absolute", "panelWidth": CONCORD_SHARE},
-                    gene_name: {"layout": "absolute", "panelWidth": SIDE_SHARE},
-                    protein_name: {"layout": "absolute", "panelWidth": SIDE_SHARE},
+                    gene_name: {"layout": "absolute", "panelWidth": CONCORD_SIDE_SHARE},
+                    protein_name: {"layout": "absolute", "panelWidth": CONCORD_SIDE_SHARE},
                 },
                 "initialCharts": {
                     cells_name: concord.charts,
-                    gene_name: side_panel([pairs[0][0]], prompt="Select gene(s) to view"),
+                    gene_name: side_panel(
+                        [pairs[0][0]],
+                        prompt="Select gene(s) to view",
+                        share=CONCORD_SIDE_SHARE,
+                    ),
                     protein_name: side_panel(
                         [pairs[0][1]],
                         prompt="Select protein(s) to view",
                         list_title="Marker proteins",
                         kind="protein",
+                        share=CONCORD_SIDE_SHARE,
                     ),
                 },
             },
         )
     elif not protein_tables:
-        skipped.append({"question": Q3_VIEW_NAME, "reason": "no protein table"})
+        skipped.append({"question": CONCORD_VIEW_NAME, "reason": "no protein table"})
     elif not protein_failed:
-        skipped.append({"question": Q3_VIEW_NAME, "reason": "protein table has none of the expected gene/protein pairs"})
+        skipped.append({"question": CONCORD_VIEW_NAME, "reason": "protein table has none of the expected gene/protein pairs"})
 
     split_columns = [column for column in comparisons if split_category_values(column)]
     if split_columns and y_field:
@@ -888,18 +923,18 @@ def plan_question_views(
                 "shows the average of the selected genes in that same grouping.\n\n"
                 "The page starts on five genes. **To plot more:** click further genes in the list on the right.",
             ),
-            120,
+            TEXT_TALL,
         )
-        rows.full(
-            cell_filter("Choose groups to compare", [str(column["field"]) for column in split_columns]),
-            88,
+        group_filter = cell_filter(
+            "Choose groups to compare", [str(column["field"]) for column in split_columns]
         )
         for column in split_columns:
             label = column_label(column, str(column.get("field")))
             chart = split_chart(column, many_genes)
             if chart is None:
                 continue
-            rows.pair(chart, heat_map(f"Selected genes by {label}", str(column["field"]), many_genes), 360)
+            rows.pair(chart, heat_map(f"Selected genes by {label}", str(column["field"]), many_genes), DOT_HEIGHT)
+        rows.selector(group_filter)
         accept(Q6_VIEW_NAME, question_view(cells_name, gene_name, rows.charts, gene_panel(gene_name, comparison_genes)))
     else:
         skipped.append({"question": Q6_VIEW_NAME, "reason": "needs a diagnosis column and marker genes"})
@@ -929,9 +964,9 @@ def plan_question_views(
                     f"**{response_label}** group, on a shared colour and size scale.\n\n"
                     "The page starts on five genes. **To plot more:** click further genes in the list on the right.",
                 ),
-                140,
+                TEXT_TALL,
             )
-            rows.full(cell_filter("Choose groups to compare", filters, selected_filters), 88)
+            group_filter = cell_filter("Choose groups to compare", filters, selected_filters)
             stage_charts = []
             for stage in stages[:2]:
                 chart = compound_dot_plot(
@@ -943,7 +978,8 @@ def plan_question_views(
                 )
                 chart["category_filters"] = [{"column": treatment_field, "category": [stage]}]
                 stage_charts.append(chart)
-            rows.pair(stage_charts[0], stage_charts[1] if len(stage_charts) > 1 else None, 380)
+            rows.pair(stage_charts[0], stage_charts[1] if len(stage_charts) > 1 else None, DOT_HEIGHT)
+            rows.selector(group_filter)
             q8_name = "Contrasting responders and non-responders at baseline and post treatment"
         else:
             rows.full(
@@ -954,9 +990,9 @@ def plan_question_views(
                     f"and the **box plot** shows how {('TNF' if 'TNF' in fields else markers[0])} varies.\n\n"
                     "The page starts on five genes. **To plot more:** click further genes in the list on the right.",
                 ),
-                140,
+                TEXT_TALL,
             )
-            rows.full(cell_filter("Choose groups to compare", filters, selected_filters), 88)
+            group_filter = cell_filter("Choose groups to compare", filters, selected_filters)
             rows.full(
                 compound_dot_plot(
                     f"{axis_label}, split by {response_label}",
@@ -965,14 +1001,15 @@ def plan_question_views(
                     split=(response_field, [str(value) for value in groups[:2]]),
                     y_label_size=110,
                 ),
-                380,
+                DOT_HEIGHT,
             )
             box_gene = "TNF" if "TNF" in fields else markers[0]
             rows.pair(
                 composition_bar(f"{axis_label} mix by {response_label}", response_field, y_field),
                 box_plot(f"{box_gene} by {response_label}", response_field, fields[box_gene]),
-                280,
+                BAR_HEIGHT,
             )
+            rows.selector(group_filter)
             q8_name = Q8_VIEW_NAME
         accept(q8_name, question_view(cells_name, gene_name, rows.charts, gene_panel(gene_name, comparison_genes)))
     else:
@@ -993,12 +1030,12 @@ def plan_question_views(
                 "**Differentially expressed genes** are not added, so there is no volcano plot. "
                 "The page starts on five genes. **To plot more:** click further genes in the list on the right.",
             ),
-            150,
+            TEXT_TALL,
         )
         filter_fields = [stage_field]
         if response is not None and str(response["field"]) not in filter_fields:
             filter_fields.append(str(response["field"]))
-        rows.full(cell_filter("Choose groups to compare", filter_fields), 88)
+        group_filter = cell_filter("Choose groups to compare", filter_fields)
         rows.pair(
             umap_chart(
                 str(stage_values[0]),
@@ -1016,13 +1053,13 @@ def plan_question_views(
                 dot_field or group_field,
                 only=(stage_field, str(stage_values[1])),
             ),
-            320,
+            UMAP_HEIGHT,
         )
         box_gene = "TNF" if "TNF" in fields else markers[0]
         rows.pair(
             composition_bar(f"{group_label} mix by {stage_label}", stage_field, group_field),
             box_plot(f"{box_gene} by {stage_label}", stage_field, fields[box_gene]),
-            280,
+            BAR_HEIGHT,
         )
         rows.full(
             compound_dot_plot(
@@ -1032,8 +1069,9 @@ def plan_question_views(
                 split=(stage_field, [str(value) for value in stage_values[:2]]),
                 y_label_size=110,
             ),
-            360,
+            DOT_HEIGHT,
         )
+        rows.selector(group_filter)
         q9_name = (
             "Comparing groups: is the UMAP different between treatment states? DEG?"
             if stages
@@ -1047,7 +1085,9 @@ def plan_question_views(
         })
 
     return {
-        "added": list(built),
+        "added": [name for name in built if name not in views],
+        "updated": [name for name in built if name in views],
+        "removed": [name for name in OMITTED_VIEW_NAMES if name in views],
         "skipped": skipped,
         "views": built,
         "gene_datasource": gene_name,
@@ -1057,12 +1097,38 @@ def plan_question_views(
     }
 
 
+def arrange_views(all_views: list[str], built: dict[str, Any]) -> list[str]:
+    """Drop omitted views and place the protein view immediately after the gene view."""
+    names = [name for name in all_views if name not in OMITTED_VIEW_NAMES]
+    protein = PROTEIN_VIEW_NAME if PROTEIN_VIEW_NAME in built else None
+    if protein:
+        if protein in names:
+            names.remove(protein)
+        if Q1_VIEW_NAME in names:
+            names.insert(names.index(Q1_VIEW_NAME) + 1, protein)
+        else:
+            names.insert(0, protein)
+    if CONCORD_VIEW_NAME in built and CONCORD_VIEW_NAME not in names:
+        after = protein if protein and protein in names else Q1_VIEW_NAME
+        if after in names:
+            names.insert(names.index(after) + 1, CONCORD_VIEW_NAME)
+        else:
+            names.append(CONCORD_VIEW_NAME)
+    for name in built:
+        if name not in names:
+            names.append(name)
+    return names
+
+
 def backup_views(project: Path) -> Path:
     views_path = project / "views.json"
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     backup_path = views_path.with_name(f"{views_path.name}.bak.{timestamp}")
     backup_path.write_bytes(views_path.read_bytes())
     return backup_path
+
+
+HEAVY_DIR_NAMES = ("images", "spatial")
 
 
 def ignore_unreadable(directory: str, names: list[str]) -> list[str]:
@@ -1074,6 +1140,56 @@ def ignore_unreadable(directory: str, names: list[str]) -> list[str]:
             print(f"Skipping unreadable directory: {path}")
             skipped.append(name)
     return skipped
+
+
+def ignore_for_copy(root: Path, *, link_heavy: bool):
+    """Skip unreadable directories, and with ``link_heavy`` the heavy root entries."""
+    root = root.resolve()
+
+    def ignore(directory: str, names: list[str]) -> list[str]:
+        skipped = ignore_unreadable(directory, names)
+        if not link_heavy or Path(directory).resolve() != root:
+            return skipped
+        for name in names:
+            if name in skipped:
+                continue
+            path = Path(directory) / name
+            if name in HEAVY_DIR_NAMES or path.suffix == ".h5":
+                skipped.append(name)
+        return skipped
+
+    return ignore
+
+
+def heavy_link_plan(project: Path) -> dict[str, list[str]]:
+    """Top-level directories to symlink and h5 files to hard-link."""
+    return {
+        "symlink_dirs": [name for name in HEAVY_DIR_NAMES if (project / name).exists()],
+        "hardlink_files": [path.name for path in sorted(project.glob("*.h5")) if path.is_file()],
+    }
+
+
+def link_heavy_paths(project: Path, output: Path) -> dict[str, list[str]]:
+    """Share the heavy source files. Raises instead of falling back to a byte copy."""
+    plan = heavy_link_plan(project)
+    for name in plan["symlink_dirs"]:
+        source = project / name
+        destination = output / name
+        destination.symlink_to(source)
+        print(f"Symlinked {destination} -> {source}")
+    for name in plan["hardlink_files"]:
+        source = project / name
+        destination = output / name
+        try:
+            os.link(source, destination)
+        except OSError as exc:
+            raise RuntimeError(
+                f"Could not hard-link {source} to {destination}. The h5 file was not copied."
+            ) from exc
+        if destination.stat().st_ino != source.stat().st_ino:
+            raise RuntimeError(f"Hard link {destination} does not share an inode with {source}.")
+        print(f"Hard-linked {destination} -> {source}")
+    return plan
 
 
 def planned_backup_paths(output: Path) -> dict[str, str]:
@@ -1091,15 +1207,17 @@ def curate(
     *,
     write: bool,
     marker_genes: list[str] | None = None,
+    link_heavy: bool = False,
+    copy_project: bool = True,
 ) -> dict[str, Any]:
     project = project.expanduser().resolve()
-    output = output.expanduser().resolve()
+    output = project if not copy_project else output.expanduser().resolve()
     excel_path = excel_path.expanduser().resolve()
     if not excel_path.is_file():
         raise FileNotFoundError(f"Spreadsheet does not exist: {excel_path}")
     if not project.is_dir():
         raise FileNotFoundError(f"Input project does not exist: {project}")
-    if output == project or project in output.parents or output in project.parents:
+    if copy_project and (output == project or project in output.parents or output in project.parents):
         raise ValueError("The output project must be a different directory from the input project.")
     for name in ("datasources.json", "views.json", "state.json"):
         if not (project / name).is_file():
@@ -1194,13 +1312,25 @@ def curate(
     report["h5_mtime_ns"] = source_before[1] if source_before else None
     report["skipped_datasources"] = skipped_datasources
     report["question_views"] = question_plan["added"]
+    report["updated_question_views"] = question_plan.get("updated", [])
     report["skipped_questions"] = question_plan["skipped"]
     report["retitled_charts"] = retitled
     report.update(planned_backup_paths(output))
+    if link_heavy:
+        report["heavy_links"] = heavy_link_plan(project)
+        print(
+            "Heavy entries will be linked: "
+            f"symlinks={report['heavy_links']['symlink_dirs']}; "
+            f"hardlinks={report['heavy_links']['hardlink_files']}"
+        )
     print_report(report)
     print("\nQuestion views")
     for name in question_plan["added"]:
         print(f"  add: {name}")
+    for name in question_plan.get("updated", []):
+        print(f"  update: {name}")
+    for name in question_plan.get("removed", []):
+        print(f"  remove: {name}")
     for item in question_plan["skipped"]:
         print(f"  skip: {item['question']}: {item['reason']}")
     print(f"  retitle stored titles/labels: {retitled}")
@@ -1219,9 +1349,18 @@ def curate(
         print("Dry run complete. The input project and datafile.h5 were not changed.")
         return report
 
-    if output.exists():
-        raise FileExistsError(f"Output project already exists: {output}")
-    shutil.copytree(project, output, symlinks=True, ignore=ignore_unreadable)
+    if copy_project:
+        if output.exists():
+            raise FileExistsError(f"Output project already exists: {output}")
+        shutil.copytree(project, output, symlinks=True, ignore=ignore_for_copy(project, link_heavy=link_heavy))
+        try:
+            if link_heavy:
+                link_heavy_paths(project, output)
+        except Exception:
+            shutil.rmtree(output)
+            raise
+    elif link_heavy:
+        print("Keeping the project in place. Heavy files stay where they are.")
     output_before = h5_stamp(output)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     json_backup = output.parent / f"{output.name}_json_backup_{timestamp}"
@@ -1239,17 +1378,15 @@ def curate(
 
     output_views = load_views(output)
     retitle_views(output_views, replacements)
+    for name in OMITTED_VIEW_NAMES:
+        output_views.pop(name, None)
     for name, view in question_plan["views"].items():
         output_views[name] = view
     atomic_write_json(output / "views.json", output_views)
     state_path = output / "state.json"
     state = json.loads(state_path.read_text(encoding="utf-8"))
-    all_views = list(state.get("all_views") or [])
-    # Only add the new views; views left out of all_views stay hidden.
-    for name in question_plan["views"]:
-        if name not in all_views:
-            all_views.append(name)
-    state["all_views"] = all_views
+    all_views = [name for name in state.get("all_views") or [] if isinstance(name, str)]
+    state["all_views"] = arrange_views(all_views, question_plan["views"])
     atomic_write_json(state_path, state)
 
     require_same_h5(output_before, h5_stamp(output), "Output")
@@ -1270,8 +1407,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--project", type=Path, required=True, help="Input MDV project directory.")
     parser.add_argument("--project-id", required=True, help="Project id column in the Data Cleaning sheet.")
     parser.add_argument("--xlsx", type=Path, required=True, help="Workbook containing the Data Cleaning sheet.")
-    parser.add_argument("--output", type=Path, required=True, help="Directory for the curated project.")
-    parser.add_argument("--write", action="store_true", help="Copy the project to --output and apply the plan.")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Directory for the curated copy. Required unless --no-copy is set.",
+    )
+    parser.add_argument("--write", action="store_true", help="Apply the plan. Copies the project unless --no-copy is set.")
+    parser.add_argument(
+        "--no-copy",
+        action="store_true",
+        help="Apply the plan to --project instead of copying it to --output.",
+    )
+    parser.add_argument(
+        "--link-heavy",
+        action="store_true",
+        help="With --write, hard-link top-level *.h5 files and symlink spatial/ and images/.",
+    )
     parser.add_argument(
         "--markers",
         help='Comma-separated marker genes for the question views, e.g. "PTPRC, CD3E, CD4". '
@@ -1289,13 +1440,23 @@ def parse_markers(text: str | None) -> list[str] | None:
 
 def main() -> int:
     args = parse_args()
+    if args.no_copy:
+        if args.output is not None and args.output.expanduser().resolve() != args.project.expanduser().resolve():
+            raise SystemExit("--output must be omitted or equal to --project when --no-copy is set.")
+        output = args.project
+    elif args.output is None:
+        raise SystemExit("--output is required unless --no-copy is set.")
+    else:
+        output = args.output
     curate(
         args.project,
         args.project_id,
         args.xlsx,
-        args.output,
+        output,
         write=args.write,
         marker_genes=parse_markers(args.markers),
+        link_heavy=args.link_heavy,
+        copy_project=not args.no_copy,
     )
     return 0
 

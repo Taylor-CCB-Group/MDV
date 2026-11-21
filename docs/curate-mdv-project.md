@@ -137,4 +137,10 @@ For a project that already has the separate plots, `python/mdvtools/scripts/conv
 
 The question views and `Cell atlas` use fixed pixel positions with about 25 px between charts, so the page can be scrolled from the gaps without the mouse wheel zooming a chart. Each view keeps its width; it gets a little taller.
 
-The scripts don't write thumbnails (`viewImage`). Open each new view with edit permission and save it (Ctrl+S) before copying `views.json` to a server where users only have view permission. A viewer who opens a project whose first view has no thumbnail gets a "Forbidden" save error.
+The curation scripts don't write thumbnails (`viewImage`). A thumbnail is the screenshot taken when a view is saved. With the project open on a running MDV server and edit permission, capture the listed views that do not yet have one:
+
+```bash
+node scripts/capture_view_thumbnails.mjs --base-url http://localhost:5055 --project <id>
+```
+
+`--all` recaptures every view, and `--only "Cell atlas"` limits the run to named views. Do this before copying `views.json` to a server where users only have view permission. A viewer who opens a project whose first view has no thumbnail gets a "Forbidden" save error.
