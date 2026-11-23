@@ -109,6 +109,17 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
         );
     }
 
+    settings.push(
+        g({
+            type: "check",
+            label: "Show all selection tools",
+            current_value: config.selection_toolbar_open ?? true,
+            func: (value) => {
+                config.selection_toolbar_open = value;
+            },
+        }),
+    );
+
     if (includeDensitySettings && chart) {
         settings.push(getDensitySettings(config));
     }

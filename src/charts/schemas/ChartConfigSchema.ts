@@ -273,6 +273,12 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
         .describe("Hides rows outside the selected categories from this chart only"),
     on_filter: z.enum(["hide", "grey"]).optional().describe("How filtered-out points should be rendered"),
     zoom_on_filter: z.boolean().optional().describe("Whether filtering should auto-fit the current view"),
+    selection_toolbar_open: z
+        .boolean()
+        .optional()
+        .describe(
+            "Whether the selection toolbar shows every tool, or one button for Pan and the last drawing tool (default true)",
+        ),
     crosshair: z
         .boolean()
         .nullable()
