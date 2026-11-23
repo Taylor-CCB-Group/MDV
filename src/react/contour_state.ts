@@ -348,7 +348,10 @@ export type DualContourLegacyConfig = {
     densityFields?: FieldSpecs; // don't have a way of specifying datatype here
     field_legend: {
         display: boolean;
-        // todo - more legend configuration options
+        /** Where the user left it over the plot, [left, top] in pixels; starts at the bottom left. */
+        pos?: [number, number];
+        /** Shown as a small button with its title. */
+        minimized?: boolean;
     };
 } & ContourVisualConfig;
 

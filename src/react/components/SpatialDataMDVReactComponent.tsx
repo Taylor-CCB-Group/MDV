@@ -58,7 +58,7 @@ import { useOuterContainer } from "../screen_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import { useViewerStore, useViewerStoreApi, VivProvider } from "./avivatorish/state";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
-import FieldContourLegend from "./FieldContourLegend";
+import { useContourLegend } from "./FieldContourLegend";
 import { rasterEntriesKey, useRasterIssues } from "./RasterIssues";
 import SelectionOverlay from "./SelectionOverlay";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
@@ -368,8 +368,13 @@ const SpatialDataViewer = observer(
         const contourConfig = useConfig<DualContourLegacyConfig>();
         const legendFields = useFieldContourLegend(contourConfig.densityFields);
         const legendCategories = useCategoryContourLegend(contourConfig);
-        const showLegend = contourConfig.field_legend.display;
-        const legendPosition = { x: 10, y: 10 };
+        // drawn in the chart's legend wrapper: draggable, can be minimised or put above the plot
+        useContourLegend(contourConfig.field_legend, {
+            fields: legendFields,
+            categories: legendCategories.items,
+            categoryLabel: legendCategories.label,
+            onContourHover: setHoveredContour,
+        });
         const { device: deckDevice, fallBack: fallBackToWebGL } = useDeckDevice(
             resolveDeckBackend(config.render_backend),
         );
@@ -631,15 +636,6 @@ const SpatialDataViewer = observer(
         return (
             <Profiler id="spatial.viewer" onRender={onSpatialProfilerRender}>
                 <SelectionOverlay />
-                {showLegend && (
-                    <FieldContourLegend
-                        fields={legendFields}
-                        categories={legendCategories.items}
-                        categoryLabel={legendCategories.label}
-                        position={legendPosition}
-                        onContourHover={setHoveredContour}
-                    />
-                )}
                 <div
                     ref={deckContainerRef}
                     aria-label="SpatialData.js image viewer"

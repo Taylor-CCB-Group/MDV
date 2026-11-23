@@ -1,6 +1,7 @@
 import { scaleBand, scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
 import BaseChart from "./BaseChart";
+import { addLegendsToSvg } from "./legendImage";
 import "d3-transition";
 import { axisBottom, axisLeft } from "d3-axis";
 import { easeLinear } from "d3-ease";
@@ -483,38 +484,14 @@ class SVGChart extends BaseChart {
         ]);
     }
 
-    _addLegendToSVG(param) {
-        const legend = this[param];
-        if (!legend) {
-            return;
-        }
-        const cl = [legend.offsetLeft, legend.offsetTop];
-        legend._leg = legend.querySelector("g");
-        legend._leg_g = select(legend._leg).attr("transform", `translate(${cl[0]},${cl[1]})`);
-        this.svg.node().append(legend._leg_g.node());
-    }
-
-    _removeLegendFromSVG(param) {
-        const legend = this[param];
-        if (!legend) {
-            return;
-        }
-        legend._leg_g.attr("transform", "translate(0,0)");
-        this.legend.querySelector("svg").append(legend._leg);
-        this.legend._leg = undefined;
-        this.legend._leg_g = undefined;
-    }
-
     getImage(callback, type) {
         if (this.addToImage) {
             this.addToImage();
         }
 
-        //temporarily attach legend
-        this._addLegendToSVG("legend");
-        if (this.extra_legends) {
-            this.extra_legends.forEach((x) => this._addLegendToSVG(x));
-        }
+        //temporarily attach legends
+        const extraLegends = (this.extra_legends ?? []).map((x) => this[x]);
+        const restoreLegends = addLegendsToSvg(this.svg.node(), [this.legend, ...extraLegends]);
 
         const svgAsXML = new XMLSerializer().serializeToString(this.svg.node());
 
@@ -524,20 +501,14 @@ class SVGChart extends BaseChart {
                 if (this.removeFromImage) {
                     this.removeFromImage();
                 }
-                this._removeLegendFromSVG("legend");
-                if (this.extra_legends) {
-                    this.extra_legends.forEach((x) => this._removeLegendFromSVG(x));
-                }
+                restoreLegends();
             });
         } else {
             callback(svgAsXML);
             if (this.removeFromImage) {
                 this.removeFromImage();
             }
-            this._removeLegendFromSVG("legend");
-            if (this.extra_legends) {
-                this.extra_legends.forEach((x) => this._removeLegendFromSVG(x));
-            }
+            restoreLegends();
         }
     }
 }

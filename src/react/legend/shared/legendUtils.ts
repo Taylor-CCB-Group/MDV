@@ -1,6 +1,12 @@
 import { scaleLinear } from "d3-scale";
 import { dateTickFormat } from "@/lib/dateFormat";
 import {
+    CONTINUOUS_COMPACT_BAR_HEIGHT,
+    CONTINUOUS_COMPACT_LABEL_HEIGHT,
+    CONTINUOUS_COMPACT_MAX_BAR_WIDTH,
+    CONTINUOUS_COMPACT_TICK_LENGTH,
+    CONTINUOUS_COMPACT_TICK_SPACING,
+    CONTINUOUS_COMPACT_TITLE_HEIGHT,
     CONTINUOUS_HORIZONTAL_PADDING,
     CONTINUOUS_MIN_LAYOUT_WIDTH,
     CONTINUOUS_TICK_TARGET_SPACING,
@@ -96,8 +102,21 @@ export function legendCategoricalContainerHeight(itemCount: number): number {
     return bodyHeight > LEGEND_CATEGORICAL_MAX_BODY_HEIGHT ? LEGEND_CATEGORICAL_MAX_BODY_HEIGHT + 35 : bodyHeight + 35;
 }
 
-export function getContinuousLegendLayout(width: number, hasLabel: boolean): ContinuousLegendLayout {
+export function getContinuousLegendLayout(width: number, hasLabel: boolean, compact = false): ContinuousLegendLayout {
     const layoutWidth = Math.max(width, CONTINUOUS_MIN_LAYOUT_WIDTH);
+    if (compact) {
+        const axisWidth = Math.min(layoutWidth - CONTINUOUS_HORIZONTAL_PADDING * 2, CONTINUOUS_COMPACT_MAX_BAR_WIDTH);
+        return {
+            layoutWidth,
+            barX: CONTINUOUS_HORIZONTAL_PADDING,
+            barY: hasLabel ? CONTINUOUS_COMPACT_TITLE_HEIGHT : 0,
+            barHeight: CONTINUOUS_COMPACT_BAR_HEIGHT,
+            axisWidth,
+            labelMaxWidth: Math.max(0, layoutWidth - 10),
+            tickCount: Math.max(2, Math.floor(axisWidth / CONTINUOUS_COMPACT_TICK_SPACING)),
+            tickLength: CONTINUOUS_COMPACT_TICK_LENGTH,
+        };
+    }
     const axisWidth = layoutWidth - CONTINUOUS_HORIZONTAL_PADDING * 2;
 
     return {
@@ -108,6 +127,7 @@ export function getContinuousLegendLayout(width: number, hasLabel: boolean): Con
         axisWidth,
         labelMaxWidth: Math.max(0, axisWidth),
         tickCount: Math.max(2, Math.ceil(layoutWidth / CONTINUOUS_TICK_TARGET_SPACING)),
+        tickLength: CONTINUOUS_AXIS_TICK_LENGTH,
     };
 }
 
@@ -119,6 +139,8 @@ export type ContinuousLegendHeightOptions = {
     width?: number;
     hasLabel?: boolean;
     isDate?: boolean;
+    /** The strip's slimmer form: tick labels are level, so the height doesn't depend on them. */
+    compact?: boolean;
 };
 
 export function getContinuousLegendContainerHeight(
@@ -128,6 +150,10 @@ export function getContinuousLegendContainerHeight(
     const width = options.width ?? DEFAULT_CONTINUOUS_LEGEND_WIDTH;
     const hasLabel = options.hasLabel ?? true;
     const isDate = options.isDate ?? false;
+    if (options.compact) {
+        const layout = getContinuousLegendLayout(width, hasLabel, true);
+        return layout.barY + layout.barHeight + layout.tickLength + CONTINUOUS_COMPACT_LABEL_HEIGHT;
+    }
     const layout = getContinuousLegendLayout(width, hasLabel);
 
     const scale = scaleLinear().domain([range[0], range[1]]).range([0, layout.axisWidth]);

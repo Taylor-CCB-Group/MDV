@@ -1,9 +1,13 @@
-import { act, type ReactElement, StrictMode, useLayoutEffect, useRef } from "react";
+import { act, type ReactElement, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
-import LegendWrapper, { type LegendWrapperComponentProps } from "@/react/components/legend/LegendWrapper";
+import { useLegendPreferredSize } from "@/react/components/legend/LegendFrame";
+import LegendWrapper, {
+    type LegendPlacement,
+    type LegendWrapperInteractions,
+} from "@/react/components/legend/LegendWrapper";
 
 // The real portal adds app providers the wrapper doesn't need; keep StrictMode,
 // since it runs layout effects twice, which is what the saved size has to survive.
@@ -17,19 +21,13 @@ vi.mock("@/react/react_utils", () => ({
 
 const DEFAULT_SIZE = { width: 180, height: 250 };
 
-/** Stands in for ColorLegend: sets the wrapper's default size, then reports layout ready. */
-function FakeLegend({ onLayoutReady }: LegendWrapperComponentProps<string>) {
-    const ref = useRef<HTMLDivElement>(null);
-    useLayoutEffect(() => {
-        const el = ref.current?.parentElement;
-        if (!el) return;
-        el.style.width = `${DEFAULT_SIZE.width}px`;
-        el.style.height = `${DEFAULT_SIZE.height}px`;
-        onLayoutReady?.();
-    }, [onLayoutReady]);
+/** Stands in for ColorLegend: asks the frame for its default size. */
+function FakeLegend() {
+    useLegendPreferredSize(DEFAULT_SIZE);
     return (
-        <div ref={ref}>
+        <div>
             <div className="legend-drag-handle">Legend</div>
+            <div className="legend-body">Items</div>
         </div>
     );
 }
@@ -39,15 +37,30 @@ function px(value: string) {
     return Number.parseFloat(value) || 0;
 }
 
-function createChart(content: { width: number; height: number }) {
+function createChart(content: { width: number; height: number }, placement?: Partial<LegendPlacement>) {
     const contentDiv = document.createElement("div");
     contentDiv.dataset.testWidth = String(content.width);
     contentDiv.dataset.testHeight = String(content.height);
     document.body.append(contentDiv);
-    const chart = { contentDiv, __doc__: document };
+    const band = document.createElement("div");
+    document.body.append(band);
+    const chart = {
+        contentDiv,
+        __doc__: document,
+        ...(placement && {
+            getLegendPlacement: (): LegendPlacement => ({
+                onTop: false,
+                band,
+                setLayout: () => {},
+                onBandChanged: () => {},
+                ...placement,
+            }),
+        }),
+    };
     return {
         contentDiv,
-        // LegendWrapper only reads contentDiv and __doc__ from the chart. A real
+        band,
+        // LegendWrapper only reads contentDiv and getLegendPlacement from the chart. A real
         // BaseChart would pull in the whole chart code, which takes minutes to load.
         wrapper: new LegendWrapper<string>(chart as unknown as BaseChart<BaseConfig>),
     };
@@ -57,20 +70,32 @@ let wrappers: LegendWrapper<string>[] = [];
 
 function renderLegend(
     content: { width: number; height: number },
-    position: { left: number; top: number; size?: [number, number] },
+    position: { left: number; top?: number; bottom?: number; size?: [number, number] },
     resizable = true,
+    interactions: LegendWrapperInteractions = {},
+    placement?: Partial<LegendPlacement>,
 ) {
-    const { wrapper, contentDiv } = createChart(content);
+    const { wrapper, contentDiv, band } = createChart(content, placement);
     wrappers.push(wrapper);
     act(() => {
         wrapper.render("spec", position, FakeLegend, {
             dragHandle: ".legend-drag-handle",
             resizable,
+            ...interactions,
         });
     });
-    const el = wrapper.getWrapperElement();
-    if (!el) throw new Error("legend wrapper was not created");
-    return { wrapper, el, contentDiv };
+    const el = wrapper.getWrapperElement()?.querySelector(".legend-container");
+    if (!(el instanceof HTMLElement)) throw new Error("legend frame was not drawn");
+    return { wrapper, el, contentDiv, band };
+}
+
+/** Presses on `target`, moves the pointer by (dx, dy) and lets go. */
+function drag(target: Element, dx: number, dy: number) {
+    act(() => {
+        target.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 100, clientY: 100 }));
+        document.dispatchEvent(new MouseEvent("pointermove", { clientX: 100 + dx, clientY: 100 + dy }));
+        document.dispatchEvent(new MouseEvent("pointerup"));
+    });
 }
 
 /** jsdom has no ResizeObserver; this one lets a test say when the chart has resized. */
@@ -99,9 +124,11 @@ class FakeResizeObserver {
 function resizeChart(contentDiv: HTMLElement, width: number, height: number) {
     contentDiv.dataset.testWidth = String(width);
     contentDiv.dataset.testHeight = String(height);
-    for (const observer of FakeResizeObserver.instances) {
-        if (!observer.disconnected && observer.targets.includes(contentDiv)) observer.trigger();
-    }
+    act(() => {
+        for (const observer of FakeResizeObserver.instances) {
+            if (!observer.disconnected && observer.targets.includes(contentDiv)) observer.trigger();
+        }
+    });
 }
 
 beforeEach(() => {
@@ -111,7 +138,10 @@ beforeEach(() => {
         return px(this.style.left);
     });
     vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (this: HTMLElement) {
-        return px(this.style.top);
+        if (this.style.top || !this.style.bottom) return px(this.style.top);
+        // placed from the bottom of the chart it's in
+        const chart = this.closest<HTMLElement>("[data-test-height]");
+        return Number(chart?.dataset.testHeight ?? 0) - px(this.style.bottom) - px(this.style.height);
     });
     vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) {
         return px(this.style.width);
@@ -160,11 +190,10 @@ describe("LegendWrapper saved size", () => {
         const corner = el.querySelector(".resizer-se");
         if (!corner) throw new Error("expected a resize handle");
 
-        corner.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: 100, clientY: 100 }));
-        document.documentElement.dispatchEvent(new MouseEvent("mousemove", { clientX: 60, clientY: 40 }));
-        document.documentElement.dispatchEvent(new MouseEvent("mouseup"));
+        drag(corner, -40, -60);
 
         expect(wrapper.getUserSize()).toEqual([140, 190]);
+        expect([el.style.width, el.style.height]).toEqual(["140px", "190px"]);
     });
 });
 
@@ -205,10 +234,121 @@ describe("LegendWrapper keeps the legend inside the chart", () => {
         expect([el.style.left, el.style.top]).toEqual(["220px", "50px"]);
     });
 
-    test("stops watching the chart when the legend is removed", () => {
-        const { wrapper } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 });
-        expect(FakeResizeObserver.instances).toHaveLength(1);
-        act(() => wrapper.unmount());
-        expect(FakeResizeObserver.instances[0].disconnected).toBe(true);
+    test("starts a legend placed from the bottom at that distance from the chart's bottom", () => {
+        const { el, wrapper } = renderLegend({ width: 400, height: 300 }, { left: 10, bottom: 10 });
+        expect([el.style.left, el.style.bottom]).toEqual(["10px", "10px"]);
+        // 300 - 250 - 10
+        expect(wrapper.getFloatingPosition()).toEqual([10, 40]);
+    });
+
+    test("moves a legend placed from the bottom down from the top when it's too tall to fit", () => {
+        const { el } = renderLegend({ width: 400, height: 200 }, { left: 10, bottom: 10 });
+        expect([el.style.left, el.style.top]).toEqual(["10px", "0px"]);
+    });
+
+    test("stops watching the chart when the legend is removed", async () => {
+        const { wrapper, contentDiv } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 });
+        const watching = () =>
+            FakeResizeObserver.instances.filter((o) => !o.disconnected && o.targets.includes(contentDiv));
+        expect(watching()).toHaveLength(1);
+        await act(async () => wrapper.unmount());
+        expect(watching()).toHaveLength(0);
+    });
+});
+
+describe("LegendWrapper dragging", () => {
+    test("moves the legend by its handle and reports where it was left", () => {
+        const onMoved = vi.fn();
+        const { el, wrapper } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 }, true, { onMoved });
+        const handle = el.querySelector(".legend-drag-handle");
+        if (!handle) throw new Error("expected a drag handle");
+
+        drag(handle, 50, 30);
+
+        expect([el.style.left, el.style.top]).toEqual(["60px", "40px"]);
+        expect(onMoved).toHaveBeenCalledWith([60, 40]);
+        expect(wrapper.getFloatingPosition()).toEqual([60, 40]);
+    });
+
+    test("doesn't move when pressed outside the handle", () => {
+        const { el } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 });
+        const body = el.querySelector(".legend-body");
+        if (!body) throw new Error("expected the legend body");
+
+        drag(body, 50, 30);
+
+        expect([el.style.left, el.style.top]).toEqual(["10px", "10px"]);
+    });
+
+    test("keeps a dragged legend inside the chart", () => {
+        const { el } = renderLegend({ width: 400, height: 300 }, { left: 10, top: 10 });
+        const handle = el.querySelector(".legend-drag-handle");
+        if (!handle) throw new Error("expected a drag handle");
+
+        drag(handle, 1000, 1000);
+
+        expect([el.style.left, el.style.top]).toEqual(["220px", "50px"]);
+    });
+});
+
+describe("LegendWrapper minimised", () => {
+    test("opens only from its + button, and can be dragged by the rest", () => {
+        const onMinimizedChange = vi.fn();
+        const { el } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 }, true, {
+            minimized: true,
+            onMinimizedChange,
+            summary: { label: "Cell type", swatches: ["#f00"] },
+        });
+        expect(el.classList).toContain("legend-minimized");
+        expect(el.textContent).toContain("Cell type");
+
+        const pill = el.querySelector(".legend-summary");
+        if (!pill) throw new Error("expected the minimised legend");
+        act(() => pill.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+        expect(onMinimizedChange).not.toHaveBeenCalled();
+
+        drag(pill, 40, 20);
+        expect([el.style.left, el.style.top]).toEqual(["50px", "30px"]);
+
+        const open = el.querySelector<HTMLButtonElement>(".legend-summary-open");
+        act(() => open?.click());
+        expect(onMinimizedChange).toHaveBeenCalledWith(false);
+    });
+
+    test("minimises from the legend's own button", () => {
+        const onMinimizedChange = vi.fn();
+        const { el } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 }, true, { onMinimizedChange });
+        const minimise = el.querySelector<HTMLButtonElement>('[aria-label="Minimise legend"]');
+        act(() => minimise?.click());
+        expect(onMinimizedChange).toHaveBeenCalledWith(true);
+    });
+});
+
+describe("LegendWrapper in the strip above the plot", () => {
+    test("draws the legend in the strip, sized by the strip, with no floating position", () => {
+        const { el, band, wrapper } = renderLegend(
+            { width: 600, height: 600 },
+            { left: 10, top: 10 },
+            true,
+            {},
+            {
+                onTop: true,
+            },
+        );
+        expect(band.contains(el)).toBe(true);
+        expect(el.classList).toContain("legend-in-band");
+        expect(el.style.width).toBe("");
+        expect(el.style.height).toBe("96px");
+        expect(el.querySelector(".resizer-se")).toBeNull();
+        expect(el.querySelector('[aria-label="Put legends above the plot"]')).toBeNull();
+        expect(wrapper.getFloatingPosition()).toBeNull();
+    });
+
+    test("offers to put the legends above the plot while floating", () => {
+        const setLayout = vi.fn();
+        const { el } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 }, true, {}, { setLayout });
+        const button = el.querySelector<HTMLButtonElement>('[aria-label="Put legends above the plot"]');
+        act(() => button?.click());
+        expect(setLayout).toHaveBeenCalledWith({ position: "top" });
     });
 });

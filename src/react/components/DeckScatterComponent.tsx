@@ -34,7 +34,7 @@ import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context"
 import AxisComponent from "./AxisComponent";
 import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
-import FieldContourLegend from "./FieldContourLegend";
+import { useContourLegend } from "./FieldContourLegend";
 import SelectionOverlay from "./SelectionOverlay";
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -250,8 +250,13 @@ const DeckScatter = observer(function DeckScatterComponent({
 
     const legendFields = useFieldContourLegend(contourConfig.densityFields);
     const legendCategories = useCategoryContourLegend(contourConfig);
-    const showLegend = contourConfig.field_legend.display;
-    const legendPosition = { x: 10, y: 10 };
+    // drawn in the chart's legend wrapper: draggable, can be minimised or put above the plot
+    useContourLegend(contourConfig.field_legend, {
+        fields: legendFields,
+        categories: legendCategories.items,
+        categoryLabel: legendCategories.label,
+        onContourHover: setHoveredContour,
+    });
 
     const axisLinesLayer = useMemo(() => {
         if (is2d) return null;
@@ -432,15 +437,6 @@ const DeckScatter = observer(function DeckScatterComponent({
                 </div>
             </AxisComponent>
             {tooltipPortal}
-            {showLegend && (
-                <FieldContourLegend
-                    fields={legendFields}
-                    categories={legendCategories.items}
-                    categoryLabel={legendCategories.label}
-                    position={legendPosition}
-                    onContourHover={setHoveredContour}
-                />
-            )}
         </>
     );
 });

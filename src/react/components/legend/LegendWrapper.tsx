@@ -1,22 +1,32 @@
-import { type ComponentType, createElement } from "react";
+import { type ComponentType, useSyncExternalStore } from "react";
 import type { Root } from "react-dom/client";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
+import LegendFrame, {
+    type LegendFrameProps,
+    type LegendFrameStart,
+    type LegendSummary,
+} from "@/react/components/legend/LegendFrame";
 import { createMdvPortal } from "@/react/react_utils";
-import { makeDraggable, makeResizable } from "@/utilities/Elements.js";
 import { createEl } from "@/utilities/ElementsTyped";
+
+export type { LegendSummary } from "@/react/components/legend/LegendFrame";
 
 export type LegendWrapperPosition = {
     left: string | number;
-    top: string | number;
+    /** Where the legend starts from the top; or give `bottom` to start from the bottom instead. */
+    top?: string | number;
+    bottom?: string | number;
     /** Size the user last resized the legend to, as [width, height]. */
     size?: [number, number];
 };
 
+/**
+ * What a legend component is given. Where it's drawn and how much room it has come from
+ * `useLegendFrame()`, and it says how big it wants to be with `useLegendPreferredSize()`.
+ */
 export type LegendWrapperComponentProps<TSpec> = {
     spec: TSpec;
-    /** Called after legend DOM is committed (wrapper attaches drag/resize here). */
-    onLayoutReady?: () => void;
 };
 
 export type LegendWrapperInteractions = {
@@ -24,40 +34,112 @@ export type LegendWrapperInteractions = {
     dragHandle?: string;
     /** Whether resize handles should be attached. */
     resizable?: boolean;
+    /** Shown instead of the legend while it's minimised. */
+    summary?: LegendSummary;
+    /** Whether this legend is minimised. Each legend is minimised on its own. */
+    minimized?: boolean;
+    /** Called by the legend's minimise button and by its minimised form; without it there's no button. */
+    onMinimizedChange?: (minimized: boolean) => void;
+    /** Called when the user has dragged the legend (or its minimised form) somewhere new. */
+    onMoved?: (position: [number, number]) => void;
 };
 
+/** Where a chart wants its legends: over the plot (default) or in the strip above it. */
+export type LegendPlacement = {
+    onTop: boolean;
+    /** Holds the legends when they're on top. */
+    band: HTMLElement;
+    setLayout: (change: { position?: "overlay" | "top" }) => void;
+    /** Called when a legend is added to or removed from the strip. */
+    onBandChanged: () => void;
+};
+
+type LegendSnapshot<TSpec> = { spec: TSpec; summary: LegendSummary };
+
+type LegendSource<TSpec> = {
+    subscribe: (listener: () => void) => () => void;
+    getSnapshot: () => LegendSnapshot<TSpec> | null;
+};
+
+type FrameSettings = Omit<LegendFrameProps, "summary" | "children">;
+
+/** The legend in its frame, showing the wrapper's current spec, so `update()` changes it without a remount. */
+function LegendWrapperView<TSpec>({
+    source,
+    component: Legend,
+    frame,
+}: {
+    source: LegendSource<TSpec>;
+    component: ComponentType<LegendWrapperComponentProps<TSpec>>;
+    frame: FrameSettings;
+}) {
+    const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot);
+    if (snapshot === null) return null;
+    return (
+        <LegendFrame {...frame} summary={snapshot.summary}>
+            <Legend spec={snapshot.spec} />
+        </LegendFrame>
+    );
+}
+
+function toPixels(value: string | number | undefined): number | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value === "number") return value;
+    const pixels = Number.parseFloat(value);
+    return Number.isNaN(pixels) ? undefined : pixels;
+}
+
 /**
- * Generic React legend wrapper for chart overlays.
- *
- * This wrapper intentionally has no color-legend-specific behavior. It can render
- * any legend component + spec pair (color, fraction, node/link, etc.) while
- * preserving shared wrapper concerns:
- * - positioned overlay container inside chart content
- * - portal lifecycle + cleanup
- * - drag/resize wiring after React commit
- * - offsetLeft/offsetTop persistence for config + SVG export
+ * Shows a chart legend (color, fraction, contour, ...) in a `LegendFrame`, mounted from code
+ * outside React: the chart says what to show and where, and the frame does the rest (dragging,
+ * resizing, minimising, the strip above the plot). The legend is mounted in a host element the
+ * chart can hold on to straight away, while React draws into it on its own schedule.
  */
 export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
     private chart: BaseChart<T>;
-    private wrapper: HTMLDivElement | null = null;
+    private host: HTMLDivElement | null = null;
     private root: Root | null = null;
-    private currentSpec: TSpec | null = null;
-    private interactionsAttached = false;
-    private interactions: LegendWrapperInteractions = {};
+    /** How the chart placed this legend when it was last drawn; null while it isn't shown. */
+    private placement: LegendPlacement | null = null;
+    private snapshot: LegendSnapshot<TSpec> | null = null;
+    private listeners = new Set<() => void>();
+    /** Where the legend was asked to float, until React has drawn it; null in the strip or if placed from the bottom. */
+    private position: [number, number] | null = null;
     private userSize: [number, number] | null = null;
-    private contentObserver: ResizeObserver | null = null;
 
     constructor(chart: BaseChart<T>) {
         this.chart = chart;
     }
 
+    private subscribe = (listener: () => void) => {
+        this.listeners.add(listener);
+        return () => {
+            this.listeners.delete(listener);
+        };
+    };
+
+    private getSnapshot = () => this.snapshot;
+
+    /** The element holding the legend, for code that needs to find, remove or export it. */
     getWrapperElement(): HTMLDivElement | null {
-        return this.wrapper;
+        return this.host;
     }
 
     /** The size the user resized the legend to, or null if they haven't. */
     getUserSize(): [number, number] | null {
         return this.userSize;
+    }
+
+    /**
+     * Where the legend sits over the plot, to save with the view. Null when it isn't shown or
+     * sits in the strip above the plot, where its offsets don't say where it floats.
+     */
+    getFloatingPosition(): [number, number] | null {
+        if (!this.host || this.placement?.onTop) return null;
+        // where the frame is now, once React has drawn it (the frame keeps it inside the chart)
+        const frame = this.host.querySelector(".legend-container");
+        if (frame instanceof HTMLElement) return [frame.offsetLeft, frame.offsetTop];
+        return this.position;
     }
 
     render(
@@ -68,113 +150,79 @@ export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
     ): void {
         this.unmount();
 
-        this.wrapper = createEl(
-            "div",
-            {
-                classes: ["legend-container"],
-                styles: {
-                    position: "absolute",
-                    padding: "0.4em",
-                    border: "1px solid rgba(128, 128, 128, 0.65)",
-                    boxShadow: "0 1px 4px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.16)",
-                },
-            },
-            this.chart.contentDiv,
-        );
+        // charts without the method (and test stand-ins) keep legends floating over the plot
+        const placement = this.chart.getLegendPlacement?.() ?? null;
+        this.placement = placement;
+        const inBand = placement?.onTop ?? false;
 
-        this.applyPosition(position);
-        this.currentSpec = spec;
-        this.interactions = interactions;
-        this.interactionsAttached = false;
+        const start: LegendFrameStart = {
+            left: toPixels(position.left) ?? 0,
+            top: toPixels(position.top),
+            bottom: toPixels(position.bottom),
+        };
+        this.position = !inBand && start.top !== undefined ? [start.left, start.top] : null;
         this.userSize = position.size ?? null;
+        this.snapshot = { spec, summary: interactions.summary ?? { label: "Legend" } };
 
-        const wrapper = this.wrapper;
+        // The host has no box of its own (display: contents), so the frame inside it is laid out
+        // as a child of the chart's content area, or as an item in the strip.
+        const host = createEl(
+            "div",
+            { classes: ["legend-host"] },
+            inBand && placement ? placement.band : this.chart.contentDiv,
+        );
+        this.host = host;
+        const frame: FrameSettings = {
+            inBand,
+            container: this.chart.contentDiv,
+            start,
+            savedSize: position.size ?? null,
+            resizable: interactions.resizable,
+            dragHandle: interactions.dragHandle,
+            minimized: interactions.minimized === true,
+            onMinimizedChange: interactions.onMinimizedChange,
+            onPutOnTop: placement && !inBand ? () => placement.setLayout({ position: "top" }) : undefined,
+            onMoved: interactions.onMoved,
+            onResized: (size) => {
+                this.userSize = size;
+            },
+        };
         this.root = createMdvPortal(
-            createElement(component, {
-                spec,
-                onLayoutReady: () => this.attachInteractions(),
-            }),
-            wrapper,
+            <LegendWrapperView
+                source={{ subscribe: this.subscribe, getSnapshot: this.getSnapshot }}
+                component={component}
+                frame={frame}
+            />,
+            host,
             this.chart,
         );
+        placement?.onBandChanged();
     }
 
-    private attachInteractions(): void {
-        const wrapper = this.wrapper;
-        const spec = this.currentSpec;
-        if (!wrapper || !spec) {
-            return;
-        }
-        // The legend component sets its default size in a layout effect, which can
-        // run more than once (StrictMode), so the saved size and the fit-inside step
-        // are reapplied every time; only the drag/resize wiring happens once.
-        if (this.userSize && this.interactions.resizable) {
-            wrapper.style.width = `${this.userSize[0]}px`;
-            wrapper.style.height = `${this.userSize[1]}px`;
-        }
-        this.keepInsideChart(wrapper);
-        if (this.interactionsAttached) {
-            return;
-        }
-        const doc = this.chart.__doc__;
-        makeDraggable(wrapper, {
-            handle: this.interactions.dragHandle,
-            contain: this.chart.contentDiv,
-            doc,
-        });
-        if (this.interactions.resizable) {
-            makeResizable(wrapper, {
-                doc,
-                onresizeend: (width: number, height: number) => {
-                    this.userSize = [width, height];
-                },
-            });
-        }
-        // Refit when the chart changes size, including when it had no size yet above.
-        if (typeof ResizeObserver !== "undefined") {
-            this.contentObserver = new ResizeObserver(() => {
-                if (this.wrapper) this.keepInsideChart(this.wrapper);
-            });
-            this.contentObserver.observe(this.chart.contentDiv);
-        }
-        this.interactionsAttached = true;
-    }
-
-    /** Moves the legend back inside the chart if it would hang over an edge. */
-    private keepInsideChart(wrapper: HTMLDivElement): void {
-        const content = this.chart.contentDiv;
-        if (!content.clientWidth || !content.clientHeight) {
-            return;
-        }
-        const maxLeft = Math.max(0, content.clientWidth - wrapper.offsetWidth);
-        const maxTop = Math.max(0, content.clientHeight - wrapper.offsetHeight);
-        const left = Math.min(Math.max(0, wrapper.offsetLeft), maxLeft);
-        const top = Math.min(Math.max(0, wrapper.offsetTop), maxTop);
-        if (left !== wrapper.offsetLeft) wrapper.style.left = `${left}px`;
-        if (top !== wrapper.offsetTop) wrapper.style.top = `${top}px`;
+    /**
+     * Shows new contents in the legend that's already drawn, without redrawing it, so its own
+     * state (e.g. a hovered item) is kept. A minimised legend's button shows the new summary.
+     */
+    update(spec: TSpec, summary?: LegendSummary): void {
+        if (!this.snapshot) return;
+        this.snapshot = { spec, summary: summary ?? this.snapshot.summary };
+        for (const listener of this.listeners) listener();
     }
 
     unmount(): void {
-        this.currentSpec = null;
-        this.interactionsAttached = false;
-        this.interactions = {};
-        this.contentObserver?.disconnect();
-        this.contentObserver = null;
-        if (this.root) {
-            this.root.unmount();
-            this.root = null;
+        this.snapshot = null;
+        this.listeners.clear();
+        const root = this.root;
+        this.root = null;
+        if (root) {
+            // Legends are often redrawn from another React tree's effects (the chart's own
+            // component), where unmounting a root right away makes React warn about a race.
+            queueMicrotask(() => root.unmount());
         }
-        if (this.wrapper) {
-            this.wrapper.remove();
-            this.wrapper = null;
-        }
-    }
-
-    private applyPosition(position: LegendWrapperPosition): void {
-        if (!this.wrapper) {
-            return;
-        }
-        this.wrapper.style.left = typeof position.left === "number" ? `${position.left}px` : String(position.left);
-        this.wrapper.style.top = typeof position.top === "number" ? `${position.top}px` : String(position.top);
+        this.host?.remove();
+        this.host = null;
+        const placement = this.placement;
+        this.placement = null;
+        placement?.onBandChanged();
     }
 }
