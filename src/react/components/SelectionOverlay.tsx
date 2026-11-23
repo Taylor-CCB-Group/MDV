@@ -125,9 +125,14 @@ export default observer(function SelectionOverlay() {
     const [cx, cy] = useParamColumns();
 
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
-    // the toolbar starts collapsed to one button that switches between Pan and the last drawing
-    // tool, so it covers less of the plot and either is a click away
-    const [expanded, setExpanded] = useState(false);
+    // open shows every tool; collapsed shows one button that switches between Pan and the last
+    // drawing tool, so it covers less of the plot. Kept in the chart config, so it is saved with the view.
+    const expanded = config.selection_toolbar_open ?? true;
+    const toggleExpanded = useCallback(() => {
+        action(() => {
+            config.selection_toolbar_open = !(config.selection_toolbar_open ?? true);
+        })();
+    }, [config]);
     // editing a gate needs the edit tools in view
     const showAllTools = expanded || editingGateId != null;
     const manageGateByChartRef = useRef<Map<string, ManageGateDialogWrapper<DeckScatterConfigWithRegion>>>(new Map());
@@ -268,7 +273,7 @@ export default observer(function SelectionOverlay() {
                 {!editingGateId && (
                     <IconWithTooltip
                         tooltipText={expanded ? "Hide tools" : "Show tools"}
-                        onClick={() => setExpanded((e) => !e)}
+                        onClick={toggleExpanded}
                         iconButtonProps={{
                             sx: { color: "var(--text_color)", borderRadius: 10, zIndex: 2, px: 0.25 },
                             "aria-label": expanded ? "Hide tools" : "Show tools",

@@ -91,6 +91,8 @@ export type ScatterPlotConfig = {
     background_filter?: BackgroundFilter | null;
     on_filter: "hide" | "grey"; //todo...
     zoom_on_filter: boolean;
+    /** Show every selection tool; when false the toolbar shows one button that switches between Pan and the last drawing tool. */
+    selection_toolbar_open: boolean;
     /** 2D only: mark the pointer with a crosshair; absent is on. null only keeps the key observable. */
     crosshair?: boolean | null;
     point_shape: "circle" | "square" | "gaussian";
@@ -130,6 +132,7 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     },
     category_filters: [],
     zoom_on_filter: false,
+    selection_toolbar_open: true,
     point_shape: "circle",
     contourParameter: undefined,
     category1: [],
