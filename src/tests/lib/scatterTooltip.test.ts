@@ -4,6 +4,7 @@ import { IsolatedGroupLayer } from "@spatialdata/layers";
 import { describe, expect, it } from "vitest";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { combineTooltipContent, getCombinedScatterTooltip } from "@/lib/scatterTooltip";
+import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 
 function layer(id: string) {
     return new ScatterplotLayer({ id, data: [] });
@@ -51,6 +52,22 @@ describe("scatterTooltip", () => {
         });
     });
 
+    it("finds a gate the SpatialData render stack draws, by the stack's id for it", () => {
+        // the stack draws the chart's gate layer as `deck:gate_display`, not under the layer's own
+        // id, and SpatialData.js's viewer draws a copy of that as `deck:gate_display-#<viewer>#`
+        const gateId = deckHostLayerId("gate_display");
+        const tooltipFor = (pickedLayerId: string) =>
+            getCombinedScatterTooltip(pickingInfo(pickedLayerId, 0, { properties: { gateName: "g1" } }), {
+                gateDisplayLayerId: gateId,
+                getPointTooltip: () => null,
+            });
+        expect(tooltipFor(gateId)).toMatchObject({ html: expect.stringContaining("<strong>g1</strong>") });
+        expect(tooltipFor(`${gateId}-#spatial-detail-x1#`)).toMatchObject({
+            html: expect.stringContaining("<strong>g1</strong>"),
+        });
+        expect(tooltipFor(`${gateId}_other`)).toBeNull();
+    });
+
     it("escapes text tooltip parts when combining", () => {
         expect(combineTooltipContent("A < B", { text: "C > D" })).toMatchObject({
             html: 'A &lt; B<div style="border-top: 1px solid rgba(255,255,255,0.35); margin: 6px 0;"></div>C &gt; D',
@@ -77,5 +94,30 @@ describe("scatterTooltip", () => {
                 getPointTooltip: (picked) => (picked ? `row ${picked.index}` : null),
             }),
         ).toEqual({ html: "row 4" });
+    });
+
+    it("finds a gate outline drawn in a group with the points", () => {
+        const group = new IsolatedGroupLayer({
+            id: "shared-cell-layers",
+            layers: [layer("scatter_1"), layer("gate-display")],
+        });
+        const gateMember = group.renderLayers().flat()[1];
+        if (!(gateMember instanceof ScatterplotLayer)) throw new Error("expected the gate member");
+        const info = group.getPickingInfo({
+            info: {
+                ...pickingInfo("shared-cell-layers", 0, { properties: { gateName: "Gate B" } }),
+                layer: group,
+                sourceLayer: gateMember,
+            },
+            mode: "hover",
+            sourceLayer: gateMember,
+        });
+
+        expect(
+            getCombinedScatterTooltip(info, {
+                gateDisplayLayerId: "gate-display",
+                getPointTooltip: () => null,
+            }),
+        ).toMatchObject({ html: expect.stringContaining("<strong>Gate B</strong>") });
     });
 });

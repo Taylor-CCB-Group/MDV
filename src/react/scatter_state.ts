@@ -11,7 +11,7 @@ import { MdvDataFilterExtension } from "@/webgl/MdvDataFilterExtension";
 import { MdvScatterplotLayer } from "@/webgl/MdvScatterplotLayer";
 import SpatialLayer, { DensityOverlayLayer } from "@/webgl/SpatialLayer";
 import { ScatterDensityExension, ScatterSquareExtension } from "../webgl/ScatterDeckExtension";
-import { type AxisScaling, radiusReferenceRange } from "./axisScaling";
+import { type AxisScaling, radiusReferenceRange, radiusReferenceRange3D } from "./axisScaling";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import type { ViewState } from "./components/VivScatterComponent";
@@ -33,6 +33,7 @@ import {
     useOwnedFilteredIndices,
     useParamColumns,
 } from "./hooks";
+import type { AxisScales, OrbitAxis } from "./orbitView";
 import { useHighlightedIndices, useHighlightRows } from "./selectionHooks";
 
 //!!! temporary fix for tsgo preview compatibility
@@ -90,6 +91,8 @@ export type ScatterPlotConfig = {
     background_filter?: BackgroundFilter | null;
     on_filter: "hide" | "grey"; //todo...
     zoom_on_filter: boolean;
+    /** 2D only: mark the pointer with a crosshair; absent is on. null only keeps the key observable. */
+    crosshair?: boolean | null;
     point_shape: "circle" | "square" | "gaussian";
     /** 2D only; absent is `equal`. See `AxisScaling`. */
     axis_scaling?: AxisScaling;
@@ -107,6 +110,10 @@ export type ScatterPlotConfig2D = ScatterPlotConfig & {
 export type ScatterPlotConfig3D = ScatterPlotConfig & {
     dimension: "3d";
     viewState: OrbitViewState;
+    /** The data axis that points up and that the view orbits round; absent is Z. */
+    orbit_axis?: OrbitAxis;
+    /** How much to stretch the x, y and z axes, as the classic 3D scatter did; absent is [1, 1, 1]. */
+    axis_scales?: AxisScales;
 };
 
 export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" | "title" | "type" | "param"> = {
@@ -296,7 +303,7 @@ export function useScatterRadius() {
     const [width, height] = useChartSize();
     const scaling = dimension === "2d" ? (axis_scaling ?? "equal") : "equal";
     const params = useParamColumns();
-    const [cx, cy] = params;
+    const [cx, cy, cz] = params;
     const scale = useRegionScale();
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     // this is reasonably ok looking, but even for abstract data it should really relate to axis labels
@@ -305,7 +312,9 @@ export function useScatterRadius() {
     // y_scale = [0, 400 / whRatio];
     // x_scale = [0, 400];
 
-    const safeScale = scale || 1; // avoid /0 (although - I don't _think_ useRegionScale() would return 0).
+    // avoid /0 (although - I don't _think_ useRegionScale() would return 0). A 3D chart's axes need
+    // not be the region's x / y, so it is not drawn at the region's scale (see `useScatterModelMatrix`).
+    const safeScale = dimension === "3d" ? 1 : scale || 1;
     const radiusScale = (radius * course_radius) / safeScale;
     return useMemo(() => {
         if (cx.minMax && cy.minMax) {
@@ -313,11 +322,41 @@ export function useScatterRadius() {
             // how does this come to be? is it a spatial conversion thing?
             const xRange = Math.abs(cx.minMax[1] - cx.minMax[0]);
             const yRange = Math.abs(cy.minMax[1] - cy.minMax[0]);
-            const r = 10000 / radiusReferenceRange(xRange, yRange, { width, height }, scaling);
+            const reference =
+                dimension === "3d" && cz?.minMax
+                    ? radiusReferenceRange3D([xRange, yRange, cz.minMax[1] - cz.minMax[0]])
+                    : radiusReferenceRange(xRange, yRange, { width, height }, scaling);
+            const r = 10000 / reference;
             return radiusScale / r;
         }
         return radiusScale;
-    }, [cx.minMax, cy.minMax, radiusScale, cx, cy, width, height, scaling]);
+    }, [cx.minMax, cy.minMax, cz?.minMax, radiusScale, cx, cy, width, height, scaling, dimension]);
+}
+
+/** How visible the rows a 3D selection left out are, relative to the points it caught. */
+const UNSELECTED_OPACITY = 0.08;
+
+/**
+ * Which of `rows` the chart's own filter (`owner`) leaves out, as a mask over every row (1: left
+ * out), or null without an active filter. A chart draws the rows its own filter leaves out (so a
+ * selection can be redrawn); this tells them apart, for a chart that shows its selection by fading
+ * the rest. A mask rather than two lists of rows, so the layers keep their `data` (and deck its
+ * attributes) and only the filter values change.
+ */
+export function ownSelectionMask(rows: Uint32Array, size: number, owner?: FilterOwner | null) {
+    if (!owner?.filterMethod) return null;
+    const local = owner.getLocalFilter();
+    const mask = new Uint8Array(size);
+    let any = false;
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        // bit 1: left out by this filter (2 is the background filter)
+        if (local[row] & 1) {
+            mask[row] = 1;
+            any = true;
+        }
+    }
+    return any ? mask : null;
 }
 
 // type Tooltip = (PickingInfo) => string;
@@ -383,8 +422,16 @@ export function useScatterplotLayer(
     const radiusScale = useScatterRadius();
 
     const { aggregateFilteredRows, ownerVisibleRows, isExternallyFiltered } = useOwnedFilteredIndices(filterOwner);
+    // a 3D selection's outline is only shown from where it was drawn, so its rows are what show it
+    const is3d = config.dimension === "3d";
     const data = ownerVisibleRows;
     const params = useParamColumns();
+    const rowCount = params[0].data.length;
+    const leftOut = useMemo(() => {
+        // `aggregateFilteredRows` changes with every filter, this chart's own included
+        aggregateFilteredRows;
+        return is3d ? ownSelectionMask(ownerVisibleRows, rowCount, filterOwner) : null;
+    }, [ownerVisibleRows, aggregateFilteredRows, is3d, filterOwner, rowCount]);
     const [cx, cy, cz] = params;
     const scale = useRegionScale();
     const hoverInfoRef = useRef<PickingInfo | null>(null);
@@ -578,13 +625,13 @@ export function useScatterplotLayer(
                 //currently useFieldSpec is typed as DataColumn|undefined,
                 //if not undefined is guaranteed to be loaded but we may change how we manage lazy-loading.
                 getFilterValue: (i: number) =>
-                    getMissingColorFilterValue(i, colorColumn, shouldFilterMissing, fallbackOnZero),
+                    leftOut?.[i] ? 0 : getMissingColorFilterValue(i, colorColumn, shouldFilterMissing, fallbackOnZero),
                 filterRange: [0.5, 1],
             } as any),
             updateTriggers: {
                 getFillColor: colorBy,
                 getPosition: [cx, cy, cz],
-                getFilterValue: [colorColumn, shouldFilterMissing, fallbackOnZero],
+                getFilterValue: [colorColumn, shouldFilterMissing, fallbackOnZero, leftOut],
             },
             pickable: true,
             onHover: (info) => {
@@ -634,6 +681,7 @@ export function useScatterplotLayer(
         shouldFilterMissing,
         colorColumn,
         fallbackOnZero,
+        leftOut,
         getModifierState,
         updateHighlightedRows,
         paintHoveredRow,
@@ -656,7 +704,6 @@ export function useScatterplotLayer(
     const greyOnFilter = config.on_filter === "grey";
     // deck.gl regenerates every attribute when `data` changes identity (and updates hidden
     // layers too), so this must not be a fresh object each time the layer is rebuilt
-    const rowCount = cx.data.length;
     const greyData = useMemo(() => ({ length: rowCount }), [rowCount]);
     const greyScatterplotLayer = useMemo(
         () =>
@@ -716,6 +763,60 @@ export function useScatterplotLayer(
             greyOnFilter,
             aggregateFilteredRows,
             isExternallyFiltered,
+            colorColumn,
+            shouldFilterMissing,
+            fallbackOnZero,
+        ],
+    );
+
+    // the rows a 3D selection left out, faint grey; drawn first, and leaving no depth behind, so the
+    // points the selection caught show through them
+    const unselectedScatterplotLayer = useMemo(
+        () =>
+            new MdvScatterplotLayer({
+                id: `scatter-unselected_${getVivId(`${id}detail-react`)}`,
+                // every row, so a new selection changes only the filter values
+                data: greyData,
+                opacity: opacity * UNSELECTED_OPACITY,
+                stroked: false,
+                filled: true,
+                radiusScale,
+                radiusMinPixels: SCATTER_RADIUS_MIN_PIXELS,
+                getPosition: (_: unknown, { target, index }: { target: number[]; index: number }) => {
+                    target[0] = cx.data[index];
+                    target[1] = cy.data[index];
+                    target[2] = cz?.minMax ? cz.data[index] : 0;
+                    return target as unknown as [number, number];
+                },
+                // grey, as for "Gray Out Points": colour is what the selection caught
+                getFillColor: [200, 200, 200],
+                billboard: true,
+                modelMatrix,
+                parameters: { depthWriteEnabled: false },
+                getFilterValue: (_: unknown, { index }: { index: number }) =>
+                    leftOut?.[index]
+                        ? getMissingColorFilterValue(index, colorColumn, shouldFilterMissing, fallbackOnZero)
+                        : 0,
+                filterRange: [0.5, 1],
+                updateTriggers: {
+                    getPosition: [cx, cy, cz],
+                    // a full pass over every row; only worth redoing while the layer is shown
+                    getFilterValue: leftOut ? [colorColumn, shouldFilterMissing, fallbackOnZero, leftOut] : false,
+                },
+                extensions: [new MdvDataFilterExtension()],
+                // deck prefers a layer hidden to one removed
+                visible: leftOut !== null,
+            }),
+        [
+            id,
+            greyData,
+            leftOut,
+            opacity,
+            radiusScale,
+            cx,
+            cy,
+            cz,
+            modelMatrix,
             colorColumn,
             shouldFilterMissing,
             fallbackOnZero,
@@ -811,6 +912,7 @@ export function useScatterplotLayer(
         () => ({
             scatterplotLayer,
             greyScatterplotLayer,
+            unselectedScatterplotLayer,
             densityLayer,
             getTooltip,
             modelMatrix,
@@ -821,6 +923,7 @@ export function useScatterplotLayer(
         [
             scatterplotLayer,
             greyScatterplotLayer,
+            unselectedScatterplotLayer,
             densityLayer,
             getTooltip,
             modelMatrix,

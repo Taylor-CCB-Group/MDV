@@ -187,9 +187,24 @@ const ContourVisualConfigSchema = z
     })
     .describe("Visual contour configuration shared by density-style charts");
 
+/**
+ * Draw a chart as a grid of small multiples, one cell per value of a property of its config.
+ * Layout options (cell size, columns) belong here too; for now the defaults apply.
+ */
+export const ChartGridConfigSchema = z
+    .object({
+        by: z
+            .enum(["densityFields"])
+            .describe("The config property whose values make the cells, e.g. one cell per density field"),
+    })
+    .describe("Show the chart as a grid of cells, one per value of a config property");
+
+export type ChartGridConfig = z.infer<typeof ChartGridConfigSchema>;
+
 const DensityFieldsConfigSchema = z
     .object({
         densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),
+        grid: ChartGridConfigSchema.nullable().optional(),
     })
     .describe("Density field selection shared by contour-based charts");
 
@@ -270,6 +285,13 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
         .describe("Hides rows outside the selected categories from this chart only"),
     on_filter: z.enum(["hide", "grey"]).optional().describe("How filtered-out points should be rendered"),
     zoom_on_filter: z.boolean().optional().describe("Whether filtering should auto-fit the current view"),
+    crosshair: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe(
+            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a grid (default true)",
+        ),
     point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
     axis_scaling: z
         .enum(["equal", "fit"])
@@ -457,6 +479,14 @@ export const DeckScatter3DConfigSchema = DeckScatterSharedConfigSchema.extend({
     type: z.literal("DeckScatter3D").describe("Deck.gl 3D scatter plot chart type"),
     dimension: z.literal("3d").optional().describe("3D deck scatter plots render in orbit view"),
     viewState: OrbitViewStateSchema.optional().describe("Current deck.gl orbit view state"),
+    orbit_axis: z
+        .enum(["Y", "Z"])
+        .optional()
+        .describe("The data axis that points up and that the view orbits round; absent is Z"),
+    axis_scales: z
+        .tuple([z.number().positive(), z.number().positive(), z.number().positive()])
+        .optional()
+        .describe("How much to stretch the x, y and z axes; absent is [1, 1, 1]"),
 }).describe("Configuration for the deck.gl 3D scatter plot");
 
 export const DeckSplatterConfigSchema = BaseConfigSchema.extend({
@@ -487,10 +517,19 @@ export const SelectionDialogConfigSchema = BaseConfigSchema.extend({
 }).describe("Configuration for selection dialogs allowing user interaction");
 
 export const GeneInfoSchema = BaseConfigSchema.extend({
-    type: z.literal("geneNetwork").describe("Gene information from genenetwork.nl API"),
+    type: z.literal("geneNetwork").describe("Gene or protein information from genenetwork.nl or UniProt"),
     autoScroll: z.boolean().optional().describe("Automatically scroll to highlighted items"),
+    source: z.enum(["genenetwork", "uniprot"]).optional().describe("Where card details come from"),
+    organism: z.enum(["human", "mouse"]).optional().describe("Species to look identifiers up in (UniProt)"),
+    search: z
+        .object({
+            query: z.string().optional().describe("Substring the identifiers are filtered by"),
+            terms: z.array(z.string()).optional().describe("Identifiers the view is limited to"),
+        })
+        .optional()
+        .describe("Search that filters the whole view"),
 }).describe(
-    "Configuration for chart allowing for selection of genes with information retrieved from genenetwork.nl API",
+    "Configuration for chart allowing for selection of genes or proteins with information from genenetwork.nl or UniProt",
 );
 
 // Register all chart-specific schemas with the registry

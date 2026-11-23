@@ -1,6 +1,6 @@
 import type { PickingInfo } from "@deck.gl/core";
 import { escapeHtml } from "@/utilities/Utilities";
-import { findPickedInfo, getPickingInfoLayerId, type MDVPickingInfo, pickingInfoMatchesLayer } from "./deckPicking";
+import { findPickedInfo, type MDVPickingInfo, pickingInfoMatchesLayer } from "./deckPicking";
 
 type TooltipContent =
     | null
@@ -30,9 +30,17 @@ export function combineTooltipContent(...contents: (TooltipContent | undefined)[
     return { html: htmlParts.join(TOOLTIP_SEPARATOR) };
 }
 
+/**
+ * Whether a pick came from the layer with this id, or from a copy of it: SpatialData.js's viewer
+ * draws a host layer as `<id>-#<viewer>#`.
+ */
+function pickedFromLayer(pickedInfo: PickingInfo, id: string) {
+    return pickingInfoMatchesLayer(pickedInfo, (layerId) => layerId === id || layerId.startsWith(`${id}-#`));
+}
+
 function getGateOrLabelTooltip(info: PickableInfo, gateDisplayLayerId?: string, gateLabelLayerId?: string) {
     const gateInfo = gateDisplayLayerId
-        ? findPickedInfo(info, (pickedInfo) => gateDisplayLayerId === getPickingInfoLayerId(pickedInfo))
+        ? findPickedInfo(info, (pickedInfo) => pickedFromLayer(pickedInfo, gateDisplayLayerId))
         : null;
     const gateName = gateInfo?.object?.properties?.gateName;
     if (gateName != null) {
@@ -42,7 +50,7 @@ function getGateOrLabelTooltip(info: PickableInfo, gateDisplayLayerId?: string, 
     }
 
     const labelInfo = gateLabelLayerId
-        ? findPickedInfo(info, (pickedInfo) => gateLabelLayerId === getPickingInfoLayerId(pickedInfo))
+        ? findPickedInfo(info, (pickedInfo) => pickedFromLayer(pickedInfo, gateLabelLayerId))
         : null;
     const labelText = labelInfo?.object?.text;
     if (labelText != null) {

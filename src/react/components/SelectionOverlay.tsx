@@ -1,21 +1,25 @@
 import { DrawPolygonByDraggingMode, type GeoJsonEditMode, TranslateMode } from "@deck.gl-community/editable-layers";
-import { TuneOutlined } from "@mui/icons-material";
+import { GridViewOutlined, TuneOutlined } from "@mui/icons-material";
 import AddCircleOutlinedIcon from "@mui/icons-material/AddCircleOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import DoneOutlinedIcon from "@mui/icons-material/DoneOutlined";
+import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
 import { ButtonGroup, Divider } from "@mui/material"; //check tree-shaking...
 import { LassoIcon, SplinePointerIcon, VectorSquareIcon } from "lucide-react";
+import { action } from "mobx";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditMode, PolygonMode, RectangleMode } from "@/editable-layers/selectionModes";
 import { useChart } from "../context";
+import type { DualContourLegacyConfig } from "../contour_state";
 import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
 import useGateActions from "../hooks/useGateActions";
 import { useSpatialLayers } from "../spatial_context";
 import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
+import { densityGridConfig, isDensityGridShown, supportsDensityGridMode } from "./densityGridUtils";
 import GateNameDialog from "./GateNameDialog";
 import IconWithTooltip from "./IconWithTooltip";
 import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
@@ -65,9 +69,11 @@ type ToolButtonProps = {
     ToolIcon: ToolIcon;
     selectedTool: Tool;
     setSelectedTool: (tool: Tool) => void;
+    /** Defaults to the tool's name. */
+    tooltipText?: string;
 };
 
-const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButtonProps) => {
+const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool, tooltipText }: ToolButtonProps) => {
     const theme = useTheme();
     const selectedBackgroundColor = theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(48, 46, 46, 0.18)";
     const style = useMemo(
@@ -81,7 +87,7 @@ const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: 
     );
     return (
         <IconWithTooltip
-            tooltipText={name}
+            tooltipText={tooltipText ?? name}
             onClick={() => setSelectedTool(name)}
             iconButtonProps={{
                 sx: style,
@@ -97,7 +103,16 @@ export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
     const chart = useChart<DeckScatterConfigWithRegion>();
     const chartId = useChartID();
-    const config = useConfig<DeckScatterConfigWithRegion>();
+    const config = useConfig<DeckScatterConfigWithRegion & DualContourLegacyConfig>();
+    const canShowDensityGrid = supportsDensityGridMode(config.type) && config.dimension !== "3d";
+    // gates are x / y outlines in the data; a 3D selection is an outline on the screen
+    const canUseGates = config.dimension !== "3d";
+    const densityGridShown = isDensityGridShown(config);
+    const toggleDensityGrid = useCallback(() => {
+        action(() => {
+            config.grid = densityGridConfig(!isDensityGridShown(config));
+        })();
+    }, [config]);
     const {
         setSelectionMode,
         selectionFeatureCollection,
@@ -105,11 +120,13 @@ export default observer(function SelectionOverlay() {
         setSelectionFeatureCollection,
         selectedTool,
         setSelectedTool: setSelectedToolX,
+        lastDrawTool,
     } = selectionProps;
     const [cx, cy] = useParamColumns();
 
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
-    // the toolbar starts collapsed to the active tool, so it covers less of the plot
+    // the toolbar starts collapsed to one button that switches between Pan and the last drawing
+    // tool, so it covers less of the plot and either is a click away
     const [expanded, setExpanded] = useState(false);
     // editing a gate needs the edit tools in view
     const showAllTools = expanded || editingGateId != null;
@@ -165,8 +182,23 @@ export default observer(function SelectionOverlay() {
     // It would be good to have a poly-line tool with draggable points, though.
     // Also a brush tool for painting on masks with variable radius.
     const toolButtons = useMemo(() => {
-        const tools = showAllTools ? toolsToShow : toolsToShow.filter((t) => t.name === selectedTool);
-        return tools.map(({ name, ToolIcon }) => (
+        if (!showAllTools) {
+            // collapsed: one button that switches between moving the view and the last drawing tool
+            const other = toolsToShow.find((t) => t.name === (selectedTool === "Pan" ? lastDrawTool : "Pan"));
+            if (!other) return [];
+            const tooltipText = other.name === "Pan" ? "Move the view" : `Select with ${other.name}`;
+            return [
+                <ToolButton
+                    key={other.name}
+                    name={other.name}
+                    ToolIcon={other.ToolIcon}
+                    selectedTool={selectedTool}
+                    setSelectedTool={setSelectedTool}
+                    tooltipText={tooltipText}
+                />,
+            ];
+        }
+        return toolsToShow.map(({ name, ToolIcon }) => (
             <ToolButton
                 key={name}
                 name={name}
@@ -175,7 +207,7 @@ export default observer(function SelectionOverlay() {
                 setSelectedTool={setSelectedTool}
             />
         ));
-    }, [selectedTool, setSelectedTool, toolsToShow, showAllTools]);
+    }, [selectedTool, setSelectedTool, toolsToShow, showAllTools, lastDrawTool]);
 
     const onManageGatesClick = useCallback(() => {
         if (manageGateByChartRef.current.get(chartId)) {
@@ -249,33 +281,53 @@ export default observer(function SelectionOverlay() {
                 {toolButtons}
                 {showAllTools && (
                     <>
-                        <Divider
-                            orientation="vertical"
-                            sx={{
-                                color: "inherit",
-                                width: "5px",
-                                height: "35px",
-                                padding: "2px",
-                            }}
-                        />
-                        <IconWithTooltip
-                            tooltipText={"Manage Gates"}
-                            onClick={onManageGatesClick}
-                            iconButtonProps={{
-                                sx: {
-                                    color: "var(--text_color)",
-                                    borderRadius: 10,
-                                    zIndex: 2,
-                                    ml: 1,
-                                },
-                                "aria-label": "Manage Gates",
-                            }}
-                        >
-                            <TuneOutlined />
-                        </IconWithTooltip>
+                        {canShowDensityGrid && (
+                            <IconWithTooltip
+                                tooltipText={
+                                    densityGridShown
+                                        ? "Show density fields on one plot"
+                                        : "Show density fields as a grid"
+                                }
+                                onClick={toggleDensityGrid}
+                                iconButtonProps={{
+                                    sx: { color: "var(--text_color)", borderRadius: 10, zIndex: 2 },
+                                    "aria-label": densityGridShown ? "Density overlay" : "Density grid",
+                                }}
+                            >
+                                {densityGridShown ? <LayersOutlinedIcon /> : <GridViewOutlined />}
+                            </IconWithTooltip>
+                        )}
+                        {canUseGates && (
+                            <Divider
+                                orientation="vertical"
+                                sx={{
+                                    color: "inherit",
+                                    width: "5px",
+                                    height: "35px",
+                                    padding: "2px",
+                                }}
+                            />
+                        )}
+                        {canUseGates && (
+                            <IconWithTooltip
+                                tooltipText={"Manage Gates"}
+                                onClick={onManageGatesClick}
+                                iconButtonProps={{
+                                    sx: {
+                                        color: "var(--text_color)",
+                                        borderRadius: 10,
+                                        zIndex: 2,
+                                        ml: 1,
+                                    },
+                                    "aria-label": "Manage Gates",
+                                }}
+                            >
+                                <TuneOutlined />
+                            </IconWithTooltip>
+                        )}
                     </>
                 )}
-                {hasSelection && !editingGateId && (
+                {canUseGates && hasSelection && !editingGateId && (
                     <IconWithTooltip
                         tooltipText={"Save selection as Gate"}
                         onClick={() => setGateDialogOpen(true)}

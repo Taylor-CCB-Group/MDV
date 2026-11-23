@@ -58,7 +58,10 @@ export function logValidationError(options: LogValidationErrorOptions) {
     const bucketName = context === "datasource" ? "datasources" : "charts";
     const label = name ?? (context === "datasource" ? "(unknown datasource)" : "(unknown chart)");
 
-    console.error(`Invalid ${context} config for '${label}'. See Debug / Report for aggregated details.`, issues);
+    console.error(
+        `Invalid ${context} config for '${label}'. See Settings > Debug and diagnostics for aggregated details.`,
+        issues,
+    );
 
     const store = getFindingsStore();
     if (!store) return;

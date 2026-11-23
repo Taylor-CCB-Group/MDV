@@ -10,8 +10,10 @@ import type {
     FieldName,
     LoadedDataColumn,
 } from "@/charts/charts";
+import type { ChartGridConfig } from "@/charts/schemas/ChartConfigSchema";
 import { type FieldSpec, type FieldSpecs, isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { g, isArray } from "@/lib/utils";
+import { type DensityGridModeConfig, isDensityGridShown } from "./components/densityGridUtils";
 import type { CategoryLegendItem, FieldLegendItem } from "./components/FieldContourLegend";
 import { useDataStore } from "./context";
 // import { useDebounce } from "use-debounce";
@@ -231,7 +233,7 @@ export type ContourLayerProps = ReturnType<typeof useCategoryContour>;
  * failed or is still under way is left out rather than read, as the weight cache reads
  * `minMax` as soon as the layer props are built.
  */
-function isLoadedDoubleColumn(column: DataColumn<DataType>): column is LoadedDataColumn<"double"> {
+export function isLoadedDoubleColumn(column: DataColumn<DataType>): column is LoadedDataColumn<"double"> {
     return column.datatype === "double" && isColumnLoaded(column) && column.minMax !== undefined;
 }
 
@@ -346,6 +348,8 @@ export type DualContourLegacyConfig = {
     category1?: string | string[];
     category2?: string | string[];
     densityFields?: FieldSpecs; // don't have a way of specifying datatype here
+    /** With `{ by: "densityFields" }`, each density field is drawn in its own cell, over the same points. */
+    grid?: ChartGridConfig | null;
     field_legend: {
         display: boolean;
         /** Where the user left it over the plot, [left, top] in pixels; starts at the bottom left. */
@@ -598,13 +602,15 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
     ];
 }
 
+const NO_FIELDS: LoadedDataColumn<"double">[] = [];
+
 /**
  * In future we will want more flexible array of contours.
  * Dual-contour is a special case of this - may be useful in terms
  * of how it relates to cell-pair interation links
  */
 export function useLegacyDualContour(hoveredContour?: HoveredContour | null): ContourLayerProps[] {
-    const config = useConfig<DualContourLegacyConfig>();
+    const config = useConfig<DualContourLegacyConfig & DensityGridModeConfig>();
     const { category1, category2 } = useContourCategorySelections(config);
     // todo: this is currently short-circuiting for non-viv deck scatter...
     // breaking rule of hooks etc, should be fixed
@@ -621,7 +627,8 @@ export function useLegacyDualContour(hoveredContour?: HoveredContour | null): Co
     const fieldContours = useFieldContour({
         ...commonProps,
         id: "fieldContours",
-        fields: fields.filter(isLoadedDoubleColumn),
+        // the grid draws each field in its own cell instead (`DeckDensityGridComponent`)
+        fields: isDensityGridShown(config) ? NO_FIELDS : fields.filter(isLoadedDoubleColumn),
     });
     const contour1 = useCategoryContour({
         ...commonProps,

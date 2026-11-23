@@ -237,7 +237,8 @@ class Dimension {
      * Filters  the data
      * @param {string} method - The name of the filter method.
      * if 'filterPredicate' then the args should contain a predicate function
-     * @param {string[]} columns - a list of column ids used in the filtering
+     * @param {(string | ArrayLike<number>)[]} columns - a list of column ids used in the filtering (some
+     * methods also take arrays of values in their place)
      * @param {object|string} args - any extra arguments for filtering
      * @param {boolean} [notify=true] - notify any listeners in the dataStore that the
      * data has been filtered

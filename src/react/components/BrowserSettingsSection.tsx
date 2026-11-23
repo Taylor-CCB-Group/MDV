@@ -1,6 +1,7 @@
 import { FormControl, FormHelperText, InputLabel, MenuItem, Select, Typography } from "@mui/material";
 import { observer } from "mobx-react-lite";
 import { type BrowserSetting, browserSettings } from "@/lib/browserSettings";
+import { matchesQuery } from "./debugDialogSearch";
 
 const ChoiceSettingControl = observer(function ChoiceSettingControl({ setting }: { setting: BrowserSetting }) {
     const labelId = `browser-setting-${setting.key}`;
@@ -24,14 +25,23 @@ const ChoiceSettingControl = observer(function ChoiceSettingControl({ setting }:
     );
 });
 
-/** Every setting in `browserSettings`; changes apply at once and are kept in this browser. */
-export default function BrowserSettingsSection() {
+/** Whether a setting matches a search query, by label, description, key or choice labels. */
+export function browserSettingMatchesQuery(setting: BrowserSetting, query: string) {
+    return matchesQuery(query, setting.label, setting.description, setting.key, ...setting.choices.map((c) => c.label));
+}
+
+/** The given settings (default: all of `browserSettings`); changes apply at once and are kept in this browser. */
+export default function BrowserSettingsSection({
+    settings = browserSettings,
+}: {
+    settings?: readonly BrowserSetting[];
+}) {
     return (
         <>
             <Typography>
                 These apply to every project opened in this browser, and are not saved with projects or views.
             </Typography>
-            {browserSettings.map((setting) => (
+            {settings.map((setting) => (
                 <ChoiceSettingControl key={setting.key} setting={setting} />
             ))}
         </>
