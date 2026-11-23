@@ -113,7 +113,14 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
         g({
             type: "check",
             label: "Show all selection tools",
-            current_value: config.selection_toolbar_open ?? true,
+            // Read live, not copied: the toolbar's own arrow changes this too, and the settings
+            // dialog renders a MobX copy of this spec, which turns the getter into a computed.
+            get current_value() {
+                return config.selection_toolbar_open ?? true;
+            },
+            set current_value(value) {
+                config.selection_toolbar_open = value;
+            },
             func: (value) => {
                 config.selection_toolbar_open = value;
             },
