@@ -1,6 +1,6 @@
 # Multi-line chart in React, with `values` and a grid — plan
 
-Status: plan (2026-11-20). Spread over several PRs; each one stands on its own. Tracked in #694.
+Status: plan (2026-11-20); 1 and 2 implemented. Spread over several PRs; each one stands on its own. Tracked in #694.
 
 ## Why
 
@@ -27,6 +27,10 @@ type MultiLineConfig = BaseConfig & {
     values: FieldSpecs;
     /** `values`: a cell per field (default when there is more than one). `categories`: a cell per category, a line per field. */
     grid?: { by: "values" | "categories" } | null;
+    /** One x scale for every cell, for comparable units; otherwise one per cell. */
+    share_x: boolean;
+    /** Brushed range per value field; each filters the other charts and cells. */
+    brush: Record<FieldName, [number, number]>;
     stacked: boolean;
     fill: boolean;
     /** Trim the x axis to this quantile; null for the column's full range. */
@@ -74,6 +78,32 @@ now "Multi Line Chart (Classic)", marked legacy, and converts to it (`legacyChar
   and which already reports `visibleCellIndices`.
 - One category legend for the chart, not one per cell.
 - Acceptance: the marker QC view's 13 charts as one chart, matching the old ones by eye.
+
+What landed:
+
+- `values` takes several number columns, picked with a multi-column control. One value draws a
+  single plot as before; several draw a cell each. `grid` is `{ by: "values" } | null` and only
+  chooses the layout, as proposed above.
+- A cell is mounted only while it is in view (`visibleCellIndices`), so only those cells compute
+  densities. Every value's data is still loaded up front (that is 4).
+- x: a domain per cell by default; `share_x` gives every cell the union of their domains, and the
+  same kernel width in data units. The band width slider reads the first cell's domain.
+- `ChartGridConfigSchema.by` is now built per chart type (`chartGridConfigSchema([...props])`);
+  the multi-line chart's only prop is `"values"`.
+- Not yet: `grid: { by: "categories" }` (a cell per category, a line per value). Lines of
+  different values only share an axis when x is shared, so it needs `share_x` or a normalised x.
+
+**Brushing: a range dimension per value.** `brush` is a map of field to range, and each brushed
+value has its own `range_dimension`, so brushing one cell filters the other charts *and the other
+cells*, as 13 separate charts did. Each cell uses `useOwnedFilteredIndices` with its own
+dimension, so its curves stay whole while it is brushed. One combined filter (all ranges ANDed in
+one dimension) would be fewer dimensions, but a chart can only leave out its own filter as a
+whole, so brushing one cell would no longer show its effect on the others, which is what a marker
+QC view is for. Dimensions are made on a value's first brush, not per value (a `RangeDimension`
+starts a worker), and destroyed when the value is removed. The brushes are applied from the
+chart, not the cells, so a saved brush on a cell out of view still filters on load. The reset
+button and "remove all filters" clear every brush. A saved single range (from 1) is read as the
+first value's.
 
 ### 3. Take over `multi_line_chart` — #692
 
