@@ -23,7 +23,7 @@ multi-line chart) are the next case.
 
 ## Kinds of cell
 
-A prop can make cells in at least two ways, and they behave differently:
+A grid can make cells in at least three ways, and they behave differently:
 
 1. **Split by field.** A list of fields (`values`, `densityFields`). Every cell sees the same
    rows; each draws a different column. Cell keys are field names.
@@ -31,8 +31,20 @@ A prop can make cells in at least two ways, and they behave differently:
    columns over a different subset of rows. Cell keys are category values, which come from the
    data, can number in the hundreds, and change when the column is edited.
 
-A third, a **sweep** of a setting (several band widths, several thresholds), is conceivable but
-has no use case yet; leave it out.
+3. **Split by layer.** In spatial charts, cells can differ in what they draw from the
+   SpatialData object rather than from MDV's tables: one cell per **image channel** (a marker
+   each), or per **segmentation** (nuclei, cell boundaries, another algorithm's shapes) over the
+   same image. Every cell shares the view, coordinate system and usually the other layers; each
+   draws a different render stack entry, or the same image with a different channel selection.
+   Cell keys are element names or channel names, not columns.
+
+A **sweep** of a setting (several band widths, several thresholds), is conceivable but has no
+use case yet; leave it out.
+
+The list of cells need not be fixed in config. Channels might be driven by another mechanism,
+such as a protein picker, as columns might come from a live query or a column group (#413). So a
+cell source can be live, and the grid follows it, adding and dropping cells (and their per-cell
+state) as it changes.
 
 Two props can make cells at once (the splatter plot's categories × fields). That is a 2D grid,
 not a longer list, and wants rows and columns labelled as such.
@@ -42,8 +54,10 @@ not a longer list, and wants rows and columns labelled as such.
 Not arbitrary props. Each chart type keeps an explicit list of the props its grid can use, as
 `chartGridConfigSchema([...])` now does in the config schema, and for each says:
 
-- **Kind**: field split or category facet, which decides how cells are enumerated and keyed.
-- **How a cell narrows its inputs**: the field, or the row subset. A cell gets inputs, not a
+- **Kind**: field split, category facet or layer split, which decides how cells are enumerated
+  and keyed, and whether the source is static config or live.
+- **How a cell narrows its inputs**: the field, the row subset, or the render stack entry or
+  channel selection it draws. A cell gets inputs, not a
   copied config (see the risks below).
 - **What is shared and what is per cell**: axes and scales, view state, legend, colour scale,
   filters and selections. Each chart answers this explicitly rather than inheriting a default.
@@ -85,6 +99,18 @@ These are the unexpected consequences to check before generalising.
   colours. A field split coloured by field (the multi-line chart's `by: "categories"` mode)
   needs a field legend instead. Sharing an axis only makes sense when the units are comparable,
   so it is an option, not a default (`share_x`).
+- **Spatial layers per cell.** The density grid draws the render stack once a frame for all
+  cells, with image layers that name no cell, so tiles load wherever they are drawn. A grid over
+  channels or segmentations draws something different in each cell, so per-cell layers lose that
+  sharing: each cell loads its own tiles or geometry, and memory grows with the cell count.
+  Channel settings (contrast limits, colour) live in render stack entry props, which the channel
+  controls write in place and immediately; a per-cell channel needs per-cell props there, not a
+  second copy of the state, and must not bump `renderStackGeneration`. Shapes geometry must load
+  once per element however many cells show it.
+- **Selections across segmentations.** A selection in a nuclei cell and one in a cell-boundary
+  cell pick different shapes, keyed to different tables. Whether one filters the other depends on
+  the relations between elements (#555); until those exist, such a grid may have to keep
+  selections per cell.
 - **Layout state.** The grid sits inside a chart that gridstack sizes. Anything that sizes the
   chart div directly (`BaseChart.setSize(w, h)`) bypasses gridstack and leaves the chart
   overflowing its slot; cells must take their size from the layout, not the other way round.
@@ -95,6 +121,8 @@ These are the unexpected consequences to check before generalising.
    to find out what a facet needs (keys from data, filters emptying cells, a field legend).
 2. Move the compound dot plot's `split_by` panels onto `ChartArrayLayout`, keeping its config.
    Two charts sharing the layout for facets would show which parts are common.
-3. Only then extract a contract, from three working cases rather than one.
+3. A grid over image channels in the SpatialData chart, alongside its density grid: the first
+   layer split, and the one most likely to be driven live (a protein picker).
+4. Only then extract a contract, from several working cases rather than one.
 
 Lazy loading of cells (#693) is independent and helps every case.
