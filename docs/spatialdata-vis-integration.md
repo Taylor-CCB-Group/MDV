@@ -268,9 +268,14 @@ that fail while *drawing*.
   again, in a loop.
 - **Only cells in view load.** A cell scrolled out unmounts its renderer and drops its layers.
 - **Points.** The chart's `background_filter` is ignored in a region grid
-  (`getActiveChartScopeFilters`), so the points layer has every region's rows. The grid splits
-  them by `region_field` and clones the layer per cell, mapping picks back to positions in all
-  the rows for the layer's own handlers. `hide_empty` leaves out regions with no rows left.
+  (`getActiveChartScopeFilters`), so the points layer has every region's rows. The grid takes
+  the points' layer as the adapter resolves it (the entry's id and inherited opacity), splits
+  its rows and highlighted rows by `region_field`, and clones it per cell, mapping picks back to
+  positions in all the rows for the layer's own handlers. Each cell composes its clone with its
+  other layers through the stack, so the data-points group's opacity and blending apply.
+  `hide_empty` leaves out regions with no rows left.
+- **A store that can't be read** shows its error over the cell, with Retry (the reader's
+  `retry`, which starts every failed read again).
 - **Views are per cell**, fitted to each region when it has none. They are kept on the chart
   (`regionViewStates`), not in the grid, so they survive the grid being turned off and on and
   a region being filtered out and back, and `getConfig` saves them, without regions the

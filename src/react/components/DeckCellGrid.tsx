@@ -16,7 +16,12 @@ import { shouldDrawInDensityGridCell } from "./densityGridUtils";
 import { hideCrosshair, placeCrosshair } from "./pointerCrosshair";
 import ViewGestureHint from "./ViewGestureHint";
 
-export type DeckCellLabel = { text: string; color: readonly number[] };
+export type DeckCellLabel = {
+    text: string;
+    color: readonly number[];
+    /** Shown over the cell, with an optional action: why it has nothing to draw, say. */
+    notice?: { text: string; action?: { label: string; onClick: () => void } };
+};
 
 type ExportCell = { element: HTMLElement; canvas: HTMLCanvasElement | undefined } & DeckCellLabel;
 
@@ -303,6 +308,20 @@ export default function DeckCellGrid({
                     >
                         {label.text}
                     </div>
+                    {label.notice && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 p-4 text-center text-xs">
+                            <span>{label.notice.text}</span>
+                            {label.notice.action && (
+                                <button
+                                    type="button"
+                                    className="rounded-sm border px-2 py-1"
+                                    onClick={label.notice.action.onClick}
+                                >
+                                    {label.notice.action.label}
+                                </button>
+                            )}
+                        </div>
+                    )}
                     {crosshair && <CrosshairLines />}
                 </>
             );

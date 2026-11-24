@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { type AssociatedLayerInputs, useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
+import SpatialLayer from "@/webgl/SpatialLayer";
 import { useChart } from "../context";
 import { useChartID, useConfig, useFieldSpec } from "../hooks";
 import { type ChartArrayCell, useChartArrayGrid } from "../hooks/useChartArrayGrid";
@@ -108,6 +109,8 @@ const RegionCellLayers = observer(function RegionCellLayers({
     publishesImageData,
     registerHover,
     onFeatureHover,
+    pointsLayer,
+    onReadError,
 }: {
     cell: SpatialRegionCell;
     viewId: string;
@@ -123,11 +126,17 @@ const RegionCellLayers = observer(function RegionCellLayers({
     publishesImageData: boolean;
     registerHover: (viewId: string, hover: CellHover | null) => void;
     onFeatureHover: SpatialRegionGridHost["onFeatureHover"];
+    /** The region's data points, as the render stack's points entry (see `regionPointsLayer`). */
+    pointsLayer: Layer | undefined;
+    /** Why the region's store could not be read, or null once it can. */
+    onReadError: (regionKey: string, message: string | null) => void;
 }) {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const reader = chart.spatialDataReader;
     const getSnapshot = useCallback(() => reader.read(cell.url).state, [reader, cell.url]);
-    const { spatialData } = useSyncExternalStore(reader.subscribe, getSnapshot);
+    const { spatialData, error } = useSyncExternalStore(reader.subscribe, getSnapshot);
+    const errorMessage = error ? error.message || String(error) : null;
+    useEffect(() => onReadError(cell.key, errorMessage), [onReadError, cell.key, errorMessage]);
     const { layers, layerOrder, mdvTooltipItems } = useAssociatedShapesLayerInputs(
         spatialData ?? undefined,
         layerInputs,
@@ -160,10 +169,13 @@ const RegionCellLayers = observer(function RegionCellLayers({
         () => vivImageLayers(renderer.vivLayerProps, { viewId, viewportId: viewId }),
         [renderer.vivLayerProps, viewId],
     );
+    // the points go through the stack like the region's own layers, so their group's opacity and
+    // blending apply as in the single view
     const cellLayers = useMemo(() => {
-        const { shared } = composeStackLayers(renderer.deckLayers, images, renderStack, renderer.layerOrder);
+        const deckLayers = pointsLayer ? [...renderer.deckLayers, pointsLayer] : renderer.deckLayers;
+        const { shared } = composeStackLayers(deckLayers, images, renderStack, renderer.layerOrder);
         return shared.map((layer) => inCell(viewId, layer));
-    }, [renderer.deckLayers, images, renderStack, renderer.layerOrder, viewId]);
+    }, [renderer.deckLayers, pointsLayer, images, renderStack, renderer.layerOrder, viewId]);
 
     useEffect(() => onLayers(viewId, cellLayers), [onLayers, viewId, cellLayers]);
     useEffect(() => () => onLayers(viewId, null), [onLayers, viewId]);
@@ -227,17 +239,18 @@ const RegionCellLayers = observer(function RegionCellLayers({
 });
 
 /**
- * A region's data points: the chart's points layer with only that region's rows, under the cell's
- * view id. Picks name a position in the region's rows; the layer's handlers expect one in all of
- * them, so they are given that.
+ * A region's data points: the render stack's points layer (its entry's id, opacity and handlers)
+ * with only that region's rows and highlighted rows. Picks name a position in the region's rows;
+ * the layer's handlers expect one in all of them, so they are given that.
  */
-function regionPointsLayer(points: Layer, viewId: string, { rows, positions }: RegionRows): Layer {
+function regionPointsLayer(points: Layer, { rows, positions }: RegionRows, highlightedData: number[]): Layer {
     const toAllRows = (info: PickingInfo): PickingInfo =>
         info.index < 0 ? info : { ...info, index: positions[info.index] ?? -1 };
     const { onHover, onClick } = points.props;
     return points.clone({
-        id: `${viewId}-${points.id}`,
         data: rows,
+        // the highlight is drawn apart from `data`, so it has to be narrowed as well
+        ...(points instanceof SpatialLayer && { highlightedData }),
         onHover: onHover
             ? (info: PickingInfo, event: Parameters<typeof onHover>[1]) => onHover(toAllRows(info), event)
             : null,
@@ -253,7 +266,7 @@ function regionPointsLayer(points: Layer, viewId: string, { rows, positions }: R
  * and the region's data points. Each cell is framed on its own region and pans and zooms alone.
  * Only the cells in view load and draw anything.
  *
- * Not yet in cells: selection tools, gates, density, filtered-out (grey) points and feature tooltips.
+ * Not yet in cells: selection tools, gates, density and filtered-out (grey) points.
  */
 export default observer(function SpatialRegionGrid({
     host,
@@ -261,16 +274,17 @@ export default observer(function SpatialRegionGrid({
     renderStack,
     vivPassthrough,
     pointsLayer,
-    pointsVisible,
 }: {
     host: SpatialRegionGridHost;
     /** The render stack's SpatialData layers, as for the single view, without the MDV overlays. */
     layerInputs: RenderStackLayerInputs;
     renderStack: RenderStack | undefined;
     vivPassthrough: VivImagePassthroughOptions;
-    /** The chart's points layer over every region's rows. */
+    /**
+     * The render stack's points layer over every region's rows, as the adapter resolves it (with
+     * its entry's id and inherited opacity); absent while the points are hidden.
+     */
     pointsLayer: Layer | undefined;
-    pointsVisible: boolean;
 }) {
     const chartId = useChartID();
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
@@ -291,13 +305,34 @@ export default observer(function SpatialRegionGrid({
         [allCells, hideEmpty, rowsByRegion],
     );
     const grid = useChartArrayGrid({ chartId, cells, getViewId: getCellViewId });
+    // a store that could not be read: the cell says so, and offers to read it again
+    const [readErrors, setReadErrors] = useState<Readonly<Record<string, string>>>({});
+    const onReadError = useCallback((regionKey: string, message: string | null) => {
+        setReadErrors((current) => {
+            if (message) return current[regionKey] === message ? current : { ...current, [regionKey]: message };
+            if (!(regionKey in current)) return current;
+            const { [regionKey]: _removed, ...rest } = current;
+            return rest;
+        });
+    }, []);
+    const retry = useCallback(() => chart.spatialDataReader.retry(), [chart]);
     const labels = useMemo<DeckCellLabel[]>(
         () =>
             cells.map((cell) => {
                 const count = rowsByRegion?.get(cell.key)?.rows.length;
-                return { text: count === undefined ? cell.label : `${cell.label} (${count})`, color: LABEL_COLOR };
+                const readError = readErrors[cell.key];
+                return {
+                    text: count === undefined ? cell.label : `${cell.label} (${count})`,
+                    color: LABEL_COLOR,
+                    ...(readError && {
+                        notice: {
+                            text: `Could not read this region's SpatialData: ${readError}`,
+                            action: { label: "Retry", onClick: retry },
+                        },
+                    }),
+                };
             }),
-        [cells, rowsByRegion],
+        [cells, rowsByRegion, readErrors, retry],
     );
 
     // Each cell's view, by region, on the chart (see `regionViewStates`), so it outlives the grid
@@ -344,20 +379,30 @@ export default observer(function SpatialRegionGrid({
     const visibleCells = grid.visibleCellIndices;
     // the image controls read the chart's own region when it is in view, else the first cell in view
     const imageDataCell = visibleCells.find((index) => cells[index]?.key === config.region) ?? visibleCells[0];
+    // each region's points, with only its own highlighted rows: the highlight is drawn apart from `data`
+    const highlighted = pointsLayer instanceof SpatialLayer ? pointsLayer.props.highlightedData : undefined;
+    const highlightedByRegion = useMemo(() => {
+        if (!Array.isArray(highlighted) || highlighted.length === 0 || !regionColumn?.data || !regionColumn.values) {
+            return null;
+        }
+        return partitionRowsByRegion(highlighted, regionColumn.data, regionColumn.values);
+    }, [highlighted, regionColumn]);
+    const regionPoints = useMemo(() => {
+        const byRegion = new Map<string, Layer>();
+        if (!pointsLayer) return byRegion;
+        for (const index of visibleCells) {
+            const cell = cells[index];
+            if (!cell) continue;
+            const rows = rowsByRegion?.get(cell.key) ?? { rows: NO_ROWS, positions: NO_ROWS };
+            const regionHighlighted = Array.from(highlightedByRegion?.get(cell.key)?.rows ?? []);
+            byRegion.set(cell.key, regionPointsLayer(pointsLayer, rows, regionHighlighted));
+        }
+        return byRegion;
+    }, [pointsLayer, visibleCells, cells, rowsByRegion, highlightedByRegion]);
+
     const layers = useMemo(
-        () =>
-            visibleCells.flatMap((index) => {
-                const viewId = grid.viewIds[index];
-                const cell = cells[index];
-                if (!viewId || !cell) return [];
-                const regionRows = rowsByRegion?.get(cell.key);
-                const points =
-                    pointsVisible && pointsLayer
-                        ? [regionPointsLayer(pointsLayer, viewId, regionRows ?? { rows: NO_ROWS, positions: NO_ROWS })]
-                        : [];
-                return [...(cellLayers[viewId] ?? []), ...points];
-            }),
-        [visibleCells, grid.viewIds, cells, rowsByRegion, pointsVisible, pointsLayer, cellLayers],
+        () => visibleCells.flatMap((index) => cellLayers[grid.viewIds[index] ?? ""] ?? []),
+        [visibleCells, grid.viewIds, cellLayers],
     );
     const deviceLayers = useLayersForDevice(layers, host.device);
 
@@ -404,6 +449,8 @@ export default observer(function SpatialRegionGrid({
                         publishesImageData={index === imageDataCell}
                         registerHover={registerHover}
                         onFeatureHover={host.onFeatureHover}
+                        pointsLayer={regionPoints.get(cell.key)}
+                        onReadError={onReadError}
                     />
                 );
             })}

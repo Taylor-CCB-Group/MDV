@@ -333,6 +333,7 @@ const SpatialRegionGridFromRenderStack = observer(function SpatialRegionGridFrom
 }: {
     host: SpatialRegionGridHost;
     layerInputs: RenderStackLayerInputs;
+    /** The render stack's points layer, as the adapter resolves it (see `SpatialRegionGrid`). */
     pointsLayer: Layer | undefined;
 }) {
     const config = useConfig<SpatialDataMdvReactConfig>();
@@ -341,7 +342,6 @@ const SpatialRegionGridFromRenderStack = observer(function SpatialRegionGridFrom
     void chart.renderStackGeneration;
     const stackStructure = useRenderStackStructure(stack);
     const vivPassthrough = useSpatialVivPassthrough(stack);
-    const pointsEntry = stack && findRenderStackEntry(stack, deckHostLayerId("scatter"));
     return (
         <SpatialRegionGrid
             host={host}
@@ -349,7 +349,6 @@ const SpatialRegionGridFromRenderStack = observer(function SpatialRegionGridFrom
             renderStack={stackStructure}
             vivPassthrough={vivPassthrough}
             pointsLayer={pointsLayer}
-            pointsVisible={pointsEntry?.visible !== false}
         />
     );
 });
@@ -684,6 +683,8 @@ const SpatialDataViewer = observer(
         );
 
         const regionGridShown = isRegionGridShown(config);
+        // as the adapter resolves the points' entry: its id, inherited opacity, and absent while hidden
+        const regionGridPointsLayer = deckLayers.find((layer) => layer.id === deckHostLayerId("scatter"));
         const regionGridLayerInputs = useMemo(
             () => ({ layers: baseLayers, layerOrder: baseLayerOrder }),
             [baseLayers, baseLayerOrder],
@@ -836,7 +837,7 @@ const SpatialDataViewer = observer(
                                     <SpatialRegionGridFromRenderStack
                                         host={regionGrid}
                                         layerInputs={regionGridLayerInputs}
-                                        pointsLayer={scatterplotLayer}
+                                        pointsLayer={regionGridPointsLayer}
                                     />
                                 ) : (
                                     <SpatialCanvasFromRenderStack
