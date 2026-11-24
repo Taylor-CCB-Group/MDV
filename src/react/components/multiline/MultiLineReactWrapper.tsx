@@ -212,6 +212,10 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
     getSettings() {
         const c = this.config;
         const domain = this.getValueDomain();
+        const bandWidthFraction = () => {
+            const now = this.getValueDomain();
+            return now ? getBandWidthFraction(c, now.domain, now.clamp) : BAND_WIDTH_SLIDER.min;
+        };
         return [
             ...super.getSettings(),
             g({
@@ -246,12 +250,19 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
             ...(domain
                 ? [
                       g({
-                          // a fraction of the range either way, converted when set: the dialog keeps
-                          // this control while the trim or value column changes under it
+                          // the dialog keeps this control while the trim or value column changes
+                          // under it, so it's a fraction of the range either way, converted when set,
+                          // and it shows the config through a getter: the dialog's observable copy
+                          // makes that a computed, so the slider follows a reset band width
                           type: "slider",
                           label: "Band Width (fraction of range)",
                           ...BAND_WIDTH_SLIDER,
-                          current_value: getBandWidthFraction(c, domain.domain, domain.clamp),
+                          get current_value() {
+                              return bandWidthFraction();
+                          },
+                          set current_value(_) {
+                              // `func` sets the config, which the getter reads
+                          },
                           func: (v) => {
                               const now = this.getValueDomain();
                               if (now) c.band_width = bandWidthFromFraction(v, now.domain, now.clamp);
