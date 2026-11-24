@@ -1920,8 +1920,6 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "polars" },
-    { name = "pyranges" },
-    { name = "pysam" },
     { name = "scanpy", extra = ["leiden"] },
     { name = "scipy" },
     { name = "spatialdata" },
@@ -1948,6 +1946,8 @@ all = [
     { name = "oauth2client" },
     { name = "psycogreen" },
     { name = "psycopg2-binary" },
+    { name = "pyranges" },
+    { name = "pysam" },
     { name = "python-dotenv" },
     { name = "python-jose" },
     { name = "redis" },
@@ -1980,6 +1980,10 @@ app = [
     { name = "requests" },
     { name = "ruff" },
     { name = "tabulate" },
+]
+genomics = [
+    { name = "pyranges" },
+    { name = "pysam" },
 ]
 
 [package.dev-dependencies]
@@ -2024,7 +2028,7 @@ requires-dist = [
     { name = "langchain-experimental", marker = "extra == 'app'", specifier = ">=0.3.4,<0.4" },
     { name = "langchain-openai", marker = "extra == 'app'", specifier = ">=0.3.33,<0.4" },
     { name = "matplotlib", marker = "extra == 'app'", specifier = ">=3.8.4,<4" },
-    { name = "mdvtools", extras = ["app"], marker = "extra == 'all'" },
+    { name = "mdvtools", extras = ["app", "genomics"], marker = "extra == 'all'" },
     { name = "mudata", specifier = ">=0.3.0" },
     { name = "nbformat", marker = "extra == 'app'", specifier = ">=5.10.4,<6" },
     { name = "numcodecs", specifier = ">=0.16.1" },
@@ -2034,8 +2038,8 @@ requires-dist = [
     { name = "polars", specifier = ">=1.31.0,<2" },
     { name = "psycogreen", marker = "extra == 'app'", specifier = ">=1.0.2,<2" },
     { name = "psycopg2-binary", marker = "extra == 'app'", specifier = ">=2.9.9,<3" },
-    { name = "pyranges", specifier = ">=0.1.4,<0.2" },
-    { name = "pysam", specifier = "==0.24.0" },
+    { name = "pyranges", marker = "extra == 'genomics'", specifier = ">=0.1.4,<0.2" },
+    { name = "pysam", marker = "extra == 'genomics'", specifier = "==0.24.0" },
     { name = "python-dotenv", marker = "extra == 'app'", specifier = ">=1.0.1,<2" },
     { name = "python-jose", marker = "extra == 'app'", specifier = ">=3.3.0,<4" },
     { name = "redis", marker = "extra == 'app'", specifier = ">=5.2.1,<6" },
@@ -2050,7 +2054,7 @@ requires-dist = [
     { name = "tabulate", marker = "extra == 'app'", specifier = ">=0.9.0,<0.10" },
     { name = "werkzeug", specifier = ">=3.0.2,<4" },
 ]
-provides-extras = ["app", "all"]
+provides-extras = ["app", "genomics", "all"]
 
 [package.metadata.requires-dev]
 dev = [
