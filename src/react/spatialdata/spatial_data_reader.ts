@@ -19,6 +19,13 @@ export const NO_SPATIAL_DATA: SpatialDataState = { spatialData: null, loading: f
 export type SpatialDataReader = {
     /** The read of `url`, starting one if there is none. Safe to call during render. */
     read(url: string): SpatialDataRead;
+    /** The read of `url` if one has started, without starting one. */
+    peek(url: string): SpatialDataRead | undefined;
+    /**
+     * `read`, then tells subscribers, so one that only `peek`s sees the read start. For a user
+     * action only, as `retry`: `read` itself stays silent, being safe to call during render.
+     */
+    open(url: string): SpatialDataRead;
     /**
      * Starts any failed read again. For a user action only: retrying from render
      * would loop with the render that asked for it.
@@ -75,6 +82,14 @@ export function createSpatialDataReader(load: (url: string) => Promise<SpatialDa
     };
     return {
         read: (url) => reads.get(url) ?? start(url),
+        peek: (url) => reads.get(url),
+        open: (url) => {
+            const existing = reads.get(url);
+            if (existing) return existing;
+            const entry = start(url);
+            notify();
+            return entry;
+        },
         retry: () => {
             const failed = [...reads.values()].filter((entry) => entry.state.error);
             if (!failed.length) return;
@@ -88,4 +103,16 @@ export function createSpatialDataReader(load: (url: string) => Promise<SpatialDa
             };
         },
     };
+}
+
+let pageReader: SpatialDataReader | undefined;
+
+/**
+ * The page's reader, shared by every SpatialData chart and by Settings › Data quality, so a
+ * store is opened once however many charts show it, and the settings dialog can list the
+ * issues of stores the charts have already read without reading them again.
+ */
+export function sharedSpatialDataReader(): SpatialDataReader {
+    pageReader ??= createSpatialDataReader();
+    return pageReader;
 }

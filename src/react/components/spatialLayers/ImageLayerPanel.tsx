@@ -14,6 +14,7 @@ import { toneFromArrays, toneFromVivLayerProps, useImageLayerRuntime } from "@/r
 import { useRenderStackEntry } from "@/react/spatialdata/render_stack_control";
 import { createVivStores, useChannelsStoreApi, useViewerStoreApi, VivProvider } from "../avivatorish/state";
 import { VivChannelList } from "../ColorChannelComponents";
+import AlphaFromIntensityControls from "./AlphaFromIntensityControls";
 
 type ImageLayerConfig = Extract<LayerConfig, { type: "image" }>;
 
@@ -244,6 +245,10 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
                     Image source: SpatialData zarr
                 </Typography>
                 <VivChannelList />
+                <AlphaFromIntensityControls
+                    value={config.alphaFromIntensity}
+                    onChange={(next) => patchLayer({ alphaFromIntensity: next })}
+                />
             </div>
         </SpatialImagePanelContext.Provider>
     );

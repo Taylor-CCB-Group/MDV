@@ -1,6 +1,6 @@
 import { RENDER_STACK_SCHEMA_VERSION, type RenderStack } from "@spatialdata/layers";
 import { describe, expect, test } from "vitest";
-import { vivImageLayerProps } from "@/react/spatialdata/viv_image_props";
+import { imageAlphaFromIntensity, vivImageLayerProps } from "@/react/spatialdata/viv_image_props";
 
 function stackWithImage(props: Record<string, unknown>): RenderStack {
     return {
@@ -38,5 +38,18 @@ describe("vivImageLayerProps", () => {
 
     test("ignores entries that are not spatial", () => {
         expect(vivImageLayerProps(stackWithImage({}), "deck:scatter")).toEqual({ pickable: false });
+    });
+});
+
+describe("imageAlphaFromIntensity", () => {
+    test("is null unless the image entry turns it on, and fills in sd.js's defaults", () => {
+        expect(imageAlphaFromIntensity(stackWithImage({}), "image-1")).toBeNull();
+        expect(imageAlphaFromIntensity(stackWithImage({ alphaFromIntensity: undefined }), "image-1")).toBeNull();
+        expect(imageAlphaFromIntensity(stackWithImage({ alphaFromIntensity: { gain: 4 } }), "image-1")).toEqual({
+            threshold: 0,
+            gain: 4,
+        });
+        expect(imageAlphaFromIntensity(stackWithImage({ alphaFromIntensity: {} }), "deck:scatter")).toBeNull();
+        expect(imageAlphaFromIntensity(undefined, "image-1")).toBeNull();
     });
 });

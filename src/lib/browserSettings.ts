@@ -149,11 +149,31 @@ export const chartDragSetting = defineChoiceSetting<"view" | "select">({
     defaultValue: "view",
 });
 
+/**
+ * Whether the SpatialData layer dialog notes how a layer's element is stored (no pyramid,
+ * oversized chunks, no length unit). Either way they are listed in Settings › Data quality, and
+ * never light a chart's menu pip; see `data_quality.ts`.
+ */
+export const dataQualityNotesSetting = defineChoiceSetting<"compact" | "hidden">({
+    key: "mdv.settings.dataQualityNotes",
+    label: "Data quality notes in layer dialog",
+    description:
+        "Whether a SpatialData layer's properties note how its element is stored, when that makes it " +
+        "slow or leaves its scale unknown: as one collapsed line, or not at all. Settings › Data " +
+        "quality lists them for every store either way.",
+    choices: [
+        { value: "compact", label: "One collapsed line" },
+        { value: "hidden", label: "Hidden" },
+    ],
+    defaultValue: "compact",
+});
+
 /** Every browser setting, in the order the Settings dialog lists them. */
 export const browserSettings: readonly BrowserSetting[] = [
     chartDragSetting,
     renderBackendSetting,
     webgpuTraceSetting,
+    dataQualityNotesSetting,
     legacyChartsSetting,
     convertLegacyChartsSetting,
 ];

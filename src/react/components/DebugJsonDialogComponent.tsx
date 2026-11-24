@@ -19,6 +19,7 @@ import { ChartProvider } from "../context";
 import { useChartManager } from "../hooks";
 import BrowserSettingsSection, { browserSettingMatchesQuery } from "./BrowserSettingsSection";
 import CustomTooltip from "./CustomTooltip";
+import { DataQualitySection, useHasSpatialStores } from "./DataQualitySection";
 import { filterJSON, filterJsonSection, type JsonSection, matchesQuery, splitJsonSections } from "./debugDialogSearch";
 import { AbstractComponent, collectDisposers } from "./SettingsDialogComponent";
 
@@ -204,6 +205,7 @@ export function ValidationIssuesSection({ validationFindings }: { validationFind
 }
 
 const PREFERENCES_TITLE = "Preferences";
+const DATA_QUALITY_TITLE = "Data quality";
 const DEBUG_GROUP_TITLE = "Debug and diagnostics";
 const TECHNICAL_SETTINGS_TITLE = "Technical settings";
 
@@ -426,10 +428,21 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     // a chart's dialog is about that chart; the project-wide sections are in the main Settings dialog
     const showBrowserSettings = !chart && filteredBrowserSettings.length > 0;
     const showTechnicalSettings = filteredTechnicalSettings.length > 0;
+    const hasSpatialStores = useHasSpatialStores();
+    const showDataQuality =
+        !chart &&
+        hasSpatialStores &&
+        matchesQuery(query, DATA_QUALITY_TITLE, "SpatialData store issues pyramid chunks length unit dismissed");
     const showDebugGroup =
         !chart && (showReport || showFaultInjection || showValidation || filteredJsonSections.length > 0);
     const nothingMatches =
-        searching && !showChartPanel && !showTechnicalSettings && !wholeJson && !showBrowserSettings && !showDebugGroup;
+        searching &&
+        !showChartPanel &&
+        !showTechnicalSettings &&
+        !wholeJson &&
+        !showBrowserSettings &&
+        !showDataQuality &&
+        !showDebugGroup;
 
     return (
         <div className="w-full max-h-[80vh] overflow-auto" style={{ userSelect: "text" }}>
@@ -500,6 +513,11 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                     {...sectionProps}
                 >
                     <BrowserSettingsSection settings={filteredBrowserSettings} />
+                </DebugSection>
+            )}
+            {showDataQuality && (
+                <DebugSection id="data-quality" title={DATA_QUALITY_TITLE} {...sectionProps}>
+                    <DataQualitySection />
                 </DebugSection>
             )}
             {showDebugGroup && (
