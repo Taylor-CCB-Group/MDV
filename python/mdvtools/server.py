@@ -21,7 +21,7 @@ import webbrowser
 import json
 from werkzeug.security import safe_join
 from mdvtools.websocket import mdv_socketio
-from mdvtools.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject, datasource_display_name
 from mdvtools.project_router import (
     ProjectBlueprint as Blueprint,
     SingleProjectShim
@@ -519,6 +519,23 @@ def create_app(
         try:
             changed = project.rename_column(data["datasource"], data["field"], data["name"])
             return jsonify({"success": True, "changed": changed})
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+
+    @project_bp.route("/rename_datasource", access_level='editable', methods=["POST"])
+    def rename_datasource():
+        """Set the name a datasource is shown under; see MDVProject.rename_datasource."""
+        # access_level is only enforced by the catalog's auth hook; in single-project
+        # mode state.json is the only thing saying whether the project is editable.
+        if project.state.get("permission") != "edit":
+            return jsonify({"success": False, "error": "Project is read-only"}), 403
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or not all(key in data for key in ("datasource", "name")):
+            return jsonify({"success": False, "error": "Request must contain 'datasource' and 'name'"}), 400
+        try:
+            changed = project.rename_datasource(data["datasource"], data["name"])
+            display_name = datasource_display_name(project.get_datasource_metadata(data["datasource"]))
+            return jsonify({"success": True, "changed": changed, "display_name": display_name})
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 400
 

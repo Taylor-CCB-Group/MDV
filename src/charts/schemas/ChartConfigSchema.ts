@@ -175,9 +175,24 @@ const ContourVisualConfigSchema = z
     })
     .describe("Visual contour configuration shared by density-style charts");
 
+/**
+ * Draw a chart as a grid of small multiples, one cell per value of a property of its config.
+ * Layout options (cell size, columns) belong here too; for now the defaults apply.
+ */
+export const ChartGridConfigSchema = z
+    .object({
+        by: z
+            .enum(["densityFields"])
+            .describe("The config property whose values make the cells, e.g. one cell per density field"),
+    })
+    .describe("Show the chart as a grid of cells, one per value of a config property");
+
+export type ChartGridConfig = z.infer<typeof ChartGridConfigSchema>;
+
 const DensityFieldsConfigSchema = z
     .object({
         densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),
+        grid: ChartGridConfigSchema.nullable().optional(),
     })
     .describe("Density field selection shared by contour-based charts");
 
@@ -258,6 +273,19 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
         .describe("Hides rows outside the selected categories from this chart only"),
     on_filter: z.enum(["hide", "grey"]).optional().describe("How filtered-out points should be rendered"),
     zoom_on_filter: z.boolean().optional().describe("Whether filtering should auto-fit the current view"),
+    selection_toolbar_open: z
+        .boolean()
+        .optional()
+        .describe(
+            "Whether the selection toolbar shows every tool, or one button for Pan and the last drawing tool (default true)",
+        ),
+    crosshair: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe(
+            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a grid (default true)",
+        ),
     point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
     axis_scaling: z
         .enum(["equal", "fit"])
@@ -389,14 +417,50 @@ export const SankeyConfigSchema = BaseConfigSchema.extend({
     // Additional sankey specific properties
 }).describe("Configuration for Sankey diagrams showing flow between categories");
 
+const ScaleTrimSchema = z
+    .enum(["0.001", "0.01", "0.05"])
+    .describe("Trim the x axis to this percentile of the values (a key of the column's quantiles)");
+
 export const MultiLineChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("multi_line_chart").describe("Multi-line chart type"),
-    stacked: z.boolean().optional().describe("Whether to stack multiple lines on top of each other"),
-    band_width: z.number().positive().optional().describe("Width of confidence bands around lines"),
-    intervals: z.number().int().positive().optional().describe("Number of intervals for data aggregation"),
-    scaletrim: z.boolean().optional().describe("Whether to trim the scale to focus on data range"),
-    // Additional multi-line chart specific properties
-}).describe("Configuration for multi-line charts showing multiple time series or categories");
+    stacked: z.boolean().optional().describe("One row per category instead of overlaid lines"),
+    fill: z.boolean().optional().describe("Fill under each line"),
+    band_width: z
+        .number()
+        .positive()
+        .optional()
+        .describe("Kernel half-width: in data units, or a fraction of the trimmed range when trimmed"),
+    intervals: z.number().int().positive().optional().describe("Roughly how many points each line has"),
+    scaletrim: z
+        .union([ScaleTrimSchema, z.literal("none")])
+        .nullable()
+        .optional()
+        .describe("Trim the x axis to a percentile; absent, null or 'none' for the full range"),
+}).describe("Configuration for multi-line charts: a density curve of `param[0]` per category of `param[1]`");
+
+export const MultiLineReactConfigSchema = BaseConfigSchema.extend({
+    type: z.literal("multi_line_chart_react").describe("React multi-line chart type"),
+    categories: z.string().nullable().optional().describe("Category column: one line per value of it"),
+    values: FieldSpecsSchema.optional().describe("Numeric fields: one density curve per category, per field"),
+    stacked: z.boolean().optional().describe("One row per category instead of overlaid lines"),
+    fill: z.boolean().optional().describe("Fill under each line"),
+    scaletrim: ScaleTrimSchema.nullable().optional(),
+    band_width: z
+        .number()
+        .positive()
+        .nullable()
+        .optional()
+        .describe(
+            "Kernel half-width: in data units, or a fraction of the trimmed range when trimmed; null for the default",
+        ),
+    intervals: z.number().int().positive().optional().describe("Roughly how many points each line has"),
+    fit_labels: z.boolean().optional().describe("Fit the axis margins to the labels; off, the axis sizes are used"),
+    brush: z
+        .tuple([z.number(), z.number()])
+        .nullable()
+        .optional()
+        .describe("The brushed range of the value, in data units, which filters other charts; null for none"),
+}).describe("Configuration for density curves of numeric values, one per category; `param` is unused");
 
 export const MultiBoxPlotConfigSchema = BaseConfigSchema.extend({
     type: z.literal("multi_box_plot").describe("Multi-box plot chart type"),
@@ -439,6 +503,14 @@ export const DeckScatter3DConfigSchema = DeckScatterSharedConfigSchema.extend({
     type: z.literal("DeckScatter3D").describe("Deck.gl 3D scatter plot chart type"),
     dimension: z.literal("3d").optional().describe("3D deck scatter plots render in orbit view"),
     viewState: OrbitViewStateSchema.optional().describe("Current deck.gl orbit view state"),
+    orbit_axis: z
+        .enum(["Y", "Z"])
+        .optional()
+        .describe("The data axis that points up and that the view orbits round; absent is Z"),
+    axis_scales: z
+        .tuple([z.number().positive(), z.number().positive(), z.number().positive()])
+        .optional()
+        .describe("How much to stretch the x, y and z axes; absent is [1, 1, 1]"),
 }).describe("Configuration for the deck.gl 3D scatter plot");
 
 export const DeckSplatterConfigSchema = BaseConfigSchema.extend({
@@ -469,10 +541,19 @@ export const SelectionDialogConfigSchema = BaseConfigSchema.extend({
 }).describe("Configuration for selection dialogs allowing user interaction");
 
 export const GeneInfoSchema = BaseConfigSchema.extend({
-    type: z.literal("geneNetwork").describe("Gene information from genenetwork.nl API"),
+    type: z.literal("geneNetwork").describe("Gene or protein information from genenetwork.nl or UniProt"),
     autoScroll: z.boolean().optional().describe("Automatically scroll to highlighted items"),
+    source: z.enum(["genenetwork", "uniprot"]).optional().describe("Where card details come from"),
+    organism: z.enum(["human", "mouse"]).optional().describe("Species to look identifiers up in (UniProt)"),
+    search: z
+        .object({
+            query: z.string().optional().describe("Substring the identifiers are filtered by"),
+            terms: z.array(z.string()).optional().describe("Identifiers the view is limited to"),
+        })
+        .optional()
+        .describe("Search that filters the whole view"),
 }).describe(
-    "Configuration for chart allowing for selection of genes with information retrieved from genenetwork.nl API",
+    "Configuration for chart allowing for selection of genes or proteins with information from genenetwork.nl or UniProt",
 );
 
 // Register all chart-specific schemas with the registry
@@ -494,6 +575,7 @@ registerChartConfigSchema("text_box", TextBoxConfigSchema, { version: "1" });
 registerChartConfigSchema("wordcloud", WordcloudConfigSchema, { version: "1" });
 registerChartConfigSchema("sankey", SankeyConfigSchema, { version: "1" });
 registerChartConfigSchema("multi_line_chart", MultiLineChartConfigSchema, { version: "1" });
+registerChartConfigSchema("multi_line_chart_react", MultiLineReactConfigSchema, { version: "1" });
 registerChartConfigSchema("multi_box_plot", MultiBoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("abundance_box_plot", AbundanceBoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("density_scatter", DensityScatterConfigSchema, { version: "1" });

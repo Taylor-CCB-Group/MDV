@@ -170,6 +170,8 @@ export type ExperimentalZarrStore = {
  */
 export type DataSource = {
     name: DataSourceName;
+    /** The name the datasource is shown under, if it has been renamed: see `getDataSourceDisplayName`. */
+    display_name?: string;
     charts: Chart[]; //what's this? probably an artifact of me not understanding when I first wrote this...
     dataStore: DataStore;
     contentDiv: HTMLDivElement;

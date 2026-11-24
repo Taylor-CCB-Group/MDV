@@ -15,7 +15,7 @@ class RangeDimension extends Dimension {
         return this._commitSpec({
             kind: "square",
             data1: this._columnData(columns[0]),
-            data2: this.parent.columnIndex[columns[1]].data,
+            data2: this._columnData(columns[1]),
             // plain copies: args may be observable proxies, which can't be posted to a worker
             range1: [args.range1[0], args.range1[1]],
             range2: [args.range2[0], args.range2[1]],
@@ -41,7 +41,7 @@ class RangeDimension extends Dimension {
         const spec = {
             kind: "poly",
             data1: this._columnData(columns[0]),
-            data2: this.parent.columnIndex[columns[1]].data,
+            data2: this._columnData(columns[1]),
             points: points.map((pt) => [pt[0], pt[1]]),
         };
         // for region-scoped gates, resolve the wanted region value's index once, up front
@@ -55,6 +55,25 @@ class RangeDimension extends Dimension {
         return this._commitSpec(spec);
     }
 
+    /**
+     * Polygon containment on screen, for a 3D chart: the x, y and z columns are projected with
+     * `args.matrix` (column-major 4x4, data to pixels) and tested against `args.points` (pixels).
+     * @param {{ matrix: ArrayLike<number>, points: Array<[number, number]> }} args
+     */
+    filterScreenPoly(args, columns) {
+        return this._commitSpec(
+            {
+                kind: "screenPoly",
+                data1: this._columnData(columns[0]),
+                data2: this._columnData(columns[1]),
+                data3: this._columnData(columns[2]),
+                matrix: Array.from(args.matrix),
+                points: args.points.map((pt) => [pt[0], pt[1]]),
+            },
+            RangeDimension.asyncScreenFilterMinRows,
+        );
+    }
+
     filterRange(args, columns) {
         return this._commitSpec({
             kind: "range",
@@ -64,7 +83,7 @@ class RangeDimension extends Dimension {
         });
     }
 
-    /** filterSquare and filterPoly accept a typed array in place of the first column name */
+    /** filterSquare and filterPoly accept typed arrays in place of column names (e.g. screen positions) */
     _columnData(column) {
         return typeof column === "string" ? this.parent.columnIndex[column].data : column;
     }
@@ -73,10 +92,11 @@ class RangeDimension extends Dimension {
      * Evaluates a filter spec on this dimension's filter worker, or synchronously below
      * {@link RangeDimension.asyncFilterMinRows}.
      * @param {import("./rangeFilterEval").FilterSpec} spec
+     * @param {number} [asyncMinRows] the row count from which to use the worker
      */
-    _commitSpec(spec) {
+    _commitSpec(spec, asyncMinRows = RangeDimension.asyncFilterMinRows) {
         const size = this.parent.size;
-        if (size < RangeDimension.asyncFilterMinRows) {
+        if (size < asyncMinRows) {
             const mask = new Uint8Array(size);
             evaluateFilterSpec(spec, size, mask);
             return this.commitFilter(mask);
@@ -133,6 +153,12 @@ class RangeDimension extends Dimension {
  * always use the worker (tests), or Infinity to never use it.
  */
 RangeDimension.asyncFilterMinRows = 100_000;
+
+/**
+ * As {@link RangeDimension.asyncFilterMinRows}, for `filterScreenPoly`, which projects every row
+ * before testing it, so moves to the worker much sooner.
+ */
+RangeDimension.asyncScreenFilterMinRows = 10_000;
 
 Dimension.types["range_dimension"] = RangeDimension;
 

@@ -1,19 +1,29 @@
-import type { RenderStack } from "@spatialdata/layers";
+import { findRenderStackEntry, type RenderStack } from "@spatialdata/layers";
+import type { EntryStatus } from "@spatialdata/vis";
 import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
+import { splitStorageIssues } from "@/react/spatialdata/data_quality";
 import type { DeckBackend } from "@/react/spatialdata/deck_backend";
+import { entryStatusErrorKey } from "@/react/spatialdata/entry_status";
+import {
+    DATA_POINTS_GROUP_ID,
+    DECK_OVERLAY_VISIBILITY_FOLLOWERS,
+    deckHostLayerId,
+    deckIdFromHostLayerId,
+} from "@/react/spatialdata/host_overlay_ids";
 import type { ImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import type { CanvasError, LayerFailure } from "@/react/spatialdata/layer_failures";
 import type { PointsLayerRegistry } from "@/react/spatialdata/points_layer_registry";
 import {
     createHostOnlyRenderStack,
     type DefaultImageLayerProps,
+    migrateSavedRenderStack,
     syncOverlayFollowerVisibility,
 } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
-import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
+import { sharedSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import {
     type SpatialDataSerializableViewState,
     toSerializableSpatialDataViewState,
@@ -23,7 +33,8 @@ import { getDensitySettings } from "../contour_state";
 import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
 import { createVivStores, type VivContextType } from "./avivatorish/state";
 import { BaseReactChart } from "./BaseReactChart";
-import type { ElementIssues } from "./RasterIssues";
+import { getDensityGridSettingsFolder } from "./densityGridSettings";
+import { getCrosshairSetting } from "./pointerCrosshair";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialStatusPanel from "./SpatialStatusPanel";
@@ -54,11 +65,14 @@ function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataS
     if (config.renderStack === undefined) {
         config.renderStack = createHostOnlyRenderStack();
     } else {
+        config.renderStack = migrateSavedRenderStack(config.renderStack);
         syncOverlayFollowerVisibility(config.renderStack);
     }
     // Must exist before makeAutoObservable(config) for later changes to be observed, and
     // survive initialiseChartConfig's JSON copy, so null rather than undefined.
     config.render_backend = config.render_backend ?? null;
+    config.grid = config.grid ?? null;
+    config.crosshair = config.crosshair ?? null;
     config.param = [...dataStore.regions.position_fields];
     if (typeof config.contourParameter === "string") {
         const column = dataStore.columnIndex[config.contourParameter];
@@ -151,18 +165,31 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     canvasErrors: CanvasError[] = [];
 
     /** Record a failure and turn the entry off, so the rest of the canvas can draw again. */
-    recordLayerFailure(entryId: string, failure: Omit<LayerFailure, "count" | "dismissed">) {
+    recordLayerFailure(failedId: string, failure: Omit<LayerFailure, "count" | "dismissed">) {
+        // The data points' group has no row of its own in the layer dialog: its failure is
+        // the data points', so turning them back on there retries it. It also outlives the
+        // group, which comes and goes with the compositing settings.
+        const entryId = failedId === DATA_POINTS_GROUP_ID ? deckHostLayerId("scatter") : failedId;
         const existing = this.layerFailures.get(entryId);
         if (existing) {
             existing.count++;
             return;
         }
         this.layerFailures.set(entryId, { ...failure, count: 1, dismissed: false });
-        const entry = this.config.renderStack?.entries.find((item) => item.id === entryId);
-        if (entry?.visible) {
-            entry.visible = false;
-            this.bumpRenderStackGeneration();
+        const stack = this.config.renderStack;
+        if (!stack) return;
+        let hidden = false;
+        // An overlay that follows this one (the grey scatter) goes off with it, as its checkbox does.
+        const deckId = deckIdFromHostLayerId(entryId);
+        const followers = deckId ? (DECK_OVERLAY_VISIBILITY_FOLLOWERS[deckId] ?? []).map(deckHostLayerId) : [];
+        for (const id of [entryId, ...followers]) {
+            const entry = findRenderStackEntry(stack, id);
+            if (entry?.visible) {
+                entry.visible = false;
+                hidden = true;
+            }
         }
+        if (hidden) this.bumpRenderStackGeneration();
     }
 
     clearLayerFailure(entryId: string) {
@@ -175,17 +202,41 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         else this.canvasErrors.push({ message, ...(stack ? { stack } : {}), count: 1, dismissed: false });
     }
 
-    /** Image and labels elements in the stack that are slow to load (`useRasterIssues`). Runtime only. */
-    rasterIssues: ElementIssues[] = [];
-    setRasterIssues(issues: ElementIssues[]) {
-        this.rasterIssues = issues;
+    /**
+     * What sd.js reports about each SpatialData layer, by entry id: why it could not load,
+     * and what is degraded but still drawing (see `entry_status.ts`). Runtime only.
+     */
+    entryStatuses = new Map<string, EntryStatus>();
+    setEntryStatus(entryId: string, status: EntryStatus | undefined) {
+        if (status) this.entryStatuses.set(entryId, status);
+        else this.entryStatuses.delete(entryId);
+    }
+    clearEntryStatuses() {
+        this.entryStatuses.clear();
+    }
+    /** Load errors taken off the menu pip (`entryStatusErrorKey`); they stay listed. */
+    dismissedLoadErrors = new Set<string>();
+
+    /** Load a layer's element again (the renderer's `retryEntry`), while the canvas is up. */
+    retryEntry?: (entryId: string) => Promise<void>;
+    setRetryEntry(retry: ((entryId: string) => Promise<void>) | undefined) {
+        this.retryEntry = retry;
     }
 
     /**
-     * The chart's read of its store, shared by the canvas and the layer dialog
-     * (`useChartSpatialData`). Not observable: the hook subscribes to the reader itself.
+     * The chart's read of its store, for the canvas and the layer dialog (`useChartSpatialData`).
+     * The page's reader, so charts on one store and Settings › Data quality share one read.
+     * Not observable: the hook subscribes to the reader itself.
      */
-    readonly spatialDataReader = createSpatialDataReader();
+    readonly spatialDataReader = sharedSpatialDataReader();
+
+    /**
+     * A layer's status without its element's storage issues, which stay quiet outside
+     * Settings › Data quality (`data_quality.ts`), and those issues.
+     */
+    visibleEntryStatus(entryId: string) {
+        return splitStorageIssues(this.entryStatuses.get(entryId));
+    }
 
     /** The store the canvas is showing, for linking to it. Runtime only. */
     spatialDataUrl: string | null = null;
@@ -193,34 +244,50 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         this.spatialDataUrl = url;
     }
 
-    /** Failed layers by display name, and a one-line summary of the chart's problems. */
+    /**
+     * Failed layers and layer statuses by display name, and a one-line summary of the
+     * chart's problems.
+     */
     get renderStatus() {
-        const entries = this.config.renderStack?.entries ?? [];
-        const failures = [...this.layerFailures].map(([entryId, failure]) => {
-            const entry = entries.find((item) => item.id === entryId);
-            return {
-                entryId,
-                failure,
-                name: entry ? renderStackEntryDisplayName(entry, this.config.renderStack) : entryId,
-            };
+        const stack = this.config.renderStack;
+        const nameOf = (entryId: string) => {
+            const entry = stack && findRenderStackEntry(stack, entryId);
+            return entry ? renderStackEntryDisplayName(entry, stack) : entryId;
+        };
+        const failures = [...this.layerFailures].map(([entryId, failure]) => ({
+            entryId,
+            failure,
+            name: nameOf(entryId),
+        }));
+        // storage issues are for Settings › Data quality: they neither count nor show here
+        const statuses = [...this.entryStatuses.keys()].flatMap((entryId) => {
+            const { status } = this.visibleEntryStatus(entryId);
+            return status ? [{ entryId, status, name: nameOf(entryId) }] : [];
         });
-        const errorCount = failures.filter((item) => !item.failure.dismissed).length + this.canvasErrors.length;
+        const renderErrorCount = failures.filter((item) => !item.failure.dismissed).length + this.canvasErrors.length;
+        const failedToLoad = statuses.filter(({ status }) => status.errors.length > 0);
+        const loadErrorCount = failedToLoad.filter(({ entryId, status }) =>
+            status.errors.some((error) => !this.dismissedLoadErrors.has(entryStatusErrorKey(entryId, error))),
+        ).length;
+        const noticeCount = statuses.filter(({ status }) => status.notices.length > 0).length;
         const summary = [
-            errorCount > 0 && `${errorCount} rendering ${errorCount === 1 ? "problem" : "problems"}`,
-            errorCount === 0 &&
+            renderErrorCount > 0 && `${renderErrorCount} rendering ${renderErrorCount === 1 ? "problem" : "problems"}`,
+            renderErrorCount === 0 &&
                 failures.length > 0 &&
                 `${failures.length} ${failures.length === 1 ? "layer" : "layers"} turned off`,
-            this.rasterIssues.length > 0 && "slow image data",
+            failedToLoad.length > 0 &&
+                `${failedToLoad.length} ${failedToLoad.length === 1 ? "layer" : "layers"} could not load`,
+            noticeCount > 0 && `${noticeCount} layer ${noticeCount === 1 ? "notice" : "notices"}`,
         ]
             .filter(Boolean)
             .join(" · ");
-        return { failures, errorCount, summary };
+        return { failures, statuses, errorCount: renderErrorCount + loadErrorCount, summary };
     }
 
     get statusPip(): MenuPip | null {
-        const { failures, errorCount, summary } = this.renderStatus;
+        const { failures, statuses, errorCount, summary } = this.renderStatus;
         if (errorCount > 0) return { level: "error", tooltip: summary };
-        if (failures.length > 0 || this.rasterIssues.length > 0) return { level: "notice", tooltip: summary };
+        if (failures.length > 0 || statuses.length > 0) return { level: "notice", tooltip: summary };
         return null;
     }
 
@@ -228,10 +295,17 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         return <SpatialStatusPanel chart={this} />;
     }
 
+    getDebugSettings() {
+        return getRenderBackendSettings(this.config);
+    }
+
     /** Clear the error count on the menu pip; failing layers stay marked in the layer dialog. */
     dismissRenderErrors() {
         for (const failure of this.layerFailures.values()) failure.dismissed = true;
         this.canvasErrors = [];
+        for (const [entryId, status] of this.entryStatuses) {
+            for (const error of status.errors) this.dismissedLoadErrors.add(entryStatusErrorKey(entryId, error));
+        }
     }
 
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: SpatialDataMdvReactConfig) {
@@ -271,8 +345,13 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             clearLayerFailure: action,
             recordCanvasError: action,
             dismissRenderErrors: action,
-            rasterIssues: observable.ref,
-            setRasterIssues: action,
+            // `.shallow`: a status is replaced whole when sd.js reports a change
+            entryStatuses: observable.shallow,
+            setEntryStatus: action,
+            clearEntryStatuses: action,
+            dismissedLoadErrors: observable,
+            retryEntry: observable.ref,
+            setRetryEntry: action,
             spatialDataUrl: observable,
             setSpatialDataUrl: action,
             renderStatus: computed,
@@ -333,6 +412,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 current_value: "Edit layers and data display…",
                 func: () => this.openLayerDialog(),
             }),
+            getCrosshairSetting(config),
+            getDensityGridSettingsFolder(config),
             g({
                 type: "dropdown",
                 label: `SpatialData (${dataStore.getColumnName(dataStore.regions?.region_field)})`,
@@ -346,7 +427,6 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                     config.background_filter.category = value;
                 },
             }),
-            ...getRenderBackendSettings(config),
         ]);
     }
 
@@ -400,6 +480,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         }
         // null only exists to keep the key observable; leave it out of saved views
         if (config.render_backend === null) config.render_backend = undefined;
+        if (config.grid === null) config.grid = undefined;
+        if (config.crosshair === null) config.crosshair = undefined;
         return config;
     }
 }

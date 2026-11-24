@@ -148,20 +148,15 @@ RUN echo 'cd /app/python && source .venv/bin/activate' >> ~/.bashrc && \
 #USER pn
 
 USER root
-RUN mkdir -p /app/mdv && chown -R pn:pn /app/mdv
+RUN mkdir -p /app/mdv /app/dev-db && chown -R pn:pn /app/mdv /app/dev-db
 USER pn
 
 
 # Command to run Gunicorn
-# NOTE: For multi-worker deployments (more than 1 worker), you MUST set REDIS_URL
-# environment variable. Flask-SocketIO requires Redis to share session state across workers.
-# Without Redis, you'll get "KeyError: 'Session is disconnected'" errors.
-# Example: REDIS_URL=redis://redis:6379/0
-#
-# Single worker (no Redis needed):
-#   -w 1
-#
-# Multi-worker (Redis required):
-#   -w 4  # or any number > 1
+# Keep -w 1. MDV does not support more than one worker:
+# - Flask-SocketIO is created without a message_queue, so sockets cannot be shared
+#   across workers. Nothing reads REDIS_URL, so setting it does not change this.
+# - Each worker keeps its own registry of served projects (ProjectBlueprint.blueprints),
+#   so a project created through one worker is missing from the others.
 CMD ["uv", "run", "--", "gunicorn", "-k", "gevent", "-t", "0", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--capture-output", "--log-level", "info", "mdvtools.dbutils.safe_mdv_app:app"]
 #CMD ["uv", "run", "--", "python", "-m", "mdvtools.dbutils.mdv_server_app"]

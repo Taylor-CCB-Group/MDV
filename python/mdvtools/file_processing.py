@@ -4,6 +4,7 @@ import json
 import uuid
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
+from mdvtools.mdvproject import datasource_display_name
 
 # Validate against a bounded sample so large uploads still flow through the
 # existing lazy Polars ingestion path without loading the entire file into memory.
@@ -458,6 +459,19 @@ def validate_datasource(project, request_data):
         raise ValidationError(
             f"Datasource '{name}' already exists, and 'replace' was not set in request"
         )
+
+    # A renamed datasource is shown under its display name, so a new one called that would
+    # look like a second datasource of the same name. `replace` only applies to identifiers.
+    # Datasources that were never renamed are covered by the check above, as before.
+    normalized = str(name).strip().casefold()
+    shown_names = [
+        (ds["name"], datasource_display_name(ds)) for ds in project.datasources
+    ]
+    if any(
+        identifier != name and shown != identifier and shown.casefold() == normalized
+        for identifier, shown in shown_names
+    ):
+        raise ValidationError(f"A datasource is already shown as '{name}'")
 
     supplied_only = request_data.get("supplied_only", False) if "supplied_only" in request_data else False
     

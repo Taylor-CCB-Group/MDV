@@ -1,5 +1,6 @@
 import BaseChart from "@/charts/BaseChart";
 import "@/charts/DensityScatterPlot";
+import "@/charts/MultiLineChart.js";
 import "@/charts/TableChart";
 import "@/charts/WGLScatterPlot";
 import "@/react/components/DeckScatterReactWrapper";
@@ -13,6 +14,7 @@ import {
 } from "@/charts/legacyCharts";
 import type DataStore from "@/datastore/DataStore";
 import { convertLegacyChartsSetting } from "@/lib/browserSettings";
+import { DEFAULT_ROTATION_ORBIT, DEFAULT_ROTATION_X } from "@/react/orbitView";
 
 afterEach(() => {
     convertLegacyChartsSetting.set("off");
@@ -53,6 +55,27 @@ describe("convertLegacyChartConfig", () => {
             const config = { type: "table_chart" };
             expect(convertLegacyChartConfig(config)).toBe("table_chart");
             expect(config).toEqual({ type: "table_chart_react" });
+        });
+
+        test("converts a classic multi-line chart, moving param to categories and values", () => {
+            convertLegacyChartsSetting.set("on");
+            const config = {
+                type: "multi_line_chart",
+                param: ["zscore_clipped_CD3", "sample_id"],
+                scaletrim: "0.05",
+                band_width: 0.1,
+                intervals: 100,
+            };
+            expect(convertLegacyChartConfig(config)).toBe("multi_line_chart");
+            expect(config).toMatchObject({
+                type: "multi_line_chart_react",
+                param: [],
+                categories: "sample_id",
+                values: ["zscore_clipped_CD3"],
+                scaletrim: "0.05",
+                band_width: 0.1,
+                intervals: 100,
+            });
         });
 
         test("converts a background filter, keeping the selected categories", () => {
@@ -96,7 +119,7 @@ describe("convertLegacyChartConfig", () => {
 
         test("leaves types with no equivalent alone", () => {
             convertLegacyChartsSetting.set("on");
-            for (const type of ["VivMdvRegionReact", "wgl_3d_scatter_plot", "DeckContourScatter"]) {
+            for (const type of ["VivMdvRegionReact", "DeckContourScatter", "DeckScatter3D"]) {
                 const config = { type };
                 expect(convertLegacyChartConfig(config)).toBeUndefined();
                 expect(config.type).toBe(type);
@@ -107,6 +130,10 @@ describe("convertLegacyChartConfig", () => {
 
 test("the classic table is legacy", () => {
     expect(BaseChart.types.table_chart.legacy).toBe(true);
+});
+
+test("the classic multi-line chart is legacy", () => {
+    expect(BaseChart.types.multi_line_chart.legacy).toBe(true);
 });
 
 describe("the Spatial Image Viewer", () => {
@@ -128,6 +155,7 @@ describe("converting a chart on request", () => {
         convertLegacyChartsSetting.set("off");
         expect(getLegacyConversionTarget({ type: "wgl_scatter_plot" })).toBe("DeckContourScatter");
         expect(getLegacyConversionTarget({ type: "table_chart" })).toBe("table_chart_react");
+        expect(getLegacyConversionTarget({ type: "multi_line_chart" })).toBe("multi_line_chart_react");
     });
 
     test("has no replacement for current charts or ones that cannot be converted", () => {
@@ -315,5 +343,137 @@ describe("the Spatial Image Viewer on a SpatialData region", () => {
         expect(
             getLegacyConversionTarget({ type: "VivMdvRegionReact", region: "other" } as never, spatialRegion),
         ).toBeUndefined();
+    });
+});
+
+describe("the classic 3D scatter plot", () => {
+    // saved by the classic chart (from real views)
+    const classic = () => ({
+        type: "wgl_3d_scatter_plot",
+        id: "c3",
+        title: "PCA",
+        param: ["pc1", "pc2", "pc3"],
+        camera: { distance: 63.96, theta: -1.038, phi: 0.261 },
+        center: [0.13, 0.19, 0.92],
+        axis_scales: [1, 1, 1],
+        radius: 5,
+        opacity: 0.8,
+        size: [300, 300],
+        brush: "default",
+        on_filter: "hide",
+        default_color: "#377eb8",
+        color_by: "leiden",
+        tooltip: { show: false },
+    });
+
+    /** Column ranges, as `getMinMaxForColumn` gives them. */
+    const withRanges = (ranges: Record<string, [number, number]>) =>
+        ({ getMinMaxForColumn: (column: string) => ranges[column] }) as unknown as DataStore;
+
+    test("loads as the deck 3D scatter plot whatever the setting", () => {
+        convertLegacyChartsSetting.set("off");
+        const config: Record<string, unknown> & { type: string } = classic();
+        expect(convertLegacyChartConfig(config)).toBe("wgl_3d_scatter_plot");
+        expect(config).toMatchObject({
+            type: "DeckScatter3D",
+            dimension: "3d",
+            orbit_axis: "Y",
+            param: ["pc1", "pc2", "pc3"],
+            title: "PCA",
+            opacity: 0.8,
+            on_filter: "hide",
+            color_by: "leiden",
+            tooltip: { show: false },
+            axis_scales: [1, 1, 1],
+        });
+        for (const key of ["camera", "center", "brush"]) expect(config).not.toHaveProperty(key);
+    });
+
+    test("keeps its camera, as an orbit view with y up", () => {
+        const config: { type: string; viewState?: any } = classic();
+        convertLegacyChartConfigNow(config);
+        const { target, zoom, rotationOrbit, rotationX } = config.viewState;
+        expect(target).toEqual([0.13, 0.19, 0.92]);
+        // a quarter turn on from theta, and phi up
+        expect(rotationOrbit).toBeCloseTo((-1.038 * 180) / Math.PI + 90);
+        expect(rotationX).toBeCloseTo((0.261 * 180) / Math.PI);
+        // a data unit is (plot height) / (distance * tan(22.5°)) pixels, as the classic chart drew it
+        expect(2 ** zoom).toBeCloseTo(250 / (63.96 * Math.tan(Math.PI / 8)), 1);
+    });
+
+    test("the classic default view is the one a new chart starts from", () => {
+        const config: { type: string; viewState?: any } = classic();
+        convertLegacyChartConfigNow(config);
+        expect(config.viewState.rotationOrbit).toBeCloseTo(DEFAULT_ROTATION_ORBIT, 0);
+        expect(config.viewState.rotationX).toBeCloseTo(DEFAULT_ROTATION_X, 0);
+    });
+
+    test("replaces a view saved when this type was briefly the deck chart", () => {
+        const config: ReturnType<typeof classic> & { viewState?: any } = {
+            ...classic(),
+            camera: { distance: 49.6, phi: 0, theta: 0 },
+            center: [0, 0, 0],
+            viewState: { target: [8.3, 2.6, 5.7], zoom: 3.8, rotationOrbit: 0, rotationX: 0 },
+        };
+        convertLegacyChartConfigNow(config);
+        expect(config.viewState.target).toEqual([0, 0, 0]);
+        expect(config.viewState.rotationOrbit).toBeCloseTo(90);
+    });
+
+    test("is fitted to its data when it saved no camera", () => {
+        const { camera, center, ...config }: Record<string, unknown> & { type: string } = {
+            ...classic(),
+            viewState: { target: [1, 2, 3], zoom: 1 },
+        };
+        convertLegacyChartConfigNow(config);
+        expect(config).not.toHaveProperty("viewState");
+    });
+
+    test("keeps its axis scales", () => {
+        const config = { ...classic(), axis_scales: [0.5, 0.5, 3] };
+        convertLegacyChartConfigNow(config);
+        expect(config.axis_scales).toEqual([0.5, 0.5, 3]);
+    });
+
+    test("draws its points the size they were at the saved view", () => {
+        const config: { type: string; radius: number; course_radius?: number; viewState?: any } = classic();
+        const ranges = { pc1: [-10, 30], pc2: [-5, 15], pc3: [-8, 8] } satisfies Record<string, [number, number]>;
+        convertLegacyChartConfigNow(config, withRanges(ranges));
+        // the deck chart's radius is a fraction of the larger x / y range, in data units
+        const deckPixelRadius =
+            ((config.radius * (config.course_radius ?? 1)) / 10000) * 40 * 2 ** config.viewState.zoom;
+        // the classic radius is a diameter
+        expect(deckPixelRadius).toBeCloseTo(2.5, 0);
+    });
+
+    test("does not start hiding rows with filters the classic chart never applied", () => {
+        const config: Record<string, unknown> & { type: string } = {
+            ...classic(),
+            background_filter: { column: "cell_type", categories: ["T", "B"], category: "T" },
+            category_filters: [{ column: "sample", category: ["a"] }],
+        };
+        convertLegacyChartConfigNow(config);
+        expect(config).not.toHaveProperty("background_filter");
+        expect(config).not.toHaveProperty("category_filters");
+    });
+
+    test("sizes points for data that only varies along z", () => {
+        const config: { type: string; radius: number; course_radius?: number; viewState?: any } = classic();
+        convertLegacyChartConfigNow(config, withRanges({ pc1: [2, 2], pc2: [3, 3], pc3: [-8, 8] }));
+        const deckPixelRadius =
+            ((config.radius * (config.course_radius ?? 1)) / 10000) * 16 * 2 ** config.viewState.zoom;
+        expect(deckPixelRadius).toBeCloseTo(2.5, 0);
+    });
+
+    test("keeps its point size when the column ranges are not known", () => {
+        const config = classic();
+        convertLegacyChartConfigNow(config);
+        expect(config.radius).toBe(5);
+    });
+
+    test("the deck chart under its older name converts too", () => {
+        const config = { type: "wgl_3d_scatter_plot_dev", viewState: { target: [0, 0, 0], zoom: 1 } };
+        expect(convertLegacyChartConfig(config)).toBe("wgl_3d_scatter_plot_dev");
+        expect(config).toEqual({ type: "DeckScatter3D", dimension: "3d", viewState: { target: [0, 0, 0], zoom: 1 } });
     });
 });

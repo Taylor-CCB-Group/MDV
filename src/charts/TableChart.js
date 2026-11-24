@@ -1,3 +1,4 @@
+import { getDataSourceDisplayName } from "@/datastore/dataSourceDisplayName";
 import { DataModel } from "../table/DataModel.js";
 import { RowSelectionModel } from "../table/RowSelectionModel.js";
 import { Overlays, SlickGrid, TextEditor } from "../table/SlickGrid.js";
@@ -221,7 +222,7 @@ class TableChart extends BaseChart {
         const save = createEl(
             "a",
             {
-                download: this.dataStore.name,
+                download: getDataSourceDisplayName(this.dataStore),
                 target: "_blank",
                 href: window.URL.createObjectURL(blob),
             },

@@ -60,6 +60,8 @@ chat_debug.log
 
 # as seen inside devcontainer
 mdv/
+# dev container SQLite volume mount point; the database itself lives in the dev-db volume
+dev-db/
 logs/
 
 # Playwright

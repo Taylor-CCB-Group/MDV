@@ -5,6 +5,22 @@ import { createSpatialDataReader } from "@/react/spatialdata/spatial_data_reader
 const fakeSpatialData = (url: string) => ({ url }) as unknown as SpatialData;
 
 describe("createSpatialDataReader", () => {
+    it("tells subscribers when a user action opens a store, where a render-time read stays silent", () => {
+        const reader = createSpatialDataReader(() => new Promise<SpatialData>(() => {}));
+        const listener = vi.fn();
+        reader.subscribe(listener);
+
+        reader.read("a");
+        expect(listener).not.toHaveBeenCalled();
+
+        expect(reader.peek("b")).toBeUndefined();
+        const opened = reader.open("b");
+        expect(listener).toHaveBeenCalledTimes(1);
+        expect(reader.peek("b")).toBe(opened);
+        expect(reader.open("b")).toBe(opened);
+        expect(listener).toHaveBeenCalledTimes(1);
+    });
+
     it("reads a store once however many trees ask for it", async () => {
         const load = vi.fn(async (url: string) => fakeSpatialData(url));
         const reader = createSpatialDataReader(load);

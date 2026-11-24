@@ -1,6 +1,6 @@
-import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
+import { type RenderStack, type RenderStackEntry, walkRenderStackEntries } from "@spatialdata/layers";
 
-import { DECK_OVERLAY_LABELS, deckIdFromHostLayerId } from "./host_overlay_ids";
+import { DATA_POINTS_GROUP_ID, DECK_OVERLAY_LABELS, deckIdFromHostLayerId } from "./host_overlay_ids";
 
 /**
  * Where a user-chosen layer name sits on an entry's `props`.
@@ -31,7 +31,13 @@ export function defaultRenderStackEntryName(entry: RenderStackEntry): string {
     if (entry.kind === "spatial") {
         return `${entry.source.elementType}: ${entry.source.elementKey}`;
     }
-    return entry.id;
+    return entry.id === DATA_POINTS_GROUP_ID ? DECK_OVERLAY_LABELS.scatter : "Group";
+}
+
+/** Entries whose default names would read the same: groups, or entries of one element. */
+function sameDefaultName(a: RenderStackEntry, b: RenderStackEntry): boolean {
+    const userGroup = (entry: RenderStackEntry) => entry.kind === "group" && entry.id !== DATA_POINTS_GROUP_ID;
+    return (userGroup(a) && userGroup(b)) || sameSpatialElement(a, b);
 }
 
 function sameSpatialElement(a: RenderStackEntry, b: RenderStackEntry): boolean {
@@ -54,11 +60,11 @@ export function renderStackEntryDisplayName(entry: RenderStackEntry, stack?: Ren
     return customDisplayName(entry) ?? numberedDefaultName(entry, stack);
 }
 
-/** The default name, numbered among entries of the same element (see `renderStackEntryDisplayName`). */
+/** The default name, numbered among groups or entries of the same element (see `renderStackEntryDisplayName`). */
 export function numberedDefaultName(entry: RenderStackEntry, stack?: RenderStack): string {
     const name = defaultRenderStackEntryName(entry);
-    if (!stack || entry.kind !== "spatial") return name;
-    const siblings = stack.entries.filter((item) => sameSpatialElement(item, entry));
+    if (!stack || entry.kind === "host") return name;
+    const siblings = Array.from(walkRenderStackEntries(stack.entries)).filter((item) => sameDefaultName(item, entry));
     if (siblings.length < 2) return name;
     return `${name} (${siblings.indexOf(entry) + 1})`;
 }

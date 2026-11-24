@@ -1,3 +1,4 @@
+import { getDataSourceDisplayName } from "@/datastore/dataSourceDisplayName";
 import { createMdvPortal } from "@/react/react_utils";
 import type DataStore from "../../datastore/DataStore.js";
 import { BaseDialog } from "../../utilities/Dialog.js";
@@ -15,7 +16,7 @@ export class AnnotationDialogReact extends BaseDialog {
     constructor(dataStore: DataStore) {
         super(
             {
-                title: `Annotate '${dataStore.name}'`,
+                title: `Annotate '${getDataSourceDisplayName(dataStore)}'`,
                 width: 560,
                 height: 740,
             },

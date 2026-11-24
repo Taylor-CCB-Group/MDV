@@ -49,6 +49,15 @@ export const DECK_OVERLAY_VISIBILITY_FOLLOWERS: Partial<Record<DeckOverlayId, De
     scatter: ["grey_scatter"],
 };
 
+/**
+ * The group the MDV data points (grey and coloured scatter) are composited in, while their
+ * compositing is not the default. Not a user group: the dialog lists it as "Data points".
+ */
+export const DATA_POINTS_GROUP_ID = "group:data-points";
+
+/** What the data points' group holds, in drawing order. */
+export const DATA_POINTS_GROUP_MEMBERS = ["deck:grey_scatter", "deck:scatter"];
+
 export function deckHostLayerId(deckId: DeckOverlayId): string {
     return `deck:${deckId}`;
 }

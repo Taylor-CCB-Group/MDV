@@ -548,6 +548,13 @@ class BaseChart<T extends BaseConfig> {
     getDebugPanel?(): ReactNode;
 
     /**
+     * Technical settings, offered in the chart's debug dialog rather than the regular settings dialog: things
+     * that matter when diagnosing a problem (such as the rendering backend) more than when using the chart.
+     * Optional.
+     */
+    getDebugSettings?(): GuiSpecs;
+
+    /**
      * needs to be implemented by subclasses
      */
     removeFilter() {}
@@ -560,6 +567,11 @@ class BaseChart<T extends BaseConfig> {
     onDataFiltered(dim?: Dimension) {}
 
     setToolTipColumn?(column: FieldSpec): void;
+    /**
+     * Sets what `param[index]` would be, for a chart that keeps its columns in named props instead.
+     * A link with `set_param` calls this when the chart has it, and writes `param` otherwise.
+     */
+    setParamAt?(index: number, column: FieldName): void;
     setBackgroundFilter?(column: FieldName): void;
     // only used by vanilla DensityScatterPlot
     changeContourParameter?(column: FieldName): void;

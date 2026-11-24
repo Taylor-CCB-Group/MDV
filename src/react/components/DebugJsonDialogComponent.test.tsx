@@ -1,6 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import type BaseChart from "@/charts/BaseChart";
+import { browserSettings, isSettingListed } from "@/lib/browserSettings";
+import { g } from "@/lib/utils";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import DebugJsonDialogComponent from "./DebugJsonDialogComponent";
 
@@ -95,11 +98,10 @@ describe("DebugJsonDialogComponent", () => {
         expect(screen.getAllByText("Raw config")).toHaveLength(2);
         expect(screen.getByText("Details")).toBeTruthy();
 
-        const topLevelJsonSource = mocks.jsonViewSources.at(-1);
-        expect(topLevelJsonSource).toMatchObject({
-            chartTypes: [],
-        });
-        expect(topLevelJsonSource).not.toHaveProperty("validationFindings");
+        // each top-level key is its own section; the supplied validationFindings payload is omitted
+        expect(mocks.jsonViewSources).toContainEqual([]);
+        expect(screen.queryByText("validationFindings")).toBeNull();
+        expect(JSON.stringify(mocks.jsonViewSources)).not.toContain("payload should not be supplied here");
     });
 
     test("renders the empty validation state", () => {
@@ -114,8 +116,167 @@ describe("DebugJsonDialogComponent", () => {
 
         render(<DebugJsonDialogComponent json={{ chartTypes: [] }} showValidationSection />);
 
-        fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+        fireEvent.click(screen.getByRole("button", { name: "Clear", hidden: true }));
 
         expect(store.hasAny).toBe(false);
+    });
+
+    describe("initial layout", () => {
+        const expandedOf = (title: string) =>
+            screen.getByRole("button", { name: title, hidden: true }).getAttribute("aria-expanded");
+
+        test("opens Preferences when there are no validation issues", () => {
+            render(<DebugJsonDialogComponent json={{ chartTypes: [] }} showValidationSection />);
+
+            expect(expandedOf("Preferences")).toBe("true");
+            expect(expandedOf("Debug and diagnostics")).toBe("false");
+        });
+
+        test("opens the validation issues instead when there are some, and keeps that after clearing", () => {
+            mocks.chartManager.validationFindings = buildStoreWithFindings();
+            render(<DebugJsonDialogComponent json={{ chartTypes: [] }} showValidationSection />);
+
+            expect(expandedOf("Preferences")).toBe("false");
+            expect(expandedOf("Debug and diagnostics")).toBe("true");
+            expect(expandedOf("Validation issues")).toBe("true");
+
+            fireEvent.click(screen.getByRole("button", { name: "Clear", hidden: true }));
+            expect(expandedOf("Debug and diagnostics")).toBe("true");
+        });
+    });
+
+    describe("search", () => {
+        const json = {
+            buildInfo: { version: "1.2.3", commit: "abc" },
+            datasources: [{ name: "cells" }],
+        };
+        const search = (value: string) =>
+            fireEvent.change(screen.getByLabelText("Search Settings, Sections and Data"), { target: { value } });
+
+        test("splits json into a section per top-level key", () => {
+            render(<DebugJsonDialogComponent json={json} />);
+
+            expect(screen.getByText("buildInfo")).toBeTruthy();
+            expect(screen.getByText("datasources")).toBeTruthy();
+        });
+
+        test("finds a section by title and a setting by label", async () => {
+            render(<DebugJsonDialogComponent json={json} />);
+
+            search("convert legacy");
+            // the search is debounced
+            await waitFor(() => expect(screen.queryByText("buildInfo")).toBeNull());
+            expect(screen.getByText("Preferences")).toBeTruthy();
+            expect(screen.queryByText("Fault Injection")).toBeNull();
+
+            search("buildinfo");
+            await waitFor(() => expect(screen.queryByText("Preferences")).toBeNull());
+            expect(screen.getByText("buildInfo")).toBeTruthy();
+            expect(screen.queryByText("datasources")).toBeNull();
+            expect(screen.queryByText("Preferences")).toBeNull();
+        });
+
+        test("reports when nothing matches", async () => {
+            render(<DebugJsonDialogComponent json={json} />);
+
+            search("zzz-no-such-thing");
+            expect(await screen.findByText("Nothing matches your search.")).toBeTruthy();
+        });
+
+        test("groups nested sections and gives each json its own filter", async () => {
+            render(
+                <DebugJsonDialogComponent
+                    json={{ project: { datasources: [{ name: "cells" }, { name: "genes" }], views: { a: 1 } } }}
+                    groupKeys={["project"]}
+                />,
+            );
+
+            expect(screen.getByText("project")).toBeTruthy();
+            expect(screen.getByText("datasources")).toBeTruthy();
+            expect(screen.getByText("views")).toBeTruthy();
+            expect(screen.getAllByLabelText("Filter")).toHaveLength(2);
+
+            fireEvent.change(screen.getAllByLabelText("Filter")[0], { target: { value: "genes" } });
+            // assert on what is rendered now, not on the history of renders
+            await waitFor(() => {
+                const rendered = screen.getAllByTestId("json-view").map((node) => node.textContent ?? "");
+                expect(rendered.filter((text) => text.includes("genes") && !text.includes("cells"))).toHaveLength(1);
+            });
+        });
+
+        test("shows Preferences first and groups debug content under Debug and diagnostics", () => {
+            render(<DebugJsonDialogComponent json={json} showValidationSection />);
+
+            const headings = screen.getAllByRole("heading", { level: 3, hidden: true }).map((h) => h.textContent);
+            expect(headings[0]).toBe("Preferences");
+            expect(headings[1]).toBe("Debug and diagnostics");
+            expect(headings.indexOf("buildInfo")).toBeGreaterThan(1);
+        });
+
+        test("shows a chart's config whole, open, after its status", async () => {
+            const config = { id: "c1", type: "SpatialDataChart", param: ["x", "y"], renderStack: [{ id: "a" }] };
+            render(
+                <DebugJsonDialogComponent
+                    json={config}
+                    jsonTitle="Chart config"
+                    chartPanel={<p>WebGPU device lost</p>}
+                />,
+            );
+
+            const headings = screen.getAllByRole("heading", { level: 3, hidden: true }).map((h) => h.textContent);
+            expect(headings.slice(0, 2)).toEqual(["Chart status", "Chart config"]);
+            expect(screen.getByText("WebGPU device lost")).toBeTruthy();
+            for (const key of ["General", "param", "renderStack"]) expect(screen.queryByText(key)).toBeNull();
+            expect(
+                screen.getByRole("button", { name: "Chart config", hidden: true }).getAttribute("aria-expanded"),
+            ).toBe("true");
+            const rendered = screen.getAllByTestId("json-view").map((node) => node.textContent);
+            expect(rendered).toEqual([JSON.stringify(config)]);
+
+            search("renderstack");
+            await waitFor(() =>
+                expect(screen.getAllByTestId("json-view").map((node) => node.textContent)).toEqual([
+                    JSON.stringify({ renderStack: config.renderStack }),
+                ]),
+            );
+        });
+
+        test("a chart's dialog has technical settings, and not the project-wide sections", async () => {
+            const chart = {
+                dataStore: {},
+                getDebugSettings: () => [
+                    g({ type: "check", label: "Rendering backend", current_value: false, func: () => {} }),
+                ],
+            } as unknown as BaseChart<any>;
+            render(
+                <DebugJsonDialogComponent
+                    json={{ id: "c1" }}
+                    jsonTitle="Chart config"
+                    chartPanel={<p>status</p>}
+                    chart={chart}
+                    showValidationSection
+                />,
+            );
+
+            const headings = screen.getAllByRole("heading", { level: 3, hidden: true }).map((h) => h.textContent);
+            expect(headings).toEqual(["Chart status", "Technical settings", "Chart config"]);
+            expect(screen.getByText("Rendering backend")).toBeTruthy();
+
+            search("rendering");
+            await waitFor(() => expect(screen.queryByText("Chart config")).toBeNull());
+            expect(screen.getByText("Technical settings")).toBeTruthy();
+
+            search("fault injection");
+            expect(await screen.findByText("Nothing matches your search.")).toBeTruthy();
+        });
+
+        test("every listed browser setting appears in Preferences, and unlisted previews don't", () => {
+            render(<DebugJsonDialogComponent json={json} />);
+
+            for (const setting of browserSettings) {
+                if (isSettingListed(setting)) expect(screen.getAllByText(setting.label).length).toBeGreaterThan(0);
+                else expect(screen.queryByText(setting.label)).toBeNull();
+            }
+        });
     });
 });

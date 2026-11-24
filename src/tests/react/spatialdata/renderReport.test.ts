@@ -43,6 +43,32 @@ describe("formatRenderReport", () => {
         expect(report).not.toContain("\\n");
     });
 
+    test("lists layers that could not load, and does not call that nothing", () => {
+        const report = formatRenderReport({
+            ...base,
+            failures: [],
+            canvasErrors: [],
+            loadErrors: [
+                {
+                    name: "image: he",
+                    errors: [
+                        {
+                            resource: "element",
+                            error: {
+                                kind: "element-not-found",
+                                message: "No image 'he'",
+                                retryable: false,
+                                elementKey: "he",
+                            },
+                        },
+                    ],
+                },
+            ],
+        });
+        expect(report).toContain("Layer could not load: image: he (element, element-not-found)\n    No image 'he'");
+        expect(report).not.toContain("No rendering problems recorded.");
+    });
+
     test("says so when there is nothing to report", () => {
         expect(formatRenderReport({ ...base, gpu: null, failures: [], canvasErrors: [] })).toContain(
             "GPU: not known yet",

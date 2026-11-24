@@ -1,4 +1,4 @@
-import type { DeckGLRef } from "@deck.gl/react";
+import type { Deck } from "@deck.gl/core";
 import { type RefObject, useEffect } from "react";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 import { useOuterContainer } from "../screen_state";
@@ -10,7 +10,7 @@ import { useOuterContainer } from "../screen_state";
  * manager was created, so without this a popped-out chart never sees the end of a tap or drag:
  * clicks, double-clicks and drags (including selection tools) silently do nothing.
  */
-export function useRebindDeckEvents(deckRef: RefObject<DeckGLRef | null>) {
+export function useRebindDeckEvents(deckRef: RefObject<{ deck?: Deck<any> | null } | null>) {
     const outerContainer = useOuterContainer();
     // biome-ignore lint/correctness/useExhaustiveDependencies: deckRef is stable; outerContainer is the trigger
     useEffect(() => {

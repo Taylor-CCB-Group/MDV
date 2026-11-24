@@ -84,6 +84,72 @@ attribute it to. Startup and rescan give every administrator ownership of one, s
 project list only shows a user the projects they hold a permission row for.
 _Avoid_: orphan, public project, shared project
 
+## Access terms
+
+**User**:
+A person who can sign in to one Independent MDV deployment, tied to the Auth0 account they
+first signed in with. A User on one deployment means nothing to another.
+_Avoid_: account, member, Auth0 user
+
+**Admin**:
+A User who can invite people and manage every User's access on their deployment. A deployment
+always keeps at least one active Admin.
+_Avoid_: administrator, superuser, Auth0 admin
+
+**Invitation**:
+An Admin's offer of access to one email address, naming the Sign-in method the person must use
+and a Project role on each chosen project. An Invitation sent to an existing User moves them to a
+new Sign-in method. It lasts 14 days, and a resend starts a new 14 days.
+_Avoid_: pending user, invite request, access request
+
+**Sign-in method**:
+The Auth0 connection a person signs in through: the deployment's password connection, or a
+Microsoft connection for an organisation whose staff sign in with their own work accounts.
+_Avoid_: provider, login type, Oxford login, Oxford user
+
+**Project role**:
+What a User may do in one project: Viewer, Editor or Owner.
+_Avoid_: permission level, access level
+
+**Deactivated user**:
+A User whose access an Admin removed. The deployment keeps them for history, and an Admin can
+reactivate them.
+_Avoid_: deleted user, blocked user, pending user
+
+## Project storage terms
+
+**Source store**:
+A zarr store a project reads bulk data from and never writes: a SpatialData store, AnnData zarr,
+or another zarr layout. May be copied into the project, linked, or remote.
+_Avoid_: original data, backing store, input zarr
+
+**Project repository**:
+The project's Icechunk repository, which holds everything MDV writes for the project and its
+history.
+_Avoid_: datafile, project store, h5 file
+
+**Project column**:
+A column whose values live in the Project repository: edits, annotations, job outputs, and every
+column of a project upgraded from h5.
+_Avoid_: editable column (editability is a permission, not a location), shadow column, h5 column
+
+**Source column**:
+A column whose values are read from a Source store.
+_Avoid_: zarr column, original column
+
+**Stored type**:
+The data type a column's values are kept in, at the precision they arrived with.
+_Avoid_: datatype (the legacy field, which mixes storage and treatment), original dtype
+
+**Column kind**:
+How charts and filters treat a column: numeric, categorical, unique or multi-valued. Follows from
+its Stored type and encoding.
+_Avoid_: datatype, column type
+
+**Legacy h5 project**:
+A project whose columns are in `datafile.h5`. Opened as before until it is upgraded.
+_Avoid_: old project, classic project
+
 ## Deployment terms
 
 **Deployable image**:

@@ -1,5 +1,6 @@
 import BaseChart from "@/charts/BaseChart";
 import "@/charts/DensityScatterPlot";
+import "@/charts/WGL3DScatterPlot";
 import "@/charts/WGLScatterPlot";
 import "@/react/components/DeckScatterReactWrapper";
 import { describe, expect, test } from "vitest";
@@ -19,7 +20,20 @@ describe("scatter plot chart types in the Add Chart dialog", () => {
         expect(type.legacy).toBeFalsy();
     });
 
-    test.each(["wgl_scatter_plot", "wgl_scatter_plot_dev", "density_scatter_plot"])("%s is legacy", (id) => {
+    test("the deck scatter plot is the 3D scatter plot", () => {
+        const type = BaseChart.types.DeckScatter3D;
+        expect(type.name).toBe("3D Scatter Plot");
+        expect(addable("DeckScatter3D")).toBe(true);
+        expect(type.legacy).toBeFalsy();
+    });
+
+    test.each([
+        "wgl_scatter_plot",
+        "wgl_scatter_plot_dev",
+        "density_scatter_plot",
+        "wgl_3d_scatter_plot",
+        "wgl_3d_scatter_plot_dev",
+    ])("%s is legacy", (id) => {
         expect(BaseChart.types[id].legacy).toBe(true);
     });
 
@@ -28,5 +42,6 @@ describe("scatter plot chart types in the Add Chart dialog", () => {
             .filter((t) => t.allow_user_add !== false && !t.legacy)
             .map((t) => t.name);
         expect(names.filter((n) => n === "2D Scatter Plot")).toHaveLength(1);
+        expect(names.filter((n) => n === "3D Scatter Plot")).toHaveLength(1);
     });
 });

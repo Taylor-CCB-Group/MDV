@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from flask.typing import ResponseReturnValue
 from typing import Optional, Tuple
 
+
 class AuthProvider(ABC):
     @abstractmethod
     def login(self) -> ResponseReturnValue:
@@ -36,9 +37,4 @@ class AuthProvider(ABC):
     @abstractmethod
     def validate_user(self) -> Tuple[Optional[dict], Optional[Tuple]]:
         """Validates and returns user data."""
-        pass
-
-    @abstractmethod
-    def sync_users_to_db(self):
-        """ Syncs users from the authentication provider (e.g., Auth0) to the application's database."""
         pass
