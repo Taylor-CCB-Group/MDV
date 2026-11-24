@@ -20,8 +20,15 @@ import type { ViewControllerOptions } from "../hooks/useGateLayers";
 import type { TooltipContent } from "../hooks/useOuterContainerDeckTooltip";
 import DeckCellGrid, { type DeckCellLabel } from "./DeckCellGrid";
 import { getDensityGridViewId } from "./densityGridUtils";
-import { isCrosshairShown } from "./pointerCrosshair";
-import { partitionRowsByRegion, type RegionRows, type SpatialRegionCell, spatialRegionCells } from "./regionGridUtils";
+import {
+    moveRegionViews,
+    partitionRowsByRegion,
+    type RegionRows,
+    type RegionViewState,
+    type SpatialRegionCell,
+    spatialRegionCells,
+    toRegionViewState,
+} from "./regionGridUtils";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import { composeStackLayers } from "./SpatialDensityGrid";
 import { useLayersForDevice } from "./scatterDeckShared";
@@ -44,6 +51,20 @@ const NO_ROWS = new Uint32Array(0);
 // the deck cell grid draws a layer only in the cell whose view id starts its id
 const getCellViewId = (chartId: string, cell: ChartArrayCell, index: number) =>
     getDensityGridViewId(chartId, cell.key, index);
+
+/**
+ * A region's view as deck's, the same object for the same state: a cell given an unchanged view
+ * does not render again when another cell moves.
+ */
+const orthographicViews = new WeakMap<RegionViewState, OrthographicViewState>();
+function toOrthographic(state: RegionViewState): OrthographicViewState {
+    let view = orthographicViews.get(state);
+    if (!view) {
+        view = { target: [state.target[0], state.target[1], 0], zoom: state.zoom };
+        orthographicViews.set(state, view);
+    }
+    return view;
+}
 
 /** Gives a layer an id under a cell's view id, so it draws only in that cell. */
 function inCell(viewId: string, layer: Layer): Layer {
@@ -236,12 +257,16 @@ export default observer(function SpatialRegionGrid({
         [cells, rowsByRegion],
     );
 
-    // Each cell's view, by region, so a cell keeps it when others come and go. Runtime only.
-    const [regionViewStates, setRegionViewStates] = useState<Record<string, OrthographicViewState>>({});
+    // Each cell's view, by region, on the chart (see `regionViewStates`), so it outlives the grid
+    // and is saved with the view.
+    const { regionViewStates } = chart;
+    const linkViews = config.grid?.link_views === true;
     const onFit = useCallback(
-        (regionKey: string, viewState: OrthographicViewState) =>
-            setRegionViewStates((states) => (states[regionKey] ? states : { ...states, [regionKey]: viewState })),
-        [],
+        (regionKey: string, viewState: OrthographicViewState) => {
+            if (chart.regionViewStates[regionKey]) return;
+            chart.setRegionViewStates({ ...chart.regionViewStates, [regionKey]: toRegionViewState(viewState) });
+        },
+        [chart],
     );
     const viewStates = useMemo(
         () =>
@@ -249,7 +274,7 @@ export default observer(function SpatialRegionGrid({
                 cells.flatMap((cell, index) => {
                     const state = regionViewStates[cell.key];
                     const viewId = grid.viewIds[index];
-                    return state && viewId ? [[viewId, state]] : [];
+                    return state && viewId ? [[viewId, toOrthographic(state)]] : [];
                 }),
             ),
         [cells, regionViewStates, grid.viewIds],
@@ -258,9 +283,9 @@ export default observer(function SpatialRegionGrid({
         (next: OrthographicViewState, viewId: string) => {
             const cell = cells[grid.viewIds.indexOf(viewId)];
             if (!cell) return;
-            setRegionViewStates((states) => ({ ...states, [cell.key]: next }));
+            chart.setRegionViewStates(moveRegionViews(regionViewStates, cell.key, toRegionViewState(next), linkViews));
         },
-        [cells, grid.viewIds],
+        [chart, cells, grid.viewIds, regionViewStates, linkViews],
     );
 
     const [cellLayers, setCellLayers] = useState<Readonly<Record<string, Layer[]>>>({});
@@ -314,7 +339,7 @@ export default observer(function SpatialRegionGrid({
                         vivPassthrough={vivPassthrough}
                         width={bounds.width}
                         height={bounds.height}
-                        viewState={regionViewStates[cell.key]}
+                        viewState={viewStates[viewId]}
                         onLayers={onLayers}
                         onFit={onFit}
                         publishesImageData={index === imageDataCell}
@@ -337,7 +362,6 @@ export default observer(function SpatialRegionGrid({
                 getTooltipContent={tooltipContent}
                 setKeyboardActive={host.setKeyboardActive}
                 onPointerLeave={host.onPointerLeave}
-                crosshair={isCrosshairShown(config)}
             />
         </>
     );

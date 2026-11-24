@@ -63,11 +63,9 @@ import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import { useOuterContainer } from "../screen_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import { useViewerStore, useViewerStoreApi, VivProvider } from "./avivatorish/state";
-import { CrosshairArea } from "./CrosshairArea";
 import { isDensityGridShown } from "./densityGridUtils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import FieldContourLegend from "./FieldContourLegend";
-import { isCrosshairShown } from "./pointerCrosshair";
 import { isRegionGridShown } from "./regionGridUtils";
 import SelectionOverlay from "./SelectionOverlay";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
@@ -307,25 +305,23 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     }
 
     return (
-        <CrosshairArea enabled={isCrosshairShown(config)}>
-            <SpatialViewer
-                width={width}
-                height={height}
-                viewState={spatialViewState}
-                onViewStateChange={onSpatialViewStateChange}
-                layers={renderer.deckLayers}
-                layerOrder={renderer.layerOrder}
-                renderStack={stackStructure}
-                vivLayerProps={renderer.vivLayerProps.length > 0 ? renderer.vivLayerProps : undefined}
-                // A prop, not part of `deckProps`: `SpatialViewer` spreads `deckProps` and then
-                // sets `onHover` from this prop, so one passed inside `deckProps` is overwritten
-                // with `undefined` and feature tooltips never appear. Only `info`: deck also
-                // passes its event, which `handleHover` would take for the tooltip's anchor.
-                onHover={(info) => handleHover(info)}
-                deckProps={deckProps}
-                deckRef={deckRef}
-            />
-        </CrosshairArea>
+        <SpatialViewer
+            width={width}
+            height={height}
+            viewState={spatialViewState}
+            onViewStateChange={onSpatialViewStateChange}
+            layers={renderer.deckLayers}
+            layerOrder={renderer.layerOrder}
+            renderStack={stackStructure}
+            vivLayerProps={renderer.vivLayerProps.length > 0 ? renderer.vivLayerProps : undefined}
+            // A prop, not part of `deckProps`: `SpatialViewer` spreads `deckProps` and then
+            // sets `onHover` from this prop, so one passed inside `deckProps` is overwritten
+            // with `undefined` and feature tooltips never appear. Only `info`: deck also
+            // passes its event, which `handleHover` would take for the tooltip's anchor.
+            onHover={(info) => handleHover(info)}
+            deckProps={deckProps}
+            deckRef={deckRef}
+        />
     );
 });
 

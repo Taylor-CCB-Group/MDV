@@ -35,7 +35,7 @@ import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "..
 import { createVivStores, type VivContextType } from "./avivatorish/state";
 import { BaseReactChart } from "./BaseReactChart";
 import { getCrosshairSetting } from "./pointerCrosshair";
-import { getSpatialDataGridSettingsFolder } from "./regionGridUtils";
+import { getSpatialDataGridSettingsFolder, type RegionViewState, toRegionViewState } from "./regionGridUtils";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialStatusPanel from "./SpatialStatusPanel";
@@ -49,6 +49,8 @@ export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     background_filter: CategoryFilter;
     renderStack?: RenderStack;
     viewState?: SpatialDataSerializableViewState | null;
+    /** Each region's view in a grid with a cell per region, by region. */
+    regionViewStates?: Record<string, SpatialDataSerializableViewState>;
     /** Experimental; null (or absent) follows the browser's default (see `deck_backend.ts`). */
     render_backend?: DeckBackend | null;
     /**
@@ -241,6 +243,16 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         return splitStorageIssues(this.entryStatuses.get(entryId));
     }
 
+    /**
+     * Each region's view in a region grid, by region: kept here rather than in the grid, so it
+     * outlives the grid (the grid turned off and on), and saved by `getConfig`, as the single
+     * view's is. A region without one is fitted to its layers.
+     */
+    regionViewStates: Readonly<Record<string, RegionViewState>> = {};
+    setRegionViewStates(next: Readonly<Record<string, RegionViewState>>) {
+        this.regionViewStates = next;
+    }
+
     /** The store the canvas is showing, for linking to it. Runtime only. */
     spatialDataUrl: string | null = null;
     setSpatialDataUrl(url: string | null) {
@@ -314,10 +326,15 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: SpatialDataMdvReactConfig) {
         const seedDefaultSpatialLayers = originalConfig.renderStack === undefined;
         const config = adaptSpatialDataConfig(originalConfig, dataStore);
-        const { defaultImageLayer } = config;
+        const { defaultImageLayer, regionViewStates } = config;
         config.defaultImageLayer = undefined;
+        // live on the chart (`regionViewStates`); `getConfig` writes them back
+        config.regionViewStates = undefined;
         super(dataStore, div, config, SpatialDataChartRoot);
         this.seedDefaultSpatialLayers = seedDefaultSpatialLayers;
+        this.regionViewStates = Object.fromEntries(
+            Object.entries(regionViewStates ?? {}).map(([region, state]) => [region, toRegionViewState(state)]),
+        );
         if (seedDefaultSpatialLayers) this.defaultImageLayerProps = defaultImageLayer;
         this.colorByColumn(config.color_by);
         makeObservable(this, {
@@ -356,6 +373,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             retryEntry: observable.ref,
             setRetryEntry: action,
             spatialDataUrl: observable,
+            regionViewStates: observable.ref,
+            setRegionViewStates: action,
             setSpatialDataUrl: action,
             renderStatus: computed,
             statusPip: computed,
@@ -481,6 +500,10 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         if (this.config.renderStack) {
             config.renderStack = this.config.renderStack;
         }
+        // regions the datasource no longer has are dropped
+        const regions = this.dataStore.regions?.all_regions ?? {};
+        const regionViewStates = Object.entries(this.regionViewStates).filter(([region]) => region in regions);
+        config.regionViewStates = regionViewStates.length > 0 ? Object.fromEntries(regionViewStates) : undefined;
         // null only exists to keep the key observable; leave it out of saved views
         if (config.render_backend === null) config.render_backend = undefined;
         if (config.grid === null) config.grid = undefined;

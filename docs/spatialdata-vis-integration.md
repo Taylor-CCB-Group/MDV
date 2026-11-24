@@ -271,7 +271,15 @@ that fail while *drawing*.
   (`getActiveChartScopeFilters`), so the points layer has every region's rows. The grid splits
   them by `region_field` and clones the layer per cell, mapping picks back to positions in all
   the rows for the layer's own handlers. `hide_empty` leaves out regions with no rows left.
-- **Views are per cell**, fitted to each region, and held only while the chart is open.
+- **Views are per cell**, fitted to each region when it has none. They are kept on the chart
+  (`regionViewStates`), not in the grid, so they survive the grid being turned off and on and
+  a region being filtered out and back, and `getConfig` saves them, without regions the
+  datasource no longer has. `link_views` moves every cell as the one being moved moves on
+  screen (the same change of zoom, the same pan in pixels; `moveRegionViews`), so each keeps
+  its own framing. A link to the same world view would suit stores in one aligned coordinate
+  system; it is not there yet.
+- **No crosshair.** Its lines mark the same offset in every cell, which only means something
+  when the cells share a view (the density grid). Single views have none either.
 - **Image controls.** The layer dialog's histograms come from one cell's images: the chart's own
   region when its cell is in view, else the first cell in view. That cell publishes the image
   layer registry, with its `region`, and the panel names it. The channel settings themselves are
