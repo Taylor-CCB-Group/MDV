@@ -163,7 +163,7 @@ describe("DebugJsonDialogComponent", () => {
         test("finds a section by title and a setting by label", async () => {
             render(<DebugJsonDialogComponent json={json} />);
 
-            search("convert legacy");
+            search("rendering backend");
             // the search is debounced
             await waitFor(() => expect(screen.queryByText("buildInfo")).toBeNull());
             expect(screen.getByText("Preferences")).toBeTruthy();
