@@ -92,9 +92,11 @@ These are the unexpected consequences to check before generalising.
 - **Scale.** Virtualisation only covers drawing. Loading every cell's column up front (#693),
   one worker per cell's compute, and one dimension per brushed cell all grow with the cell count.
   A grid over 1,000 genes needs lazy loading first.
-- **Image export.** `buildChartSvg` copies the chart's SVGs at their on-screen positions. In a
-  grid it exports the mounted cells only, which are the ones in view, at their scrolled
-  positions. A grid export needs to lay out every cell, which means drawing the ones out of view.
+- **Image export.** `buildChartSvg` copies the chart's SVGs at their on-screen positions, and a
+  grid only mounts the cells in view. The multi-line chart's export draws every cell first, 16 at
+  a time (each starts a density worker), then exports the grid's whole layout. Once cells load
+  their data lazily (#693), export would also load every column: a grid over 1,000 genes needs a
+  limit, a warning or a choice of which cells to export before that becomes the default.
 - **Legends and axes.** One legend per chart works when every cell has the same categories and
   colours. A field split coloured by field (the multi-line chart's `by: "categories"` mode)
   needs a field legend instead. Sharing an axis only makes sense when the units are comparable,

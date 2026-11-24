@@ -179,10 +179,12 @@ const CELL_BORDER = 1;
 type GridProps = Omit<CellProps, "width" | "height" | "column" | "xDomain" | "inGrid"> & {
     columns: NumberColumn[];
     xDomains: XDomain[];
+    /** Also draw the first this many cells, not only those in view: for an image of the whole grid. */
+    exportCellCount: number;
 };
 
-/** A cell per value, through `ChartArrayLayout`; cells out of view draw nothing. */
-function MultiLineGrid({ columns, xDomains, ...cellProps }: GridProps) {
+/** A cell per value, through `ChartArrayLayout`; cells out of view draw nothing unless exported. */
+function MultiLineGrid({ columns, xDomains, exportCellCount, ...cellProps }: GridProps) {
     const chartId = useChartID();
     const cells = useMemo(() => columns.map((c) => ({ key: c.field, label: c.name })), [columns]);
     const grid = useChartArrayGrid({ chartId, cells });
@@ -191,7 +193,7 @@ function MultiLineGrid({ columns, xDomains, ...cellProps }: GridProps) {
         const bounds = grid.getCellBounds(index);
         const column = columns[index];
         const xDomain = xDomains[index];
-        if (!visible.has(index) || !bounds || !column || !xDomain) return null;
+        if ((index >= exportCellCount && !visible.has(index)) || !bounds || !column || !xDomain) return null;
         return (
             <MultiLineCell
                 {...cellProps}
@@ -267,7 +269,15 @@ const MultiLineComponent = observer(function MultiLineComponent() {
             />
         );
     }
-    return <MultiLineGrid columns={columns} xDomains={xDomains} categoryColumn={categoryColumn} colors={colors} />;
+    return (
+        <MultiLineGrid
+            columns={columns}
+            xDomains={xDomains}
+            categoryColumn={categoryColumn}
+            colors={colors}
+            exportCellCount={chart.exportCellCount}
+        />
+    );
 });
 
 export default MultiLineComponent;

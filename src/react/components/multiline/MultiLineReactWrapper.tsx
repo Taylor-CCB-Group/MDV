@@ -27,6 +27,30 @@ import {
     withBrush,
 } from "./multiLineConfig";
 
+/**
+ * An export draws the cells out of view this many at a time, as each computes its densities in a
+ * worker of its own: a grid of hundreds of values would otherwise start hundreds at once.
+ */
+const CELL_EXPORT_BATCH = 16;
+/** How long an export waits for a batch of cells; it moves on with what it has after. */
+const CELL_EXPORT_TIMEOUT_MS = 20_000;
+
+/** Resolves once the first `count` cells of `grid` have drawn something (curves, or a message), or on timeout. */
+function waitForCells(grid: HTMLElement, count: number, timeoutMs: number) {
+    const view = grid.ownerDocument.defaultView ?? window;
+    const start = performance.now();
+    return new Promise<void>((resolve) => {
+        const check = () => {
+            const cells = [...grid.querySelectorAll(".mdv-chart-array__cell")].slice(0, count);
+            const drawn = cells.every((cell) => cell.childElementCount > 0);
+            if (drawn || performance.now() - start > timeoutMs) resolve();
+            else view.requestAnimationFrame(check);
+        };
+        // let the cells mount first
+        view.requestAnimationFrame(check);
+    });
+}
+
 export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
     /** Bumped when the data or colours of a column this chart draws are changed in place, so it redraws. */
     dataVersion = 0;
@@ -38,6 +62,11 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
     readonly dims = observable.map<FieldName, Dimension>({}, { deep: false });
     /** The filter range each dimension has, as a string, so an unchanged brush isn't refiltered. */
     private appliedRanges = new Map<FieldName, string>();
+    /**
+     * While an image is made, a grid also draws its first this many cells, not only those in
+     * view; 0 otherwise.
+     */
+    exportCellCount = 0;
 
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: SavedMultiLineConfig) {
         const config = adaptMultiLineConfig(originalConfig);
@@ -51,6 +80,8 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
             bumpDataVersion: action,
             setBrush: action,
             removeFilter: action,
+            exportCellCount: observable,
+            setExportCellCount: action,
             setValues: action,
             setCategories: action,
         });
@@ -70,9 +101,13 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
         const fields = flattenFields(this.config.values);
         for (const [field, dim] of [...this.dims]) {
             if (!fields.includes(field)) {
-                // no longer drawn
+                // no longer drawn (a live query can drop it without `setValues`): a brush doesn't
+                // outlive its column, or it would filter again if the column came back
                 dim.destroy();
-                runInAction(() => this.dims.delete(field));
+                runInAction(() => {
+                    this.dims.delete(field);
+                    this.config.brush = withBrush(this.config.brush, field, null);
+                });
                 this.appliedRanges.delete(field);
             } else if (!brush[field] && this.appliedRanges.has(field)) {
                 dim.removeFilter();
@@ -177,17 +212,48 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
 
     /** For the chart menu's "create svg/png image". */
     getImage(callback: (image: string | HTMLCanvasElement) => void, type: "png" | "svg") {
-        const style = this.contentDiv.style;
-        const textColor = style.getPropertyValue("--text_color");
-        style.setProperty("--text_color", "black");
-        const svg = buildChartSvg(this.contentDiv);
-        if (textColor) style.setProperty("--text_color", textColor);
-        else style.removeProperty("--text_color");
-        if (type === "svg") {
-            callback(new XMLSerializer().serializeToString(svg));
+        void this.withEveryCellDrawn((container) => {
+            const style = this.contentDiv.style;
+            const textColor = style.getPropertyValue("--text_color");
+            style.setProperty("--text_color", "black");
+            const svg = buildChartSvg(container);
+            if (textColor) style.setProperty("--text_color", textColor);
+            else style.removeProperty("--text_color");
+            if (type === "svg") {
+                callback(new XMLSerializer().serializeToString(svg));
+                return;
+            }
+            this.getImageFromSVG(svg, (canvas) => callback(canvas));
+        });
+    }
+
+    setExportCellCount(count: number) {
+        this.exportCellCount = count;
+    }
+
+    /**
+     * Calls `draw` with the element to export. A grid only draws the cells in view, so for a grid
+     * every cell is drawn first, a batch at a time (each computes its densities), and the grid's
+     * whole layout is exported rather than the scrolled part of it. Once values load lazily (#693),
+     * this also loads every value, which wants a limit or a warning for a large grid.
+     */
+    private async withEveryCellDrawn(draw: (container: HTMLElement) => void) {
+        const grid = this.contentDiv.querySelector<HTMLElement>(".mdv-chart-array");
+        if (!grid) {
+            draw(this.contentDiv);
             return;
         }
-        this.getImageFromSVG(svg, (canvas) => callback(canvas));
+        const cellCount = grid.querySelectorAll(".mdv-chart-array__cell").length;
+        try {
+            for (let count = CELL_EXPORT_BATCH; ; count += CELL_EXPORT_BATCH) {
+                this.setExportCellCount(Math.min(count, cellCount));
+                await waitForCells(grid, count, CELL_EXPORT_TIMEOUT_MS);
+                if (count >= cellCount) break;
+            }
+            draw(grid);
+        } finally {
+            this.setExportCellCount(0);
+        }
     }
 
     /**

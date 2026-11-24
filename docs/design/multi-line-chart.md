@@ -86,6 +86,8 @@ What landed:
   chooses the layout, as proposed above.
 - A cell is mounted only while it is in view (`visibleCellIndices`), so only those cells compute
   densities. Every value's data is still loaded up front (that is 4).
+- Image export draws every cell, 16 at a time, and exports the whole grid, not the scrolled
+  part. With lazy values (4) that loads every value, which a large grid shouldn't do unasked.
 - x: a domain per cell by default; `share_x` gives every cell the union of their domains, and the
   same kernel width in data units. The band width slider reads the first cell's domain.
 - `ChartGridConfigSchema.by` is now built per chart type (`chartGridConfigSchema([...props])`);
@@ -128,7 +130,8 @@ data, so labels, layout and x scales are ready at once. Cells without data show 
 - Then the same hook for the density grid (`useDensityGridCellLayers` already filters by
   `visibleCellIndices`) and for selection dialog entries.
 - Anything that needs every value at once (a shared auto scale computed from data, clustering)
-  has to come from metadata or wait for all of them; flag it per feature.
+  has to come from metadata or wait for all of them; flag it per feature. Image export is one: it
+  draws every cell today, so with lazy values it needs a limit or a warning for a large grid.
 
 ### 5. Column groups as a `values` source (#413)
 
