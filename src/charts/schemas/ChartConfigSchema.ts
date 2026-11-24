@@ -179,13 +179,18 @@ const ContourVisualConfigSchema = z
  * Draw a chart as a grid of small multiples, one cell per value of a property of its config.
  * Layout options (cell size, columns) belong here too; for now the defaults apply.
  */
-export const ChartGridConfigSchema = z
-    .object({
-        by: z
-            .enum(["densityFields"])
-            .describe("The config property whose values make the cells, e.g. one cell per density field"),
-    })
-    .describe("Show the chart as a grid of cells, one per value of a config property");
+export function chartGridConfigSchema<const T extends readonly [string, ...string[]]>(props: T) {
+    return z
+        .object({
+            by: z
+                .enum(props)
+                .describe("The config property whose values make the cells, e.g. one cell per density field"),
+        })
+        .describe("Show the chart as a grid of cells, one per value of a config property");
+}
+
+/** The grid of a chart that draws density fields: a cell per field. Each chart type names its own props. */
+export const ChartGridConfigSchema = chartGridConfigSchema(["densityFields"]);
 
 export type ChartGridConfig = z.infer<typeof ChartGridConfigSchema>;
 
@@ -441,7 +446,7 @@ export const MultiLineChartConfigSchema = BaseConfigSchema.extend({
 export const MultiLineReactConfigSchema = BaseConfigSchema.extend({
     type: z.literal("multi_line_chart_react").describe("React multi-line chart type"),
     categories: z.string().nullable().optional().describe("Category column: one line per value of it"),
-    values: FieldSpecsSchema.optional().describe("Numeric fields: one density curve per category, per field"),
+    values: FieldSpecsSchema.optional().describe("Numeric fields: a cell per field, with a density curve per category"),
     stacked: z.boolean().optional().describe("One row per category instead of overlaid lines"),
     fill: z.boolean().optional().describe("Fill under each line"),
     scaletrim: ScaleTrimSchema.nullable().optional(),
@@ -455,12 +460,16 @@ export const MultiLineReactConfigSchema = BaseConfigSchema.extend({
         ),
     intervals: z.number().int().positive().optional().describe("Roughly how many points each line has"),
     fit_labels: z.boolean().optional().describe("Fit the axis margins to the labels; off, the axis sizes are used"),
-    brush: z
-        .tuple([z.number(), z.number()])
+    grid: chartGridConfigSchema(["values"])
         .nullable()
         .optional()
-        .describe("The brushed range of the value, in data units, which filters other charts; null for none"),
-}).describe("Configuration for density curves of numeric values, one per category; `param` is unused");
+        .describe("Several values are drawn a cell per value whatever this is; it chooses the layout"),
+    share_x: z.boolean().optional().describe("One x scale for every cell, for values in comparable units"),
+    brush: z
+        .record(z.string(), z.tuple([z.number(), z.number()]))
+        .optional()
+        .describe("The brushed range of each value, in data units, by field; each filters other charts"),
+}).describe("Configuration for density curves of numeric values, one per category and value; `param` is unused");
 
 export const MultiBoxPlotConfigSchema = BaseConfigSchema.extend({
     type: z.literal("multi_box_plot").describe("Multi-box plot chart type"),
