@@ -90,6 +90,8 @@ What landed:
   same kernel width in data units. The band width slider reads the first cell's domain.
 - `ChartGridConfigSchema.by` is now built per chart type (`chartGridConfigSchema([...props])`);
   the multi-line chart's only prop is `"values"`.
+- Making grids generic across charts and props is sketched, with its risks, in
+  [chart-grid.md](chart-grid.md).
 - Not yet: `grid: { by: "categories" }` (a cell per category, a line per value). Lines of
   different values only share an axis when x is shared, so it needs `share_x` or a normalised x.
 
