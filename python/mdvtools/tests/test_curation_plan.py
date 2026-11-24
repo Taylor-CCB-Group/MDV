@@ -15,6 +15,7 @@ from mdvtools.examples.curate_mdv_project import (
     plan_question_views,
     split_category_values,
     stored_name,
+    table_kind,
 )
 from mdvtools.examples.rename_softdelete_mdv_project_fields import (
     apply_plan,
@@ -162,12 +163,36 @@ def test_derm_and_taurus_column_names_get_roles():
     assert column_role({"name": "Major Cell Type"}) == "cell_type"
 
 
+def test_unrenamed_cell_fields_and_prot_table_are_recognized():
+    assert column_role({"name": "bucket"}) == "cell_group"
+    assert column_role({"name": "sub_bucket"}) == "cell_subgroup"
+    assert column_role({"name": "annotation"}) == "cell_type"
+    assert table_kind("prot") == 2
+    assert table_kind("protein") == 2
+    assert table_kind("rna") == 0
+
+
 def test_protein_names_match_hyphen_or_underscore():
     available = {"adt-CD14", "adt-CD1c", "adt-PD-L1"}
     assert stored_name(available, "adt_CD14") == "adt-CD14"
     assert stored_name(available, "adt_CD1c") == "adt-CD1c"
     assert stored_name(available, "adt_PD-L1") == "adt-PD-L1"
     assert stored_name(available, "adt_CD99") is None
+
+
+def test_new_question_views_keep_protein_beside_the_gene_view():
+    ordered = arrange_views(
+        ["Cell atlas", "summary"],
+        {
+            Q1_VIEW_NAME: {},
+            PROTEIN_VIEW_NAME: {},
+            "Is the expression different between disease stages/patient groups/tissue types?": {},
+            CONCORD_VIEW_NAME: {},
+        },
+    )
+    assert ordered[:2] == ["Cell atlas", "summary"]
+    assert ordered[ordered.index(Q1_VIEW_NAME) + 1] == PROTEIN_VIEW_NAME
+    assert ordered[ordered.index(PROTEIN_VIEW_NAME) + 1] == CONCORD_VIEW_NAME
 
 
 def test_protein_view_follows_the_gene_view_and_omitted_views_are_dropped():

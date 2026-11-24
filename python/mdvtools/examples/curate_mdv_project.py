@@ -118,9 +118,12 @@ TREATMENT_STAGE_PAIRS = (
 ROLE_BY_NAME = {
     "cell group": "cell_group",
     "cell compartment": "cell_group",
+    "bucket": "cell_group",
     "cell type": "cell_type",
     "cell state": "cell_type",
+    "annotation": "cell_type",
     "cell subgroup": "cell_subgroup",
+    "sub_bucket": "cell_subgroup",
     "diagnosis": "diagnosis",
     "diagnosed disease": "diagnosis",
     "disease": "diagnosis",
@@ -235,7 +238,7 @@ def linked_tables(
 
 def table_kind(name: str) -> int:
     folded = name.casefold()
-    if "protein" in folded or folded.startswith("adt"):
+    if folded in {"prot", "protein", "adt"} or "protein" in folded or folded.startswith("adt"):
         return 2
     if folded in {"rna", "genes", "gene"} or "gene" in folded:
         return 0
@@ -1100,6 +1103,12 @@ def plan_question_views(
 def arrange_views(all_views: list[str], built: dict[str, Any]) -> list[str]:
     """Drop omitted views and place the protein view immediately after the gene view."""
     names = [name for name in all_views if name not in OMITTED_VIEW_NAMES]
+    # Add the new question views before placing protein and concordance, so a
+    # project that does not already list the gene view still gets protein next to it.
+    placed_later = {PROTEIN_VIEW_NAME, CONCORD_VIEW_NAME}
+    for name in built:
+        if name not in names and name not in placed_later:
+            names.append(name)
     protein = PROTEIN_VIEW_NAME if PROTEIN_VIEW_NAME in built else None
     if protein:
         if protein in names:
