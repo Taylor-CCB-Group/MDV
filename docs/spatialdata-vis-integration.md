@@ -272,8 +272,13 @@ that fail while *drawing*.
   them by `region_field` and clones the layer per cell, mapping picks back to positions in all
   the rows for the layer's own handlers. `hide_empty` leaves out regions with no rows left.
 - **Views are per cell**, fitted to each region, and held only while the chart is open.
+- **Image controls.** The layer dialog's histograms come from one cell's images: the chart's own
+  region when its cell is in view, else the first cell in view. That cell publishes the image
+  layer registry, with its `region`, and the panel names it. The channel settings themselves are
+  the stack entry's props, so they apply to every cell. Overlaying the histograms of every
+  region in view would show whether one set of limits suits them all; that is not done yet.
 - **Not in cells yet:** selection tools, gates, density, grey (filtered-out) points, feature
-  tooltips, layer status and the image layer registry (the layer dialog's histograms).
+  tooltips and layer status.
 
 ## The points layer panel
 

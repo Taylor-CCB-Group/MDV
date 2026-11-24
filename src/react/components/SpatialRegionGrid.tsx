@@ -9,8 +9,9 @@ import {
 } from "@spatialdata/vis";
 import type { Layer, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
-import { memo, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
+import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { useChart } from "../context";
 import { useChartID, useConfig, useFieldSpec } from "../hooks";
@@ -52,10 +53,11 @@ function inCell(viewId: string, layer: Layer): Layer {
 /**
  * The layers of one region's cell: its SpatialData drawn with the chart's layers, each under the
  * cell's view id. Draws nothing itself; it reports the layers (and a view that fits them, until
- * the cell has one) to the grid, which draws every cell from one deck. Memoised: the grid renders
- * again whenever a cell reports, and a cell rendered again with the same props would report again.
+ * the cell has one) to the grid, which draws every cell from one deck. Memoised (as an observer):
+ * the grid renders again whenever a cell reports, and a cell rendered again with the same props
+ * would report again.
  */
-const RegionCellLayers = memo(function RegionCellLayers({
+const RegionCellLayers = observer(function RegionCellLayers({
     cell,
     viewId,
     layerInputs,
@@ -66,6 +68,7 @@ const RegionCellLayers = memo(function RegionCellLayers({
     viewState,
     onLayers,
     onFit,
+    publishesImageData,
 }: {
     cell: SpatialRegionCell;
     viewId: string;
@@ -77,8 +80,11 @@ const RegionCellLayers = memo(function RegionCellLayers({
     viewState: OrthographicViewState | undefined;
     onLayers: (viewId: string, layers: Layer[] | null) => void;
     onFit: (regionKey: string, viewState: OrthographicViewState) => void;
+    /** Whether the layer dialog's image controls (histograms) read this cell's images. */
+    publishesImageData: boolean;
 }) {
-    const reader = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>().spatialDataReader;
+    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    const reader = chart.spatialDataReader;
     const getSnapshot = useCallback(() => reader.read(cell.url).state, [reader, cell.url]);
     const { spatialData } = useSyncExternalStore(reader.subscribe, getSnapshot);
     const { layers, layerOrder } = useAssociatedShapesLayerInputs(spatialData ?? undefined, layerInputs, cell.file);
@@ -116,6 +122,22 @@ const RegionCellLayers = memo(function RegionCellLayers({
 
     useEffect(() => onLayers(viewId, cellLayers), [onLayers, viewId, cellLayers]);
     useEffect(() => () => onLayers(viewId, null), [onLayers, viewId]);
+
+    // The layer dialog's image controls read one store's images, as in the single view. The stack
+    // is edited in place, so a new generation means a new registry, as there.
+    const stack = chart.config.renderStack;
+    const generation = chart.renderStackGeneration;
+    const { getImageLoadedDataByElementKey, getLayerLoadState } = renderer;
+    useEffect(() => {
+        void generation;
+        if (!publishesImageData || !stack) return;
+        const registry = createImageLayerRegistry(stack, getImageLoadedDataByElementKey, getLayerLoadState, cell.key);
+        chart.setImageLayerRegistry(registry);
+        return () => {
+            // another cell may have published since
+            if (chart.imageLayerRegistry === registry) chart.setImageLayerRegistry(undefined);
+        };
+    }, [chart, publishesImageData, stack, generation, getImageLoadedDataByElementKey, getLayerLoadState, cell.key]);
 
     // fit the cell to its region once its layers have bounds, as the single view does
     const { getWorldBoundsForVisibleLayers, hasEnabledLayers, hasLayersDrawn, isBlocking } = renderer;
@@ -252,6 +274,8 @@ export default observer(function SpatialRegionGrid({
     }, []);
 
     const visibleCells = grid.visibleCellIndices;
+    // the image controls read the chart's own region when it is in view, else the first cell in view
+    const imageDataCell = visibleCells.find((index) => cells[index]?.key === config.region) ?? visibleCells[0];
     const layers = useMemo(
         () =>
             visibleCells.flatMap((index) => {
@@ -293,6 +317,7 @@ export default observer(function SpatialRegionGrid({
                         viewState={regionViewStates[cell.key]}
                         onLayers={onLayers}
                         onFit={onFit}
+                        publishesImageData={index === imageDataCell}
                     />
                 );
             })}

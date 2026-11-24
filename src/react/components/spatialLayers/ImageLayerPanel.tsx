@@ -242,7 +242,9 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
         <SpatialImagePanelContext.Provider value={panelContext}>
             <div className="space-y-2">
                 <Typography variant="caption" color="text.secondary">
-                    Image source: SpatialData zarr
+                    {chart.imageLayerRegistry?.region
+                        ? `Histograms from region ${chart.imageLayerRegistry.region}; the settings apply to every region`
+                        : "Image source: SpatialData zarr"}
                 </Typography>
                 <VivChannelList />
                 <AlphaFromIntensityControls
