@@ -1,10 +1,10 @@
-import { action, makeObservable, observable } from "mobx";
+import { action, makeObservable, observable, runInAction } from "mobx";
 import BaseChart, { type ColumnChangeEvent } from "@/charts/BaseChart";
 import type { FieldName } from "@/charts/charts";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import type DataStore from "@/datastore/DataStore";
 import type Dimension from "@/datastore/Dimension";
-import { type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
+import { type FieldSpecs, flattenFields } from "@/lib/columnTypeHelpers";
 import { g, isArray } from "@/lib/utils";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
@@ -17,71 +17,107 @@ import {
     bandWidthFromFraction,
     getBandWidthFraction,
     getBrushFilterRange,
-    getXDomain,
+    getCellXDomains,
+    keepBrushes,
     MULTI_LINE_REACT_TYPE,
     type MultiLineConfig,
     type SavedMultiLineConfig,
     SCALE_TRIMS,
     type ScaleTrim,
+    withBrush,
 } from "./multiLineConfig";
 
 export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
     /** Bumped when the data or colours of a column this chart draws are changed in place, so it redraws. */
     dataVersion = 0;
-    /** Filters the other charts to the brushed range; this chart keeps drawing every row it would without it. */
-    dim: Dimension;
+    /**
+     * A range dimension per brushed value, made on its first brush: each filters the other charts,
+     * and the other cells, to the rows with its value in the brushed range. A cell draws every row
+     * its own dimension excludes, so its curves stay whole while brushing.
+     */
+    readonly dims = observable.map<FieldName, Dimension>({}, { deep: false });
+    /** The filter range each dimension has, as a string, so an unchanged brush isn't refiltered. */
+    private appliedRanges = new Map<FieldName, string>();
 
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: SavedMultiLineConfig) {
         const config = adaptMultiLineConfig(originalConfig);
-        const valueField = flattenFields(config.values)[0];
-        if (!config.title && valueField) {
-            config.title = dataStore.getColumnName(valueField) ?? valueField;
+        const valueFields = flattenFields(config.values);
+        if (!config.title && valueFields.length === 1) {
+            config.title = dataStore.getColumnName(valueFields[0]) ?? valueFields[0];
         }
         super(dataStore, div, config, MultiLineComponent);
-        this.dim = this.dataStore.getDimension("range_dimension");
         makeObservable(this, {
             dataVersion: observable,
             bumpDataVersion: action,
             setBrush: action,
-            setValueColumn: action,
+            removeFilter: action,
+            setValues: action,
             setCategories: action,
         });
     }
 
-    /** Called by the brush; the component applies the filter, so a saved brush filters on load too. */
-    setBrush(range: [number, number] | null) {
-        this.config.brush = range;
+    /** Called by a cell's brush; the component applies the filters, so saved brushes filter on load too. */
+    setBrush(field: FieldName, range: [number, number] | null) {
+        this.config.brush = withBrush(this.config.brush, field, range);
     }
 
-    /** Filters the other charts to the rows whose `field` is in the brushed range, or lifts the filter. */
-    applyBrushFilter(field: FieldName | undefined, domain: [number, number] | undefined) {
+    /**
+     * Filters the other charts to each value's brushed range, or lifts the filter of a value with
+     * no brush. `domains` are the x domains of the values whose data is loaded, by field.
+     */
+    applyBrushFilters(domains: ReadonlyMap<FieldName, [number, number]>) {
         const { brush } = this.config;
-        if (!brush || !field || !domain) {
-            this.dim.removeFilter();
-            this.resetButton.style.display = "none";
-            return;
+        const fields = flattenFields(this.config.values);
+        for (const [field, dim] of [...this.dims]) {
+            if (!fields.includes(field)) {
+                // no longer drawn
+                dim.destroy();
+                runInAction(() => this.dims.delete(field));
+                this.appliedRanges.delete(field);
+            } else if (!brush[field] && this.appliedRanges.has(field)) {
+                dim.removeFilter();
+                this.appliedRanges.delete(field);
+            }
         }
-        this.dim.filter("filterRange", [field], getBrushFilterRange(brush, domain));
-        this.resetButton.style.display = "inline";
+        for (const field of fields) {
+            const range = brush[field];
+            const domain = domains.get(field);
+            if (!range || !domain) continue;
+            const filterRange = getBrushFilterRange(range, domain);
+            const key = `${filterRange.min},${filterRange.max}`;
+            if (this.appliedRanges.get(field) === key) continue;
+            let dim = this.dims.get(field);
+            if (!dim) {
+                const created = this.dataStore.getDimension("range_dimension");
+                runInAction(() => this.dims.set(field, created));
+                dim = created;
+            }
+            dim.filter("filterRange", [field], filterRange);
+            this.appliedRanges.set(field, key);
+        }
+        this.resetButton.style.display = this.appliedRanges.size ? "inline" : "none";
     }
 
-    /** The chart menu's reset button. */
+    /** The chart menu's reset button: clears every brush. */
     removeFilter() {
-        this.dim.removeFilter();
-        this.setBrush(null);
+        for (const dim of this.dims.values()) dim.removeFilter();
+        this.appliedRanges.clear();
+        this.config.brush = {};
+        this.resetButton.style.display = "none";
     }
 
     onDataFiltered(dim?: unknown) {
-        // "remove all filters" has already lifted this chart's filter
-        if (dim === "all_removed" && this.config.brush) {
-            this.setBrush(null);
+        // "remove all filters" has already lifted every dimension's filter
+        if (dim === "all_removed") {
+            this.appliedRanges.clear();
+            if (Object.keys(this.config.brush).length) runInAction(() => (this.config.brush = {}));
             this.resetButton.style.display = "none";
         }
     }
 
     remove() {
-        // also lifts the brush filter from the other charts
-        this.dim.destroy();
+        // also lifts the brush filters from the other charts
+        for (const dim of this.dims.values()) dim.destroy();
         super.remove();
     }
 
@@ -89,15 +125,19 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
         this.dataVersion++;
     }
 
-    setValueColumn(field: FieldSpec) {
+    setValues(values: FieldSpecs) {
         const c = this.config;
-        c.values = [field];
-        // the brushed range was of the old column
-        c.brush = null;
-        // a saved label named the old column
-        c.axis.x.label = null;
-        // in data units: the old column's band width means nothing for the new one
-        c.band_width = null;
+        const before = flattenFields(c.values);
+        const after = flattenFields(values);
+        c.values = values;
+        // a brushed range only means something for its own column
+        c.brush = keepBrushes(c.brush, after);
+        if (before[0] !== after[0]) {
+            // a saved label named the old column
+            c.axis.x.label = null;
+            // in data units: the old column's band width means nothing for the new one
+            c.band_width = null;
+        }
     }
 
     setCategories(field: FieldName) {
@@ -107,7 +147,7 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
 
     /** For a link with `set_param`: `param` was `[value, categories]` in the legacy chart. */
     setParamAt(index: number, column: FieldName) {
-        if (index === 0) this.setValueColumn(column);
+        if (index === 0) this.setValues([column]);
         else if (index === 1) this.setCategories(column);
     }
 
@@ -150,13 +190,18 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
         this.getImageFromSVG(svg, (canvas) => callback(canvas));
     }
 
-    /** The x domain of the value column for a trim (by default the current one), for the band width. */
+    /**
+     * The x domain of the first cell for a trim (by default the current one), for the band width.
+     * Shared, it is every cell's.
+     */
     private getValueDomain(trim: ScaleTrim | null = this.config.scaletrim) {
-        const field = flattenFields(this.config.values)[0];
-        const column = field ? this.dataStore.columnIndex[field] : undefined;
-        if (!column) return undefined;
-        const quantiles = typeof column.quantiles === "object" ? column.quantiles : undefined;
-        return getXDomain({ minMax: this.dataStore.getMinMaxForColumn(field), quantiles }, trim);
+        const ranges = flattenFields(this.config.values).flatMap((field) => {
+            const column = this.dataStore.columnIndex[field];
+            if (!column) return [];
+            const quantiles = typeof column.quantiles === "object" ? column.quantiles : undefined;
+            return [{ minMax: this.dataStore.getMinMaxForColumn(field), quantiles }];
+        });
+        return getCellXDomains(ranges, trim, this.config.share_x)[0];
     }
 
     /** Column pickers bound to `categories` and `values`, in place of the ones `param` would give. */
@@ -164,12 +209,12 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
         const c = this.config;
         return [
             g({
-                type: "column",
-                label: "Value (x axis)",
-                current_value: c.values[0],
+                type: "multicolumn",
+                label: "Values (a cell each)",
+                current_value: c.values,
                 columnType: "number",
                 func: (v) => {
-                    this.setValueColumn(isArray(v) ? v[0] : v);
+                    this.setValues(isArray(v) ? [...v] : [v]);
                 },
             }),
             g({
@@ -245,6 +290,14 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
                     // a trim the column has no quantiles for draws untrimmed, so compare what's drawn
                     if (this.getValueDomain(trim)?.clamp !== this.getValueDomain()?.clamp) c.band_width = null;
                     c.scaletrim = trim;
+                },
+            }),
+            g({
+                type: "check",
+                label: "Share x axis between cells",
+                current_value: c.share_x,
+                func: (v) => {
+                    c.share_x = v;
                 },
             }),
             ...(domain

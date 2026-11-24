@@ -1,6 +1,6 @@
 import type { BaseConfig } from "@/charts/BaseChart";
 import type { FieldName, Quantiles } from "@/charts/charts";
-import type { FieldSpecs } from "@/lib/columnTypeHelpers";
+import { type FieldSpecs, flattenFields } from "@/lib/columnTypeHelpers";
 import type { AxisConfig } from "@/react/scatter_state";
 
 /** The legacy `multi_line_chart` converts to this (see `legacyCharts.ts`). */
@@ -23,8 +23,16 @@ const DEFAULT_INTERVALS = 40;
 export type MultiLineConfig = BaseConfig & {
     /** Category column: one line per value of it. */
     categories: FieldName | null;
-    /** Numeric fields. One is drawn for now; several, as a grid, come later. */
+    /** Numeric fields: one cell of the grid per field, or a single plot for one. */
     values: FieldSpecs;
+    /**
+     * Which prop makes the cells. Several values are always drawn a cell per value (overlaying
+     * values × categories in one plot is unreadable), so this only chooses the layout; null is the
+     * same as `{ by: "values" }`. `"categories"` (a cell per category, a line per value) is to come.
+     */
+    grid: MultiLineGridConfig | null;
+    /** One x scale for every cell, for values in comparable units (z-scores); otherwise one per cell. */
+    share_x: boolean;
     /** One row per category, each scaled to its own height, instead of overlaid lines. */
     stacked: boolean;
     /** Fill under each line. */
@@ -42,9 +50,17 @@ export type MultiLineConfig = BaseConfig & {
     axis: { x: MultiLineAxis; y: MultiLineAxis };
     /** Fit the axis margins to the labels; off, the axis sizes are used, as in the legacy chart. */
     fit_labels: boolean;
-    /** The brushed range of the value, in data units, which filters other charts; null for none. */
-    brush: [number, number] | null;
+    /**
+     * The brushed range of each value, in data units, by field: each filters the other charts (and
+     * the other cells) to the rows with that value in range.
+     */
+    brush: MultiLineBrushes;
 };
+
+export type MultiLineGridConfig = { by: "values" };
+
+/** Brushed ranges by value field; a value with no brush has no entry. */
+export type MultiLineBrushes = Partial<Record<FieldName, [number, number]>>;
 
 /** `label` replaces the default axis label (the value's name, or "density"); legacy charts saved one. */
 export type MultiLineAxis = AxisConfig & { label: string | null };
@@ -54,16 +70,31 @@ type LegacyAxis = { size?: number; tickfont?: number; textsize?: number; rotate_
 
 /** Config as saved by the legacy chart or an earlier version of this one. */
 export type SavedMultiLineConfig = BaseConfig &
-    Partial<Omit<MultiLineConfig, "axis" | "scaletrim" | "categories" | "values">> & {
+    Partial<Omit<MultiLineConfig, "axis" | "scaletrim" | "categories" | "values" | "brush" | "grid">> & {
         categories?: FieldName | null;
         values?: FieldSpecs;
         /** The legacy chart saved "none" or left it out for no trim. */
         scaletrim?: string | boolean | null;
         axis?: { x?: LegacyAxis; y?: LegacyAxis };
+        /** A range for the first value, as the chart saved it when it drew one value; or ranges by field. */
+        brush?: [number, number] | Record<string, unknown> | null;
+        grid?: { by?: string } | null;
     };
 
 function isRange(value: unknown): value is [number, number] {
     return Array.isArray(value) && value.length === 2 && value.every(Number.isFinite);
+}
+
+/** Brushes by field, from a saved config; a single range was the first value's. */
+function toBrushes(saved: SavedMultiLineConfig["brush"], values: FieldSpecs): MultiLineBrushes {
+    if (isRange(saved)) {
+        const field = flattenFields(values)[0];
+        return field ? { [field]: saved } : {};
+    }
+    if (!saved || Array.isArray(saved) || typeof saved !== "object") return {};
+    return Object.fromEntries(
+        Object.entries(saved).filter((entry): entry is [string, [number, number]] => isRange(entry[1])),
+    );
 }
 
 function toScaleTrim(value: unknown): ScaleTrim | null {
@@ -88,6 +119,7 @@ export function adaptMultiLineConfig(original: SavedMultiLineConfig): MultiLineC
     const legacyValue = param[0];
     const legacyCategory = param[1];
     const stacked = original.stacked ?? false;
+    const values = original.values ?? (legacyValue !== undefined ? [legacyValue] : []);
     return {
         ...original,
         param: [],
@@ -97,7 +129,9 @@ export function adaptMultiLineConfig(original: SavedMultiLineConfig): MultiLineC
                 : typeof legacyCategory === "string"
                   ? legacyCategory
                   : null,
-        values: original.values ?? (legacyValue !== undefined ? [legacyValue] : []),
+        values,
+        grid: original.grid?.by === "values" ? { by: "values" } : null,
+        share_x: original.share_x ?? false,
         stacked,
         fill: original.fill ?? false,
         scaletrim: toScaleTrim(original.scaletrim),
@@ -107,7 +141,7 @@ export function adaptMultiLineConfig(original: SavedMultiLineConfig): MultiLineC
         color_legend: { ...original.color_legend, display: original.color_legend?.display ?? !stacked },
         axis: { x: toAxis(original.axis?.x, 30), y: toAxis(original.axis?.y, 45) },
         fit_labels: original.fit_labels ?? true,
-        brush: isRange(original.brush) ? original.brush : null,
+        brush: toBrushes(original.brush, values),
     };
 }
 
@@ -124,6 +158,37 @@ export function getXDomain(range: ValueRange, scaletrim: ScaleTrim | null) {
         return { domain: trimmed, clamp: true };
     }
     return { domain: range.minMax, clamp: false };
+}
+
+export type XDomain = { domain: [number, number]; clamp: boolean };
+
+/**
+ * The x domain of each cell, for value ranges in cell order. Shared, every cell gets the union of
+ * their domains (the same object), and values are clamped to it when trimmed.
+ */
+export function getCellXDomains(ranges: readonly ValueRange[], scaletrim: ScaleTrim | null, share: boolean): XDomain[] {
+    const own = ranges.map((range) => getXDomain(range, scaletrim));
+    if (!share || own.length < 2) return own;
+    const shared: XDomain = {
+        domain: [Math.min(...own.map((d) => d.domain[0])), Math.max(...own.map((d) => d.domain[1]))],
+        clamp: own.some((d) => d.clamp),
+    };
+    return own.map(() => shared);
+}
+
+/** `brushes` with `field`'s brush set to `range`, or removed for null. */
+export function withBrush(
+    brushes: MultiLineBrushes,
+    field: FieldName,
+    range: [number, number] | null,
+): MultiLineBrushes {
+    const { [field]: _, ...rest } = brushes;
+    return range ? { ...rest, [field]: range } : rest;
+}
+
+/** `brushes` without those of fields not in `fields`. */
+export function keepBrushes(brushes: MultiLineBrushes, fields: readonly FieldName[]): MultiLineBrushes {
+    return Object.fromEntries(Object.entries(brushes).filter(([field]) => fields.includes(field)));
 }
 
 /**

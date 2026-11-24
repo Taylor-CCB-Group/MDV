@@ -6,8 +6,11 @@ import {
     getBandWidthFraction,
     getBandwidth,
     getBrushFilterRange,
+    getCellXDomains,
     getXDomain,
+    keepBrushes,
     type SavedMultiLineConfig,
+    withBrush,
 } from "@/react/components/multiline/multiLineConfig";
 
 /** One of a marker QC view's multi-line charts, as the legacy chart saved it. */
@@ -66,6 +69,52 @@ describe("adaptMultiLineConfig", () => {
     });
 });
 
+describe("several values", () => {
+    it("keeps several values, and reads only a known grid", () => {
+        const config = adaptMultiLineConfig({ ...legacy, param: [], categories: "sample_id", values: ["CD3", "CD4"] });
+        expect(config.values).toEqual(["CD3", "CD4"]);
+        expect(config.grid).toBeNull();
+        expect(config.share_x).toBe(false);
+        expect(adaptMultiLineConfig({ ...legacy, grid: { by: "values" } }).grid).toEqual({ by: "values" });
+        expect(adaptMultiLineConfig({ ...legacy, grid: { by: "densityFields" } }).grid).toBeNull();
+    });
+
+    it("gives a config with brushes and a grid the schema accepts", () => {
+        const config = adaptMultiLineConfig({
+            ...legacy,
+            values: ["CD3", "CD4"],
+            grid: { by: "values" },
+            share_x: true,
+            brush: { CD3: [0, 1] },
+        });
+        expect(MultiLineReactConfigSchema.safeParse({ ...config, type: "multi_line_chart_react" }).success).toBe(true);
+    });
+});
+
+describe("cell x domains", () => {
+    const a = { minMax: [-2, 8] as [number, number], quantiles: { "0.05": [0, 4] as [number, number] } };
+    const b = { minMax: [-5, 3] as [number, number], quantiles: { "0.05": [-1, 2] as [number, number] } };
+
+    it("gives each cell its own domain by default", () => {
+        expect(getCellXDomains([a, b], "0.05", false)).toEqual([
+            { domain: [0, 4], clamp: true },
+            { domain: [-1, 2], clamp: true },
+        ]);
+    });
+
+    it("shares the union of the domains when asked", () => {
+        const [first, second] = getCellXDomains([a, b], "0.05", true);
+        expect(first).toEqual({ domain: [-1, 4], clamp: true });
+        // the same object, so cells key their densities by it alike
+        expect(second).toBe(first);
+        expect(getCellXDomains([a, b], null, true)[0]).toEqual({ domain: [-5, 8], clamp: false });
+    });
+
+    it("has nothing to share with one value", () => {
+        expect(getCellXDomains([a], "0.05", true)).toEqual([{ domain: [0, 4], clamp: true }]);
+    });
+});
+
 describe("x domain and bandwidth", () => {
     const range = { minMax: [-2, 8] as [number, number], quantiles: { "0.05": [0, 4] as [number, number] } };
 
@@ -97,10 +146,26 @@ describe("x domain and bandwidth", () => {
 });
 
 describe("brush", () => {
-    it("is read from a saved config, and left unset otherwise", () => {
-        expect(adaptMultiLineConfig(legacy).brush).toBeNull();
-        expect(adaptMultiLineConfig({ ...legacy, brush: [0.2, 1.5] }).brush).toEqual([0.2, 1.5]);
-        expect(adaptMultiLineConfig({ ...legacy, brush: [0.2] as never }).brush).toBeNull();
+    it("is read by field from a saved config, and left empty otherwise", () => {
+        expect(adaptMultiLineConfig(legacy).brush).toEqual({});
+        expect(adaptMultiLineConfig({ ...legacy, brush: { CD3: [0.2, 1.5], CD4: [1] } }).brush).toEqual({
+            CD3: [0.2, 1.5],
+        });
+    });
+
+    it("reads a single saved range as the first value's", () => {
+        expect(adaptMultiLineConfig({ ...legacy, brush: [0.2, 1.5] }).brush).toEqual({
+            zscore_clipped_DAPI: [0.2, 1.5],
+        });
+        expect(adaptMultiLineConfig({ ...legacy, brush: [0.2] as never }).brush).toEqual({});
+    });
+
+    it("is set and cleared per field", () => {
+        const one = withBrush({}, "CD3", [0, 1]);
+        const two = withBrush(one, "CD4", [2, 3]);
+        expect(two).toEqual({ CD3: [0, 1], CD4: [2, 3] });
+        expect(withBrush(two, "CD3", null)).toEqual({ CD4: [2, 3] });
+        expect(keepBrushes(two, ["CD4", "CD8"])).toEqual({ CD4: [2, 3] });
     });
 
     it("filters the brushed range, in either direction", () => {
