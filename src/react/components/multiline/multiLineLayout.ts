@@ -55,19 +55,45 @@ export type MultiLineLayout = {
     yLabel: string;
 };
 
-/** The most ticks (up to d3's default) whose labels fit side by side across the plot. */
+/** Whether labels centred on `ticks` fit side by side across the plot. */
+function ticksFit(
+    ticks: number[],
+    format: (t: number) => string,
+    domain: [number, number],
+    plotWidth: number,
+    fontSize: number,
+    measure: MeasureText,
+) {
+    if (ticks.length <= 1) return true;
+    const widest = Math.max(0, ...ticks.map((t) => measure(format(t), fontSize)));
+    // the closest pair of labels, as a fallback may not be evenly spaced
+    let gap = Number.POSITIVE_INFINITY;
+    for (let i = 1; i < ticks.length; i++) gap = Math.min(gap, ticks[i] - ticks[i - 1]);
+    const spacing = (plotWidth * gap) / (domain[1] - domain[0]);
+    return widest + MIN_TICK_SPACING <= spacing;
+}
+
+/**
+ * The most ticks (up to d3's default) whose labels fit side by side across the plot. If even the
+ * fewest d3 offers don't fit, just the outer two, then just the one nearest the middle.
+ */
 function chooseXTicks(domain: [number, number], plotWidth: number, fontSize: number, measure: MeasureText) {
     const scale = scaleLinear().domain(domain);
-    for (let count = MAX_X_TICKS; count > 1; count--) {
+    for (let count = MAX_X_TICKS; count >= 2; count--) {
         const ticks = scale.ticks(count);
         const format = scale.tickFormat(count);
-        // labels are centred on ticks evenly spaced across the plot
-        const widest = Math.max(0, ...ticks.map((t) => measure(format(t), fontSize)));
-        const spacing = ticks.length > 1 ? (plotWidth * (ticks[1] - ticks[0])) / (domain[1] - domain[0]) : plotWidth;
-        if (ticks.length <= 1 || widest + MIN_TICK_SPACING <= spacing) return { ticks, format };
+        if (ticksFit(ticks, format, domain, plotWidth, fontSize, measure)) return { ticks, format };
     }
-    const ticks = scale.ticks(2);
-    return { ticks, format: scale.tickFormat(2) };
+    const fewest = scale.ticks(2);
+    const format = scale.tickFormat(2);
+    const outer = fewest.length > 2 ? [fewest[0], fewest[fewest.length - 1]] : fewest;
+    if (ticksFit(outer, format, domain, plotWidth, fontSize, measure)) return { ticks: outer, format };
+    const middle = (domain[0] + domain[1]) / 2;
+    const nearest = fewest.reduce<number[]>(
+        (best, t) => (best.length && Math.abs(best[0] - middle) <= Math.abs(t - middle) ? best : [t]),
+        [],
+    );
+    return { ticks: nearest, format };
 }
 
 export function getMultiLineLayout(input: MultiLineLayoutInput, measure: MeasureText): MultiLineLayout {

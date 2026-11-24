@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import { MultiLineChartConfigSchema, MultiLineReactConfigSchema } from "@/charts/schemas/ChartConfigSchema";
 import {
     adaptMultiLineConfig,
+    bandWidthFromFraction,
+    getBandWidthFraction,
     getBandwidth,
     getBrushFilterRange,
     getXDomain,
     type SavedMultiLineConfig,
 } from "@/react/components/multiline/multiLineConfig";
 
-/** A chart from `/project/20?view=MarkersQC`, as the legacy chart saved it. */
+/** One of a marker QC view's multi-line charts, as the legacy chart saved it. */
 const legacy = {
     id: "a",
     size: [300, 300] as [number, number],
@@ -56,6 +58,12 @@ describe("adaptMultiLineConfig", () => {
         const config = adaptMultiLineConfig(legacy);
         expect(MultiLineReactConfigSchema.safeParse({ ...config, type: "multi_line_chart_react" }).success).toBe(true);
     });
+
+    it("accepts a legacy config saved with a null trim, and reads it as untrimmed", () => {
+        const untrimmed = { ...legacy, scaletrim: null };
+        expect(MultiLineChartConfigSchema.safeParse(untrimmed).success).toBe(true);
+        expect(adaptMultiLineConfig(untrimmed).scaletrim).toBeNull();
+    });
 });
 
 describe("x domain and bandwidth", () => {
@@ -73,6 +81,18 @@ describe("x domain and bandwidth", () => {
         expect(getBandwidth({ band_width: null }, [0, 4], true)).toBeCloseTo(0.4);
         expect(getBandwidth({ band_width: 0.5 }, [-2, 8], false)).toBe(0.5);
         expect(getBandwidth({ band_width: null }, [-2, 8], false)).toBeCloseTo(0.1);
+    });
+
+    it("shows band_width as a fraction of the range on the slider, and converts it back", () => {
+        expect(getBandWidthFraction({ band_width: 0.2 }, [0, 4], true)).toBe(0.2);
+        expect(getBandWidthFraction({ band_width: 0.5 }, [-2, 8], false)).toBeCloseTo(0.05);
+        expect(getBandWidthFraction({ band_width: null }, [-2, 8], false)).toBeCloseTo(0.01);
+        expect(bandWidthFromFraction(0.2, [0, 4], true)).toBe(0.2);
+        expect(bandWidthFromFraction(0.05, [-2, 8], false)).toBeCloseTo(0.5);
+        // a fraction gives the same kernel trimmed or not
+        expect(getBandwidth({ band_width: bandWidthFromFraction(0.1, [0, 4], true) }, [0, 4], true)).toBeCloseTo(
+            getBandwidth({ band_width: bandWidthFromFraction(0.1, [0, 4], false) }, [0, 4], false),
+        );
     });
 });
 

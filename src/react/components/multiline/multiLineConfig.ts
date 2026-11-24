@@ -136,17 +136,24 @@ export function getBandwidth(config: Pick<MultiLineConfig, "band_width">, domain
     return config.band_width ?? span * UNTRIMMED_DEFAULT_BAND_FRACTION;
 }
 
-/** Band width slider bounds and the value it shows, in the units `band_width` is in. */
-export function getBandWidthSetting(
+/** Band width slider bounds. It's a fraction of the range whether trimmed or not. */
+export const BAND_WIDTH_SLIDER = { min: 0.001, max: 0.5, step: 0.001 } as const;
+
+/** The band width as a fraction of the range, for the slider. */
+export function getBandWidthFraction(
     config: Pick<MultiLineConfig, "band_width">,
     domain: [number, number],
     clamp: boolean,
 ) {
-    if (clamp) {
-        return { min: 0.005, max: 0.5, step: 0.005, value: config.band_width ?? TRIMMED_DEFAULT_BAND_WIDTH };
-    }
-    const span = domain[1] - domain[0] || 1;
-    return { min: span / 1000, max: span / 10, step: span / 1000, value: getBandwidth(config, domain, clamp) };
+    if (clamp) return config.band_width ?? TRIMMED_DEFAULT_BAND_WIDTH;
+    const span = domain[1] - domain[0];
+    return span > 0 ? getBandwidth(config, domain, clamp) / span : UNTRIMMED_DEFAULT_BAND_FRACTION;
+}
+
+/** `band_width` for a fraction of the range: the fraction itself when trimmed, in data units when not. */
+export function bandWidthFromFraction(fraction: number, domain: [number, number], clamp: boolean) {
+    const span = domain[1] - domain[0];
+    return clamp || !(span > 0) ? fraction : fraction * span;
 }
 
 /**

@@ -124,4 +124,5 @@ Worth recording as an ADR, as this is the SOP and not written down anywhere yet:
 - Loading through `useFieldSpecs` (or the lazy hook), not `@loadColumnData` on `param`
 - Settings use FieldSpec controls bound to the props, not `getParamsGuiSpec`
 - Add-chart dialog builds the props
-- Links that write a chart's `param` (`chart_columnval_link`) need a target prop instead
+- Links that write a chart's `param` (`chart_columnval_link` with `set_param`) call the chart's
+  `setParamAt(index, column)` when it has one, so implement it to set the matching prop

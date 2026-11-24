@@ -57,18 +57,33 @@ function Message({ children }: { children: string }) {
     return <div className="flex h-full items-center justify-center text-sm">{children}</div>;
 }
 
-/** The x domain and clamp for a column and trim, from its metadata. */
+/**
+ * The x domain and clamp for a column and trim, from its metadata. Kept by value, so it changes
+ * only when the domain does: the densities are discarded rather than redrawn when it changes.
+ */
 function useXDomain(
     dataStore: ReturnType<typeof useDataStore>,
     column: NumberColumn | undefined,
     trim: ScaleTrim | null,
+    dataVersion: number,
 ) {
-    return useMemo(() => {
+    // biome-ignore lint/correctness/useExhaustiveDependencies: dataVersion changes when the column's data is replaced in place
+    const xDomain = useMemo(() => {
         if (!column) return undefined;
         const minMax = dataStore.getMinMaxForColumn(column.field);
         const quantiles = typeof column.quantiles === "object" ? column.quantiles : undefined;
         return getXDomain({ minMax, quantiles }, trim);
-    }, [dataStore, column, trim]);
+    }, [dataStore, column, trim, dataVersion]);
+    const lo = xDomain?.domain[0];
+    const hi = xDomain?.domain[1];
+    const clamp = xDomain?.clamp;
+    return useMemo(
+        () =>
+            lo === undefined || hi === undefined || clamp === undefined
+                ? undefined
+                : { domain: [lo, hi] satisfies [number, number], clamp },
+        [lo, hi, clamp],
+    );
 }
 
 const MultiLineComponent = observer(function MultiLineComponent() {
@@ -85,7 +100,10 @@ const MultiLineComponent = observer(function MultiLineComponent() {
     const valueColumn = isNumberColumn(valueSpec) ? valueSpec : undefined;
 
     const { scaletrim, band_width, intervals, stacked, fill, axis } = config;
-    const xDomain = useXDomain(dataStore, valueColumn, scaletrim);
+    // edits replace a column's data, and set its colours, on the same column object
+    const { dataVersion } = chart;
+    const xDomain = useXDomain(dataStore, valueColumn, scaletrim, dataVersion);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: dataVersion changes when a column's data is replaced in place
     const inputs = useMemo<DensityInputs | undefined>(() => {
         if (!categoryColumn || !valueColumn || !xDomain) return undefined;
         const { domain, clamp } = xDomain;
@@ -98,8 +116,8 @@ const MultiLineComponent = observer(function MultiLineComponent() {
             clamp: clamp ? domain : undefined,
             domain,
         };
-    }, [categoryColumn, valueColumn, xDomain, intervals, band_width]);
-    const state = useDensities(inputs, rows, chart.dataVersion);
+    }, [categoryColumn, valueColumn, xDomain, intervals, band_width, dataVersion]);
+    const state = useDensities(inputs, rows, dataVersion);
 
     // the brush filters the other charts; applied from the config, so a saved brush filters on load
     const brushKey = JSON.stringify(config.brush);
@@ -111,16 +129,17 @@ const MultiLineComponent = observer(function MultiLineComponent() {
     }, [chart, brushKey, valueField, domain]);
     const setBrush = useCallback((range: [number, number] | null) => chart.setBrush(range), [chart]);
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: dataVersion changes when the column's colours are set
     const colors = useMemo(
         () => (categoryColumn ? dataStore.getColumnColors(categoryColumn.field).map(String) : []),
-        [dataStore, categoryColumn],
+        [dataStore, categoryColumn, dataVersion],
     );
 
-    // the legend shows the category column, which may only now have loaded or have changed
-    // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the category column changes
+    // the legend shows the category column, which may only now have loaded, changed or been recoloured
+    // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the category column or its colours change
     useEffect(() => {
         chart.setColorLegend();
-    }, [chart, categoryColumn]);
+    }, [chart, categoryColumn, dataVersion]);
 
     if (!config.categories || config.values.length === 0) return <Message>Choose categories and a value</Message>;
     if (!inputs) return null;
@@ -138,7 +157,8 @@ const MultiLineComponent = observer(function MultiLineComponent() {
             colors={colors}
             stacked={stacked}
             fill={fill}
-            axis={axis}
+            // copied, so this observer reads (and redraws on) the axis settings, which are edited in place
+            axis={{ x: { ...axis.x }, y: { ...axis.y } }}
             fitLabels={config.fit_labels}
             xLabel={axis.x.label ?? valueColumn.name}
             yLabel={axis.y.label ?? "density"}

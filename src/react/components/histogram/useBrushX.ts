@@ -56,6 +56,9 @@ export function useBrushX(
     } = options.style ?? {};
     const updateOn = options.updateOn ?? "brush";
     const below = options.below ?? false;
+    // read when the brush is rebuilt, so a rebuild (such as on resize) keeps the selection
+    const valueRef = useRef(brushConfig?.value);
+    valueRef.current = brushConfig?.value;
 
     useEffect(() => {
         if (!ref.current || !minMax || !setValue) return;
@@ -101,6 +104,9 @@ export function useBrushX(
             .attr("fill", handleFill)
             .attr("stroke", "none")
             .attr("vector-effect", "non-scaling-stroke");
+        const value = valueRef.current;
+        // a move has no source event, so it isn't reported back as a user's brush
+        if (value) brushGroup.call(brush.move, [xScale(value[0]), xScale(value[1])]);
 
         return () => {
             svg.select(".brush").remove();

@@ -427,8 +427,9 @@ export const MultiLineChartConfigSchema = BaseConfigSchema.extend({
     intervals: z.number().int().positive().optional().describe("Roughly how many points each line has"),
     scaletrim: z
         .union([ScaleTrimSchema, z.literal("none")])
+        .nullable()
         .optional()
-        .describe("Trim the x axis to a percentile; absent or 'none' for the full range"),
+        .describe("Trim the x axis to a percentile; absent, null or 'none' for the full range"),
 }).describe("Configuration for multi-line charts: a density curve of `param[0]` per category of `param[1]`");
 
 export const MultiLineReactConfigSchema = BaseConfigSchema.extend({

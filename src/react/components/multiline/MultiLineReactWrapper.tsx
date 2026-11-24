@@ -4,7 +4,7 @@ import type { FieldName } from "@/charts/charts";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import type DataStore from "@/datastore/DataStore";
 import type Dimension from "@/datastore/Dimension";
-import { flattenFields } from "@/lib/columnTypeHelpers";
+import { type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
 import { g, isArray } from "@/lib/utils";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
@@ -13,17 +13,20 @@ import { buildChartSvg } from "../dotplot/dotPlotImage";
 import MultiLineComponent from "./MultiLineComponent";
 import {
     adaptMultiLineConfig,
-    getBandWidthSetting,
+    BAND_WIDTH_SLIDER,
+    bandWidthFromFraction,
+    getBandWidthFraction,
     getBrushFilterRange,
     getXDomain,
     MULTI_LINE_REACT_TYPE,
     type MultiLineConfig,
     type SavedMultiLineConfig,
     SCALE_TRIMS,
+    type ScaleTrim,
 } from "./multiLineConfig";
 
 export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
-    /** Bumped when the data of a column this chart draws is edited in place, so it recomputes. */
+    /** Bumped when the data or colours of a column this chart draws are changed in place, so it redraws. */
     dataVersion = 0;
     /** Filters the other charts to the brushed range; this chart keeps drawing every row it would without it. */
     dim: Dimension;
@@ -36,7 +39,13 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
         }
         super(dataStore, div, config, MultiLineComponent);
         this.dim = this.dataStore.getDimension("range_dimension");
-        makeObservable(this, { dataVersion: observable, bumpDataVersion: action, setBrush: action });
+        makeObservable(this, {
+            dataVersion: observable,
+            bumpDataVersion: action,
+            setBrush: action,
+            setValueColumn: action,
+            setCategories: action,
+        });
     }
 
     /** Called by the brush; the component applies the filter, so a saved brush filters on load too. */
@@ -80,17 +89,38 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
         this.dataVersion++;
     }
 
+    setValueColumn(field: FieldSpec) {
+        const c = this.config;
+        c.values = [field];
+        // the brushed range was of the old column
+        c.brush = null;
+        // a saved label named the old column
+        c.axis.x.label = null;
+        // in data units: the old column's band width means nothing for the new one
+        c.band_width = null;
+    }
+
+    setCategories(field: FieldName) {
+        this.config.categories = field;
+        this.setColorLegend();
+    }
+
+    /** For a link with `set_param`: `param` was `[value, categories]` in the legacy chart. */
+    setParamAt(index: number, column: FieldName) {
+        if (index === 0) this.setValueColumn(column);
+        else if (index === 1) this.setCategories(column);
+    }
+
     /** Every column the chart draws, as field names. */
     getFields(): FieldName[] {
         const { categories, values } = this.config;
         return [...(categories ? [categories] : []), ...flattenFields(values)];
     }
 
-    // BaseChart only looks at `param`, which this chart leaves empty
+    // BaseChart only looks at `param`, which this chart leaves empty. Even when the edit refiltered,
+    // the rows this chart draws may be unchanged, as they leave out its own brush
     onDataChanged(data: ColumnChangeEvent) {
-        if (!data.hasFiltered && this.getFields().some((f) => data.columns.includes(f))) {
-            this.bumpDataVersion();
-        }
+        if (this.getFields().some((f) => data.columns.includes(f))) this.bumpDataVersion();
     }
 
     onColumnRemoved(column: FieldName) {
@@ -120,13 +150,13 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
         this.getImageFromSVG(svg, (canvas) => callback(canvas));
     }
 
-    /** The x domain of the value column, for the band width slider. */
-    private getValueDomain() {
+    /** The x domain of the value column for a trim (by default the current one), for the band width. */
+    private getValueDomain(trim: ScaleTrim | null = this.config.scaletrim) {
         const field = flattenFields(this.config.values)[0];
         const column = field ? this.dataStore.columnIndex[field] : undefined;
         if (!column) return undefined;
         const quantiles = typeof column.quantiles === "object" ? column.quantiles : undefined;
-        return getXDomain({ minMax: this.dataStore.getMinMaxForColumn(field), quantiles }, this.config.scaletrim);
+        return getXDomain({ minMax: this.dataStore.getMinMaxForColumn(field), quantiles }, trim);
     }
 
     /** Column pickers bound to `categories` and `values`, in place of the ones `param` would give. */
@@ -139,13 +169,7 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
                 current_value: c.values[0],
                 columnType: "number",
                 func: (v) => {
-                    c.values = [isArray(v) ? v[0] : v];
-                    // the brushed range was of the old column
-                    c.brush = null;
-                    // a saved label named the old column
-                    c.axis.x.label = null;
-                    // in data units: the old column's band width means nothing for the new one
-                    c.band_width = null;
+                    this.setValueColumn(isArray(v) ? v[0] : v);
                 },
             }),
             g({
@@ -155,9 +179,7 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
                 columnType: ["text", "text16"],
                 func: (v) => {
                     const field = isArray(v) ? v[0] : v;
-                    if (typeof field !== "string") return;
-                    c.categories = field;
-                    this.setColorLegend();
+                    if (typeof field === "string") this.setCategories(field);
                 },
             }),
         ];
@@ -190,7 +212,6 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
     getSettings() {
         const c = this.config;
         const domain = this.getValueDomain();
-        const bandWidth = domain ? getBandWidthSetting(c, domain.domain, domain.clamp) : undefined;
         return [
             ...super.getSettings(),
             g({
@@ -216,22 +237,24 @@ export class MultiLineReact extends BaseReactChart<MultiLineConfig> {
                 choices: [["No Trim", "none"], ...SCALE_TRIMS.map((t): [string, string] => [t, t])],
                 func: (v) => {
                     const trim = SCALE_TRIMS.find((t) => t === v) ?? null;
-                    // band width is a fraction of the range when trimmed and in data units when not
-                    if ((trim === null) !== (c.scaletrim === null)) c.band_width = null;
+                    // band width is a fraction of the range when trimmed and in data units when not;
+                    // a trim the column has no quantiles for draws untrimmed, so compare what's drawn
+                    if (this.getValueDomain(trim)?.clamp !== this.getValueDomain()?.clamp) c.band_width = null;
                     c.scaletrim = trim;
                 },
             }),
-            ...(bandWidth
+            ...(domain
                 ? [
                       g({
+                          // a fraction of the range either way, converted when set: the dialog keeps
+                          // this control while the trim or value column changes under it
                           type: "slider",
-                          label: domain?.clamp ? "Band Width (fraction of range)" : "Band Width",
-                          min: bandWidth.min,
-                          max: bandWidth.max,
-                          step: bandWidth.step,
-                          current_value: bandWidth.value,
+                          label: "Band Width (fraction of range)",
+                          ...BAND_WIDTH_SLIDER,
+                          current_value: getBandWidthFraction(c, domain.domain, domain.clamp),
                           func: (v) => {
-                              c.band_width = v;
+                              const now = this.getValueDomain();
+                              if (now) c.band_width = bandWidthFromFraction(v, now.domain, now.clamp);
                           },
                       }),
                   ]

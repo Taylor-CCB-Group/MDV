@@ -59,6 +59,19 @@ describe("getMultiLineLayout", () => {
         expect(widest).toBeLessThan(spacing);
     });
 
+    it("thins to the outer ticks, then one, when even d3's fewest labels would overlap", () => {
+        for (const width of [120, 60]) {
+            const layout = getMultiLineLayout({ ...base, width, domain: [1000000, 1000001] }, measure);
+            const { xTicks } = layout;
+            expect(xTicks.length).toBeGreaterThan(0);
+            const widest = Math.max(...xTicks.map((t) => measure(layout.xTickFormat(t), 10)));
+            for (let i = 1; i < xTicks.length; i++) {
+                const spacing = (layout.plotWidth * (xTicks[i] - xTicks[i - 1])) / 1;
+                expect(widest).toBeLessThan(spacing);
+            }
+        }
+    });
+
     it("shortens the x label to the plot width", () => {
         const layout = getMultiLineLayout({ ...base, width: 80 }, measure);
         expect(layout.xLabel).toContain("…");
