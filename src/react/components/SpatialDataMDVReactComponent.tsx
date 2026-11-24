@@ -606,12 +606,16 @@ const SpatialDataViewer = observer(
         } | null>(null);
 
         const onFeatureHover = useCallback(
-            (event: SpatialFeaturePickEvent, anchorElement?: HTMLElement) => {
+            (
+                event: SpatialFeaturePickEvent,
+                anchorElement?: HTMLElement,
+                // a region grid's cell gives its own region's (see `SpatialRegionGrid`)
+                tooltipItems: typeof mdvTooltipItems = mdvTooltipItems,
+            ) => {
                 const info = event.pickInfo;
                 // The viewer fills in the fields it can read from the table's obs; MDV adds
                 // the rest from the datasource row (see `splitTooltipFields`).
-                const extra =
-                    event.featureId === undefined ? [] : mdvTooltipItems(event.entryId, String(event.featureId));
+                const extra = event.featureId === undefined ? [] : tooltipItems(event.entryId, String(event.featureId));
                 const tooltip =
                     extra.length === 0
                         ? event.tooltip
@@ -696,10 +700,13 @@ const SpatialDataViewer = observer(
                           getTooltipContent,
                           setKeyboardActive: setScatterKeyboardActive,
                           onPointerLeave: onFeatureHoverEnd,
+                          onFeatureHover,
+                          onFeatureHoverEnd,
                       }
                     : undefined,
             [
                 regionGridShown,
+                onFeatureHover,
                 deckDevice,
                 deviceProps,
                 onDeviceInitialized,

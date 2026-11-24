@@ -285,8 +285,12 @@ that fail while *drawing*.
   layer registry, with its `region`, and the panel names it. The channel settings themselves are
   the stack entry's props, so they apply to every cell. Overlaying the histograms of every
   region in view would show whether one set of limits suits them all; that is not done yet.
-- **Not in cells yet:** selection tools, gates, density, grey (filtered-out) points, feature
-  tooltips and layer status.
+- **Feature tooltips.** Each cell registers a hover handler with the grid, which sends a pick
+  to the cell it was made in. The cell strips its view id from the picked layer's id, asks its
+  own renderer for the feature, and adds its own region's MDV tooltip items. As in the single
+  view, the top pick wins, so where the MDV points cover a shape the shape has no tooltip.
+- **Not in cells yet:** selection tools, gates, density, grey (filtered-out) points and layer
+  status.
 
 ## The points layer panel
 

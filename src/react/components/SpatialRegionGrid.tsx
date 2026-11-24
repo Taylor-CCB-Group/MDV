@@ -3,16 +3,18 @@ import { viewStateFromBounds } from "@spatialdata/core";
 import type { RenderStack } from "@spatialdata/layers";
 import {
     type RenderStackLayerInputs,
+    resolvePickedEntryId,
+    type SpatialFeaturePickEvent,
     useSpatialCanvasRendererFromLayerInputs,
     type VivImagePassthroughOptions,
     vivImageLayers,
 } from "@spatialdata/vis";
 import type { Layer, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
-import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
+import { type AssociatedLayerInputs, useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { useChart } from "../context";
 import { useChartID, useConfig, useFieldSpec } from "../hooks";
 import { type ChartArrayCell, useChartArrayGrid } from "../hooks/useChartArrayGrid";
@@ -43,7 +45,21 @@ export type SpatialRegionGridHost = {
     getTooltipContent: (info: PickingInfo) => TooltipContent | undefined;
     setKeyboardActive: (active: boolean) => void;
     onPointerLeave: () => void;
+    /**
+     * A SpatialData feature under the pointer: the event, the canvas its `x` / `y` are relative
+     * to, and the MDV tooltip items for the cell's region.
+     */
+    onFeatureHover: (
+        event: SpatialFeaturePickEvent,
+        anchor: HTMLElement | undefined,
+        tooltipItems: CellTooltipItems,
+    ) => void;
+    onFeatureHoverEnd: () => void;
 };
+
+type CellTooltipItems = AssociatedLayerInputs["mdvTooltipItems"];
+/** A cell's hover handler: a pick in its view, with the canvas it was made in. */
+type CellHover = (info: PickingInfo, canvas: HTMLCanvasElement | undefined) => boolean;
 
 const LABEL_COLOR = [226, 232, 240] as const;
 const NO_ROWS = new Uint32Array(0);
@@ -90,6 +106,8 @@ const RegionCellLayers = observer(function RegionCellLayers({
     onLayers,
     onFit,
     publishesImageData,
+    registerHover,
+    onFeatureHover,
 }: {
     cell: SpatialRegionCell;
     viewId: string;
@@ -103,12 +121,18 @@ const RegionCellLayers = observer(function RegionCellLayers({
     onFit: (regionKey: string, viewState: OrthographicViewState) => void;
     /** Whether the layer dialog's image controls (histograms) read this cell's images. */
     publishesImageData: boolean;
+    registerHover: (viewId: string, hover: CellHover | null) => void;
+    onFeatureHover: SpatialRegionGridHost["onFeatureHover"];
 }) {
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
     const reader = chart.spatialDataReader;
     const getSnapshot = useCallback(() => reader.read(cell.url).state, [reader, cell.url]);
     const { spatialData } = useSyncExternalStore(reader.subscribe, getSnapshot);
-    const { layers, layerOrder } = useAssociatedShapesLayerInputs(spatialData ?? undefined, layerInputs, cell.file);
+    const { layers, layerOrder, mdvTooltipItems } = useAssociatedShapesLayerInputs(
+        spatialData ?? undefined,
+        layerInputs,
+        cell.file,
+    );
     const spatialViewState = useMemo(
         () =>
             viewState
@@ -143,6 +167,25 @@ const RegionCellLayers = observer(function RegionCellLayers({
 
     useEffect(() => onLayers(viewId, cellLayers), [onLayers, viewId, cellLayers]);
     useEffect(() => () => onLayers(viewId, null), [onLayers, viewId]);
+
+    // A pick in this cell: its layers' ids carry the cell's view id, which the renderer's don't.
+    const hover = useRef<CellHover>(() => false);
+    hover.current = (info, canvas) => {
+        const pickedId = resolvePickedEntryId(info);
+        const entryId = pickedId.startsWith(`${viewId}-`) ? pickedId.slice(viewId.length + 1) : pickedId;
+        const event = renderer.getFeaturePickEvent(entryId, { index: info.index, object: info.object });
+        if (!event) return false;
+        onFeatureHover(
+            { ...event, coordinateSystem: cell.coordinateSystem, spatialData, entryId, pickInfo: info },
+            canvas,
+            mdvTooltipItems,
+        );
+        return true;
+    };
+    useEffect(() => {
+        registerHover(viewId, (info, canvas) => hover.current(info, canvas));
+        return () => registerHover(viewId, null);
+    }, [registerHover, viewId]);
 
     // The layer dialog's image controls read one store's images, as in the single view. The stack
     // is edited in place, so a new generation means a new registry, as there.
@@ -318,6 +361,22 @@ export default observer(function SpatialRegionGrid({
     );
     const deviceLayers = useLayersForDevice(layers, host.device);
 
+    // each cell handles a hover in its view: only it knows what its layers show
+    const hoverHandlers = useRef(new Map<string, CellHover>());
+    const registerHover = useCallback((viewId: string, hover: CellHover | null) => {
+        if (hover) hoverHandlers.current.set(viewId, hover);
+        else hoverHandlers.current.delete(viewId);
+    }, []);
+    const { onFeatureHoverEnd } = host;
+    const onHover = useCallback(
+        (info: PickingInfo, canvas: HTMLCanvasElement | undefined) => {
+            const hover = info.picked ? hoverHandlers.current.get(info.viewport?.id ?? "") : undefined;
+            // deck reports moving off a feature as an unpicked hover
+            if (!hover?.(info, canvas)) onFeatureHoverEnd();
+        },
+        [onFeatureHoverEnd],
+    );
+
     const fallbackViewState = useMemo<OrthographicViewState>(() => ({ target: [0, 0, 0], zoom: 0 }), []);
     const { getTooltipContent } = host;
     const tooltipContent = useCallback((info: PickingInfo) => getTooltipContent(info), [getTooltipContent]);
@@ -343,6 +402,8 @@ export default observer(function SpatialRegionGrid({
                         onLayers={onLayers}
                         onFit={onFit}
                         publishesImageData={index === imageDataCell}
+                        registerHover={registerHover}
+                        onFeatureHover={host.onFeatureHover}
                     />
                 );
             })}
@@ -360,6 +421,7 @@ export default observer(function SpatialRegionGrid({
                 onViewStateChange={onViewStateChange}
                 controllerOptions={host.controllerOptions}
                 getTooltipContent={tooltipContent}
+                onHover={onHover}
                 setKeyboardActive={host.setKeyboardActive}
                 onPointerLeave={host.onPointerLeave}
             />
