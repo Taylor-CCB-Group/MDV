@@ -1,6 +1,7 @@
 import { findRenderStackEntry, type RenderStack } from "@spatialdata/layers";
 import type { EntryStatus } from "@spatialdata/vis";
 import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
+import type { SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
@@ -33,8 +34,8 @@ import { getDensitySettings } from "../contour_state";
 import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
 import { createVivStores, type VivContextType } from "./avivatorish/state";
 import { BaseReactChart } from "./BaseReactChart";
-import { getDensityGridSettingsFolder } from "./densityGridSettings";
 import { getCrosshairSetting } from "./pointerCrosshair";
+import { getSpatialDataGridSettingsFolder } from "./regionGridUtils";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialStatusPanel from "./SpatialStatusPanel";
@@ -42,6 +43,8 @@ import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScat
 
 export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     type: "SpatialDataMdvRegionReact";
+    /** A cell per density field, or a cell per region (`SpatialRegionGrid`). */
+    grid?: SpatialDataGridConfig | null;
     region: string;
     background_filter: CategoryFilter;
     renderStack?: RenderStack;
@@ -413,7 +416,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 func: () => this.openLayerDialog(),
             }),
             getCrosshairSetting(config),
-            getDensityGridSettingsFolder(config),
+            getSpatialDataGridSettingsFolder(config),
             g({
                 type: "dropdown",
                 label: `SpatialData (${dataStore.getColumnName(dataStore.regions?.region_field)})`,

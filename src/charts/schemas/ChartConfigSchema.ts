@@ -194,6 +194,19 @@ export const ChartGridConfigSchema = chartGridConfigSchema(["densityFields"]);
 
 export type ChartGridConfig = z.infer<typeof ChartGridConfigSchema>;
 
+/**
+ * The SpatialData chart's grid: a cell per density field, or a cell per region (each region's
+ * SpatialData drawn with the chart's layers, and its own rows).
+ */
+export const SpatialDataGridConfigSchema = chartGridConfigSchema(["densityFields", "region"]).extend({
+    hide_empty: z
+        .boolean()
+        .optional()
+        .describe('With `by: "region"`: leave out regions with no rows left after filtering'),
+});
+
+export type SpatialDataGridConfig = z.infer<typeof SpatialDataGridConfigSchema>;
+
 const DensityFieldsConfigSchema = z
     .object({
         densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),

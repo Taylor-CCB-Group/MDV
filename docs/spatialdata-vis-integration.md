@@ -253,6 +253,28 @@ This replaced MDV's own raster-layout check (`raster_health.ts`), which moved in
 `@spatialdata/core` 0.17. It is distinct from `layer_failures.ts`, which turns off layers
 that fail while *drawing*.
 
+## A cell per region
+
+`grid: { by: "region" }` draws a cell per region of the chart's datasource (each region with
+`spatial` metadata), from one deck (`SpatialRegionGrid`, on `DeckCellGrid`). The chart's
+`region` still picks the store its render stack is seeded from and the layer dialog reads.
+
+- **The render stack is a template.** Every cell draws the chart's one stack against its own
+  store: an entry names an element, found by name in each region's store. Similar stores (the
+  same Xenium panel) need no per-region config. A store without an element just lacks the layer.
+- **Each cell is a renderer.** `RegionCellLayers` runs `useSpatialCanvasRendererFromLayerInputs`
+  for its region and hands its layers, ids prefixed with the cell's view id, up to the grid. It
+  is memoised: the grid renders again on every report, and a cell rendered again would report
+  again, in a loop.
+- **Only cells in view load.** A cell scrolled out unmounts its renderer and drops its layers.
+- **Points.** The chart's `background_filter` is ignored in a region grid
+  (`getActiveChartScopeFilters`), so the points layer has every region's rows. The grid splits
+  them by `region_field` and clones the layer per cell, mapping picks back to positions in all
+  the rows for the layer's own handlers. `hide_empty` leaves out regions with no rows left.
+- **Views are per cell**, fitted to each region, and held only while the chart is open.
+- **Not in cells yet:** selection tools, gates, density, grey (filtered-out) points, feature
+  tooltips, layer status and the image layer registry (the layer dialog's histograms).
+
 ## The points layer panel
 
 `PointsLayerPanel` is a bridge, not a leaf. The layer dialog is a portal with its own

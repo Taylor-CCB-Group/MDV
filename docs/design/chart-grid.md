@@ -14,6 +14,7 @@ Several charts already draw small multiples, each in its own way:
 | Multi-line chart (#691) | `values`: a cell per numeric field once there are several | `ChartArrayLayout`, an SVG per cell | densities, x domain (unless `share_x`), a brush and its range dimension | categories, colours, legend, settings |
 | Compound dot plot | `split_by` / `split_values`: a panel per category value | its own panel layout | the rows of that category value | columns, colour scale (`auto` is shared) |
 | Splatter plot | categories × `densityFields`: a cell per pair | its own layout | the category's rows, the field's density | view state |
+| SpatialData region grid | `grid: { by: "region" }`: a cell per region (a store and coordinate system) | `ChartArrayLayout`, one deck (`DeckCellGrid`) | the region's store, renderer and rows; its view state | the render stack (as a template), colours, filters |
 
 They answer the same questions (what is a cell, what does it share, where does its state live)
 differently, and only the first two use `ChartArrayLayout`. A generic grid could make a new
