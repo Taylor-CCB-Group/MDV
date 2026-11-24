@@ -19,6 +19,7 @@ from mdvtools.examples.curate_mdv_project import (
 )
 from mdvtools.examples.rename_softdelete_mdv_project_fields import (
     apply_plan,
+    build_plan,
     build_soft_delete_plan,
     planned_soft_deletes,
 )
@@ -73,6 +74,47 @@ def test_rename_ignores_an_already_soft_deleted_column(tmp_path):
     project = write_project(tmp_path, columns)
     _summary, results, _log = apply_plan(project, "cells", [rename("spatial_region", "Region")], True)
     assert results[0]["status"] == "planned"
+
+
+def test_workbook_renames_bucket_and_annotation(tmp_path):
+    project = write_project(
+        tmp_path,
+        [
+            {"field": "bucket", "name": "bucket"},
+            {"field": "annotation", "name": "annotation"},
+            {"field": "sub_bucket", "name": "sub_bucket"},
+        ],
+    )
+    workbook = tmp_path / "cleaning.xlsx"
+    import pandas as pd
+
+    pd.DataFrame(
+        [
+            {
+                "datasource": "cells",
+                "original name": "bucket",
+                "displayed name": "bucket",
+                "new_display_name": "Cell Group",
+                "Final Column Name": "Cell Group",
+                "Project id": "mdv_gut",
+            },
+            {
+                "datasource": "cells",
+                "original name": "annotation",
+                "displayed name": "annotation",
+                "new_display_name": "Cell Type",
+                "Final Column Name": "Cell Type",
+                "Project id": "mdv_gut",
+            },
+        ]
+    ).to_excel(workbook, sheet_name="Data Cleaning", index=False)
+    plan, _warnings, _errors, kept, _ambiguous = build_plan(project, "cells", workbook, "mdv_gut")
+    by_field = {item["field"]: item for item in plan}
+    assert by_field["bucket"]["action"] == "rename"
+    assert by_field["bucket"]["target_name"] == "Cell Group"
+    assert by_field["annotation"]["target_name"] == "Cell Type"
+    assert by_field["sub_bucket"]["action"] == "keep"
+    assert "sub_bucket" in kept
 
 
 def test_gates_column_is_never_soft_deleted(tmp_path):

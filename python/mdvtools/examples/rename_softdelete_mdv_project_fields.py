@@ -313,7 +313,17 @@ def build_plan(
             continue
         current_name = normalize_text(target_columns[field].get("name"))
         # Field id only. rna:bucket is displayed as "bucket" but is a different column, so the sheet still renames it.
-        if datasource == "cells" and field in CELL_RENAME_EXCLUSIONS:
+        # An explicit workbook name wins, so a sheet row for bucket or annotation is applied.
+        sheet_targets = {
+            item["target_name"]
+            for item in sheet_rows
+            if item["target_name"]
+            and (
+                item["original_name"] == field
+                or item["displayed_name"] in {field, display_name}
+            )
+        }
+        if datasource == "cells" and field in CELL_RENAME_EXCLUSIONS and len(sheet_targets) != 1:
             kept_fields.add(field)
             plan.append({
                 "row": None,
