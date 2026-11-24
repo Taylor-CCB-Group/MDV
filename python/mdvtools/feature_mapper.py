@@ -27,13 +27,11 @@ _UNNAMED_GENE_RE = re.compile(
 
 import pandas as pd
 
-try:
-    import pyranges as pr
-except ModuleNotFoundError as exc:  # pragma: no cover
-    raise ModuleNotFoundError(
-        "pyranges is required for mdvtools.feature_mapper. "
-        "Install with: pip install pyranges"
-    ) from exc
+from mdvtools._optional import require_extra
+
+require_extra("genomics", "pyranges")
+
+import pyranges as pr  # noqa: E402  (safe below the guard)
 
 
 def _chr_norm(chrom: Any) -> str:
