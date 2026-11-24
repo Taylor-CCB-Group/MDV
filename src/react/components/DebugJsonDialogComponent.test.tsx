@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type BaseChart from "@/charts/BaseChart";
-import { browserSettings } from "@/lib/browserSettings";
+import { browserSettings, isSettingListed } from "@/lib/browserSettings";
 import { g } from "@/lib/utils";
 import ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import DebugJsonDialogComponent from "./DebugJsonDialogComponent";
@@ -163,7 +163,7 @@ describe("DebugJsonDialogComponent", () => {
         test("finds a section by title and a setting by label", async () => {
             render(<DebugJsonDialogComponent json={json} />);
 
-            search("convert legacy");
+            search("rendering backend");
             // the search is debounced
             await waitFor(() => expect(screen.queryByText("buildInfo")).toBeNull());
             expect(screen.getByText("Preferences")).toBeTruthy();
@@ -270,11 +270,12 @@ describe("DebugJsonDialogComponent", () => {
             expect(await screen.findByText("Nothing matches your search.")).toBeTruthy();
         });
 
-        test("every browser setting appears in Preferences", () => {
+        test("every listed browser setting appears in Preferences, and unlisted previews don't", () => {
             render(<DebugJsonDialogComponent json={json} />);
 
             for (const setting of browserSettings) {
-                expect(screen.getAllByText(setting.label).length).toBeGreaterThan(0);
+                if (isSettingListed(setting)) expect(screen.getAllByText(setting.label).length).toBeGreaterThan(0);
+                else expect(screen.queryByText(setting.label)).toBeNull();
             }
         });
     });

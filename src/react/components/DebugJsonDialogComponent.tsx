@@ -11,7 +11,7 @@ import ClearIcon from "@mui/icons-material/Clear";
 import { Box, Button, Divider, IconButton, InputAdornment, Link, Paper, TextField, Typography } from "@mui/material";
 import type BaseChart from "@/charts/BaseChart";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { browserSettings } from "@/lib/browserSettings";
+import { browserSettings, isSettingListed } from "@/lib/browserSettings";
 import type ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import type { ValidationFinding } from "@/lib/ValidationFindingsStore";
 import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
@@ -392,6 +392,8 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                 : browserSettings.filter((setting) => browserSettingMatchesQuery(setting, query)),
         [query],
     );
+    // Outside the memo so it reacts to the feature-previews setting (this component is an observer).
+    const listedBrowserSettings = filteredBrowserSettings.filter(isSettingListed);
     const technicalSettings = useMemo(() => chart?.getDebugSettings?.() ?? [], [chart]);
     useEffect(() => {
         const disposers = collectDisposers(technicalSettings);
@@ -426,7 +428,7 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     const showValidation =
         showValidationSection && matchesQuery(debugQuery, "Validation issues", "validation findings");
     // a chart's dialog is about that chart; the project-wide sections are in the main Settings dialog
-    const showBrowserSettings = !chart && filteredBrowserSettings.length > 0;
+    const showBrowserSettings = !chart && listedBrowserSettings.length > 0;
     const showTechnicalSettings = filteredTechnicalSettings.length > 0;
     const hasSpatialStores = useHasSpatialStores();
     const showDataQuality =
@@ -512,7 +514,7 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                     defaultExpanded={!showFindingsFirst}
                     {...sectionProps}
                 >
-                    <BrowserSettingsSection settings={filteredBrowserSettings} />
+                    <BrowserSettingsSection settings={listedBrowserSettings} />
                 </DebugSection>
             )}
             {showDataQuality && (

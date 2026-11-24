@@ -527,6 +527,7 @@ BaseChart.types["DeckSplatter"] = {
     name: "Splatter Plot",
     class: DeckSplatterReact,
     allow_user_add: true,
+    preview: true,
     params: [
         {
             type: "number",

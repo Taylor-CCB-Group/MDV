@@ -45,3 +45,4 @@ import "../charts/dialogs/AnnotationDialogReact";
 import "../react/components/HighlightedFeatureChart";
 import "../react/components/GeneNetworkChart";
 import "../react/components/SelectionDialogReact";
+import "../spatial_stats/CrossPcfChart";
