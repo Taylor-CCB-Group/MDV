@@ -117,6 +117,21 @@ These are the unexpected consequences to check before generalising.
   chart div directly (`BaseChart.setSize(w, h)`) bypasses gridstack and leaves the chart
   overflowing its slot; cells must take their size from the layout, not the other way round.
 
+## Display options (follow-up)
+
+Every grid takes `ChartArrayLayout`'s defaults today: cells at least 260px wide, square unless
+they fill the panel, as many columns as fit, and one scrolling page. Wanted, in the `grid` config
+(where `ChartGridConfigSchema` already says layout options belong), shared by every chart:
+
+- **Element sizes**: a cell size (or minimum width) and aspect ratio, and/or a fixed number of
+  columns, so a dozen marker cells can match the size of the single charts they replace.
+- **Pagination**: a page of cells at a time, as an alternative to scrolling. It bounds how many
+  cells are mounted, loaded (#693) and computed, which matters for a grid over hundreds of
+  values, and gives export a natural unit (this page, or every page).
+
+Both change how many cells are in view, so `visibleCellIndices`, the lazy loading window and
+export should all follow the page rather than the scroll position when paging is on.
+
 ## Suggested order
 
 1. Category facets for the multi-line chart (`grid: { by: "categories" }`), within that chart,
