@@ -3,10 +3,13 @@ Build information module for gathering version metadata from environment or git.
 
 This module provides utilities to extract build/version information that can be
 used for reproducibility and debugging. It checks environment variables first
-(as set by Docker builds or devcontainers), then falls back to git commands.
+(as set by Docker builds or devcontainers), then git commands in the enclosing
+checkout, then the commit pip/uv recorded when installing from a git URL.
 """
+import json
 import os
 import subprocess
+from importlib import metadata
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -137,6 +140,55 @@ def _get_from_git() -> Optional[Dict[str, Any]]:
         return None
 
 
+def read_direct_url() -> Optional[Dict[str, Any]]:
+    """The installed distribution's PEP 610 ``direct_url.json`` record, if any.
+
+    pip and uv write it for installs from a URL, a local directory (including
+    editable installs) or a VCS; it is absent for installs from an index.
+    """
+    try:
+        text = metadata.distribution("mdvtools").read_text("direct_url.json")
+    except metadata.PackageNotFoundError:
+        return None
+    if not text:
+        return None
+    try:
+        record = json.loads(text)
+    except ValueError:
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def _get_from_direct_url() -> Optional[Dict[str, Any]]:
+    """Commit of a git install (``mdvtools @ git+https://...``), from PEP 610.
+
+    Such an install has no ``.git`` to ask, but the installer records the commit
+    it resolved. Only the commit and repository are known; the date, message and
+    branch are not recorded.
+    """
+    record = read_direct_url()
+    vcs_info = record.get("vcs_info") if record else None
+    if not isinstance(vcs_info, dict) or vcs_info.get("vcs") != "git":
+        return None
+    commit = vcs_info.get("commit_id")
+    if not commit:
+        return None
+    repository = record.get("url") if record else None
+    subdirectory = record.get("subdirectory") if record else None
+    if repository and subdirectory:
+        repository = f"{repository} ({subdirectory})"
+    return {
+        "git_commit_hash": commit,
+        "git_commit_date": None,
+        "git_branch": None,
+        "git_commit_message": None,
+        "build_date": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "git_dirty": None,
+        "repository": repository,
+        "source": "git install",
+    }
+
+
 def get_build_info() -> Dict[str, Any]:
     """
     Get build information from environment variables or git.
@@ -149,18 +201,24 @@ def get_build_info() -> Dict[str, Any]:
         - git_branch: Branch name
         - build_date: Build timestamp
         - git_dirty: Whether working directory has uncommitted changes
-        - source: "environment", "git", or "unknown"
+        - repository: Repository URL (git installs only)
+        - source: "environment", "git", "git install", or "unknown"
     """
     # Try environment first (Docker/build-time)
     info = _get_from_env()
     if info:
         return info
-    
+
     # Fallback to git
     info = _get_from_git()
     if info:
         return info
-    
+
+    # Installed from a git URL: no checkout, but the installer recorded the commit
+    info = _get_from_direct_url()
+    if info:
+        return info
+
     # No information available
     return {
         "git_commit_hash": None,
@@ -196,6 +254,8 @@ def build_info_to_markdown(info: Dict[str, Any]) -> str:
         lines.append(f"- **Commit date**: {info['git_commit_date']}")
     if info["git_branch"]:
         lines.append(f"- **Branch**: {info['git_branch']}")
+    if info.get("repository"):
+        lines.append(f"- **Repository**: {info['repository']}")
     if info["build_date"]:
         lines.append(f"- **Build date**: {info['build_date']}")
     if info["git_dirty"] is not None:
