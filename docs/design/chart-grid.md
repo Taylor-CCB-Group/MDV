@@ -117,7 +117,7 @@ These are the unexpected consequences to check before generalising.
   chart div directly (`BaseChart.setSize(w, h)`) bypasses gridstack and leaves the chart
   overflowing its slot; cells must take their size from the layout, not the other way round.
 
-## Display options (follow-up)
+## Display options (follow-up, #704)
 
 Every grid takes `ChartArrayLayout`'s defaults today: cells at least 260px wide, square unless
 they fill the panel, as many columns as fit, and one scrolling page. Wanted, in the `grid` config
