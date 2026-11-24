@@ -567,6 +567,11 @@ class BaseChart<T extends BaseConfig> {
     onDataFiltered(dim?: Dimension) {}
 
     setToolTipColumn?(column: FieldSpec): void;
+    /**
+     * Sets what `param[index]` would be, for a chart that keeps its columns in named props instead.
+     * A link with `set_param` calls this when the chart has it, and writes `param` otherwise.
+     */
+    setParamAt?(index: number, column: FieldName): void;
     setBackgroundFilter?(column: FieldName): void;
     // only used by vanilla DensityScatterPlot
     changeContourParameter?(column: FieldName): void;
