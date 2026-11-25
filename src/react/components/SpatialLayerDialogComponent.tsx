@@ -405,8 +405,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
         <div
             ref={setNodeRef}
             style={{ paddingLeft: (nested ? 40 : 20) + depth * TREE_INDENT_PX, ...style }}
-            className={`flex items-center gap-1 py-0.5 cursor-pointer rounded pr-1 ${selected ? "bg-blue-100 dark:bg-blue-900/30" : failure ? "bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:hover:bg-amber-900/50" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
-            onClick={() => onSelect(entryId)}
+            className={`flex items-center gap-1 py-0.5 rounded pr-1 ${selected ? "bg-blue-100 dark:bg-blue-900/30" : failure ? "bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:hover:bg-amber-900/50" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
             title={failure ? `Failed and turned off: ${failure.reason}` : undefined}
         >
             {dragHandle ? (
@@ -468,12 +467,13 @@ const LayerTreeRow = observer(function LayerTreeRow({
             ) : (
                 <Typography
                     variant="body2"
-                    className="grow truncate select-none rounded focus-visible:outline focus-visible:outline-2"
+                    // grows to fill the row between its controls, so it is the row's click target
+                    className="grow truncate select-none cursor-pointer rounded focus-visible:outline focus-visible:outline-2"
                     title="Double-click (or F2) to rename"
-                    // the keyboard path to selecting a row; the row's own click is for the mouse
                     role="button"
                     tabIndex={0}
                     aria-pressed={selected}
+                    onClick={() => onSelect(entryId)}
                     onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
@@ -510,7 +510,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
                 </IconButton>
             )}
             {supportsOpacity && (
-                <div className="w-20 px-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <div className="w-20 px-1 flex-shrink-0">
                     <Slider
                         size="small"
                         min={0}
