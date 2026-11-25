@@ -88,15 +88,24 @@ export function moveRegionViews(
  * per category of the first colour column, per fill colour column (or category) of a shapes or
  * labels layer, or per region.
  */
-export function getSpatialDataGridSettingsFolder(config: {
-    grid?: SpatialDataGridConfig | null;
-    renderStack?: RenderStack;
-}) {
+export function getSpatialDataGridSettingsFolder(
+    config: {
+        grid?: SpatialDataGridConfig | null;
+        renderStack?: RenderStack;
+    },
+    /** Whether a table annotates a layer's element, so it can be coloured by a column (see `fillColorLayers`). */
+    isAnnotated?: (layer: FillColorLayer) => boolean,
+) {
+    // the layer the grid is by stays a choice, so the dropdown can show it
+    const gridLayer = config.grid?.by === "layer_fill" ? config.grid.layer : undefined;
+    const layers = fillColorLayers(config.renderStack).filter(
+        (layer) => !isAnnotated || layer.id === gridLayer || isAnnotated(layer),
+    );
     const choices = [
         { name: "One view", value: "none" },
         { name: "A cell per density field", value: "densityFields" },
         ...COLOR_GRID_CHOICES,
-        ...layerFillGridChoices(fillColorLayers(config.renderStack)),
+        ...layerFillGridChoices(layers),
         { name: "A cell per region", value: "region" },
     ];
     return g({
@@ -149,12 +158,16 @@ export function getSpatialDataGridSettingsFolder(config: {
     });
 }
 
-/** The stack's shapes and labels layers, which can be coloured by a column: their ids and names. */
-export function fillColorLayers(stack: RenderStack | undefined): { id: string; name: string }[] {
+/** A shapes or labels layer of the stack, which can be coloured by a column if a table annotates it. */
+export type FillColorLayer = { id: string; name: string; elementType: "shapes" | "labels"; elementKey: string };
+
+/** The stack's shapes and labels layers: their ids, names and elements. */
+export function fillColorLayers(stack: RenderStack | undefined): FillColorLayer[] {
     if (!stack) return [];
-    return Array.from(walkRenderStackEntries(stack.entries)).flatMap((entry) =>
-        entry.kind === "spatial" && (entry.source.elementType === "shapes" || entry.source.elementType === "labels")
-            ? [{ id: entry.id, name: renderStackEntryDisplayName(entry, stack) }]
-            : [],
-    );
+    return Array.from(walkRenderStackEntries(stack.entries)).flatMap((entry) => {
+        if (entry.kind !== "spatial") return [];
+        const { elementType, elementKey } = entry.source;
+        if (elementType !== "shapes" && elementType !== "labels") return [];
+        return [{ id: entry.id, name: renderStackEntryDisplayName(entry, stack), elementType, elementKey }];
+    });
 }

@@ -24,11 +24,13 @@ import {
     syncOverlayFollowerVisibility,
 } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
+import { spatialDataUrlForRegion } from "@/react/spatialdata/shared_spatial_data";
 import { sharedSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import {
     type SpatialDataSerializableViewState,
     toSerializableSpatialDataViewState,
 } from "@/react/spatialdata/spatialdata_config";
+import { resolveAssociatedElementTable } from "@/react/spatialdata/table_association";
 import BaseChart, { type ColumnChangeEvent, type MenuPip } from "../../charts/BaseChart";
 import type { FieldName } from "../../charts/charts";
 import {
@@ -44,7 +46,12 @@ import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "..
 import { createVivStores, type VivContextType } from "./avivatorish/state";
 import { BaseReactChart } from "./BaseReactChart";
 import { getCrosshairSetting } from "./pointerCrosshair";
-import { getSpatialDataGridSettingsFolder, type RegionViewState, toRegionViewState } from "./regionGridUtils";
+import {
+    type FillColorLayer,
+    getSpatialDataGridSettingsFolder,
+    type RegionViewState,
+    toRegionViewState,
+} from "./regionGridUtils";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialStatusPanel from "./SpatialStatusPanel";
@@ -426,6 +433,20 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
      * to their layers, and is edited with every other layer in the layer dialog
      * (`getDataLayerSettings`, `getDensityLayerSettings`), so the two are not split across dialogs.
      */
+    /**
+     * Whether a table annotates a layer's element, by the association the layer panels use, for
+     * the grid settings to offer only layers that can be coloured by a column. Undefined while the
+     * region's store has not been read, when every layer is offered.
+     */
+    private annotatedLayerFilter(): ((layer: FillColorLayer) => boolean) | undefined {
+        const url = spatialDataUrlForRegion(this.dataStore.regions?.all_regions[this.config.region]);
+        const spatialData = url ? this.spatialDataReader.peek(url)?.state.spatialData : undefined;
+        if (!spatialData) return undefined;
+        const dataSources = window.mdv.chartManager.dataSources;
+        return ({ elementType, elementKey }) =>
+            resolveAssociatedElementTable({ spatialData, elementType, elementKey, dataSources }).status === "resolved";
+    }
+
     getSettings() {
         const config = this.config;
         const dataStore = this.dataStore;
@@ -439,7 +460,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 func: () => this.openLayerDialog(),
             }),
             getCrosshairSetting(config),
-            getSpatialDataGridSettingsFolder(config),
+            getSpatialDataGridSettingsFolder(config, this.annotatedLayerFilter()),
             g({
                 type: "dropdown",
                 label: `SpatialData (${dataStore.getColumnName(dataStore.regions?.region_field)})`,

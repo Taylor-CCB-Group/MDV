@@ -1,5 +1,13 @@
+import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
 import { describe, expect, test } from "vitest";
-import { isRegionGridShown, moveRegionViews, spatialRegionCells } from "./regionGridUtils";
+import type { GuiSpec } from "@/charts/charts";
+import type { SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
+import {
+    getSpatialDataGridSettingsFolder,
+    isRegionGridShown,
+    moveRegionViews,
+    spatialRegionCells,
+} from "./regionGridUtils";
 
 describe("spatialRegionCells", () => {
     test("a cell per region with a store and coordinate system", () => {
@@ -56,5 +64,49 @@ describe("moveRegionViews", () => {
     test("cells without a view are left to be fitted", () => {
         const moved = moveRegionViews({ a }, "a", { target: [1, 1], zoom: 0 }, true);
         expect(Object.keys(moved)).toEqual(["a"]);
+    });
+});
+
+describe("getSpatialDataGridSettingsFolder", () => {
+    const layer = (id: string, elementType: "shapes" | "labels" | "image", elementKey: string): RenderStackEntry => ({
+        kind: "spatial",
+        id,
+        visible: true,
+        props: {},
+        source: { elementType, elementKey },
+    });
+    const renderStack: RenderStack = {
+        schemaVersion: 2,
+        entries: [
+            layer("he", "image", "he"),
+            layer("circles", "shapes", "cell_circles"),
+            layer("boundaries", "shapes", "cell_boundaries"),
+        ],
+    };
+    const layerChoices = (folder: GuiSpec<"folder">) => {
+        const [show] = folder.current_value;
+        if (show?.type !== "dropdown") return [];
+        const options: unknown[] = show.values?.[0] ?? [];
+        return options.flatMap((option) =>
+            option &&
+            typeof option === "object" &&
+            "value" in option &&
+            typeof option.value === "string" &&
+            option.value.startsWith("layer_fill:")
+                ? [option.value]
+                : [],
+        );
+    };
+    const annotated = ({ elementKey }: { elementKey: string }) => elementKey === "cell_circles";
+
+    test("offers a colour grid for each shapes or labels layer a table annotates", () => {
+        const folder = getSpatialDataGridSettingsFolder({ renderStack }, annotated);
+        expect(layerChoices(folder)).toEqual(["layer_fill:columns:circles", "layer_fill:categories:circles"]);
+    });
+
+    test("keeps the layer the chart is a grid of, and every layer when it cannot tell", () => {
+        const grid: SpatialDataGridConfig = { by: "layer_fill", layer: "boundaries" };
+        expect(layerChoices(getSpatialDataGridSettingsFolder({ renderStack, grid }, annotated))).toHaveLength(4);
+        expect(layerChoices(getSpatialDataGridSettingsFolder({ renderStack }))).toHaveLength(4);
     });
 });

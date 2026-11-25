@@ -340,6 +340,9 @@ and any reader of the saved stack, takes the first (`projectMdvFieldSpecs`).
   (`splitRenderStackAt`), with each cell's copy between. An isolated group holding the layer is
   split with it, so its two halves composite separately, and the copies do not get its blending.
 
+The Grid dropdown offers only layers whose element a table annotates (`annotatedLayerFilter`,
+the association the layer panels use), and the layer the chart is a grid of.
+
 The copies are made for every cell, not only those in view, and each costs a pass over the
 element's features when its column or the filter changes. An active link's change of columns
 changes the cells, and with them the copies.
