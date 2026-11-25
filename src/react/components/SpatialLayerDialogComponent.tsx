@@ -78,6 +78,7 @@ import { useChart, useDataStore } from "../context";
 import { useConfig, useDataSources } from "../hooks";
 import EntryStatusDetails from "./EntryStatusDetails";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import { GridByIcon } from "./GridByControl";
 import { layerFillGrid, layerFillGridConfig } from "./layerFillGridUtils";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import { CompositingButton, hasCompositing } from "./spatialLayers/CompositingButton";
@@ -424,6 +425,8 @@ const LayerTreeRow = observer(function LayerTreeRow({
     const supportsOpacity = entry.kind === "spatial" || entry.kind === "group";
     const name = renderStackEntryDisplayName(entry, config.renderStack);
     const table = entry.kind === "spatial" ? tableSummary(entry.source.elementType, entry.source.elementKey) : null;
+    const grid = layerFillGrid(config);
+    const gridSplit = grid?.layer === entryId ? grid.split : null;
 
     return (
         <div
@@ -518,6 +521,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
                 </Typography>
             )}
             {table && <ElementTableIcon summary={table} />}
+            {gridSplit && <GridByIcon split={gridSplit} />}
             {hasCompositing(entry.kind, entryId) && <CompositingButton entryId={entryId} name={name} />}
             {entry.kind === "group" && onAddInto && (
                 <IconButton
