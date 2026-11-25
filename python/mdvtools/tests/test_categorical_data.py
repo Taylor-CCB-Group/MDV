@@ -209,6 +209,21 @@ def test_add_annotations_categorical_missing_values():
         assert list(annotation_data) == ['A', 'MISSING', 'B', 'MISSING']
 
 
+def test_add_annotations_nullable_boolean_missing_values():
+    """Nullable booleans reject a string fill, both for rows absent from `data` and own nulls."""
+    with temp_mdv_project() as test_dir:
+        mdv = MDVProject(test_dir, delete_existing=True)
+        mdv.add_datasource("test", pd.DataFrame({'id': range(3), 'value': list(range(3))}))
+
+        annotation_df = pd.DataFrame({
+            'id': [0, 1],
+            'flag': pd.array([True, None], dtype="boolean"),
+        })
+        mdv.add_annotations("test", annotation_df, missing_value="MISSING")
+
+        assert list(mdv.get_column("test", "flag")) == ['True', 'MISSING', 'MISSING']
+
+
 def test_add_annotations_small_int_missing_values_stay_missing():
     """int32 storage can't hold NaN, so missing rows must not silently become 0."""
     with temp_mdv_project() as test_dir:

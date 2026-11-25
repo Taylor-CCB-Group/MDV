@@ -127,15 +127,15 @@ def convert_scanpy_to_mdv(
     add_layer_data = True,
     gene_identifier_column = None,
     link_name_column: str | None = None,
-    add_reverse_link: bool = False,
-    reverse_link_name_column: str | None = None,
     rows_as_columns_name_column: str | None = None,
-    x_data_name: str = "Gene Expr",
-    x_data_transformation: str = "Gene Score",
     gene_columns: List[dict[str, Any]] | None = None,
     compute_x_umap: bool = False,
     leiden_resolution: float = 1.0,
     leiden_column: str = "leiden",
+    add_reverse_link: bool = False,
+    reverse_link_name_column: str | None = None,
+    x_data_name: str = "Gene Expr",
+    x_data_transformation: str = "Gene Score",
 ) -> MDVProject:
     """
     Convert a Scanpy AnnData object to MDV (Multi-Dimensional Viewer) format.
@@ -339,6 +339,9 @@ def convert_scanpy_to_mdv(
                 obs_ds_name,
                 x_data_transformation,
                 reverse_matrix,
+                # the label may match a gene metadata column already stored in this group
+                name=_unused_h5_name(mdv, var_ds_name, x_data_transformation),
+                label=x_data_transformation,
                 chunk_data=chunk_data,
             )
 
@@ -381,16 +384,37 @@ def convert_scanpy_to_mdv(
         
     return mdv
 
+def _unused_h5_name(mdv: MDVProject, datasource: str, base: str) -> str:
+    """``base``, or ``base_<n>`` if a column or subgroup in ``datasource`` already uses it."""
+    h5 = mdv._get_h5_handle(read_only=True)
+    try:
+        group = h5[datasource]
+        assert isinstance(group, h5py.Group)
+        name, i = base, 1
+        while name in group:
+            name = f"{base}_{i}"
+            i += 1
+        return name
+    finally:
+        h5.close()
+
+
 def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False, chunk_data=False):
     md=mudata_object
     p= MDVProject(folder,delete_existing=delete_existing)
     mods = list(md.mod.keys())
-    # md.obs holds global columns plus "<mod>:<column>" copies pulled up from each
-    # modality; drop the copies of columns that already exist globally
+    # md.obs holds global columns plus "<mod>:<column>" columns pulled up from each
+    # modality; drop those that only repeat the global column's values
     mod_prefixes = tuple(f"{m}:" for m in mods)
     global_cols = [x for x in md.obs.columns if not x.startswith(mod_prefixes)]
-    repeat_cols = [f"{m}:{c}" for m in mods for c in global_cols]
-    table = md.obs.drop(columns=repeat_cols, errors="ignore")
+    repeat_cols = [
+        f"{m}:{c}"
+        for m in mods
+        for c in global_cols
+        if f"{m}:{c}" in md.obs.columns
+        and md.obs[f"{m}:{c}"].astype(object).equals(md.obs[c].astype(object))
+    ]
+    table = md.obs.drop(columns=repeat_cols)
 
     #are there any general drs
     table = _add_dims(table,md.obsm,max_dims)

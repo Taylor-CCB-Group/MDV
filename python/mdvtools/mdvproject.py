@@ -1497,8 +1497,8 @@ class MDVProject:
                 if values.isna().to_numpy().any():
                     c["datatype"] = "integer"
                 continue
-            if isinstance(values.dtype, pandas.CategoricalDtype):
-                # missing_value is usually not one of the categories
+            if values.dtype != object and not isinstance(values.dtype, pandas.StringDtype):
+                # categorical, nullable boolean etc. reject a string fill value
                 values = values.astype(object)
             aligned[field] = values.fillna(missing_value)
 
@@ -2277,7 +2277,9 @@ class MDVProject:
                     # Transposing the array without loading into memmory would probably take the 
                     # same amount of time
                     # Adapt chunk_size so large row length won't consume too much memory.
-                    chunk_size = self._get_optimal_chunk_size(num_rows, num_cols)
+                    chunk_size = self._get_optimal_chunk_size(
+                        num_rows, num_cols, numpy.dtype(getattr(data, "dtype", numpy.float32))
+                    )
                     for i in range(0, num_cols,chunk_size):
                         # protect against out-of-bounds end_col here 
                         # - although in testing, no difference observed, because
@@ -2297,8 +2299,10 @@ class MDVProject:
         self.set_datasource_metadata(ds)
         h5.close()
 
-    def _get_optimal_chunk_size(self, rows: int, cols: int) -> int:
-        """Determine optimal chunk size based on matrix dimensions and available memory."""
+    def _get_optimal_chunk_size(
+        self, rows: int, cols: int, dtype: numpy.dtype = numpy.dtype(numpy.float32)
+    ) -> int:
+        """Columns per chunk so that writing one chunk stays within half the available memory."""
         try:
             import psutil
             available_memory_mb = psutil.virtual_memory().available / 1024 / 1024
@@ -2306,8 +2310,9 @@ class MDVProject:
             # Fallback if psutil is not available
             available_memory_mb = 1000  # Assume 1GB available
         
-        # Estimate memory per element (float32 = 4 bytes)
-        bytes_per_element = 4
+        # Each chunk is a slice in the source dtype, its flattened copy, and the
+        # float32 copy h5py makes when writing
+        bytes_per_element = 2 * dtype.itemsize + 4
         
         # Calculate how many elements we can process with available memory
         # Use 50% of available memory
