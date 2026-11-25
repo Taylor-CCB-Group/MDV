@@ -96,6 +96,7 @@ all = ["mdvtools[app,genomics]"]
 [project.urls]
 Homepage = "https://github.com/Taylor-CCB-Group/MDV"
 "Bug Tracker" = "https://github.com/Taylor-CCB-Group/MDV/issues"
+Changelog = "https://github.com/Taylor-CCB-Group/MDV/blob/main/CHANGELOG.md"
 
 [project.scripts]
 mdvtools = "mdvtools.cli:cli"

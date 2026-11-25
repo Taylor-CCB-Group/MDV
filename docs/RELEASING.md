@@ -174,7 +174,8 @@ stops the Release workflow from publishing it again.
   `uv build`, `uv lock` and `uv sync`. Upgrade it with `uv self update`, or `pip install -U uv`
   for a pip install.
 - The PyPI page shows `python/PYPI_README.md`, not the developer `README.md`. Update its
-  quickstart when the API changes. `CHANGELOG.md` appears on GitHub only.
+  quickstart when the API changes. The page links to `CHANGELOG.md` on GitHub through the
+  Changelog entry in `[project.urls]`, and doesn't show the changelog itself.
 - `uv build` and `uv publish` do not read `uv.lock`. The lock matters for `uv sync` in
   development, Docker and CI.
 - After each `sync` push to the release branch, the new CI runs on the release pull request
