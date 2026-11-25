@@ -6,6 +6,12 @@ All notable changes to `mdvtools` are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- Optional telemetry. With `OTEL_EXPORTER_OTLP_ENDPOINT` set, the server sends request traces
+  and metrics to an OpenTelemetry collector and adds the trace ID to its log lines. With
+  `FARO_COLLECTOR_URL` set, the browser records page loads, Web Vitals and spatial chart load
+  times. See `docs/telemetry.md`. (#676)
+
 ## [1.4.0] - 2026-11-25
 
 > ⚠️ Behaviour changes for the full application (`mdvtools[app]`): when `DB_BACKEND` is
