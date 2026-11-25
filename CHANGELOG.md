@@ -6,7 +6,7 @@ All notable changes to `mdvtools` are documented here. The format is based on
 
 ## [Unreleased]
 
-## [1.4.0] - 2026-11-16
+## [1.4.0] - 2026-11-25
 
 > ⚠️ Behaviour changes for the full application (`mdvtools[app]`): when `DB_BACKEND` is
 > unset, the server now uses SQLite unless it finds a PostgreSQL setting (`DB_HOST`,
@@ -16,6 +16,15 @@ All notable changes to `mdvtools` are documented here. The format is based on
 > `DB_BACKEND` value other than `sqlite` or `postgres` stops the server from starting
 > (#435, #579). The server also records usage events, such as who opened which project and
 > view, in a new `usage_events` table. Set `ENABLE_USAGE_TRACKING=0` to turn this off (#540).
+>
+> Sign-in with Auth0 now works through Invitations. MDV no longer copies users from Auth0, and
+> `mdvtools/scripts/manage_project_permissions.py` is removed. Someone without a user in MDV
+> gets in only by accepting an open Invitation that names their email and sign-in method, and
+> sees a no-access page otherwise. Invitations are sent from the MDV-Admin extension. When the
+> users table is empty, the first verified sign-in with the email in
+> `MDV_BOOTSTRAP_ADMIN_EMAIL` becomes the first Admin. `MDV_ACCESS_CONTACT` sets the contact
+> shown on the no-access page, and `AUTH0_MICROSOFT_CONNECTIONS` names the site's Microsoft
+> connections. Sites on the dummy auth provider are unchanged (#636).
 
 A feature release. SQLite is now the default database for new installs of the full application, a new `SpatialData` chart overlays spatial layers, new charts show genomic data, and MDV works behind proxies that strip a path prefix, such as Verily Workbench. `pip install mdvtools` still installs the slim core.
 
@@ -31,7 +40,8 @@ A feature release. SQLite is now the default database for new installs of the fu
   (#530).
 - Genome support: a `genome` datastore parameter, an SV Circos plot, a UCSC browser view, an
   embedded IGV browser and a category heat map. `mdvtools serve --track-dir` adds extra track
-  folders. `pip install mdvtools` now installs `pysam` and `pyranges` for these (#470).
+  folders. These need `pip install "mdvtools[genomics]"`, which installs `pysam` and
+  `pyranges`. `mdvtools[all]` now includes `genomics` (#470, #703).
 - A date column type. Datetimes from pandas and polars show as `YYYY-MM-DD` in tables,
   tooltips, axes, legends and filters, and still sort and filter in date order (#527).
 - Legend filtering: click a category in a colour legend to filter by it (#482, #493).
@@ -49,7 +59,7 @@ A feature release. SQLite is now the default database for new installs of the fu
   cards in a production build (#570).
 - When a host frames MDV without cross-origin isolation, the catalog and project pages offer
   to open MDV in a new tab, where data loading works (#573).
-- The debug dialog lists validation issues in a readable form (#491).
+- The Settings dialog lists validation issues in a readable form (#491).
 - The density legend lists categorical contours as well as density fields, and hovering an
   entry highlights its contour (#590).
 - `mdvtools --version` (`-V`) prints the mdvtools version, git commit, Python and platform
@@ -81,8 +91,8 @@ A feature release. SQLite is now the default database for new installs of the fu
   and fraction legends, and SVG or PNG export. Selecting a dot filters to its data (#574,
   #634).
 - The SpatialData chart and the 2D and 3D deck scatter plots render with WebGPU where the
-  browser supports it. Each chart has a Rendering backend setting, the Debug dialog's Browser
-  settings section sets the default, and charts left at the default fall back to WebGL when
+  browser supports it. "Default rendering backend" in the Settings dialog's Preferences sets
+  the backend, each chart can override it under Technical settings in its debug dialog, and charts left at the default fall back to WebGL when
   WebGPU is unavailable or fails (#597, #607).
 - A "Legacy charts" browser setting shows the classic scatter plot, Density Scatter Plot,
   Table (Classic) and the Viv image viewer in Add Chart, which now hides them. An experimental
@@ -95,12 +105,36 @@ A feature release. SQLite is now the default database for new installs of the fu
 - When project code or data fails to load, the error panel fetches the failed file again and
   explains the result, such as a proxy error or a missing file. It has a Copy details button
   for bug reports (#650).
+- The SpatialData chart's layer dialog holds every layer's settings, including the data
+  points' colour, tooltip, point shape and size, opacity and category filters, which used to
+  be in chart settings. Density is a layer of its own, and layers can be renamed (#657).
+- SpatialData labels layers have colour, fill, fill opacity, outline opacity and outline width
+  controls, so a labels layer without an annotating table can still be coloured (#657).
+- SpatialData chart layers can be put in groups, with their own visibility, opacity and blend
+  mode. Layers and groups can use blend and compositing modes, image layers can take their
+  opacity from brightness, and a Data quality section in the Settings dialog lists each
+  spatial store's issues (#667, #681, #698).
+- The 2D deck scatter plot and the SpatialData chart can show their density fields as a grid
+  with a cell per field, and the SpatialData chart can show a cell per region. Both charts
+  mark the pointer with a crosshair (#683, #684, #707).
+- Datasources can be renamed from the datasource menu bar. The new name is stored as
+  `display_name`, so views and links keep working. `MDVProject.rename_datasource` and a
+  `rename_datasource` route do the same from scripts (#661).
+- A React "Multi Line Chart" whose brush filters the other charts by value. It can draw
+  several values as a grid of cells (#699, #702).
+- "Gene / Protein Info", formerly Gene Info, can show protein details from UniProt and has a
+  search box that filters the whole view (#678).
+- A "Dragging on charts" setting chooses whether a plain drag on a deck chart moves the view
+  or draws a selection. ⌘-drag (Ctrl-drag off macOS) always moves the view (#695).
+- A "Feature previews" setting shows charts still taking shape, such as a Cross-PCF matrix
+  chart (#645).
+- `mdvtools` installed from a git URL records the MDV commit in build information (#705).
 
 ### Changed
 - `mdvtools` now installs on Python 3.12 and 3.13. Python 3.11 is no longer supported, so
   pip on Python 3.11 keeps installing 1.3.0 (#609).
-- `mdvtools` now depends on `spatialdata-js-util` 0.3.1 (with its `write` extra), which needs
-  `zarr` 3.3 or later and `imagecodecs` 2026.6.26 or later (#609, #653).
+- `mdvtools` now depends on `spatialdata-js-util` 0.4 (with its `write` extra), which needs
+  `zarr` 3.3 or later and `imagecodecs` 2026.6.26 or later (#609, #653, #664).
 - Upgraded `spatialdata` to 0.8 and `spatialdata-io` to 0.7.1 (from 0.7.2 and 0.6.0).
   `spatialdata-io` 0.7.1 indexes Xenium shapes by `cell_id` (#609).
 - `mdvtools convert-spatial` default views now use the SpatialData.js viewer instead of the
@@ -120,10 +154,8 @@ A feature release. SQLite is now the default database for new installs of the fu
   brushing stays responsive and shows results during a drag rather than when it pauses.
   Editing a selection on a spatial scatter chart is also faster (#585).
 - The fraction legend is now a React component (#503).
-- `sync_users_to_db` fetches the Auth0 admin role members once, instead of once per user
-  (#526).
-- Dependency updates: `@spatialdata/*` 0.16.0, deck.gl and luma.gl 9.4, viv 0.23 (#529, #541,
-  #561, #588, #626, #630, #654, #655).
+- Dependency updates: `@spatialdata/*` 0.17.0, deck.gl and luma.gl 9.4, viv 0.23 (#529, #541,
+  #561, #588, #626, #630, #654, #655, #664, #681).
 - "2D Scatter Plot" in Add Chart now creates the deck scatter plot with density (#614).
 - Catalog cards show long project names over up to 3 lines, and in full on hover. The cards
   no longer show the last-modified date (#641).
@@ -137,6 +169,21 @@ A feature release. SQLite is now the default database for new installs of the fu
 - The browser reuses spatial files for an hour instead of asking the server again for each
   chunk (#617).
 - Only admins see the Rescan Projects button (#604).
+- The Debug dialog is now the Settings dialog. It has one search box, and lists browser
+  settings first under Preferences, with diagnostics under Debug and diagnostics (#697).
+- The deck scatter plot is now the 3D Scatter Plot. Saved classic 3D scatter plots open as
+  deck charts every time a view loads, keeping their camera and axis scales (#687).
+- The classic multi-line chart is now "Multi Line Chart (Classic)" and is hidden from Add
+  Chart (#699).
+- The mouse wheel over a deck chart scrolls the page. Hold ⌘ (Ctrl off macOS) or pinch on a
+  trackpad to zoom (#686).
+- The datasource menu bar wraps at narrow widths and shows the share of rows passing the
+  filters (#660).
+- A project view opens its Socket.IO connection only when chat is enabled. Messages for the
+  Unity and VR prototype are off by default (#679).
+- The selection toolbar can collapse to one button that switches between Pan and the last
+  drawing tool. The "Show all selection tools" chart setting saves whether it is open, and the
+  Rectangle, Polygon and Modify tools have clearer icons (#672, #701).
 
 ### Fixed
 - `pip install mdvtools` now installs `leidenalg` and `igraph`, so `--compute-x-umap` and
@@ -203,6 +250,10 @@ A feature release. SQLite is now the default database for new installs of the fu
   from an older build (#601).
 - A genome browser with `sync_with_datastores` set no longer fails when the chart is set up
   (#608).
+- The custom box plot computes each region's area from its width and height. It used the
+  width twice, so normalised values change for regions that are not square (#637).
+- Sorting by an integer, `unique` or `multitext` column, such as in the DeepTools heat map's
+  Sort By, orders negative integers correctly and no longer throws (#665).
 
 ## [1.3.0] - 2026-06-04
 

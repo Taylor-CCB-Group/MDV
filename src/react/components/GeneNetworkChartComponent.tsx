@@ -5,8 +5,9 @@ import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { useChart } from "../context";
 import { useParamColumns, useSimplerFilteredIndices } from "../hooks";
 import { useHighlightedIndices, useHighlightRows } from "../selectionHooks";
+import { FeatureInfoCard } from "./FeatureInfoCard";
+import { FeatureSearchBar } from "./FeatureSearchBar";
 import type { GeneNetworkConfig } from "./GeneNetworkChart";
-import { GeneNetworkInfoComponent } from "./GeneNetworkInfoComponent";
 
 /**
  * Get text value from a column at a given index.
@@ -67,6 +68,8 @@ export const GeneNetworkChartComponent = observer(() => {
     // Auto-scroll to highlighted genes from external sources (smart interaction detection).
     // Controlled via chart config so it can be toggled from settings and serialised.
     const autoScroll = chart.config.autoScroll ?? true;
+    const source = chart.config.source ?? "genenetwork";
+    const organism = chart.config.organism ?? "human";
     useLayoutEffect(() => {
         if (!autoScroll) return;
         if (highlightedIndices.length === 0 || visibleRowIndices.length === 0) return;
@@ -361,6 +364,7 @@ export const GeneNetworkChartComponent = observer(() => {
 
     return (
         <div className="absolute w-[100%] h-[100%] text-sm h-full flex flex-col">
+            {column && <FeatureSearchBar column={column} shownCount={visibleRowIndices.length} />}
             {visibleRowIndices.length > 0 ? (
                 <>
                     <div
@@ -391,8 +395,10 @@ export const GeneNetworkChartComponent = observer(() => {
                                         }}
                                     >
                                         <div className="relative h-full flex items-center">
-                                            <GeneNetworkInfoComponent
-                                                geneId={geneId}
+                                            <FeatureInfoCard
+                                                id={geneId}
+                                                source={source}
+                                                organism={organism}
                                                 isHighlighted={isHighlighted}
                                                 onCardClick={(event) => handleGeneClick(rowIndex, event)}
                                                 onCardKeyDown={(event) => handleGeneKeyDown(rowIndex, event)}
@@ -405,7 +411,7 @@ export const GeneNetworkChartComponent = observer(() => {
                     </div>
                 </>
             ) : (
-                <div>No gene IDs found.</div>
+                <div className="px-2">No identifiers to show.</div>
             )}
         </div>
     );

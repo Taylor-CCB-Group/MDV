@@ -25,6 +25,10 @@ jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    env:
+      # The dev compose file defaults to SQLite; CI keeps testing against Postgres.
+      COMPOSE_PROFILES: postgres
+      DB_BACKEND: postgres
     steps:
       - uses: actions/checkout@v5
 
@@ -40,14 +44,14 @@ jobs:
           export GIT_LAST_COMMIT_MESSAGE=$(git show -s --format=%s | sed 's/"/\\"/g' | tr -d '\n' || echo "")
           export BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           export GIT_DIRTY=false
-          # Use both docker-secrets.yml and docker-compose.ci.yml to add playwright_test service
-          docker compose -f docker-secrets.yml -f docker-compose.ci.yml up -d --build
+          # Use both docker-compose.dev.yml and docker-compose.ci.yml to add playwright_test service
+          docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml up -d --build
 
       - name: Wait for app to be ready
         run: |
           echo "Waiting for app service to be ready..."
           for i in {1..60}; do
-            if docker compose -f docker-secrets.yml -f docker-compose.ci.yml exec -T mdv_app curl -fsS http://localhost:5055/ >/dev/null 2>&1; then
+            if docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml exec -T mdv_app curl -fsS http://localhost:5055/ >/dev/null 2>&1; then
               echo "App is ready!"
               break
             fi
@@ -56,7 +60,7 @@ jobs:
           done
 
       - name: Run Playwright tests
-        run: docker compose -f docker-secrets.yml -f docker-compose.ci.yml exec -T playwright_test sh -c "cd /app && TEST_BASE_URL=http://mdv_app:5055 pnpm run playwright-test"
+        run: docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml exec -T playwright_test sh -c "cd /app && TEST_BASE_URL=http://mdv_app:5055 pnpm run playwright-test"
 
       - name: Upload test results
         if: always()
@@ -76,12 +80,12 @@ jobs:
 
       - name: Show app logs on failure
         if: failure()
-        run: docker compose -f docker-secrets.yml -f docker-compose.ci.yml logs mdv_app --tail=100
+        run: docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml logs mdv_app --tail=100
 
       - name: Show test logs on failure
         if: failure()
-        run: docker compose -f docker-secrets.yml -f docker-compose.ci.yml logs playwright_test --tail=100
+        run: docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml logs playwright_test --tail=100
 
       - name: Cleanup
         if: always()
-        run: docker compose -f docker-secrets.yml -f docker-compose.ci.yml down -v
+        run: docker compose -f docker-compose.dev.yml -f docker-compose.ci.yml down -v

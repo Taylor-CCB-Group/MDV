@@ -252,6 +252,15 @@ def map_polars_datetime_to_day_doubles(series: "pl.Series") -> "pl.Series":
     return days.cast(pl.Float64)
 
 
+def datasource_display_name(datasource: dict) -> str:
+    """The name a datasource is shown under: its `display_name` if it has a usable one,
+    otherwise its `name`. Matches `getDataSourceDisplayName` in the frontend."""
+    display_name = datasource.get("display_name")
+    if isinstance(display_name, str) and display_name.strip():
+        return display_name.strip()
+    return datasource["name"]
+
+
 class MDVProject:
     def __init__(
         self,
@@ -862,6 +871,56 @@ class MDVProject:
         else:
             mds[index[0]] = ds
         self.datasources = mds
+
+    def rename_datasource(self, datasource: str, new_name: str) -> bool:
+        """Change the name a datasource is shown under, leaving its `name` untouched.
+
+        The new name is stored as `display_name` on the datasource's entry in
+        datasources.json, which the frontend shows in place of `name`. `name` stays the
+        datasource's identifier: the h5 file, views, links, the API and Python code all use
+        it, so renaming cannot break any of them, and nothing but that one entry changes.
+
+        Args:
+            datasource (str): The datasource's `name` (not its display name).
+            new_name (str): The new display name. Surrounding whitespace is stripped.
+
+        Returns:
+            bool: True if the name changed, False if the datasource is already shown
+                under that name.
+
+        Raises:
+            AttributeError: if the datasource does not exist.
+            ValueError: if `new_name` is empty or not a string, or another datasource is
+                already called or shown as it (compared case-insensitively). The names of
+                other datasources stay reserved after they are renamed, so a datasource can
+                never be shown under another one's identifier.
+        """
+        trimmed = new_name.strip() if isinstance(new_name, str) else ""
+        if not trimmed:
+            raise ValueError("Datasource name is required")
+
+        # The whole file is rewritten, so a concurrent write to another datasource
+        # would otherwise be lost.
+        with self.lock("write"):
+            datasources = self.datasources
+            entry = next((x for x in datasources if x.get("name") == datasource), None)
+            if entry is None:
+                raise AttributeError(f"{datasource} datasource not found")
+
+            if datasource_display_name(entry) == trimmed:
+                return False
+
+            normalized = trimmed.casefold()
+            for other in datasources:
+                if other is entry:
+                    continue
+                taken = (other.get("name"), other.get("display_name"))
+                if any(isinstance(n, str) and n.strip().casefold() == normalized for n in taken):
+                    raise ValueError(f"A datasource called '{trimmed}' already exists")
+
+            entry["display_name"] = trimmed
+            self.datasources = datasources
+        return True
 
     def add_images_to_datasource(
         self,

@@ -1,9 +1,14 @@
-import type { RenderStack } from "@spatialdata/layers";
+import { type RenderStack, walkRenderStackEntries } from "@spatialdata/layers";
 import type { ImageLoaderData, LayerLoadState } from "@spatialdata/vis";
 
 export type ImageLayerRegistry = {
     getImageLoadedDataByElementKey: (elementKey: string) => ImageLoaderData | undefined;
     getLayerLoadStateByElementKey?: (elementKey: string) => LayerLoadState | undefined;
+    /**
+     * The region whose store the images come from, when the chart shows several (a grid with a
+     * cell per region); unset for the single view.
+     */
+    region?: string;
 };
 
 export function getLayerLoadStateByElementKey(
@@ -11,13 +16,16 @@ export function getLayerLoadStateByElementKey(
     stack: RenderStack,
     getLayerLoadState: (layerId?: string) => LayerLoadState | undefined,
 ): LayerLoadState | undefined {
-    for (const entry of stack.entries) {
+    // The same element can be in several entries, some never loaded (e.g. in a hidden
+    // group): the first one with a load state answers.
+    for (const entry of walkRenderStackEntries(stack.entries)) {
         if (
             entry.kind === "spatial" &&
             entry.source.elementType === "image" &&
             entry.source.elementKey === elementKey
         ) {
-            return getLayerLoadState(entry.id);
+            const state = getLayerLoadState(entry.id);
+            if (state) return state;
         }
     }
     return undefined;
@@ -27,10 +35,12 @@ export function createImageLayerRegistry(
     stack: RenderStack,
     getImageLoadedDataByElementKey: ImageLayerRegistry["getImageLoadedDataByElementKey"],
     getLayerLoadState: (layerId?: string) => LayerLoadState | undefined,
+    region?: string,
 ): ImageLayerRegistry {
     return {
         getImageLoadedDataByElementKey,
         getLayerLoadStateByElementKey: (elementKey) =>
             getLayerLoadStateByElementKey(elementKey, stack, getLayerLoadState),
+        ...(region !== undefined && { region }),
     };
 }

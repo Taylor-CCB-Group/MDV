@@ -1,18 +1,24 @@
-import {
-    CompositeMode,
-    type GeoJsonEditMode,
-    type Position,
-    type SimpleFeatureCollection,
-    type SimpleGeometry,
+import type { Layer, Viewport } from "@deck.gl/core";
+import type {
+    GeoJsonEditMode,
+    Position,
+    SimpleFeatureCollection,
+    SimpleGeometry,
 } from "@deck.gl-community/editable-layers";
 import { Matrix4 } from "@math.gl/core";
-import { action, toJS } from "mobx";
+import { action, reaction, toJS } from "mobx";
 import { observer } from "mobx-react-lite";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
-import { SELECTION_COORDINATE_SYSTEM, selectionFromEdit } from "@/editable-layers/selectionModes";
+import {
+    panMode,
+    RectangleMode,
+    SELECTION_COORDINATE_SYSTEM,
+    selectionFromEdit,
+} from "@/editable-layers/selectionModes";
+import { chartDragSetting } from "@/lib/browserSettings";
 import { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import type RangeDimension from "../datastore/RangeDimension";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
@@ -21,8 +27,15 @@ import type { HoveredContour } from "./contour_state";
 import { getEmptyFeatureCollection } from "./deck_state";
 import { DEFAULT_GATE_COLOR, SELECTION_FILL_COLOR, SELECTION_LINE_COLOR } from "./gates/gateUtils";
 import { useGateManager } from "./gates/useGateManager";
-import { type FilterPolyRegionOpts, useChartID, useRangeDimension2D } from "./hooks";
-import { type ScatterPlotConfig, useRegionScale, useScatterplotLayer } from "./scatter_state";
+import { type FilterPolyRegionOpts, useChartID, useConfig, useParamColumns, useRangeDimension2D } from "./hooks";
+import {
+    DEFAULT_AXIS_SCALES,
+    type OrbitSelectionView,
+    orbitSelectionViewOf,
+    screenProjectionMatrix,
+    validAxisScales,
+} from "./orbitView";
+import { type ScatterPlotConfig, type ScatterPlotConfig3D, useRegionScale, useScatterplotLayer } from "./scatter_state";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -44,7 +57,16 @@ export type RangeState = {
     setSelectionMode: (mode: GeoJsonEditMode) => void;
     selectedTool: Tool;
     setSelectedTool: (tool: Tool) => void;
+    /** The drawing tool (Rectangle, Freehand or Polygon) last chosen, which the toolbar offers to switch back to. */
+    lastDrawTool: Tool;
     modelMatrix: Matrix4;
+    /**
+     * Whether a drag pressed at a point should go to another layer rather than draw a selection: a
+     * gate label there, which drags to move (see `useGateLayers`). Null for none.
+     */
+    yieldDragRef: {
+        current: ((point: [number, number], viewport: Viewport, layers: readonly Layer[]) => boolean) | null;
+    };
 };
 export type MeasureState = {
     startPixels: P;
@@ -80,6 +102,37 @@ function useSelectionCoords(selection: SimpleFeatureCollection) {
     return coords as [number, number][];
 }
 
+/** The tools that draw a selection, as opposed to moving the view (Pan) or editing one (Modify). */
+const DRAW_TOOLS: readonly Tool[] = ["Rectangle", "Freehand", "Polygon"];
+
+/** The tool a chart starts with (see `chartDragSetting`): Pan moves the view, Rectangle draws. */
+function defaultTool(): Tool {
+    return chartDragSetting.get() === "select" ? "Rectangle" : "Pan";
+}
+
+function defaultToolMode(): GeoJsonEditMode {
+    return chartDragSetting.get() === "select" ? new RectangleMode() : panMode();
+}
+
+/** A chart that draws in 3D says what its camera is, for a selection drawn on it to record. */
+function getOrbitSelectionView(chart: BaseChart<any>): OrbitSelectionView | null {
+    if (!("getOrbitSelectionView" in chart) || typeof chart.getOrbitSelectionView !== "function") return null;
+    return orbitSelectionViewOf({ view: chart.getOrbitSelectionView() }) ?? null;
+}
+
+/** In 3D, the selection with the camera it was drawn in (see `projectRowsToScreen`). */
+function withSelectionView(chart: BaseChart<any>, selection: SimpleFeatureCollection): SimpleFeatureCollection {
+    if (chart.config.dimension !== "3d") return selection;
+    const view = getOrbitSelectionView(chart);
+    return {
+        ...selection,
+        features: selection.features.map((feature) => ({
+            ...feature,
+            properties: { ...feature.properties, view: view ?? undefined },
+        })),
+    };
+}
+
 /**
  * for this to be more useful as a hook will depend on state/context...
  * and with proper spatialdata support we should review this so we have proper coordinate system.
@@ -87,13 +140,13 @@ function useSelectionCoords(selection: SimpleFeatureCollection) {
  */
 function useScatterModelMatrix() {
     const scale = useRegionScale();
-    const s = 1 / scale;
-    const [modelMatrix, setModelMatrix] = useState(new Matrix4().scale(s));
-    useEffect(() => {
-        const m = new Matrix4().scale(s);
-        setModelMatrix(m);
-    }, [s]);
-    return { modelMatrix, setModelMatrix };
+    const config = useConfig<ScatterPlotConfig & Partial<ScatterPlotConfig3D>>();
+    const is3d = config.dimension === "3d";
+    // a 3D chart can stretch each axis (`axis_scales`), and its axes need not be the region's x / y
+    const [ax, ay, az] = is3d ? validAxisScales(config.axis_scales) : DEFAULT_AXIS_SCALES;
+    const s = is3d ? 1 : 1 / scale;
+    const modelMatrix = useMemo(() => new Matrix4().scale([s * ax, s * ay, s * az]), [s, ax, ay, az]);
+    return { modelMatrix };
 }
 
 function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
@@ -113,11 +166,51 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         }),
         [],
     );
-    const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
-    const [selectedTool, setSelectedTool] = useState<Tool>("Pan");
+    // what a plain drag does until a tool is picked: move the view (Pan) or draw a rectangle, as
+    // chosen in this browser (`chartDragSetting`); ⌘-drag moves the view either way (`viewGestureGate`)
+    const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(() => defaultToolMode());
+    const [selectedTool, setSelectedToolState] = useState<Tool>(() => defaultTool());
+    const toolPicked = useRef(false);
+    const [lastDrawTool, setLastDrawTool] = useState<Tool>("Rectangle");
+    const setSelectedTool = useCallback((tool: Tool) => {
+        toolPicked.current = true;
+        setSelectedToolState(tool);
+        if (DRAW_TOOLS.includes(tool)) setLastDrawTool(tool);
+    }, []);
+    // a chart whose tool nobody has picked follows the setting when it changes (as when it is first chosen)
+    useEffect(
+        () =>
+            reaction(
+                () => chartDragSetting.get(),
+                () => {
+                    if (toolPicked.current) return;
+                    setSelectionMode(defaultToolMode());
+                    setSelectedToolState(defaultTool());
+                },
+            ),
+        [],
+    );
     const [editingGateId, setEditingGateId] = useState<string | null>(null);
+    const yieldDragRef = useRef<RangeState["yieldDragRef"]["current"]>(null);
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
+    const is3d = chart.config.dimension === "3d";
+    // a 3D selection is an outline on the screen, and selects what was inside it from where it was drawn
+    const selectionProperties = selectionFeatureCollection.features[0]?.properties;
+    const selectionView = useMemo(
+        () => (is3d ? orbitSelectionViewOf(toJS(selectionProperties)) : undefined),
+        [is3d, selectionProperties],
+    );
+    const [cx, cy, cz] = useParamColumns();
+    const filterOnScreen = useCallback(
+        (points: [number, number][], view: OrbitSelectionView) => {
+            if (!rangeDimension || !cx || !cy || !cz) return;
+            const matrix = screenProjectionMatrix(view, modelMatrix);
+            // projected and tested on the dimension's filter worker
+            rangeDimension.filter("filterScreenPoly", [cx.field, cy.field, cz.field], { matrix, points });
+        },
+        [rangeDimension, cx, cy, cz, modelMatrix],
+    );
 
     const getFillColor = useCallback((): [number, number, number, number] => {
         if (!editingGateId) return SELECTION_FILL_COLOR; // Neutral grey fill
@@ -165,6 +258,13 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         }
         chart.resetButton.style.display = "inline";
 
+        if (is3d) {
+            // a shape drawn before this chart knew its camera (or not in 3D) can't say what it selected
+            if (selectionView) filterOnScreen(coords, selectionView);
+            else removeFilter();
+            return;
+        }
+
         const ds = chart.dataStore;
         const regionField = ds.regions?.region_field;
         // Get the region value of the gate if it exists
@@ -198,7 +298,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         return () => {
             cancelled = true;
         };
-    }, [coords, filterPoly, removeFilter, chart, gateManager, editingGateId]);
+    }, [coords, filterPoly, removeFilter, chart, gateManager, editingGateId, is3d, selectionView, filterOnScreen]);
     // The collection holds at most one shape (see `onEdit`), and it is always the one being
     // edited. Selecting it on hover made translate-vs-draw depend on whether a hover pick had
     // landed before the press, which on WebGPU (async picking) it often had not.
@@ -215,6 +315,8 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             id: `selection_${getVivId(`${id}detail-react`)}`,
             data: selectionFeatureCollection,
             mode: selectionMode,
+            yieldDrag: (point, viewport, layers) => yieldDragRef.current?.(point, viewport, layers) ?? false,
+            onEmptyClick: clearSelection,
             coordinateSystem: SELECTION_COORDINATE_SYSTEM,
             getFillColor,
             getLineColor,
@@ -232,7 +334,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             // adding `action` here gets rid of warnings but doesn't help with performance.
             onEdit: action((edit) => {
                 const selection = selectionFromEdit(edit);
-                if (selection) setSelectionFeatureCollection(selection);
+                if (selection) setSelectionFeatureCollection(withSelectionView(chart, selection));
             }),
             modeConfig: {
                 // dragToDraw: true,
@@ -250,10 +352,13 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         setSelectionFeatureCollection,
         getFillColor,
         getLineColor,
+        chart,
+        clearSelection,
     ]);
 
     return {
         editableLayer,
+        yieldDragRef,
         rangeDimension,
         selectionFeatureCollection,
         selectionMode,
@@ -264,6 +369,7 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         setEditingGateId,
         selectedTool,
         setSelectedTool,
+        lastDrawTool,
     };
 }
 function useCreateMeasure() {
@@ -272,13 +378,22 @@ function useCreateMeasure() {
     return { startPixels, setStart, endPixels, setEnd };
 }
 //add generic that extends SpatialConfig?
-function useCreateSpatialAnnotationState(chart: BaseChart<any>, hoveredContour?: HoveredContour | null) {
+function useCreateSpatialAnnotationState(
+    chart: BaseChart<any>,
+    hoveredContour?: HoveredContour | null,
+    separateDensityLayer = false,
+) {
     // should we use zustand for this state?
     // doesn't matter too much as it's just used once by SpatialAnnotationProvider
     // consider for project-wide annotation stuff as opposed to ephemeral selections
     const rectRange = useCreateRange(chart);
     const measure = useCreateMeasure();
-    const scatterProps = useScatterplotLayer(rectRange.modelMatrix, hoveredContour, rectRange.rangeDimension);
+    const scatterProps = useScatterplotLayer(
+        rectRange.modelMatrix,
+        hoveredContour,
+        rectRange.rangeDimension,
+        separateDensityLayer,
+    );
     return { rectRange, measure, scatterProps };
 }
 
@@ -287,13 +402,16 @@ export const SpatialAnnotationProvider = observer(function SpatialAnnotationProv
     children,
     hoveredContour,
     setHoveredContour,
+    separateDensityLayer,
     //add generic that extends SpatialConfig?
 }: {
     chart: BaseChart<any>;
     hoveredContour?: HoveredContour | null;
     setHoveredContour?: (contour: HoveredContour | null) => void;
+    /** Give `scatterProps` a `densityLayer` and keep density out of the points layer. */
+    separateDensityLayer?: boolean;
 } & React.PropsWithChildren) {
-    const annotationState = useCreateSpatialAnnotationState(chart, hoveredContour);
+    const annotationState = useCreateSpatialAnnotationState(chart, hoveredContour, separateDensityLayer);
     const stateWithHover = { ...annotationState, hoveredContour, setHoveredContour };
     return <SpatialAnnotationState.Provider value={stateWithHover}>{children}</SpatialAnnotationState.Provider>;
 });

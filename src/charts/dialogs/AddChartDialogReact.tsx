@@ -16,6 +16,7 @@ import { action, observable, reaction, toJS } from "mobx";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import JsonView from "react18-json-view";
+import { getDataSourceDisplayName } from "@/datastore/dataSourceDisplayName";
 import {
     columnMatchesType,
     type FieldSpec,
@@ -42,7 +43,8 @@ import { Close as CloseIcon } from "@mui/icons-material";
 import { ErrorBoundary } from "react-error-boundary";
 import { preloadLazyChartTypesForPicker } from "@/charts/lazyChartRegistrations";
 import { isLegacyChartType } from "@/charts/legacyCharts";
-import { legacyChartsSetting } from "@/lib/browserSettings";
+import { legacyChartsSetting, showFeaturePreviews } from "@/lib/browserSettings";
+import { PreviewChip } from "@/react/components/BrowserSettingsSection";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper.js";
 
 // Draft chart config: param slots are FieldSpec / FieldSpecs until we emit a flat `param` for ChartManager.
@@ -320,11 +322,13 @@ const ConfigureChart = observer(({ config, onDone }: { config: ChartConfig; onDo
     }, []);
 
     const showLegacy = legacyChartsSetting.get() === "show";
+    const showPreviews = showFeaturePreviews();
     const chartTypes = useMemo(() => {
         lazyTypesReady;
         return Object.values(BaseChart.types).filter((t) => {
             if (t.allow_user_add === false) return false;
             if (!showLegacy && isLegacyChartType(t, dataStore)) return false;
+            if (!showPreviews && t.preview) return false;
             if (t.required) {
                 console.log(t.name, "required", t.required);
                 if (typeof t.required === "function") {
@@ -333,13 +337,14 @@ const ConfigureChart = observer(({ config, onDone }: { config: ChartConfig; onDo
                 // nb `t.required.every(r => r in dataStore)` seems like it should work,
                 // but since we're in glorious JS land, we have things like `dataStore['interactions'] = undefined`
                 // which means that `'interactions' in dataStore` is true, but `!!dataStore['interactions']` is false.
-                //@ts-ignore DataStore string index on things 'required' for chart types
+                //@ts-expect-error DataStore string index on things 'required' for chart types
                 return t.required.every((r) => !!dataStore[r]);
             }
             return true;
         });
-    }, [dataStore, lazyTypesReady, showLegacy]);
+    }, [dataStore, lazyTypesReady, showLegacy, showPreviews]);
     const chartNames = chartTypes.map((t) => t.name).sort((a, b) => a.localeCompare(b));
+    const previewNames = new Set(chartTypes.filter((t) => t.preview).map((t) => t.name));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
     // biome-ignore lint/correctness/useExhaustiveDependencies: need to figure out mobx/biome linting...
     const setChartTypeName = useCallback(
@@ -423,8 +428,19 @@ const ConfigureChart = observer(({ config, onDone }: { config: ChartConfig; onDo
                                 value={config.type}
                                 onChange={(_, value) => value && setChartTypeName(value)}
                                 renderInput={(params) => <TextField {...params} label="Chart Type" />}
+                                renderOption={({ key, ...props }, option) => (
+                                    <li key={key} {...props}>
+                                        {option}
+                                        {previewNames.has(option) && <PreviewChip />}
+                                    </li>
+                                )}
                                 sx={{ pt: 1 }}
                             />
+                            {previewNames.has(config.type) && (
+                                <Typography variant="body2" color="text.secondary" component="div">
+                                    <PreviewChip /> Still taking shape: its behaviour and saved settings may change.
+                                </Typography>
+                            )}
                             <TextField
                                 label="Title"
                                 size="small"
@@ -544,7 +560,7 @@ const Wrapper = (props: { dataStore: DataStore; modal: boolean; onDone: () => vo
             }}
         >
             <DialogTitle>
-                Add Chart in "{props.dataStore.name}"
+                Add Chart in "{getDataSourceDisplayName(props.dataStore)}"
                 <IconButton
                     aria-label="close"
                     onClick={() => {
@@ -569,7 +585,7 @@ class AddChartDialogReact extends BaseDialog {
     constructor(dataStore: DataStore) {
         super(
             {
-                title: `Add Chart in '${dataStore.name}'`,
+                title: `Add Chart in '${getDataSourceDisplayName(dataStore)}'`,
                 width: 600,
                 height: 420,
             },

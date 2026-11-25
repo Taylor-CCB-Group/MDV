@@ -44,6 +44,18 @@ pnpm run build-flask-vite
 
 Syncing Python packages alone is not enough for `mdvtools serve` — the Vite build must run at least once.
 
+### Optional extras
+
+`python-setup` installs the core package and the `dev` group only. Two optional extras add more:
+
+- `app` — database/server, chat/LLM and auth (what the Docker image runs).
+- `genomics` — `pysam` and `pyranges`, used for SV VCF import (`conversions.add_svvcf_to_mdv`) and gene overlap mapping (`mdvtools.feature_mapper`). These have no native Windows wheels, so this extra needs Linux, macOS or WSL.
+
+```bash
+cd python
+uv sync --group dev --extra app --extra genomics --frozen
+```
+
 ## Quick Start
 
 ### Creating a Project
@@ -224,11 +236,11 @@ To run all core tests including performance tests:
 uv run -- pytest mdvtools/tests
 ```
 
-Auth and backend tests depend on optional dependency groups that are not installed by `pnpm run python-setup`.
-Install those groups first if you want to run the separated suites:
+Auth, backend and genomics tests depend on optional extras that are not installed by `pnpm run python-setup`; without them those tests are skipped or fail to import.
+Install the extras first to run the full suite (as CI does):
 
 ```bash
-uv sync --group dev --group backend --group auth --frozen
+uv sync --group dev --extra app --extra genomics --frozen
 ```
 
 ### Performance Testing in CI

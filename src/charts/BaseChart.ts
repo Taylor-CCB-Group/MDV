@@ -548,6 +548,13 @@ class BaseChart<T extends BaseConfig> {
     getDebugPanel?(): ReactNode;
 
     /**
+     * Technical settings, offered in the chart's debug dialog rather than the regular settings dialog: things
+     * that matter when diagnosing a problem (such as the rendering backend) more than when using the chart.
+     * Optional.
+     */
+    getDebugSettings?(): GuiSpecs;
+
+    /**
      * needs to be implemented by subclasses
      */
     removeFilter() {}
@@ -560,6 +567,11 @@ class BaseChart<T extends BaseConfig> {
     onDataFiltered(dim?: Dimension) {}
 
     setToolTipColumn?(column: FieldSpec): void;
+    /**
+     * Sets what `param[index]` would be, for a chart that keeps its columns in named props instead.
+     * A link with `set_param` calls this when the chart has it, and writes `param` otherwise.
+     */
+    setParamAt?(index: number, column: FieldName): void;
     setBackgroundFilter?(column: FieldName): void;
     // only used by vanilla DensityScatterPlot
     changeContourParameter?(column: FieldName): void;
@@ -916,6 +928,14 @@ class BaseChart<T extends BaseConfig> {
      * @returns an array of objects describing tweakable parameters
      */
     getSettings() {
+        const settings = this.getGeneralSettings();
+        const colorSettings = this.getColorSettingsFolder();
+        if (colorSettings) settings.push(colorSettings);
+        return settings;
+    }
+
+    /** Name, legend and parameter settings: everything `getSettings` returns but colour. */
+    getGeneralSettings() {
         const c = this.config;
         const settings: GuiSpecs = [
             {
@@ -940,6 +960,12 @@ class BaseChart<T extends BaseConfig> {
         if (paramsSettings) {
             settings.push(paramsSettings);
         }
+        return settings;
+    }
+
+    /** The "Color Settings" folder, for charts whose `getColorOptions` allows colouring by a column. */
+    getColorSettingsFolder() {
+        const c = this.config;
         const colorOptions = this.getColorOptions();
 
         if (colorOptions.colorby) {
@@ -950,13 +976,11 @@ class BaseChart<T extends BaseConfig> {
                     : colorOptions.colorby;
 
             const colorSettings: GuiSpecs = [];
-            settings.push(
-                g({
-                    type: "folder",
-                    label: "Color Settings",
-                    current_value: colorSettings,
-                }),
-            );
+            const folder = g({
+                type: "folder",
+                label: "Color Settings",
+                current_value: colorSettings,
+            });
 
             // change this to use setting with type: "column" - so it should understand "filter" in a similar way
             colorSettings.push(
@@ -1064,9 +1088,9 @@ class BaseChart<T extends BaseConfig> {
                     }
                 },
             });
+            return folder;
         }
-
-        return settings;
+        return undefined;
     }
 
     unpinIcon?: HTMLElement;

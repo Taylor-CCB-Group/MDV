@@ -5,6 +5,7 @@ import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { shallow } from "zustand/shallow";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
+import { GatedOrthographicController } from "@/lib/viewGestureGate";
 import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { useViewStateLink } from "../chartLinkHooks";
@@ -21,6 +22,7 @@ import { type OME_TIFF, useChannelsStore, useLoader, useViewerStore, useViewerSt
 import FieldContourLegend from "./FieldContourLegend";
 import SelectionOverlay from "./SelectionOverlay";
 import type { VivRoiConfig } from "./VivMDVReact";
+import ViewGestureHint from "./ViewGestureHint";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -205,8 +207,9 @@ const Main = observer(
                 //     },
                 // },
                 controller: {
+                    type: GatedOrthographicController,
                     doubleClickZoom: false,
-                    dragPan: controllerOptions.dragPan,
+                    ...controllerOptions,
                 },
                 // deviceProps: {
                 //     // todo - get this working more usefully.
@@ -269,6 +272,7 @@ const Main = observer(
                         deckProps={deckProps}
                     />
                 </div>
+                <ViewGestureHint />
                 {tooltipPortal}
             </>
         );

@@ -1,4 +1,5 @@
 import type { PickingInfo } from "@deck.gl/core";
+import { getIsolatedGroupMemberId } from "@spatialdata/layers";
 
 type DeckPicker = {
     pickMultipleObjects: (options: {
@@ -35,7 +36,9 @@ function getUniquePickedInfos(primary: PickingInfo, pickedInfos: PickingInfo[]) 
     for (const info of [primary, ...pickedInfos]) {
         const layerId = getPickingInfoLayerId(info);
         const sourceLayerId = getPickingInfoSourceLayerId(info);
-        const key = `${layerId}|${sourceLayerId}|${info.index}`;
+        // inside an isolated group, `layer` is the group: the member tells its layers apart
+        const memberId = getIsolatedGroupMemberId(info) ?? "";
+        const key = `${layerId}|${memberId}|${sourceLayerId}|${info.index}`;
         if (keys.has(key)) continue;
         keys.add(key);
         uniqueInfos.push(info);
@@ -99,8 +102,13 @@ export function getPickingInfoSourceLayerId(info: PickingInfo | null | undefined
     return info?.sourceLayer?.id ?? "";
 }
 
+/**
+ * Whether the pick came from a layer the predicate accepts: the picked layer, the
+ * sublayer under it, or, inside an isolated layer group, the group member.
+ */
 export function pickingInfoMatchesLayer(info: PickingInfo | null | undefined, predicate: (layerId: string) => boolean) {
     const layerId = getPickingInfoLayerId(info);
     const sourceLayerId = getPickingInfoSourceLayerId(info);
-    return predicate(layerId) || predicate(sourceLayerId);
+    const memberId = info ? (getIsolatedGroupMemberId(info) ?? "") : "";
+    return predicate(layerId) || predicate(sourceLayerId) || (memberId !== "" && predicate(memberId));
 }

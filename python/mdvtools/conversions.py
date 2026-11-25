@@ -543,6 +543,8 @@ def add_svvcf_to_mdv(mdv : MDVProject, vcf_filename:str, name: str ="svs", genom
     # SV VCF  files have an END field in the INFO column
     # however pysam seems to convert this to a stop field in the record
     # so we will use that
+    from mdvtools._optional import require_extra
+    require_extra("genomics", "pysam")
     import pysam
     BND_REMOTE_RE = re.compile(r"[\[\]]([^:\[\]]+):(\d+)[\[\]]")
 

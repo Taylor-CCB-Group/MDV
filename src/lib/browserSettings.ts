@@ -3,8 +3,8 @@ import { action, observable } from "mobx";
 /**
  * Settings for this browser rather than for a project: stored in localStorage, so they
  * apply to every project opened here and are never saved with a project or view. They are
- * observable, so anything reading them in an `observer` updates when one changes. The Debug
- * dialog lists every setting in `browserSettings`.
+ * observable, so anything reading them in an `observer` updates when one changes. The Settings
+ * dialog lists every setting in `browserSettings`, under Preferences.
  *
  * Only choice settings exist so far; add other kinds alongside `defineChoiceSetting` when a
  * setting needs one.
@@ -21,11 +21,15 @@ export type ChoiceSettingDefinition<T extends string> = {
     defaultValue: T;
     /** A value stored by an older form of this setting, read when there is no current value. */
     legacy?: () => T | undefined;
+    /** A feature preview: listed only while "Feature previews" is on, or while it is not at its default. */
+    preview?: boolean;
 };
 
 export type BrowserSetting<T extends string = string> = ChoiceSettingDefinition<T> & {
     get(): T;
     set(value: T): void;
+    /** Whether a value has been chosen in this browser, rather than the default applying. */
+    isChosen(): boolean;
 };
 
 function readStorage(key: string): string | null {
@@ -48,14 +52,17 @@ export function defineChoiceSetting<T extends string>(definition: ChoiceSettingD
     const isChoice = (value: string | null): value is T => definition.choices.some((choice) => choice.value === value);
     const stored = readStorage(definition.key);
     const box = observable.box<T>(isChoice(stored) ? stored : (definition.legacy?.() ?? definition.defaultValue));
+    const chosen = observable.box(isChoice(stored));
     return {
         ...definition,
         get: () => box.get(),
         set: action((value: T) => {
             if (!isChoice(value)) return;
             box.set(value);
+            chosen.set(true);
             writeStorage(definition.key, value);
         }),
+        isChosen: () => chosen.get(),
     };
 }
 
@@ -66,7 +73,7 @@ export const renderBackendSetting = defineChoiceSetting<RenderBackend>({
     key: "mdv.settings.renderBackend",
     label: "Default rendering backend",
     description:
-        "Used by SpatialData charts and scatter plots whose own Rendering backend setting is left " +
+        "Used by SpatialData charts and scatter plots whose own Rendering backend setting (in the chart's debug dialog) is left " +
         "at the default. Where WebGPU is unavailable or fails, those charts use WebGL. On " +
         "WebGPU, image contrast and brightness are not yet supported. ?webgpu or ?webgpu=0 " +
         "in the URL overrides this for one page load.",
@@ -108,10 +115,30 @@ export const legacyChartsSetting = defineChoiceSetting<"hide" | "show">({
     defaultValue: "hide",
 });
 
+/**
+ * Whether features still taking shape are offered: chart types marked `preview` in their `BaseChart.types`
+ * entry, and settings marked `preview` here.
+ */
+export const featurePreviewsSetting = defineChoiceSetting<"hide" | "show">({
+    key: "mdv.settings.featurePreviews",
+    label: "Feature previews",
+    description:
+        "Offer features that are still taking shape, marked Preview where they appear. Their behaviour " +
+        "and saved settings may change. Existing charts of a preview type load either way.",
+    choices: [
+        { value: "hide", label: "Hide" },
+        { value: "show", label: "Show" },
+    ],
+    defaultValue: "hide",
+});
+
+export const showFeaturePreviews = () => featurePreviewsSetting.get() === "show";
+
 /** Whether charts of a `legacy` type are loaded as their current equivalent; see `src/charts/legacyCharts.ts`. */
 export const convertLegacyChartsSetting = defineChoiceSetting<"off" | "on">({
     key: "mdv.settings.convertLegacyCharts",
-    label: "Convert legacy charts (experimental)",
+    label: "Convert legacy charts",
+    preview: true,
     description:
         "For developers; the behaviour is likely to change. Load charts of a legacy type (such as the classic scatter plots) as their current " +
         "equivalent; turning this on also converts the charts already open. The conversion is saved if the view is saved, " +
@@ -124,10 +151,56 @@ export const convertLegacyChartsSetting = defineChoiceSetting<"off" | "on">({
     defaultValue: "off",
 });
 
-/** Every browser setting, in the order the Debug dialog lists them. */
+/**
+ * What a plain drag does on the charts with a selection toolbar (scatter plots, SpatialData): the
+ * tool a chart starts with. Either way, ⌘-drag (Ctrl-drag off a Mac) or a right-button drag moves
+ * the view, and the toolbar's drawing tools draw. Offered in a chart the first time a plain drag
+ * moves its view (see `ViewGestureHint`).
+ */
+export const chartDragSetting = defineChoiceSetting<"view" | "select">({
+    key: "mdv.settings.chartDrag",
+    label: "Dragging on charts",
+    description:
+        "What a plain drag does on scatter plots and spatial charts, until another tool is chosen " +
+        "in the chart's toolbar. Either way, ⌘-drag (Ctrl-drag off a Mac) or a right-button drag " +
+        "moves the view, and a click on empty space clears a selection.",
+    choices: [
+        { value: "view", label: "Move the view" },
+        { value: "select", label: "Draw a selection" },
+    ],
+    defaultValue: "view",
+});
+
+/**
+ * Whether the SpatialData layer dialog notes how a layer's element is stored (no pyramid,
+ * oversized chunks, no length unit). Either way they are listed in Settings › Data quality, and
+ * never light a chart's menu pip; see `data_quality.ts`.
+ */
+export const dataQualityNotesSetting = defineChoiceSetting<"compact" | "hidden">({
+    key: "mdv.settings.dataQualityNotes",
+    label: "Data quality notes in layer dialog",
+    description:
+        "Whether a SpatialData layer's properties note how its element is stored, when that makes it " +
+        "slow or leaves its scale unknown: as one collapsed line, or not at all. Settings › Data " +
+        "quality lists them for every store either way.",
+    choices: [
+        { value: "compact", label: "One collapsed line" },
+        { value: "hidden", label: "Hidden" },
+    ],
+    defaultValue: "compact",
+});
+
+/** Every browser setting, in the order the Settings dialog lists them. */
 export const browserSettings: readonly BrowserSetting[] = [
+    chartDragSetting,
     renderBackendSetting,
     webgpuTraceSetting,
+    dataQualityNotesSetting,
     legacyChartsSetting,
+    featurePreviewsSetting,
     convertLegacyChartsSetting,
 ];
+
+/** A setting is listed unless it is a preview, previews are hidden, and it is at its default (so it can always be turned back). */
+export const isSettingListed = (setting: BrowserSetting) =>
+    !setting.preview || showFeaturePreviews() || setting.get() !== setting.defaultValue;

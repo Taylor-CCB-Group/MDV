@@ -39,7 +39,21 @@ export type PolyFilterSpec = {
     region?: { data: NumericArray | null; index: number };
 };
 
-export type FilterSpec = RangeFilterSpec | SquareFilterSpec | PolyFilterSpec;
+/**
+ * Polygon containment on screen: each row's x, y, z projected by `matrix` (as a 3D chart draws
+ * it), then tested against `points`, in pixels from the top left. Rows behind the camera are out.
+ */
+export type ScreenPolyFilterSpec = {
+    kind: "screenPoly";
+    data1: NumericArray;
+    data2: NumericArray;
+    data3: NumericArray;
+    /** 4x4, column-major: data position to pixels (the chart's projection, view and model matrices) */
+    matrix: NumericArray;
+    points: ReadonlyArray<readonly [number, number]>;
+};
+
+export type FilterSpec = RangeFilterSpec | SquareFilterSpec | PolyFilterSpec | ScreenPolyFilterSpec;
 
 export type FilterRequest = {
     id: number;
@@ -68,6 +82,8 @@ export function evaluateFilterSpec(spec: FilterSpec, size: number, out: Uint8Arr
             return evaluateSquare(spec, size, out);
         case "poly":
             return evaluatePoly(spec, size, out);
+        case "screenPoly":
+            return evaluateScreenPoly(spec, size, out);
     }
 }
 
@@ -135,6 +151,54 @@ function evaluatePoly({ data1, data2, points, region }: PolyFilterSpec, size: nu
             continue;
         }
         // ray-casting: count edge crossings to decide whether the point is inside
+        let inside = false;
+        for (let curr = 0, prev = n - 1; curr < n; prev = curr++) {
+            const xi = px[curr];
+            const yi = py[curr];
+            const xj = px[prev];
+            const yj = py[prev];
+            if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+        }
+        out[i] = inside ? 1 : 0;
+    }
+}
+
+function evaluateScreenPoly(
+    { data1, data2, data3, matrix: m, points }: ScreenPolyFilterSpec,
+    size: number,
+    out: Uint8Array,
+) {
+    const n = points.length;
+    const px = Float64Array.from(points, (pt) => pt[0]);
+    const py = Float64Array.from(points, (pt) => pt[1]);
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (let k = 0; k < n; k++) {
+        minX = Math.min(minX, px[k]);
+        maxX = Math.max(maxX, px[k]);
+        minY = Math.min(minY, py[k]);
+        maxY = Math.max(maxY, py[k]);
+    }
+    const [m0, m1, , m3, m4, m5, , m7, m8, m9, , m11, m12, m13, , m15] = Array.from(m);
+    for (let i = 0; i < size; i++) {
+        const X = data1[i];
+        const Y = data2[i];
+        const Z = data3[i];
+        const w = m3 * X + m7 * Y + m11 * Z + m15;
+        // behind the camera, or a missing coordinate (NaN fails the comparisons)
+        if (!(w > 0)) {
+            out[i] = 0;
+            continue;
+        }
+        const x = (m0 * X + m4 * Y + m8 * Z + m12) / w;
+        const y = (m1 * X + m5 * Y + m9 * Z + m13) / w;
+        if (!(x >= minX && x <= maxX && y >= minY && y <= maxY)) {
+            out[i] = 0;
+            continue;
+        }
+        // ray-casting, as for `poly`
         let inside = false;
         for (let curr = 0, prev = n - 1; curr < n; prev = curr++) {
             const xi = px[curr];

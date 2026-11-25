@@ -27,7 +27,7 @@ Run all three in order:
 
 ```bash
 # 1. Backend
-docker compose -f docker-secrets.yml up -d
+docker compose -f docker-compose.dev.yml up -d --build
 curl -f http://localhost:5055
 
 # 2. Browser binaries (run in user terminal only)

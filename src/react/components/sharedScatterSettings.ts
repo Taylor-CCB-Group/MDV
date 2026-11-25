@@ -37,7 +37,7 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
                 current_value: config.point_shape,
                 values: [["circle", "square", "gaussian"]],
                 func: (value) => {
-                    // @ts-ignore existing GuiSpec dropdowns are stringly typed
+                    // @ts-expect-error existing GuiSpec dropdowns are stringly typed
                     config.point_shape = value;
                 },
             }),
@@ -109,6 +109,24 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
         );
     }
 
+    settings.push(
+        g({
+            type: "check",
+            label: "Show all selection tools",
+            // Read live, not copied: the toolbar's own arrow changes this too, and the settings
+            // dialog renders a MobX copy of this spec, which turns the getter into a computed.
+            get current_value() {
+                return config.selection_toolbar_open ?? true;
+            },
+            set current_value(value) {
+                config.selection_toolbar_open = value;
+            },
+            func: (value) => {
+                config.selection_toolbar_open = value;
+            },
+        }),
+    );
+
     if (includeDensitySettings && chart) {
         settings.push(getDensitySettings(config));
     }
@@ -116,7 +134,7 @@ export function getSharedScatterSettings<C extends ScatterPlotConfig>(
     return settings;
 }
 
-/** "Default" names what the default currently is; it is set in the Debug dialog, per browser. */
+/** "Default" names what the default currently is; it is set in the Settings dialog, per browser. */
 function renderBackendOptions() {
     const current = defaultDeckBackend() === "webgpu" ? "WebGPU" : "WebGL";
     return [

@@ -10,6 +10,18 @@ import type { TypedArrayConstructor } from "@luma.gl/core";
 import type { DataColumn, DataSource, DataSourceName, DataType, FieldName } from "@/charts/charts";
 
 type Columns = DataColumn<DataType>[];
+
+/**
+ * One column's data from a {@link ColumnDataLoader}: bytes laid out the way
+ * `DataStore.setColumnData` expects, or plain values it converts (slower).
+ */
+export type LoadedColumn = { field: FieldName; data: SharedArrayBuffer | unknown[] };
+
+/**
+ * Loads the data for a batch of columns of one datasource. A column it cannot load is left out
+ * of the result; `ChartManager` retries any requested column that is missing.
+ */
+export type ColumnDataLoader = (columns: Columns, dataSource: DataSourceName, size: number) => Promise<LoadedColumn[]>;
 type DataLoaderFaultMode = "empty" | "corrupt" | "timeout";
 type DataLoaderFaultConfig = {
     mode: DataLoaderFaultMode;
@@ -90,8 +102,8 @@ function applyDataLoaderFaultAfterFetch(config: DataLoaderFaultConfig | null, da
  * @returns a list of objects containing each colums's field name
  * and data
  **/
-function processArrayBuffer(data: ArrayBufferLike, columns: Columns, size: number) {
-    const dataList = [];
+function processArrayBuffer(data: ArrayBufferLike, columns: Columns, size: number): LoadedColumn[] {
+    const dataList: LoadedColumn[] = [];
     let offset = 0;
     for (const column of columns) {
         //default values for numbers
@@ -180,7 +192,7 @@ function processArrayBuffer(data: ArrayBufferLike, columns: Columns, size: numbe
  * @param url - The url of the api
  * @returns a dataloader that can be used to construct {@link ChartManager}
  **/
-function getArrayBufferDataLoader(url: string, decompress = false) {
+function getArrayBufferDataLoader(url: string, decompress = false): ColumnDataLoader {
     return async (columns: DataColumn<DataType>[], dataSource: DataSourceName, size: number) => {
         const faultConfig = readDataLoaderFaultConfig();
         await applyDataLoaderFaultBeforeFetch(faultConfig);
@@ -221,7 +233,7 @@ function getArrayBufferDataLoader(url: string, decompress = false) {
  * @returns a dataloader that can be used to construct {@link ChartManager}
  **/
 
-function getLocalCompressedBinaryDataLoader(dataSources: DataSource[], folder: string) {
+function getLocalCompressedBinaryDataLoader(dataSources: DataSource[], folder: string): ColumnDataLoader {
     const loaders: Record<DataSourceName, CompressedBinaryDataLoader> = {};
     for (const ds of dataSources) {
         loaders[ds.name] = new CompressedBinaryDataLoader(`${folder}/${ds.name}.gz`, ds.size);
@@ -240,7 +252,7 @@ class CompressedBinaryDataLoader {
         this.index = null;
         this.size = size;
     }
-    async getColumnData(cols: Columns, size: number) {
+    async getColumnData(cols: Columns, size: number): Promise<LoadedColumn[]> {
         const { default: pako } = await import("pako");
         if (!this.index) {
             const iurl = this.url.replace(".gz", ".json");
@@ -249,8 +261,8 @@ class CompressedBinaryDataLoader {
         }
         //unable to request multiple ranges, which would be more efficient
         //send off request for each column separately and then return all of them
-        return await Promise.all(
-            cols.map(async (c) => {
+        const loaded = await Promise.all(
+            cols.map(async (c): Promise<LoadedColumn | undefined> => {
                 let lu = c.field;
                 if (c.subgroup) {
                     const arr = c.field.split("|");
@@ -310,6 +322,8 @@ class CompressedBinaryDataLoader {
                 }
             }),
         );
+        // leave out columns that failed, so ChartManager retries only those
+        return loaded.filter((c): c is LoadedColumn => c !== undefined);
     }
 }
 

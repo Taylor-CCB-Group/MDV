@@ -43,10 +43,7 @@ dependencies = [
     "spatialdata>=0.8.0,<0.9",
     "spatialdata-io>=0.7.1,<0.8",
     "generate-tiff-offsets>=0.1.7,<0.2",
-    "spatialdata-js-util[write]>=0.3.1,<0.4",
-    # genomic operations
-    "pysam==0.24.0",
-    "pyranges>=0.1.4,<0.2",
+    "spatialdata-js-util[write]>=0.4.0,<0.5",
 ]
 
 [project.optional-dependencies]
@@ -84,7 +81,17 @@ app = [
     "flask-jwt-extended>=4.7.1,<5",
     "redis>=5.2.1,<6",
 ]
-all = ["mdvtools[app]"]
+# Genomics: SV VCF import (conversions.add_svvcf_to_mdv) and gene overlap
+# mapping (feature_mapper). Kept out of core because pysam, and pyranges' ncls /
+# sorted-nearest, ship no Windows wheels, so they would block a native Windows
+# install (#656).
+#   pip install "mdvtools[genomics]"
+genomics = [
+    "pysam==0.24.0",
+    "pyranges>=0.1.4,<0.2",
+]
+# Everything, including genomics: not installable on native Windows.
+all = ["mdvtools[app,genomics]"]
 
 [project.urls]
 Homepage = "https://github.com/Taylor-CCB-Group/MDV"

@@ -14,6 +14,7 @@ import { toneFromArrays, toneFromVivLayerProps, useImageLayerRuntime } from "@/r
 import { useRenderStackEntry } from "@/react/spatialdata/render_stack_control";
 import { createVivStores, useChannelsStoreApi, useViewerStoreApi, VivProvider } from "../avivatorish/state";
 import { VivChannelList } from "../ColorChannelComponents";
+import AlphaFromIntensityControls from "./AlphaFromIntensityControls";
 
 type ImageLayerConfig = Extract<LayerConfig, { type: "image" }>;
 
@@ -241,9 +242,15 @@ const ImageLayerPanelReady = observer(function ImageLayerPanelReady({
         <SpatialImagePanelContext.Provider value={panelContext}>
             <div className="space-y-2">
                 <Typography variant="caption" color="text.secondary">
-                    Image source: SpatialData zarr
+                    {chart.imageLayerRegistry?.region
+                        ? `Histograms from region ${chart.imageLayerRegistry.region}; the settings apply to every region`
+                        : "Image source: SpatialData zarr"}
                 </Typography>
                 <VivChannelList />
+                <AlphaFromIntensityControls
+                    value={config.alphaFromIntensity}
+                    onChange={(next) => patchLayer({ alphaFromIntensity: next })}
+                />
             </div>
         </SpatialImagePanelContext.Provider>
     );

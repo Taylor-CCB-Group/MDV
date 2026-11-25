@@ -1,11 +1,25 @@
 import type { Layer } from "@deck.gl/core";
-import type { RenderStack, RenderStackEntry, RenderStackHostEntry } from "@spatialdata/layers";
-import { type LayerConfig, layerConfig, type RenderStackLayerInputs, renderStackOrder } from "@spatialdata/vis";
+import {
+    type RenderStack,
+    type RenderStackEntry,
+    type RenderStackHostEntry,
+    resolveRenderStackGroupProps,
+    walkRenderStackEntries,
+} from "@spatialdata/layers";
+import {
+    type LayerConfig,
+    layerConfig,
+    type RenderStackLayerInputs,
+    renderStackOrder,
+    renderStackToLayerInputs,
+    resolveRenderStackHostLayers,
+} from "@spatialdata/vis";
 import { useMemo, useRef } from "react";
 
 import { withoutMdvFieldSpecs } from "./field_spec_projection";
 import { type DeckOverlayId, deckIdFromHostLayerId } from "./host_overlay_ids";
 import { measureSpatial } from "./perf";
+import { DISPLAY_NAME_PROP } from "./render_stack_display";
 import { renderStackSpatialRevision, touchRenderStack } from "./render_stack_observe";
 
 export type MdvDeckOverlayLayers = Record<DeckOverlayId, Layer | null>;
@@ -39,6 +53,18 @@ export function spatialEntryAsLayerConfig(entry: Extract<RenderStackEntry, { kin
         },
         entry.props,
     );
+}
+
+/**
+ * Take MDV's own bookkeeping off a layer config on its way to the viewer: the field
+ * specs (see `withoutMdvFieldSpecs`) and the user's name for the layer, which only the
+ * layer dialog reads.
+ */
+export function withoutMdvOnlyProps<T extends object>(config: T): T {
+    const stripped = withoutMdvFieldSpecs(config);
+    if (!(DISPLAY_NAME_PROP in stripped)) return stripped;
+    const { [DISPLAY_NAME_PROP]: _removed, ...rest } = stripped as T & { [DISPLAY_NAME_PROP]?: unknown };
+    return rest as T;
 }
 
 function stableSignatureValue(value: unknown): unknown {
@@ -76,20 +102,21 @@ export function syncRenderStackLayerInputs(
     cache: RenderStackLayerInputsCache,
 ): RenderStackLayerInputs {
     const nextIds = new Set<string>();
+    // Spatial entries at any depth, with their groups' visibility and opacity applied.
+    const inputs = renderStackToLayerInputs(stack);
 
-    for (const entry of stack.entries) {
-        if (entry.kind !== "spatial") continue;
-        nextIds.add(entry.id);
-        // MDV's field specs stop here: past this point a layer config is the
-        // viewer's, and a `RowsAsColsQuery` is not something to hand it.
-        const nextConfig = withoutMdvFieldSpecs(spatialEntryAsLayerConfig(entry));
+    for (const id of inputs.layerOrder) {
+        nextIds.add(id);
+        // MDV's field specs and layer names stop here: past this point a layer config
+        // is the viewer's, and a `RowsAsColsQuery` is not something to hand it.
+        const nextConfig = withoutMdvOnlyProps(inputs.layers[id]);
         const nextSignature = layerConfigReplacementSignature(nextConfig);
-        const existing = cache.layers[entry.id];
-        if (existing && cache.layerConfigSignatures[entry.id] === nextSignature) {
+        const existing = cache.layers[id];
+        if (existing && cache.layerConfigSignatures[id] === nextSignature) {
             Object.assign(existing, nextConfig);
         } else {
-            cache.layers[entry.id] = nextConfig;
-            cache.layerConfigSignatures[entry.id] = nextSignature;
+            cache.layers[id] = nextConfig;
+            cache.layerConfigSignatures[id] = nextSignature;
         }
     }
 
@@ -108,40 +135,69 @@ export function syncRenderStackLayerInputs(
     return { layers: cache.layers, layerOrder: cache.layerOrder };
 }
 
+/** What host layers depend on besides their sources: entry visibility, and the
+ *  visibility and opacity of the groups above them. */
 function renderStackHostFingerprint(stack: RenderStack | undefined): string {
     if (!stack) return "";
-    return stack.entries
-        .filter((entry): entry is RenderStackHostEntry => entry.kind === "host")
-        .map((entry) => `${entry.id}:${entry.visible}`)
-        .join("|");
-}
-
-function cloneHostLayer(source: Layer, entryId: string): Layer {
-    return source.clone({ id: entryId });
+    const parts: string[] = [];
+    for (const entry of walkRenderStackEntries(stack.entries)) {
+        if (entry.kind === "host") parts.push(`${entry.id}:${entry.visible}`);
+        if (entry.kind === "group") {
+            const { opacity, isolate } = resolveRenderStackGroupProps(entry);
+            parts.push(`${entry.id}:${entry.visible}:${opacity}:${isolate}:${entry.children.length}`);
+        }
+    }
+    return parts.join("|");
 }
 
 /**
- * Resolve visible host stack entries to deck layers. The source layers are owned by
- * MDV hooks, so clone at each adapter refresh to preserve the latest source props.
+ * Resolve visible host stack entries, at any depth, to deck layers. The source layers
+ * are owned by MDV hooks, so clone at each adapter refresh to preserve the latest
+ * source props.
  */
 export function resolveCachedHostDeckLayers(
     stack: RenderStack | undefined,
     resolver: (entry: RenderStackHostEntry) => Layer | Layer[] | null | undefined,
 ): Layer[] {
-    if (!stack) return [];
+    return resolveRenderStackHostLayers(stack, resolver);
+}
 
-    const layers: Layer[] = [];
-    for (const entry of stack.entries) {
-        if (entry.kind !== "host" || !entry.visible) continue;
-        const resolved = resolver(entry);
-        if (!resolved) continue;
-        const sources = Array.isArray(resolved) ? resolved : [resolved];
-        for (const source of sources) {
-            if (!source) continue;
-            layers.push(cloneHostLayer(source, entry.id));
-        }
+function entryStructure(entry: RenderStackEntry): RenderStackEntry {
+    if (entry.kind !== "group") {
+        // A layer's own blend mode places it: inside an isolated group, the viewer draws it
+        // as a one-member group with that mode. Its other props are the layer's config.
+        const { blendMode } = entry.props;
+        return { ...entry, props: blendMode ? { blendMode } : {} };
     }
-    return layers;
+    const { opacity, blendMode, isolate } = entry.props;
+    return {
+        kind: "group",
+        id: entry.id,
+        visible: entry.visible,
+        props: { opacity, blendMode, isolate },
+        children: entry.children.map(entryStructure),
+    };
+}
+
+/**
+ * The stack's tree for the viewer to place layers by: ids, sources, visibility, group
+ * props and each layer's blend mode, with the rest of the entry props left out. The observable stack is edited in place, so
+ * this is a plain copy, and keeps its identity until its value changes: a cosmetic
+ * edit to an entry's props must not hand the viewer a new stack. Call from an
+ * observer, so structural edits re-render.
+ */
+export function renderStackStructure(stack: RenderStack): RenderStack {
+    return { schemaVersion: stack.schemaVersion, entries: stack.entries.map(entryStructure) };
+}
+
+export function useRenderStackStructure(stack: RenderStack | undefined): RenderStack | undefined {
+    // Building the key reads the whole structure, so an observer re-renders on any
+    // structural edit; the copy is rebuilt only when that key changes.
+    const key = stack ? JSON.stringify(renderStackStructure(stack)) : "";
+    return useMemo(() => {
+        void key; // trigger-only dep: the stack is mutated in place, so its identity never changes
+        return stack && renderStackStructure(stack);
+    }, [stack, key]);
 }
 
 function observeRenderStack(stack: RenderStack | undefined) {

@@ -106,6 +106,21 @@ categorical/string fixes; see the version note below.
 alone. It covers MDV's asynchronous `loadColumnSet`, which the viewer knows nothing
 about. Columns the viewer owns are covered by the viewer's own last-good retention.
 
+### Tooltip fields
+
+Split along the same line as fill colour. `splitTooltipFields` hands the viewer the
+fields in the table's obs, which it reads and formats itself, and MDV keeps the rest:
+`useAssociatedShapesLayerInputs` projects each layer's `tooltipFields` down to its obs
+fields, loads the others from the datasource, and `mdvTooltipItems(entryId, featureId)`
+reads them from the feature's datasource row at hover time. The chart appends those items
+to the viewer's tooltip. Without that, a gene score chosen as a tooltip field showed
+nothing — the viewer has no way to reach it.
+
+The hover handler goes to `SpatialViewer` as its `onHover` prop. Passing it inside
+`deckProps` does not work: `SpatialViewer` spreads `deckProps` and then sets `onHover` from
+its own prop, so a handler there is overwritten with `undefined` and no feature tooltip
+ever appears.
+
 ### Columns that keep moving
 
 MDV's column picker can also return a `RowsAsColsQuery` — an "active link", whose
@@ -125,6 +140,162 @@ Gene scores live in a linked datasource, never in obs, so an active-link colour
 always takes the per-feature route above. Before this existed the picker offered the
 tab and the handler dropped anything that was not a string, so choosing an active
 link did nothing at all — silently.
+
+## The layer dialog
+
+One place for everything about how layers look. Chart settings hold only chart-wide
+options (name, region, rendering backend) and a button that opens the dialog.
+
+- **SpatialData elements** are sortable rows. **MDV data** lists the host overlays that
+  mean something to a user — data points, gates, gate labels — in a section of their own,
+  because host layers always draw above SpatialData layers and cannot be reordered among
+  them. They cannot be removed either: `mergeHostOverlayEntriesInPlace` puts them back.
+  The grey (filtered-out) scatter follows the data points' visibility
+  (`DECK_OVERLAY_VISIBILITY_FOLLOWERS`); the selection overlay belongs to the selection tools.
+- The **Data points** layer's properties are the GuiSpecs from
+  `SpatialDataMdvReact.getDataLayerSettings()` — BaseChart's colour folder plus the shared
+  scatter settings — rendered with the settings dialog's controls via `SettingsGuiList`.
+  They used to be chart settings; they still write the same config fields.
+- **Names.** A layer's name is `props.displayName`, the only open part of a render-stack
+  entry (its top level is a strict schema). `withoutMdvOnlyProps` takes it off at the
+  viewer boundary along with the field specs. Unnamed layers that show the same element
+  are numbered in stack order (`renderStackEntryDisplayName(entry, stack)`), so duplicates
+  can be told apart before anyone renames them.
+- **Labels appearance** (colour, filled, fill/outline opacity, outline width) is the labels
+  layer's `channels`. `patchRenderStackEntryPropsInPlace` merges `channels` field by field,
+  so its key list covers the labels fields as well as the image ones; without them those edits
+  would be dropped once a layer had any saved channels.
+
+- **Opacity from brightness** (image layers; `AlphaFromIntensityControls`) is sd.js's
+  `alphaFromIntensity` (`threshold`, `gain`) on the entry's props. It makes dark pixels
+  transparent, so a fluorescence image can be drawn over brightfield. WebGPU's raster layer
+  reads the prop itself. On WebGL it needs `AlphaFromIntensityExtension`, which MDV's
+  `vivImageExtensionResolver` adds to that layer only: the extension is not neutral when the
+  option is off (threshold 0, gain 1 discards black). The two extension lists keep their
+  identity, so deck sees a change of extensions only when the option is switched.
+
+### Groups and compositing
+
+The stack is a tree (schema v2). sd.js draws it with `renderStackToDeckLayers`, in the
+single view (`VivSpatialViewer`, given `useRenderStackStructure`) and in the density grid
+(`SpatialDensityGrid`, whose shared layers are then wrapped once more by
+`sharedCellLayersGroup`). MDV edits it, and sd.js decides how it draws (ADR 0007 upstream):
+
+- **A group** has `opacity`, `blendMode` and `isolate`. Pass-through (the default) multiplies
+  its opacity into each child. Any other mode, or `isolate`, draws the children into a
+  target of their own (`IsolatedGroupLayer`) and composites that with the group's opacity
+  and mode. Opacity is the row's slider; mode and "Draw as one layer" are in the row's
+  blending popover (below). Both are edited in place. Opacity and mode change layer inputs, so they bump `renderStackPropsGeneration`, never
+  `renderStackGeneration`.
+- **A layer's own blend mode** (`props.blendMode` on a spatial entry)
+  takes effect only inside an isolated group, at any depth. There sd.js draws the layer as a
+  one-member isolated group with that mode. Elsewhere it draws as normal, and the popover and
+  the row badge say so. `normal` is stored as no mode. The mode is placement, not
+  appearance: only `useRenderStackStructure` carries it to the viewer, and
+  `renderStackSpatialRevision` ignores it. So `setLeafBlendMode` writes it with no
+  generation bump, and a change re-renders through the structure key alone. A capture
+  with `perf.ts` shows two `adapter.sync` and no `shapes.loadRenderData` per change.
+- **Compositing operators** (`intersect`, `cut-out`, `xor`, `clip`) make a layer or group
+  a mask on what is below it *inside its isolated group*. A top-level group with one draws
+  as normal. The select lists them under "Masks" and warns when they are inactive.
+- **Set from the layer list, not the properties pane** (`CompositingButton`). Each row that
+  can blend (SpatialData layers, groups, the data points) has one control: a faint icon
+  while the compositing is the default, or a badge naming it (`compositingBadge`; dashed
+  means "saved, but drawn as normal here"). Clicking it opens a small popover by the row
+  (`CompositingControls`), with one plain line on what the setting does. It is one element
+  whichever it shows, because the popover is anchored to it while a change turns the icon
+  into a badge.
+- **The data points** are composited through `group:data-points` (`setDataPointsCompositing`),
+  which exists only while their compositing is not the default. It is always top-level, so
+  it does not offer the operators. Its popover also has opacity, as the data points row has
+  no slider.
+- **Runtime fix.** `isolated_group_fix.ts` gives a blended layer's one-member group a
+  sublayer id of its own (`-blend`). sd.js gives the wrapper the layer's id, and deck 9.4
+  transfers state between same-id sublayers whatever their class. Remove the fix once sd.js
+  scopes the wrapper's id itself.
+- MDV overlays (data points, density, gates) cannot be moved into user groups: they stay
+  above SpatialData layers, and the grid takes the selection, gate labels and density out of
+  the shared stack.
+
+### Layer status
+
+The renderer reports each SpatialData layer's `EntryStatus` (`onEntryStatusChange`): load
+errors, and notices such as `element-issues` (slow raster layout, or a coordinate system
+with no length unit), `table-rows-unmatched` and `preload-truncated`. The chart keeps them
+in `entryStatuses` (`entry_status.ts`).
+
+- Errors and notices, other than storage issues (below), are shown in the layer dialog (an
+  alert above the layer's properties, and an icon on its row), the status panel and the menu
+  pip.
+- Retryable errors offer **Retry** (the renderer's `retryEntry`).
+- `entryStatusForDisplay` keeps only the shown coordinate system's unit issue. It also drops
+  points notices, as sd.js's own viewer does, because the points panel reports truncation.
+- MDV words each issue's `Remedy` itself (`describeRemedy`).
+
+- **Storage issues stay quiet.** An element's `element-issues` (no pyramid, oversized chunks,
+  no length unit) describe the data, not the layer (`splitStorageIssues` in
+  `data_quality.ts`). They never light the row icon or the menu pip. The layer dialog notes
+  them on one muted, collapsed line, or not at all with the "Data quality notes in layer
+  dialog" preference (`dataQualityNotesSetting`). Load errors and other notices keep their
+  alert.
+- **Settings › Data quality** (`DataQualitySection`) is the one place they are listed in full.
+  It covers every SpatialData store the project's regions point at, with
+  `SpatialData.assessIssues()` per element. A missing length unit is one row per coordinate
+  system, naming its elements. Each issue shows its remedy. It is a listing only: nothing
+  there is dismissed or hidden.
+  - Stores are read through the page's shared reader (`sharedSpatialDataReader`), the one the
+    charts use. A store a chart has opened is listed at once; any other waits for **Check**,
+    so opening Settings never starts reading a remote store.
+  - The remedy is data (`Remedy`). That is what a future fix from here would act on: asking
+    the server to rewrite the store with spatialdata-js-util.
+
+This replaced MDV's own raster-layout check (`raster_health.ts`), which moved into
+`@spatialdata/core` 0.17. It is distinct from `layer_failures.ts`, which turns off layers
+that fail while *drawing*.
+
+## A cell per region
+
+`grid: { by: "region" }` draws a cell per region of the chart's datasource (each region with
+`spatial` metadata), from one deck (`SpatialRegionGrid`, on `DeckCellGrid`). The chart's
+`region` still picks the store its render stack is seeded from and the layer dialog reads.
+
+- **The render stack is a template.** Every cell draws the chart's one stack against its own
+  store: an entry names an element, found by name in each region's store. Similar stores (the
+  same Xenium panel) need no per-region config. A store without an element just lacks the layer.
+- **Each cell is a renderer.** `RegionCellLayers` runs `useSpatialCanvasRendererFromLayerInputs`
+  for its region and hands its layers, ids prefixed with the cell's view id, up to the grid. It
+  is memoised: the grid renders again on every report, and a cell rendered again would report
+  again, in a loop.
+- **Only cells in view load.** A cell scrolled out unmounts its renderer and drops its layers.
+- **Points.** The chart's `background_filter` is ignored in a region grid
+  (`getActiveChartScopeFilters`), so the points layer has every region's rows. The grid takes
+  the points' layer as the adapter resolves it (the entry's id and inherited opacity), splits
+  its rows and highlighted rows by `region_field`, and clones it per cell, mapping picks back to
+  positions in all the rows for the layer's own handlers. Each cell composes its clone with its
+  other layers through the stack, so the data-points group's opacity and blending apply.
+  `hide_empty` leaves out regions with no rows left.
+- **A store that can't be read** shows its error over the cell, with Retry (the reader's
+  `retry`, which starts every failed read again).
+- **Views are per cell**, fitted to each region when it has none. They are kept on the chart
+  (`regionViewStates`), not in the grid, so they survive the grid being turned off and on and
+  a region being filtered out and back, and `getConfig` saves them, without regions the
+  datasource no longer has. `link_views` moves every cell as the one being moved moves on
+  screen (the same change of zoom, the same pan in pixels; `moveRegionViews`), so each keeps
+  its own framing. A link to the same world view would suit stores in one aligned coordinate
+  system; it is not there yet.
+- **No crosshair.** Its lines mark the same offset in every cell, which only means something
+  when the cells share a view (the density grid). Single views have none either.
+- **Image controls.** The layer dialog's histograms come from one cell's images: the chart's own
+  region when its cell is in view, else the first cell in view. That cell publishes the image
+  layer registry, with its `region`, and the panel names it. The channel settings themselves are
+  the stack entry's props, so they apply to every cell. Overlaying the histograms of every
+  region in view would show whether one set of limits suits them all; that is not done yet.
+- **Feature tooltips.** Each cell registers a hover handler with the grid, which sends a pick
+  to the cell it was made in. The cell strips its view id from the picked layer's id, asks its
+  own renderer for the feature, and adds its own region's MDV tooltip items. As in the single
+  view, the top pick wins, so where the MDV points cover a shape the shape has no tooltip.
+- **Not in cells yet:** selection tools, gates, density, grey (filtered-out) points and layer
+  status.
 
 ## The points layer panel
 
@@ -272,8 +443,8 @@ The pins in `package.json` are the enforcement; keep them at or above these.
 SpatialData.js 0.12 renders images, labels, shapes and points on WebGPU when the canvas
 is given `deckProps.deviceProps = { type: "webgpu", adapters: [webgpuAdapter] }`.
 **WebGPU is the default** for SpatialData charts wherever the browser has it. A chart can
-choose its own backend (`render_backend`, "Rendering backend" in its settings); charts
-left at the default follow the "Default rendering backend" browser setting in the Debug
+choose its own backend (`render_backend`, "Rendering backend" under "Technical settings" in its debug dialog); charts
+left at the default follow the "Default rendering backend" browser setting in the Settings
 dialog (`src/lib/browserSettings.ts`, stored in localStorage; it replaced the old
 `MDV_WEBGPU` flag, which it still reads), and `?webgpu` / `?webgpu=0` overrides that for
 one page load — see `src/react/spatialdata/deck_backend.ts`. deck picks its device once,
@@ -302,7 +473,7 @@ debug dialog (`BaseChart.setMenuPip` / `getDebugPanel`; `SpatialStatusPanel`).
 **Diagnosing WebGPU errors.** A chart's "Chart status" has "Copy details": a plain-text
 report of the renderer, GPU, browser and each failure. Validation errors arrive
 asynchronously, so their own stack never shows the caller. For those, turn on "WebGPU call
-tracing" in the Debug dialog's browser settings and reload: `webgpu_trace.ts` then wraps
+tracing" in the Settings dialog's preferences and reload: `webgpu_trace.ts` then wraps
 the WebGPU encoder API before any device exists, reports a pass still open when its
 encoder is finished (with both stacks), logs the recent encoder calls before each
 uncaptured error, and adds both to "Copy details". Turn it off when done; it slows

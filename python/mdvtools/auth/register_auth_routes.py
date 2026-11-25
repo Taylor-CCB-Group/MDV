@@ -70,29 +70,28 @@ def register_auth_routes(app):
                 session.clear()  # Clear session on error
                 return jsonify({"error": "Failed to complete authentication process."}), 500
 
-        # Route for logout (clears the session and redirects to home)
         @app.route('/logout')
         def logout():
+            """Clear the session and sign out through the provider used to sign in.
+
+            The page for a refused sign-in links here, so it works for someone
+            MDV gives no access to, as well as for a signed-in User.
+            """
             try:
                 auth_method = session.get("auth_method")
-                # Auth0 can still hold a session after ours is gone (cookie lost or
-                # overwritten). Without ending it, a refused person cannot switch account.
-                if not auth_method and (app.config.get("DEFAULT_AUTH_METHOD") or "").lower() == "auth0":
-                    auth_method = "auth0"
                 logger.info(f"Logout initiated for auth method: {auth_method}")
+
+                # Look the provider up before clearing the session, which holds
+                # auth_method. With none there, as when MDV cleared a Deactivated
+                # user's session or the cookie was lost, this is the site's default
+                # provider, so a refused person can still end their Auth0 session.
+                provider = get_auth_provider()
 
                 # Always attempt to clear the session early
                 session.clear()
                 session.modified = True
 
-                # Get the appropriate provider if method is set
-                if auth_method:
-                    auth_provider = get_auth_provider()
-                    return auth_provider.logout()
-
-                # Fallback for unknown or missing auth method
-                logger.warning("No auth method found in session during logout.")
-                return jsonify({"message": "Session cleared, but auth method unknown."}), 200
+                return provider.logout()
 
             except Exception as e:
                 logger.exception(f"In register_auth_routes: Error during logout: {e}")

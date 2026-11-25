@@ -100,7 +100,7 @@ COPY --chown=pn:pn python/README.md ./python/
 WORKDIR /app/python
 # The first layer does not include the full source tree yet,
 # so we sync dependencies without installing the project itself.
-RUN uv sync --no-install-project --frozen --group dev --extra app
+RUN uv sync --no-install-project --frozen --group dev --extra app --extra genomics
 
 WORKDIR /app
 # copy package manager metadata as a separate step so dependency install can be cached (with correct ownership)
@@ -131,7 +131,7 @@ WORKDIR /app/python
 # installing again so we have mdvtools as a module, on top of the previous install layer with dependencies
 # this step should be very fast
 # if we don't have this, the server itself runs, but anything that doesn't run from this workdir will fail to import mdvtools
-RUN uv sync --frozen --group dev --extra app
+RUN uv sync --frozen --group dev --extra app --extra genomics
 
 # Expose the port that Flask will run on
 EXPOSE 5055
@@ -148,20 +148,15 @@ RUN echo 'cd /app/python && source .venv/bin/activate' >> ~/.bashrc && \
 #USER pn
 
 USER root
-RUN mkdir -p /app/mdv && chown -R pn:pn /app/mdv
+RUN mkdir -p /app/mdv /app/dev-db && chown -R pn:pn /app/mdv /app/dev-db
 USER pn
 
 
 # Command to run Gunicorn
-# NOTE: For multi-worker deployments (more than 1 worker), you MUST set REDIS_URL
-# environment variable. Flask-SocketIO requires Redis to share session state across workers.
-# Without Redis, you'll get "KeyError: 'Session is disconnected'" errors.
-# Example: REDIS_URL=redis://redis:6379/0
-#
-# Single worker (no Redis needed):
-#   -w 1
-#
-# Multi-worker (Redis required):
-#   -w 4  # or any number > 1
+# Keep -w 1. MDV does not support more than one worker:
+# - Flask-SocketIO is created without a message_queue, so sockets cannot be shared
+#   across workers. Nothing reads REDIS_URL, so setting it does not change this.
+# - Each worker keeps its own registry of served projects (ProjectBlueprint.blueprints),
+#   so a project created through one worker is missing from the others.
 CMD ["uv", "run", "--", "gunicorn", "-k", "gevent", "-t", "0", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--capture-output", "--log-level", "info", "mdvtools.dbutils.safe_mdv_app:app"]
 #CMD ["uv", "run", "--", "python", "-m", "mdvtools.dbutils.mdv_server_app"]

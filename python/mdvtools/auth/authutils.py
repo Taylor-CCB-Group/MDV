@@ -1,7 +1,7 @@
 from functools import wraps
 
 from flask import abort, current_app, has_request_context, redirect, request, session
-from mdvtools.auth.access_denied import access_denied_reason, login_url_with_reason
+from mdvtools.auth.access_denied import access_denied_reason, deny_access, login_url_with_reason
 from mdvtools.logging_config import get_logger
 
 # Setup logging
@@ -92,9 +92,10 @@ def is_authenticated(project_id=None):
 
     :param project_id: Optional project ID (int or str). If provided and auth is
         enabled, requires the user to have read-level access to this project.
-    :return: Tuple (success: bool, reason: Optional[str]). When success is True,
-        reason is None. When False, reason is a short message for logging (e.g.
-        "Authentication required.", "No access to this project.").
+    :return: Tuple (success: bool, reason). When success is True, reason is None.
+        When False, reason is a short message for logging (e.g. "Authentication
+        required.", "No access to this project."). A refusal the login page
+        should explain is also recorded with deny_access.
     """
     ENABLE_AUTH = current_app.config.get("ENABLE_AUTH", False)
 
@@ -132,13 +133,21 @@ def is_authenticated(project_id=None):
         # whose local user id and admin flag mean nothing here. Re-resolve the user
         # from this deployment's own records on every request, keyed by auth_id.
         # The dummy provider's user has no database row, so it is left as it is.
+        # The row is read on every request, not from user_cache: MDV-Admin
+        # deactivates users by writing to the database from another process, and
+        # nothing refreshes the cache when it does (ADR 0020).
         if (current_app.config.get("DEFAULT_AUTH_METHOD") or "").lower() != "dummy":
             auth_id = user.get("auth_id") if user else None
-            local_user = user_cache.get(auth_id) if auth_id else None
-            if auth_id and local_user is None:
-                # Not cached yet, for example a user created since the last refresh.
+            local_user = None
+            if auth_id:
                 from mdvtools.dbutils.dbmodels import User
                 db_user = User.query.filter_by(auth_id=auth_id).first()
+                if db_user and not db_user.is_active:
+                    # Their open session ends on the same page a refused sign-in
+                    # gets, which does not show that their User still exists.
+                    session.clear()
+                    deny_access("no_account", db_user.email)
+                    return (False, "No access to this deployment.")
                 if db_user:
                     local_user = {
                         "id": db_user.id,

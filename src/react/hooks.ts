@@ -38,6 +38,7 @@ type ChartScopeCategoryFilter = {
 type ChartScopeConfig = {
     background_filter?: ChartScopeCategoryFilter;
     category_filters?: ChartScopeCategoryFilter[];
+    grid?: { by: string } | null;
 };
 
 let nextFilteredIndicesListenerId = 0;
@@ -50,7 +51,8 @@ function isAllCategoryFilter(category?: string | string[] | null) {
 
 export function getActiveChartScopeFilters(config: ChartScopeConfig) {
     const filters: ChartScopeCategoryFilter[] = [];
-    const backgroundFilter = config.background_filter;
+    // A chart with a cell per region shows every region; each cell narrows to its own rows.
+    const backgroundFilter = config.grid?.by === "region" ? undefined : config.background_filter;
     if (
         backgroundFilter?.column &&
         backgroundFilter.column !== "__none__" &&
@@ -268,7 +270,12 @@ export function useFieldSpecs(specs?: FieldSpecs | FieldSpec) {
             setColumns([]);
             return;
         }
-        return autorun(() => {
+        // a load can finish after a later one (or after this effect is gone): only the latest
+        // request, while the effect is active, may set the columns
+        let active = true;
+        let latestRequest = 0;
+        const dispose = autorun(() => {
+            const request = ++latestRequest;
             const fieldNames = flattenFields(specs);
             if (!fieldNames) {
                 setColumns([]);
@@ -279,11 +286,16 @@ export function useFieldSpecs(specs?: FieldSpecs | FieldSpec) {
             // but then that's generally the case with setState etc
             // console.log("loading columns", fieldNames);
             chartManager.loadColumnSet(fieldNames, chart.dataStore.name, () => {
+                if (!active || request !== latestRequest) return;
                 const { columnIndex } = chart.dataStore;
                 const columns = fieldNames.map((f) => columnIndex[f]).filter(notEmpty);
                 setColumns(columns);
             });
         });
+        return () => {
+            active = false;
+            dispose();
+        };
     }, [specs, chart.dataStore, chartManager]);
     return columns;
 }

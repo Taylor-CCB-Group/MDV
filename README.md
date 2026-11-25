@@ -61,6 +61,15 @@ code .
 
 This should display a prompt to re-open in a devcontainer, which will initially take a few minutes to build and then open a server on http://localhost:5055.
 
+The dev container stores its database in SQLite, in a Docker volume that belongs to the compose project, so each checkout gets its own database. On first start, the app adds every project folder it finds in `~/mdv` to that database. To use Postgres instead, put these 2 lines in a `.env` file at the root of the repository and rebuild the container:
+
+```sh
+COMPOSE_PROFILES=postgres   # starts the mdv_db and mdv_pgadmin services
+DB_BACKEND=postgres         # switches the app to Postgres
+```
+
+Removing both lines switches back to SQLite and leaves any existing Postgres container and its data where they are. Rebuild the container after any change to this setup, because the image creates the folder that holds the SQLite database.
+
 For front-end development, a vite dev-server can be started with `pnpm run dev` from a terminal in the container. The main front-page for that is accessed at http://localhost:5170/ by default, and you can pick another port with `pnpm run dev -- --port <port>`.
 
 

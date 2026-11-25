@@ -30,6 +30,42 @@ describe("entryForLabel", () => {
         expect(entryForLabel("deck:grey_scatter-#spatial-detail-x#", ENTRY_IDS)).toBe("deck:grey_scatter");
     });
 
+    it("names the member, not the isolated group, for a layer drawn inside one", () => {
+        const ids = ["group-#g1", "spatialdata-shapes-cells-#a1", "spatialdata-image-he-#b2"];
+        // a member and its sublayers: the group id comes first, scoped with the view token
+        expect(entryForLabel("group-#g1-#v#/spatialdata-shapes-cells-#a1-#v#-polygons", ids)).toBe(
+            "spatialdata-shapes-cells-#a1",
+        );
+        // the group's own composite stays the group's
+        expect(entryForLabel("group-#g1-#v#-composite", ids)).toBe("group-#g1");
+        // nested: the inner group's member, with the group part of its id escaped
+        expect(entryForLabel("group-#g1-#v#%2Fgroup-#g2/spatialdata-image-he-#b2-#v#", [...ids, "group-#g2"])).toBe(
+            "spatialdata-image-he-#b2",
+        );
+    });
+
+    it("finds the entry from a tile's sublayer, which deck names after the tile", () => {
+        const labels = "spatialdata-labels-cell_labels-#7g6BOq";
+        expect(entryForLabel(`sub-layer--4-0-0-0,57837,17138,0-${labels}-labels-0-0--4`, [...ENTRY_IDS, labels])).toBe(
+            labels,
+        );
+    });
+
+    it("finds the entry from a region grid cell's layer, which carries the cell's view id first", () => {
+        const labels = "spatialdata-labels-cell_labels-#7g6BOq";
+        const cell = "density-grid-3PZt1J-0-store_zarr_cell_labels";
+        expect(entryForLabel(`${cell}-${labels}-labels-0-0--4`, [...ENTRY_IDS, labels])).toBe(labels);
+        expect(entryForLabel(`sub-layer--4-0-0-0,1,2,0-${cell}-${labels}-labels-0-0--4`, [...ENTRY_IDS, labels])).toBe(
+            labels,
+        );
+        // a member of an isolated group in a cell is still the member's
+        const ids = ["group-#g1", "spatialdata-shapes-cells-#a1"];
+        expect(entryForLabel(`${cell}-group-#g1-#v#/spatialdata-shapes-cells-#a1-#v#-polygons`, ids)).toBe(
+            "spatialdata-shapes-cells-#a1",
+        );
+        expect(entryForLabel(`${cell}-group-#g1-#v#-composite`, ids)).toBe("group-#g1");
+    });
+
     it("needs a whole label prefix, not a substring", () => {
         expect(entryForLabel("mydeck:scatterplot", ENTRY_IDS)).toBeUndefined();
         expect(entryForLabel(TOO_BIG, ENTRY_IDS)).toBeUndefined();
