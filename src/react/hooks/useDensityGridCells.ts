@@ -1,13 +1,13 @@
 import { useMemo } from "react";
-import type { LoadedDataColumn } from "@/charts/charts";
+import type { LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { isDensityGridShown } from "../components/densityGridUtils";
-import { type DualContourLegacyConfig, isLoadedDoubleColumn } from "../contour_state";
+import { type DualContourLegacyConfig, isLoadedNumericColumn } from "../contour_state";
 import { useConfig, useFieldSpecs } from "../hooks";
 import type { ChartArrayCell } from "./useChartArrayGrid";
 
 export type DensityGridCells = {
     cells: ChartArrayCell[];
-    densityFields: LoadedDataColumn<"double">[];
+    densityFields: LoadedDataColumn<NumberDataType>[];
 };
 
 /**
@@ -17,7 +17,7 @@ export type DensityGridCells = {
 export function useDensityGridCells(): DensityGridCells {
     const config = useConfig<DualContourLegacyConfig>();
     const loadedFields = useFieldSpecs(isDensityGridShown(config) ? config.densityFields : undefined);
-    const densityFields = useMemo(() => loadedFields.filter(isLoadedDoubleColumn), [loadedFields]);
+    const densityFields = useMemo(() => loadedFields.filter(isLoadedNumericColumn), [loadedFields]);
     const cells: ChartArrayCell[] = useMemo(
         () => densityFields.map((field) => ({ key: field.field, label: field.name || field.field })),
         [densityFields],
