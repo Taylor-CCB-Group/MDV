@@ -1,51 +1,45 @@
 import GridViewOutlinedIcon from "@mui/icons-material/GridViewOutlined";
-import { FormControlLabel, Switch, ToggleButton, ToggleButtonGroup } from "@mui/material";
+import { FormControlLabel, Switch } from "@mui/material";
 import type { GridSplit } from "@/charts/charts";
 
+const CELLS: Record<GridSplit, string> = { columns: "a cell per column", categories: "a cell per category" };
+
 /**
- * Under a column picker whose property the chart can be drawn as a grid of: whether it is, and if
- * so, a cell per column or a cell per category of the first. The picker takes several columns
- * only while it is on.
+ * Under a column picker whose property the chart can be drawn as a grid of: whether it is. The
+ * split follows the column's type (see `GridBySpec`), and the label says which it is, or would be:
+ * a cell per category of a categorical column, or a cell per numeric column, when the picker
+ * takes several.
  */
 export default function GridByControl({
     split,
+    available,
     onChange,
 }: {
+    /** How the chart is split now, or null when it is not a grid of this property. */
     split: GridSplit | null;
-    onChange: (split: GridSplit | null) => void;
+    /** How it would be split, or null when the column cannot be a grid. */
+    available: GridSplit | null;
+    onChange: (on: boolean) => void;
 }) {
+    const cells = split ?? available;
     return (
-        <div className="flex flex-wrap items-center gap-2">
-            <FormControlLabel
-                control={
-                    <Switch
-                        size="small"
-                        checked={split !== null}
-                        onChange={(_, checked) => onChange(checked ? "columns" : null)}
-                    />
-                }
-                label="Grid by this"
-                slotProps={{ typography: { variant: "caption" } }}
-            />
-            {split !== null && (
-                <ToggleButtonGroup
+        <FormControlLabel
+            control={
+                <Switch
                     size="small"
-                    exclusive
-                    value={split}
-                    aria-label="Grid cells"
-                    onChange={(_, next: GridSplit | null) => {
-                        if (next) onChange(next);
-                    }}
-                >
-                    <ToggleButton value="columns" sx={{ py: 0, textTransform: "none" }}>
-                        A cell per column
-                    </ToggleButton>
-                    <ToggleButton value="categories" sx={{ py: 0, textTransform: "none" }}>
-                        Per category
-                    </ToggleButton>
-                </ToggleButtonGroup>
-            )}
-        </div>
+                    checked={split !== null}
+                    disabled={split === null && available === null}
+                    onChange={(_, checked) => onChange(checked)}
+                />
+            }
+            label={cells ? `Grid by this: ${CELLS[cells]}` : "Grid by this"}
+            title={
+                split === null && available === null
+                    ? "Choose a numeric or categorical column to show a grid of it"
+                    : undefined
+            }
+            slotProps={{ typography: { variant: "caption" } }}
+        />
     );
 }
 

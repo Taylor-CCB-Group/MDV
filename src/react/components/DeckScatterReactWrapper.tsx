@@ -268,7 +268,7 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
 
     /** BaseChart's settings, with the colour settings for `color_fields` in place of its own. */
     getBaseSettings() {
-        return [...this.getGeneralSettings(), getColorFieldsSettingsFolder(this.config)];
+        return [...this.getGeneralSettings(), getColorFieldsSettingsFolder(this.config, this.dataStore)];
     }
 
     getConfig() {
@@ -382,7 +382,7 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                 }),
             );
             settings.push(getCrosshairSetting(c));
-            settings.push(getScatterGridSettingsFolder(c));
+            settings.push(getScatterGridSettingsFolder(c, this.dataStore));
         } else {
             settings.push(...this.get3DSettings(c));
         }

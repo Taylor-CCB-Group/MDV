@@ -1,11 +1,20 @@
 import { type RenderStack, walkRenderStackEntries } from "@spatialdata/layers";
 import type { SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
+import type { FieldSpecs } from "@/lib/columnTypeHelpers";
 import { g } from "@/lib/utils";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { spatialDataUrlForRegion } from "@/react/spatialdata/shared_spatial_data";
+import { availableColorGridSplit, type ColumnTypes } from "../colorFields";
 import type { ChartArrayCell } from "../hooks/useChartArrayGrid";
-import { COLOR_GRID_CHOICES, colorGridChoice, colorGridConfig, gridChoiceValue } from "./colorGridUtils";
-import { layerFillGridChoice, layerFillGridChoices, layerFillGridConfig } from "./layerFillGridUtils";
+import {
+    type ColorGridSplit,
+    colorGridChoice,
+    colorGridChoices,
+    colorGridConfig,
+    colorGridSplit,
+    gridChoiceValue,
+} from "./colorGridUtils";
+import { fillColumnName, layerFillGridChoice, layerFillGridChoices, layerFillGridConfig } from "./layerFillGridUtils";
 
 /** A cell of a SpatialData chart drawn with a cell per region: the region and where its store is. */
 export type SpatialRegionCell = ChartArrayCell & {
@@ -83,31 +92,52 @@ export function moveRegionViews(
     return moved;
 }
 
+const SPLITS: readonly ColorGridSplit[] = ["columns", "categories"];
+
+type SpatialDataGridSettingsConfig = {
+    type?: string;
+    grid?: SpatialDataGridConfig | null;
+    renderStack?: RenderStack;
+    color_fields?: FieldSpecs;
+};
+
 /**
- * The SpatialData chart's grid settings: one view, a cell per density field, per colour column,
- * per category of the first colour column, per fill colour column (or category) of a shapes or
- * labels layer, or per region.
+ * Each layer's colour grid choices: the split its colour column allows, and the chart's current
+ * grid, so the dropdown can show it.
+ */
+function layerGridChoices(
+    config: SpatialDataGridSettingsConfig,
+    layerGridSplit: ((layer: FillColorLayer) => ColorGridSplit | null) | undefined,
+) {
+    const { grid } = config;
+    const current =
+        grid?.by === "layer_fill" && grid.layer
+            ? { layer: grid.layer, split: grid.split === "categories" ? "categories" : "columns" }
+            : undefined;
+    return fillColorLayers(config.renderStack).flatMap((layer) => {
+        const available = layerGridSplit?.(layer);
+        return SPLITS.filter(
+            (split) =>
+                !layerGridSplit || split === available || (current?.layer === layer.id && current.split === split),
+        ).map((split) => ({ id: layer.id, name: layer.name, split }));
+    });
+}
+
+/**
+ * The SpatialData chart's grid settings: one view, a cell per density field, a grid of the
+ * chart's colour or of a shapes or labels layer's fill colour (a cell per colour column, or per
+ * category of a categorical one), or a cell per region.
  */
 export function getSpatialDataGridSettingsFolder(
-    config: {
-        grid?: SpatialDataGridConfig | null;
-        renderStack?: RenderStack;
-    },
-    /** Whether a table annotates a layer's element, so it can be coloured by a column (see `fillColorLayers`). */
-    isAnnotated?: (layer: FillColorLayer) => boolean,
+    config: SpatialDataGridSettingsConfig,
+    columns: ColumnTypes,
+    /**
+     * How a grid of a layer's fill colour would be split, by the type of its column in the table
+     * annotating its element, or null when it cannot be one (no table, or no column of a type to
+     * split). Absent when that cannot be told yet: every layer is offered either way.
+     */
+    layerGridSplit?: (layer: FillColorLayer) => ColorGridSplit | null,
 ) {
-    // the layer the grid is by stays a choice, so the dropdown can show it
-    const gridLayer = config.grid?.by === "layer_fill" ? config.grid.layer : undefined;
-    const layers = fillColorLayers(config.renderStack).filter(
-        (layer) => !isAnnotated || layer.id === gridLayer || isAnnotated(layer),
-    );
-    const choices = [
-        { name: "One view", value: "none" },
-        { name: "A cell per density field", value: "densityFields" },
-        ...COLOR_GRID_CHOICES,
-        ...layerFillGridChoices(layers),
-        { name: "A cell per region", value: "region" },
-    ];
     return g({
         type: "folder",
         label: "Grid",
@@ -122,7 +152,20 @@ export function getSpatialDataGridSettingsFolder(
                 set current_value(_value: string) {
                     // `func` sets the grid, which the getter reads back
                 },
-                values: [choices, "name", "value"],
+                // the colour choices follow the colour columns' types
+                get values(): [{ name: string; value: string }[], string, string] {
+                    const choices = [
+                        { name: "One view", value: "none" },
+                        { name: "A cell per density field", value: "densityFields" },
+                        ...colorGridChoices(availableColorGridSplit(config, columns), colorGridSplit(config)),
+                        ...layerFillGridChoices(layerGridChoices(config, layerGridSplit)),
+                        { name: "A cell per region", value: "region" },
+                    ];
+                    return [choices, "name", "value"];
+                },
+                set values(_values) {
+                    // made from the config
+                },
                 func: (value: string) => {
                     const colorSplit = colorGridChoice(value);
                     const layerGrid = layerFillGridChoice(value);
@@ -159,7 +202,14 @@ export function getSpatialDataGridSettingsFolder(
 }
 
 /** A shapes or labels layer of the stack, which can be coloured by a column if a table annotates it. */
-export type FillColorLayer = { id: string; name: string; elementType: "shapes" | "labels"; elementKey: string };
+export type FillColorLayer = {
+    id: string;
+    name: string;
+    elementType: "shapes" | "labels";
+    elementKey: string;
+    /** The column it is coloured by (the first, for several), if any. */
+    fillColumn?: string;
+};
 
 /** The stack's shapes and labels layers: their ids, names and elements. */
 export function fillColorLayers(stack: RenderStack | undefined): FillColorLayer[] {
@@ -168,6 +218,7 @@ export function fillColorLayers(stack: RenderStack | undefined): FillColorLayer[
         if (entry.kind !== "spatial") return [];
         const { elementType, elementKey } = entry.source;
         if (elementType !== "shapes" && elementType !== "labels") return [];
-        return [{ id: entry.id, name: renderStackEntryDisplayName(entry, stack), elementType, elementKey }];
+        const name = renderStackEntryDisplayName(entry, stack);
+        return [{ id: entry.id, name, elementType, elementKey, fillColumn: fillColumnName(entry.props) }];
     });
 }

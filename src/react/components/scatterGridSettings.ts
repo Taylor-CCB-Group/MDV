@@ -1,8 +1,11 @@
+import type { FieldSpecs } from "@/lib/columnTypeHelpers";
 import { g } from "@/lib/utils";
+import { availableColorGridSplit, type ColumnTypes } from "../colorFields";
 import {
-    COLOR_GRID_CHOICES,
     colorGridChoice,
+    colorGridChoices,
     colorGridConfig,
+    colorGridSplit,
     gridChoiceValue,
     supportsColorGridMode,
 } from "./colorGridUtils";
@@ -10,15 +13,13 @@ import { supportsDensityGridMode } from "./densityGridUtils";
 
 /**
  * The deck scatter plot's grid settings: one view, a cell per density field (charts that draw
- * density), a cell per colour column, or a cell per category of the first colour column. Options
- * for the grid's layout belong here as they come.
+ * density), or a grid of the colour: a cell per colour column, or per category of a categorical
+ * colour column. Options for the grid's layout belong here as they come.
  */
-export function getScatterGridSettingsFolder(config: { type?: string; grid?: { by: string; split?: string } | null }) {
-    const choices = [
-        { name: "One view", value: "none" },
-        ...(supportsDensityGridMode(config.type) ? [{ name: "A cell per density field", value: "densityFields" }] : []),
-        ...(supportsColorGridMode(config.type) ? COLOR_GRID_CHOICES : []),
-    ];
+export function getScatterGridSettingsFolder(
+    config: { type?: string; grid?: { by: string; split?: string } | null; color_fields?: FieldSpecs },
+    columns: ColumnTypes,
+) {
     return g({
         type: "folder",
         label: "Grid",
@@ -33,7 +34,22 @@ export function getScatterGridSettingsFolder(config: { type?: string; grid?: { b
                 set current_value(_value: string) {
                     // `func` sets the grid, which the getter reads back
                 },
-                values: [choices, "name", "value"],
+                // the colour choice follows the colour column's type
+                get values(): [{ name: string; value: string }[], string, string] {
+                    const choices = [
+                        { name: "One view", value: "none" },
+                        ...(supportsDensityGridMode(config.type)
+                            ? [{ name: "A cell per density field", value: "densityFields" }]
+                            : []),
+                        ...(supportsColorGridMode(config.type)
+                            ? colorGridChoices(availableColorGridSplit(config, columns), colorGridSplit(config))
+                            : []),
+                    ];
+                    return [choices, "name", "value"];
+                },
+                set values(_values) {
+                    // made from the config
+                },
                 func: (value: string) => {
                     const colorSplit = colorGridChoice(value);
                     if (colorSplit) config.grid = colorGridConfig(colorSplit);

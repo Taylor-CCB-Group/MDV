@@ -340,8 +340,9 @@ and any reader of the saved stack, takes the first (`projectMdvFieldSpecs`).
   (`splitRenderStackAt`), with each cell's copy between. An isolated group holding the layer is
   split with it, so its two halves composite separately, and the copies do not get its blending.
 
-The Grid dropdown offers only layers whose element a table annotates (`annotatedLayerFilter`,
-the association the layer panels use), and the layer the chart is a grid of. In the layer list
+The Grid dropdown offers only layers whose element a table annotates (`layerGridSplit`, the
+association the layer panels use), each with the split its colour column's type allows, and the
+layer and split the chart is a grid of. In the layer list
 that layer's row has a grid icon (`GridByIcon`) beside its table icon, as does the row of a
 collapsed group that holds it.
 

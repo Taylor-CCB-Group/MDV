@@ -41,8 +41,9 @@ import { action } from "mobx";
 import { observer } from "mobx-react-lite";
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import type { GridBySpec, GridSplit } from "@/charts/charts";
+import type { GridBySpec } from "@/charts/charts";
 import { dataQualityNotesSetting } from "@/lib/browserSettings";
+import type { ColumnTypes } from "@/react/colorFields";
 import {
     DECK_OVERLAY_VISIBILITY_FOLLOWERS,
     type DeckOverlayId,
@@ -76,10 +77,11 @@ import { useChartSpatialData } from "@/react/spatialdata/shared_spatial_data";
 import { useElementTableAssociation } from "@/react/spatialdata/table_association";
 import { useChart, useDataStore } from "../context";
 import { useConfig, useDataSources } from "../hooks";
+import { colorGridSplitFor } from "./colorGridUtils";
 import EntryStatusDetails from "./EntryStatusDetails";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import { GridByIcon } from "./GridByControl";
-import { layerFillGrid, layerFillGridConfig } from "./layerFillGridUtils";
+import { fillColumnName, layerFillGrid, layerFillGridConfig } from "./layerFillGridUtils";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import { CompositingButton, hasCompositing } from "./spatialLayers/CompositingButton";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
@@ -185,27 +187,35 @@ const LayerFailureDetails = observer(function LayerFailureDetails({ entryId }: {
     );
 });
 
-/** Turns the chart's grid by this layer's fill colour on (split as asked) and off. */
-function useLayerFillGridBy(entryId: string): GridBySpec {
+/**
+ * Turns the chart's grid by this layer's fill colour on and off, split by the type of its colour
+ * column in the table annotating it (`columns`, undefined without one).
+ */
+function useLayerFillGridBy(entryId: string, columns: ColumnTypes | undefined): GridBySpec {
     const config = useConfig<SpatialDataMdvReactConfig>();
-    return useMemo(
-        () => ({
+    return useMemo(() => {
+        const available = () => {
+            const entry = config.renderStack ? findRenderStackEntry(config.renderStack, entryId) : undefined;
+            const column = entry ? fillColumnName(entry.props) : undefined;
+            return colorGridSplitFor(column ? columns?.columnIndex[column] : undefined);
+        };
+        return {
             get: () => {
                 const grid = layerFillGrid(config);
                 return grid?.layer === entryId ? grid.split : null;
             },
-            set: action((split: GridSplit | null) => {
+            available,
+            set: action((on: boolean) => {
+                const split = on ? available() : null;
                 if (split) config.grid = layerFillGridConfig(entryId, split);
                 else if (layerFillGrid(config)?.layer === entryId) config.grid = null;
             }),
-        }),
-        [config, entryId],
-    );
+        };
+    }, [config, entryId, columns]);
 }
 
 const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: string }) {
     const dataStore = useDataStore();
-    const gridBy = useLayerFillGridBy(entryId);
     const dataSources = useDataSources();
     const { spatialData } = useChartSpatialData();
     const { entry, layer, patchLayer } = useRenderStackEntry(entryId);
@@ -217,11 +227,12 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
         spatialElementKey,
         dataSources,
     );
-    const layerDataStore =
+    const tableDataStore =
         tableAssociation.status === "resolved"
-            ? (dataSources.find((dataSource) => dataSource.name === tableAssociation.dataSourceName)?.dataStore ??
-              dataStore)
-            : dataStore;
+            ? dataSources.find((dataSource) => dataSource.name === tableAssociation.dataSourceName)?.dataStore
+            : undefined;
+    const layerDataStore = tableDataStore ?? dataStore;
+    const gridBy = useLayerFillGridBy(entryId, tableDataStore);
 
     if (!entry) return null;
 

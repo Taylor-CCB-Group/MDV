@@ -144,15 +144,17 @@ function isMultiSpec(props: ColumnSelectionSpec): props is GuiSpec<"multicolumn"
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSelectionSpec }) => {
-    // A property the chart can be a grid of takes one column until it is (see `GuiSpec.gridBy`);
-    // its value stays an array either way, the picker showing the first while single.
+    // A property the chart can be a grid of takes one column, unless it is a grid of a cell per
+    // column, when it takes several numeric ones (see `GuiSpec.gridBy`). Its value stays an array
+    // either way, the picker showing the first while single.
     const gridBy = isMultiSpec(props) ? props.gridBy : undefined;
     const split = gridBy?.get() ?? null;
-    const multiple = isMultiSpec(props) && (!gridBy || split !== null);
+    const available = gridBy?.available() ?? null;
+    const multiple = isMultiSpec(props) && (!gridBy || split === "columns");
     const singleOfMulti = isMultiSpec(props) && !multiple;
     const currentValue = isMultiSpec(props) && singleOfMulti ? props.current_value[0] : props.current_value;
 
-    const filter = props.columnType;
+    const filter = gridBy && split === "columns" ? "number" : props.columnType;
     // not only is the filter not working, but we need to decide how to express "multiple"
     const props2 = useMemo(
         () =>
@@ -168,6 +170,8 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
                     const next = singleOfMulti ? [v] : v;
                     props.current_value = next;
                     props.func?.(next);
+                    // the split follows the new column's type
+                    if (props.gridBy?.get()) props.gridBy.set(true);
                 }),
                 type: filter, //is it ok for this to be optional?
                 multiple,
@@ -189,7 +193,7 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
             <MLabel props={props} />
             <div className="grid w-full gap-1">
                 <ColumnSelectionComponent {...props2} />
-                <GridByControl split={split} onChange={gridBy.set} />
+                <GridByControl split={split} available={available} onChange={gridBy.set} />
             </div>
         </>
     );

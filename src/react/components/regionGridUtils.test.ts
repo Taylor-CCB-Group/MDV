@@ -2,7 +2,10 @@ import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
 import { describe, expect, test } from "vitest";
 import type { GuiSpec } from "@/charts/charts";
 import type { SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
+import type { ColumnTypes } from "../colorFields";
+import { colorGridSplitFor } from "./colorGridUtils";
 import {
+    type FillColorLayer,
     getSpatialDataGridSettingsFolder,
     isRegionGridShown,
     moveRegionViews,
@@ -83,30 +86,60 @@ describe("getSpatialDataGridSettingsFolder", () => {
             layer("boundaries", "shapes", "cell_boundaries"),
         ],
     };
-    const layerChoices = (folder: GuiSpec<"folder">) => {
+    const choiceValues = (folder: GuiSpec<"folder">) => {
         const [show] = folder.current_value;
         if (show?.type !== "dropdown") return [];
         const options: unknown[] = show.values?.[0] ?? [];
         return options.flatMap((option) =>
-            option &&
-            typeof option === "object" &&
-            "value" in option &&
-            typeof option.value === "string" &&
-            option.value.startsWith("layer_fill:")
+            option && typeof option === "object" && "value" in option && typeof option.value === "string"
                 ? [option.value]
                 : [],
         );
     };
-    const annotated = ({ elementKey }: { elementKey: string }) => elementKey === "cell_circles";
+    const layerChoices = (folder: GuiSpec<"folder">) =>
+        choiceValues(folder).filter((value) => value.startsWith("layer_fill:"));
+    const withFill = (entry: RenderStackEntry, columnName: string): RenderStackEntry => ({
+        ...entry,
+        props: { fillColorByColumn: { columnName, mode: "auto" } },
+    });
+    const colorStack: RenderStack = {
+        schemaVersion: 2,
+        entries: [
+            layer("he", "image", "he"),
+            withFill(layer("circles", "shapes", "cell_circles"), "leiden"),
+            withFill(layer("boundaries", "shapes", "cell_boundaries"), "leiden"),
+            withFill(layer("nuclei", "labels", "nuclei"), "area"),
+        ],
+    };
+    const columns: ColumnTypes = { columnIndex: { leiden: { datatype: "text" }, area: { datatype: "double" } } };
+    // a table annotates cell_circles and nuclei, not cell_boundaries
+    const annotated = new Set(["cell_circles", "nuclei"]);
+    const layerGridSplit = ({ elementKey, fillColumn }: FillColorLayer) =>
+        annotated.has(elementKey) ? colorGridSplitFor(fillColumn ? columns.columnIndex[fillColumn] : undefined) : null;
 
-    test("offers a colour grid for each shapes or labels layer a table annotates", () => {
-        const folder = getSpatialDataGridSettingsFolder({ renderStack }, annotated);
-        expect(layerChoices(folder)).toEqual(["layer_fill:columns:circles", "layer_fill:categories:circles"]);
+    test("offers each annotated layer the split its colour column's type allows", () => {
+        const folder = getSpatialDataGridSettingsFolder({ renderStack: colorStack }, columns, layerGridSplit);
+        expect(layerChoices(folder)).toEqual(["layer_fill:categories:circles", "layer_fill:columns:nuclei"]);
     });
 
-    test("keeps the layer the chart is a grid of, and every layer when it cannot tell", () => {
-        const grid: SpatialDataGridConfig = { by: "layer_fill", layer: "boundaries" };
-        expect(layerChoices(getSpatialDataGridSettingsFolder({ renderStack, grid }, annotated))).toHaveLength(4);
-        expect(layerChoices(getSpatialDataGridSettingsFolder({ renderStack }))).toHaveLength(4);
+    test("keeps the chart's grid, and every layer's splits when it cannot tell", () => {
+        const grid: SpatialDataGridConfig = { by: "layer_fill", layer: "boundaries", split: "columns" };
+        expect(
+            layerChoices(getSpatialDataGridSettingsFolder({ renderStack: colorStack, grid }, columns, layerGridSplit)),
+        ).toEqual(["layer_fill:categories:circles", "layer_fill:columns:boundaries", "layer_fill:columns:nuclei"]);
+        expect(layerChoices(getSpatialDataGridSettingsFolder({ renderStack }, columns))).toHaveLength(4);
+    });
+
+    test("offers the chart's colour grid the split its first colour column allows", () => {
+        const colorChoices = (color_fields: string[]) =>
+            choiceValues(
+                getSpatialDataGridSettingsFolder(
+                    { type: "SpatialDataMdvRegionReact", renderStack, color_fields },
+                    columns,
+                ),
+            ).filter((value) => value.startsWith("color_fields:"));
+        expect(colorChoices(["leiden"])).toEqual(["color_fields:categories"]);
+        expect(colorChoices(["area", "leiden"])).toEqual(["color_fields:columns"]);
+        expect(colorChoices([])).toEqual([]);
     });
 });

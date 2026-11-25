@@ -35,12 +35,20 @@ export function layerFillChoiceValue(layer: string, split: ColorGridSplit) {
     return `layer_fill:${split}:${layer}`;
 }
 
-/** The choices a grid settings dropdown offers for each layer that can be coloured by a column. */
-export function layerFillGridChoices(layers: readonly { id: string; name: string }[]) {
-    return layers.flatMap(({ id, name }) => [
-        { name: `A cell per colour column of ${name}`, value: layerFillChoiceValue(id, "columns") },
-        { name: `A cell per colour category of ${name}`, value: layerFillChoiceValue(id, "categories") },
-    ]);
+/** The choices a grid settings dropdown offers for layers, a choice per layer and split. */
+export function layerFillGridChoices(layers: readonly { id: string; name: string; split: ColorGridSplit }[]) {
+    return layers.map(({ id, name, split }) => ({
+        name: split === "columns" ? `A cell per colour column of ${name}` : `A cell per colour category of ${name}`,
+        value: layerFillChoiceValue(id, split),
+    }));
+}
+
+/** The column a shapes or labels layer's props colour it by (the first, for several), if any. */
+export function fillColumnName(props: object): string | undefined {
+    const fill = "fillColorByColumn" in props ? props.fillColorByColumn : undefined;
+    if (!fill || typeof fill !== "object" || !("columnName" in fill)) return undefined;
+    const { columnName } = fill;
+    return typeof columnName === "string" && columnName ? columnName : undefined;
 }
 
 /** The layer grid a grid settings dropdown's value chooses, or null for another kind of grid. */

@@ -36,7 +36,11 @@ describe("layerFillGrid", () => {
 
 describe("layer grid choices", () => {
     test("round trip through the grid settings dropdown", () => {
-        const choices = layerFillGridChoices([{ id: "spatialdata-shapes-a-#x1", name: "shapes: a" }]);
+        const id = "spatialdata-shapes-a-#x1";
+        const choices = layerFillGridChoices([
+            { id, name: "shapes: a", split: "columns" },
+            { id, name: "shapes: a", split: "categories" },
+        ]);
         expect(choices.map((choice) => choice.name)).toEqual([
             "A cell per colour column of shapes: a",
             "A cell per colour category of shapes: a",

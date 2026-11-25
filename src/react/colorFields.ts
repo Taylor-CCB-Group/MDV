@@ -6,7 +6,14 @@ import type { DataColumn, DataType, FieldName, GridBySpec } from "@/charts/chart
 import { type FieldSpec, type FieldSpecs, flattenFields } from "@/lib/columnTypeHelpers";
 import { isDateColumn } from "@/lib/dateFormat";
 import { g } from "@/lib/utils";
-import { colorByField, colorGridConfig, colorGridSplit, supportsColorGridMode } from "./components/colorGridUtils";
+import {
+    type ColorGridSplit,
+    colorByField,
+    colorGridConfig,
+    colorGridSplit,
+    colorGridSplitFor,
+    supportsColorGridMode,
+} from "./components/colorGridUtils";
 import { useChart } from "./context";
 import { useConfig, useFieldSpecs } from "./hooks";
 import { buildColorLegendSpec } from "./legend/color_legend/buildColorLegendSpec";
@@ -136,20 +143,37 @@ const TRIMS: readonly TrimChoice[] = ["none", "0.001", "0.01", "0.05"];
 const isTrim = (value: string): value is TrimChoice => TRIMS.some((trim) => trim === value);
 const TRIM_CHOICES: [string, string][] = TRIMS.map((trim) => [trim === "none" ? "No Trim" : trim, trim]);
 
-/** The colour settings of a chart with `color_fields`, in place of BaseChart's "Color Settings". */
-/** For a chart that can be a grid of its colour: turns the grid on (split as asked) and off. */
-function colorFieldsGridBy(config: ColorFieldsConfig): GridBySpec | undefined {
+/** Where a chart looks up its columns' types: its datastore. */
+export type ColumnTypes = { columnIndex: Record<string, { datatype: DataType } | undefined> };
+
+/**
+ * How a grid of the chart's colour would be split now, by the type of its first colour column
+ * (see `colorGridSplitFor`), or null when it cannot be a grid of it.
+ */
+export function availableColorGridSplit(
+    config: { color_fields?: FieldSpecs },
+    columns: ColumnTypes,
+): ColorGridSplit | null {
+    const first = colorFieldNames(config.color_fields)[0];
+    return colorGridSplitFor(first ? columns.columnIndex[first] : undefined);
+}
+
+/** For a chart that can be a grid of its colour: turns the grid on (split by the column's type) and off. */
+function colorFieldsGridBy(config: ColorFieldsConfig, columns: ColumnTypes): GridBySpec | undefined {
     if (!supportsColorGridMode(config.type)) return undefined;
     return {
         get: () => colorGridSplit(config),
-        set: (split) => {
+        available: () => availableColorGridSplit(config, columns),
+        set: (on) => {
+            const split = on ? availableColorGridSplit(config, columns) : null;
             if (split) config.grid = colorGridConfig(split);
             else if (config.grid?.by === "color_fields") config.grid = null;
         },
     };
 }
 
-export function getColorFieldsSettingsFolder(config: ColorFieldsConfig) {
+/** The colour settings of a chart with `color_fields`, in place of BaseChart's "Color Settings". */
+export function getColorFieldsSettingsFolder(config: ColorFieldsConfig, columns: ColumnTypes) {
     return g({
         type: "folder",
         label: "Color Settings",
@@ -163,7 +187,7 @@ export function getColorFieldsSettingsFolder(config: ColorFieldsConfig) {
                 func: (x: FieldSpecs) => {
                     config.color_fields = x;
                 },
-                gridBy: colorFieldsGridBy(config),
+                gridBy: colorFieldsGridBy(config, columns),
             }),
             g({
                 type: "check",
@@ -240,6 +264,8 @@ export function colorFieldsLegendSpec<T extends ChartColorFieldsConfig>(chart: B
  *   that BaseChart does not wrap it to load the column and track queries: the chart's components
  *   load `color_fields` themselves, live queries included.
  * - the colour legend follows the legend column and the settings that change it.
+ * - a grid of the colour keeps the split its first column's type allows, when the columns change
+ *   other than by its picker (an active link, `colorByColumn`).
  */
 export function setUpColorFields<T extends ChartColorFieldsConfig>(chart: BaseChart<T>) {
     const config: ChartColorFieldsConfig = chart.config;
@@ -260,6 +286,13 @@ export function setUpColorFields<T extends ChartColorFieldsConfig>(chart: BaseCh
             ],
             () => chart.setColorLegend(),
             { equals: comparer.structural },
+        ),
+        reaction(
+            () => (colorGridSplit(config) ? availableColorGridSplit(config, chart.dataStore) : null),
+            (split) => {
+                // none (a link not yet resolved, or a column of another type) leaves the grid be
+                if (split && colorGridSplit(config) !== split) config.grid = colorGridConfig(split);
+            },
         ),
     );
 }

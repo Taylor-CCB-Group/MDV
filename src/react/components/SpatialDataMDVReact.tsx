@@ -45,6 +45,7 @@ import { getDensitySettings } from "../contour_state";
 import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
 import { createVivStores, type VivContextType } from "./avivatorish/state";
 import { BaseReactChart } from "./BaseReactChart";
+import { type ColorGridSplit, colorGridSplitFor } from "./colorGridUtils";
 import { getCrosshairSetting } from "./pointerCrosshair";
 import {
     type FillColorLayer,
@@ -429,24 +430,27 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
     }
 
     /**
-     * Chart-wide settings only. What the MDV data points and their density look like belongs
-     * to their layers, and is edited with every other layer in the layer dialog
-     * (`getDataLayerSettings`, `getDensityLayerSettings`), so the two are not split across dialogs.
+     * How a grid of a layer's fill colour would be split, by the type of its column in the table
+     * annotating its element (null with no table): read from the region's store, or undefined if
+     * it has not been read, when every layer is offered.
      */
-    /**
-     * Whether a table annotates a layer's element, by the association the layer panels use, for
-     * the grid settings to offer only layers that can be coloured by a column. Undefined while the
-     * region's store has not been read, when every layer is offered.
-     */
-    private annotatedLayerFilter(): ((layer: FillColorLayer) => boolean) | undefined {
+    private layerGridSplit(): ((layer: FillColorLayer) => ColorGridSplit | null) | undefined {
         const url = spatialDataUrlForRegion(this.dataStore.regions?.all_regions[this.config.region]);
         const spatialData = url ? this.spatialDataReader.peek(url)?.state.spatialData : undefined;
         if (!spatialData) return undefined;
         const dataSources = window.mdv.chartManager.dataSources;
-        return ({ elementType, elementKey }) =>
-            resolveAssociatedElementTable({ spatialData, elementType, elementKey, dataSources }).status === "resolved";
+        return ({ elementType, elementKey, fillColumn }) => {
+            const table = resolveAssociatedElementTable({ spatialData, elementType, elementKey, dataSources });
+            if (table.status !== "resolved") return null;
+            return colorGridSplitFor(fillColumn ? table.dataStore.columnIndex[fillColumn] : undefined);
+        };
     }
 
+    /**
+     * Chart-wide settings only. What the MDV data points and their density look like belongs
+     * to their layers, and is edited with every other layer in the layer dialog
+     * (`getDataLayerSettings`, `getDensityLayerSettings`), so the two are not split across dialogs.
+     */
     getSettings() {
         const config = this.config;
         const dataStore = this.dataStore;
@@ -460,7 +464,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 func: () => this.openLayerDialog(),
             }),
             getCrosshairSetting(config),
-            getSpatialDataGridSettingsFolder(config, this.annotatedLayerFilter()),
+            getSpatialDataGridSettingsFolder(config, dataStore, this.layerGridSplit()),
             g({
                 type: "dropdown",
                 label: `SpatialData (${dataStore.getColumnName(dataStore.regions?.region_field)})`,
@@ -501,7 +505,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             });
         });
         return [
-            getColorFieldsSettingsFolder(config),
+            getColorFieldsSettingsFolder(config, this.dataStore),
             ...getSharedScatterSettings(config, {
                 chart: this,
                 includePointShape: true,

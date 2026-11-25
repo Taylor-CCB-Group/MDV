@@ -48,8 +48,12 @@ A SpatialData layer's fill colour is the second, and the first inside the render
 
 Such a property's picker says so (`GuiSpec.gridBy`, and `GridByControl` beside a layer's colour
 picker): it takes one column, with a "Grid by this" switch, and turning that on makes the chart a
-grid of it, split by columns or categories, and lets the picker take several. Turning it off
-leaves the columns in config, the first in use.
+grid of it. The split follows the first column's type, not a choice: a categorical column (one
+category per row) gives a cell per category, and the picker stays single; a numeric one gives a
+cell per column, and the picker takes several numeric columns. Choosing a column of the other
+kind while it is on changes the split, and one of neither kind (`multitext`, `unique`) turns it
+off. Turning it off leaves the columns in config, the first in use. The Grid dropdown offers only
+the split the column allows (`colorGridSplitFor`), and the chart's current one.
 
 A **sweep** of a setting (several band widths, several thresholds), is conceivable but has no
 use case yet; leave it out.

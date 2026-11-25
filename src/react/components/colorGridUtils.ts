@@ -1,4 +1,4 @@
-import type { FieldName } from "@/charts/charts";
+import type { DataType, FieldName } from "@/charts/charts";
 import type { ChartArrayCell } from "../hooks/useChartArrayGrid";
 
 /**
@@ -42,11 +42,41 @@ export function colorGridConfig(split: ColorGridSplit): { by: "color_fields"; sp
     return { by: "color_fields", split };
 }
 
-/** The choices a grid settings dropdown offers for a colour grid. */
+/**
+ * How a grid of a colour column splits it: a cell per category for a column with one category
+ * per row, a cell per column (it and those after it) for a numeric one. Null for no column, or a
+ * column of another type (`multitext`, `unique`).
+ */
+export function colorGridSplitFor(column: { datatype: DataType } | undefined): ColorGridSplit | null {
+    switch (column?.datatype) {
+        case "text":
+        case "text16":
+            return "categories";
+        case "integer":
+        case "double":
+        case "int32":
+            return "columns";
+        default:
+            return null;
+    }
+}
+
+/** The choices a grid settings dropdown can offer for a colour grid. */
 export const COLOR_GRID_CHOICES: readonly { name: string; value: string }[] = [
     { name: "A cell per colour column", value: "color_fields:columns" },
     { name: "A cell per colour category", value: "color_fields:categories" },
 ];
+
+/**
+ * The colour grid choices to offer: the split the colour column allows (`colorGridSplitFor`), and
+ * the chart's current one, so the dropdown can show it.
+ */
+export function colorGridChoices(available: ColorGridSplit | null, current: ColorGridSplit | null) {
+    return COLOR_GRID_CHOICES.filter((choice) => {
+        const split = colorGridChoice(choice.value);
+        return split === available || split === current;
+    });
+}
 
 /** The colour grid a grid settings dropdown's value chooses, or null for another kind of grid. */
 export function colorGridChoice(value: string): ColorGridSplit | null {

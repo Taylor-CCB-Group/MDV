@@ -131,9 +131,9 @@ export default function TableAssociationControls({
 const FILL_COLOR_MODE = "auto" as const;
 
 /**
- * The layer's colour column. With `gridBy`, a control to make the chart a grid of it; while it
- * is, the picker takes several columns (the layer itself takes the first), and turned off, it
- * shows the first again.
+ * The layer's colour column. With `gridBy`, a control to make the chart a grid of it: of a cell
+ * per category of a categorical column, or of a cell per numeric column, when the picker takes
+ * several (the layer itself takes the first). Turned off, it shows the first again.
  */
 export const FillColorByColumnControl = observer(function FillColorByColumnControl({
     association,
@@ -145,6 +145,7 @@ export const FillColorByColumnControl = observer(function FillColorByColumnContr
 }: FillColorByColumnProps) {
     const fillByColumn = fillColorByColumn?.columnName;
     const split = gridBy?.get() ?? null;
+    const available = gridBy?.available() ?? null;
 
     // Without a table there is no column to colour by: the layer's own colour controls apply.
     if (association.status !== "resolved") return null;
@@ -155,6 +156,8 @@ export const FillColorByColumnControl = observer(function FillColorByColumnContr
     const select = (selection: FieldSpec | FieldSpecs) => {
         const columnName = flattenFields(selection)[0];
         onChange(columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined, selection);
+        // the split follows the new column's type
+        if (gridBy?.get()) gridBy.set(true);
     };
     const specs = Array.isArray(fillColorByColumnSpec)
         ? fillColorByColumnSpec
@@ -167,9 +170,10 @@ export const FillColorByColumnControl = observer(function FillColorByColumnContr
         <div className="grid gap-2">
             <LabeledControl label="Colour by">
                 <div className="grid gap-1">
-                    {split !== null ? (
+                    {split === "columns" ? (
                         <ColumnSelectionComponent
                             multiple
+                            type="number"
                             dataStore={dataStore}
                             current_value={specs}
                             placeholder="Select columns"
@@ -186,7 +190,7 @@ export const FillColorByColumnControl = observer(function FillColorByColumnContr
                             setSelectedColumn={select}
                         />
                     )}
-                    {gridBy && <GridByControl split={split} onChange={gridBy.set} />}
+                    {gridBy && <GridByControl split={split} available={available} onChange={gridBy.set} />}
                 </div>
             </LabeledControl>
         </div>

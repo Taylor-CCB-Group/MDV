@@ -1,10 +1,21 @@
 import type { SpatialData } from "@spatialdata/core";
 import { findRenderStackEntry } from "@spatialdata/layers";
-import { useMemo } from "react";
+import { action } from "mobx";
+import { useEffect, useMemo } from "react";
 import { flattenFields } from "@/lib/columnTypeHelpers";
-import { type ColorGridCell, type ColorGridSplit, colorGridCells } from "../components/colorGridUtils";
+import {
+    type ColorGridCell,
+    type ColorGridSplit,
+    colorGridCells,
+    colorGridSplitFor,
+} from "../components/colorGridUtils";
 import { getDensityGridViewId } from "../components/densityGridUtils";
-import { type LayerFillCopy, layerFillGrid } from "../components/layerFillGridUtils";
+import {
+    fillColumnName,
+    type LayerFillCopy,
+    layerFillGrid,
+    layerFillGridConfig,
+} from "../components/layerFillGridUtils";
 import type { SpatialDataMdvReactConfig } from "../components/SpatialDataMDVReact";
 import { getFieldColor } from "../fieldColorManager";
 import { useChartID, useConfig, useDataSources } from "../hooks";
@@ -25,19 +36,11 @@ export type LayerFillGridCells = {
 
 const NO_VALUES: readonly string[] = [];
 
-function columnNameOf(fillColorByColumn: unknown): string | undefined {
-    if (!fillColorByColumn || typeof fillColorByColumn !== "object" || !("columnName" in fillColorByColumn)) {
-        return undefined;
-    }
-    const { columnName } = fillColorByColumn;
-    return typeof columnName === "string" && columnName ? columnName : undefined;
-}
-
 /**
  * The cells of the chart's grid by a shapes or labels layer's fill colour, or null when it draws
  * none. Split by columns, a cell per column the layer's colour picker names (its active link's
  * columns as they change); by categories, a cell per category of the first, which needs one
- * category per feature (`text` or `text16`). The columns are those of the table annotating the
+ * category per feature (`text` or `text16`). It keeps the split the first column's type allows. The columns are those of the table annotating the
  * layer's element, which need not be the chart's own datasource.
  */
 export function useLayerFillGridCells(spatialData: SpatialData | undefined): LayerFillGridCells | null {
@@ -55,7 +58,7 @@ export function useLayerFillGridCells(spatialData: SpatialData | undefined): Lay
 
     // read here, in an observer's render, so an active link's change of columns re-renders
     const spec = spatialEntry ? mdvFieldSpecsOf(spatialEntry.props)?.fillColorByColumn : undefined;
-    const fallbackColumn = columnNameOf(spatialEntry?.props.fillColorByColumn);
+    const fallbackColumn = spatialEntry ? fillColumnName(spatialEntry.props) : undefined;
     const names = spec ? flattenFields(spec) : fallbackColumn ? [fallbackColumn] : [];
     const namesKey = names.join("\u0000");
 
@@ -68,6 +71,18 @@ export function useLayerFillGridCells(spatialData: SpatialData | undefined): Lay
     );
     const dataStore = table?.status === "resolved" ? table.dataStore : undefined;
 
+    // The split follows the first column's type, when it changes other than by the layer's picker
+    // (an active link); none (a link not yet resolved) leaves the grid be.
+    const typeSplit = colorGridSplitFor(names[0] && dataStore ? dataStore.columnIndex[names[0]] : undefined);
+    const gridLayer = grid?.layer;
+    const gridSplit = grid?.split;
+    useEffect(() => {
+        if (!gridLayer || !typeSplit || typeSplit === gridSplit) return;
+        action(() => {
+            config.grid = layerFillGridConfig(gridLayer, typeSplit);
+        })();
+    }, [config, gridLayer, gridSplit, typeSplit]);
+
     const first = grid?.split === "categories" ? names[0] : undefined;
     const column = first && dataStore ? dataStore.columnIndex[first] : undefined;
     const categorical = column && (column.datatype === "text" || column.datatype === "text16") ? column : undefined;
@@ -78,8 +93,8 @@ export function useLayerFillGridCells(spatialData: SpatialData | undefined): Lay
     const valuesKey = values.join("\u0000");
     const colorsKey = JSON.stringify(colors);
 
-    const layerId = grid?.layer;
-    const split = grid?.split;
+    const layerId = gridLayer;
+    const split = gridSplit;
     // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by value, as columns and links change in place
     return useMemo(() => {
         if (!layerId || !split || !spatialEntry) return null;

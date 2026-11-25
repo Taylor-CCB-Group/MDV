@@ -4,8 +4,10 @@ import {
     colorByField,
     colorGridCells,
     colorGridChoice,
+    colorGridChoices,
     colorGridConfig,
     colorGridSplit,
+    colorGridSplitFor,
     gridChoiceValue,
     partitionRowsByCategory,
     supportsColorGridMode,
@@ -60,6 +62,30 @@ describe("grid settings choices", () => {
             if (split) expect(gridChoiceValue({ grid: colorGridConfig(split) })).toBe(choice.value);
         }
         expect(colorGridChoice("region")).toBeNull();
+    });
+
+    test("offer the split the colour column's type allows, and the current one", () => {
+        const values = (choices: { value: string }[]) => choices.map((choice) => choice.value);
+        expect(values(colorGridChoices("columns", null))).toEqual(["color_fields:columns"]);
+        expect(values(colorGridChoices("categories", null))).toEqual(["color_fields:categories"]);
+        expect(values(colorGridChoices(null, null))).toEqual([]);
+        expect(values(colorGridChoices("columns", "categories"))).toEqual([
+            "color_fields:columns",
+            "color_fields:categories",
+        ]);
+    });
+});
+
+describe("colorGridSplitFor", () => {
+    test("by category for one category per row, by column for numbers, else none", () => {
+        expect(colorGridSplitFor({ datatype: "text" })).toBe("categories");
+        expect(colorGridSplitFor({ datatype: "text16" })).toBe("categories");
+        expect(colorGridSplitFor({ datatype: "double" })).toBe("columns");
+        expect(colorGridSplitFor({ datatype: "integer" })).toBe("columns");
+        expect(colorGridSplitFor({ datatype: "int32" })).toBe("columns");
+        expect(colorGridSplitFor({ datatype: "multitext" })).toBeNull();
+        expect(colorGridSplitFor({ datatype: "unique" })).toBeNull();
+        expect(colorGridSplitFor(undefined)).toBeNull();
     });
 });
 
