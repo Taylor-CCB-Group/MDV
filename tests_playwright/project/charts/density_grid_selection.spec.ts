@@ -135,6 +135,8 @@ test.describe("Density grid", () => {
     test.setTimeout(180_000);
 
     test("draws a cell per field, selects through any cell, and toggles back to one plot", async ({ page }) => {
+        // a plain drag draws (the "Draw a selection" choice), so Rectangle is the tool cells start with
+        await page.addInitScript(() => localStorage.setItem("mdv.settings.chartDrag", "select"));
         const projectHandle = await createTemporaryProjectViaSyntheticAnndata(page, {
             // "realistic" has several numeric obs columns and the X_umap / X_pca reductions
             synthetic: { profile: "realistic", nCells: 500, nGenes: 50, force: true },
@@ -159,9 +161,11 @@ test.describe("Density grid", () => {
                 .poll(async () => await cellCanvases.first().evaluate((canvas: HTMLCanvasElement) => canvas.width))
                 .toBeGreaterThan(50);
 
-            // the toolbar starts collapsed to the active tool
+            // a plain drag draws in this browser, so cells start with Rectangle, and the collapsed
+            // toolbar offers the other tool, Pan
+            await expect(scope.locator('button[aria-label="Pan"]')).toBeVisible();
+            await expect(scope.locator('button[aria-label="Rectangle"]')).toHaveCount(0);
             await scope.locator('button[aria-label="Show tools"]').click();
-            await scope.locator('button[aria-label="Rectangle"]').click();
             // the last cell is in another row and column (a 2 x 2 grid at this size)
             const last = fields.length - 1;
             expect((await cellBox(page, id, last)).y).toBeGreaterThan((await cellBox(page, id, 0)).y);
@@ -174,6 +178,26 @@ test.describe("Density grid", () => {
             for (const key of ["minX", "maxX", "minY", "maxY"] as const) {
                 expect(Math.abs(second[key] - first[key])).toBeLessThan(tolerance);
             }
+
+            // ⌘-drag (Ctrl-drag off a Mac) in a cell moves every cell's view, and leaves the selection
+            const mac = await page.evaluate(() => /Mac|iPhone|iPad/.test(navigator.userAgent));
+            const viewKey = mac ? "Meta" : "Control";
+            const readTarget = () =>
+                page.evaluate(
+                    (id) => [...(window as any).mdv.chartManager.charts[id].chart.config.viewState.target],
+                    id,
+                );
+            const before = await readTarget();
+            const ringBefore = await readRings(page, id);
+            const box = await cellBox(page, id, 0);
+            await page.keyboard.down(viewKey);
+            await page.mouse.move(...at(box, 0.2, 0.2), { steps: 3 });
+            await page.mouse.down();
+            await page.mouse.move(...at(box, 0.4, 0.3), { steps: 10 });
+            await page.mouse.up();
+            await page.keyboard.up(viewKey);
+            await expect.poll(readTarget).not.toEqual(before);
+            expect(await readRings(page, id)).toEqual(ringBefore);
 
             await scope.locator('button[aria-label="Density overlay"]').click();
             await expect(cells).toHaveCount(0);

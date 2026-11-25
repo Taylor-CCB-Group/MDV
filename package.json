@@ -87,6 +87,7 @@
     "@grafana/faro-web-sdk": "2.13.0",
     "@grafana/faro-web-tracing": "2.13.0",
     "@hms-dbmi/viv": "0.23.0",
+    "intraspatial": "^0.2.0",
     "@intraspatial/deck": "^0.1.2",
     "@luma.gl/constants": "9.4.2",
     "@luma.gl/core": "9.4.2",

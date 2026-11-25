@@ -14,8 +14,10 @@ import { CSS } from "@dnd-kit/utilities";
 import AddIcon from "@mui/icons-material/Add";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import LayersClearIcon from "@mui/icons-material/LayersClear";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
@@ -32,12 +34,13 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
+import type { ElementIssue } from "@spatialdata/core";
 import { findRenderStackEntry, type RenderStackSpatialElementType, walkRenderStackEntries } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
 import { observer } from "mobx-react-lite";
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-
+import { dataQualityNotesSetting } from "@/lib/browserSettings";
 import {
     DECK_OVERLAY_VISIBILITY_FOLLOWERS,
     type DeckOverlayId,
@@ -71,8 +74,10 @@ import { useChartSpatialData } from "@/react/spatialdata/shared_spatial_data";
 import { useElementTableAssociation } from "@/react/spatialdata/table_association";
 import { useChart, useDataStore } from "../context";
 import { useConfig, useDataSources } from "../hooks";
+import EntryStatusDetails from "./EntryStatusDetails";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
+import { CompositingButton, hasCompositing } from "./spatialLayers/CompositingButton";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
 import GroupLayerPanel from "./spatialLayers/GroupLayerPanel";
 import ImageLayerPanel from "./spatialLayers/ImageLayerPanel";
@@ -96,6 +101,56 @@ function isLayerConfigOfType<TType extends LayerConfig["type"]>(
 ): layer is Extract<LayerConfig, { type: TType }> {
     return layer?.type === type;
 }
+
+/**
+ * What sd.js reports about the layer: why it could not load (with a retry where that could
+ * help), and what is degraded but still drawing.
+ */
+const LayerStatusDetails = observer(function LayerStatusDetails({ entryId }: { entryId: string }) {
+    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    const { status, storageIssues } = chart.visibleEntryStatus(entryId);
+    const { retryEntry } = chart;
+    return (
+        <>
+            {status && (
+                <Alert
+                    severity={status.errors.length > 0 ? "error" : "info"}
+                    sx={{ mb: 1, "& .MuiAlert-message": { minWidth: 0, width: "100%" } }}
+                >
+                    <AlertTitle>
+                        {status.errors.length > 0 ? "This layer could not load" : "Notes on this layer"}
+                    </AlertTitle>
+                    <Typography variant="body2" component="div">
+                        <EntryStatusDetails status={status} onRetry={retryEntry && (() => void retryEntry(entryId))} />
+                    </Typography>
+                </Alert>
+            )}
+            <StorageIssuesNote issues={storageIssues} />
+        </>
+    );
+});
+
+/**
+ * How the layer's element is stored, when that makes it slow or leaves its scale unknown: one
+ * muted, collapsed line, as it is about the data rather than the layer, and Settings › Data
+ * quality lists it for every store. Not shown at all with `dataQualityNotesSetting` hidden.
+ */
+const StorageIssuesNote = observer(function StorageIssuesNote({ issues }: { issues: readonly ElementIssue[] }) {
+    if (issues.length === 0 || dataQualityNotesSetting.get() === "hidden") return null;
+    return (
+        <Typography variant="caption" color="text.secondary" component="details" sx={{ display: "block", mb: 1 }}>
+            <summary className="cursor-pointer select-none">
+                Data quality: {issues.length} {issues.length === 1 ? "note" : "notes"} on how this element is stored
+            </summary>
+            <EntryStatusDetails
+                status={{ errors: [], notices: [{ kind: "element-issues", message: "", issues: [...issues] }] }}
+            />
+            <span className="block mt-1">
+                Listed for every store in Settings › Data quality. Hide these notes in Settings › Preferences.
+            </span>
+        </Typography>
+    );
+});
 
 /** Why a layer was turned off; shown above its properties until it is turned back on. */
 const LayerFailureDetails = observer(function LayerFailureDetails({ entryId }: { entryId: string }) {
@@ -335,6 +390,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
     const { entry, patchProps } = useRenderStackEntry(entryId);
     const [renaming, setRenaming] = useState(false);
     const failure = chart.layerFailures.get(entryId);
+    const { status } = chart.visibleEntryStatus(entryId);
 
     if (!entry) return null;
 
@@ -386,6 +442,22 @@ const LayerTreeRow = observer(function LayerTreeRow({
                 inputProps={{ "aria-label": `show ${name}` }}
             />
             {failure && <WarningAmberIcon fontSize="small" color="warning" sx={{ flexShrink: 0 }} />}
+            {!failure && status && (
+                <span
+                    className="flex flex-shrink-0"
+                    title={
+                        status.errors.length > 0
+                            ? `Could not load: ${status.errors.map(({ error }) => error.message).join(" ")}`
+                            : status.notices.map((notice) => notice.message).join(" ")
+                    }
+                >
+                    {status.errors.length > 0 ? (
+                        <ErrorOutlineIcon fontSize="small" color="error" />
+                    ) : (
+                        <InfoOutlinedIcon fontSize="small" color="info" />
+                    )}
+                </span>
+            )}
             {renaming ? (
                 <div className="grow min-w-0">
                     <LayerNameField entryId={entryId} autoFocus variant="standard" onDone={() => setRenaming(false)} />
@@ -418,6 +490,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
                     {name}
                 </Typography>
             )}
+            {hasCompositing(entry.kind, entryId) && <CompositingButton entryId={entryId} name={name} />}
             {entry.kind === "group" && onAddInto && (
                 <IconButton
                     size="small"
@@ -885,6 +958,7 @@ const SpatialLayerDialogComponent = observer(() => {
                     >
                         <LayerHeader entryId={selectedEntryId} />
                         <LayerFailureDetails entryId={selectedEntryId} />
+                        <LayerStatusDetails entryId={selectedEntryId} />
                         <LayerDetails entryId={selectedEntryId} />
                         <GroupLayerPanel entryId={selectedEntryId} onUngroup={onUngroup} />
                     </ErrorBoundary>

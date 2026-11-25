@@ -8,7 +8,7 @@ import type { LoadedDataColumn } from "@/charts/charts";
 import type { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
-import { GatedOrbitController, GatedOrthographicController } from "@/lib/wheelZoomGate";
+import { GatedOrbitController, GatedOrthographicController } from "@/lib/viewGestureGate";
 import { useChart } from "../context";
 import {
     type DualContourLegacyConfig,
@@ -26,15 +26,13 @@ import { isSameOrbitView, ORBIT_FOVY, type OrbitSelectionView, orbitSelectionVie
 import { useScatterRadius } from "../scatter_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import AxisComponent from "./AxisComponent";
-import { CrosshairArea } from "./CrosshairArea";
 import DeckDensityGridComponent from "./DeckDensityGridComponent";
 import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
 import { isDensityGridShown } from "./densityGridUtils";
 import FieldContourLegend from "./FieldContourLegend";
-import { isCrosshairShown } from "./pointerCrosshair";
 import SelectionOverlay from "./SelectionOverlay";
 import { ScatterDeckBoundary, useLayersForDevice, useScatterDeckDevice, useZoomOnFilter } from "./scatterDeckShared";
-import WheelZoomHint from "./WheelZoomHint";
+import ViewGestureHint from "./ViewGestureHint";
 
 /**
  * Currently this implementation is somewhat separate from VivMDVReact / scatter_state,
@@ -323,7 +321,7 @@ const DeckScatter = observer(function DeckScatterComponent({
                 <div
                     ref={deckContainerRef}
                     aria-label="Scatter plot"
-                    style={{ width: "100%", height: "100%", outline: "none" }}
+                    style={{ width: "100%", height: "100%", outline: "none", position: "relative" }}
                     onPointerDown={suppressTooltipUntilPointerUp}
                     onMouseDown={() => {
                         setScatterKeyboardActive(true);
@@ -334,40 +332,38 @@ const DeckScatter = observer(function DeckScatterComponent({
                         setScatterKeyboardActive(false);
                     }}
                 >
-                    <CrosshairArea enabled={isCrosshairShown(config)}>
-                        <ScatterDeckBoundary device={device} failedOnWebGPU={failedOnWebGPU}>
-                            <DeckGL
-                                ref={deckRef}
-                                layers={deckLayers}
-                                {...(deviceProps && { deviceProps })}
-                                onDeviceInitialized={onDeviceInitialized}
-                                onError={onError}
-                                useDevicePixels={true}
-                                controller={{
-                                    type: is2d ? GatedOrthographicController : GatedOrbitController,
-                                    // double-click finishes polygons / removes vertices in selection tools
-                                    doubleClickZoom: false,
-                                    dragPan: controllerOptions.dragPan,
-                                }}
-                                viewState={screenSelection.viewState ?? viewState}
-                                // initialViewState={viewState} //consider not using react state for this
-                                views={view}
-                                layerFilter={screenSelection.layerFilter}
-                                onViewStateChange={(v) => {
-                                    // the selection view does not move
-                                    if (v.viewId === selectionViewId(id)) return;
-                                    action(() => (config.viewState = v.viewState))();
-                                }}
-                                getTooltip={getPortalTooltip}
-                                getCursor={({ isDragging }) => {
-                                    return isDragging ? "grabbing" : "crosshair";
-                                }}
-                            />
-                        </ScatterDeckBoundary>
-                    </CrosshairArea>
+                    <ScatterDeckBoundary device={device} failedOnWebGPU={failedOnWebGPU}>
+                        <DeckGL
+                            ref={deckRef}
+                            layers={deckLayers}
+                            {...(deviceProps && { deviceProps })}
+                            onDeviceInitialized={onDeviceInitialized}
+                            onError={onError}
+                            useDevicePixels={true}
+                            controller={{
+                                type: is2d ? GatedOrthographicController : GatedOrbitController,
+                                // double-click finishes polygons / removes vertices in selection tools
+                                doubleClickZoom: false,
+                                ...controllerOptions,
+                            }}
+                            viewState={screenSelection.viewState ?? viewState}
+                            // initialViewState={viewState} //consider not using react state for this
+                            views={view}
+                            layerFilter={screenSelection.layerFilter}
+                            onViewStateChange={(v) => {
+                                // the selection view does not move
+                                if (v.viewId === selectionViewId(id)) return;
+                                action(() => (config.viewState = v.viewState))();
+                            }}
+                            getTooltip={getPortalTooltip}
+                            getCursor={({ isDragging }) => {
+                                return isDragging ? "grabbing" : "crosshair";
+                            }}
+                        />
+                    </ScatterDeckBoundary>
                 </div>
             </AxisComponent>
-            <WheelZoomHint />
+            <ViewGestureHint />
             {tooltipPortal}
             {showLegend && (
                 <FieldContourLegend

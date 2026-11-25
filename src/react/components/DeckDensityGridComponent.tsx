@@ -13,17 +13,21 @@ import useGateLayers from "../hooks/useGateLayers";
 import { useSpatialLayers } from "../spatial_context";
 import DeckCellGrid from "./DeckCellGrid";
 import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
+import { sharedCellLayersGroup } from "./densityGridSharedLayers";
 import { getDensityGridViewId } from "./densityGridUtils";
 import { isCrosshairShown } from "./pointerCrosshair";
 import { useLayersForDevice, useScatterDeckDevice, useZoomOnFilter } from "./scatterDeckShared";
 import { useDensityGridCellLayers } from "./useDensityGridCellLayers";
+
+const withoutNull = (layers: (Layer | null | undefined)[]) => layers.filter((layer): layer is Layer => layer != null);
 
 const getCellViewId = (chartId: string, cell: ChartArrayCell, index: number) =>
     getDensityGridViewId(chartId, cell.key, index);
 
 /**
  * The deck scatter plot with each density field in its own cell (see `DeckCellGrid`). The points,
- * gates and selection are drawn in every cell; a cell's density layer only in its own.
+ * gates and selection are drawn in every cell; a cell's density layer only in its own. The points
+ * and gate outlines are drawn once a frame, for all the cells (see `sharedCellLayersGroup`).
  */
 export default observer(function DeckDensityGridComponent({ cells, densityFields }: DensityGridCells) {
     const chartId = useChartID();
@@ -53,18 +57,18 @@ export default observer(function DeckDensityGridComponent({ cells, densityFields
 
     const { visibleCells, densityLayers, labels } = useDensityGridCellLayers(grid, densityFields);
 
-    const layers: Layer[] = [
-        greyScatterplotLayer,
-        scatterplotLayer,
-        ...densityLayers,
-        gateDisplayLayer,
-        selectionLayer,
-        gateLabelLayer,
-    ].filter((layer): layer is NonNullable<typeof layer> => layer != null);
-    const { device, deviceProps, onDeviceInitialized, onError } = useScatterDeckDevice(layers.map((layer) => layer.id));
+    const sharedLayers = withoutNull([greyScatterplotLayer, scatterplotLayer, gateDisplayLayer]);
+    // over the shared layers: each cell's own, the selection (it listens on each cell's canvas), and
+    // the gate labels (dragged and clicked)
+    const cellLayers = withoutNull([...densityLayers, selectionLayer, gateLabelLayer]);
+    const { device, deviceProps, onDeviceInitialized, onError } = useScatterDeckDevice(
+        [...sharedLayers, ...cellLayers].map((layer) => layer.id),
+    );
     // deck picks synchronously only on WebGL; on WebGPU the hover pick is all there is
     const pickAlternates = device.status === "ready" && device.backend === "webgl";
-    const deckLayers = useLayersForDevice(layers, device);
+    const sharedDeckLayers = useLayersForDevice(sharedLayers, device);
+    const cellDeckLayers = useLayersForDevice(cellLayers, device);
+    const deckLayers = [sharedCellLayersGroup(sharedDeckLayers), ...cellDeckLayers];
 
     const getTooltipContent = useCallback(
         (info: PickingInfo, deck: Deck<OrthographicView[]> | null) => {
@@ -98,7 +102,7 @@ export default observer(function DeckDensityGridComponent({ cells, densityFields
             onError={onError}
             viewState={config.viewState}
             onViewStateChange={onViewStateChange}
-            dragPan={controllerOptions.dragPan}
+            controllerOptions={controllerOptions}
             getTooltipContent={getTooltipContent}
             setKeyboardActive={setScatterKeyboardActive}
             exportTarget={chart}

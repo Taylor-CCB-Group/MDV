@@ -7,7 +7,6 @@ report (traceback, command line, versions, platform) suitable for pasting into
 a bug report, and the process exits with status 1.
 """
 import functools
-import json
 import os
 import platform
 import shlex
@@ -18,7 +17,7 @@ from typing import Any, Callable, Dict, Optional, ParamSpec, TypeVar
 
 import click
 
-from .build_info import get_build_info
+from .build_info import get_build_info, read_direct_url
 
 ISSUE_TRACKER_URL = "https://github.com/Taylor-CCB-Group/MDV/issues"
 
@@ -49,19 +48,12 @@ def _package_version(name: str) -> Optional[str]:
 
 def _install_kind() -> Optional[str]:
     """'editable' or 'installed', from the distribution's PEP 610 record."""
-    try:
-        dist = metadata.distribution("mdvtools")
-    except metadata.PackageNotFoundError:
+    if _package_version("mdvtools") is None:
         return None
-    direct_url = dist.read_text("direct_url.json")
-    if direct_url:
-        try:
-            record = json.loads(direct_url)
-        except ValueError:
-            record = None
-        dir_info = record.get("dir_info") if isinstance(record, dict) else None
-        if isinstance(dir_info, dict) and dir_info.get("editable"):
-            return "editable"
+    record = read_direct_url()
+    dir_info = record.get("dir_info") if record else None
+    if isinstance(dir_info, dict) and dir_info.get("editable"):
+        return "editable"
     return "installed"
 
 

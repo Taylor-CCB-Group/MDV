@@ -44,6 +44,8 @@ function spatialPropsState(props: Record<string, unknown>): Record<string, unkno
     const state: Record<string, unknown> = {};
     for (const key of Object.keys(props).sort()) {
         if (key === "channels" || key === "vivLayerProps") continue;
+        // placement, not appearance: the stack's structure carries it (`useRenderStackStructure`)
+        if (key === "blendMode") continue;
         state[key] = stableRevisionValue(props[key]);
     }
     return state;

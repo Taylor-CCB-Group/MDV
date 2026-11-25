@@ -13,6 +13,8 @@ import { action } from "mobx";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditMode, PolygonMode, RectangleMode } from "@/editable-layers/selectionModes";
+// Debug: registers `__crossPcf.selection(chart)` until cross-PCF has a real consumer.
+import "@/spatial_stats/crossPcfDebug";
 import { useChart } from "../context";
 import type { DualContourLegacyConfig } from "../contour_state";
 import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
@@ -69,9 +71,11 @@ type ToolButtonProps = {
     ToolIcon: ToolIcon;
     selectedTool: Tool;
     setSelectedTool: (tool: Tool) => void;
+    /** Defaults to the tool's name. */
+    tooltipText?: string;
 };
 
-const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButtonProps) => {
+const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool, tooltipText }: ToolButtonProps) => {
     const theme = useTheme();
     const selectedBackgroundColor = theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(48, 46, 46, 0.18)";
     const style = useMemo(
@@ -85,7 +89,7 @@ const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool }: 
     );
     return (
         <IconWithTooltip
-            tooltipText={name}
+            tooltipText={tooltipText ?? name}
             onClick={() => setSelectedTool(name)}
             iconButtonProps={{
                 sx: style,
@@ -118,12 +122,19 @@ export default observer(function SelectionOverlay() {
         setSelectionFeatureCollection,
         selectedTool,
         setSelectedTool: setSelectedToolX,
+        lastDrawTool,
     } = selectionProps;
     const [cx, cy] = useParamColumns();
 
     const [gateDialogOpen, setGateDialogOpen] = useState(false);
-    // the toolbar starts collapsed to the active tool, so it covers less of the plot
-    const [expanded, setExpanded] = useState(false);
+    // open shows every tool; collapsed shows one button that switches between Pan and the last
+    // drawing tool, so it covers less of the plot. Kept in the chart config, so it is saved with the view.
+    const expanded = config.selection_toolbar_open ?? true;
+    const toggleExpanded = useCallback(() => {
+        action(() => {
+            config.selection_toolbar_open = !(config.selection_toolbar_open ?? true);
+        })();
+    }, [config]);
     // editing a gate needs the edit tools in view
     const showAllTools = expanded || editingGateId != null;
     const manageGateByChartRef = useRef<Map<string, ManageGateDialogWrapper<DeckScatterConfigWithRegion>>>(new Map());
@@ -178,8 +189,23 @@ export default observer(function SelectionOverlay() {
     // It would be good to have a poly-line tool with draggable points, though.
     // Also a brush tool for painting on masks with variable radius.
     const toolButtons = useMemo(() => {
-        const tools = showAllTools ? toolsToShow : toolsToShow.filter((t) => t.name === selectedTool);
-        return tools.map(({ name, ToolIcon }) => (
+        if (!showAllTools) {
+            // collapsed: one button that switches between moving the view and the last drawing tool
+            const other = toolsToShow.find((t) => t.name === (selectedTool === "Pan" ? lastDrawTool : "Pan"));
+            if (!other) return [];
+            const tooltipText = other.name === "Pan" ? "Move the view" : `Select with ${other.name}`;
+            return [
+                <ToolButton
+                    key={other.name}
+                    name={other.name}
+                    ToolIcon={other.ToolIcon}
+                    selectedTool={selectedTool}
+                    setSelectedTool={setSelectedTool}
+                    tooltipText={tooltipText}
+                />,
+            ];
+        }
+        return toolsToShow.map(({ name, ToolIcon }) => (
             <ToolButton
                 key={name}
                 name={name}
@@ -188,7 +214,7 @@ export default observer(function SelectionOverlay() {
                 setSelectedTool={setSelectedTool}
             />
         ));
-    }, [selectedTool, setSelectedTool, toolsToShow, showAllTools]);
+    }, [selectedTool, setSelectedTool, toolsToShow, showAllTools, lastDrawTool]);
 
     const onManageGatesClick = useCallback(() => {
         if (manageGateByChartRef.current.get(chartId)) {
@@ -249,7 +275,7 @@ export default observer(function SelectionOverlay() {
                 {!editingGateId && (
                     <IconWithTooltip
                         tooltipText={expanded ? "Hide tools" : "Show tools"}
-                        onClick={() => setExpanded((e) => !e)}
+                        onClick={toggleExpanded}
                         iconButtonProps={{
                             sx: { color: "var(--text_color)", borderRadius: 10, zIndex: 2, px: 0.25 },
                             "aria-label": expanded ? "Hide tools" : "Show tools",

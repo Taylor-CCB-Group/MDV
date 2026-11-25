@@ -1,8 +1,8 @@
 import { ColorPaletteExtension } from "@hms-dbmi/viv";
 import { Button } from "@mui/material";
 import { viewStateFromBounds } from "@spatialdata/core";
-import { findRenderStackEntry, getRenderStackEntryIds } from "@spatialdata/layers";
-import type { RenderStackLayerInputs } from "@spatialdata/vis";
+import { AlphaFromIntensityExtension, findRenderStackEntry, getRenderStackEntryIds } from "@spatialdata/layers";
+import type { EntryStatus, RenderStackLayerInputs } from "@spatialdata/vis";
 import {
     resolvePickedEntryId,
     type ViewState as SpatialCanvasViewState,
@@ -12,14 +12,14 @@ import {
     type VivImageLayerContext,
     type VivImagePropsResolver,
 } from "@spatialdata/vis";
-import type { DeckGLProps, DeckGLRef, OrthographicViewState, PickingInfo } from "deck.gl";
+import type { DeckGLProps, DeckGLRef, Layer, OrthographicViewState, PickingInfo } from "deck.gl";
 import { observer } from "mobx-react-lite";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
-import { GatedOrthographicController } from "@/lib/wheelZoomGate";
+import { GatedOrthographicController } from "@/lib/viewGestureGate";
 import {
     type DeckErrorHandlers,
     resolveDeckBackend,
@@ -27,9 +27,11 @@ import {
     useDeckDeviceProps,
 } from "@/react/spatialdata/deck_backend";
 import { ensureParquetWorker } from "@/react/spatialdata/ensureParquetWorker";
+import { entryStatusForDisplay } from "@/react/spatialdata/entry_status";
 import { useProjectMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import { deckHostLayerId } from "@/react/spatialdata/host_overlay_ids";
 import { createImageLayerRegistry } from "@/react/spatialdata/image_layer_registry";
+import { applyIsolatedGroupFix } from "@/react/spatialdata/isolated_group_fix";
 import { LayerFailureTracker } from "@/react/spatialdata/layer_failures";
 import { useMarkSpatialChartOpened, useSpatialLoadTiming } from "@/react/spatialdata/load_timing";
 import { onSpatialProfilerRender } from "@/react/spatialdata/perf";
@@ -48,6 +50,7 @@ import type { SpatialDataState } from "@/react/spatialdata/spatial_data_reader";
 import { formatSpatialFeatureTooltipHtml } from "@/react/spatialdata/spatial_feature_tooltip";
 import { useAssociatedShapesLayerInputs } from "@/react/spatialdata/table_association";
 import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_state_bridge";
+import { imageAlphaFromIntensity, vivImageLayerProps } from "@/react/spatialdata/viv_image_props";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
@@ -61,16 +64,18 @@ import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import { useOuterContainer } from "../screen_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import { useViewerStore, useViewerStoreApi, VivProvider } from "./avivatorish/state";
-import { CrosshairArea } from "./CrosshairArea";
 import { isDensityGridShown } from "./densityGridUtils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import FieldContourLegend from "./FieldContourLegend";
-import { isCrosshairShown } from "./pointerCrosshair";
-import { rasterEntriesKey, useRasterIssues } from "./RasterIssues";
+import { isRegionGridShown } from "./regionGridUtils";
 import SelectionOverlay from "./SelectionOverlay";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import SpatialDensityGrid, { type SpatialDensityGridHost } from "./SpatialDensityGrid";
-import WheelZoomHint from "./WheelZoomHint";
+import SpatialRegionGrid, { type SpatialRegionGridHost } from "./SpatialRegionGrid";
+import ViewGestureHint from "./ViewGestureHint";
+
+// before any isolated group draws, in the single view or the density grid
+applyIsolatedGroupFix();
 
 type SpatialRegionMetadata = {
     spatial?: {
@@ -84,6 +89,33 @@ type SpatialRegionMetadata = {
 function getSpatialRegionMetadata(region: unknown): SpatialRegionMetadata | null {
     if (!region || typeof region !== "object") return null;
     return region;
+}
+
+/**
+ * Viv's image extensions and per-layer props for the chart's render stack, for the single view
+ * and the grids alike.
+ */
+function useSpatialVivPassthrough(stack: SpatialDataMdvReactConfig["renderStack"]) {
+    const extensions = useMemo(() => [new ColorPaletteExtension(), new VivContrastExtension()], []);
+    // For image layers with "opacity from brightness" on, and only those (see
+    // `imageAlphaFromIntensity`). Both lists keep their identity, so deck sees no change of
+    // extensions until the option is turned on or off.
+    const extensionsWithAlpha = useMemo(() => [...extensions, new AlphaFromIntensityExtension()], [extensions]);
+
+    const vivImagePropsResolver = useCallback<VivImagePropsResolver>(
+        (ctx: VivImageLayerContext) => vivImageLayerProps(stack, ctx.layerId),
+        [stack],
+    );
+
+    return useMemo(
+        () => ({
+            vivImageExtensions: extensions,
+            vivImageExtensionResolver: (ctx: VivImageLayerContext) =>
+                imageAlphaFromIntensity(stack, ctx.layerId) ? extensionsWithAlpha : extensions,
+            vivImagePropsResolver,
+        }),
+        [extensions, extensionsWithAlpha, stack, vivImagePropsResolver],
+    );
 }
 
 const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderStack({
@@ -133,32 +165,24 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     }, [stack]);
     const onAfterRenderTiming = useSpatialLoadTiming(deckRef, chart, describeLoad);
 
-    const extensions = useMemo(() => [new ColorPaletteExtension(), new VivContrastExtension()], []);
+    const vivPassthrough = useSpatialVivPassthrough(stack);
 
-    const vivImagePropsResolver = useCallback<VivImagePropsResolver>(
-        (ctx: VivImageLayerContext) => {
-            if (!stack) return undefined;
-            const entry = findRenderStackEntry(stack, ctx.layerId);
-            if (!entry || entry.kind !== "spatial") return undefined;
-            const saved = entry.props.vivLayerProps;
-            if (!saved || typeof saved !== "object") return undefined;
-            return saved as Record<string, unknown>;
+    // What sd.js reports about each layer, for the chart's status and the layer dialog, which
+    // live outside this tree. Called from an effect, with each layer's status as it changes.
+    const onEntryStatusChange = useCallback(
+        (layerId: string, status: EntryStatus | undefined) => {
+            const entry = stack && findRenderStackEntry(stack, layerId);
+            const elementType = entry?.kind === "spatial" ? entry.source.elementType : undefined;
+            chart.setEntryStatus(layerId, entryStatusForDisplay(status, coordinateSystem, elementType));
         },
-        [stack],
+        [chart, stack, coordinateSystem],
     );
-
-    const vivPassthrough = useMemo(
-        () => ({
-            vivImageExtensions: extensions,
-            vivImageExtensionResolver: () => extensions,
-            vivImagePropsResolver,
-        }),
-        [extensions, vivImagePropsResolver],
-    );
+    useEffect(() => () => chart.clearEntryStatuses(), [chart]);
 
     const renderer = useSpatialCanvasRendererFromLayerInputs({
         spatialData,
         coordinateSystem,
+        onEntryStatusChange,
         layerInputs: { layers, layerOrder },
         renderOrder: layerOrder,
         viewState: spatialViewState,
@@ -221,6 +245,11 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     // it cannot reach the renderer result. No render-stack dependency: the engine is
     // stable for the life of the renderer and owns its own notifications, so this
     // publishes once rather than on every generation bump.
+    useEffect(() => {
+        chart.setRetryEntry(renderer.retryEntry);
+        return () => chart.setRetryEntry(undefined);
+    }, [chart, renderer.retryEntry]);
+
     useEffect(() => {
         chart.setPointsLayerRegistry(createPointsLayerRegistry(renderer.pointsEngine, renderer.resolvePointsTarget));
         return () => chart.setPointsLayerRegistry(undefined);
@@ -295,25 +324,51 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     }
 
     return (
-        <CrosshairArea enabled={isCrosshairShown(config)}>
-            <SpatialViewer
-                width={width}
-                height={height}
-                viewState={spatialViewState}
-                onViewStateChange={onSpatialViewStateChange}
-                layers={renderer.deckLayers}
-                layerOrder={renderer.layerOrder}
-                renderStack={stackStructure}
-                vivLayerProps={renderer.vivLayerProps.length > 0 ? renderer.vivLayerProps : undefined}
-                // A prop, not part of `deckProps`: `SpatialViewer` spreads `deckProps` and then
-                // sets `onHover` from this prop, so one passed inside `deckProps` is overwritten
-                // with `undefined` and feature tooltips never appear. Only `info`: deck also
-                // passes its event, which `handleHover` would take for the tooltip's anchor.
-                onHover={(info) => handleHover(info)}
-                deckProps={timedDeckProps}
-                deckRef={deckRef}
-            />
-        </CrosshairArea>
+        <SpatialViewer
+            width={width}
+            height={height}
+            viewState={spatialViewState}
+            onViewStateChange={onSpatialViewStateChange}
+            layers={renderer.deckLayers}
+            layerOrder={renderer.layerOrder}
+            renderStack={stackStructure}
+            vivLayerProps={renderer.vivLayerProps.length > 0 ? renderer.vivLayerProps : undefined}
+            // A prop, not part of `deckProps`: `SpatialViewer` spreads `deckProps` and then
+            // sets `onHover` from this prop, so one passed inside `deckProps` is overwritten
+            // with `undefined` and feature tooltips never appear. Only `info`: deck also
+            // passes its event, which `handleHover` would take for the tooltip's anchor.
+            onHover={(info) => handleHover(info)}
+            deckProps={timedDeckProps}
+            deckRef={deckRef}
+        />
+    );
+});
+
+/** The chart's region grid, with the render stack read as the single view reads it. */
+const SpatialRegionGridFromRenderStack = observer(function SpatialRegionGridFromRenderStack({
+    host,
+    layerInputs,
+    pointsLayer,
+}: {
+    host: SpatialRegionGridHost;
+    layerInputs: RenderStackLayerInputs;
+    /** The render stack's points layer, as the adapter resolves it (see `SpatialRegionGrid`). */
+    pointsLayer: Layer | undefined;
+}) {
+    const config = useConfig<SpatialDataMdvReactConfig>();
+    const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
+    const stack = config.renderStack;
+    void chart.renderStackGeneration;
+    const stackStructure = useRenderStackStructure(stack);
+    const vivPassthrough = useSpatialVivPassthrough(stack);
+    return (
+        <SpatialRegionGrid
+            host={host}
+            layerInputs={layerInputs}
+            renderStack={stackStructure}
+            vivPassthrough={vivPassthrough}
+            pointsLayer={pointsLayer}
+        />
     );
 });
 
@@ -498,12 +553,6 @@ const SpatialDataViewer = observer(
             seedRenderStackFromSpatialData(config, spatialData, coordinateSystem, chart);
         }, [chart, config, coordinateSystem, loading, spatialData]);
 
-        // For the chart's status (its menu pip and debug dialog), which live outside this tree.
-        const rasterIssues = useRasterIssues(spatialData, rasterEntriesKey(config.renderStack));
-        useEffect(() => {
-            chart.setRasterIssues(rasterIssues);
-            return () => chart.setRasterIssues([]);
-        }, [chart, rasterIssues]);
         const storeUrl = spatialData?.url ?? null;
         useEffect(() => {
             chart.setSpatialDataUrl(storeUrl);
@@ -576,12 +625,16 @@ const SpatialDataViewer = observer(
         } | null>(null);
 
         const onFeatureHover = useCallback(
-            (event: SpatialFeaturePickEvent, anchorElement?: HTMLElement) => {
+            (
+                event: SpatialFeaturePickEvent,
+                anchorElement?: HTMLElement,
+                // a region grid's cell gives its own region's (see `SpatialRegionGrid`)
+                tooltipItems: typeof mdvTooltipItems = mdvTooltipItems,
+            ) => {
                 const info = event.pickInfo;
                 // The viewer fills in the fields it can read from the table's obs; MDV adds
                 // the rest from the datasource row (see `splitTooltipFields`).
-                const extra =
-                    event.featureId === undefined ? [] : mdvTooltipItems(event.entryId, String(event.featureId));
+                const extra = event.featureId === undefined ? [] : tooltipItems(event.entryId, String(event.featureId));
                 const tooltip =
                     extra.length === 0
                         ? event.tooltip
@@ -640,13 +693,50 @@ const SpatialDataViewer = observer(
                 controller: {
                     type: GatedOrthographicController,
                     doubleClickZoom: false,
-                    dragPan: controllerOptions.dragPan,
+                    ...controllerOptions,
                 },
                 ...(deviceProps && { deviceProps }),
                 onDeviceInitialized,
                 onError: onDeckError,
             }),
             [id, getPortalTooltip, controllerOptions, deviceProps, onDeviceInitialized, onDeckError],
+        );
+
+        const regionGridShown = isRegionGridShown(config);
+        // as the adapter resolves the points' entry: its id, inherited opacity, and absent while hidden
+        const regionGridPointsLayer = deckLayers.find((layer) => layer.id === deckHostLayerId("scatter"));
+        const regionGridLayerInputs = useMemo(
+            () => ({ layers: baseLayers, layerOrder: baseLayerOrder }),
+            [baseLayers, baseLayerOrder],
+        );
+        const regionGrid = useMemo<SpatialRegionGridHost | undefined>(
+            () =>
+                regionGridShown
+                    ? {
+                          device: deckDevice,
+                          deviceProps,
+                          onDeviceInitialized,
+                          onError: onDeckError,
+                          controllerOptions,
+                          getTooltipContent,
+                          setKeyboardActive: setScatterKeyboardActive,
+                          onPointerLeave: onFeatureHoverEnd,
+                          onFeatureHover,
+                          onFeatureHoverEnd,
+                      }
+                    : undefined,
+            [
+                regionGridShown,
+                onFeatureHover,
+                deckDevice,
+                deviceProps,
+                onDeviceInitialized,
+                onDeckError,
+                controllerOptions,
+                getTooltipContent,
+                setScatterKeyboardActive,
+                onFeatureHoverEnd,
+            ],
         );
 
         const densityGridCells = useDensityGridCells();
@@ -661,7 +751,7 @@ const SpatialDataViewer = observer(
                           deviceProps,
                           onDeviceInitialized,
                           onError: onDeckError,
-                          dragPan: controllerOptions.dragPan,
+                          controllerOptions,
                           getTooltipContent,
                           setKeyboardActive: setScatterKeyboardActive,
                           onPointerLeave: onFeatureHoverEnd,
@@ -674,7 +764,7 @@ const SpatialDataViewer = observer(
                 deviceProps,
                 onDeviceInitialized,
                 onDeckError,
-                controllerOptions.dragPan,
+                controllerOptions,
                 getTooltipContent,
                 setScatterKeyboardActive,
                 onFeatureHoverEnd,
@@ -714,9 +804,10 @@ const SpatialDataViewer = observer(
 
         return (
             <Profiler id="spatial.viewer" onRender={onSpatialProfilerRender}>
-                <SelectionOverlay />
+                {/* selection tools, gates and density are not in region cells yet */}
+                {!regionGrid && <SelectionOverlay />}
                 {/* in the grid each cell is labelled with its field; categories still need the legend */}
-                {showLegend && (!densityGrid || legendCategories.items.length > 0) && (
+                {showLegend && !regionGrid && (!densityGrid || legendCategories.items.length > 0) && (
                     <FieldContourLegend
                         fields={densityGrid ? [] : legendFields}
                         categories={legendCategories.items}
@@ -762,27 +853,35 @@ const SpatialDataViewer = observer(
                                 // cannot spin this into a re-throw loop.
                                 resetKeys={[layers, layerOrder]}
                             >
-                                <SpatialCanvasFromRenderStack
-                                    spatialData={spatialData}
-                                    coordinateSystem={coordinateSystem}
-                                    spatialViewState={spatialViewState}
-                                    onSpatialViewStateChange={onSpatialViewStateChange}
-                                    deckLayers={deckLayers}
-                                    layers={layers}
-                                    layerOrder={layerOrder}
-                                    width={width}
-                                    height={height}
-                                    deckProps={deckProps}
-                                    onFeatureHover={onFeatureHover}
-                                    onFeatureHoverEnd={onFeatureHoverEnd}
-                                    densityGrid={densityGrid}
-                                />
+                                {regionGrid ? (
+                                    <SpatialRegionGridFromRenderStack
+                                        host={regionGrid}
+                                        layerInputs={regionGridLayerInputs}
+                                        pointsLayer={regionGridPointsLayer}
+                                    />
+                                ) : (
+                                    <SpatialCanvasFromRenderStack
+                                        spatialData={spatialData}
+                                        coordinateSystem={coordinateSystem}
+                                        spatialViewState={spatialViewState}
+                                        onSpatialViewStateChange={onSpatialViewStateChange}
+                                        deckLayers={deckLayers}
+                                        layers={layers}
+                                        layerOrder={layerOrder}
+                                        width={width}
+                                        height={height}
+                                        deckProps={deckProps}
+                                        onFeatureHover={onFeatureHover}
+                                        onFeatureHoverEnd={onFeatureHoverEnd}
+                                        densityGrid={densityGrid}
+                                    />
+                                )}
                             </ErrorBoundary>
                         </Profiler>
                     </div>
                 </div>
                 {/* the grid has its own, over its scrolling cells */}
-                {!densityGrid && <WheelZoomHint />}
+                {!densityGrid && !regionGrid && <ViewGestureHint />}
                 {tooltipPortal}
                 {featureTooltipPortal}
             </Profiler>

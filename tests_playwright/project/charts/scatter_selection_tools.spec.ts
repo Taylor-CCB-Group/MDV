@@ -2,7 +2,11 @@
  * End-to-end guard for the deck scatter selection tools (issues #577, #578):
  * - a double-click finishes a Polygon with the double-clicked point as its last vertex, and doesn't zoom;
  * - Freehand, Modify (vertex removal) and Pan (translate selection / controller pan + zoom) work;
- * - all of that still works after the chart is popped out into another window, and after it comes back.
+ * - all of that still works after the chart is popped out into another window, and after it comes back;
+ * - with nothing chosen in this browser, a plain drag moves the view and asks what dragging should
+ *   do; once "Draw a selection" is chosen, a plain drag draws a rectangle, while ⌘-drag (Ctrl-drag
+ *   off a Mac) and a right-button drag move the view (with a hint until the view has been moved
+ *   that way), and a click on empty space clears the selection.
  *
  * Runs against whichever frontend TEST_BASE_URL serves; to test a branch's UI, use Vite from that checkout, e.g.
  *   PORT=5171 pnpm run dev
@@ -78,7 +82,7 @@ function chartScope(ui: Page, id: string): Locator {
     return ui.locator(`[${CHART_ATTR}="${id}"]`);
 }
 
-/** The selection toolbar, which starts collapsed to the active tool. */
+/** The selection toolbar, which starts collapsed to one button that switches to the other tool. */
 function toolbar(ui: Page, id: string): Locator {
     return chartScope(ui, id).getByRole("group", { name: "choose tool for manipulating view or selection" });
 }
@@ -132,6 +136,14 @@ async function waitForViewState(page: Page, id: string): Promise<SelectionViewSt
     const { viewState } = await readState(page, id);
     if (!viewState) throw new Error("no viewState");
     return viewState;
+}
+
+/**
+ * What a plain drag does in charts, for this test's browser context (`chartDragSetting`), set before
+ * the app loads so that its prompt doesn't come up in tests about something else.
+ */
+async function chooseChartDrag(page: Page, value: "view" | "select") {
+    await page.addInitScript((value) => localStorage.setItem("mdv.settings.chartDrag", value), value);
 }
 
 /** A point in the canvas given as fractions of its width / height. */
@@ -204,7 +216,7 @@ async function drawFreehandSquare(ui: Page, page: Page, id: string, box: Box) {
     return rings[0];
 }
 
-/** (f): with no selection, Pan drags the view and the wheel zooms. */
+/** (f): with no selection, Pan (the lock) drags the view, and the wheel zooms with the view key held. */
 async function checkController(ui: Page, page: Page, id: string, box: Box) {
     await clearSelection(page, id);
     await selectTool(ui, id, "Pan");
@@ -220,8 +232,18 @@ async function checkController(ui: Page, page: Page, id: string, box: Box) {
 
     const [cx, cy] = at(box, 0.5, 0.5);
     await ui.mouse.move(cx, cy, { steps: 3 });
+    // a plain wheel is left to scroll the page; Ctrl / ⌘ + wheel zooms
+    const viewKey = await viewKeyOf(ui);
+    await ui.keyboard.down(viewKey);
     await ui.mouse.wheel(0, -400);
+    await ui.keyboard.up(viewKey);
     await expect.poll(async () => (await readState(page, id)).viewState?.zoom).not.toBe(before.zoom);
+}
+
+/** The key the app reads to move the view: ⌘ on a Mac (where Ctrl-click is a right-click), Ctrl elsewhere. */
+async function viewKeyOf(ui: Page) {
+    const mac = await ui.evaluate(() => /Mac|iPhone|iPad/.test(navigator.userAgent));
+    return mac ? "Meta" : "Control";
 }
 
 type DataToScreen = (p: Point) => Point;
@@ -287,6 +309,42 @@ async function checkAllTools(ui: Page, page: Page, id: string, box: Box, where: 
     await test.step(`${where}: (f) pan and wheel move the view`, async () => {
         await checkController(ui, page, id, box);
     });
+}
+
+/**
+ * Starts recording what the chart's gesture hint shows. The hint is only up for about a second,
+ * which a slow first drag (software rendering) can outlast, so it is watched rather than polled.
+ */
+async function watchHint(page: Page, id: string) {
+    await page.evaluate((id) => {
+        const content: HTMLElement = (window as any).mdv.chartManager.charts[id].chart.contentDiv;
+        const hint = content.querySelector<HTMLElement>("[data-view-gesture-hint]");
+        if (!hint) throw new Error("no gesture hint in the chart");
+        const shown: string[] = [];
+        (window as any).__hintShown = shown;
+        (window as any).__hintObserver?.disconnect();
+        const observer = new MutationObserver(() => {
+            if (hint.style.opacity === "1") shown.push(hint.textContent ?? "");
+        });
+        observer.observe(hint, { attributes: true, attributeFilter: ["style"], subtree: true, characterData: true });
+        (window as any).__hintObserver = observer;
+    }, id);
+}
+
+/** What the hint has shown since `watchHint`. */
+async function hintShown(page: Page): Promise<string[]> {
+    return await page.evaluate(() => [...((window as any).__hintShown ?? [])]);
+}
+
+/** A drag from one point to another, with a button and keys held (as a real mouse and keyboard). */
+async function dragWith(ui: Page, from: Point, to: Point, { button = "left", keys = [] as string[] } = {}) {
+    for (const key of keys) await ui.keyboard.down(key);
+    await ui.mouse.move(...from, { steps: 3 });
+    await ui.mouse.down({ button: button as "left" | "right" });
+    await ui.mouse.move(...to, { steps: 10 });
+    await ui.mouse.up({ button: button as "left" | "right" });
+    for (const key of keys) await ui.keyboard.up(key);
+    await settle(ui);
 }
 
 /** Let deck and React catch up: two animation frames in the chart's window, then a short wait. */
@@ -406,6 +464,7 @@ test.describe("Scatter selection tools", () => {
     test("polygon, freehand, modify and pan work in place, popped out and popped back in", async ({ page }) => {
         const title = `Selection Tools ${Date.now()}`;
         let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
+        await chooseChartDrag(page, "view");
         try {
             handle = await createTemporaryProjectViaSyntheticAnndata(page, {
                 nameSegment: `scatter-selection-tools--${Date.now()}`,
@@ -455,6 +514,108 @@ test.describe("Scatter selection tools", () => {
         }
     });
 
+    test("dragging moves the view until drawing is chosen; then ⌘-drag or a right-button drag moves it", async ({
+        page,
+    }) => {
+        const title = `Drag To Select ${Date.now()}`;
+        let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
+        try {
+            handle = await createTemporaryProjectViaSyntheticAnndata(page, {
+                nameSegment: `scatter-drag-to-select--${Date.now()}`,
+                synthetic: { profile: "realistic", nCells: 200, nGenes: 12, force: true },
+            });
+            const id = await addScatterChart(page, title);
+            const box = await measureCanvas(page, id);
+            const viewKey = await viewKeyOf(page);
+            const mac = viewKey === "Meta";
+            // a fresh browser context: nothing chosen, and no view moved with a modifier yet
+            let start = await waitForViewState(page, id);
+
+            await test.step("with nothing chosen, a plain drag moves the view and asks what dragging should do", async () => {
+                await dragWith(page, at(box, 0.3, 0.3), at(box, 0.45, 0.4));
+                await expect.poll(async () => (await readState(page, id)).viewState?.target).not.toEqual(start.target);
+                expect((await readState(page, id)).rings).toHaveLength(0);
+                // collapsed, the toolbar offers drawing as the other tool
+                await expect(toolbar(page, id).locator('button[aria-label="Rectangle"]')).toBeVisible();
+                const choice = chartScope(page, id).getByRole("dialog", { name: "What dragging does on charts" });
+                await expect(choice).toBeVisible();
+                await choice.getByRole("button", { name: "Draw a selection" }).click();
+                await expect(choice).toBeHidden();
+                expect(await page.evaluate(() => localStorage.getItem("mdv.settings.chartDrag"))).toBe("select");
+                // the chart now draws, and its toolbar offers moving the view instead
+                await expect(toolbar(page, id).locator('button[aria-label="Pan"]')).toBeVisible();
+                start = await waitForViewState(page, id);
+            });
+
+            await test.step("then a plain drag draws a rectangle, and says how to move the view", async () => {
+                await watchHint(page, id);
+                await page.mouse.move(...at(box, 0.3, 0.3), { steps: 3 });
+                await page.mouse.down();
+                await page.mouse.move(...at(box, 0.6, 0.6), { steps: 10 });
+                await page.mouse.up();
+                const ring = await settledRing(page, page, id);
+                await expect
+                    .poll(() => hintShown(page))
+                    .toContainEqual(`Hold ${mac ? "⌘" : "Ctrl"} and drag to move the view`);
+                expect(ring).toHaveLength(5);
+                expect((await readState(page, id)).viewState?.target).toEqual(start.target);
+            });
+
+            const drawn = (await readState(page, id)).rings[0];
+            let view = await waitForViewState(page, id);
+
+            await test.step(`${viewKey}-drag moves the view and leaves the selection`, async () => {
+                await dragWith(page, at(box, 0.7, 0.2), at(box, 0.8, 0.35), { keys: [viewKey] });
+                const { rings, viewState } = await readState(page, id);
+                expect(viewState?.target).not.toEqual(view.target);
+                expect(rings).toEqual([drawn]);
+                expect(await page.evaluate(() => localStorage.getItem("mdv.viewDragLearned"))).toBe("1");
+                view = await waitForViewState(page, id);
+            });
+
+            await test.step("a right-button drag moves the view too", async () => {
+                await dragWith(page, at(box, 0.7, 0.2), at(box, 0.6, 0.3), { button: "right" });
+                const { rings, viewState } = await readState(page, id);
+                expect(viewState?.target).not.toEqual(view.target);
+                expect(rings).toEqual([drawn]);
+                view = await waitForViewState(page, id);
+            });
+
+            await test.step("Shift-drag still draws, and the hint has stopped", async () => {
+                await watchHint(page, id);
+                await page.keyboard.down("Shift");
+                await page.mouse.move(...at(box, 0.2, 0.6), { steps: 3 });
+                await page.mouse.down();
+                await page.mouse.move(...at(box, 0.4, 0.8), { steps: 10 });
+                await page.mouse.up();
+                await page.keyboard.up("Shift");
+                const ring = await settledRing(page, page, id);
+                expect(await hintShown(page)).toEqual([]);
+                expect(ring).not.toEqual(drawn);
+                expect((await readState(page, id)).viewState?.target).toEqual(view.target);
+            });
+
+            await test.step("a click on empty space clears the selection", async () => {
+                // zoomed well out, the data and the selection shrink to the middle and leave the edges empty
+                await page.evaluate((id) => {
+                    const config = (window as any).mdv.chartManager.charts[id].chart.config;
+                    const vs = config.viewState;
+                    const out = (z: number | undefined) => (z === undefined ? undefined : z - 3);
+                    config.viewState = { ...vs, zoom: out(vs.zoom), zoomX: out(vs.zoomX), zoomY: out(vs.zoomY) };
+                }, id);
+                await settle(page);
+                expect((await readState(page, id)).rings).toHaveLength(1);
+                // the left edge, half way down (the bottom of a 700px chart is out of the window)
+                await page.mouse.click(...at(box, 0.02, 0.5));
+                await expect.poll(async () => (await readState(page, id)).rings.length).toBe(0);
+            });
+        } finally {
+            if (handle !== undefined) {
+                await handle.cleanup();
+            }
+        }
+    });
+
     /**
      * The layer only gets a new selection when React re-renders, and until then editable-layers hands
      * edits the previous one: writing those back put the old shape back as soon as the pointer moved.
@@ -462,6 +623,7 @@ test.describe("Scatter selection tools", () => {
     test("a shape drawn over an existing selection stays selected when the pointer moves on", async ({ page }) => {
         const title = `Selection Persistence ${Date.now()}`;
         let handle: SyntheticAnndataTemporaryProjectHandle | undefined;
+        await chooseChartDrag(page, "view");
         try {
             handle = await createTemporaryProjectViaSyntheticAnndata(page, {
                 nameSegment: `scatter-selection-persistence--${Date.now()}`,

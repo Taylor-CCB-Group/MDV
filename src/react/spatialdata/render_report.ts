@@ -1,4 +1,5 @@
 import type { DeviceInfo } from "@luma.gl/core";
+import type { EntryStatusError } from "@spatialdata/vis";
 import type { CanvasError, LayerFailure } from "./layer_failures";
 
 /**
@@ -23,6 +24,8 @@ export type RenderReportInput = {
     url: string;
     failures: Array<{ name: string; failure: LayerFailure }>;
     canvasErrors: readonly CanvasError[];
+    /** Layers that could not load, as sd.js reported them (`EntryStatus.errors`). */
+    loadErrors?: ReadonlyArray<{ name: string; errors: readonly EntryStatusError[] }>;
     /** `webgpuTraceReport()`: null while tracing is off. */
     trace?: string | null;
 };
@@ -48,11 +51,17 @@ export function formatRenderReport(input: RenderReportInput): string {
         if (failure.detail) lines.push("  Reported as:", indent(failure.detail));
         if (failure.stack) lines.push("  Stack:", indent(failure.stack));
     }
+    const loadErrors = input.loadErrors ?? [];
+    for (const { name, errors } of loadErrors) {
+        for (const { resource, error } of errors) {
+            lines.push("", `Layer could not load: ${name} (${resource}, ${error.kind})`, indent(error.message));
+        }
+    }
     for (const error of input.canvasErrors) {
         lines.push("", `Rendering error (×${error.count}):`, indent(error.message));
         if (error.stack) lines.push("  Stack:", indent(error.stack));
     }
-    if (input.failures.length === 0 && input.canvasErrors.length === 0)
+    if (input.failures.length === 0 && input.canvasErrors.length === 0 && loadErrors.length === 0)
         lines.push("", "No rendering problems recorded.");
     lines.push(
         "",

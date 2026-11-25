@@ -24,8 +24,15 @@ and authentication — install the `app` extra:
 pip install "mdvtools[app]"
 ```
 
-If you call a full-app feature on a slim install, you'll get a clear message telling you to
-`pip install "mdvtools[app]"` rather than a cryptic import error.
+Genomics helpers (structural-variant VCF import and gene overlap mapping) need the
+`genomics` extra, which depends on `pysam` and is not available on native Windows:
+
+```bash
+pip install "mdvtools[genomics]"
+```
+
+If you call a full-app or genomics feature without its extra, you'll get a clear message telling you which
+extra to install rather than a cryptic import error.
 
 > **Testing a pre-release from TestPyPI:**
 > ```bash

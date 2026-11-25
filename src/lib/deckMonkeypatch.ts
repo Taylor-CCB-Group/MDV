@@ -1,8 +1,10 @@
-import { Deck, type Viewport } from "@deck.gl/core";
-import { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
-import type { EventManager } from "mjolnir.js";
+import { Deck, type Layer, type Viewport } from "@deck.gl/core";
+import { EditableGeoJsonLayer, TranslateMode } from "@deck.gl-community/editable-layers";
+import type { EventManager, MjolnirGestureEvent } from "mjolnir.js";
 import { cpuEditablePicks } from "@/editable-layers/cpuPicks";
+import { FreehandMode, RectangleMode } from "@/editable-layers/selectionModes";
 import { getViewportAtCanvasPoint } from "./deckViewports";
+import { isViewDrag, VIEW_DRAG_PASSED_EVENT } from "./viewGestureGate";
 
 // we aren't really using this as an actual subclass, just declaring things as public so we can access them.
 //! we don't want to keep this around for future maintenance, hopefully deck can be patched so this is less necessary
@@ -51,7 +53,101 @@ function canvasIdOfEvent(deck: MonkeyPatchDeck, event: MjolnirEvent): string | u
  */
 const subscribedManagers = new WeakMap<object, EventManager[]>();
 
+/** Handlers (see `subscribedManagers`) whose current drag the layer leaves to others. */
+const viewDrags = new WeakSet<object>();
+
+type SelectionLayerProps = ConstructorParameters<typeof EditableGeoJsonLayer>[0] & {
+    /**
+     * True when a drag pressed at `point` (canvas pixels, in `viewport`) belongs to another layer,
+     * e.g. a gate label being moved. `layers` are the ones deck draws (charts may hand deck copies).
+     */
+    yieldDrag?: (point: [number, number], viewport: Viewport, layers: readonly Layer[]) => boolean;
+    /** Called for a click on empty space (no data point, gate or label, nor the selection) with a tool that doesn't use clicks. */
+    onEmptyClick?: () => void;
+};
+
 export class MonkeyPatchEditableGeoJsonLayer extends EditableGeoJsonLayer {
+    constructor(props: SelectionLayerProps) {
+        super(props);
+    }
+
+    /** Whether the layer leaves a drag that starts now alone: see `yieldDrag`. */
+    private yieldsDrag(event: MjolnirGestureEvent) {
+        const yieldDrag: unknown = Reflect.get(this.props, "yieldDrag");
+        if (typeof yieldDrag !== "function") return false;
+        // where the button went down: panstart comes once the pointer has moved a little
+        const point: [number, number] = [
+            event.offsetCenter.x - (event.deltaX ?? 0),
+            event.offsetCenter.y - (event.deltaY ?? 0),
+        ];
+        const viewport = this.viewportAt(point) ?? this.context.viewport;
+        const local: [number, number] = [point[0] - (viewport.x ?? 0), point[1] - (viewport.y ?? 0)];
+        const layers: readonly Layer[] = this.patchDeck?.layerManager?.getLayers() ?? [];
+        return Boolean(yieldDrag(local, viewport, layers));
+    }
+
+    /**
+     * A drag that moves the view (`isViewDrag`: ⌘ / Ctrl, or the right or middle button) is left
+     * to the controller whatever the tool, and one another layer claims (`yieldDrag`) to that layer.
+     * A plain one draws, so the chart says how to move the view instead, unless the Pan tool
+     * (plain `TranslateMode`) is the lock that moves it.
+     */
+    _onpanstart(event: MjolnirGestureEvent) {
+        const handler = this.state._editableLayerState.eventHandler;
+        if (isViewDrag(event) || this.yieldsDrag(event)) {
+            viewDrags.add(handler);
+            return;
+        }
+        viewDrags.delete(handler);
+        super._onpanstart(event);
+        if (!(this.props.mode instanceof TranslateMode)) {
+            event.srcEvent.target?.dispatchEvent(new CustomEvent(VIEW_DRAG_PASSED_EVENT, { bubbles: true }));
+        }
+    }
+
+    /**
+     * A click on empty space clears the selection, with the tools that don't use clicks themselves
+     * (not Polygon, which adds a vertex, nor Modify). What is under the click is picked
+     * asynchronously, which works on WebGPU too: anything picked with an index (a point, a gate,
+     * a label) keeps the selection, while an image or nothing doesn't.
+     */
+    _onclick(event: MjolnirGestureEvent) {
+        super._onclick(event);
+        const onEmptyClick: unknown = Reflect.get(this.props, "onEmptyClick");
+        const { mode, data } = this.props;
+        const clearable =
+            mode instanceof TranslateMode || mode instanceof RectangleMode || mode instanceof FreehandMode;
+        if (typeof onEmptyClick !== "function" || !clearable || data.features.length === 0) return;
+        const point: [number, number] = [event.offsetCenter.x, event.offsetCenter.y];
+        // on the selection's own outline or fill
+        if (this.getPicks(point).some((pick) => pick.index >= 0 && !Reflect.get(pick, "isGuide"))) return;
+        const deck = this.patchDeck;
+        if (!deck?.layerManager) return;
+        const layerIds = deck.layerManager
+            .getLayers()
+            .filter((layer: { parent: unknown; id: string }) => !layer.parent && layer.id !== this.props.id)
+            .map((layer: { id: string }) => layer.id);
+        deck.pickObjectAsync({ x: point[0], y: point[1], radius: 2, layerIds, canvasId: this.eventCanvasId })
+            .then((info) => {
+                if (!info || info.index < 0) onEmptyClick();
+            })
+            .catch((error) => console.warn("Could not pick under a click", error));
+    }
+
+    _onpanmove(event: MjolnirGestureEvent) {
+        if (viewDrags.has(this.state._editableLayerState.eventHandler)) return;
+        super._onpanmove(event);
+    }
+
+    _onpanend(event: MjolnirGestureEvent) {
+        const handler = this.state._editableLayerState.eventHandler;
+        if (viewDrags.has(handler)) {
+            viewDrags.delete(handler);
+            return;
+        }
+        super._onpanend(event);
+    }
+
     /** The canvas the event being handled came from, in a multi-canvas deck. */
     private eventCanvasId: string | undefined;
 

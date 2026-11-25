@@ -3,18 +3,25 @@ import type { Device } from "@luma.gl/core";
 import { applyWebGPUPickingFix, applyWebGPUPresentationAlphaFix } from "@spatialdata/layers";
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { syncEditableLayerEvents } from "@/lib/deckMonkeypatch";
-import { GatedOrthographicController } from "@/lib/wheelZoomGate";
+import { GatedOrthographicController } from "@/lib/viewGestureGate";
 import type { DeckDevice } from "@/react/spatialdata/deck_backend";
+import { registerSpatialPerfDeck } from "@/react/spatialdata/perf";
 import type { UseChartArrayGridResult } from "../hooks/useChartArrayGrid";
+import type { ViewControllerOptions } from "../hooks/useGateLayers";
 import { type TooltipContent, useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import ChartArrayLayout from "./ChartArrayLayout";
 import { CrosshairLines } from "./CrosshairArea";
 import { shouldDrawInDensityGridCell } from "./densityGridUtils";
 import { hideCrosshair, placeCrosshair } from "./pointerCrosshair";
-import WheelZoomHint from "./WheelZoomHint";
+import ViewGestureHint from "./ViewGestureHint";
 
-export type DeckCellLabel = { text: string; color: readonly number[] };
+export type DeckCellLabel = {
+    text: string;
+    color: readonly number[];
+    /** Shown over the cell, with an optional action: why it has nothing to draw, say. */
+    notice?: { text: string; action?: { label: string; onClick: () => void } };
+};
 
 type ExportCell = { element: HTMLElement; canvas: HTMLCanvasElement | undefined } & DeckCellLabel;
 
@@ -62,10 +69,13 @@ export type DeckCellGridProps = {
     deviceProps?: Record<string, unknown>;
     onDeviceInitialized: (device: Device) => void;
     onError: (error: Error, layer?: Layer | null) => void;
-    /** Shared by every cell. */
+    /** Every cell's, unless it has its own in `viewStates`. */
     viewState: OrthographicViewState;
-    onViewStateChange: (next: OrthographicViewState) => void;
-    dragPan: boolean;
+    /** Cells with a view of their own, by view id: panning or zooming one moves only it. */
+    viewStates?: Readonly<Record<string, OrthographicViewState>>;
+    /** A pan or zoom, in the cell with this view id. */
+    onViewStateChange: (next: OrthographicViewState, viewId: string) => void;
+    controllerOptions: ViewControllerOptions;
     /** The tooltip for a pick; `deck` is there to pick again (for overlapping layers). */
     getTooltipContent: (info: PickingInfo, deck: Deck<OrthographicView[]> | null) => TooltipContent | undefined;
     /** A hover, with the canvas it was made in (`info.x` / `info.y` are relative to it). */
@@ -112,7 +122,8 @@ function CellCanvas({
  * Small multiples from one deck. Every cell has its own canvas, so the browser lays them out and
  * scrolls them; one deck, on one device, draws into the canvases of the cells in view (deck's
  * experimental multi-canvas mode, `_canvases`), with a view per canvas under one shared view
- * state, so panning or zooming any cell moves them all.
+ * state, so panning or zooming any cell moves them all, unless the cells have view states of their
+ * own (`viewStates`).
  */
 export default function DeckCellGrid({
     grid,
@@ -124,8 +135,9 @@ export default function DeckCellGrid({
     onDeviceInitialized,
     onError,
     viewState,
+    viewStates: ownViewStates,
     onViewStateChange,
-    dragPan,
+    controllerOptions,
     getTooltipContent,
     onHover,
     setKeyboardActive,
@@ -145,13 +157,18 @@ export default function DeckCellGrid({
                         id,
                         canvasId: id,
                         flipY: false,
-                        controller: { type: GatedOrthographicController, doubleClickZoom: false, dragPan },
+                        controller: { type: GatedOrthographicController, doubleClickZoom: false, ...controllerOptions },
                     }),
                 ];
             }),
-        [visibleCells, grid.viewIds, dragPan],
+        [visibleCells, grid.viewIds, controllerOptions],
     );
-    const viewStates = useMemo(() => Object.fromEntries(views.map((view) => [view.id, viewState])), [views, viewState]);
+    const viewStates = useMemo(
+        () => Object.fromEntries(views.map((view) => [view.id, ownViewStates?.[view.id] ?? viewState])),
+        [views, viewState, ownViewStates],
+    );
+    const latestViewStates = useRef(viewStates);
+    latestViewStates.current = viewStates;
 
     /** Each cell's canvas, by view id. */
     const canvases = useRef(new Map<string, HTMLCanvasElement>());
@@ -191,7 +208,21 @@ export default function DeckCellGrid({
             onLoad: () => syncEditableLayerEvents(deck),
         });
         deckHolder.current.deck = deck;
+        // for timing frames (see `perf.ts`): moves every cell's view `step` device pixels
+        const unregisterPerf = registerSpatialPerfDeck("densityGrid", deck, (step) => {
+            const scale = globalThis.devicePixelRatio || 1;
+            deck.setProps({
+                viewState: Object.fromEntries(
+                    Object.entries(latestViewStates.current).map(([id, state]) => {
+                        const zoom = typeof state.zoom === "number" ? state.zoom : 0;
+                        const [x = 0, y = 0, z = 0] = state.target ?? [];
+                        return [id, { ...state, target: [x + step / scale / 2 ** zoom, y, z] }];
+                    }),
+                ),
+            });
+        });
         return () => {
+            unregisterPerf();
             deckHolder.current.deck = null;
             deck.finalize();
         };
@@ -221,8 +252,8 @@ export default function DeckCellGrid({
             viewState: viewStates,
             layers,
             layerFilter: ({ layer, viewport }) => shouldDrawInDensityGridCell(layer.id, viewport.id),
-            onViewStateChange: ({ viewState: next }: { viewState: OrthographicViewState }) =>
-                callbacks.current.onViewStateChange(next),
+            onViewStateChange: ({ viewState: next, viewId }: { viewState: OrthographicViewState; viewId: string }) =>
+                callbacks.current.onViewStateChange(next, viewId),
             onHover: (info) => callbacks.current.onHover?.(info, canvases.current.get(info.viewport?.id ?? "")),
             getTooltip: getPortalTooltip,
             getCursor: ({ isDragging }) => (isDragging ? "grabbing" : "crosshair"),
@@ -277,6 +308,20 @@ export default function DeckCellGrid({
                     >
                         {label.text}
                     </div>
+                    {label.notice && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 p-4 text-center text-xs">
+                            <span>{label.notice.text}</span>
+                            {label.notice.action && (
+                                <button
+                                    type="button"
+                                    className="rounded-sm border px-2 py-1"
+                                    onClick={label.notice.action.onClick}
+                                >
+                                    {label.notice.action.label}
+                                </button>
+                            )}
+                        </div>
+                    )}
                     {crosshair && <CrosshairLines />}
                 </>
             );
@@ -322,7 +367,7 @@ export default function DeckCellGrid({
                     renderCell={renderCell}
                 />
             </div>
-            <WheelZoomHint />
+            <ViewGestureHint />
             {tooltipPortal}
         </>
     );

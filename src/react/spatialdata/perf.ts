@@ -141,3 +141,88 @@ export function onSpatialProfilerRender(id: string, _phase: unknown, actualDurat
     if (!ENABLED) return;
     bump(`render:${id}`, actualDuration);
 }
+
+/**
+ * A deck to time whole frames of, as `__benchSpatialDeck(label)`. Also records each frame's
+ * CPU time under `<label>.draw`. `pan(step)` moves the view `step` device pixels from where
+ * it is (0 puts it back), so a frame can be forced to draw from scratch. No-op when disabled.
+ *
+ * ## Frame benchmarks
+ *
+ * `await __benchSpatialDeck("densityGrid", { frames: 60, pan: true })` draws `frames` frames
+ * synchronously, each waiting for the GPU before the next, and returns ms per frame. With
+ * `pan`, every frame moves the view a pixel, so cached drawing (an isolated group's target)
+ * is redrawn once per frame; without, nothing changed, so only what cannot be cached draws.
+ * Labels recorded meanwhile, such as `densityGrid.targetRender` (one per isolated-group
+ * target drawn), say how much was drawn.
+ */
+type PerfDeck = {
+    redraw: (reason?: string) => void;
+    setProps: (props: { onBeforeRender?: () => void; onAfterRender?: () => void }) => void;
+    getCanvasContext: () => { device: { handle: unknown; submit: () => void } } | null;
+};
+
+type PerfDeckEntry = { deck: PerfDeck; pan: (step: number) => void };
+const perfDecks = new Map<string, PerfDeckEntry>();
+
+function hasGPUQueue(handle: unknown): handle is { queue: { onSubmittedWorkDone: () => Promise<void> } } {
+    return (
+        typeof handle === "object" &&
+        handle !== null &&
+        "queue" in handle &&
+        typeof handle.queue === "object" &&
+        handle.queue !== null &&
+        "onSubmittedWorkDone" in handle.queue
+    );
+}
+
+/** Waits for the GPU to finish the work submitted so far; says how, as a check on the timings. */
+async function waitForGPU(deck: PerfDeck) {
+    const device = deck.getCanvasContext()?.device;
+    if (!device) return "no device";
+    device.submit();
+    const { handle } = device;
+    if (hasGPUQueue(handle)) {
+        await handle.queue.onSubmittedWorkDone();
+        return "webgpu";
+    }
+    if (typeof WebGL2RenderingContext !== "undefined" && handle instanceof WebGL2RenderingContext) {
+        // finish() returns early in some browsers; reading a pixel cannot
+        handle.readPixels(0, 0, 1, 1, handle.RGBA, handle.UNSIGNED_BYTE, new Uint8Array(4));
+        return "webgl";
+    }
+    return "none";
+}
+
+async function benchSpatialDeck(label: string, { frames = 60, pan = true } = {}) {
+    const entry = perfDecks.get(label);
+    if (!entry) throw new Error(`no deck registered as "${label}"; have ${[...perfDecks.keys()].join(", ")}`);
+    const { deck } = entry;
+    const sync = await waitForGPU(deck);
+    const t0 = performance.now();
+    for (let i = 0; i < frames; i++) {
+        if (pan) entry.pan(i % 2 === 0 ? 1 : 0);
+        deck.redraw("perf bench");
+        await waitForGPU(deck);
+    }
+    const msPerFrame = (performance.now() - t0) / frames;
+    entry.pan(0);
+    deck.redraw("perf bench");
+    return { msPerFrame: +msPerFrame.toFixed(2), sync };
+}
+
+export function registerSpatialPerfDeck(label: string, deck: PerfDeck, pan: (step: number) => void) {
+    if (!ENABLED) return () => {};
+    let frameStart = 0;
+    deck.setProps({
+        onBeforeRender: () => {
+            frameStart = performance.now();
+        },
+        onAfterRender: () => bump(`${label}.draw`, performance.now() - frameStart),
+    });
+    perfDecks.set(label, { deck, pan });
+    (window as unknown as { __benchSpatialDeck?: typeof benchSpatialDeck }).__benchSpatialDeck = benchSpatialDeck;
+    return () => {
+        if (perfDecks.get(label)?.deck === deck) perfDecks.delete(label);
+    };
+}

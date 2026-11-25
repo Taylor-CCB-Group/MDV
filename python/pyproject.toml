@@ -1,12 +1,12 @@
 [project]
 name = "mdvtools"
-version = "1.3.0"
+version = "1.4.0"
 description = "Multi Dimensional Viewer (MDV) is web based application for analyzing data"
 authors = [
     { name = "Martin Sergeant", email = "m.j.sergeant1@googlemail.com" },
     { name = "PeterTodd", email = "peter.todd@well.ox.ac.uk" },
 ]
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12,<3.14"
 # Standalone PyPI long description (rendered on the package page, no repo context).
 # Dev-facing setup lives in README.md; release process in ../docs/RELEASING.md.
 readme = "PYPI_README.md"
@@ -15,6 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 # Slim core: project manipulation, viewing, MDVProject.serve(), and spatial.
 # This is what a bare `pip install mdvtools` gets. The heavy server/chat/auth
@@ -43,9 +44,6 @@ dependencies = [
     "spatialdata-io>=0.7.1,<0.8",
     "generate-tiff-offsets>=0.1.7,<0.2",
     "spatialdata-js-util[write]>=0.4.0,<0.5",
-    # genomic operations
-    "pysam==0.24.0",
-    "pyranges>=0.1.4,<0.2",
 ]
 
 [project.optional-dependencies]
@@ -91,11 +89,22 @@ app = [
     "opentelemetry-instrumentation-sqlalchemy>=0.66b2,<1",
     "opentelemetry-instrumentation-system-metrics>=0.66b2,<1",
 ]
-all = ["mdvtools[app]"]
+# Genomics: SV VCF import (conversions.add_svvcf_to_mdv) and gene overlap
+# mapping (feature_mapper). Kept out of core because pysam, and pyranges' ncls /
+# sorted-nearest, ship no Windows wheels, so they would block a native Windows
+# install (#656).
+#   pip install "mdvtools[genomics]"
+genomics = [
+    "pysam==0.24.0",
+    "pyranges>=0.1.4,<0.2",
+]
+# Everything, including genomics: not installable on native Windows.
+all = ["mdvtools[app,genomics]"]
 
 [project.urls]
 Homepage = "https://github.com/Taylor-CCB-Group/MDV"
 "Bug Tracker" = "https://github.com/Taylor-CCB-Group/MDV/issues"
+Changelog = "https://github.com/Taylor-CCB-Group/MDV/blob/main/CHANGELOG.md"
 
 [project.scripts]
 mdvtools = "mdvtools.cli:cli"

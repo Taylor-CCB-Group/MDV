@@ -130,6 +130,10 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
             if (link.set_param) {
                 runInAction(() => {
                     if (link.param_index === undefined) return;
+                    if (target.setParamAt) {
+                        target.setParamAt(link.param_index, newValue);
+                        return;
+                    }
                     target.config.param[link.param_index] = newValue;
                     //not sure what the most appropriate way to update non-react charts is... needs some work
                     if (target.config.type === "table_chart") {
