@@ -799,6 +799,37 @@ export function useScatterplotLayer(
         ],
     );
 
+    /**
+     * A copy of a grey points layer (the one above, or a copy of it) under another id, leaving
+     * out the points with no value in another column: a colour grid cell's, when each cell hides
+     * missing values of its own column. Null while the grey points are not shown or missing
+     * values not hidden, when one grey layer serves every cell.
+     */
+    const regreyPoints = useMemo(() => {
+        if (!greyOnFilter || !hideMissing) return null;
+        return (grey: Layer, id: string, column: DataColumn<DataType>) => {
+            const filterMissing = shouldFilterMissingColor(column, hideMissing);
+            const props = {
+                id,
+                getFilterValue: (_: unknown, { index }: { index: number }) => {
+                    if (!isExternallyFiltered(index)) return 0;
+                    return getMissingColorFilterValue(index, column, filterMissing, fallbackOnZero);
+                },
+                updateTriggers: {
+                    ...grey.props.updateTriggers,
+                    getFilterValue: [
+                        aggregateFilteredRows,
+                        isExternallyFiltered,
+                        column,
+                        filterMissing,
+                        fallbackOnZero,
+                    ],
+                },
+            };
+            return grey.clone(props);
+        };
+    }, [greyOnFilter, hideMissing, isExternallyFiltered, aggregateFilteredRows, fallbackOnZero]);
+
     // the rows a 3D selection left out, faint grey; drawn first, and leaving no depth behind, so the
     // points the selection caught show through them
     const unselectedScatterplotLayer = useMemo(
@@ -950,9 +981,11 @@ export function useScatterplotLayer(
             unproject,
             setScatterKeyboardActive,
             recolorPoints,
+            regreyPoints,
         }),
         [
             recolorPoints,
+            regreyPoints,
             scatterplotLayer,
             greyScatterplotLayer,
             unselectedScatterplotLayer,

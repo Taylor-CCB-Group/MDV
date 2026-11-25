@@ -16,11 +16,19 @@ const NO_VALUES: readonly string[] = [];
 export type RecolorPoints = (points: Layer, id: string, color: RowColor, column: DataColumn<DataType>) => Layer;
 
 /**
+ * A copy of a grey (filtered-out) points layer under another id, leaving out those with no value
+ * in another column; null when one grey layer serves every cell (see `useScatterplotLayer`).
+ */
+export type RegreyPoints = ((grey: Layer, id: string, column: DataColumn<DataType>) => Layer) | null;
+
+/**
  * For a colour grid: the cells in view, each one's points (a copy of `points` with its id prefixed
  * with the cell's view id, so it draws only there) and a label per cell.
  *
  * - Split by columns, a cell's copy draws every point, coloured by its column (`recolorPoints`).
- *   Each copy builds every attribute, so the cost grows with the cells in view.
+ *   Each copy builds every attribute, so the cost grows with the cells in view. When missing
+ *   values are hidden, which differ by column, each cell also draws its own grey points
+ *   (`regreyPoints`, under its points), and `ownGrey` says the shared grey layer is to be left out.
  * - Split by categories, a cell's copy draws only its category's rows, and its label says how
  *   many. The rows are split once, by the column's codes, so each copy builds its attributes from
  *   its own rows only.
@@ -31,7 +39,11 @@ export function useColorGridCellLayers(
     /** The points layer over all the rows the chart draws; absent while hidden. */
     points: Layer | null | undefined,
     recolorPoints: RecolorPoints,
+    /** The grey (filtered-out) points layer, and how to copy it for a cell. */
+    grey?: { layer: Layer | null | undefined; regreyPoints: RegreyPoints },
 ) {
+    const greyLayer = grey?.regreyPoints ? grey.layer : undefined;
+    const regreyPoints = greyLayer ? grey?.regreyPoints : undefined;
     const { cells } = colorCells;
     const visibleCells = useMemo(
         () => grid.visibleCellIndices.filter((index) => cells[index] && grid.viewIds[index]),
@@ -64,13 +76,28 @@ export function useColorGridCellLayers(
             if (colorCells.split === "columns") {
                 const column = colorCells.columns[index];
                 const color = colorCells.colorFunctions[index];
-                return column && color ? [recolorPoints(points, id, color, column)] : [];
+                if (!column || !color) return [];
+                const recolored = recolorPoints(points, id, color, column);
+                if (!greyLayer || !regreyPoints) return [recolored];
+                return [regreyPoints(greyLayer, `${viewId}-${greyLayer.id}`, column), recolored];
             }
             const rows = rowsByCategory?.get(cell.key) ?? NO_ROWS;
             const cellHighlighted = Array.from(highlightedByCategory?.get(cell.key)?.rows ?? []);
             return [subsetPointsLayer(points, rows, cellHighlighted, id)];
         });
-    }, [points, visibleCells, cells, grid.viewIds, colorCells, recolorPoints, rowsByCategory, highlightedByCategory]);
+    }, [
+        points,
+        visibleCells,
+        cells,
+        grid.viewIds,
+        colorCells,
+        recolorPoints,
+        greyLayer,
+        regreyPoints,
+        rowsByCategory,
+        highlightedByCategory,
+    ]);
+    const ownGrey = colorCells.split === "columns" && !!greyLayer;
 
     const labels: DeckCellLabel[] = useMemo(
         () =>
@@ -81,5 +108,5 @@ export function useColorGridCellLayers(
             }),
         [cells, rowsByCategory],
     );
-    return { visibleCells, pointLayers, labels };
+    return { visibleCells, pointLayers, labels, ownGrey };
 }

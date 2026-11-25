@@ -12,6 +12,13 @@ describe("migrateColorBy", () => {
         expect(migrateColorBy({ color_by: { column: { field: "cluster" } } }).color_fields).toEqual(["cluster"]);
     });
 
+    test("an active link in color_by stays a link, as saved or live", () => {
+        const saved = { type: "RowsAsColsQuery", linkedDsName: "genes", subgroupName: "scores", maxItems: 10 };
+        expect(migrateColorBy({ color_by: saved }).color_fields).toEqual([saved]);
+        const live = { fields: ["CD3E"], columns: [] };
+        expect(migrateColorBy({ color_by: live }).color_fields).toEqual([live]);
+    });
+
     test("no colour, no columns; color_fields already set wins", () => {
         expect(migrateColorBy({}).color_fields).toEqual([]);
         const config = migrateColorBy({ color_by: "old", color_fields: ["a", "b"] });

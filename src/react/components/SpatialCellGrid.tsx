@@ -52,6 +52,8 @@ export type SpatialCellGridSpec =
           cells: ColorGridCells;
           /** The render stack's points layer, as the adapter resolves it; absent while hidden. */
           pointsLayer: Layer | undefined;
+          /** The stack's grey (filtered-out) points, which cells copy when missing values are hidden. */
+          greyLayer: Layer | undefined;
       }
     | {
           by: "layer_fill";
@@ -62,6 +64,9 @@ export type SpatialCellGridSpec =
 
 /** The render stack entry of MDV's data points. */
 const POINTS_ENTRY_ID = deckHostLayerId("scatter");
+const GREY_POINTS_ENTRY_ID = deckHostLayerId("grey_scatter");
+const OWN_POINTS: readonly string[] = [POINTS_ENTRY_ID];
+const OWN_POINTS_AND_GREY: readonly string[] = [POINTS_ENTRY_ID, GREY_POINTS_ENTRY_ID];
 
 /**
  * The view token the image layers carry. It names no cell, as they draw in all of them; with no
@@ -188,7 +193,15 @@ type SpatialCellGridProps = {
 /** The SpatialData chart as a grid of cells, of whichever kind `spec` asks for. */
 export default function SpatialCellGrid({ spec, ...props }: SpatialCellGridProps & { spec: SpatialCellGridSpec }) {
     if (spec.by === "color_fields") {
-        return <SpatialColorGrid host={spec.host} colorCells={spec.cells} pointsLayer={spec.pointsLayer} {...props} />;
+        return (
+            <SpatialColorGrid
+                host={spec.host}
+                colorCells={spec.cells}
+                pointsLayer={spec.pointsLayer}
+                greyLayer={spec.greyLayer}
+                {...props}
+            />
+        );
     }
     if (spec.by === "layer_fill") {
         return <SpatialLayerFillGrid host={spec.host} layerCells={spec.cells} {...props} />;
@@ -264,12 +277,24 @@ const SpatialColorGrid = observer(function SpatialColorGrid({
     host,
     colorCells,
     pointsLayer,
+    greyLayer,
     ...props
-}: SpatialCellGridProps & { host: SpatialGridHost; colorCells: ColorGridCells; pointsLayer: Layer | undefined }) {
+}: SpatialCellGridProps & {
+    host: SpatialGridHost;
+    colorCells: ColorGridCells;
+    pointsLayer: Layer | undefined;
+    greyLayer: Layer | undefined;
+}) {
     const chartId = useChartID();
-    const { recolorPoints } = useSpatialLayers().scatterProps;
+    const { recolorPoints, regreyPoints } = useSpatialLayers().scatterProps;
     const grid = useChartArrayGrid({ chartId, cells: colorCells.cells, getViewId: getCellViewId });
-    const { visibleCells, pointLayers, labels } = useColorGridCellLayers(grid, colorCells, pointsLayer, recolorPoints);
+    const { visibleCells, pointLayers, labels, ownGrey } = useColorGridCellLayers(
+        grid,
+        colorCells,
+        pointsLayer,
+        recolorPoints,
+        { layer: greyLayer, regreyPoints },
+    );
     return (
         <StackCellGrid
             host={host}
@@ -277,7 +302,7 @@ const SpatialColorGrid = observer(function SpatialColorGrid({
             labels={labels}
             visibleCells={visibleCells}
             cellLayers={pointLayers}
-            ownPointsEntryId={POINTS_ENTRY_ID}
+            ownEntryIds={ownGrey ? OWN_POINTS_AND_GREY : OWN_POINTS}
             {...props}
         />
     );
@@ -294,7 +319,7 @@ const StackCellGrid = observer(function StackCellGrid({
     labels,
     visibleCells,
     cellLayers: ownCellLayers,
-    ownPointsEntryId,
+    ownEntryIds,
     cellEntry,
     renderer,
     renderStack,
@@ -308,8 +333,8 @@ const StackCellGrid = observer(function StackCellGrid({
     visibleCells: readonly number[];
     /** The cells' own layers, each id prefixed with its cell's view id. */
     cellLayers: readonly Layer[];
-    /** The stack entry the cells draw their own copies of, left out of what every cell draws. */
-    ownPointsEntryId?: string;
+    /** The stack entries the cells draw their own copies of, left out of what every cell draws. */
+    ownEntryIds?: readonly string[];
     /**
      * A stack entry the renderer draws a copy of per cell (each id under its cell's view id), in
      * its place in the stack: the stack is drawn once below the copies and once above them.
@@ -324,10 +349,8 @@ const StackCellGrid = observer(function StackCellGrid({
     );
     const stackDeckLayers = useMemo(
         () =>
-            ownPointsEntryId
-                ? renderer.deckLayers.filter((layer) => layer.id !== ownPointsEntryId)
-                : renderer.deckLayers,
-        [renderer.deckLayers, ownPointsEntryId],
+            ownEntryIds ? renderer.deckLayers.filter((layer) => !ownEntryIds.includes(layer.id)) : renderer.deckLayers,
+        [renderer.deckLayers, ownEntryIds],
     );
     const { below, copies, above, overlays } = useMemo(() => {
         if (!cellEntry) {

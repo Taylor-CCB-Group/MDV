@@ -50,7 +50,7 @@ export const DeckDensityGridComponent = observer(function DeckDensityGridCompone
 /**
  * The deck scatter plot with a cell per colour column, or per category of the first (see
  * `DeckCellGrid`). Each cell draws its own points; gates, selection and filtered-out (grey) points
- * are drawn in every cell.
+ * are drawn in every cell, unless the cells draw their own grey points too (`ownGrey`).
  */
 export const DeckColorGridComponent = observer(function DeckColorGridComponent({
     colorCells,
@@ -58,13 +58,14 @@ export const DeckColorGridComponent = observer(function DeckColorGridComponent({
     colorCells: ColorGridCells;
 }) {
     const chartId = useChartID();
-    const { scatterplotLayer, recolorPoints } = useSpatialLayers().scatterProps;
+    const { scatterplotLayer, greyScatterplotLayer, recolorPoints, regreyPoints } = useSpatialLayers().scatterProps;
     const grid = useChartArrayGrid({ chartId, cells: colorCells.cells, getViewId: getCellViewId });
-    const { visibleCells, pointLayers, labels } = useColorGridCellLayers(
+    const { visibleCells, pointLayers, labels, ownGrey } = useColorGridCellLayers(
         grid,
         colorCells,
         scatterplotLayer,
         recolorPoints,
+        { layer: greyScatterplotLayer, regreyPoints },
     );
     return (
         <ScatterCellGrid
@@ -73,6 +74,7 @@ export const DeckColorGridComponent = observer(function DeckColorGridComponent({
             visibleCells={visibleCells}
             cellLayers={pointLayers}
             pointsInEveryCell={false}
+            greyInEveryCell={!ownGrey}
         />
     );
 });
@@ -88,6 +90,7 @@ const ScatterCellGrid = observer(function ScatterCellGrid({
     visibleCells,
     cellLayers: ownCellLayers,
     pointsInEveryCell,
+    greyInEveryCell = true,
 }: {
     grid: UseChartArrayGridResult;
     labels: readonly DeckCellLabel[];
@@ -96,6 +99,8 @@ const ScatterCellGrid = observer(function ScatterCellGrid({
     cellLayers: readonly Layer[];
     /** Draw the chart's points in every cell; false when each cell draws its own. */
     pointsInEveryCell: boolean;
+    /** Draw the filtered-out (grey) points in every cell; false when each cell draws its own. */
+    greyInEveryCell?: boolean;
 }) {
     const chart = useChart<DeckScatterConfig, DeckScatterReact>();
     const config = useConfig<DeckScatterConfig>();
@@ -121,7 +126,7 @@ const ScatterCellGrid = observer(function ScatterCellGrid({
     useZoomOnFilter(rows, cellWidth, cellHeight, { refitOnResize: true });
 
     const sharedLayers = withoutNull([
-        greyScatterplotLayer,
+        greyInEveryCell ? greyScatterplotLayer : null,
         pointsInEveryCell ? scatterplotLayer : null,
         gateDisplayLayer,
     ]);

@@ -704,6 +704,7 @@ const SpatialDataViewer = observer(
         const regionGridShown = isRegionGridShown(config);
         // as the adapter resolves the points' entry: its id, inherited opacity, and absent while hidden
         const stackPointsLayer = deckLayers.find((layer) => layer.id === deckHostLayerId("scatter"));
+        const stackGreyLayer = deckLayers.find((layer) => layer.id === deckHostLayerId("grey_scatter"));
         const regionGridLayerInputs = useMemo(
             () => ({ layers: baseLayers, layerOrder: baseLayerOrder }),
             [baseLayers, baseLayerOrder],
@@ -768,10 +769,11 @@ const SpatialDataViewer = observer(
             ],
         );
         const pointsLayer = colorGridShown ? stackPointsLayer : undefined;
+        const greyLayer = colorGridShown ? stackGreyLayer : undefined;
         const cellGrid = useMemo<SpatialCellGridSpec | undefined>(() => {
             if (densityGridShown) return { by: "densityFields", host: gridHost, cells: densityGridCells };
             if (colorGridShown && colorGridCells) {
-                return { by: "color_fields", host: gridHost, cells: colorGridCells, pointsLayer };
+                return { by: "color_fields", host: gridHost, cells: colorGridCells, pointsLayer, greyLayer };
             }
             if (layerFillGridShown && layerFillCells)
                 return { by: "layer_fill", host: gridHost, cells: layerFillCells };
@@ -785,6 +787,7 @@ const SpatialDataViewer = observer(
             colorGridCells,
             layerFillCells,
             pointsLayer,
+            greyLayer,
         ]);
         const densityGrid = cellGrid?.by === "densityFields";
 

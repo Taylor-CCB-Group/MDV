@@ -6,6 +6,7 @@ import type { DataColumn, DataType, FieldName, GridBySpec } from "@/charts/chart
 import { type FieldSpec, type FieldSpecs, flattenFields } from "@/lib/columnTypeHelpers";
 import { isDateColumn } from "@/lib/dateFormat";
 import { g } from "@/lib/utils";
+import type { MultiColumnQuery } from "@/links/link_utils";
 import {
     type ColorGridSplit,
     colorByField,
@@ -37,15 +38,27 @@ export type ColorFieldsConfig = Omit<ColorConfig, "color_by"> & {
 export type RowColor = (row: number) => [r: number, g: number, b: number];
 
 /**
+ * Whether a saved `color_by` is an active link: a live query, or one as saved, which
+ * `initialiseChartConfig` deserialises wherever it is in the config (so it is typed as the query
+ * it becomes, as a saved `color_fields` entry is).
+ */
+function isColorByQuery(colorBy: unknown): colorBy is MultiColumnQuery {
+    if (!colorBy || typeof colorBy !== "object") return false;
+    if ("type" in colorBy && colorBy.type === "RowsAsColsQuery") return true;
+    return "fields" in colorBy && Array.isArray(colorBy.fields);
+}
+
+/**
  * Gives a config saved with `color_by` (any chart saved before `color_fields` existed, or converted
  * from another type) its `color_fields`, and leaves `color_by` out: these charts no longer read or
- * write it. A config with `color_fields` keeps them.
+ * write it. A config with `color_fields` keeps them. An active link in `color_by` stays a link.
  */
 export function migrateColorBy<T extends { color_by?: unknown; color_fields?: FieldSpecs }>(
     config: T,
 ): T & { color_fields: FieldSpecs } {
     const field = colorByField(config.color_by);
-    const color_fields = config.color_fields ?? (field ? [field] : []);
+    const spec: FieldSpec | undefined = field ?? (isColorByQuery(config.color_by) ? config.color_by : undefined);
+    const color_fields = config.color_fields ?? (spec ? [spec] : []);
     delete config.color_by;
     return Object.assign(config, { color_fields });
 }

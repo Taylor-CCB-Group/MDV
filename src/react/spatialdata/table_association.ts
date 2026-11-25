@@ -628,6 +628,11 @@ function categoryVisibleRows(
     return result;
 }
 
+/**
+ * A version that advances when any of the datastores refilters, gains rows, or has data changed
+ * in place: an edited annotation keeps its array's identity, so the visible rows are rebuilt for
+ * it too, and what is cached on them (a category's rows, feature states) with them.
+ */
 function useDataStoreFilterVersion(dataStores: DataStore[]) {
     const [version, setVersion] = useState(0);
     // `DataStore.addListener` is keyed, and a duplicate key silently REPLACES the
@@ -639,7 +644,7 @@ function useDataStoreFilterVersion(dataStores: DataStore[]) {
     useEffect(() => {
         const listenerId = `spatial-table-association-${instanceId}`;
         const listener = (type: string) => {
-            if (type === "filtered" || type === "data_added") {
+            if (type === "filtered" || type === "data_added" || type === "data_changed") {
                 setVersion((current) => current + 1);
             }
         };
