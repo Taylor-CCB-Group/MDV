@@ -79,8 +79,8 @@ const UCSCBrowserComponent = observer(() => {
         if (match) {
             config.location = {
                 chr: match[1],
-                start: parseInt(match[2].replace(/,/g, "")),
-                end: parseInt(match[3].replace(/,/g, "")),
+                start: Number.parseInt(match[2].replace(/,/g, "")),
+                end: Number.parseInt(match[3].replace(/,/g, "")),
             };
             setCoordInput("");
         }

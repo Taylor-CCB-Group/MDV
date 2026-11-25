@@ -1299,7 +1299,7 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
 
         // If present, seed with segment clipped at read end (first segment),
         // else earliest by readStart.
-        let seedIdx = remaining.findIndex((n) => Boolean(n.clipAtReadEnd) && !Boolean(n.clipAtReadStart));
+        let seedIdx = remaining.findIndex((n) => Boolean(n.clipAtReadEnd) && !n.clipAtReadStart);
         if (seedIdx < 0) {
             seedIdx = remaining.findIndex((n) => Boolean(n.clipAtReadEnd));
         }

@@ -20,9 +20,9 @@ const areViewStatesEqual = (viewState: ViewState, otherViewState?: ViewState) =>
     return (
         otherViewState === viewState ||
         (viewState?.zoom === otherViewState?.zoom &&
-            //@ts-ignore CBA to discriminate between Orbit and Ortho viewStates
+            //@ts-expect-error CBA to discriminate between Orbit and Ortho viewStates
             viewState?.rotationX === otherViewState?.rotationX &&
-            //@ts-ignore
+            //@ts-expect-error
             viewState?.rotationOrbit === otherViewState?.rotationOrbit &&
             equal(viewState?.target, otherViewState?.target))
     );

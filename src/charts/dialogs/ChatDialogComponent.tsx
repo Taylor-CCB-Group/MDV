@@ -426,7 +426,7 @@ const MessageMarkdown = ({ text }: { text: string }) => {
                                 // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-syntax-highlighter, not our code
                                 children={String(children).replace(/\n$/, "")}
                                 // TODO: follow-up: tree-shake syntax-highlighter languages to keep this chunk minimal.
-                                //@ts-ignore - not sure what's wrong here - maybe @types/react-syntax-highlighter needs updating?
+                                //@ts-expect-error - not sure what's wrong here - maybe @types/react-syntax-highlighter needs updating?
                                 style={dracula}
                                 language={match[1]}
                                 PreTag="div"

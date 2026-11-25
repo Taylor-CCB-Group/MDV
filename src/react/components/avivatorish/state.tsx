@@ -203,11 +203,10 @@ export function createVivStores() {
             set((state: ChannelsState) => {
                 const entries = getEntries(newProperties);
                 const newState: Partial<ChannelsState> = {};
-                //@ts-ignore there is a strong case for changing the structure of the state...
                 entries.forEach(([property, value]) => {
-                    //@ts-ignore there is a strong case for changing the structure of the state...
+                    //@ts-expect-error there is a strong case for changing the structure of the state...
                     newState[property] = [...state[property]];
-                    //@ts-ignore there is a strong case for changing the structure of the state...
+                    //@ts-expect-error there is a strong case for changing the structure of the state...
                     newState[property][channel] = value;
                 });
                 return { ...state, ...newState };
@@ -218,9 +217,9 @@ export function createVivStores() {
                 const channelKeys = Object.keys(DEFAUlT_CHANNEL_VALUES);
                 Object.keys(state).forEach((key) => {
                     if (channelKeys.includes(key)) {
-                        //@ts-ignore
+                        //@ts-expect-error
                         newState[key] = state[key].filter(
-                            //@ts-ignore
+                            //@ts-expect-error
                             (_, j) => j !== channel,
                         );
                     }
@@ -232,13 +231,13 @@ export function createVivStores() {
                 const entries = getEntries(newProperties);
                 const newState = { ...state };
                 entries.forEach(([property, value]) => {
-                    //@ts-ignore there is a strong case for changing the structure of the state...
+                    //@ts-expect-error there is a strong case for changing the structure of the state...
                     newState[property] = [...state[property], value];
                 });
                 Object.entries(DEFAUlT_CHANNEL_VALUES).forEach(([k, v]) => {
-                    //@ts-ignore
+                    //@ts-expect-error
                     if (newState[k].length < newState[entries[0][0]].length) {
-                        //@ts-ignore
+                        //@ts-expect-error
                         newState[k] = [...state[k], v];
                     }
                 });

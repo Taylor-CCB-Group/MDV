@@ -138,7 +138,7 @@ export class ChartManager {
         }
         // manage global singleton
         if (!window.mdv) {
-            // @ts-ignore this is unclean but somewhat ok
+            // @ts-expect-error this is unclean but somewhat ok
             window.mdv = {};
         }
         if (window.mdv.chartManager) {
@@ -435,7 +435,7 @@ export class ChartManager {
                 //would be nice if this could be maybe async / lazy / different ways of composing filters?
 
                 const args = [info[c1], info[c2]];
-                // @ts-ignore should revisit this at some point
+                // @ts-expect-error should revisit this at some point
                 args.operand = "and"; //force multitext to use "and"
 
                 interactionFilter.filter("filterCategories", [icols[2]], args);
@@ -1129,7 +1129,7 @@ export class ChartManager {
             if (ds.contentDiv) {
                 initialCharts[ds.name] = [];
                 const w = this.dsPanes[ds.name].style.width;
-                const re2 = /calc\((.+)\%.+/;
+                const re2 = /calc\((.+)%.+/;
                 this.viewData.dataSources[ds.name].panelWidth = Number.parseFloat(w.match(re2)[1]);
             }
 
@@ -2037,7 +2037,7 @@ export class ChartManager {
             dataSource: ds,
         };
         this._makeChartRD(chart, ds);
-        // @ts-ignore
+        // @ts-expect-error
         chart.popoutIcon = chart.addMenuIcon("fas fa-external-link-alt", "popout", {
             func: () => {
                 this._popOutChart(chart);
@@ -2051,7 +2051,7 @@ export class ChartManager {
             this._callListeners("chart_removed", chart);
         });
 
-        // @ts-ignore
+        // @ts-expect-error
         if (chart.setupLinks) {
             //phasing out
             if (ds.index_link_to) {
@@ -2069,13 +2069,13 @@ export class ChartManager {
         //I think this is obsolete now
         //(the above comment is itself very old)
         const cll = ds.column_link_to;
-        // @ts-ignore
+        // @ts-expect-error
         if (cll && chart.createColumnLinks) {
             const func = (columns, callback) => {
                 //make sure index is loaded before use
                 this._getColumnsThen(cll.dataSource, columns, callback);
             };
-            // @ts-ignore
+            // @ts-expect-error
             chart.createColumnLinks(this.dsIndex[cll.dataSource].dataStore, cll.columns, func);
         }
 

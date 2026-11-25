@@ -3,7 +3,7 @@ import { g } from "../../../lib/utils";
 import { BaseReactChart } from "../../../react/components/BaseReactChart";
 import type { BaseConfig } from "../../BaseChart";
 import BaseChart from "../../BaseChart";
-import { type GenomeLocation, GenomeViewMargins } from "../genomicLocationUtils";
+import type { GenomeLocation, GenomeViewMargins } from "../genomicLocationUtils";
 import UCSCBrowserComponent from "./UCSCBrowserComponent";
 
 //all should be required but have default values
@@ -102,5 +102,5 @@ BaseChart.types["ucsc_browser"] = {
     },
 };
 
-export { UCSCBrowserConfig };
+export type { UCSCBrowserConfig };
 export default UCSCBrowser;

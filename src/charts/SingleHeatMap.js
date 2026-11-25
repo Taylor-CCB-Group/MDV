@@ -119,7 +119,7 @@ class SingleHeatMap extends SVGChart {
         //value
         const vc = ci[p[2]].data;
         const len = this.dataStore.size;
-        const data = new Array();
+        const data = [];
         for (let n = 0; n < y_len; n++) {
             data[n] = new Array(x_len);
         }

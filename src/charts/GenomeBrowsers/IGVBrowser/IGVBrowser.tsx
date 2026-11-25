@@ -129,7 +129,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         const sr = igvContainer.shadowRoot?.adoptedStyleSheets[0];
         let css = "";
         if (sr) {
-            for (let rule of sr.cssRules) {
+            for (const rule of sr.cssRules) {
                 css += rule.cssText + " ";
             }
         }

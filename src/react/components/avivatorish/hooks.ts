@@ -88,9 +88,7 @@ export const useImage = (source?: { description: string; urlOrFile: string }, hi
                     loaderErrorSnackbar: { on: true, message },
                 }),
             );
-            //@ts-ignore flagging so we can get back to this
             let nextMeta: any;
-            //@ts-ignore flagging so we can get back to this
             let nextLoader: any; //PixelSource | PixelSource[] | null = null;
             if (Array.isArray(newLoader)) {
                 if (newLoader.length > 1) {
