@@ -10,7 +10,7 @@ import type {
     FieldName,
     LoadedDataColumn,
 } from "@/charts/charts";
-import type { ChartGridConfig } from "@/charts/schemas/ChartConfigSchema";
+import type { ChartGridConfig, SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
 import { type FieldSpec, type FieldSpecs, isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { g, isArray } from "@/lib/utils";
 import { type DensityGridModeConfig, isDensityGridShown } from "./components/densityGridUtils";
@@ -348,8 +348,11 @@ export type DualContourLegacyConfig = {
     category1?: string | string[];
     category2?: string | string[];
     densityFields?: FieldSpecs; // don't have a way of specifying datatype here
-    /** With `{ by: "densityFields" }`, each density field is drawn in its own cell, over the same points. */
-    grid?: ChartGridConfig | null;
+    /**
+     * With `{ by: "densityFields" }`, each density field is drawn in its own cell, over the same
+     * points. The SpatialData chart can also draw a cell per region (`SpatialDataGridConfig`).
+     */
+    grid?: ChartGridConfig | SpatialDataGridConfig | null;
     field_legend: {
         display: boolean;
         // todo - more legend configuration options

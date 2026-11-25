@@ -194,6 +194,25 @@ export const ChartGridConfigSchema = chartGridConfigSchema(["densityFields"]);
 
 export type ChartGridConfig = z.infer<typeof ChartGridConfigSchema>;
 
+/**
+ * The SpatialData chart's grid: a cell per density field, or a cell per region (each region's
+ * SpatialData drawn with the chart's layers, and its own rows).
+ */
+export const SpatialDataGridConfigSchema = chartGridConfigSchema(["densityFields", "region"]).extend({
+    hide_empty: z
+        .boolean()
+        .optional()
+        .describe('With `by: "region"`: leave out regions with no rows left after filtering'),
+    link_views: z
+        .boolean()
+        .optional()
+        .describe(
+            'With `by: "region"`: panning or zooming one cell moves every cell the same way on screen, each keeping its own framing',
+        ),
+});
+
+export type SpatialDataGridConfig = z.infer<typeof SpatialDataGridConfigSchema>;
+
 const DensityFieldsConfigSchema = z
     .object({
         densityFields: FieldSpecsSchema.optional().describe("Numeric fields rendered as density overlays"),
@@ -289,7 +308,7 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
         .nullable()
         .optional()
         .describe(
-            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a grid (default true)",
+            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a density grid (default true)",
         ),
     point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
     axis_scaling: z

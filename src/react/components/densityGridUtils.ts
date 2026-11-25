@@ -1,5 +1,4 @@
 import type { ChartGridConfig } from "@/charts/schemas/ChartConfigSchema";
-import type { DualContourLegacyConfig } from "../contour_state";
 import { getChartArrayViewId } from "./chartArrayUtils";
 
 /** Chart types that can show their density fields as a grid. */
@@ -9,7 +8,9 @@ export function supportsDensityGridMode(chartType: string | undefined) {
     return typeof chartType === "string" && DENSITY_GRID_CHART_TYPES.has(chartType);
 }
 
-export type DensityGridModeConfig = Pick<DualContourLegacyConfig, "grid"> & {
+export type DensityGridModeConfig = {
+    /** Charts name their own kinds of cell (the SpatialData chart also has `region`). */
+    grid?: { by: string } | null;
     type?: string;
     dimension?: "2d" | "3d";
 };

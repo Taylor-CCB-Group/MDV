@@ -60,7 +60,7 @@ const CELL_OVERLAY_ENTRY_IDS = new Set([deckHostLayerId("selection"), deckHostLa
  * Layers no entry claims go on top. The `CELL_OVERLAY_ENTRY_IDS` overlays are left out, as
  * `overlays`, in the order the renderer gave them.
  */
-function composeStackLayers(
+export function composeStackLayers(
     deckLayers: readonly Layer[],
     images: Map<string, Layer[]>,
     renderStack: RenderStack | undefined,

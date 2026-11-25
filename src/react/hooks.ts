@@ -38,6 +38,7 @@ type ChartScopeCategoryFilter = {
 type ChartScopeConfig = {
     background_filter?: ChartScopeCategoryFilter;
     category_filters?: ChartScopeCategoryFilter[];
+    grid?: { by: string } | null;
 };
 
 let nextFilteredIndicesListenerId = 0;
@@ -50,7 +51,8 @@ function isAllCategoryFilter(category?: string | string[] | null) {
 
 export function getActiveChartScopeFilters(config: ChartScopeConfig) {
     const filters: ChartScopeCategoryFilter[] = [];
-    const backgroundFilter = config.background_filter;
+    // A chart with a cell per region shows every region; each cell narrows to its own rows.
+    const backgroundFilter = config.grid?.by === "region" ? undefined : config.background_filter;
     if (
         backgroundFilter?.column &&
         backgroundFilter.column !== "__none__" &&

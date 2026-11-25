@@ -48,8 +48,10 @@ function isBoundary(ch: string | undefined, chars: RegExp): boolean {
 
 /**
  * The render-stack entry a deck layer id or luma resource label belongs to: an entry id
- * that appears as a whole label prefix. Layer ids are `<entry id>[-<sublayer>…]`, and a
- * member of an isolated group draws as `<group id>/<entry id>…`, so an id just after a
+ * that appears as a whole label part. Layer ids are `<entry id>[-<sublayer>…]`, but an
+ * entry id can also follow a `-`: deck names a tile's sublayer `sub-layer-<tile>-<parent id>…`,
+ * and a region grid puts its cell's view id before each layer's (`<view id>-<entry id>…`).
+ * A member of an isolated group draws as `<group id>/<entry id>…`, so an id just after a
  * `/` names the member and wins over the group before it (the group's own composite has
  * no `/` and stays the group's). Otherwise the longest id wins.
  */
@@ -58,7 +60,7 @@ export function entryForLabel(text: string, entryIds: readonly string[]): string
     for (const id of entryIds) {
         if (!id) continue;
         for (let at = text.indexOf(id); at >= 0; at = text.indexOf(id, at + 1)) {
-            if (!isBoundary(text[at - 1], /["(\s/]/) || !isBoundary(text[at + id.length], /[-"/)\s]/)) continue;
+            if (!isBoundary(text[at - 1], /["(\s/-]/) || !isBoundary(text[at + id.length], /[-"/)\s]/)) continue;
             const member = text[at - 1] === "/";
             const better =
                 !best ||

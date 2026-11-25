@@ -253,6 +253,50 @@ This replaced MDV's own raster-layout check (`raster_health.ts`), which moved in
 `@spatialdata/core` 0.17. It is distinct from `layer_failures.ts`, which turns off layers
 that fail while *drawing*.
 
+## A cell per region
+
+`grid: { by: "region" }` draws a cell per region of the chart's datasource (each region with
+`spatial` metadata), from one deck (`SpatialRegionGrid`, on `DeckCellGrid`). The chart's
+`region` still picks the store its render stack is seeded from and the layer dialog reads.
+
+- **The render stack is a template.** Every cell draws the chart's one stack against its own
+  store: an entry names an element, found by name in each region's store. Similar stores (the
+  same Xenium panel) need no per-region config. A store without an element just lacks the layer.
+- **Each cell is a renderer.** `RegionCellLayers` runs `useSpatialCanvasRendererFromLayerInputs`
+  for its region and hands its layers, ids prefixed with the cell's view id, up to the grid. It
+  is memoised: the grid renders again on every report, and a cell rendered again would report
+  again, in a loop.
+- **Only cells in view load.** A cell scrolled out unmounts its renderer and drops its layers.
+- **Points.** The chart's `background_filter` is ignored in a region grid
+  (`getActiveChartScopeFilters`), so the points layer has every region's rows. The grid takes
+  the points' layer as the adapter resolves it (the entry's id and inherited opacity), splits
+  its rows and highlighted rows by `region_field`, and clones it per cell, mapping picks back to
+  positions in all the rows for the layer's own handlers. Each cell composes its clone with its
+  other layers through the stack, so the data-points group's opacity and blending apply.
+  `hide_empty` leaves out regions with no rows left.
+- **A store that can't be read** shows its error over the cell, with Retry (the reader's
+  `retry`, which starts every failed read again).
+- **Views are per cell**, fitted to each region when it has none. They are kept on the chart
+  (`regionViewStates`), not in the grid, so they survive the grid being turned off and on and
+  a region being filtered out and back, and `getConfig` saves them, without regions the
+  datasource no longer has. `link_views` moves every cell as the one being moved moves on
+  screen (the same change of zoom, the same pan in pixels; `moveRegionViews`), so each keeps
+  its own framing. A link to the same world view would suit stores in one aligned coordinate
+  system; it is not there yet.
+- **No crosshair.** Its lines mark the same offset in every cell, which only means something
+  when the cells share a view (the density grid). Single views have none either.
+- **Image controls.** The layer dialog's histograms come from one cell's images: the chart's own
+  region when its cell is in view, else the first cell in view. That cell publishes the image
+  layer registry, with its `region`, and the panel names it. The channel settings themselves are
+  the stack entry's props, so they apply to every cell. Overlaying the histograms of every
+  region in view would show whether one set of limits suits them all; that is not done yet.
+- **Feature tooltips.** Each cell registers a hover handler with the grid, which sends a pick
+  to the cell it was made in. The cell strips its view id from the picked layer's id, asks its
+  own renderer for the feature, and adds its own region's MDV tooltip items. As in the single
+  view, the top pick wins, so where the MDV points cover a shape the shape has no tooltip.
+- **Not in cells yet:** selection tools, gates, density, grey (filtered-out) points and layer
+  status.
+
 ## The points layer panel
 
 `PointsLayerPanel` is a bridge, not a leaf. The layer dialog is a portal with its own

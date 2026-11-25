@@ -1,12 +1,15 @@
 import { g } from "@/lib/utils";
 
 export type CrosshairConfig = {
-    /** Mark the pointer with a horizontal and a vertical line; absent is on. */
+    /** Mark the pointer with a horizontal and a vertical line in every cell of a density grid; absent is on. */
     crosshair?: boolean | null;
     dimension?: "2d" | "3d";
 };
 
-/** Whether the chart marks the pointer with a crosshair: on unless turned off, and never in 3D. */
+/**
+ * Whether a density grid marks the pointer with a crosshair in every cell: on unless turned off,
+ * and never in 3D. Single views and region grids have none.
+ */
 export function isCrosshairShown(config: CrosshairConfig) {
     return config.dimension !== "3d" && (config.crosshair ?? true);
 }
@@ -15,7 +18,7 @@ export function isCrosshairShown(config: CrosshairConfig) {
 export function getCrosshairSetting(config: CrosshairConfig) {
     return g({
         type: "check",
-        label: "Mark the pointer with a crosshair",
+        label: "Mark the pointer in every cell of a density grid",
         current_value: isCrosshairShown(config),
         func: (x) => {
             config.crosshair = x;
