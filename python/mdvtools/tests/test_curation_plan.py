@@ -13,6 +13,7 @@ from mdvtools.examples.curate_mdv_project import (
     gene_panel,
     opening_names,
     pin_legends,
+    pin_project_legends,
     plan_question_views,
     side_panel,
     split_category_values,
@@ -289,14 +290,34 @@ def test_non_dot_legends_sit_bottom_right():
                 {"type": "heat_map", "size": [600, 400], "color_legend": {"display": True, "pos": [8, 280]}},
                 {"type": "wgl_scatter_plot_dev", "size": [500, 300], "color_legend": {"display": True}},
                 {"type": "compound_dot_plot", "size": [900, 600], "color_legend": {"display": True, "pos": [40, 10]}},
+                {"type": "dot_plot", "size": [425, 442], "color_legend": {"display": True, "pos": [12, 12]}},
             ]
         }
     }
     pin_legends(view)
-    heat, scatter, dot = view["initialCharts"]["cells"]
+    heat, scatter, dot, old_dot = view["initialCharts"]["cells"]
     assert heat["color_legend"]["pos"] == [600 - 180, 400 - 120]
     assert scatter["color_legend"]["pos"] == [500 - 180, 300 - 120]
     assert "pos" not in dot["color_legend"]
+    assert "pos" not in old_dot["color_legend"]
+
+
+def test_saved_views_get_bottom_right_legends():
+    views = {
+        "Cell atlas": {
+            "initialCharts": {
+                "cells": [
+                    {
+                        "type": "wgl_scatter_plot_dev",
+                        "size": [590, 690],
+                        "color_legend": {"display": True, "pos": [5, 5]},
+                    }
+                ]
+            }
+        }
+    }
+    pin_project_legends(views)
+    assert views["Cell atlas"]["initialCharts"]["cells"][0]["color_legend"]["pos"] == [590 - 180, 690 - 120]
 
 
 def test_signature_view_is_not_created(tmp_path):

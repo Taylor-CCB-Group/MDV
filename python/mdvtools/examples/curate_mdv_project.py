@@ -550,7 +550,7 @@ def pin_legends(view: dict[str, Any]) -> dict[str, Any]:
     for charts in view.get("initialCharts", {}).values():
         for chart in charts:
             legend = chart.get("color_legend")
-            if chart.get("type") == "compound_dot_plot":
+            if chart.get("type") in {"dot_plot", "compound_dot_plot"}:
                 if isinstance(legend, dict):
                     legend.pop("pos", None)
                 continue
@@ -559,6 +559,13 @@ def pin_legends(view: dict[str, Any]) -> dict[str, Any]:
                 width, height = size
                 legend["pos"] = [max(8, int(width) - 180), max(8, int(height) - 120)]
     return view
+
+
+def pin_project_legends(views: dict[str, Any]) -> None:
+    """Move legends on every saved view, not only the newly built question views."""
+    for view in views.values():
+        if isinstance(view, dict):
+            pin_legends(view)
 
 
 def question_view(
@@ -1388,6 +1395,7 @@ def curate(
         output_views.pop(name, None)
     for name, view in question_plan["views"].items():
         output_views[name] = view
+    pin_project_legends(output_views)
     atomic_write_json(output / "views.json", output_views)
     state_path = output / "state.json"
     state = json.loads(state_path.read_text(encoding="utf-8"))
