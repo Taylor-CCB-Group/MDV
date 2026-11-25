@@ -41,7 +41,6 @@ const UserProfile: React.FC = () => {
                 ) : (
                     <Avatar
                         sx={{ width: 32, height: 32, color: "inherit" }}
-                        src={user?.avatarUrl}
                         alt={user?.name ?? "Account"}
                     >
                         <Person />
@@ -102,10 +101,9 @@ const UserProfile: React.FC = () => {
                         >
                             <Avatar
                                 sx={{ width: 100, height: 100, color: "inherit" }}
-                                src={user.avatarUrl}
                                 alt={user.name}
                             >
-                                {!user.avatarUrl && <Person sx={{ fontSize: 50 }} />}
+                                <Person sx={{ fontSize: 50 }} />
                             </Avatar>
                             <Box>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>

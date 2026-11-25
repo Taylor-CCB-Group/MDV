@@ -5,7 +5,6 @@ export interface User {
     name: string;
     email: string;
     association: string;
-    avatarUrl: string;
 }
 
 const useUser = () => {
