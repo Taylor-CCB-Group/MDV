@@ -106,6 +106,11 @@ export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
     /** Where the legend was asked to float, until React has drawn it; null in the strip or if placed from the bottom. */
     private position: [number, number] | null = null;
     private userSize: [number, number] | null = null;
+    /**
+     * Whether the legend was just minimised or opened with its own button while it had keyboard
+     * focus; the next time it's drawn that way, focus goes to its new button. Null otherwise.
+     */
+    private focusWhenMinimized: boolean | null = null;
 
     constructor(chart: BaseChart<T>) {
         this.chart = chart;
@@ -137,8 +142,8 @@ export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
     getFloatingPosition(): [number, number] | null {
         if (!this.host || this.placement?.onTop) return null;
         // where the frame is now, once React has drawn it (the frame keeps it inside the chart)
-        const frame = this.host.querySelector(".legend-container");
-        if (frame instanceof HTMLElement) return [frame.offsetLeft, frame.offsetTop];
+        const frame = this.host.querySelector<HTMLElement>(".legend-container");
+        if (frame) return [frame.offsetLeft, frame.offsetTop];
         return this.position;
     }
 
@@ -148,6 +153,9 @@ export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
         component: ComponentType<LegendWrapperComponentProps<TSpec>>,
         interactions: LegendWrapperInteractions = {},
     ): void {
+        const minimized = interactions.minimized === true;
+        const focusToggle = this.focusWhenMinimized === minimized;
+        this.focusWhenMinimized = null;
         this.unmount();
 
         // charts without the method (and test stand-ins) keep legends floating over the plot
@@ -179,13 +187,14 @@ export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
             savedSize: position.size ?? null,
             resizable: interactions.resizable,
             dragHandle: interactions.dragHandle,
-            minimized: interactions.minimized === true,
-            onMinimizedChange: interactions.onMinimizedChange,
+            minimized,
+            onMinimizedChange: this.keepingFocus(interactions.onMinimizedChange),
             onPutOnTop: placement && !inBand ? () => placement.setLayout({ position: "top" }) : undefined,
             onMoved: interactions.onMoved,
             onResized: (size) => {
                 this.userSize = size;
             },
+            focusToggle,
         };
         this.root = createMdvPortal(
             <LegendWrapperView
@@ -197,6 +206,18 @@ export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
             this.chart,
         );
         placement?.onBandChanged();
+    }
+
+    /** Notes whether the legend had keyboard focus when it's minimised or opened, before the chart redraws it. */
+    private keepingFocus(
+        onMinimizedChange: ((minimized: boolean) => void) | undefined,
+    ): ((minimized: boolean) => void) | undefined {
+        if (!onMinimizedChange) return undefined;
+        return (minimized) => {
+            const focused = this.host?.ownerDocument.activeElement;
+            this.focusWhenMinimized = focused && this.host?.contains(focused) ? minimized : null;
+            onMinimizedChange(minimized);
+        };
     }
 
     /**

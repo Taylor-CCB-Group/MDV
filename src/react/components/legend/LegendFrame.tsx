@@ -3,6 +3,7 @@ import {
     createContext,
     type ReactNode,
     type PointerEvent as ReactPointerEvent,
+    type Ref,
     type RefObject,
     useCallback,
     useContext,
@@ -82,6 +83,11 @@ export type LegendFrameProps = {
     /** Called when the user has dragged the legend somewhere new. */
     onMoved?: (position: [number, number]) => void;
     onResized?: (size: [number, number]) => void;
+    /**
+     * Moves keyboard focus to the minimise or + button once drawn, for a legend that was just
+     * minimised or opened with its own button, so focus isn't lost when it's redrawn.
+     */
+    focusToggle?: boolean;
     children: ReactNode;
 };
 
@@ -96,30 +102,46 @@ function clamp(value: number, min: number, max: number) {
 }
 
 /**
- * Follows the pointer after a press on the legend, from the document it's in (charts can be
- * popped out into another window), until it's released.
+ * Follows the pointer that pressed the legend, from the document it's in (charts can be popped
+ * out into another window), until it's released; other pointers are ignored. Returns a function
+ * that stops following it without calling `onEnd`.
  */
 function trackPointer(
     event: ReactPointerEvent<HTMLElement>,
     onMove: (dx: number, dy: number) => void,
     onEnd: () => void,
-) {
+): () => void {
     const doc = event.currentTarget.ownerDocument;
+    const { pointerId } = event;
     const startX = event.clientX;
     const startY = event.clientY;
-    const move = (e: MouseEvent) => {
+    const move = (e: PointerEvent) => {
+        if (e.pointerId !== pointerId) return;
         e.preventDefault();
         onMove(e.clientX - startX, e.clientY - startY);
     };
-    const end = () => {
+    const stop = () => {
         doc.removeEventListener("pointermove", move);
         doc.removeEventListener("pointerup", end);
         doc.removeEventListener("pointercancel", end);
+    };
+    const end = (e: PointerEvent) => {
+        if (e.pointerId !== pointerId) return;
+        stop();
         onEnd();
     };
     doc.addEventListener("pointermove", move);
     doc.addEventListener("pointerup", end);
     doc.addEventListener("pointercancel", end);
+    return stop;
+}
+
+/**
+ * Whether the event target is an element. Not `instanceof Element`: a chart popped out into
+ * another window holds elements from both windows, and each window has its own `Element`.
+ */
+function isElement(target: EventTarget | null): target is Element {
+    return target !== null && "closest" in target;
 }
 
 /** The element's width, followed as it changes; 0 while not `enabled`. */
@@ -210,14 +232,17 @@ export function LegendControlButton({
     label,
     onClick,
     className,
+    ref,
 }: {
     icon: string;
     label: string;
     onClick: () => void;
     className?: string;
+    ref?: Ref<HTMLButtonElement>;
 }) {
     return (
         <button
+            ref={ref}
             type="button"
             className={className ? `legend-control-btn ${className}` : "legend-control-btn"}
             title={label}
@@ -230,7 +255,15 @@ export function LegendControlButton({
 }
 
 /** The minimised legend's title and colours, with a + button that opens the legend again. */
-function LegendSummaryPill({ summary, onOpen }: { summary: LegendSummary; onOpen: () => void }) {
+function LegendSummaryPill({
+    summary,
+    onOpen,
+    openRef,
+}: {
+    summary: LegendSummary;
+    onOpen: () => void;
+    openRef: Ref<HTMLButtonElement>;
+}) {
     return (
         <div className="legend-summary" title={summary.label}>
             <span className="legend-summary-label">{summary.label}</span>
@@ -250,6 +283,7 @@ function LegendSummaryPill({ summary, onOpen }: { summary: LegendSummary; onOpen
                 label={`Show legend: ${summary.label}`}
                 className="legend-summary-open"
                 onClick={onOpen}
+                ref={openRef}
             />
         </div>
     );
@@ -273,9 +307,14 @@ export default function LegendFrame({
     onPutOnTop,
     onMoved,
     onResized,
+    focusToggle = false,
     children,
 }: LegendFrameProps) {
     const ref = useRef<HTMLDivElement>(null);
+    /** The minimise button, or the + while minimised. */
+    const toggleRef = useRef<HTMLButtonElement>(null);
+    /** Stops the drag or resize in progress, if any. */
+    const gesture = useRef<(() => void) | null>(null);
     const minimized = minimizedProp && onMinimizedChange !== undefined;
     const floating = !inBand;
     const canResize = resizable && floating && !minimized;
@@ -285,16 +324,41 @@ export default function LegendFrame({
     const bandWidth = useElementWidth(ref, inBand && !minimized);
     const { style: positionStyle, moveTo, setPosition } = useFloatingPosition(ref, container, start, floating);
 
+    useLayoutEffect(() => {
+        if (focusToggle) toggleRef.current?.focus();
+    }, [focusToggle]);
+
+    // a drag or resize still going when the legend is redrawn is dropped, not reported
+    useEffect(
+        () => () => {
+            gesture.current?.();
+            gesture.current = null;
+        },
+        [],
+    );
+
+    const track = (
+        event: ReactPointerEvent<HTMLDivElement>,
+        onMove: (dx: number, dy: number) => void,
+        onEnd: () => void,
+    ) => {
+        gesture.current?.();
+        gesture.current = trackPointer(event, onMove, () => {
+            gesture.current = null;
+            onEnd();
+        });
+    };
+
     const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
         const el = ref.current;
         const target = event.target;
-        if (!floating || !el || event.button !== 0 || !(target instanceof Element)) return;
+        if (!floating || !el || event.button !== 0 || !isElement(target)) return;
         if (target.closest("button, [data-resize]")) return;
         if (!minimized && dragHandle && !target.closest(dragHandle)) return;
         event.preventDefault();
         const from = { left: el.offsetLeft, top: el.offsetTop };
         let last: Point | null = null;
-        trackPointer(
+        track(
             event,
             (dx, dy) => {
                 last = moveTo(from.left + dx, from.top + dy);
@@ -313,7 +377,7 @@ export default function LegendFrame({
         const from = { left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight };
         let size: [number, number] | null = null;
         let moved: Point | null = null;
-        trackPointer(
+        track(
             event,
             (dx, dy) => {
                 let { left, top, width, height } = from;
@@ -351,19 +415,22 @@ export default function LegendFrame({
                 className={
                     inBand ? "legend-container legend-in-band legend-minimized" : "legend-container legend-minimized"
                 }
-                style={floating ? positionStyle : undefined}
+                style={floating ? { ...positionStyle, touchAction: "none" } : undefined}
                 onPointerDown={floating ? onPointerDown : undefined}
             >
-                <LegendSummaryPill summary={summary} onOpen={() => onMinimizedChange?.(false)} />
+                <LegendSummaryPill summary={summary} onOpen={() => onMinimizedChange?.(false)} openRef={toggleRef} />
             </div>
         );
     }
 
+    // the size the user gave a floating legend is kept for when it floats again, not used in the strip
     const width = floating ? (userSize?.[0] ?? preferred?.width) : undefined;
-    const height = userSize?.[1] ?? preferred?.height;
+    const height = floating ? (userSize?.[1] ?? preferred?.height) : preferred?.height;
     const sizeStyle: CSSProperties = {
         width,
         height: inBand && height !== undefined ? Math.min(height, LEGEND_BAND_MAX_HEIGHT) : height,
+        // dragged from anywhere: touch moves it rather than scrolling the page
+        touchAction: floating && !dragHandle ? "none" : undefined,
     };
 
     return (
@@ -388,6 +455,7 @@ export default function LegendFrame({
                             icon="fas fa-minus"
                             label="Minimise legend"
                             onClick={() => onMinimizedChange(true)}
+                            ref={toggleRef}
                         />
                     ) : null}
                 </div>
@@ -398,6 +466,7 @@ export default function LegendFrame({
                           key={direction}
                           className={`resizer-${direction}`}
                           data-resize={direction}
+                          style={{ touchAction: "none" }}
                           onPointerDown={onResizeStart(direction)}
                       />
                   ))

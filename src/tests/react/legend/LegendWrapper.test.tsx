@@ -98,6 +98,13 @@ function drag(target: Element, dx: number, dy: number) {
     });
 }
 
+/** A pointer event from a given pointer; jsdom's mouse events have no pointerId. */
+function pointer(type: string, pointerId: number, init: MouseEventInit = {}) {
+    const event = new MouseEvent(type, { bubbles: true, button: 0, ...init });
+    Object.defineProperty(event, "pointerId", { value: pointerId });
+    return event;
+}
+
 /** jsdom has no ResizeObserver; this one lets a test say when the chart has resized. */
 class FakeResizeObserver {
     static instances: FakeResizeObserver[] = [];
@@ -280,6 +287,68 @@ describe("LegendWrapper dragging", () => {
         expect([el.style.left, el.style.top]).toEqual(["10px", "10px"]);
     });
 
+    test("follows only the pointer that started the drag", () => {
+        const onMoved = vi.fn();
+        const { el } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 }, true, { onMoved });
+        const handle = el.querySelector(".legend-drag-handle");
+        if (!handle) throw new Error("expected a drag handle");
+
+        act(() => {
+            handle.dispatchEvent(pointer("pointerdown", 1, { clientX: 100, clientY: 100 }));
+            document.dispatchEvent(pointer("pointermove", 2, { clientX: 300, clientY: 300 }));
+            document.dispatchEvent(pointer("pointerup", 2));
+        });
+        expect([el.style.left, el.style.top]).toEqual(["10px", "10px"]);
+        expect(onMoved).not.toHaveBeenCalled();
+
+        act(() => {
+            document.dispatchEvent(pointer("pointermove", 1, { clientX: 150, clientY: 130 }));
+            document.dispatchEvent(pointer("pointerup", 1));
+        });
+        expect([el.style.left, el.style.top]).toEqual(["60px", "40px"]);
+        expect(onMoved).toHaveBeenCalledWith([60, 40]);
+    });
+
+    test("drops a drag still going when the legend is redrawn", async () => {
+        const onMoved = vi.fn();
+        const { el, wrapper } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 }, true, { onMoved });
+        const handle = el.querySelector(".legend-drag-handle");
+        if (!handle) throw new Error("expected a drag handle");
+        act(() => {
+            handle.dispatchEvent(pointer("pointerdown", 1, { clientX: 100, clientY: 100 }));
+            document.dispatchEvent(pointer("pointermove", 1, { clientX: 150, clientY: 130 }));
+        });
+
+        await act(async () => wrapper.unmount());
+        act(() => document.dispatchEvent(pointer("pointerup", 1)));
+
+        expect(onMoved).not.toHaveBeenCalled();
+    });
+
+    test("can be dragged in a chart popped out into another window", () => {
+        const frame = document.createElement("iframe");
+        document.body.append(frame);
+        const popout = frame.contentDocument;
+        if (!popout) throw new Error("expected the other window's document");
+        const { wrapper, contentDiv } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 });
+        popout.body.append(contentDiv);
+        // redrawn there, so it's made of the other window's elements
+        // (at 0, 0: the stand-in offsets above are this window's, so they don't apply to them)
+        act(() => wrapper.render("spec", { left: 0, top: 0 }, FakeLegend, { dragHandle: ".legend-drag-handle" }));
+        const el = wrapper.getWrapperElement()?.querySelector<HTMLElement>(".legend-container");
+        const handle = el?.querySelector(".legend-drag-handle");
+        if (!el || !handle) throw new Error("expected a drag handle");
+        expect(handle instanceof Element).toBe(false);
+
+        act(() => {
+            handle.dispatchEvent(pointer("pointerdown", 1, { clientX: 100, clientY: 100 }));
+            popout.dispatchEvent(pointer("pointermove", 1, { clientX: 150, clientY: 130 }));
+            popout.dispatchEvent(pointer("pointerup", 1));
+        });
+
+        expect([el.style.left, el.style.top]).toEqual(["50px", "30px"]);
+    });
+
     test("keeps a dragged legend inside the chart", () => {
         const { el } = renderLegend({ width: 400, height: 300 }, { left: 10, top: 10 });
         const handle = el.querySelector(".legend-drag-handle");
@@ -324,6 +393,46 @@ describe("LegendWrapper minimised", () => {
     });
 });
 
+describe("LegendWrapper keyboard focus", () => {
+    /** A legend whose minimise and + buttons redraw it, as the charts' do. */
+    function renderRedrawnLegend() {
+        let redraw = (_minimized: boolean) => {};
+        const interactions: LegendWrapperInteractions = {
+            summary: { label: "Cell type" },
+            onMinimizedChange: (minimized) => redraw(minimized),
+        };
+        const { wrapper } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 }, true, interactions);
+        redraw = (minimized) =>
+            wrapper.render("spec", { left: 10, top: 10 }, FakeLegend, { ...interactions, minimized });
+        const find = (selector: string) => wrapper.getWrapperElement()?.querySelector<HTMLButtonElement>(selector);
+        return { wrapper, redraw, find };
+    }
+
+    test("stays on the legend's button as it's minimised and opened from the keyboard", () => {
+        const { find } = renderRedrawnLegend();
+
+        find('[aria-label="Minimise legend"]')?.focus();
+        act(() => find('[aria-label="Minimise legend"]')?.click());
+        expect(document.activeElement).toBe(find(".legend-summary-open"));
+
+        act(() => find(".legend-summary-open")?.click());
+        expect(document.activeElement).toBe(find('[aria-label="Minimise legend"]'));
+    });
+
+    test("is left alone when the legend didn't have it, or is redrawn for another reason", () => {
+        const { find, redraw } = renderRedrawnLegend();
+        const elsewhere = document.createElement("button");
+        document.body.append(elsewhere);
+        elsewhere.focus();
+
+        act(() => find('[aria-label="Minimise legend"]')?.click());
+        expect(document.activeElement).toBe(elsewhere);
+
+        act(() => redraw(false));
+        expect(document.activeElement).toBe(elsewhere);
+    });
+});
+
 describe("LegendWrapper in the strip above the plot", () => {
     test("draws the legend in the strip, sized by the strip, with no floating position", () => {
         const { el, band, wrapper } = renderLegend(
@@ -342,6 +451,20 @@ describe("LegendWrapper in the strip above the plot", () => {
         expect(el.querySelector(".resizer-se")).toBeNull();
         expect(el.querySelector('[aria-label="Put legends above the plot"]')).toBeNull();
         expect(wrapper.getFloatingPosition()).toBeNull();
+    });
+
+    test("uses the legend's own height in the strip, not the size it was resized to while floating", () => {
+        const { el } = renderLegend(
+            { width: 600, height: 600 },
+            { left: 10, top: 10, size: [120, 40] },
+            true,
+            {},
+            {
+                onTop: true,
+            },
+        );
+        // 250 asked for, capped at the strip's 96
+        expect(el.style.height).toBe("96px");
     });
 
     test("offers to put the legends above the plot while floating", () => {

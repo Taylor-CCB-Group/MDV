@@ -157,6 +157,23 @@ describe("FractionLegendController", () => {
         expect(contentDiv.textContent).toContain("% expressing");
     });
 
+    test("keeps the size the user resized it to when it's redrawn", () => {
+        const { controller, contentDiv } = setUp({ display: true });
+        act(() => controller.show(() => SPEC, [0, 0]));
+        const corner = frameIn(contentDiv)?.querySelector(".resizer-se");
+        if (!corner) throw new Error("expected a resize handle");
+        act(() => {
+            corner.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 0, clientY: 0 }));
+            document.dispatchEvent(new MouseEvent("pointermove", { clientX: 140, clientY: 90 }));
+            document.dispatchEvent(new MouseEvent("pointerup"));
+        });
+
+        act(() => controller.show(() => SPEC, [0, 0]));
+
+        const frame = frameIn(contentDiv);
+        expect([frame?.style.width, frame?.style.height]).toEqual(["140px", "90px"]);
+    });
+
     test("moves into the strip above the plot and back with the chart's other legends", () => {
         const { controller, contentDiv, band, setOnTop } = setUp({ display: true, position: [30, 40] });
         act(() => controller.show(() => SPEC, [0, 0]));

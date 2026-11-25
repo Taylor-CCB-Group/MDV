@@ -145,7 +145,8 @@ class BaseChart<T extends BaseConfig> {
     private legendBandItems: HTMLDivElement;
     private legendBandControls: HTMLDivElement;
     private legendBandControlsRoot: Root | null = null;
-    private legendBandObserver: ResizeObserver | null = null;
+    /** Stops following the strip's height, and cancels a resize still waiting for the next frame. */
+    private stopWatchingLegendBand: (() => void) | null = null;
     colorLegendFilterDimension: Dimension | null = null;
     colorLegendFilterDimensionKind: ColorLegendFilter["kind"] | null = null;
     colorLegendFilter: ColorLegendFilter | null = null;
@@ -769,7 +770,7 @@ class BaseChart<T extends BaseConfig> {
         if (typeof win.ResizeObserver === "undefined") return;
         let lastHeight = 0;
         let frame: number | null = null;
-        this.legendBandObserver = new win.ResizeObserver(() => {
+        const observer = new win.ResizeObserver(() => {
             // resizing the chart can change the strip again, so do it after the observer's callback
             if (frame !== null) return;
             frame = win.requestAnimationFrame(() => {
@@ -780,7 +781,12 @@ class BaseChart<T extends BaseConfig> {
                 this.setSize();
             });
         });
-        this.legendBandObserver.observe(this.legendBand);
+        observer.observe(this.legendBand);
+        this.stopWatchingLegendBand = () => {
+            observer.disconnect();
+            if (frame !== null) win.cancelAnimationFrame(frame);
+            frame = null;
+        };
     }
 
     /**
@@ -961,8 +967,8 @@ class BaseChart<T extends BaseConfig> {
         this.colorLegendWrapper.unmount();
         this.legend = undefined;
         destroyColorLegendFilter(this, notify);
-        this.legendBandObserver?.disconnect();
-        this.legendBandObserver = null;
+        this.stopWatchingLegendBand?.();
+        this.stopWatchingLegendBand = null;
         const controlsRoot = this.legendBandControlsRoot;
         this.legendBandControlsRoot = null;
         if (controlsRoot) queueMicrotask(() => controlsRoot.unmount());

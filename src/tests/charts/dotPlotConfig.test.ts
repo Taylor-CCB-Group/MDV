@@ -49,6 +49,17 @@ const base = {
 };
 
 describe("adaptDotPlotConfig", () => {
+    it("docks the legends in the strip above the plot, keeping a layout saved with the view", () => {
+        expect(adaptDotPlotConfig({ ...base, legend_layout: { position: "overlay" } }).legend_layout).toEqual({
+            position: "overlay",
+        });
+        // older views that kept space above the plot have their legends there; those that didn't float
+        expect(adaptDotPlotConfig({ ...base, reserve_legend_space: true }).legend_layout).toEqual({ position: "top" });
+        const floating = adaptDotPlotConfig({ ...base, reserve_legend_space: false });
+        expect(floating.legend_layout).toEqual({ position: "overlay" });
+        expect("reserve_legend_space" in floating).toBe(false);
+    });
+
     it("fills in defaults for a new chart", () => {
         const c = adaptDotPlotConfig(base);
         expect(c.y_axis_order).toBe("data");
@@ -57,8 +68,7 @@ describe("adaptDotPlotConfig", () => {
         expect(c.color_scale).toEqual({ palette: "reds", log: false, mode: "auto" });
         expect(c.color_legend.display).toBe(true);
         expect(c.fraction_legend.display).toBe(true);
-        expect(c.reserve_legend_space).toBe(true);
-        expect(adaptDotPlotConfig({ ...base, reserve_legend_space: false }).reserve_legend_space).toBe(false);
+        expect(c.legend_layout).toEqual({ position: "top" });
         expect(c.axis.x).toEqual({
             size: 60,
             tickfont: 10,

@@ -410,10 +410,6 @@ export const CompoundDotPlotConfigSchema = BaseConfigSchema.extend({
         })
         .optional()
         .describe("Show the fraction legend"),
-    reserve_legend_space: z
-        .boolean()
-        .optional()
-        .describe("Keep space above the plot for the legends; off, the plot fills the height"),
 }).describe("Configuration for React dot plots, optionally split into panels that share one colour and size scale");
 
 // earlier type name of the compound dot plot, still accepted

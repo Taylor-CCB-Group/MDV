@@ -79,7 +79,7 @@ export default function FractionLegend({ spec: savedSpec }: LegendWrapperCompone
     const { inBand } = useLegendFrame();
     // in the strip above the plot the circles sit in a row, in whatever width the strip gives
     const spec: FractionLegendSpec = inBand ? { ...savedSpec, orientation: "horizontal", width: undefined } : savedSpec;
-    const { layout, bodyHeight } = getItemLayout(spec);
+    const { layout, bodyWidth, bodyHeight } = getItemLayout(spec);
     const { width, height } = getFractionLegendSize(spec);
     useLegendPreferredSize({ width: inBand ? undefined : width, height });
 
@@ -96,12 +96,13 @@ export default function FractionLegend({ spec: savedSpec }: LegendWrapperCompone
                 {spec.label}
             </div>
             <div
-                className="legend-body overflow-y-auto overflow-x-hidden w-full"
+                // a row too long for the strip scrolls sideways rather than being cut off
+                className={`legend-body overflow-y-auto w-full ${inBand ? "overflow-x-auto" : "overflow-x-hidden"}`}
                 style={{
                     height: `calc(100% - ${FRACTION_LEGEND_TITLE_HEIGHT}px)`,
                 }}
             >
-                <svg height={bodyHeight} width="100%" className="relative">
+                <svg height={bodyHeight} width={inBand ? bodyWidth : "100%"} className="relative">
                     <g>
                         {spec.items.map((item, i) => {
                             const { cx, cy, textX } = layout[i];

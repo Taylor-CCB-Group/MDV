@@ -443,6 +443,8 @@ reflowed every chart. Handles are still painted and still receive pointer events
 .legend-floating .legend-drag-handle,
 .legend-floating .legend-continuous-drag-handle {
     cursor: move;
+    /* so dragging by touch moves the legend rather than scrolling the page */
+    touch-action: none;
 }
 /* in the strip a legend is at most this tall (LEGEND_BAND_MAX_HEIGHT); its list scrolls */
 .legend-container.legend-in-band {
@@ -504,6 +506,7 @@ reflowed every chart. Handles are still painted and still receive pointer events
 /* minimised legends keep to the right, so open ones don't swap places as legends are minimised */
 .legend-container.legend-in-band.legend-minimized {
     order: 1;
+    max-width: 100%;
 }
 /* an equal share, whatever width the legend asked for; the list stays inside the capped height */
 .legend-container.legend-in-band:not(.legend-minimized) {
@@ -562,6 +565,8 @@ reflowed every chart. Handles are still painted and still receive pointer events
     font: inherit;
     font-size: 12px;
     white-space: nowrap;
+    max-width: 100%;
+    min-width: 0;
     cursor: grab;
 }
 .legend-in-band .legend-summary {
@@ -575,6 +580,7 @@ reflowed every chart. Handles are still painted and still receive pointer events
     border-radius: 999px;
     background-color: rgba(128, 128, 128, 0.2);
     font-size: 9px;
+    flex-shrink: 0;
 }
 .legend-summary .legend-summary-open:hover {
     background-color: rgba(128, 128, 128, 0.45);
@@ -585,11 +591,16 @@ reflowed every chart. Handles are still painted and still receive pointer events
 .legend-summary-label {
     font-weight: 500;
     margin-right: 2px;
+    /* a long title shrinks first, so the + stays in view */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .legend-summary-swatch {
     width: 8px;
     height: 8px;
     border-radius: 2px;
+    flex-shrink: 0;
 }
 .legend-summary-more {
     font-size: 11px;

@@ -39,9 +39,11 @@ export function useChartLegend<TSpec, T extends BaseConfig>({
 }: UseChartLegendOptions<TSpec, T>) {
     const wrapperRef = useRef<LegendWrapper<TSpec, T> | null>(null);
     if (!wrapperRef.current) wrapperRef.current = new LegendWrapper<TSpec, T>(chart);
-    // the redraw effect reads these without depending on them
+    // the redraw effect reads these without depending on them; kept up to date before it runs
     const latest = useRef({ spec, summary, legend, defaultBottomLeft });
-    latest.current = { spec, summary, legend, defaultBottomLeft };
+    useEffect(() => {
+        latest.current = { spec, summary, legend, defaultBottomLeft };
+    });
 
     const visible = legend.display && spec !== null;
     const onTop = useSyncExternalStore(chart.subscribeLegendLayout, () => chart.legendsOnTop());

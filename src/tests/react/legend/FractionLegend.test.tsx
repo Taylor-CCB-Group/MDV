@@ -122,4 +122,31 @@ describe("FractionLegend", () => {
         await waitFor(() => expect(wrapper.style.height).not.toBe(""));
         expect(wrapper.style.width).toBe("");
     });
+
+    test("scrolls sideways in the strip rather than cutting off the last circles", () => {
+        const items = ["20", "40", "60", "80", "100"].map((key, i) => ({ key, label: `${key}%`, radius: 4 + i * 2 }));
+        const { container } = render(
+            <Frame inBand>
+                <FractionLegend spec={{ label: "fraction", items }} />
+            </Frame>,
+        );
+
+        const svg = container.querySelector("svg");
+        const body = container.querySelector(".legend-body");
+        const lastCircle = [...container.querySelectorAll("circle")].at(-1);
+        // the drawing is as wide as its row, so the strip scrolls to the last circle
+        const width = Number(svg?.getAttribute("width"));
+        expect(width).toBeGreaterThan(Number(lastCircle?.getAttribute("cx")) + 14);
+        expect(body?.classList).toContain("overflow-x-auto");
+    });
+
+    test("fits the width it's given while floating", () => {
+        const { container } = render(
+            <Frame>
+                <FractionLegend spec={{ label: "fraction", items: [{ key: "20", label: "20", radius: 8 }] }} />
+            </Frame>,
+        );
+        expect(container.querySelector("svg")?.getAttribute("width")).toBe("100%");
+        expect(container.querySelector(".legend-body")?.classList).toContain("overflow-x-hidden");
+    });
 });

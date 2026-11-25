@@ -493,23 +493,22 @@ class SVGChart extends BaseChart {
         const extraLegends = (this.extra_legends ?? []).map((x) => this[x]);
         const restoreLegends = addLegendsToSvg(this.svg.node(), [this.legend, ...extraLegends]);
 
-        const svgAsXML = new XMLSerializer().serializeToString(this.svg.node());
-
-        if (type === "png") {
-            this.getImageFromSVG(this.svg.node(), (canvas) => {
-                callback(canvas);
-                if (this.removeFromImage) {
-                    this.removeFromImage();
-                }
-                restoreLegends();
-            });
-        } else {
-            callback(svgAsXML);
+        // the image is copied straight away (getImageFromSVG clones the SVG before drawing it), so
+        // the chart is put back right after, even if drawing the image fails
+        let svgAsXML;
+        try {
+            if (type === "png") {
+                this.getImageFromSVG(this.svg.node(), (canvas) => callback(canvas));
+                return;
+            }
+            svgAsXML = new XMLSerializer().serializeToString(this.svg.node());
+        } finally {
             if (this.removeFromImage) {
                 this.removeFromImage();
             }
             restoreLegends();
         }
+        callback(svgAsXML);
     }
 }
 

@@ -76,7 +76,9 @@ export default class FractionLegendController<T extends BaseConfig = BaseConfig>
             this.wrapper.unmount();
             return;
         }
-        this.wrapper.render(spec, { left: position[0], top: position[1] }, FractionLegend, {
+        // the size the user resized it to, kept across redraws
+        const size = this.wrapper.getUserSize() ?? undefined;
+        this.wrapper.render(spec, { left: position[0], top: position[1], size }, FractionLegend, {
             dragHandle: ".legend-drag-handle",
             resizable: true,
             summary: { label: spec.label },

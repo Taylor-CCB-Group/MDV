@@ -215,12 +215,22 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
 
     /** For the chart menu's "create svg/png image": the plot with its legends, black text. */
     getImage(callback: (image: string | HTMLCanvasElement) => void, type: "png" | "svg") {
-        const style = this.contentDiv.style;
-        const textColor = style.getPropertyValue("--text_color");
-        style.setProperty("--text_color", "black");
-        const svg = buildChartSvg(this.contentDiv);
-        if (textColor) style.setProperty("--text_color", textColor);
-        else style.removeProperty("--text_color");
+        // legends in the strip above the plot are part of the image too; the strip sets its own
+        // text colour, so its colour is changed there rather than on the legends in it
+        const parts: [HTMLElement, ...HTMLElement[]] = this.legendsOnTop()
+            ? [this.contentDiv, this.legendBand]
+            : [this.contentDiv];
+        const restoreColors = parts.map((part) => {
+            const style = part.style;
+            const textColor = style.getPropertyValue("--text_color");
+            style.setProperty("--text_color", "black");
+            return () => {
+                if (textColor) style.setProperty("--text_color", textColor);
+                else style.removeProperty("--text_color");
+            };
+        });
+        const svg = buildChartSvg(...parts);
+        for (const restore of restoreColors) restore();
 
         if (type === "svg") {
             callback(new XMLSerializer().serializeToString(svg));
@@ -378,14 +388,6 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
                 func: (v) => {
                     c.fraction_legend.display = v;
                     this.showFractionLegend();
-                },
-            }),
-            g({
-                type: "check",
-                label: "Keep space above the plot for legends",
-                current_value: c.reserve_legend_space,
-                func: (v) => {
-                    c.reserve_legend_space = v;
                 },
             }),
             this.getScaleSettings(),
