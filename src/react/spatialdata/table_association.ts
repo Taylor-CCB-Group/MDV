@@ -295,6 +295,22 @@ function withoutViewerFillColorColumn<T extends LayerConfig>(layer: T): T {
     return rest as T;
 }
 
+/**
+ * The layer with only the tooltip fields and fill colour column the viewer can read from the
+ * table's obs (none when that is unknown); the layer itself when it has nothing else. For a layer
+ * MDV has no table for yet: the rest are MDV's, filled in once it has.
+ */
+export function withViewerReadableColumns<T extends LayerConfig>(layer: T, obsColumnNames: Set<string> | undefined): T {
+    const readable = (column: string) => obsColumnNames?.has(column) ?? false;
+    const tooltipFields = layerTooltipFields(layer);
+    const fillColumn = layerFillColorColumnName(layer);
+    const keepTooltip = !tooltipFields || tooltipFields.every(readable);
+    const keepFill = !fillColumn || readable(fillColumn);
+    if (keepTooltip && keepFill) return layer;
+    const withFill = keepFill ? layer : withoutViewerFillColorColumn(layer);
+    return keepTooltip ? withFill : { ...withFill, tooltipFields: (tooltipFields ?? []).filter(readable) };
+}
+
 export function layerFillColorColumnName(layer: LayerConfig): string | undefined {
     if (!("fillColorByColumn" in layer)) return undefined;
     return layer.fillColorByColumn?.columnName;
@@ -976,7 +992,21 @@ export function useAssociatedShapesLayerInputs(
 
                     const associationKey = `${layer.type}:${layer.elementKey}`;
                     const table = tableByAssociationKey[associationKey];
-                    if (table?.status !== "resolved") continue;
+                    if (table?.status !== "resolved") {
+                        // Until MDV has the layer's table (the store still being read, or with
+                        // none), the viewer gets only the columns it can read: a gene score
+                        // left in would be loaded from obs, fail, and leave the layer
+                        // reporting that it could not load after MDV took the column over.
+                        const viewerOnly = withViewerReadableColumns(
+                            layer,
+                            obsColumnNamesByAssociationKey[associationKey],
+                        );
+                        if (viewerOnly !== layer) {
+                            nextLayers[layerId] = viewerOnly;
+                            changed = true;
+                        }
+                        continue;
+                    }
 
                     const tooltipFields = layerTooltipFields(layer);
                     const viewerTooltipFields = mdvTooltipFieldsByLayerId[layerId]
@@ -1025,8 +1055,26 @@ export function useAssociatedShapesLayerInputs(
                     // the inputs it actually reads separates the two: the copy stays cheap
                     // and per-render, the per-feature pass runs only when something it
                     // depends on moved.
+                    // What the viewer gets of the layer's columns: decided by the table, so the
+                    // same before the feature rows are mapped (below) as after.
+                    const projected = viewerFillColor
+                        ? { ...layer, fillColorByColumn: viewerFillColor }
+                        : withoutViewerFillColorColumn(layer);
+                    const withTooltip = viewerTooltipFields
+                        ? { ...projected, tooltipFields: viewerTooltipFields }
+                        : projected;
+
                     const source = rowIndexByFeatureIdByAssociationKey[associationKey];
-                    if (!source) continue;
+                    if (!source) {
+                        // Still mapping features to rows: no colours or filter yet, but the
+                        // viewer must not be handed MDV's columns meanwhile (see
+                        // `withViewerReadableColumns`).
+                        if (withTooltip !== layer) {
+                            nextLayers[layerId] = withTooltip;
+                            changed = true;
+                        }
+                        continue;
+                    }
 
                     const rowCount = table.dataStore.size;
                     const alpha = layerFillAlpha(layer);
@@ -1084,12 +1132,6 @@ export function useAssociatedShapesLayerInputs(
 
                     if (!featureState && !viewerFillColor && !viewerTooltipFields) continue;
 
-                    const projected = viewerFillColor
-                        ? { ...layer, fillColorByColumn: viewerFillColor }
-                        : withoutViewerFillColorColumn(layer);
-                    const withTooltip = viewerTooltipFields
-                        ? { ...projected, tooltipFields: viewerTooltipFields }
-                        : projected;
                     nextLayers[layerId] = featureState ? { ...withTooltip, featureState } : withTooltip;
                     changed = true;
                 }

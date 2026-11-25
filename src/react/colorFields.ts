@@ -52,16 +52,29 @@ function isColorByQuery(colorBy: unknown): colorBy is MultiColumnQuery {
  * Gives a config saved with `color_by` (any chart saved before `color_fields` existed, or converted
  * from another type) its `color_fields`, and leaves `color_by` out: these charts no longer read or
  * write it. A config with `color_fields` keeps them. An active link in `color_by` stays a link.
+ *
+ * It also gives the config each colour setting the colour settings folder sets, so that they are
+ * there when the config is made observable: one added afterwards is not observed, and setting it
+ * would not redraw the chart.
  */
-export function migrateColorBy<T extends { color_by?: unknown; color_fields?: FieldSpecs }>(
-    config: T,
-): T & { color_fields: FieldSpecs } {
+export function migrateColorBy<
+    T extends { color_by?: unknown; color_fields?: FieldSpecs } & Pick<ColorConfig, ColorSettingKey>,
+>(config: T): T & { color_fields: FieldSpecs } {
     const field = colorByField(config.color_by);
     const spec: FieldSpec | undefined = field ?? (isColorByQuery(config.color_by) ? config.color_by : undefined);
     const color_fields = config.color_fields ?? (spec ? [spec] : []);
     delete config.color_by;
-    return Object.assign(config, { color_fields });
+    return Object.assign(config, {
+        color_fields,
+        log_color_scale: config.log_color_scale ?? false,
+        trim_color_scale: config.trim_color_scale ?? "none",
+        fallbackOnZero: config.fallbackOnZero ?? false,
+        hideMissing: config.hideMissing ?? false,
+    });
 }
+
+/** The colour settings `getColorFieldsSettingsFolder` sets (as well as `color_fields`). */
+type ColorSettingKey = "log_color_scale" | "trim_color_scale" | "fallbackOnZero" | "hideMissing";
 
 /** The columns `color_fields` names now, active links resolved; an empty list when there are none. */
 export function colorFieldNames(colorFields: FieldSpecs | undefined): FieldName[] {

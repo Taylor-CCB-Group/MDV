@@ -12,6 +12,16 @@ describe("migrateColorBy", () => {
         expect(migrateColorBy({ color_by: { column: { field: "cluster" } } }).color_fields).toEqual(["cluster"]);
     });
 
+    test("the colour settings exist, so that setting them is observed", () => {
+        const config = migrateColorBy({ color_fields: ["a"], hideMissing: true });
+        expect(config).toMatchObject({
+            log_color_scale: false,
+            trim_color_scale: "none",
+            fallbackOnZero: false,
+            hideMissing: true,
+        });
+    });
+
     test("an active link in color_by stays a link, as saved or live", () => {
         const saved = { type: "RowsAsColsQuery", linkedDsName: "genes", subgroupName: "scores", maxItems: 10 };
         expect(migrateColorBy({ color_by: saved }).color_fields).toEqual([saved]);
