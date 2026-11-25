@@ -79,6 +79,7 @@ import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import { CompositingButton, hasCompositing } from "./spatialLayers/CompositingButton";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
+import { ElementTableIcon, ElementTableMenuHint, useElementTableSummary } from "./spatialLayers/ElementTableBadge";
 import GroupLayerPanel from "./spatialLayers/GroupLayerPanel";
 import ImageLayerPanel from "./spatialLayers/ImageLayerPanel";
 import LabelsLayerPanel from "./spatialLayers/LabelsLayerPanel";
@@ -391,12 +392,14 @@ const LayerTreeRow = observer(function LayerTreeRow({
     const [renaming, setRenaming] = useState(false);
     const failure = chart.layerFailures.get(entryId);
     const { status } = chart.visibleEntryStatus(entryId);
+    const tableSummary = useElementTableSummary();
 
     if (!entry) return null;
 
     const layerOpacity = typeof entry.props.opacity === "number" ? entry.props.opacity : 1;
     const supportsOpacity = entry.kind === "spatial" || entry.kind === "group";
     const name = renderStackEntryDisplayName(entry, config.renderStack);
+    const table = entry.kind === "spatial" ? tableSummary(entry.source.elementType, entry.source.elementKey) : null;
 
     return (
         <div
@@ -490,6 +493,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
                     {name}
                 </Typography>
             )}
+            {table && <ElementTableIcon summary={table} />}
             {hasCompositing(entry.kind, entryId) && <CompositingButton entryId={entryId} name={name} />}
             {entry.kind === "group" && onAddInto && (
                 <IconButton
@@ -654,6 +658,7 @@ const SpatialLayerDialogComponent = observer(() => {
     // The open add-layer menu: where it hangs, and the group it adds into (null: the top level).
     const [addMenu, setAddMenu] = useState<{ anchor: HTMLElement; parentId: string | null } | null>(null);
     const [deckCollapsed, setDeckCollapsed] = useState(false);
+    const tableSummary = useElementTableSummary();
     const coordinateSystem = //todo datasources schema including spatial regions when referring to dataStore here.
         (chart.dataStore.regions?.all_regions[config.region] as { spatial?: { coordinate_system?: string } })?.spatial
             ?.coordinate_system ?? null;
@@ -976,6 +981,7 @@ const SpatialLayerDialogComponent = observer(() => {
                 slotProps={{ paper: { sx: { maxHeight: 360 } } }}
             >
                 {insertOptions.flatMap((option, index) => {
+                    const table = option.kind === "spatial" ? tableSummary(option.type, option.elementKey) : null;
                     const item = (
                         <MenuItem
                             key={option.label}
@@ -987,6 +993,7 @@ const SpatialLayerDialogComponent = observer(() => {
                             }}
                         >
                             {option.kind === "group" ? "Group (drag layers into it)" : option.label}
+                            {table && <ElementTableMenuHint summary={table} />}
                         </MenuItem>
                     );
                     return index === 1
