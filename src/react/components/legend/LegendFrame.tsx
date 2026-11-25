@@ -13,6 +13,7 @@ import {
     useRef,
     useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { LEGEND_BAND_MAX_HEIGHT } from "@/react/legend/shared/legendConstants";
 
 /** What a minimised legend shows: its title and a hint of its colours. */
@@ -353,6 +354,17 @@ export default function LegendFrame({
         });
     };
 
+    /**
+     * Where the frame is shown once `update` is drawn, along with anything that keeps it inside
+     * the chart afterwards: what a drag or resize reports when it ends, so the saved position
+     * matches the legend on screen.
+     */
+    const shownAfter = (update: () => void): [number, number] | null => {
+        flushSync(update);
+        const el = ref.current;
+        return el ? [el.offsetLeft, el.offsetTop] : null;
+    };
+
     const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
         const el = ref.current;
         const target = event.target;
@@ -368,7 +380,10 @@ export default function LegendFrame({
                 last = moveTo(from.left + dx, from.top + dy);
             },
             () => {
-                if (last) onMoved?.([last.left, last.top]);
+                const end = last;
+                if (!end) return;
+                const shown = shownAfter(() => setPosition(end));
+                if (shown) onMoved?.(shown);
             },
         );
     };
@@ -401,8 +416,15 @@ export default function LegendFrame({
                 setPosition({ left, top });
             },
             () => {
-                if (size) onResized?.(size);
-                if (moved) onMoved?.([moved.left, moved.top]);
+                const endSize = size;
+                const endPosition = moved;
+                if (endSize) onResized?.(endSize);
+                if (!endPosition) return;
+                const shown = shownAfter(() => {
+                    if (endSize) setUserSize(endSize);
+                    setPosition(endPosition);
+                });
+                if (shown) onMoved?.(shown);
             },
         );
     };

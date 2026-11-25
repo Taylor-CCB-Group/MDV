@@ -354,6 +354,28 @@ describe("LegendWrapper dragging", () => {
         expect(onMoved).toHaveBeenCalledWith([70, 50]);
     });
 
+    test("reports where the legend is shown when the chart shrinks during the drag", () => {
+        const onMoved = vi.fn();
+        const { el, wrapper, contentDiv } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 }, true, {
+            onMoved,
+        });
+        const handle = el.querySelector(".legend-drag-handle");
+        if (!handle) throw new Error("expected a drag handle");
+
+        act(() => {
+            handle.dispatchEvent(pointer("pointerdown", 1, { clientX: 100, clientY: 100 }));
+            document.dispatchEvent(pointer("pointermove", 1, { clientX: 300, clientY: 300 }));
+        });
+        expect([el.style.left, el.style.top]).toEqual(["210px", "210px"]);
+        // the legend (180 x 250) is moved back inside a chart now 400 x 400
+        resizeChart(contentDiv, 400, 400);
+        act(() => document.dispatchEvent(pointer("pointerup", 1)));
+
+        expect([el.style.left, el.style.top]).toEqual(["210px", "150px"]);
+        expect(onMoved).toHaveBeenCalledWith([210, 150]);
+        expect(wrapper.getFloatingPosition()).toEqual([210, 150]);
+    });
+
     test("drops a drag still going when the legend is redrawn", async () => {
         const onMoved = vi.fn();
         const { el, wrapper } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 }, true, { onMoved });
