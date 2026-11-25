@@ -114,30 +114,33 @@ def register_auth_routes(app):
                 return jsonify({"error": "Failed to start login process using SSO."}), 500
 
 
-        # You can also add a sample route to check the user's profile or token
         @app.route('/profile')
         def profile():
-            try:
-                # Get the appropriate authentication provider based on session
-                provider = get_auth_provider()
-                # If the provider is Auth0, we need to pass the token (which should be in the session)
-                token = session.get("token")
+            """Return the signed-in user's profile from this deployment's users table."""
+            session_user = session.get("user")
+            if not session_user:
+                return jsonify({"error": "User profile could not be retrieved."}), 404
 
-                # Get the user information
-                if token:
-                    # If token is available, use it for Auth0
-                    user_info = provider.get_user(token=token)
-                else:
-                    # If no token (e.g., using Shibboleth), just call get_user without token
-                    user_info = provider.get_user()
+            # The dummy provider's user has no database row.
+            if (app.config.get("DEFAULT_AUTH_METHOD") or "").lower() == "dummy":
+                first_name = session_user.get("first_name", "")
+                last_name = session_user.get("last_name", "")
+                email = session_user.get("email", "")
+                institution = ""
+            else:
+                from mdvtools.dbutils.dbmodels import User
 
-                if not user_info:
+                user = User.query.filter_by(id=session_user.get("id")).first()
+                if user is None:
                     return jsonify({"error": "User profile could not be retrieved."}), 404
-                # Return the user profile in a JSON response
-                return jsonify(user_info), 200
-            except Exception as e:
-                logger.exception(f"Error during profile retrieval: {e}")
-                return jsonify({"error": "Failed to retrieve user profile."}), 500
+                first_name, last_name, email = user.first_name, user.last_name, user.email
+                institution = user.institution or ""
+
+            return jsonify({
+                "name": f"{first_name} {last_name}".strip(),
+                "email": email,
+                "association": institution,
+            }), 200
 
 
         logger.info("Auth routes registered successfully!")

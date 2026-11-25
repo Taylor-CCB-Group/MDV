@@ -191,15 +191,39 @@ const ContourVisualConfigSchema = z
  * Draw a chart as a grid of small multiples, one cell per value of a property of its config.
  * Layout options (cell size, columns) belong here too; for now the defaults apply.
  */
-export const ChartGridConfigSchema = z
-    .object({
-        by: z
-            .enum(["densityFields"])
-            .describe("The config property whose values make the cells, e.g. one cell per density field"),
-    })
-    .describe("Show the chart as a grid of cells, one per value of a config property");
+export function chartGridConfigSchema<const T extends readonly [string, ...string[]]>(props: T) {
+    return z
+        .object({
+            by: z
+                .enum(props)
+                .describe("The config property whose values make the cells, e.g. one cell per density field"),
+        })
+        .describe("Show the chart as a grid of cells, one per value of a config property");
+}
+
+/** The grid of a chart that draws density fields: a cell per field. Each chart type names its own props. */
+export const ChartGridConfigSchema = chartGridConfigSchema(["densityFields"]);
 
 export type ChartGridConfig = z.infer<typeof ChartGridConfigSchema>;
+
+/**
+ * The SpatialData chart's grid: a cell per density field, or a cell per region (each region's
+ * SpatialData drawn with the chart's layers, and its own rows).
+ */
+export const SpatialDataGridConfigSchema = chartGridConfigSchema(["densityFields", "region"]).extend({
+    hide_empty: z
+        .boolean()
+        .optional()
+        .describe('With `by: "region"`: leave out regions with no rows left after filtering'),
+    link_views: z
+        .boolean()
+        .optional()
+        .describe(
+            'With `by: "region"`: panning or zooming one cell moves every cell the same way on screen, each keeping its own framing',
+        ),
+});
+
+export type SpatialDataGridConfig = z.infer<typeof SpatialDataGridConfigSchema>;
 
 const DensityFieldsConfigSchema = z
     .object({
@@ -285,12 +309,18 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
         .describe("Hides rows outside the selected categories from this chart only"),
     on_filter: z.enum(["hide", "grey"]).optional().describe("How filtered-out points should be rendered"),
     zoom_on_filter: z.boolean().optional().describe("Whether filtering should auto-fit the current view"),
+    selection_toolbar_open: z
+        .boolean()
+        .optional()
+        .describe(
+            "Whether the selection toolbar shows every tool, or one button for Pan and the last drawing tool (default true)",
+        ),
     crosshair: z
         .boolean()
         .nullable()
         .optional()
         .describe(
-            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a grid (default true)",
+            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a density grid (default true)",
         ),
     point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
     axis_scaling: z
@@ -429,14 +459,54 @@ export const SankeyConfigSchema = BaseConfigSchema.extend({
     // Additional sankey specific properties
 }).describe("Configuration for Sankey diagrams showing flow between categories");
 
+const ScaleTrimSchema = z
+    .enum(["0.001", "0.01", "0.05"])
+    .describe("Trim the x axis to this percentile of the values (a key of the column's quantiles)");
+
 export const MultiLineChartConfigSchema = BaseConfigSchema.extend({
     type: z.literal("multi_line_chart").describe("Multi-line chart type"),
-    stacked: z.boolean().optional().describe("Whether to stack multiple lines on top of each other"),
-    band_width: z.number().positive().optional().describe("Width of confidence bands around lines"),
-    intervals: z.number().int().positive().optional().describe("Number of intervals for data aggregation"),
-    scaletrim: z.boolean().optional().describe("Whether to trim the scale to focus on data range"),
-    // Additional multi-line chart specific properties
-}).describe("Configuration for multi-line charts showing multiple time series or categories");
+    stacked: z.boolean().optional().describe("One row per category instead of overlaid lines"),
+    fill: z.boolean().optional().describe("Fill under each line"),
+    band_width: z
+        .number()
+        .positive()
+        .optional()
+        .describe("Kernel half-width: in data units, or a fraction of the trimmed range when trimmed"),
+    intervals: z.number().int().positive().optional().describe("Roughly how many points each line has"),
+    scaletrim: z
+        .union([ScaleTrimSchema, z.literal("none")])
+        .nullable()
+        .optional()
+        .describe("Trim the x axis to a percentile; absent, null or 'none' for the full range"),
+}).describe("Configuration for multi-line charts: a density curve of `param[0]` per category of `param[1]`");
+
+export const MultiLineReactConfigSchema = BaseConfigSchema.extend({
+    type: z.literal("multi_line_chart_react").describe("React multi-line chart type"),
+    categories: z.string().nullable().optional().describe("Category column: one line per value of it"),
+    values: FieldSpecsSchema.optional().describe("Numeric fields: a cell per field, with a density curve per category"),
+    stacked: z.boolean().optional().describe("One row per category instead of overlaid lines"),
+    fill: z.boolean().optional().describe("Fill under each line"),
+    scaletrim: ScaleTrimSchema.nullable().optional(),
+    band_width: z
+        .number()
+        .positive()
+        .nullable()
+        .optional()
+        .describe(
+            "Kernel half-width: in data units, or a fraction of the trimmed range when trimmed; null for the default",
+        ),
+    intervals: z.number().int().positive().optional().describe("Roughly how many points each line has"),
+    fit_labels: z.boolean().optional().describe("Fit the axis margins to the labels; off, the axis sizes are used"),
+    grid: chartGridConfigSchema(["values"])
+        .nullable()
+        .optional()
+        .describe("Several values are drawn a cell per value whatever this is; it chooses the layout"),
+    share_x: z.boolean().optional().describe("One x scale for every cell, for values in comparable units"),
+    brush: z
+        .record(z.string(), z.tuple([z.number(), z.number()]))
+        .optional()
+        .describe("The brushed range of each value, in data units, by field; each filters other charts"),
+}).describe("Configuration for density curves of numeric values, one per category and value; `param` is unused");
 
 export const MultiBoxPlotConfigSchema = BaseConfigSchema.extend({
     type: z.literal("multi_box_plot").describe("Multi-box plot chart type"),
@@ -551,6 +621,7 @@ registerChartConfigSchema("text_box", TextBoxConfigSchema, { version: "1" });
 registerChartConfigSchema("wordcloud", WordcloudConfigSchema, { version: "1" });
 registerChartConfigSchema("sankey", SankeyConfigSchema, { version: "1" });
 registerChartConfigSchema("multi_line_chart", MultiLineChartConfigSchema, { version: "1" });
+registerChartConfigSchema("multi_line_chart_react", MultiLineReactConfigSchema, { version: "1" });
 registerChartConfigSchema("multi_box_plot", MultiBoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("abundance_box_plot", AbundanceBoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("density_scatter", DensityScatterConfigSchema, { version: "1" });

@@ -1,6 +1,4 @@
-import * as d3 from "d3";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatDateDays } from "@/lib/dateFormat";
 import {
     type BrushXConfig,
     type BrushXScaleType,
@@ -9,6 +7,7 @@ import {
     useBrushX,
 } from "@/react/components/histogram/useBrushX";
 import { useTheme } from "../hooks";
+import BrushRangeChip, { formatBrushRange, useBrushStyle } from "./histogram/BrushRangeChip";
 
 export type HistogramScaleType = BrushXScaleType;
 export type HistogramBrushConfig = BrushXConfig;
@@ -55,17 +54,8 @@ type HistogramWidgetProps = {
     isDate?: boolean;
 };
 
-const formatNumericBrushValue = d3.format(".4~g");
-
 /** Brush chip text for a numeric or calendar-date histogram range. */
-export function formatHistogramBrushRange(start: number, end: number, isDate = false): string {
-    const lo = start <= end ? start : end;
-    const hi = start <= end ? end : start;
-    if (isDate) {
-        return `${formatDateDays(lo)} - ${formatDateDays(hi)}`;
-    }
-    return `${formatNumericBrushValue(lo)} - ${formatNumericBrushValue(hi)}`;
-}
+export const formatHistogramBrushRange = formatBrushRange;
 
 export default function HistogramWidget({
     layers,
@@ -116,17 +106,14 @@ export default function HistogramWidget({
         return () => observer.disconnect();
     }, [onVisibleOnce, hasTriggeredCallback, rootMargin]);
 
+    const brushStyle = useBrushStyle();
     useBrushX(ref, isVisible ? brush : undefined, xScaleType, {
         layout: {
             width,
             height: height + 4,
             y: -2,
         },
-        style: {
-            selectionFill: dark ? "rgba(255, 255, 255, 0.08)" : "rgba(15, 23, 42, 0.08)",
-            selectionStroke: dark ? "rgba(229, 231, 235, 0.95)" : "rgba(15, 23, 42, 0.7)",
-            handleFill: dark ? "rgba(229, 231, 235, 0.92)" : "rgba(15, 23, 42, 0.88)",
-        },
+        style: brushStyle,
     });
 
     const padding = 2;
@@ -168,25 +155,9 @@ export default function HistogramWidget({
         [height, resolvedBinEdges, xScale, yScale],
     );
 
-    const brushValueLabel = useMemo(() => {
-        if (!brush?.value) return null;
-        return formatHistogramBrushRange(brush.value[0], brush.value[1], isDate);
-    }, [brush?.value, isDate]);
-
     return (
         <div className="relative w-full" ref={containerRef}>
-            {brushValueLabel ? (
-                <div
-                    className="pointer-events-none absolute left-1 top-1 z-10 rounded px-1 py-0 text-[9px] shadow-sm"
-                    style={{
-                        border: `1px solid ${dark ? "rgba(71, 85, 105, 0.9)" : "rgba(203, 213, 225, 0.95)"}`,
-                        background: dark ? "rgba(15, 23, 42, 0.9)" : "rgba(255, 255, 255, 0.92)",
-                        color: dark ? "rgba(241, 245, 249, 0.95)" : "rgba(15, 23, 42, 0.92)",
-                    }}
-                >
-                    {brushValueLabel}
-                </div>
-            ) : null}
+            {brush?.value ? <BrushRangeChip range={brush.value} isDate={isDate} /> : null}
             {scaleControls ? (
                 <div className="pointer-events-none absolute right-1 top-1 z-10 flex items-center gap-1 text-[10px] opacity-75">
                     {!isDate ? (

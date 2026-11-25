@@ -1,6 +1,7 @@
 import type DataStore from "@/datastore/DataStore";
 import { convertLegacyChartsSetting } from "@/lib/browserSettings";
 import { deckRadiusForClassicRadius, deckRadiusForPixelRadius, radiusReferenceRange3D } from "@/react/axisScaling";
+import { adaptMultiLineConfig } from "@/react/components/multiline/multiLineConfig";
 import { fitOrbitView, orbitViewFromLegacyCamera, validAxisScales } from "@/react/orbitView";
 import type { ChartType } from "./ChartTypes";
 
@@ -207,6 +208,10 @@ const legacyConversions: Record<string, LegacyConversion[]> = {
     // still the viewer for a Viv image region that is not SpatialData
     VivMdvRegionReact: [
         { to: "SpatialDataMdvRegionReact", canConvert: isSpatialDataVivRegion, adapt: adaptVivToSpatialData },
+    ],
+    // `param: [value, category]` becomes `values` and `categories`; the rest reads the same
+    multi_line_chart: [
+        { to: "multi_line_chart_react", adapt: (config) => Object.assign(config, adaptMultiLineConfig(config)) },
     ],
     density_scatter_plot: [
         {

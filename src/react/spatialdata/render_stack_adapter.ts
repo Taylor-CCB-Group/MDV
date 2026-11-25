@@ -163,7 +163,12 @@ export function resolveCachedHostDeckLayers(
 }
 
 function entryStructure(entry: RenderStackEntry): RenderStackEntry {
-    if (entry.kind !== "group") return { ...entry, props: {} };
+    if (entry.kind !== "group") {
+        // A layer's own blend mode places it: inside an isolated group, the viewer draws it
+        // as a one-member group with that mode. Its other props are the layer's config.
+        const { blendMode } = entry.props;
+        return { ...entry, props: blendMode ? { blendMode } : {} };
+    }
     const { opacity, blendMode, isolate } = entry.props;
     return {
         kind: "group",
@@ -175,13 +180,13 @@ function entryStructure(entry: RenderStackEntry): RenderStackEntry {
 }
 
 /**
- * The stack's tree for the viewer to place layers by: ids, sources, visibility and
- * group props, with entry props left out. The observable stack is edited in place, so
+ * The stack's tree for the viewer to place layers by: ids, sources, visibility, group
+ * props and each layer's blend mode, with the rest of the entry props left out. The observable stack is edited in place, so
  * this is a plain copy, and keeps its identity until its value changes: a cosmetic
  * edit to an entry's props must not hand the viewer a new stack. Call from an
  * observer, so structural edits re-render.
  */
-function renderStackStructure(stack: RenderStack): RenderStack {
+export function renderStackStructure(stack: RenderStack): RenderStack {
     return { schemaVersion: stack.schemaVersion, entries: stack.entries.map(entryStructure) };
 }
 

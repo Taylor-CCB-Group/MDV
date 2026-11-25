@@ -1,7 +1,12 @@
-import { FormControl, FormHelperText, InputLabel, MenuItem, Select, Typography } from "@mui/material";
+import { Chip, FormControl, FormHelperText, InputLabel, MenuItem, Select, Typography } from "@mui/material";
 import { observer } from "mobx-react-lite";
-import { type BrowserSetting, browserSettings } from "@/lib/browserSettings";
+import { type BrowserSetting, browserSettings, isSettingListed } from "@/lib/browserSettings";
 import { matchesQuery } from "./debugDialogSearch";
+
+/** Marks a feature preview wherever one is offered (Add Chart, Browser settings). */
+export function PreviewChip() {
+    return <Chip label="Preview" size="small" color="info" variant="outlined" sx={{ ml: 1, height: 20 }} />;
+}
 
 const ChoiceSettingControl = observer(function ChoiceSettingControl({ setting }: { setting: BrowserSetting }) {
     const labelId = `browser-setting-${setting.key}`;
@@ -20,7 +25,11 @@ const ChoiceSettingControl = observer(function ChoiceSettingControl({ setting }:
                     </MenuItem>
                 ))}
             </Select>
-            {setting.description && <FormHelperText>{setting.description}</FormHelperText>}
+            {(setting.description || setting.preview) && (
+                <FormHelperText component="div">
+                    {setting.preview && <PreviewChip />} {setting.description}
+                </FormHelperText>
+            )}
         </FormControl>
     );
 });
@@ -30,8 +39,11 @@ export function browserSettingMatchesQuery(setting: BrowserSetting, query: strin
     return matchesQuery(query, setting.label, setting.description, setting.key, ...setting.choices.map((c) => c.label));
 }
 
-/** The given settings (default: all of `browserSettings`); changes apply at once and are kept in this browser. */
-export default function BrowserSettingsSection({
+/**
+ * The given settings (default: all of `browserSettings`) that are listed — a feature preview only
+ * when previews are shown or its value was changed; changes apply at once and are kept in this browser.
+ */
+const BrowserSettingsSection = observer(function BrowserSettingsSection({
     settings = browserSettings,
 }: {
     settings?: readonly BrowserSetting[];
@@ -41,9 +53,10 @@ export default function BrowserSettingsSection({
             <Typography>
                 These apply to every project opened in this browser, and are not saved with projects or views.
             </Typography>
-            {settings.map((setting) => (
+            {settings.filter(isSettingListed).map((setting) => (
                 <ChoiceSettingControl key={setting.key} setting={setting} />
             ))}
         </>
     );
-}
+});
+export default BrowserSettingsSection;

@@ -11,7 +11,7 @@ import ClearIcon from "@mui/icons-material/Clear";
 import { Box, Button, Divider, IconButton, InputAdornment, Link, Paper, TextField, Typography } from "@mui/material";
 import type BaseChart from "@/charts/BaseChart";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { browserSettings } from "@/lib/browserSettings";
+import { browserSettings, isSettingListed } from "@/lib/browserSettings";
 import type ValidationFindingsStore from "@/lib/ValidationFindingsStore";
 import type { ValidationFinding } from "@/lib/ValidationFindingsStore";
 import { DEBUG_JSON_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
@@ -19,6 +19,7 @@ import { ChartProvider } from "../context";
 import { useChartManager } from "../hooks";
 import BrowserSettingsSection, { browserSettingMatchesQuery } from "./BrowserSettingsSection";
 import CustomTooltip from "./CustomTooltip";
+import { DataQualitySection, useHasSpatialStores } from "./DataQualitySection";
 import { filterJSON, filterJsonSection, type JsonSection, matchesQuery, splitJsonSections } from "./debugDialogSearch";
 import { AbstractComponent, collectDisposers } from "./SettingsDialogComponent";
 
@@ -204,6 +205,7 @@ export function ValidationIssuesSection({ validationFindings }: { validationFind
 }
 
 const PREFERENCES_TITLE = "Preferences";
+const DATA_QUALITY_TITLE = "Data quality";
 const DEBUG_GROUP_TITLE = "Debug and diagnostics";
 const TECHNICAL_SETTINGS_TITLE = "Technical settings";
 
@@ -390,6 +392,8 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                 : browserSettings.filter((setting) => browserSettingMatchesQuery(setting, query)),
         [query],
     );
+    // Outside the memo so it reacts to the feature-previews setting (this component is an observer).
+    const listedBrowserSettings = filteredBrowserSettings.filter(isSettingListed);
     const technicalSettings = useMemo(() => chart?.getDebugSettings?.() ?? [], [chart]);
     useEffect(() => {
         const disposers = collectDisposers(technicalSettings);
@@ -424,12 +428,23 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
     const showValidation =
         showValidationSection && matchesQuery(debugQuery, "Validation issues", "validation findings");
     // a chart's dialog is about that chart; the project-wide sections are in the main Settings dialog
-    const showBrowserSettings = !chart && filteredBrowserSettings.length > 0;
+    const showBrowserSettings = !chart && listedBrowserSettings.length > 0;
     const showTechnicalSettings = filteredTechnicalSettings.length > 0;
+    const hasSpatialStores = useHasSpatialStores();
+    const showDataQuality =
+        !chart &&
+        hasSpatialStores &&
+        matchesQuery(query, DATA_QUALITY_TITLE, "SpatialData store issues pyramid chunks length unit dismissed");
     const showDebugGroup =
         !chart && (showReport || showFaultInjection || showValidation || filteredJsonSections.length > 0);
     const nothingMatches =
-        searching && !showChartPanel && !showTechnicalSettings && !wholeJson && !showBrowserSettings && !showDebugGroup;
+        searching &&
+        !showChartPanel &&
+        !showTechnicalSettings &&
+        !wholeJson &&
+        !showBrowserSettings &&
+        !showDataQuality &&
+        !showDebugGroup;
 
     return (
         <div className="w-full max-h-[80vh] overflow-auto" style={{ userSelect: "text" }}>
@@ -499,7 +514,12 @@ const DebugJsonDialogComponent = observer(function DebugJsonDialogComponent({
                     defaultExpanded={!showFindingsFirst}
                     {...sectionProps}
                 >
-                    <BrowserSettingsSection settings={filteredBrowserSettings} />
+                    <BrowserSettingsSection settings={listedBrowserSettings} />
+                </DebugSection>
+            )}
+            {showDataQuality && (
+                <DebugSection id="data-quality" title={DATA_QUALITY_TITLE} {...sectionProps}>
+                    <DataQualitySection />
                 </DebugSection>
             )}
             {showDebugGroup && (

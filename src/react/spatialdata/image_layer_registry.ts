@@ -4,6 +4,11 @@ import type { ImageLoaderData, LayerLoadState } from "@spatialdata/vis";
 export type ImageLayerRegistry = {
     getImageLoadedDataByElementKey: (elementKey: string) => ImageLoaderData | undefined;
     getLayerLoadStateByElementKey?: (elementKey: string) => LayerLoadState | undefined;
+    /**
+     * The region whose store the images come from, when the chart shows several (a grid with a
+     * cell per region); unset for the single view.
+     */
+    region?: string;
 };
 
 export function getLayerLoadStateByElementKey(
@@ -30,10 +35,12 @@ export function createImageLayerRegistry(
     stack: RenderStack,
     getImageLoadedDataByElementKey: ImageLayerRegistry["getImageLoadedDataByElementKey"],
     getLayerLoadState: (layerId?: string) => LayerLoadState | undefined,
+    region?: string,
 ): ImageLayerRegistry {
     return {
         getImageLoadedDataByElementKey,
         getLayerLoadStateByElementKey: (elementKey) =>
             getLayerLoadStateByElementKey(elementKey, stack, getLayerLoadState),
+        ...(region !== undefined && { region }),
     };
 }

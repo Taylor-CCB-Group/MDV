@@ -61,6 +61,12 @@ export type ChartType<T extends BaseConfig> = {
      * are still needed by some data (see `isLegacyChartType`).
      */
     legacy?: boolean | ((dataStore: DataStore) => boolean);
+    /**
+     * A feature preview: still taking shape, and its config may change. Hidden from the 'add chart'
+     * dialog unless the "Feature previews" browser setting is on, and marked as a preview there;
+     * existing charts of this type still load.
+     */
+    preview?: boolean;
 };
 
 export type ChartTypeMap = Record<string, ChartType<any>>;

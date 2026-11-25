@@ -338,7 +338,8 @@ class MultiLineChart extends SVGChart {
 
 BaseChart.types["multi_line_chart"] = {
     class: MultiLineChart,
-    name: "Multi Line Chart",
+    name: "Multi Line Chart (Classic)",
+    legacy: true,
     // methodsUsingColumns: ["changeCategories"],
     params: [
         {
