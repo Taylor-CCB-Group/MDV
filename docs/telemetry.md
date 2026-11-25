@@ -35,6 +35,8 @@ networks:
     external: true
 ```
 
+Compose does not create an external network, so the stack must be running whenever the MDV service is recreated, such as on a redeploy. A running MDV container is not affected when the stack stops. If the stack is down and MDV has to be recreated, start the stack first, or remove the 4 variables and the `mdv-telemetry` entries from the service.
+
 With `FARO_COLLECTOR_URL` set, MDV's pages load Grafana Faro, which records page loads, Web Vitals, request timings and uncaught errors, but not console messages. Faro posts to `telemetry/faro` on the same deployment, and MDV forwards each post to the collector. MDV refuses posts from other sites, posts over 256 KiB and more than 10 posts a second from one address, with bursts of up to 100. With auth on, sign-in is needed too.
 
 ## Names the dashboards read
