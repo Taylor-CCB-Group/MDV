@@ -1,7 +1,11 @@
+import { type RenderStack, walkRenderStackEntries } from "@spatialdata/layers";
 import type { SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
 import { g } from "@/lib/utils";
+import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { spatialDataUrlForRegion } from "@/react/spatialdata/shared_spatial_data";
 import type { ChartArrayCell } from "../hooks/useChartArrayGrid";
+import { COLOR_GRID_CHOICES, colorGridChoice, colorGridConfig, gridChoiceValue } from "./colorGridUtils";
+import { layerFillGridChoice, layerFillGridChoices, layerFillGridConfig } from "./layerFillGridUtils";
 
 /** A cell of a SpatialData chart drawn with a cell per region: the region and where its store is. */
 export type SpatialRegionCell = ChartArrayCell & {
@@ -42,43 +46,6 @@ export function spatialRegionCells(allRegions: Record<string, unknown> | undefin
     });
 }
 
-/** A region's rows, and where each is in the array they were taken from. */
-export type RegionRows = { rows: Uint32Array; positions: Uint32Array };
-
-/**
- * Splits rows by region, keeping their order. `codes` is the region column's data (an index into
- * `values` per row). Regions with no rows are left out.
- */
-export function partitionRowsByRegion(
-    rows: ArrayLike<number>,
-    codes: ArrayLike<number>,
-    values: readonly string[],
-): Map<string, RegionRows> {
-    const counts = new Uint32Array(values.length);
-    for (let i = 0; i < rows.length; i++) {
-        const code = codes[rows[i]];
-        if (code < values.length) counts[code]++;
-    }
-    const byCode = Array.from(counts, (count) =>
-        count > 0 ? { rows: new Uint32Array(count), positions: new Uint32Array(count) } : null,
-    );
-    const filled = new Uint32Array(values.length);
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const code = codes[row];
-        const target = byCode[code];
-        if (!target) continue;
-        const at = filled[code]++;
-        target.rows[at] = row;
-        target.positions[at] = i;
-    }
-    const result = new Map<string, RegionRows>();
-    byCode.forEach((target, code) => {
-        if (target) result.set(values[code], target);
-    });
-    return result;
-}
-
 /** A region cell's view: where it is centred, in the region's coordinate system, and its zoom. */
 export type RegionViewState = { target: [number, number]; zoom: number };
 
@@ -116,15 +83,20 @@ export function moveRegionViews(
     return moved;
 }
 
-type GridChoice = "none" | SpatialDataGridConfig["by"];
-
 /**
- * The SpatialData chart's grid settings: one view, a cell per density field, or a cell per region.
+ * The SpatialData chart's grid settings: one view, a cell per density field, per colour column,
+ * per category of the first colour column, per fill colour column (or category) of a shapes or
+ * labels layer, or per region.
  */
-export function getSpatialDataGridSettingsFolder(config: { grid?: SpatialDataGridConfig | null }) {
-    const choices: { name: string; value: GridChoice }[] = [
+export function getSpatialDataGridSettingsFolder(config: {
+    grid?: SpatialDataGridConfig | null;
+    renderStack?: RenderStack;
+}) {
+    const choices = [
         { name: "One view", value: "none" },
         { name: "A cell per density field", value: "densityFields" },
+        ...COLOR_GRID_CHOICES,
+        ...layerFillGridChoices(fillColorLayers(config.renderStack)),
         { name: "A cell per region", value: "region" },
     ];
     return g({
@@ -134,10 +106,20 @@ export function getSpatialDataGridSettingsFolder(config: { grid?: SpatialDataGri
             g({
                 type: "dropdown",
                 label: "Show",
-                current_value: config.grid?.by ?? "none",
+                // read from the config, as the colour pickers' "Grid by this" also sets it
+                get current_value() {
+                    return gridChoiceValue(config);
+                },
+                set current_value(_value: string) {
+                    // `func` sets the grid, which the getter reads back
+                },
                 values: [choices, "name", "value"],
                 func: (value: string) => {
-                    if (value === "densityFields") config.grid = { by: "densityFields" };
+                    const colorSplit = colorGridChoice(value);
+                    const layerGrid = layerFillGridChoice(value);
+                    if (colorSplit) config.grid = colorGridConfig(colorSplit);
+                    else if (layerGrid) config.grid = layerFillGridConfig(layerGrid.layer, layerGrid.split);
+                    else if (value === "densityFields") config.grid = { by: "densityFields" };
                     else if (value === "region")
                         config.grid = {
                             by: "region",
@@ -165,4 +147,14 @@ export function getSpatialDataGridSettingsFolder(config: { grid?: SpatialDataGri
             }),
         ],
     });
+}
+
+/** The stack's shapes and labels layers, which can be coloured by a column: their ids and names. */
+export function fillColorLayers(stack: RenderStack | undefined): { id: string; name: string }[] {
+    if (!stack) return [];
+    return Array.from(walkRenderStackEntries(stack.entries)).flatMap((entry) =>
+        entry.kind === "spatial" && (entry.source.elementType === "shapes" || entry.source.elementType === "labels")
+            ? [{ id: entry.id, name: renderStackEntryDisplayName(entry, stack) }]
+            : [],
+    );
 }

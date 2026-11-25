@@ -14,6 +14,8 @@ Several charts already draw small multiples, each in its own way:
 | Multi-line chart (#691) | `values`: a cell per numeric field once there are several | `ChartArrayLayout`, an SVG per cell | densities, x domain (unless `share_x`), a brush and its range dimension | categories, colours, legend, settings |
 | Compound dot plot | `split_by` / `split_values`: a panel per category value | its own panel layout | the rows of that category value | columns, colour scale (`auto` is shared) |
 | Splatter plot | categories × `densityFields`: a cell per pair | its own layout | the category's rows, the field's density | view state |
+| Deck scatter / SpatialData colour grid | `grid: { by: "color_fields", split }`: a cell per colour column (`columns`), or per category of the first (`categories`) | `ChartArrayLayout`, one deck (`DeckCellGrid`) | the cell's points: all of them coloured by its column, or its category's | grey points, gates, selection, view state; in SpatialData, the render stack but for its points |
+| SpatialData layer colour grid | `grid: { by: "layer_fill", layer, split }`: a cell per fill colour column of a shapes or labels layer, or per category of the first | `ChartArrayLayout`, one deck (`DeckCellGrid`) | its copy of the layer: every feature coloured by its column, or its category's | the render stack below and above the layer, view state |
 | SpatialData region grid | `grid: { by: "region" }`: a cell per region (a store and coordinate system) | `ChartArrayLayout`, one deck (`DeckCellGrid`) | the region's store, renderer and rows; its view state | the render stack (as a template), colours, filters |
 
 They answer the same questions (what is a cell, what does it share, where does its state live)
@@ -38,6 +40,16 @@ A grid can make cells in at least three ways, and they behave differently:
    same image. Every cell shares the view, coordinate system and usually the other layers; each
    draws a different render stack entry, or the same image with a different channel selection.
    Cell keys are element names or channel names, not columns.
+
+`color_fields` (the deck scatter plot and the SpatialData chart) is the first property made
+multi-column so that it could be a grid: it replaces the single `color_by` there, and its grid
+can split it either way, by column (kind 1) or by the categories of its first column (kind 2).
+A SpatialData layer's fill colour is the second, and the first inside the render stack.
+
+Such a property's picker says so (`GuiSpec.gridBy`, and `GridByControl` beside a layer's colour
+picker): it takes one column, with a "Grid by this" switch, and turning that on makes the chart a
+grid of it, split by columns or categories, and lets the picker take several. Turning it off
+leaves the columns in config, the first in use.
 
 A **sweep** of a setting (several band widths, several thresholds), is conceivable but has no
 use case yet; leave it out.

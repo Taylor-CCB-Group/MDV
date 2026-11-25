@@ -1,4 +1,11 @@
-import { CompositeLayer, type Layer, type LayerProps, type LayersList } from "@deck.gl/core";
+import {
+    CompositeLayer,
+    type GetPickingInfoParams,
+    type Layer,
+    type LayerProps,
+    type LayersList,
+    type PickingInfo,
+} from "@deck.gl/core";
 import type { ScatterplotLayerProps } from "@deck.gl/layers";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import { DensityLayer } from "@intraspatial/deck";
@@ -77,6 +84,19 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     // biome-ignore lint/complexity/noUselessConstructor: tsc error if we remove this?
     constructor(props: SpatialLayerProps) {
         super(props);
+    }
+    /**
+     * A point's row as the pick's `object`, as deck gives for an array of rows but not for the
+     * typed array of rows the points are drawn from. A layer drawing some of the rows (a grid
+     * cell's, see `subsetPointsLayer`) is picked by position among them, not among all the rows.
+     */
+    getPickingInfo(params: GetPickingInfoParams): PickingInfo {
+        const info = super.getPickingInfo(params);
+        const { data } = this.props;
+        if (info.index >= 0 && params.sourceLayer?.props.data === data && data instanceof Uint32Array) {
+            info.object = data[info.index];
+        }
+        return info;
     }
     renderLayers(): Layer<SpatialLayerProps> | LayersList {
         // order matters here, we should make a ui where we can easily control it

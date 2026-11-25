@@ -37,9 +37,11 @@ import {
 import type { ElementIssue } from "@spatialdata/core";
 import { findRenderStackEntry, type RenderStackSpatialElementType, walkRenderStackEntries } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
+import { action } from "mobx";
 import { observer } from "mobx-react-lite";
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
+import type { GridBySpec, GridSplit } from "@/charts/charts";
 import { dataQualityNotesSetting } from "@/lib/browserSettings";
 import {
     DECK_OVERLAY_VISIBILITY_FOLLOWERS,
@@ -76,6 +78,7 @@ import { useChart, useDataStore } from "../context";
 import { useConfig, useDataSources } from "../hooks";
 import EntryStatusDetails from "./EntryStatusDetails";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import { layerFillGrid, layerFillGridConfig } from "./layerFillGridUtils";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import { CompositingButton, hasCompositing } from "./spatialLayers/CompositingButton";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
@@ -181,8 +184,27 @@ const LayerFailureDetails = observer(function LayerFailureDetails({ entryId }: {
     );
 });
 
+/** Turns the chart's grid by this layer's fill colour on (split as asked) and off. */
+function useLayerFillGridBy(entryId: string): GridBySpec {
+    const config = useConfig<SpatialDataMdvReactConfig>();
+    return useMemo(
+        () => ({
+            get: () => {
+                const grid = layerFillGrid(config);
+                return grid?.layer === entryId ? grid.split : null;
+            },
+            set: action((split: GridSplit | null) => {
+                if (split) config.grid = layerFillGridConfig(entryId, split);
+                else if (layerFillGrid(config)?.layer === entryId) config.grid = null;
+            }),
+        }),
+        [config, entryId],
+    );
+}
+
 const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: string }) {
     const dataStore = useDataStore();
+    const gridBy = useLayerFillGridBy(entryId);
     const dataSources = useDataSources();
     const { spatialData } = useChartSpatialData();
     const { entry, layer, patchLayer } = useRenderStackEntry(entryId);
@@ -221,6 +243,7 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
                     association={tableAssociation}
                     dataStore={layerDataStore}
                     updateLayer={patchLayer}
+                    gridBy={gridBy}
                 />
             );
         case "points":
@@ -234,6 +257,7 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
                     association={tableAssociation}
                     dataStore={layerDataStore}
                     updateLayer={patchLayer}
+                    gridBy={gridBy}
                 />
             );
         default:

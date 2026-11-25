@@ -41,6 +41,7 @@ import CustomTooltip from "./CustomTooltip";
 import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
 import { getCategorySelectionDropdownKey } from "./categorySelectionUtils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import GridByControl from "./GridByControl";
 
 const SettingsSearchContext = createContext("");
 const SEARCH_HINT_DURATION_MS = 4000;
@@ -143,8 +144,13 @@ function isMultiSpec(props: ColumnSelectionSpec): props is GuiSpec<"multicolumn"
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSelectionSpec }) => {
-    // multiple etc... this is the level above ColumnSelectionComponent I need to be focusing on.
-    const multiple = isMultiSpec(props);
+    // A property the chart can be a grid of takes one column until it is (see `GuiSpec.gridBy`);
+    // its value stays an array either way, the picker showing the first while single.
+    const gridBy = isMultiSpec(props) ? props.gridBy : undefined;
+    const split = gridBy?.get() ?? null;
+    const multiple = isMultiSpec(props) && (!gridBy || split !== null);
+    const singleOfMulti = isMultiSpec(props) && !multiple;
+    const currentValue = isMultiSpec(props) && singleOfMulti ? props.current_value[0] : props.current_value;
 
     const filter = props.columnType;
     // not only is the filter not working, but we need to decide how to express "multiple"
@@ -154,20 +160,37 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
                 // fixing this stuff is high priority
                 //@ts-expect-error ColumnSelection setSelectedColumn(v: never)???
                 setSelectedColumn: action((v) => {
-                    props.current_value = v;
-                    props.func?.(v);
+                    if (!isMultiSpec(props)) {
+                        props.current_value = v;
+                        props.func?.(v);
+                        return;
+                    }
+                    const next = singleOfMulti ? [v] : v;
+                    props.current_value = next;
+                    props.func?.(next);
                 }),
                 type: filter, //is it ok for this to be optional?
                 multiple,
-                current_value: props.current_value, //! ideally this would also react to changes in the mobx store, why doesn't it?
+                current_value: currentValue, //! ideally this would also react to changes in the mobx store, why doesn't it?
                 // current_value: props.current_value... maybe want to be more mobx-y about this
             }),
-        [filter, props, props.current_value, multiple],
+        [filter, props, currentValue, multiple, singleOfMulti],
     );
+    if (!gridBy) {
+        return (
+            <>
+                <MLabel props={props} />
+                <ColumnSelectionComponent {...props2} />
+            </>
+        );
+    }
     return (
         <>
             <MLabel props={props} />
-            <ColumnSelectionComponent {...props2} />
+            <div className="grid w-full gap-1">
+                <ColumnSelectionComponent {...props2} />
+                <GridByControl split={split} onChange={gridBy.set} />
+            </div>
         </>
     );
 });

@@ -1,21 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { isRegionGridShown, moveRegionViews, partitionRowsByRegion, spatialRegionCells } from "./regionGridUtils";
-
-describe("partitionRowsByRegion", () => {
-    test("splits rows by region, in order, with their positions", () => {
-        // row -> region code
-        const codes = [0, 1, 0, 2, 1, 0];
-        const values = ["a", "b", "c"];
-        const rows = new Uint32Array([5, 1, 2, 4, 0]);
-        const parts = partitionRowsByRegion(rows, codes, values);
-        expect([...parts.keys()]).toEqual(["a", "b"]);
-        expect([...(parts.get("a")?.rows ?? [])]).toEqual([5, 2, 0]);
-        expect([...(parts.get("a")?.positions ?? [])]).toEqual([0, 2, 4]);
-        expect([...(parts.get("b")?.rows ?? [])]).toEqual([1, 4]);
-        expect([...(parts.get("b")?.positions ?? [])]).toEqual([1, 3]);
-        expect(parts.has("c")).toBe(false);
-    });
-});
+import { isRegionGridShown, moveRegionViews, spatialRegionCells } from "./regionGridUtils";
 
 describe("spatialRegionCells", () => {
     test("a cell per region with a store and coordinate system", () => {

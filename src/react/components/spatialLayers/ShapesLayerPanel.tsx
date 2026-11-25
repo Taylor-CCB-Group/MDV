@@ -1,6 +1,7 @@
 import { Slider } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
 
+import type { GridBySpec } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import { mdvFieldSpecsOf, type WithMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import type { TableAssociation } from "@/react/spatialdata/table_association";
@@ -14,9 +15,11 @@ type Props = {
     updateLayer: (updates: Partial<ShapesLayerConfig>) => void;
     association: TableAssociation;
     dataStore: DataStore;
+    /** The chart's grid by this layer's fill colour. */
+    gridBy?: GridBySpec;
 };
 
-export default function ShapesLayerPanel({ config, updateLayer, association, dataStore }: Props) {
+export default function ShapesLayerPanel({ config, updateLayer, association, dataStore, gridBy }: Props) {
     const fillColor = config.fillColor ?? [200, 200, 200, 120];
     const strokeColor = config.strokeColor ?? [255, 255, 255, 200];
     const tooltipFields = config.tooltipFields ?? [];
@@ -41,6 +44,7 @@ export default function ShapesLayerPanel({ config, updateLayer, association, dat
                 dataStore={dataStore}
                 fillColorByColumn={config.fillColorByColumn}
                 fillColorByColumnSpec={specs?.fillColorByColumn}
+                gridBy={gridBy}
                 onChange={(next, spec) =>
                     updateLayer({
                         fillColorByColumn: next,

@@ -194,11 +194,39 @@ export const ChartGridConfigSchema = chartGridConfigSchema(["densityFields"]);
 
 export type ChartGridConfig = z.infer<typeof ChartGridConfigSchema>;
 
+const ColorGridSplitSchema = z
+    .enum(["columns", "categories"])
+    .optional()
+    .describe(
+        'With `by: "color_fields"`: a cell per colour column, each colouring every point by its column (`columns`, the default), or a cell per category of the first colour column, each drawing that category\'s points (`categories`; a `text` or `text16` column)',
+    );
+
+/** The deck scatter plot's grid: a cell per density field, or cells made from its colour. */
+export const DeckScatterGridConfigSchema = chartGridConfigSchema(["densityFields", "color_fields"]).extend({
+    split: ColorGridSplitSchema,
+});
+
 /**
- * The SpatialData chart's grid: a cell per density field, or a cell per region (each region's
- * SpatialData drawn with the chart's layers, and its own rows).
+ * The SpatialData chart's grid: a cell per density field, cells made from its colour (each drawing
+ * its data points over the whole render stack), cells made from a shapes or labels layer's fill
+ * colour (each drawing its own copy of the layer), or a cell per region (each region's SpatialData
+ * drawn with the chart's layers, and its own rows).
  */
-export const SpatialDataGridConfigSchema = chartGridConfigSchema(["densityFields", "region"]).extend({
+export const SpatialDataGridConfigSchema = chartGridConfigSchema([
+    "densityFields",
+    "color_fields",
+    "layer_fill",
+    "region",
+]).extend({
+    split: ColorGridSplitSchema.describe(
+        'With `by: "color_fields"` or `by: "layer_fill"`: a cell per colour column (`columns`, the default), or a cell per category of the first colour column (`categories`; a `text` or `text16` column)',
+    ),
+    layer: z
+        .string()
+        .optional()
+        .describe(
+            'With `by: "layer_fill"`: the render stack entry id of the shapes or labels layer whose fill colour makes the cells; each cell draws its own copy of the layer',
+        ),
     hide_empty: z
         .boolean()
         .optional()
@@ -281,6 +309,10 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
     ...ChartColorConfigSchema.shape,
     ...TooltipConfigSchema.shape,
     ...ContourScatterConfigSchema.shape,
+    color_fields: FieldSpecsSchema.optional().describe(
+        'Columns the points are coloured by: one view by the first, or a grid of them (`grid.by: "color_fields"`). Replaces `color_by`, which older configs have instead',
+    ),
+    grid: DeckScatterGridConfigSchema.nullable().optional(),
     course_radius: z.number().positive().optional().describe("Coarse multiplier applied to the scatter point radius"),
     radius: z.number().positive().optional().describe("Scatter point radius"),
     opacity: z.number().min(0).max(1).optional().describe("Scatter point opacity"),

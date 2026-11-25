@@ -583,6 +583,51 @@ function visibleRowsForDataStore(dataStore: DataStore): Uint32Array {
     return visibleRows;
 }
 
+/** Of `rows`, those whose value in a categorical column's `codes` is `code`. */
+export function rowsInCategory(rows: ArrayLike<number>, codes: ArrayLike<number>, code: number): Uint32Array {
+    let count = 0;
+    for (let i = 0; i < rows.length; i++) if (codes[rows[i]] === code) count++;
+    const result = new Uint32Array(count);
+    let at = 0;
+    for (let i = 0; i < rows.length; i++) if (codes[rows[i]] === code) result[at++] = rows[i];
+    return result;
+}
+
+type CategoryRowsCacheEntry = {
+    rows: Uint32Array;
+    codes: ArrayLike<number> | undefined;
+    category: string;
+    result: Uint32Array;
+};
+
+const NO_ROWS = new Uint32Array(0);
+
+/**
+ * The visible rows of one category of a layer's fill column: what a cell of a grid by the
+ * layer's fill categories draws. None until the column's data has loaded. Cached on what it
+ * reads, so an unchanged subset keeps its identity and the feature-state cache holds.
+ */
+function categoryVisibleRows(
+    cache: Record<string, CategoryRowsCacheEntry>,
+    layerId: string,
+    rows: Uint32Array,
+    dataStore: DataStore,
+    columnName: string | undefined,
+    category: string,
+): Uint32Array {
+    const column = columnName ? dataStore.columnIndex[columnName] : undefined;
+    const codes = column?.data ?? undefined;
+    const cached = cache[layerId];
+    if (cached && cached.rows === rows && cached.codes === codes && cached.category === category) {
+        return cached.result;
+    }
+    const values: unknown[] = Array.isArray(column?.values) ? column.values : [];
+    const code = values.indexOf(category);
+    const result = codes && code >= 0 ? rowsInCategory(rows, codes, code) : NO_ROWS;
+    cache[layerId] = { rows, codes, category, result };
+    return result;
+}
+
 function useDataStoreFilterVersion(dataStores: DataStore[]) {
     const [version, setVersion] = useState(0);
     // `DataStore.addListener` is keyed, and a duplicate key silently REPLACES the
@@ -716,6 +761,11 @@ export function useAssociatedShapesLayerInputs(
     spatialData: SpatialData | undefined,
     layerInputs: RenderStackLayerInputs,
     spatialDataName?: string,
+    /**
+     * Layers that draw only the features of one category of their fill column, by layer id: the
+     * copies of a grid by a layer's fill categories (see `withLayerFillCopies`).
+     */
+    categoryByLayerId?: Readonly<Record<string, string>>,
 ): AssociatedLayerInputs {
     const dataSources = useDataSources();
     // Stable by value, not by identity: which elements are on the canvas changes far
@@ -904,6 +954,7 @@ export function useAssociatedShapesLayerInputs(
     }, [fillColumnsByDataSource, loadedColorColumnVersion, tableByAssociationKey]);
     const lastFillColorsRef = useRef<Record<string, Record<string, RgbaColor>>>({});
     const featureStateCacheRef = useRef<Record<string, FeatureStateCacheEntry>>({});
+    const categoryRowsCacheRef = useRef<Record<string, CategoryRowsCacheEntry>>({});
 
     // `count` here is how many times the association projection ran during a capture;
     // `avgMs` tells you whether the per-feature pass was cached or rebuilt. A cosmetic
@@ -943,8 +994,20 @@ export function useAssociatedShapesLayerInputs(
                             : undefined;
                     // A selected column whose data has not loaded yet has no colour function.
                     const colorReady = !fillColumnName || !!viewerFillColor || colorForRow !== undefined;
-                    const visibleRows =
+                    const filteredRows =
                         visibleRowsByDataSource[table.dataSourceName] ?? visibleRowsForDataStore(table.dataStore);
+                    const category = categoryByLayerId?.[layerId];
+                    const visibleRows =
+                        category === undefined
+                            ? filteredRows
+                            : categoryVisibleRows(
+                                  categoryRowsCacheRef.current,
+                                  layerId,
+                                  filteredRows,
+                                  table.dataStore,
+                                  fillColumnName,
+                                  category,
+                              );
 
                     // Filtering rides `featureState` on both routes: cross-filtering is
                     // MDV's, not the table's, and no column in obs can express it.
@@ -1031,6 +1094,7 @@ export function useAssociatedShapesLayerInputs(
                 // feature of that element — reachable for the life of the chart.
                 pruneToKeys(featureStateCacheRef.current, layerInputs.layerOrder);
                 pruneToKeys(lastFillColorsRef.current, layerInputs.layerOrder);
+                pruneToKeys(categoryRowsCacheRef.current, layerInputs.layerOrder);
 
                 return changed ? nextLayers : layerInputs.layers;
             }),
@@ -1043,6 +1107,7 @@ export function useAssociatedShapesLayerInputs(
             visibleRowsByDataSource,
             colorFunctionByDataSource,
             mdvTooltipFieldsByLayerId,
+            categoryByLayerId,
         ],
     );
 
