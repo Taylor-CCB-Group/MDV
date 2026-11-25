@@ -12,10 +12,13 @@ from mdvtools.examples.curate_mdv_project import (
     column_role,
     gene_panel,
     opening_names,
+    pin_legends,
     plan_question_views,
+    side_panel,
     split_category_values,
     stored_name,
     table_kind,
+    wide_dot,
 )
 from mdvtools.examples.rename_softdelete_mdv_project_fields import (
     apply_plan,
@@ -223,18 +226,24 @@ def test_protein_names_match_hyphen_or_underscore():
 
 
 def test_new_question_views_keep_protein_beside_the_gene_view():
+    disease = "Is the expression different between disease stages/patient groups/tissue types?"
     ordered = arrange_views(
         ["Cell atlas", "summary"],
         {
             Q1_VIEW_NAME: {},
             PROTEIN_VIEW_NAME: {},
-            "Is the expression different between disease stages/patient groups/tissue types?": {},
+            disease: {},
             CONCORD_VIEW_NAME: {},
         },
     )
-    assert ordered[:2] == ["Cell atlas", "summary"]
-    assert ordered[ordered.index(Q1_VIEW_NAME) + 1] == PROTEIN_VIEW_NAME
-    assert ordered[ordered.index(PROTEIN_VIEW_NAME) + 1] == CONCORD_VIEW_NAME
+    assert ordered == [
+        "Cell atlas",
+        Q1_VIEW_NAME,
+        PROTEIN_VIEW_NAME,
+        CONCORD_VIEW_NAME,
+        disease,
+        "summary",
+    ]
 
 
 def test_protein_view_follows_the_gene_view_and_omitted_views_are_dropped():
@@ -254,6 +263,40 @@ def test_protein_view_follows_the_gene_view_and_omitted_views_are_dropped():
     assert ordered[ordered.index(Q1_VIEW_NAME) + 1] == PROTEIN_VIEW_NAME
     assert CONCORD_VIEW_NAME in ordered
     assert ordered.index(CONCORD_VIEW_NAME) < ordered.index("MNP cell signatures")
+
+
+def test_side_panels_use_the_information_chart():
+    gene_charts = side_panel(["PTPRC"])
+    protein_charts = side_panel(["adt_CD14"], kind="protein", list_title="Marker proteins")
+    assert gene_charts[-1]["type"] == "geneNetwork"
+    assert gene_charts[-1]["title"] == "Click a gene to plot it"
+    assert protein_charts[-1]["type"] == "geneNetwork"
+    assert protein_charts[-1]["title"] == "Click a protein to plot it"
+
+
+def test_dot_plots_keep_category_text_visible():
+    chart = wide_dot("Genes by Cell Type", "annotation", {"type": "RowsAsColsQuery"})
+    assert chart["axis"]["y"]["size"] == 220
+    assert chart["axis"]["x"]["size"] == 110
+    assert chart["axis"]["x"]["truncate_labels"] is False
+    assert "pos" not in chart["color_legend"]
+
+
+def test_non_dot_legends_sit_bottom_right():
+    view = {
+        "initialCharts": {
+            "cells": [
+                {"type": "heat_map", "size": [600, 400], "color_legend": {"display": True, "pos": [8, 280]}},
+                {"type": "wgl_scatter_plot_dev", "size": [500, 300], "color_legend": {"display": True}},
+                {"type": "compound_dot_plot", "size": [900, 600], "color_legend": {"display": True, "pos": [40, 10]}},
+            ]
+        }
+    }
+    pin_legends(view)
+    heat, scatter, dot = view["initialCharts"]["cells"]
+    assert heat["color_legend"]["pos"] == [600 - 180, 400 - 120]
+    assert scatter["color_legend"]["pos"] == [500 - 180, 300 - 120]
+    assert "pos" not in dot["color_legend"]
 
 
 def test_signature_view_is_not_created(tmp_path):

@@ -62,7 +62,6 @@ from mdvtools.template_views.create_question_views import (
     compound_dot_plot,
     feature_list,
     feature_query,
-    feature_table,
     gene_info,
     heat_map,
     place_legends,
@@ -74,9 +73,23 @@ from mdvtools.template_views.create_question_views import (
 from mdvtools.template_views.create_synovial_question_views import MARKER_GENES
 
 Q8_VIEW_NAME = "Contrasting responders and non-responders"
+Q8_TREATMENT_VIEW_NAME = "Contrasting responders and non-responders at baseline and post treatment"
 Q9_VIEW_NAME = "Comparing groups: is the UMAP different between responders and non-responders?"
+Q9_TREATMENT_VIEW_NAME = "Comparing groups: is the UMAP different between treatment states? DEG?"
 PROTEIN_VIEW_NAME = "Where is my protein of interest expressed across cell populations?"
 CONCORD_VIEW_NAME = "Is the gene expression concordant with protein expression?"
+CELL_ATLAS_NAME = "Cell atlas"
+QUESTION_ORDER = (
+    Q1_VIEW_NAME,
+    PROTEIN_VIEW_NAME,
+    CONCORD_VIEW_NAME,
+    Q2_VIEW_NAME,
+    Q6_VIEW_NAME,
+    Q8_TREATMENT_VIEW_NAME,
+    Q8_VIEW_NAME,
+    Q9_TREATMENT_VIEW_NAME,
+    Q9_VIEW_NAME,
+)
 # These stay out of the project: the signature view has no collection column,
 # and the CITE-seq view is a duplicate of CONCORD_VIEW_NAME.
 OMITTED_VIEW_NAMES = (Q7_VIEW_NAME, Q3_VIEW_NAME)
@@ -93,6 +106,8 @@ TEXT_HEIGHT = 150
 TEXT_TALL = 215
 UMAP_HEIGHT = 400
 DOT_HEIGHT = 620
+DOT_Y_LABEL = 220
+DOT_X_LABEL = 110
 HEAT_HEIGHT = 430
 FILTER_WIDTH = 420
 FILTER_HEIGHT = 360
@@ -516,11 +531,34 @@ def side_panel(
         y += PROMPT_HEIGHT + CHART_GAP
     charts.append(placed(feature_list(list_title, names), [0, y], [width, LIST_HEIGHT]))
     y += LIST_HEIGHT + CHART_GAP
-    if kind == "protein":
-        charts.append(placed(feature_table("Click a protein to plot it"), [0, y], [width, DETAIL_HEIGHT]))
-    else:
-        charts.append(placed(gene_info("Click a gene to plot it"), [0, y], [width, DETAIL_HEIGHT]))
+    info_title = "Click a protein to plot it" if kind == "protein" else "Click a gene to plot it"
+    charts.append(placed(gene_info(info_title), [0, y], [width, DETAIL_HEIGHT]))
     return charts
+
+
+def wide_dot(title: str, category: str, features: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+    """A full-width dot plot with room for category and gene names."""
+    chart = compound_dot_plot(title, category, features, y_label_size=DOT_Y_LABEL, **kwargs)
+    axis_x = chart["axis"]["x"]
+    axis_x["size"] = DOT_X_LABEL
+    axis_x["truncate_labels"] = False
+    return chart
+
+
+def pin_legends(view: dict[str, Any]) -> dict[str, Any]:
+    """Colour legends sit bottom-right. Dot plots keep the default top legend."""
+    for charts in view.get("initialCharts", {}).values():
+        for chart in charts:
+            legend = chart.get("color_legend")
+            if chart.get("type") == "compound_dot_plot":
+                if isinstance(legend, dict):
+                    legend.pop("pos", None)
+                continue
+            size = chart.get("size")
+            if isinstance(legend, dict) and legend.get("display") and isinstance(size, list) and len(size) == 2:
+                width, height = size
+                legend["pos"] = [max(8, int(width) - 180), max(8, int(height) - 120)]
+    return view
 
 
 def question_view(
@@ -638,29 +676,18 @@ def plan_question_views(
     axis_label = group_label if group_field else dot_label
 
     def accept(name: str, view: dict[str, Any]) -> None:
-        laid = place_legends(view, counts)
-        for charts in laid.get("initialCharts", {}).values():
-            for chart in charts:
-                if chart.get("type") != "heat_map":
-                    continue
-                legend = chart.get("color_legend")
-                size = chart.get("size")
-                if isinstance(legend, dict) and legend.get("display") and isinstance(size, list) and len(size) == 2:
-                    width, height = size
-                    legend["pos"] = [max(8, int(width) - 180), max(8, int(height) - 120)]
-        built[name] = laid
+        built[name] = pin_legends(place_legends(view, counts))
 
     def split_chart(column: dict[str, Any], query: dict[str, Any]) -> dict[str, Any] | None:
         values = split_category_values(column)
         if values is None or not y_field:
             return None
         label = column_label(column, str(column.get("field")))
-        return compound_dot_plot(
+        return wide_dot(
             f"{axis_label}, split by {label}",
             y_field,
             query,
             split=(str(column["field"]), values),
-            y_label_size=110,
         )
 
     comparisons = [roles[role] for role in COMPARE_ROLES if role in roles]
@@ -684,10 +711,7 @@ def plan_question_views(
             UMAP_HEIGHT,
         )
         rows.full(heat_map(f"Selected gene by {group_label}", group_field, one_gene), HEAT_HEIGHT)
-        rows.full(
-            compound_dot_plot(f"Selected gene by {dot_label}", dot_field, one_gene, y_label_size=110),
-            DOT_HEIGHT,
-        )
+        rows.full(wide_dot(f"Selected gene by {dot_label}", dot_field, one_gene), DOT_HEIGHT)
         accept(
             Q1_VIEW_NAME,
             question_view(
@@ -763,7 +787,7 @@ def plan_question_views(
                 HEAT_HEIGHT,
             )
             protein_rows.full(
-                compound_dot_plot(f"Selected protein by {dot_label}", dot_field, one_protein, y_label_size=110),
+                wide_dot(f"Selected protein by {dot_label}", dot_field, one_protein),
                 DOT_HEIGHT,
             )
             accept(
@@ -821,22 +845,17 @@ def plan_question_views(
             chart = split_chart(column, many_genes)
             if chart is None and len([value for value in text_column_values(column) if value.strip()]) == 1:
                 label = column_label(column, str(column.get("field")))
-                chart = compound_dot_plot(
+                chart = wide_dot(
                     f"Selected genes by {label}",
                     str(column["field"]),
                     many_genes,
-                    y_label_size=110,
                 )
             if chart is not None:
                 pending.append(chart)
         if dot_field:
-            pending.append(
-                compound_dot_plot(f"Selected genes by {dot_label}", dot_field, many_genes, y_label_size=110)
-            )
-        while pending:
-            left = pending.pop(0)
-            right = pending.pop(0) if pending else None
-            rows.pair(left, right, DOT_HEIGHT)
+            pending.append(wide_dot(f"Selected genes by {dot_label}", dot_field, many_genes))
+        for chart in pending:
+            rows.full(chart, DOT_HEIGHT)
         rows.selector(group_filter)
         accept(Q2_VIEW_NAME, question_view(cells_name, gene_name, rows.charts, gene_panel(gene_name, comparison_genes)))
     else:
@@ -861,11 +880,8 @@ def plan_question_views(
             LinkedFeatures(protein_name, protein_subgroup, [pairs[0][1]]),
             CONCORD_MAX_ITEMS,
         )
-        concord.pair(
-            compound_dot_plot(f"RNA by {dot_label}", dot_field, gene_query, y_label_size=110),
-            compound_dot_plot(f"Protein by {dot_label}", dot_field, protein_query, y_label_size=110),
-            DOT_HEIGHT,
-        )
+        concord.full(wide_dot(f"RNA by {dot_label}", dot_field, gene_query), DOT_HEIGHT)
+        concord.full(wide_dot(f"Protein by {dot_label}", dot_field, protein_query), DOT_HEIGHT)
         if umap_x and umap_y:
             concord.pair(
                 umap_chart(
@@ -922,8 +938,8 @@ def plan_question_views(
             text_box(
                 "About this page",
                 "**How comparable is the expression across different diseases?** "
-                "Each row is one comparison. The **split dot plot** has a panel per group, and the **heat map** "
-                "shows the average of the selected genes in that same grouping.\n\n"
+                "Each comparison is a **split dot plot** with a panel per group, and a **heat map** "
+                "under it showing the average of the selected genes in that same grouping.\n\n"
                 "The page starts on five genes. **To plot more:** click further genes in the list on the right.",
             ),
             TEXT_TALL,
@@ -936,7 +952,11 @@ def plan_question_views(
             chart = split_chart(column, many_genes)
             if chart is None:
                 continue
-            rows.pair(chart, heat_map(f"Selected genes by {label}", str(column["field"]), many_genes), DOT_HEIGHT)
+            rows.full(chart, DOT_HEIGHT)
+            rows.full(
+                heat_map(f"Selected genes by {label}", str(column["field"]), many_genes),
+                HEAT_HEIGHT,
+            )
         rows.selector(group_filter)
         accept(Q6_VIEW_NAME, question_view(cells_name, gene_name, rows.charts, gene_panel(gene_name, comparison_genes)))
     else:
@@ -972,18 +992,18 @@ def plan_question_views(
             group_filter = cell_filter("Choose groups to compare", filters, selected_filters)
             stage_charts = []
             for stage in stages[:2]:
-                chart = compound_dot_plot(
+                chart = wide_dot(
                     f"{stage}: {response_label}",
                     y_field,
                     many_genes,
                     split=(response_field, [str(value) for value in groups[:2]]),
-                    y_label_size=110,
                 )
                 chart["category_filters"] = [{"column": treatment_field, "category": [stage]}]
                 stage_charts.append(chart)
-            rows.pair(stage_charts[0], stage_charts[1] if len(stage_charts) > 1 else None, DOT_HEIGHT)
+            for chart in stage_charts:
+                rows.full(chart, DOT_HEIGHT)
             rows.selector(group_filter)
-            q8_name = "Contrasting responders and non-responders at baseline and post treatment"
+            q8_name = Q8_TREATMENT_VIEW_NAME
         else:
             rows.full(
                 text_box(
@@ -997,12 +1017,11 @@ def plan_question_views(
             )
             group_filter = cell_filter("Choose groups to compare", filters, selected_filters)
             rows.full(
-                compound_dot_plot(
+                wide_dot(
                     f"{axis_label}, split by {response_label}",
                     y_field,
                     many_genes,
                     split=(response_field, [str(value) for value in groups[:2]]),
-                    y_label_size=110,
                 ),
                 DOT_HEIGHT,
             )
@@ -1065,21 +1084,16 @@ def plan_question_views(
             BAR_HEIGHT,
         )
         rows.full(
-            compound_dot_plot(
+            wide_dot(
                 f"{axis_label}, split by {stage_label}",
                 y_field,
                 many_genes,
                 split=(stage_field, [str(value) for value in stage_values[:2]]),
-                y_label_size=110,
             ),
             DOT_HEIGHT,
         )
         rows.selector(group_filter)
-        q9_name = (
-            "Comparing groups: is the UMAP different between treatment states? DEG?"
-            if stages
-            else Q9_VIEW_NAME
-        )
+        q9_name = Q9_TREATMENT_VIEW_NAME if stages else Q9_VIEW_NAME
         accept(q9_name, question_view(cells_name, gene_name, rows.charts, gene_panel(gene_name, comparison_genes)))
     else:
         skipped.append({
@@ -1101,32 +1115,15 @@ def plan_question_views(
 
 
 def arrange_views(all_views: list[str], built: dict[str, Any]) -> list[str]:
-    """Drop omitted views and place the protein view immediately after the gene view."""
+    """Cell atlas, then the question views, then every other saved view."""
     names = [name for name in all_views if name not in OMITTED_VIEW_NAMES]
-    # Add the new question views before placing protein and concordance, so a
-    # project that does not already list the gene view still gets protein next to it.
-    placed_later = {PROTEIN_VIEW_NAME, CONCORD_VIEW_NAME}
+    questions = [name for name in QUESTION_ORDER if name in built]
     for name in built:
-        if name not in names and name not in placed_later:
-            names.append(name)
-    protein = PROTEIN_VIEW_NAME if PROTEIN_VIEW_NAME in built else None
-    if protein:
-        if protein in names:
-            names.remove(protein)
-        if Q1_VIEW_NAME in names:
-            names.insert(names.index(Q1_VIEW_NAME) + 1, protein)
-        else:
-            names.insert(0, protein)
-    if CONCORD_VIEW_NAME in built and CONCORD_VIEW_NAME not in names:
-        after = protein if protein and protein in names else Q1_VIEW_NAME
-        if after in names:
-            names.insert(names.index(after) + 1, CONCORD_VIEW_NAME)
-        else:
-            names.append(CONCORD_VIEW_NAME)
-    for name in built:
-        if name not in names:
-            names.append(name)
-    return names
+        if name not in questions:
+            questions.append(name)
+    others = [name for name in names if name not in questions and name != CELL_ATLAS_NAME]
+    atlas = [CELL_ATLAS_NAME] if CELL_ATLAS_NAME in names else []
+    return atlas + questions + others
 
 
 def backup_views(project: Path) -> Path:
