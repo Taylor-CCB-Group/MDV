@@ -254,6 +254,9 @@ A feature release. SQLite is now the default database for new installs of the fu
   width twice, so normalised values change for regions that are not square (#637).
 - Sorting by an integer, `unique` or `multitext` column, such as in the DeepTools heat map's
   Sort By, orders negative integers correctly and no longer throws (#665).
+- The catalog's account menu shows the signed-in user's name and email from MDV's users
+  table. It asked Auth0 with the token saved at sign-in, so once that token expired it showed
+  "Unable to fetch user data" (#712).
 
 ## [1.3.0] - 2026-06-04
 
