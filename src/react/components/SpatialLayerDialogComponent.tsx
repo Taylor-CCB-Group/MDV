@@ -79,6 +79,7 @@ import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import { CompositingButton, hasCompositing } from "./spatialLayers/CompositingButton";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
+import { ElementTableIcon, ElementTableMenuHint, useElementTableSummary } from "./spatialLayers/ElementTableBadge";
 import GroupLayerPanel from "./spatialLayers/GroupLayerPanel";
 import ImageLayerPanel from "./spatialLayers/ImageLayerPanel";
 import LabelsLayerPanel from "./spatialLayers/LabelsLayerPanel";
@@ -391,19 +392,20 @@ const LayerTreeRow = observer(function LayerTreeRow({
     const [renaming, setRenaming] = useState(false);
     const failure = chart.layerFailures.get(entryId);
     const { status } = chart.visibleEntryStatus(entryId);
+    const tableSummary = useElementTableSummary();
 
     if (!entry) return null;
 
     const layerOpacity = typeof entry.props.opacity === "number" ? entry.props.opacity : 1;
     const supportsOpacity = entry.kind === "spatial" || entry.kind === "group";
     const name = renderStackEntryDisplayName(entry, config.renderStack);
+    const table = entry.kind === "spatial" ? tableSummary(entry.source.elementType, entry.source.elementKey) : null;
 
     return (
         <div
             ref={setNodeRef}
             style={{ paddingLeft: (nested ? 40 : 20) + depth * TREE_INDENT_PX, ...style }}
-            className={`flex items-center gap-1 py-0.5 cursor-pointer rounded pr-1 ${selected ? "bg-blue-100 dark:bg-blue-900/30" : failure ? "bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:hover:bg-amber-900/50" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
-            onClick={() => onSelect(entryId)}
+            className={`flex items-center gap-1 py-0.5 rounded pr-1 ${selected ? "bg-blue-100 dark:bg-blue-900/30" : failure ? "bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:hover:bg-amber-900/50" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
             title={failure ? `Failed and turned off: ${failure.reason}` : undefined}
         >
             {dragHandle ? (
@@ -465,12 +467,13 @@ const LayerTreeRow = observer(function LayerTreeRow({
             ) : (
                 <Typography
                     variant="body2"
-                    className="grow truncate select-none rounded focus-visible:outline focus-visible:outline-2"
+                    // grows to fill the row between its controls, so it is the row's click target
+                    className="grow truncate select-none cursor-pointer rounded focus-visible:outline focus-visible:outline-2"
                     title="Double-click (or F2) to rename"
-                    // the keyboard path to selecting a row; the row's own click is for the mouse
                     role="button"
                     tabIndex={0}
                     aria-pressed={selected}
+                    onClick={() => onSelect(entryId)}
                     onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
@@ -490,6 +493,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
                     {name}
                 </Typography>
             )}
+            {table && <ElementTableIcon summary={table} />}
             {hasCompositing(entry.kind, entryId) && <CompositingButton entryId={entryId} name={name} />}
             {entry.kind === "group" && onAddInto && (
                 <IconButton
@@ -506,7 +510,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
                 </IconButton>
             )}
             {supportsOpacity && (
-                <div className="w-20 px-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <div className="w-20 px-1 flex-shrink-0">
                     <Slider
                         size="small"
                         min={0}
@@ -654,6 +658,7 @@ const SpatialLayerDialogComponent = observer(() => {
     // The open add-layer menu: where it hangs, and the group it adds into (null: the top level).
     const [addMenu, setAddMenu] = useState<{ anchor: HTMLElement; parentId: string | null } | null>(null);
     const [deckCollapsed, setDeckCollapsed] = useState(false);
+    const tableSummary = useElementTableSummary();
     const coordinateSystem = //todo datasources schema including spatial regions when referring to dataStore here.
         (chart.dataStore.regions?.all_regions[config.region] as { spatial?: { coordinate_system?: string } })?.spatial
             ?.coordinate_system ?? null;
@@ -976,6 +981,7 @@ const SpatialLayerDialogComponent = observer(() => {
                 slotProps={{ paper: { sx: { maxHeight: 360 } } }}
             >
                 {insertOptions.flatMap((option, index) => {
+                    const table = option.kind === "spatial" ? tableSummary(option.type, option.elementKey) : null;
                     const item = (
                         <MenuItem
                             key={option.label}
@@ -987,6 +993,7 @@ const SpatialLayerDialogComponent = observer(() => {
                             }}
                         >
                             {option.kind === "group" ? "Group (drag layers into it)" : option.label}
+                            {table && <ElementTableMenuHint summary={table} />}
                         </MenuItem>
                     );
                     return index === 1
