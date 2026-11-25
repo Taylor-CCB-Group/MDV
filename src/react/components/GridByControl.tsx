@@ -50,14 +50,13 @@ export default function GridByControl({
 }
 
 /**
- * Marks the thing the chart is a grid of (in the layer list, the layer whose fill colour it is
- * split by), so it can be found without opening each layer's settings.
+ * Marks the thing the chart is a grid of: in the layer list, the layer whose fill colour it is
+ * split by, or, given the layer's name, the collapsed group that holds it.
  */
-export function GridByIcon({ split }: { split: GridSplit }) {
-    const description =
-        split === "columns"
-            ? "The chart is a grid of this layer's colour: a cell per colour column"
-            : "The chart is a grid of this layer's colour: a cell per category";
+export function GridByIcon({ split, layerName }: { split: GridSplit; layerName?: string }) {
+    const layer = layerName ? `'${layerName}' (in this group)` : "this layer";
+    const cells = split === "columns" ? "a cell per colour column" : "a cell per category";
+    const description = `The chart is a grid of the colour of ${layer}: ${cells}`;
     return (
         <span className="flex flex-shrink-0" title={description} role="img" aria-label={description}>
             <GridViewOutlinedIcon fontSize="small" color="primary" sx={{ fontSize: 16 }} />

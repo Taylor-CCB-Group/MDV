@@ -342,7 +342,8 @@ and any reader of the saved stack, takes the first (`projectMdvFieldSpecs`).
 
 The Grid dropdown offers only layers whose element a table annotates (`annotatedLayerFilter`,
 the association the layer panels use), and the layer the chart is a grid of. In the layer list
-that layer's row has a grid icon (`GridByIcon`) beside its table icon.
+that layer's row has a grid icon (`GridByIcon`) beside its table icon, as does the row of a
+collapsed group that holds it.
 
 The copies are made for every cell, not only those in view, and each costs a pass over the
 element's features when its column or the filter changes. An active link's change of columns

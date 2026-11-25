@@ -427,6 +427,11 @@ const LayerTreeRow = observer(function LayerTreeRow({
     const table = entry.kind === "spatial" ? tableSummary(entry.source.elementType, entry.source.elementKey) : null;
     const grid = layerFillGrid(config);
     const gridSplit = grid?.layer === entryId ? grid.split : null;
+    // a collapsed group stands in for the gridded layer it hides
+    const hiddenGridLayer =
+        grid && entry.kind === "group" && expander && !expander.expanded
+            ? Array.from(walkRenderStackEntries(entry.children)).find((child) => child.id === grid.layer)
+            : undefined;
 
     return (
         <div
@@ -522,6 +527,12 @@ const LayerTreeRow = observer(function LayerTreeRow({
             )}
             {table && <ElementTableIcon summary={table} />}
             {gridSplit && <GridByIcon split={gridSplit} />}
+            {grid && hiddenGridLayer && (
+                <GridByIcon
+                    split={grid.split}
+                    layerName={renderStackEntryDisplayName(hiddenGridLayer, config.renderStack)}
+                />
+            )}
             {hasCompositing(entry.kind, entryId) && <CompositingButton entryId={entryId} name={name} />}
             {entry.kind === "group" && onAddInto && (
                 <IconButton
