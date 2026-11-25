@@ -192,7 +192,8 @@ export default class LegendWrapper<TSpec, T extends BaseConfig = BaseConfig> {
             onPutOnTop: placement && !inBand ? () => placement.setLayout({ position: "top" }) : undefined,
             onMoved: interactions.onMoved,
             onResized: (size) => {
-                this.userSize = size;
+                // a resize finishing on a legend that's since been redrawn or removed doesn't count
+                if (this.host === host) this.userSize = size;
             },
             focusToggle,
         };

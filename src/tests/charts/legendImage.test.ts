@@ -10,23 +10,43 @@ function placeAt(element: Element, left: number, top: number, width = 100, heigh
     boxes.set(element, { left, top, width, height });
 }
 
-/** A legend as `LegendWrapper` draws it: a host holding a frame, which holds the legend's SVG. */
-function wrappedLegend(left: number, top: number, minimized = false) {
+/**
+ * A legend as `LegendWrapper` draws it: a host holding a frame, which holds the legend's SVG in
+ * a list that scrolls. Give `list` to place the list and cut off what's outside it.
+ */
+function wrappedLegend(
+    left: number,
+    top: number,
+    minimized = false,
+    list?: { left: number; top: number; width: number; height: number },
+) {
     const host = document.createElement("div");
     const frame = document.createElement("div");
     frame.className = "legend-container";
     host.append(frame);
     if (!minimized) {
+        const body = document.createElement("div");
         const svg = document.createElementNS(SVG_NS, "svg");
         const g = document.createElementNS(SVG_NS, "g");
         g.setAttribute("transform", "translate(2,3)");
         const after = document.createElementNS(SVG_NS, "text");
         svg.append(g, after);
-        frame.append(svg);
+        body.append(svg);
+        frame.append(body);
         placeAt(svg, left, top);
+        if (list) {
+            body.style.overflowY = "auto";
+            placeAt(body, list.left, list.top, list.width, list.height);
+        }
     }
     document.body.append(host);
     return host;
+}
+
+/** The nested SVG a legend's drawing is put in, which cuts it to what can be seen. */
+function frameOf(svg: SVGSVGElement) {
+    const frame = svg.querySelector("svg");
+    return frame && ["x", "y", "width", "height"].map((name) => frame.getAttribute(name));
 }
 
 /** The chart's SVG, at (10, 100) on screen. */
@@ -59,8 +79,8 @@ describe("addLegendsToSvg", () => {
 
         addLegendsToSvg(svg, [legend]);
 
-        const drawing = svg.querySelector("g");
-        expect(drawing?.getAttribute("transform")).toBe("translate(40,25) translate(2,3)");
+        expect(frameOf(svg)).toEqual(["40", "25", "100", "50"]);
+        expect(svg.querySelector("g")?.getAttribute("transform")).toBe("translate(0,0) translate(2,3)");
         expect(legend.querySelector("g")).toBeNull();
         // nothing above the plot, so the image keeps its size
         expect(svg.getAttribute("height")).toBe("200");
@@ -73,7 +93,7 @@ describe("addLegendsToSvg", () => {
 
         addLegendsToSvg(svg, [legend]);
 
-        expect(svg.querySelector("g")?.getAttribute("transform")).toBe("translate(0,-40) translate(2,3)");
+        expect(frameOf(svg)).toEqual(["0", "-40", "100", "50"]);
         expect(svg.getAttribute("height")).toBe("240");
         expect(svg.getAttribute("viewBox")).toBe("0 -40 300 240");
     });
@@ -114,6 +134,27 @@ describe("addLegendsToSvg", () => {
 
         addLegendsToSvg(svg, [legend]);
 
-        expect(svg.querySelector("g")?.getAttribute("transform")).toBe("translate(7,9)");
+        expect(frameOf(svg)).toEqual(["7", "9", "100", "50"]);
+        expect(svg.querySelector("g")?.getAttribute("transform")).toBe("translate(0,0)");
+    });
+
+    test("cuts a scrolled legend list to the part that can be seen, so it doesn't cover the plot", () => {
+        // the list shows 30px of a 50px drawing, scrolled down by 10px
+        const legend = wrappedLegend(50, 115, false, { left: 50, top: 125, width: 100, height: 30 });
+        const svg = chartSvg();
+
+        addLegendsToSvg(svg, [legend]);
+
+        expect(frameOf(svg)).toEqual(["40", "25", "100", "30"]);
+        expect(svg.querySelector("g")?.getAttribute("transform")).toBe("translate(0,-10) translate(2,3)");
+    });
+
+    test("leaves out a legend scrolled out of view", () => {
+        const legend = wrappedLegend(50, 300, false, { left: 50, top: 125, width: 100, height: 30 });
+        const svg = chartSvg();
+
+        addLegendsToSvg(svg, [legend]);
+
+        expect(svg.childElementCount).toBe(0);
     });
 });

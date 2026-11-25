@@ -596,6 +596,17 @@ reflowed every chart. Handles are still painted and still receive pointer events
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* the colours shrink and are cut off before the + would be pushed out of the pill */
+.legend-summary-previews {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+}
+.legend-summary-previews:empty {
+    display: none;
+}
 .legend-summary-swatch {
     width: 8px;
     height: 8px;
@@ -610,6 +621,7 @@ reflowed every chart. Handles are still painted and still receive pointer events
     width: 36px;
     height: 8px;
     border-radius: 2px;
+    flex-shrink: 0;
 }
 
 .row-bar {

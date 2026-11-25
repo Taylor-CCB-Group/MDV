@@ -1,3 +1,5 @@
+import { getVisibleBox } from "@/charts/legendImage";
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 /**
@@ -69,22 +71,37 @@ export function buildChartSvg(...containers: [HTMLElement, ...HTMLElement[]]): S
     out.setAttribute("height", String(box.height));
     out.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
 
-    const svgs = containers.flatMap((c) => [...c.querySelectorAll("svg")]);
+    const svgs = containers.flatMap((c) => [...c.querySelectorAll("svg")].map((svg) => ({ svg, container: c })));
     const titles = containers.flatMap((c) => [...c.querySelectorAll(HTML_TITLE_SELECTOR)]);
 
-    for (const svg of svgs) {
+    for (const { svg, container } of svgs) {
         // nested SVGs come along with their outer one
         if (svg.parentElement?.closest("svg")) continue;
         const rect = svg.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) continue;
+        // only the part that can be seen: a legend scrolled in the strip shows as it does on screen
+        const visible = getVisibleBox(svg, container);
+        if (visible.width === 0 || visible.height === 0) continue;
         const copy = svg.cloneNode(true);
         if (!(copy instanceof Element)) continue;
         inlineStyles(copy, svg);
-        copy.setAttribute("x", String(rect.left - box.left));
-        copy.setAttribute("y", String(rect.top - box.top));
         copy.setAttribute("width", String(rect.width));
         copy.setAttribute("height", String(rect.height));
-        out.append(copy);
+        if (visible.width === rect.width && visible.height === rect.height) {
+            copy.setAttribute("x", String(rect.left - box.left));
+            copy.setAttribute("y", String(rect.top - box.top));
+            out.append(copy);
+            continue;
+        }
+        // cut off what's out of view with an SVG the size of the visible part
+        const frame = doc.createElementNS(SVG_NS, "svg");
+        frame.setAttribute("x", String(visible.left - box.left));
+        frame.setAttribute("y", String(visible.top - box.top));
+        frame.setAttribute("width", String(visible.width));
+        frame.setAttribute("height", String(visible.height));
+        copy.setAttribute("x", String(rect.left - visible.left));
+        copy.setAttribute("y", String(rect.top - visible.top));
+        frame.append(copy);
+        out.append(frame);
     }
 
     for (const title of titles) {

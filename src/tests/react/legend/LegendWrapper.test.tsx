@@ -204,6 +204,27 @@ describe("LegendWrapper saved size", () => {
     });
 });
 
+describe("LegendWrapper resized while redrawn", () => {
+    test("ignores a resize that finishes on a legend that's since been redrawn", () => {
+        const { el, wrapper } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 });
+        const corner = el.querySelector(".resizer-se");
+        if (!corner) throw new Error("expected a resize handle");
+
+        act(() => {
+            corner.dispatchEvent(pointer("pointerdown", 1, { clientX: 100, clientY: 100 }));
+            document.dispatchEvent(pointer("pointermove", 1, { clientX: 60, clientY: 40 }));
+            // redrawn mid-resize; the old legend is only taken down after this
+            wrapper.render("spec", { left: 10, top: 10 }, FakeLegend, {
+                dragHandle: ".legend-drag-handle",
+                resizable: true,
+            });
+            document.dispatchEvent(pointer("pointerup", 1));
+        });
+
+        expect(wrapper.getUserSize()).toBeNull();
+    });
+});
+
 describe("LegendWrapper keeps the legend inside the chart", () => {
     test("moves a legend that would hang over the bottom-right edge back inside", () => {
         // 180x250 legend saved at the bottom right of a chart it no longer fits at
@@ -307,6 +328,30 @@ describe("LegendWrapper dragging", () => {
         });
         expect([el.style.left, el.style.top]).toEqual(["60px", "40px"]);
         expect(onMoved).toHaveBeenCalledWith([60, 40]);
+    });
+
+    test("keeps following the first pointer when a second presses the handle before it's released", () => {
+        const onMoved = vi.fn();
+        const { el } = renderLegend({ width: 600, height: 600 }, { left: 10, top: 10 }, true, { onMoved });
+        const handle = el.querySelector(".legend-drag-handle");
+        if (!handle) throw new Error("expected a drag handle");
+
+        act(() => {
+            handle.dispatchEvent(pointer("pointerdown", 1, { clientX: 100, clientY: 100 }));
+            handle.dispatchEvent(pointer("pointerdown", 2, { clientX: 200, clientY: 200 }));
+            document.dispatchEvent(pointer("pointermove", 2, { clientX: 400, clientY: 400 }));
+            document.dispatchEvent(pointer("pointermove", 1, { clientX: 150, clientY: 130 }));
+        });
+        expect([el.style.left, el.style.top]).toEqual(["60px", "40px"]);
+
+        act(() => {
+            document.dispatchEvent(pointer("pointerup", 2));
+            document.dispatchEvent(pointer("pointermove", 1, { clientX: 160, clientY: 140 }));
+            document.dispatchEvent(pointer("pointerup", 1));
+        });
+        expect([el.style.left, el.style.top]).toEqual(["70px", "50px"]);
+        expect(onMoved).toHaveBeenCalledTimes(1);
+        expect(onMoved).toHaveBeenCalledWith([70, 50]);
     });
 
     test("drops a drag still going when the legend is redrawn", async () => {

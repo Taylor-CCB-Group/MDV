@@ -267,17 +267,20 @@ function LegendSummaryPill({
     return (
         <div className="legend-summary" title={summary.label}>
             <span className="legend-summary-label">{summary.label}</span>
-            {(summary.swatches ?? []).map((color, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: swatches are positional and colours can repeat
-                <span key={i} className="legend-summary-swatch" style={{ backgroundColor: color }} />
-            ))}
-            {summary.more ? <span className="legend-summary-more">+{summary.more}</span> : null}
-            {summary.gradient && summary.gradient.length > 1 ? (
-                <span
-                    className="legend-summary-gradient"
-                    style={{ backgroundImage: `linear-gradient(90deg, ${summary.gradient.join(", ")})` }}
-                />
-            ) : null}
+            {/* the colours give way to the + on a narrow pill, and are cut off */}
+            <span className="legend-summary-previews">
+                {(summary.swatches ?? []).map((color, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: swatches are positional and colours can repeat
+                    <span key={i} className="legend-summary-swatch" style={{ backgroundColor: color }} />
+                ))}
+                {summary.more ? <span className="legend-summary-more">+{summary.more}</span> : null}
+                {summary.gradient && summary.gradient.length > 1 ? (
+                    <span
+                        className="legend-summary-gradient"
+                        style={{ backgroundImage: `linear-gradient(90deg, ${summary.gradient.join(", ")})` }}
+                    />
+                ) : null}
+            </span>
             <LegendControlButton
                 icon="fas fa-plus"
                 label={`Show legend: ${summary.label}`}
@@ -342,7 +345,8 @@ export default function LegendFrame({
         onMove: (dx: number, dy: number) => void,
         onEnd: () => void,
     ) => {
-        gesture.current?.();
+        // the first pointer keeps control until it's released
+        if (gesture.current) return;
         gesture.current = trackPointer(event, onMove, () => {
             gesture.current = null;
             onEnd();

@@ -402,7 +402,13 @@ export const CompoundDotPlotConfigSchema = BaseConfigSchema.extend({
         })
         .optional()
         .describe("Colour scale for mean expression, shared by all panels"),
-    color_legend: z.object({ display: z.boolean() }).optional().describe("Show the colour legend"),
+    color_legend: z
+        .object({
+            display: z.boolean(),
+            minimized: z.boolean().optional().describe("Shown as a small button with its title"),
+        })
+        .optional()
+        .describe("Show the colour legend"),
     fraction_legend: z
         .object({
             display: z.boolean(),

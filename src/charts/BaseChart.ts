@@ -405,6 +405,8 @@ class BaseChart<T extends BaseConfig> {
         //work out width and height based on container
         this._setDimensions();
         this.deferredInit(() => {
+            // the chart may be removed before this runs; its legend would be left behind
+            if (this.removed) return;
             try {
                 //some charts weren't properly initialising the color legend, so doing it here may help that to be more consistent.
                 //there is an implementation of the method here in BaseChart, but we wrap in a try/catch as it assumes other associated methods are also implemented.
@@ -960,10 +962,14 @@ class BaseChart<T extends BaseConfig> {
         this._tooltip.style.display = "none";
     }
 
+    /** Whether `remove()` has been called. */
+    private removed = false;
+
     /**
      * Just removes the DOM elements, subclasses should do their own cleanup
      */
     remove(notify?: boolean) {
+        this.removed = true;
         this.colorLegendWrapper.unmount();
         this.legend = undefined;
         destroyColorLegendFilter(this, notify);
