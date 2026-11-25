@@ -1,12 +1,12 @@
 [project]
 name = "mdvtools"
-version = "1.3.0"
+version = "1.4.0"
 description = "Multi Dimensional Viewer (MDV) is web based application for analyzing data"
 authors = [
     { name = "Martin Sergeant", email = "m.j.sergeant1@googlemail.com" },
     { name = "PeterTodd", email = "peter.todd@well.ox.ac.uk" },
 ]
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12,<3.14"
 # Standalone PyPI long description (rendered on the package page, no repo context).
 # Dev-facing setup lives in README.md; release process in ../docs/RELEASING.md.
 readme = "PYPI_README.md"
@@ -15,6 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 # Slim core: project manipulation, viewing, MDVProject.serve(), and spatial.
 # This is what a bare `pip install mdvtools` gets. The heavy server/chat/auth
