@@ -48,3 +48,15 @@ For the SpatialData chart image layer panel (`ImageLayerPanel`, `ColorChannelCom
   `layerInputs.layers` therefore has to be keyed by value, not identity, or it will churn on
   every edit; and anything that hands the canvas *copies* has to keep re-copying, so cache the
   expensive work inside it rather than skipping the whole step.
+
+### Telemetry names
+
+The Grafana dashboards live in a separate operations repository and query the metric, label,
+browser measurement and log names listed in `docs/telemetry.md`. Nothing in this repository
+catches a mismatch, so when a change renames, removes or relabels one of those names (usually in
+`python/mdvtools/telemetry.py`, `python/mdvtools/logging_config.py`,
+`src/utils/browserTelemetry.ts` or `src/react/spatialdata/perf.ts`):
+
+- update `docs/telemetry.md` in the same change
+- in your final message, list each old and new name and say the stack's dashboards need the
+  matching change
