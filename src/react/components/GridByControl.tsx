@@ -1,6 +1,7 @@
 import GridViewOutlinedIcon from "@mui/icons-material/GridViewOutlined";
 import { FormControlLabel, Switch } from "@mui/material";
 import type { GridSplit } from "@/charts/charts";
+import type { GriddedEntry } from "./layerFillGridUtils";
 
 const CELLS: Record<GridSplit, string> = { columns: "a cell per column", categories: "a cell per category" };
 
@@ -44,13 +45,13 @@ export default function GridByControl({
 }
 
 /**
- * Marks the thing the chart is a grid of: in the layer list, the layer whose fill colour it is
- * split by, or, given the layer's name, the collapsed group that holds it.
+ * Marks what the chart is a grid of: in the layer list, the layer (or MDV overlay) the grid is made
+ * from, or, given that layer's name, the collapsed group that holds it.
  */
-export function GridByIcon({ split, layerName }: { split: GridSplit; layerName?: string }) {
+export function GridByIcon({ gridded, layerName }: { gridded: GriddedEntry; layerName?: string }) {
     const layer = layerName ? `'${layerName}' (in this group)` : "this layer";
-    const cells = split === "columns" ? "a cell per colour column" : "a cell per category";
-    const description = `The chart is a grid of the colour of ${layer}: ${cells}`;
+    const of = gridded.byColour ? `the colour of ${layer}` : layer;
+    const description = `The chart is a grid of ${of}: ${gridded.cells}`;
     return (
         <span className="flex flex-shrink-0" title={description} role="img" aria-label={description}>
             <GridViewOutlinedIcon fontSize="small" color="primary" sx={{ fontSize: 16 }} />

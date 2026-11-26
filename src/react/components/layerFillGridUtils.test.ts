@@ -5,6 +5,7 @@ import { SpatialDataGridConfigSchema } from "@/charts/schemas/ChartConfigSchema"
 import { rowsInCategory } from "@/react/spatialdata/table_association";
 import { gridChoiceValue } from "./colorGridUtils";
 import {
+    griddedEntry,
     layerFillGrid,
     layerFillGridChoice,
     layerFillGridChoices,
@@ -14,6 +15,34 @@ import {
 } from "./layerFillGridUtils";
 
 const SPATIAL = "SpatialDataMdvRegionReact";
+
+describe("griddedEntry", () => {
+    test("marks the layer whose fill colour the grid splits", () => {
+        expect(
+            griddedEntry({ type: SPATIAL, grid: { by: "layer_fill", layer: "cells", split: "categories" } }),
+        ).toEqual({ entryId: "cells", byColour: true, cells: "a cell per category" });
+    });
+
+    test("marks the MDV points for a colour grid, and the density overlay for a density grid", () => {
+        expect(griddedEntry({ type: SPATIAL, grid: { by: "color_fields" } })).toEqual({
+            entryId: "deck:scatter",
+            byColour: true,
+            cells: "a cell per colour column",
+        });
+        expect(griddedEntry({ type: SPATIAL, grid: { by: "densityFields" } })).toEqual({
+            entryId: "deck:density",
+            byColour: false,
+            cells: "a cell per density field",
+        });
+    });
+
+    test("is null for a region grid, no grid, 3D or another chart", () => {
+        expect(griddedEntry({ type: SPATIAL, grid: { by: "region" } })).toBeNull();
+        expect(griddedEntry({ type: SPATIAL, grid: null })).toBeNull();
+        expect(griddedEntry({ type: SPATIAL, dimension: "3d", grid: { by: "color_fields" } })).toBeNull();
+        expect(griddedEntry({ type: "DeckScatter", grid: { by: "color_fields" } })).toBeNull();
+    });
+});
 
 describe("layerFillGrid", () => {
     test("reads the layer and split of a SpatialData chart's grid by a layer's fill", () => {

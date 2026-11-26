@@ -343,8 +343,9 @@ and any reader of the saved stack, takes the first (`projectMdvFieldSpecs`).
 The Grid dropdown offers only layers whose element a table annotates (`layerGridSplit`, the
 association the layer panels use), each with the split its colour column's type allows, and the
 layer and split the chart is a grid of. In the layer list
-that layer's row has a grid icon (`GridByIcon`) beside its table icon, as does the row of a
-collapsed group that holds it.
+that layer's row has a grid icon (`GridByIcon`, placed by `griddedEntry`) beside its table icon, as
+does the row of a collapsed group that holds it. The MDV data rows get it the same way: Data points
+for a grid of the chart's colour, Density for a grid of density fields.
 
 The copies are made for every cell, not only those in view, and each costs a pass over the
 element's features when its column or the filter changes. An active link's change of columns

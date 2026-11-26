@@ -1,6 +1,8 @@
 import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
 import type { LayerConfig, RenderStackLayerInputs } from "@spatialdata/vis";
-import type { ColorGridSplit } from "./colorGridUtils";
+import { deckHostLayerId } from "../spatialdata/host_overlay_ids";
+import { type ColorGridSplit, colorGridSplit } from "./colorGridUtils";
+import { isDensityGridShown } from "./densityGridUtils";
 
 /**
  * A grid of the SpatialData chart by a shapes or labels layer's fill colour: a cell per column
@@ -18,6 +20,36 @@ export function layerFillGrid(config: LayerFillGridModeConfig): LayerFillGrid | 
     const { grid } = config;
     if (config.type !== "SpatialDataMdvRegionReact" || grid?.by !== "layer_fill" || !grid.layer) return null;
     return { layer: grid.layer, split: grid.split === "categories" ? "categories" : "columns" };
+}
+
+/**
+ * The layer list entry the chart's grid is made from, for marking it there: a layer whose fill
+ * colour it splits, the MDV points whose colour it splits (`color_fields`), or the density
+ * overlay (a cell per density field). Null when there is no such grid, as for a region grid.
+ */
+export type GriddedEntry = {
+    entryId: string;
+    /** Whether the cells split the entry's colour, rather than the entry itself. */
+    byColour: boolean;
+    /** What each cell is, as words: "a cell per category". */
+    cells: string;
+};
+
+const CELLS_BY_SPLIT: Record<ColorGridSplit, string> = {
+    columns: "a cell per colour column",
+    categories: "a cell per category",
+};
+
+export function griddedEntry(config: LayerFillGridModeConfig & { dimension?: "2d" | "3d" }): GriddedEntry | null {
+    if (config.type !== "SpatialDataMdvRegionReact") return null;
+    const layerGrid = layerFillGrid(config);
+    if (layerGrid) return { entryId: layerGrid.layer, byColour: true, cells: CELLS_BY_SPLIT[layerGrid.split] };
+    const split = colorGridSplit(config);
+    if (split) return { entryId: deckHostLayerId("scatter"), byColour: true, cells: CELLS_BY_SPLIT[split] };
+    if (isDensityGridShown(config)) {
+        return { entryId: deckHostLayerId("density"), byColour: false, cells: "a cell per density field" };
+    }
+    return null;
 }
 
 /** The `grid` config of a grid by this layer's fill colour, split this way. */

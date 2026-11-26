@@ -81,7 +81,7 @@ import { colorGridSplitFor } from "./colorGridUtils";
 import EntryStatusDetails from "./EntryStatusDetails";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import { GridByIcon } from "./GridByControl";
-import { fillColumnName, layerFillGrid, layerFillGridConfig } from "./layerFillGridUtils";
+import { fillColumnName, griddedEntry, layerFillGrid, layerFillGridConfig } from "./layerFillGridUtils";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import { CompositingButton, hasCompositing } from "./spatialLayers/CompositingButton";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
@@ -436,12 +436,11 @@ const LayerTreeRow = observer(function LayerTreeRow({
     const supportsOpacity = entry.kind === "spatial" || entry.kind === "group";
     const name = renderStackEntryDisplayName(entry, config.renderStack);
     const table = entry.kind === "spatial" ? tableSummary(entry.source.elementType, entry.source.elementKey) : null;
-    const grid = layerFillGrid(config);
-    const gridSplit = grid?.layer === entryId ? grid.split : null;
+    const gridded = griddedEntry(config);
     // a collapsed group stands in for the gridded layer it hides
     const hiddenGridLayer =
-        grid && entry.kind === "group" && expander && !expander.expanded
-            ? Array.from(walkRenderStackEntries(entry.children)).find((child) => child.id === grid.layer)
+        gridded && entry.kind === "group" && expander && !expander.expanded
+            ? Array.from(walkRenderStackEntries(entry.children)).find((child) => child.id === gridded.entryId)
             : undefined;
 
     return (
@@ -537,10 +536,10 @@ const LayerTreeRow = observer(function LayerTreeRow({
                 </Typography>
             )}
             {table && <ElementTableIcon summary={table} />}
-            {gridSplit && <GridByIcon split={gridSplit} />}
-            {grid && hiddenGridLayer && (
+            {gridded?.entryId === entryId && <GridByIcon gridded={gridded} />}
+            {gridded && hiddenGridLayer && (
                 <GridByIcon
-                    split={grid.split}
+                    gridded={gridded}
                     layerName={renderStackEntryDisplayName(hiddenGridLayer, config.renderStack)}
                 />
             )}
