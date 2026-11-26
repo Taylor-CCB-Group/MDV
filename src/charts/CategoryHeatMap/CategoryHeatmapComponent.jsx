@@ -269,9 +269,9 @@ const CategoryHeatmapComponent = observer(() => {
                             const isActive =
                                 chart.cellFilter && chart.cellFilter[0] === xLabel && chart.cellFilter[1] === yLabel;
                             return (
-                                <div
+                                <button
+                                    type="button"
                                     key={`cell-${xLabel}-${yLabel}`}
-                                    roll="button"
                                     style={{
                                         ...cellBaseStyle,
                                         background: getCellColor(value, displayData.maxCount, isDark),
@@ -294,7 +294,7 @@ const CategoryHeatmapComponent = observer(() => {
                                     onClick={() => chart.filterCell(xLabel, yLabel)}
                                 >
                                     {value}
-                                </div>
+                                </button>
                             );
                         })}
                     </Fragment>
@@ -308,6 +308,7 @@ const CategoryHeatmapComponent = observer(() => {
                         const v = i / 19;
                         return (
                             <div
+                                // biome-ignore lint/suspicious/noArrayIndexKey: fixed set of gradient swatches
                                 key={i}
                                 style={{
                                     flex: 1,

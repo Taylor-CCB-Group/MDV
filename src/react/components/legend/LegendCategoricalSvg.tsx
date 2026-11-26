@@ -43,6 +43,7 @@ export default function LegendCategoricalSvg({
                     const dimmed = focusedKey !== null && focusedKey !== item.key && !isActive;
                     const isInteractive = Boolean(onItemHover || onItemClick);
                     return (
+                        // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only legend rows
                         <g
                             key={item.key}
                             onMouseEnter={onItemHover ? () => onItemHover(item.key) : undefined}

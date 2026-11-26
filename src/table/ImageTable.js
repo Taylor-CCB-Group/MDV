@@ -354,7 +354,9 @@ class ImageTable {
     }
 
     _removeByClass(className) {
-        document.querySelectorAll(className).forEach((e) => e.remove());
+        document.querySelectorAll(className).forEach((e) => {
+            e.remove();
+        });
     }
 
     render(begin_row, end_row, all) {

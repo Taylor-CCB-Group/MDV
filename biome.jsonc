@@ -16,7 +16,9 @@
                 "noExplicitAny": "off",
                 "noImplicitAnyLet": "off",
                 "noAssignInExpressions": "off",
-                "noPrototypeBuiltins": "off"
+                "noPrototypeBuiltins": "off",
+                // Tailwind v3 `@tailwind` directives; biome's tailwindDirectives parser only covers v4 syntax
+                "noUnknownAtRules": { "level": "error", "options": { "ignore": ["tailwind"] } }
             },
             "correctness": {
                 "useExhaustiveDependencies": "info",

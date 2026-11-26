@@ -14,12 +14,14 @@ const H5JsonViewer = ({ data, title, initiallyExpanded = false, maxHeight = "max
     return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             {title && (
-                <div
-                    className="flex items-center p-3 cursor-pointer border-b border-gray-200 dark:border-gray-700"
+                <button
+                    type="button"
+                    className="flex w-full items-center p-3 cursor-pointer border-b border-gray-200 dark:border-gray-700"
+                    aria-expanded={isExpanded}
                     onClick={() => setIsExpanded(!isExpanded)}
                 >
                     <h3 className="text-sm font-medium">{title}</h3>
-                </div>
+                </button>
             )}
             {isExpanded && (
                 <div className={`overflow-auto ${maxHeight}`}>

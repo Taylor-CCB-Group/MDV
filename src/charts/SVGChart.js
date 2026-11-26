@@ -513,7 +513,9 @@ class SVGChart extends BaseChart {
         //temporarily attach legend
         this._addLegendToSVG("legend");
         if (this.extra_legends) {
-            this.extra_legends.forEach((x) => this._addLegendToSVG(x));
+            this.extra_legends.forEach((x) => {
+                this._addLegendToSVG(x);
+            });
         }
 
         const svgAsXML = new XMLSerializer().serializeToString(this.svg.node());
@@ -526,7 +528,9 @@ class SVGChart extends BaseChart {
                 }
                 this._removeLegendFromSVG("legend");
                 if (this.extra_legends) {
-                    this.extra_legends.forEach((x) => this._removeLegendFromSVG(x));
+                    this.extra_legends.forEach((x) => {
+                        this._removeLegendFromSVG(x);
+                    });
                 }
             });
         } else {
@@ -536,7 +540,9 @@ class SVGChart extends BaseChart {
             }
             this._removeLegendFromSVG("legend");
             if (this.extra_legends) {
-                this.extra_legends.forEach((x) => this._removeLegendFromSVG(x));
+                this.extra_legends.forEach((x) => {
+                    this._removeLegendFromSVG(x);
+                });
             }
         }
     }

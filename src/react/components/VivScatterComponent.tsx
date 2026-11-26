@@ -85,7 +85,7 @@ const Main = observer(
         const id = useChartID();
         const detailId = `${id}detail-react`;
         const outerContainer = useOuterContainer();
-        const deckContainerRef = useRef<HTMLDivElement | null>(null);
+        const deckContainerRef = useRef<HTMLElement | null>(null);
 
         // this isn't updating when we tweak the config...
         const { scatterProps, selectionLayer } = useSpatialLayers();
@@ -242,7 +242,7 @@ const Main = observer(
                         onContourHover={setHoveredContour}
                     />
                 )}
-                <div
+                <section
                     ref={deckContainerRef}
                     aria-label="Spatial scatter plot"
                     style={{ width: "100%", height: "100%", outline: "none" }}
@@ -271,7 +271,7 @@ const Main = observer(
                         }}
                         deckProps={deckProps}
                     />
-                </div>
+                </section>
                 <ViewGestureHint />
                 {tooltipPortal}
             </>

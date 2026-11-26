@@ -115,6 +115,7 @@ function ValidationFindingCard({ finding }: { finding: ValidationFinding }) {
                 {latest?.issues?.length ? (
                     latest.issues.map((issue, index) => (
                         <Box
+                            // biome-ignore lint/suspicious/noArrayIndexKey: index disambiguates repeated issues
                             key={`${issue.path}-${issue.message}-${index}`}
                             sx={{
                                 borderLeft: "3px solid #f2c94c",

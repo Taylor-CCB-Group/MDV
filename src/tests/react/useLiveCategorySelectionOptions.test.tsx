@@ -39,7 +39,9 @@ describe("useLiveCategorySelectionValues", () => {
 
         act(() => {
             tagColumn.values.push("a, b", "b");
-            Object.values(listeners).forEach((listener) => listener("data_changed", { columns: ["__tags"] }));
+            Object.values(listeners).forEach((listener) => {
+                listener("data_changed", { columns: ["__tags"] });
+            });
         });
 
         expect(result.current).toEqual(["a", "b"]);

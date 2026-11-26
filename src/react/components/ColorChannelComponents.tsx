@@ -98,6 +98,7 @@ const ChannelChooserMUI = ({ index }: { index: number }) => {
                     }}
                 >
                     {channels.map((c, i) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: the option value is the channel index; names may repeat
                         <MenuItem key={`${i}_${c}`} value={i}>
                             {c}
                         </MenuItem>
@@ -151,6 +152,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
                 }}
             >
                 {channels.map((c, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: the option value is the channel index; names may repeat
                     <option key={`${i}_${c}`} value={i}>
                         {c}
                     </option>
@@ -205,6 +207,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
                 }}
             >
                 {channels.map((c, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: the option value is the channel index; names may repeat
                     <option key={`${i}_${c}`} value={i}>
                         {c}
                     </option>
@@ -488,6 +491,7 @@ const ChannelController = ({ index }: { index: number }) => {
                     },
                 }}
             >
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops clicks/focus reaching the accordion summary */}
                 <div
                     className="grid w-full min-w-0 grid-cols-[minmax(11rem,0.95fr)_minmax(0,1.15fr)] gap-2"
                     onClick={stopAccordionToggle}
@@ -526,6 +530,7 @@ const ChannelController = ({ index }: { index: number }) => {
                                         channelsStore.setState({ channelsVisible: visible });
                                     }}
                                 />
+                                {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops clicks/focus reaching the accordion summary */}
                                 <div
                                     className="h-7 min-w-9 overflow-hidden rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-sm"
                                     onClick={stopAccordionToggle}
@@ -550,6 +555,7 @@ const ChannelController = ({ index }: { index: number }) => {
                                 </div>
                             </div>
                         </div>
+                        {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops clicks/focus reaching the accordion summary */}
                         <div onClick={stopAccordionToggle} onFocus={stopAccordionToggle}>
                             <ChannelChooser index={index} />
                         </div>

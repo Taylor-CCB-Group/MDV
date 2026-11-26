@@ -615,31 +615,29 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
 export function getRowsAsColumnsLinks(dataStore: DataStore) {
     const dataSources = window.mdv.chartManager.dataSources;
     if (dataStore.links) {
-        const result = Object.keys(dataStore.links)
-            .map((linkedDsName) => {
-                if (!dataStore.links) throw "unreachable";
-                const links = dataStore.links[linkedDsName];
-                if (links.rows_as_columns) {
-                    // first pass... there can be only one or zero.
-                    // how often will users actually want to link multiple dataSources in this way?
-                    // perhaps not often - but let's handle it so we don't have to change it later or have bugs.
-                    // There are also multiple subgroups within a single linked dataSource - also important to support.
-                    // UI should be simpler for the common case with a single linked dataSource/sg.
-                    // Are there any crazy edge cases we should consider - like indirect links? links to self?
-                    // !! this should be ok now, but we should test with multiple links.
-                    const linkedDs = dataSources.find((ds) => ds.name === linkedDsName);
-                    if (!linkedDs) {
-                        throw new Error();
-                    }
-                    // todo make sure the link is reasonably typed
-                    const link = links.rows_as_columns as RowsAsColslink;
-                    // we could be lazier about this, especially if we have a lot of links.
-                    initRacListener(link, dataStore, linkedDs.dataStore);
-                    return { linkedDs, link };
+        return Object.keys(dataStore.links).flatMap((linkedDsName) => {
+            if (!dataStore.links) throw "unreachable";
+            const links = dataStore.links[linkedDsName];
+            if (links.rows_as_columns) {
+                // first pass... there can be only one or zero.
+                // how often will users actually want to link multiple dataSources in this way?
+                // perhaps not often - but let's handle it so we don't have to change it later or have bugs.
+                // There are also multiple subgroups within a single linked dataSource - also important to support.
+                // UI should be simpler for the common case with a single linked dataSource/sg.
+                // Are there any crazy edge cases we should consider - like indirect links? links to self?
+                // !! this should be ok now, but we should test with multiple links.
+                const linkedDs = dataSources.find((ds) => ds.name === linkedDsName);
+                if (!linkedDs) {
+                    throw new Error();
                 }
-            })
-            .filter((l) => l !== undefined); //todo type-safety of filter
-        return result;
+                // todo make sure the link is reasonably typed
+                const link = links.rows_as_columns as RowsAsColslink;
+                // we could be lazier about this, especially if we have a lot of links.
+                initRacListener(link, dataStore, linkedDs.dataStore);
+                return [{ linkedDs, link }];
+            }
+            return [];
+        });
     }
     return [];
 }

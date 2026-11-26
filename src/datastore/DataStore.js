@@ -1474,7 +1474,9 @@ class DataStore {
                 const v = arr[i];
                 const vs = v.split(delim);
                 max = Math.max(max, vs.length);
-                vs.forEach((x) => vals.add(x.trim()));
+                vs.forEach((x) => {
+                    vals.add(x.trim());
+                });
             }
             vals.delete("");
             const buff = new SharedArrayBuffer(this.size * max * 2);

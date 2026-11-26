@@ -381,7 +381,9 @@ export default class TagModel {
     }
 
     private callListeners() {
-        this.listeners.forEach((callback) => callback());
+        this.listeners.forEach((callback) => {
+            callback();
+        });
     }
 
     addListener(callback: () => void) {
@@ -434,7 +436,9 @@ export default class TagModel {
     getTagsInSelection(): Set<string> {
         const tags = new Set<string>();
         for (const rowIndex of this.getSelectedRowIndices()) {
-            getSemanticRowItems(this.tagColumn, rowIndex).forEach((tag) => tags.add(tag));
+            getSemanticRowItems(this.tagColumn, rowIndex).forEach((tag) => {
+                tags.add(tag);
+            });
         }
         return tags;
     }

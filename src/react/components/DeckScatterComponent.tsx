@@ -261,7 +261,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     const pickAlternates = device.status === "ready" && device.backend === "webgl";
     const deckLayers = useLayersForDevice(layers, device);
 
-    const deckContainerRef = useRef<HTMLDivElement | null>(null);
+    const deckContainerRef = useRef<HTMLElement | null>(null);
     const deckRef = useRef<DeckGLRef | null>(null);
     const chart = useChart<DeckScatterConfig, DeckScatterReact>();
     useEffect(() => {
@@ -318,7 +318,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     return (
         <>
             <AxisComponent config={config} unproject={unproject}>
-                <div
+                <section
                     ref={deckContainerRef}
                     aria-label="Scatter plot"
                     style={{ width: "100%", height: "100%", outline: "none", position: "relative" }}
@@ -361,7 +361,7 @@ const DeckScatter = observer(function DeckScatterComponent({
                             }}
                         />
                     </ScatterDeckBoundary>
-                </div>
+                </section>
             </AxisComponent>
             <ViewGestureHint />
             {tooltipPortal}

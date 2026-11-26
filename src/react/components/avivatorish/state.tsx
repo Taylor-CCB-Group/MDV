@@ -322,6 +322,31 @@ export function useViewerStore<U>(selector: Selector<ViewerStore, U>, equalityFn
     return useStoreWithEqualityFn(store, selector, equalityFn);
 }
 
+// Stores for the optional hooks below to subscribe to outside a VivProvider, so they call the same hooks either way.
+let detachedVivStores: VivContextType | undefined;
+function useOptionalStoreApi<S extends StoreName>(storeName: S) {
+    const stores = useContext(VivContext);
+    if (stores) return { store: stores[storeName], attached: true };
+    detachedVivStores ??= createVivStores();
+    return { store: detachedVivStores[storeName], attached: false };
+}
+/** Whether this component is rendered within a VivProvider. */
+export function useIsInVivContext() {
+    return useContext(VivContext) !== null;
+}
+/** Like `useChannelsStore`, but returns `undefined` rather than throwing outside a VivProvider. */
+export function useOptionalChannelsStore<U>(selector: Selector<ChannelsStore, U>, equalityFn?: EqFn<U>) {
+    const { store, attached } = useOptionalStoreApi("channelsStore");
+    const value = useStoreWithEqualityFn(store, selector, equalityFn);
+    return attached ? value : undefined;
+}
+/** Like `useViewerStore`, but returns `undefined` rather than throwing outside a VivProvider. */
+export function useOptionalViewerStore<U>(selector: Selector<ViewerStore, U>, equalityFn?: EqFn<U>) {
+    const { store, attached } = useOptionalStoreApi("viewerStore");
+    const value = useStoreWithEqualityFn(store, selector, equalityFn);
+    return attached ? value : undefined;
+}
+
 export const useLoader = () => {
     const [fullLoader, image] = useChannelsStore((store) => [store.loader, store.image]);
     return Array.isArray(fullLoader[0]) ? fullLoader[image] : fullLoader;
@@ -341,14 +366,11 @@ type OME_METADATA = OME_ZARR["metadata"] & {
 export type Metadata = OME_TIFF["metadata"] | OME_METADATA;
 //export type Metadata = TiffPreviewProps["metadata"];
 export const useMetadata = (): Metadata | undefined | null => {
-    try {
-        const image = useChannelsStore((store) => store.image);
-        const metadata = useViewerStore((store) => store.metadata);
-        return Array.isArray(metadata) ? metadata[image] : metadata;
-    } catch (e) {
-        // we now sometimes call this hook outside of a Viv context, so this is expected.
-        // console.error("no metadata", e);
-    }
+    // we now sometimes call this hook outside of a Viv context, where both of these are undefined.
+    const image = useOptionalChannelsStore((store) => store.image);
+    const metadata = useOptionalViewerStore((store) => store.metadata);
+    if (!Array.isArray(metadata)) return metadata;
+    return image === undefined ? undefined : metadata[image];
 };
 
 /** Add default values to a *config* (not an instance of actual store) that may have been serialized before

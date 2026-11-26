@@ -466,7 +466,7 @@ function getDistanceMatrices(areas, sets, setids) {
     // the areas match
     areas
         .filter((x) => x.sets.length === 2)
-        .map((current) => {
+        .forEach((current) => {
             const left = setids[current.sets[0]];
             const right = setids[current.sets[1]];
             const r1 = Math.sqrt(sets[left].size / Math.PI);
@@ -854,7 +854,7 @@ function orientateCircles(circles, orientation, orientationOrder) {
 
 function disjointCluster(circles) {
     // union-find clustering to get disjoint sets
-    circles.map((circle) => {
+    circles.forEach((circle) => {
         circle.parent = circle;
     });
 
@@ -885,7 +885,7 @@ function disjointCluster(circles) {
     // find all the disjoint clusters and group them together
     const disjointClusters = {};
     let setid;
-    for (i = 0; i < circles.length; ++i) {
+    for (let i = 0; i < circles.length; ++i) {
         setid = find(circles[i]).parent.setid;
         if (!(setid in disjointClusters)) {
             disjointClusters[setid] = [];
@@ -894,7 +894,7 @@ function disjointCluster(circles) {
     }
 
     // cleanup bookkeeping
-    circles.map((circle) => {
+    circles.forEach((circle) => {
         circle.parent = undefined;
     });
 

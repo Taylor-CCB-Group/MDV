@@ -367,6 +367,7 @@ class MDVivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivV
               }
             : deckProps;
         return (
+            // biome-ignore lint/a11y/noStaticElementInteractions: only clears hover state when the pointer leaves the canvas
             <div className="h-full w-full" onMouseLeave={() => hoverHooks?.handleLeave?.()}>
                 <DeckGL
                     // MDV: we mess with deck internals via ref to get eventManager to work in popouts

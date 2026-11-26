@@ -20,7 +20,10 @@ class TreeDiagram extends SVGChart {
 
     setBranchLength(d, y0, k) {
         d.y = (y0 += d.data.length) * k;
-        if (d.children) d.children.forEach((d) => this.setBranchLength(d, y0, k));
+        if (d.children)
+            d.children.forEach((d) => {
+                this.setBranchLength(d, y0, k);
+            });
     }
 
     drawChart() {
