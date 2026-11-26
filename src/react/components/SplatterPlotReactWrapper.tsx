@@ -471,11 +471,11 @@ const SplatterPlot = observer(function SplatterPlot() {
                             boxShadow: "0 4px 16px rgba(15, 23, 42, 0.18)",
                         }}
                     >
-                        <div className="break-words">
+                        <div className="wrap-break-word">
                             <strong>{categoryColumn.name}:</strong>{" "}
                             {hoveredCategory.label === "" ? "none" : hoveredCategory.label}
                         </div>
-                        <div className="break-words">{hoveredField.name === "" ? "none" : hoveredField.name}</div>
+                        <div className="wrap-break-word">{hoveredField.name === "" ? "none" : hoveredField.name}</div>
                     </div>
                 ) : null}
             </div>

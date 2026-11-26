@@ -107,7 +107,7 @@ export function FeatureInfoCard({
             className={clsx(
                 "h-[150px] w-full overflow-hidden flex flex-col rounded-md transition-shadow",
                 onCardClick ? "cursor-pointer" : "cursor-default",
-                "focus:outline-none focus:ring-2 focus:ring-offset-1",
+                "focus:outline-hidden focus:ring-2 focus:ring-offset-1",
             )}
             sx={{
                 p: 1.5,

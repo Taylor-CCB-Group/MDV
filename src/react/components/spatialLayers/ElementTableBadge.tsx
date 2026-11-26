@@ -74,7 +74,7 @@ export function ElementTableIcon({ summary }: { summary: ElementTableSummary }) 
     if (summary.status === "none") return null;
     const description = elementTableDescription(summary);
     return (
-        <span className="flex flex-shrink-0" title={description} role="img" aria-label={description}>
+        <span className="flex shrink-0" title={description} role="img" aria-label={description}>
             <TableChartOutlinedIcon
                 fontSize="small"
                 color={summary.status === "ambiguous" ? "warning" : "action"}

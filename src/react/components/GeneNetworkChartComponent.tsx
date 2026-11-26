@@ -363,7 +363,7 @@ export const GeneNetworkChartComponent = observer(() => {
     };
 
     return (
-        <div className="absolute w-[100%] h-[100%] text-sm h-full flex flex-col">
+        <div className="absolute w-full h-full text-sm h-full flex flex-col">
             {column && <FeatureSearchBar column={column} shownCount={visibleRowIndices.length} />}
             {visibleRowIndices.length > 0 ? (
                 <>

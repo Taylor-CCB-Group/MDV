@@ -163,7 +163,7 @@ export default function HistogramWidget({
                     {!isDate ? (
                         <button
                             type="button"
-                            className="pointer-events-auto rounded border border-[hsl(var(--border))] bg-[hsl(var(--background)/0.9)] px-1 py-0 text-[9px] text-[hsl(var(--foreground))] shadow-sm"
+                            className="pointer-events-auto rounded border border-[hsl(var(--border))] bg-[hsl(var(--background)/0.9)] px-1 py-0 text-[9px] text-[hsl(var(--foreground))] shadow-xs"
                             onClick={scaleControls.onToggleX}
                         >
                             X:{scaleControls.xLabel}
@@ -171,7 +171,7 @@ export default function HistogramWidget({
                     ) : null}
                     <button
                         type="button"
-                        className="pointer-events-auto rounded border border-[hsl(var(--border))] bg-[hsl(var(--background)/0.9)] px-1 py-0 text-[9px] text-[hsl(var(--foreground))] shadow-sm"
+                        className="pointer-events-auto rounded border border-[hsl(var(--border))] bg-[hsl(var(--background)/0.9)] px-1 py-0 text-[9px] text-[hsl(var(--foreground))] shadow-xs"
                         onClick={scaleControls.onToggleY}
                     >
                         Y:{scaleControls.yLabel}

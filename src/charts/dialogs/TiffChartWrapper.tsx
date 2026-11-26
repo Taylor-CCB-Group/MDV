@@ -84,7 +84,7 @@ const TiffChartWrapper: React.FC<PropsWithChildren<TiffChartWrapperProps>> = obs
                         func: toggleFullscreen,
                     })}
                 </div>
-                <div ref={contentDivRef} className="ciview-chart-content flex-grow overflow-auto">
+                <div ref={contentDivRef} className="ciview-chart-content grow overflow-auto">
                     {children}
                 </div>
             </div>

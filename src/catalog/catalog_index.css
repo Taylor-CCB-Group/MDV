@@ -1,105 +1,107 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "../tailwind-theme.css";
 
-/*! If making any change to the css variables, sync the changes with charts/css/charts.css (temporary fix) */
-@media (prefers-color-scheme: dark) {
-    :root {
+/* layered so Tailwind utilities still beat these element rules, as they did in v3 */
+@layer base {
+    /*! If making any change to the css variables, sync the changes with charts/css/charts.css (temporary fix) */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --title_bar_color: #222;
+            --main_panel_color: black;
+            --text_color: white;
+            --background_color: #f5f5f5;
+            --fade_background_color: rgba(245, 245, 245, 0.4);
+            --menu_bar_color: #d6d8db;
+            --border_menu_bar_color: #c9c9c9;
+            --primary_background: #ecf0f1;
+            --shadow_color: #888;
+            --input_border_color: #222;
+            --input_background_color: #222;
+            --dlg_background_color: #111;
+            --background_color_error: #fdeded;
+            --icon_color_error: #ff4c4c;
+            --text_color_error: #5f213b;
+            --menu-gradient: linear-gradient(#444, #222);
+            --tooltip_background_color: #f5f5f5;
+            --tooltip_text_color: #222;
+        }
+    }
+    @media (prefers-color-scheme: light) {
+        :root {
+            --title_bar_color: white;
+            --main_panel_color: #f1f1f1;
+            --text_color: black;
+            --background_color: #f5f5f5;
+            --fade_background_color: rgba(245, 245, 245, 0.4);
+            --menu_bar_color: #d6d8db;
+            --border_menu_bar_color: #c9c9c9;
+            --primary_background: #ecf0f1;
+            --shadow_color: #888;
+            --input_border_color: rgb(230, 230, 230);
+            --input_background_color: rgb(230, 230, 230);
+            --dlg_background_color: white;
+            --background_color_error: #fdeded;
+            --icon_color_error: #ff4c4c;
+            --text_color_error: #5f213b;
+            --menu-gradient: linear-gradient(white, darkgray);
+            --tooltip_background_color: #222;
+            --tooltip_text_color: #f5f5f5;
+        }
+    }
+
+    .dark {
         --title_bar_color: #222;
         --main_panel_color: black;
         --text_color: white;
-        --background_color: #f5f5f5;
-        --fade_background_color: rgba(245, 245, 245, 0.4);
-        --menu_bar_color: #d6d8db;
-        --border_menu_bar_color: #c9c9c9;
-        --primary_background: #ecf0f1;
-        --shadow_color: #888;
+        --background_color: #252525;
+        --fade_background_color: rgba(37, 37, 37, 0.4);
+        --menu_bar_color: #404040;
+        --border_menu_bar_color: #727272;
+        --primary_background: #353536;
+        --shadow_color: #121212;
         --input_border_color: #222;
         --input_background_color: #222;
         --dlg_background_color: #111;
-        --background_color_error: #fdeded;
-        --icon_color_error: #ff4c4c;
-        --text_color_error: #5f213b;
+        --background_color_error: #4f3037;
+        --text_color_error: #ff8d91;
         --menu-gradient: linear-gradient(#444, #222);
         --tooltip_background_color: #f5f5f5;
         --tooltip_text_color: #222;
     }
-}
-@media (prefers-color-scheme: light) {
-    :root {
+
+    .light {
         --title_bar_color: white;
         --main_panel_color: #f1f1f1;
         --text_color: black;
         --background_color: #f5f5f5;
         --fade_background_color: rgba(245, 245, 245, 0.4);
         --menu_bar_color: #d6d8db;
-        --border_menu_bar_color: #c9c9c9;
         --primary_background: #ecf0f1;
         --shadow_color: #888;
         --input_border_color: rgb(230, 230, 230);
         --input_background_color: rgb(230, 230, 230);
         --dlg_background_color: white;
         --background_color_error: #fdeded;
-        --icon_color_error: #ff4c4c;
         --text_color_error: #5f213b;
         --menu-gradient: linear-gradient(white, darkgray);
         --tooltip_background_color: #222;
         --tooltip_text_color: #f5f5f5;
     }
-}
+    :root {
+        font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+        --button_color: #1266f1;
+    }
 
-.dark {
-    --title_bar_color: #222;
-    --main_panel_color: black;
-    --text_color: white;
-    --background_color: #252525;
-    --fade_background_color: rgba(37, 37, 37, 0.4);
-    --menu_bar_color: #404040;
-    --border_menu_bar_color: #727272;
-    --primary_background: #353536;
-    --shadow_color: #121212;
-    --input_border_color: #222;
-    --input_background_color: #222;
-    --dlg_background_color: #111;
-    --background_color_error: #4f3037;
-    --text_color_error: #ff8d91;
-    --menu-gradient: linear-gradient(#444, #222);
-    --tooltip_background_color: #f5f5f5;
-    --tooltip_text_color: #222;
-}
+    a {
+        color: var(--button_color);
+    }
 
-.light {
-    --title_bar_color: white;
-    --main_panel_color: #f1f1f1;
-    --text_color: black;
-    --background_color: #f5f5f5;
-    --fade_background_color: rgba(245, 245, 245, 0.4);
-    --menu_bar_color: #d6d8db;
-    --primary_background: #ecf0f1;
-    --shadow_color: #888;
-    --input_border_color: rgb(230, 230, 230);
-    --input_background_color: rgb(230, 230, 230);
-    --dlg_background_color: white;
-    --background_color_error: #fdeded;
-    --text_color_error: #5f213b;
-    --menu-gradient: linear-gradient(white, darkgray);
-    --tooltip_background_color: #222;
-    --tooltip_text_color: #f5f5f5;
-}
-:root {
-    font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-    --button_color: #1266f1;
-}
+    /* Project Readme Markdown styles */
+    .readme-markdown {
+        word-break: break-word;
+    }
 
-a {
-    color: var(--button_color);
-}
-
-/* Project Readme Markdown styles */
-.readme-markdown {
-    word-break: break-word;
-}
-
-.readme-markdown p {
-    margin: 0 0 16px;
+    .readme-markdown p {
+        margin: 0 0 16px;
+    }
 }

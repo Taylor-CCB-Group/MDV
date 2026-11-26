@@ -17,9 +17,7 @@
                 "noExplicitAny": "off",
                 "noImplicitAnyLet": "off",
                 "noAssignInExpressions": "off",
-                "noPrototypeBuiltins": "off",
-                // Tailwind v3 `@tailwind` directives; biome's tailwindDirectives parser only covers v4 syntax
-                "noUnknownAtRules": { "level": "error", "options": { "ignore": ["tailwind"] } }
+                "noPrototypeBuiltins": "off"
             },
             "correctness": {
                 "useExhaustiveDependencies": "info",
@@ -53,6 +51,7 @@
             }
         }
     ],
+    "css": { "parser": { "tailwindDirectives": true } },
     "formatter": {
         "enabled": true,
         "indentStyle": "space",
@@ -68,7 +67,6 @@
             "!src/table/Slick*",
             "!src/venn/**/*",
             "!src/table/css/slick*",
-            "!src/tailwind.css",
             "!src/utilities/css/**/*",
             "!src/css/**/*",
             "!src/utilities/jpeg2000/chafey/**/*",

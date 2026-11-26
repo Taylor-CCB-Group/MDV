@@ -95,7 +95,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
             <select
                 disabled={isChannelLoading[index]}
                 value={spatial.selections[index]?.c ?? 0}
-                className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm text-[hsl(var(--foreground))] shadow-sm outline-none transition focus:border-[hsl(var(--ring))] disabled:cursor-wait disabled:opacity-60"
+                className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm text-[hsl(var(--foreground))] shadow-xs outline-hidden transition focus:border-[hsl(var(--ring))] disabled:cursor-wait disabled:opacity-60"
                 onChange={(e) => {
                     const c = Number.parseInt(e.target.value, 10);
                     if (Number.isNaN(c)) return;
@@ -120,7 +120,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
             <select
                 disabled={isChannelLoading[index]}
                 value={selections[index].c ?? 0}
-                className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm text-[hsl(var(--foreground))] shadow-sm outline-none transition focus:border-[hsl(var(--ring))] disabled:cursor-wait disabled:opacity-60"
+                className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm text-[hsl(var(--foreground))] shadow-xs outline-hidden transition focus:border-[hsl(var(--ring))] disabled:cursor-wait disabled:opacity-60"
                 onChange={async (e) => {
                     // see Avivator Controller.jsx onSelectionChange
                     try {
@@ -486,7 +486,7 @@ const ChannelController = ({ index }: { index: number }) => {
                                 />
                                 {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops clicks/focus reaching the accordion summary */}
                                 <div
-                                    className="h-7 min-w-9 overflow-hidden rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-sm"
+                                    className="h-7 min-w-9 overflow-hidden rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-xs"
                                     onClick={stopAccordionToggle}
                                     onFocus={stopAccordionToggle}
                                 >
@@ -602,7 +602,7 @@ const AddChannel = () => {
     return (
         <button
             type="button"
-            className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--foreground))] shadow-sm transition hover:bg-[hsl(var(--muted)/0.45)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--foreground))] shadow-xs transition hover:bg-[hsl(var(--muted)/0.45)] disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canAddChannel || isAddingChannel}
             onClick={async () => {
                 if (spatial) {
