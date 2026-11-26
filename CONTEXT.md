@@ -164,6 +164,29 @@ _Avoid_: stable image, production build
 One of the SQLite instances on bia running a labelled pull request's deployable image until the label comes off, when the instance goes back to `:sqlite` and its database is restored.
 _Avoid_: staging, test instance, dev deployment
 
+## Workspace terms
+
+**Pane workspace**:
+The current project view: one split pane per data source, each with its own menu bar and
+layout (absolute or gridstack). Views saved in `views.json`.
+_Avoid_: old view, classic view, legacy workspace
+
+**Workspace preview**:
+The browser preference that opens every view in the one-grid workspace instead of the Pane
+workspace. Listed while Feature previews is on.
+_Avoid_: new UI, redesign flag, beta
+
+**View's data sources**:
+The data sources a view is about: the keys of its `dataSources` when it opens, plus any a chart
+is added for. Highlights and filter tracking follow this set, not which charts exist.
+_Avoid_: panes, view members, active data sources
+
+**v2 view**:
+A view saved by the Workspace preview in `views_v2.json`: a flat chart list where each chart
+names its data source, and one 12-column layout in grid units.
+_Avoid_: new view, converted view (a converted view is a pane view opened in the preview and
+not yet saved)
+
 ## SpatialData.js integration terms
 
 Canonical rendering vocabulary lives in [SpatialData.js CONTEXT.md](https://github.com/Taylor-CCB-Group/SpatialData.js/blob/main/CONTEXT.md). MDV chart code uses the same terms:
