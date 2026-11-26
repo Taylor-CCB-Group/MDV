@@ -58,20 +58,22 @@ export function useColorGridCellLayers(
     );
     const codes = colorCells.split === "categories" ? colorCells.codes : undefined;
     const values = colorCells.split === "categories" ? colorCells.values : NO_VALUES;
+    const dataVersion = colorCells.split === "categories" ? colorCells.dataVersion : 0;
     const pointRows = points?.props.data;
-    // `cells` changes when the column gains categories in place, which `values` would not show
+    // `cells` changes when the column gains categories in place, which `values` would not show, and
+    // `dataVersion` when rows move between categories, which none of the arrays would
     // biome-ignore lint/correctness/useExhaustiveDependencies: see above
     const rowsByCategory = useMemo(() => {
         if (!(pointRows instanceof Uint32Array) || !codes) return null;
         return partitionRowsByCategory(pointRows, codes, values);
-    }, [pointRows, codes, values, cells]);
+    }, [pointRows, codes, values, cells, dataVersion]);
     // the highlight is drawn apart from `data`: each cell gets its own category's
     const highlighted = points instanceof SpatialLayer ? points.props.highlightedData : undefined;
     // biome-ignore lint/correctness/useExhaustiveDependencies: see `rowsByCategory`
     const highlightedByCategory = useMemo(() => {
         if (!Array.isArray(highlighted) || highlighted.length === 0 || !codes) return null;
         return partitionRowsByCategory(highlighted, codes, values);
-    }, [highlighted, codes, values, cells]);
+    }, [highlighted, codes, values, cells, dataVersion]);
 
     const pointLayers = useMemo(() => {
         if (!points) return [];

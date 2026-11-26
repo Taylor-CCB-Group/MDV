@@ -95,10 +95,12 @@ export function colorLegendField(config: ColorFieldsConfig): FieldName | undefin
  * missing, hide missing). The column must be loaded.
  */
 export function colorFunctionFor(chart: BaseChart<BaseConfig>, field: FieldName): RowColor {
+    const column = chart.dataStore.columnIndex[field];
     const conf = {
         asArray: true,
         overideValues: {
-            colorLogScale: chart.config.log_color_scale,
+            // as the legend (`colorFieldsLegendSpec`): a log scale does not suit calendar day numbers
+            colorLogScale: column && isDateColumn(column) ? false : chart.config.log_color_scale,
             fallbackOnZero: chart.config.fallbackOnZero,
             hideMissing: chart.config.hideMissing,
         },

@@ -189,14 +189,19 @@ const LayerFailureDetails = observer(function LayerFailureDetails({ entryId }: {
 
 /**
  * Turns the chart's grid by this layer's fill colour on and off, split by the type of its colour
- * column in the table annotating it (`columns`, undefined without one).
+ * column in the table annotating it (`columns`, undefined without one). Turning it on with no
+ * column yet (an active link that has not resolved) leaves the grid as it is, for the column to
+ * come; with a column that cannot be split, it turns it off.
  */
 function useLayerFillGridBy(entryId: string, columns: ColumnTypes | undefined): GridBySpec {
     const config = useConfig<SpatialDataMdvReactConfig>();
     return useMemo(() => {
-        const available = () => {
+        const fillColumn = () => {
             const entry = config.renderStack ? findRenderStackEntry(config.renderStack, entryId) : undefined;
-            const column = entry ? fillColumnName(entry.props) : undefined;
+            return entry ? fillColumnName(entry.props) : undefined;
+        };
+        const available = () => {
+            const column = fillColumn();
             return colorGridSplitFor(column ? columns?.columnIndex[column] : undefined);
         };
         return {
@@ -206,6 +211,7 @@ function useLayerFillGridBy(entryId: string, columns: ColumnTypes | undefined): 
             },
             available,
             set: action((on: boolean) => {
+                if (on && !fillColumn()) return;
                 const split = on ? available() : null;
                 if (split) config.grid = layerFillGridConfig(entryId, split);
                 else if (layerFillGrid(config)?.layer === entryId) config.grid = null;
@@ -822,11 +828,25 @@ const SpatialLayerDialogComponent = observer(() => {
 
     const onRemove = useCallback(
         (id: string) => {
+            // a grid of the removed layer's fill (or of a layer in a removed group) goes with it
+            const gridded = layerFillGrid(config)?.layer;
+            const removed = stack ? findRenderStackEntry(stack, id) : undefined;
+            const removesGridded =
+                removed &&
+                gridded &&
+                (removed.id === gridded ||
+                    (removed.kind === "group" &&
+                        Array.from(walkRenderStackEntries(removed.children)).some((e) => e.id === gridded)));
             mutateStack((current) => removeRenderStackEntry(current, id));
+            if (removesGridded) {
+                action(() => {
+                    config.grid = null;
+                })();
+            }
             chart.clearLayerFailure(id);
             if (selectedEntryId === id) setSelectedEntryId(null);
         },
-        [chart, mutateStack, selectedEntryId],
+        [chart, config, stack, mutateStack, selectedEntryId],
     );
 
     if (!stack?.entries.length) {

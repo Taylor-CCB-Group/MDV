@@ -186,7 +186,11 @@ export const FillColorByColumnControl = observer(function FillColorByColumnContr
                             current_value={specs[0]}
                             placeholder="Select column"
                             optional
-                            clearSelectedColumn={() => onChange(undefined, undefined)}
+                            clearSelectedColumn={() => {
+                                onChange(undefined, undefined);
+                                // no column, no grid of it
+                                gridBy?.set(false);
+                            }}
                             setSelectedColumn={select}
                         />
                     )}

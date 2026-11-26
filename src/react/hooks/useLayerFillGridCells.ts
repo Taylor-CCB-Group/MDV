@@ -79,11 +79,17 @@ export function useLayerFillGridCells(spatialData: SpatialData | undefined): Lay
     useEffect(() => {
         if (!gridLayer || !typeSplit || typeSplit === gridSplit) return;
         action(() => {
+            // a grid chosen since this render (another layer, or none) is left alone
+            const current = layerFillGrid(config);
+            if (current?.layer !== gridLayer || current.split !== gridSplit) return;
             config.grid = layerFillGridConfig(gridLayer, typeSplit);
         })();
     }, [config, gridLayer, gridSplit, typeSplit]);
 
-    const first = grid?.split === "categories" ? names[0] : undefined;
+    // the cells follow the column's type now, before the effect above saves it; the saved split
+    // stands while a link has not resolved
+    const split = gridLayer ? (typeSplit ?? gridSplit) : undefined;
+    const first = split === "categories" ? names[0] : undefined;
     const column = first && dataStore ? dataStore.columnIndex[first] : undefined;
     const categorical = column && (column.datatype === "text" || column.datatype === "text16") ? column : undefined;
     const values: readonly string[] = categorical?.values ?? NO_VALUES;
@@ -94,7 +100,6 @@ export function useLayerFillGridCells(spatialData: SpatialData | undefined): Lay
     const colorsKey = JSON.stringify(colors);
 
     const layerId = gridLayer;
-    const split = gridSplit;
     // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by value, as columns and links change in place
     return useMemo(() => {
         if (!layerId || !split || !spatialEntry) return null;

@@ -156,12 +156,13 @@ function splitEntries(
     entryId: string,
 ): { below: RenderStackEntry[]; above: RenderStackEntry[] } | null {
     for (const [index, entry] of entries.entries()) {
-        const before = entries.slice(0, index);
-        const after = entries.slice(index + 1);
-        if (entry.id === entryId) return { below: before, above: after };
+        // sliced only once found, not for every entry passed over
+        if (entry.id === entryId) return { below: entries.slice(0, index), above: entries.slice(index + 1) };
         if (entry.kind !== "group") continue;
         const inner = splitEntries(entry.children, entryId);
         if (!inner) continue;
+        const before = entries.slice(0, index);
+        const after = entries.slice(index + 1);
         const below = inner.below.length > 0 ? [...before, { ...entry, children: inner.below }] : before;
         const above =
             inner.above.length > 0 ? [{ ...entry, id: `${entry.id}:above`, children: inner.above }, ...after] : after;
