@@ -509,7 +509,7 @@ def umap_chart(
 def gene_panel(datasource: str, names: list[str], prompt: str | None = None) -> list[dict[str, Any]]:
     """`names` are the genes the list starts on; charts follow the genes picked in it.
 
-    `prompt` adds a text box above the list. The gene view does not use one.
+    Question views leave `prompt` unset, so the list starts at the top of the pane.
     """
     del datasource
     return side_panel(names, prompt=prompt)
@@ -780,7 +780,7 @@ def plan_question_views(
                     f"The first map shows **{group_label}**. The second map is the selected protein "
                     f"(darker = higher). The **dot plot** and **heat map** show that one protein, by "
                     f"**{dot_label}** and by **{group_label}**.\n\n"
-                    f"**To look at another protein:** click one name under **Select protein(s) to view**.",
+                    "**To look at another protein:** click one name in the protein list on the right.",
                 ),
                 TEXT_HEIGHT,
             )
@@ -805,7 +805,6 @@ def plan_question_views(
                     protein_rows.charts,
                     side_panel(
                         [pairs[0][1]],
-                        prompt="Select protein(s) to view",
                         list_title="Marker proteins",
                         kind="protein",
                     ),
@@ -920,12 +919,10 @@ def plan_question_views(
                     cells_name: concord.charts,
                     gene_name: side_panel(
                         [pairs[0][0]],
-                        prompt="Select gene(s) to view",
                         share=CONCORD_SIDE_SHARE,
                     ),
                     protein_name: side_panel(
                         [pairs[0][1]],
-                        prompt="Select protein(s) to view",
                         list_title="Marker proteins",
                         kind="protein",
                         share=CONCORD_SIDE_SHARE,
