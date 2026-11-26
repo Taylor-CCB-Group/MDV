@@ -16,7 +16,7 @@ import DotPlotPanel, { type DotPlotDot } from "./DotPlotPanel";
 import type { DotPlotReact } from "./DotPlotReactWrapper";
 import DotPlotRowAxis from "./DotPlotRowAxis";
 import { type DotPlotReactConfig, getColorRange } from "./dotPlotConfig";
-import { DOT_PLOT_MAX_RADIUS, getDotPlotLayout, getVisibleRows, getXLabelLayout } from "./dotPlotLayout";
+import { getDotPlotLayout, getVisibleRows, getXLabelLayout } from "./dotPlotLayout";
 import { getLegendLayout, type LegendLayout } from "./dotPlotLegends";
 import { binnedColorScale, getDotPlotPalette, MISSING_VALUE_COLOR, toCssColors } from "./dotPlotPalettes";
 import { type DotPlotStats, queryDotPlotStats } from "./dotPlotStats";
@@ -218,37 +218,28 @@ const DotPlotComponent = observer(function DotPlotComponent() {
             height,
         ],
     );
-    // The fraction legend's dots match the panels' dots, whose size depends on the space left
-    // after the legend band: lay out for the largest dots, then again for the size that gives.
-    const layoutBelow = (bandHeight: number) =>
-        getDotPlotLayout({ ...sizes, height: height - bandHeight, xAxisHeight: xLabels.margin });
-    const legendLayoutFor = (radius: number) =>
-        getLegendLayout({
-            width,
-            height,
-            colorRange:
-                showColorLegend && rangeMin !== undefined && rangeMax !== undefined ? [rangeMin, rangeMax] : null,
-            fracMax: showFractionLegend && fracMax !== undefined ? fracMax : null,
-            reserveSpace: config.reserve_legend_space,
-            maxRadius: radius,
-        });
-    const rawLegendLayout = legendLayoutFor(layoutBelow(legendLayoutFor(DOT_PLOT_MAX_RADIUS).height).maxRadius);
-    const layout = layoutBelow(rawLegendLayout.height);
+    const layout = getDotPlotLayout({ ...sizes, height, xAxisHeight: xLabels.margin });
     const { maxRadius } = layout;
+    // the fraction legend's dots match the panels' dots
+    const rawLegendLayout = getLegendLayout({
+        width,
+        colorRange: showColorLegend && rangeMin !== undefined && rangeMax !== undefined ? [rangeMin, rangeMax] : null,
+        fracMax: showFractionLegend && fracMax !== undefined ? fracMax : null,
+        maxRadius,
+    });
 
     // keyed by value, so the legends are only told about a real change
-    const { height: bandHeight, colorWidth, fractionItems } = rawLegendLayout;
+    const { colorWidth, fractionItems } = rawLegendLayout;
     const [colorLeft, colorTop] = rawLegendLayout.color ?? [];
     const [fractionLeft, fractionTop] = rawLegendLayout.fraction ?? [];
     const legendLayout = useMemo<LegendLayout>(
         () => ({
-            height: bandHeight,
             colorWidth,
             fractionItems,
             color: colorLeft !== undefined && colorTop !== undefined ? [colorLeft, colorTop] : null,
             fraction: fractionLeft !== undefined && fractionTop !== undefined ? [fractionLeft, fractionTop] : null,
         }),
-        [bandHeight, colorWidth, fractionItems, colorLeft, colorTop, fractionLeft, fractionTop],
+        [colorWidth, fractionItems, colorLeft, colorTop, fractionLeft, fractionTop],
     );
     useEffect(() => {
         // nothing to show (e.g. a split with no values): no legends, not the last ones
@@ -302,14 +293,7 @@ const DotPlotComponent = observer(function DotPlotComponent() {
 
     return (
         <div className="relative h-full w-full">
-            <svg
-                width={width}
-                height={height - bandHeight}
-                className="absolute left-0"
-                style={{ top: bandHeight }}
-                role="img"
-                aria-label={config.title}
-            >
+            <svg width={width} height={height} className="absolute top-0 left-0" role="img" aria-label={config.title}>
                 <DotPlotRowAxis
                     rows={visibleRows}
                     labels={rowColumn.values}

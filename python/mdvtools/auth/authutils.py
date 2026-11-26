@@ -7,18 +7,6 @@ from mdvtools.logging_config import get_logger
 # Setup logging
 logger = get_logger(__name__)
 
-# in_memory_cache.py
-# nb - we should review thread-safety of this: could lead to some uid having wrong value
-# which would be *bad*
-user_cache = {}  # key: auth_id -> user details
-user_project_cache = {}  # key: user_id -> project permissions
-all_users_cache = []  # list of all user summaries
-active_projects_cache = []
-
-# Cache metadata
-cache_last_updated = None
-CACHE_REFRESH_INTERVAL = 300  # 5 minutes
-
 def create_auth_provider(auth_method: str, app):
     """Factory function to create an authentication provider."""
     auth_method = auth_method.lower()
@@ -117,8 +105,7 @@ def is_authenticated(project_id=None):
         # session rather than once per request - the else branch below handles
         # every subsequent request. All three providers converge here, so this
         # is the single login capture point for Auth0, Shibboleth and dummy.
-        # Imported lazily: authutils is imported before db.init_app() runs,
-        # the same reason cache_user_projects() defers its import.
+        # Imported lazily: authutils is imported before db.init_app() runs.
         try:
             from mdvtools.dbutils.dbservice import UsageEventService
 
@@ -133,9 +120,8 @@ def is_authenticated(project_id=None):
         # whose local user id and admin flag mean nothing here. Re-resolve the user
         # from this deployment's own records on every request, keyed by auth_id.
         # The dummy provider's user has no database row, so it is left as it is.
-        # The row is read on every request, not from user_cache: MDV-Admin
-        # deactivates users by writing to the database from another process, and
-        # nothing refreshes the cache when it does (ADR 0020).
+        # The row is read on every request because MDV-Admin deactivates users
+        # by writing to the database from another process (ADR 0020).
         if (current_app.config.get("DEFAULT_AUTH_METHOD") or "").lower() != "dummy":
             auth_id = user.get("auth_id") if user else None
             local_user = None
@@ -171,16 +157,9 @@ def is_authenticated(project_id=None):
             pid = int(project_id)
         except (ValueError, TypeError):
             return (False, "Invalid project.")
-        perms = user_project_cache.get(user_id, {}).get(pid)
-        has_read_access = (
-            perms
-            and (
-                perms.get("can_read")
-                or perms.get("can_write")
-                or perms.get("is_owner")
-            )
-        )
-        if not has_read_access:
+        from mdvtools.auth.permissions import can_view, project_role
+
+        if not can_view(project_role(user_id, pid)):
             return (False, "No access to this project.")
 
     return (True, None)
@@ -300,125 +279,3 @@ def admin_required(view):
         return view(*args, **kwargs)
 
     return wrapped
-
-def needs_cache_refresh():
-    """Check if cache needs to be refreshed based on time interval."""
-    import time
-    global cache_last_updated
-    
-    if cache_last_updated is None:
-        return True
-    
-    return time.time() - cache_last_updated > CACHE_REFRESH_INTERVAL
-
-def cache_user_projects():
-    """
-    Caches user details and their associated project permissions in memory.
-    """
-    global cache_last_updated
-    import time
-    
-    from mdvtools.dbutils.dbmodels import User, UserProject
-    from mdvtools.dbutils.dbservice import ProjectService
-    
-    try:
-        logger.info("Caching user details and project permissions...")
-
-        users = User.query.all()
-        all_users_cache.clear()
-        user_cache.clear()
-        user_project_cache.clear()
-        active_projects_cache.clear()
-
-        for user in users:
-            user_data = {
-                "id": user.id,
-                "auth_id": user.auth_id,
-                "email": user.email,
-                "is_admin": user.is_admin
-            }
-            user_cache[user.auth_id] = user_data
-            all_users_cache.append(user_data)
-
-            user_projects = UserProject.query.filter_by(user_id=user.id).all()
-            project_permissions = {
-                up.project_id: {
-                    "can_read": up.can_read,
-                    "can_write": up.can_write,
-                    "is_owner": up.is_owner
-                }
-                for up in user_projects
-            }
-            user_project_cache[user.id] = project_permissions
-
-        active_projects = ProjectService.get_active_projects()
-        active_projects_cache[:] = active_projects
-        
-        # Update cache timestamp
-        cache_last_updated = time.time()
-
-        logger.info("Cached users and their project permissions in memory.")
-        return True
-
-    except Exception as e:
-        logger.exception(f"Error caching user projects: {e}")
-        return False
-    
-def update_cache(user_id=None, project_id=None, user_data=None, project_data=None, permissions=None):
-    """
-    Updates the in-memory caches (user_cache, user_project_cache, all_users_cache, active_projects_cache)
-    for the provided user and project details, including any changes in permissions.
-
-    :param user_id: The ID of the user whose cache needs to be updated.
-    :param project_id: The ID of the project to be added or updated in the cache.
-    :param user_data: A dictionary containing the user's details (if updating the user cache).
-    :param project_data: A dictionary containing the project's details (if updating the project cache).
-    :param permissions: A dictionary containing the user's permissions for a project (optional).
-    """
-    try:
-        # Step 1: Update user_cache (user details)
-        if user_data and user_id:
-            user_cache[user_id] = user_data  # Update or add the user in the cache
-            
-            # Ensure the user is in all_users_cache if they are not already
-            if user_data not in all_users_cache:
-                all_users_cache.append(user_data)
-        
-        # Step 2: Update user_project_cache (user-project relationship)
-        if user_id and project_id and permissions is not None:
-            # Create or update user project permissions in cache
-            if user_id not in user_project_cache:
-                user_project_cache[user_id] = {}
-
-            user_project_cache[user_id][project_id] = permissions  # Update or add project permissions
-            
-        # Step 3: Update active_projects_cache (active project details)
-        if project_data and project_id:
-            # Search for the project in the cache
-            existing_project = next((p for p in active_projects_cache if p["id"] == project_id), None)
-
-            if existing_project:
-                # Project exists in cache, update only the changed fields
-                existing_project["name"] = project_data.get("name", existing_project["name"])
-                existing_project["path"] = project_data.get("path", existing_project.get("path"))
-                existing_project["lastModified"] = project_data.get("lastModified", existing_project["lastModified"])
-                existing_project["thumbnail"] = project_data.get("thumbnail", existing_project["thumbnail"])
-                logger.info(f"Updated project {project_id} in active projects cache.")
-            else:
-                # Project does not exist in cache, append a new entry
-                project_entry = {
-                    "id": project_data["id"],
-                    "name": project_data["name"],
-                    "path": project_data.get("path"),
-                    "lastModified": project_data["lastModified"],
-                    "thumbnail": project_data["thumbnail"]
-                }
-                active_projects_cache.append(project_entry)
-                logger.info(f"Added new project {project_id} to active projects cache.")
-
-        logger.info("Cache successfully updated.")
-    
-    except Exception as e:
-        logger.exception(f"Error updating cache: {e}")
-
-

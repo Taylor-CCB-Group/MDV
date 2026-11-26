@@ -1,6 +1,5 @@
 from flask import session, redirect, request, jsonify
 from mdvtools.dbutils.dbservice import UserService
-from mdvtools.auth.authutils import update_cache
 from mdvtools.auth.auth_provider import AuthProvider
 from typing import Optional
 from flask.typing import ResponseReturnValue
@@ -33,20 +32,11 @@ class ShibbolethProvider(AuthProvider):
                     return jsonify({"error": "Shibboleth login URL not configured."}), 500
 
             # Provision user in DB
-            user = UserService.add_or_update_user(
+            UserService.add_or_update_user(
                 email=email,
                 auth_id=persistent_id,
                 institution="University of Oxford"
             )
-
-            # Cache user data
-            user_data = {
-                "id": user.id,
-                "auth_id": user.auth_id,
-                "email": user.email,
-                "is_admin": user.is_admin
-            }
-            update_cache(user_id=user.id, user_data=user_data)
 
             logger.info(f"SSO login successful: {email}")
             return redirect("/")

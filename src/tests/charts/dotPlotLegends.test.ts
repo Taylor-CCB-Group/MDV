@@ -4,7 +4,6 @@ import {
     getColorLegendBox,
     getFractionLegendBox,
     getLegendLayout,
-    MAX_LEGEND_BAND_FRACTION,
     DOT_PLOT_LEGEND_MARGIN as m,
     pickEvenly,
 } from "@/react/components/dotplot/dotPlotLegends";
@@ -12,67 +11,32 @@ import { getFractionLegendSize } from "@/react/components/legend/FractionLegend"
 import type { FractionLegendSpec } from "@/react/legend/fraction_legend/types";
 
 const colorRange: [number, number] = [0, 90];
-const input = { width: 1200, height: 800, colorRange, fracMax: 100, maxRadius: 25, reserveSpace: true };
+const input = { width: 1200, colorRange, fracMax: 100, maxRadius: 25 };
 /** Width of a one-row band at full size: colour legend, then the fraction legend beside it. */
 const fullRowWidth =
     m + getColorLegendBox(colorRange).width + m + getFractionLegendBox(buildFractionLegendSpec(100, 25)).width + m;
 
 describe("getLegendLayout", () => {
-    it("starts the legends in the same row but keeps no band when space isn't kept for them", () => {
-        const kept = getLegendLayout(input);
-        const notKept = getLegendLayout({ ...input, reserveSpace: false });
-        expect(notKept.height).toBe(0);
-        expect(notKept.color).toEqual(kept.color);
-        expect(notKept.fraction).toEqual(kept.fraction);
-        expect(notKept.fractionItems).toBe(kept.fractionItems);
-    });
-
-    it("keeps full-size legends on a short chart when space isn't kept, as there's no band to cap", () => {
-        const short = getLegendLayout({ ...input, height: 150, reserveSpace: false });
-        expect(short.height).toBe(0);
-        expect(short.fractionItems).toBe(Number.POSITIVE_INFINITY);
-    });
-
     it("puts both legends at full size in one row when there's room", () => {
         const layout = getLegendLayout(input);
         expect(layout.fractionItems).toBe(Number.POSITIVE_INFINITY);
         expect(layout.color).toEqual([m, m]);
         expect(layout.fraction?.[1]).toBe(m);
         expect(layout.fraction?.[0]).toBeGreaterThan(m);
-        expect(layout.height).toBeGreaterThan(0);
     });
 
     it("shows fewer fraction dots rather than stacking when the row is a little too wide", () => {
         const layout = getLegendLayout({ ...input, width: fullRowWidth - 1 });
         expect(layout.fractionItems).toBeLessThan(Number.POSITIVE_INFINITY);
         expect(layout.fraction?.[1]).toBe(m);
-        expect(layout.height).toBeGreaterThan(0);
     });
 
-    it("never stacks the legends in the band", () => {
-        for (const width of [300, 400, 500, 600, 800]) {
-            const layout = getLegendLayout({ ...input, width });
-            if (layout.height > 0) {
-                expect(layout.fraction?.[1]).toBe(m);
-            }
-        }
-    });
-
-    it("drops the band and starts the legends over the plot when even a compact row won't fit", () => {
+    it("stacks the legends when even a compact row won't fit", () => {
         const layout = getLegendLayout({ ...input, width: 250 });
-        expect(layout.height).toBe(0);
         expect(layout.color).toEqual([m, m]);
         // no room beside the colour legend, so the fraction legend starts below it
         expect(layout.fraction?.[0]).toBe(m);
         expect(layout.fraction?.[1]).toBeGreaterThan(m);
-    });
-
-    it("never lets the band take more than a third of the height", () => {
-        const layout = getLegendLayout({ ...input, height: 150 });
-        expect(layout.height).toBe(0);
-        for (const height of [300, 400, 800]) {
-            expect(getLegendLayout({ ...input, height }).height).toBeLessThanOrEqual(height * MAX_LEGEND_BAND_FRACTION);
-        }
     });
 
     it("only lays out the legends that are shown", () => {
@@ -83,7 +47,7 @@ describe("getLegendLayout", () => {
         expect(fractionOnly.color).toBeNull();
         expect(fractionOnly.fraction).toEqual([m, m]);
         const none = getLegendLayout({ ...input, colorRange: null, fracMax: null });
-        expect(none).toMatchObject({ height: 0, color: null, fraction: null });
+        expect(none).toMatchObject({ color: null, fraction: null });
     });
 });
 

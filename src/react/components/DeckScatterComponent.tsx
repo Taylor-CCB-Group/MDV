@@ -28,7 +28,7 @@ import AxisComponent from "./AxisComponent";
 import DeckDensityGridComponent from "./DeckDensityGridComponent";
 import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
 import { isDensityGridShown } from "./densityGridUtils";
-import FieldContourLegend from "./FieldContourLegend";
+import { useContourLegend } from "./FieldContourLegend";
 import SelectionOverlay from "./SelectionOverlay";
 import { ScatterDeckBoundary, useLayersForDevice, useScatterDeckDevice, useZoomOnFilter } from "./scatterDeckShared";
 import ViewGestureHint from "./ViewGestureHint";
@@ -175,8 +175,13 @@ const DeckScatter = observer(function DeckScatterComponent({
 
     const legendFields = useFieldContourLegend(contourConfig.densityFields);
     const legendCategories = useCategoryContourLegend(contourConfig);
-    const showLegend = contourConfig.field_legend.display;
-    const legendPosition = { x: 10, y: 10 };
+    // drawn in the chart's legend wrapper: draggable, can be minimised or put above the plot
+    useContourLegend(contourConfig.field_legend, {
+        fields: legendFields,
+        categories: legendCategories.items,
+        categoryLabel: legendCategories.label,
+        onContourHover: setHoveredContour,
+    });
 
     const { modelMatrix } = selectionProps;
     // as the classic 3D scatter drew them: each axis across its column's range, through the middle of the data
@@ -362,15 +367,6 @@ const DeckScatter = observer(function DeckScatterComponent({
             </AxisComponent>
             <ViewGestureHint />
             {tooltipPortal}
-            {showLegend && (
-                <FieldContourLegend
-                    fields={legendFields}
-                    categories={legendCategories.items}
-                    categoryLabel={legendCategories.label}
-                    position={legendPosition}
-                    onContourHover={setHoveredContour}
-                />
-            )}
         </>
     );
 });
