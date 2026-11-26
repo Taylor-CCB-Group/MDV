@@ -317,7 +317,7 @@ export function FileDropzoneView({
                         {supportedFileTypes.map((extension) => (
                             <span
                                 key={extension}
-                                className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                                className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                             >
                                 {extension}
                             </span>

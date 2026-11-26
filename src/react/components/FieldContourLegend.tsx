@@ -184,7 +184,7 @@ export default function FieldContourLegend({
     return (
         <div
             ref={containerRef}
-            className="legend-container absolute border-[0.5px] border-current z-[2]"
+            className="legend-container absolute border-[0.5px] border-current z-2"
             style={{
                 width: "120px",
                 height: `${containerHeight}px`,

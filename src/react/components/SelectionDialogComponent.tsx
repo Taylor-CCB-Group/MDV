@@ -964,7 +964,7 @@ const SelectionDialogComponent = () => {
         [config, orderedParams],
     );
     return (
-        <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
+        <div className="p-3 absolute w-full h-full overflow-x-hidden overflow-y-auto">
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                 <SortableContext items={orderedParams.map((col) => col.field)} strategy={verticalListSortingStrategy}>
                     {orderedParams.map((col) => (

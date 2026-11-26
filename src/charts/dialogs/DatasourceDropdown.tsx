@@ -32,7 +32,7 @@ export const DatasourceDropdown: React.FC<DropdownProps> = ({ options, onSelect 
             <select
                 value={selectedOption || ""}
                 onChange={handleSelect}
-                className="block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-xs focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             >
                 <option value="" disabled>
                     -- Select an option --

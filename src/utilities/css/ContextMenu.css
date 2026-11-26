@@ -126,8 +126,11 @@
   /* margin: 6px 10px 14px 10px; */
 }
 
-* {
-  user-select: none;
+/* in Tailwind's base layer, so utility classes on the element still win as they did with Tailwind v3 */
+@layer base {
+  * {
+    user-select: none;
+  }
 }
 
 .ciview-menu-icon{
@@ -261,9 +264,12 @@
   border-radius: 8px;
 }
 
-select, input, textarea {
-  color: var(--text_color);
-  background-color: var(--background_color);
+/* in Tailwind's base layer, so utility classes on the element still win as they did with Tailwind v3 */
+@layer base {
+  select, input, textarea {
+    color: var(--text_color);
+    background-color: var(--background_color);
+  }
 }
   
    .gutter-horizontal{

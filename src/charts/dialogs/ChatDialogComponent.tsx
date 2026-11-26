@@ -157,7 +157,7 @@ function DataPreviewBody({ content }: { content: string }) {
         return <MessageMarkdown text={content} />;
     }
     return (
-        <pre className="mb-0 max-h-[70vh] overflow-auto font-mono text-xs leading-snug text-slate-900 whitespace-pre-wrap break-words md:text-sm dark:text-slate-100">
+        <pre className="mb-0 max-h-[70vh] overflow-auto font-mono text-xs leading-snug text-slate-900 whitespace-pre-wrap wrap-break-word md:text-sm dark:text-slate-100">
             {content}
         </pre>
     );

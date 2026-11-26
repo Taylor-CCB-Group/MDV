@@ -21,7 +21,7 @@ export default function EntryStatusDetails({
         <div className="grid gap-1">
             {status.errors.map(({ resource, error }) => (
                 <div key={`error:${resource}:${error.kind}`} role="alert" className="flex items-start gap-2">
-                    <span className="grow break-words">{error.message}</span>
+                    <span className="grow wrap-break-word">{error.message}</span>
                     {error.retryable && onRetry && (
                         <Button size="small" variant="outlined" onClick={onRetry}>
                             Retry
@@ -44,7 +44,7 @@ export default function EntryStatusDetails({
                         ))}
                     </div>
                 ) : (
-                    <p key={notice.kind} role="status" className="break-words">
+                    <p key={notice.kind} role="status" className="wrap-break-word">
                         {notice.message}
                     </p>
                 ),
