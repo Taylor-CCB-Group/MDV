@@ -359,7 +359,7 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
         .nullable()
         .optional()
         .describe(
-            "In a colour grid with a cell per category: draw the other categories' points in grey under each cell's own (default false)",
+            "In a grid with a cell per category: also draw the other categories, dimmed: points in grey under each cell's own, a layer's shapes or labels faded (default false)",
         ),
     point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
     axis_scaling: z

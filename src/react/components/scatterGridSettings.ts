@@ -13,11 +13,14 @@ import {
 } from "./colorGridUtils";
 import { supportsDensityGridMode } from "./densityGridUtils";
 
-/** In a grid with a cell per category: whether each cell shows the other categories in grey. */
+/**
+ * In a grid with a cell per category: whether each cell also shows the other categories, dimmed
+ * (points in grey; a layer's shapes or labels faded).
+ */
 export function getGreyOtherCategoriesSetting(config: { grey_other_categories?: boolean | null }) {
     return g({
         type: "check",
-        label: "A cell per category: show the other categories in grey",
+        label: "A cell per category: also show the other categories, dimmed",
         current_value: !!config.grey_other_categories,
         func: (x: boolean) => {
             config.grey_other_categories = x;

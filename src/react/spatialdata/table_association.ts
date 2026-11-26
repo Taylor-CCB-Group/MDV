@@ -210,9 +210,17 @@ function toRgba(color: RgbColor | RgbaColor | undefined, alpha: number): RgbaCol
     ];
 }
 
+/**
+ * The opacity of faded features drawn for context (`emphasisedRows`), relative to their own. The
+ * viewer's default suits a cross-filter, where the faded features are few; for a grid cell's
+ * other categories they are most of the element, and at that opacity bury the cell's own.
+ */
+const CONTEXT_OPACITY = 0.15;
+
 export function buildAssociatedFeatureStateFromRowMap({
     rowIndexByFeatureId,
     visibleRows,
+    emphasisedRows,
     rowCount,
     baseFeatureState,
     colorForRow,
@@ -220,13 +228,20 @@ export function buildAssociatedFeatureStateFromRowMap({
 }: {
     rowIndexByFeatureId: Map<string, number> | Iterable<[string, number]>;
     visibleRows: ArrayLike<number>;
+    /**
+     * When given, the visible rows drawn as they are; the other visible rows are faded
+     * (`fadedFeatureIds`) rather than hidden. A grid cell's category, with the rest for context.
+     */
+    emphasisedRows?: ArrayLike<number>;
     rowCount: number;
     baseFeatureState?: AssociatedFeatureState;
     colorForRow?: RowColorFunction;
     alpha: number;
 }): AssociatedFeatureState | undefined {
     const visibleRowSet = new Set(Array.from(visibleRows));
+    const emphasisedRowSet = emphasisedRows ? new Set(Array.from(emphasisedRows)) : undefined;
     const hiddenFeatureIds = new Set(baseFeatureState?.hiddenFeatureIds ?? []);
+    const fadedFeatureIds = new Set(baseFeatureState?.fadedFeatureIds ?? []);
     const fillColorByFeatureId = {
         ...(baseFeatureState?.fillColorByFeatureId ?? {}),
     };
@@ -239,6 +254,8 @@ export function buildAssociatedFeatureStateFromRowMap({
         hasTableState = true;
         if (!visibleRowSet.has(rowIndex)) {
             hiddenFeatureIds.add(featureId);
+        } else if (emphasisedRowSet && !emphasisedRowSet.has(rowIndex)) {
+            fadedFeatureIds.add(featureId);
         }
 
         if (colorForRow) {
@@ -253,6 +270,9 @@ export function buildAssociatedFeatureStateFromRowMap({
         ...baseFeatureState,
         fillColorByFeatureId: Object.keys(fillColorByFeatureId).length > 0 ? fillColorByFeatureId : undefined,
         hiddenFeatureIds: hiddenFeatureIds.size > 0 ? Array.from(hiddenFeatureIds) : undefined,
+        fadedFeatureIds: fadedFeatureIds.size > 0 ? Array.from(fadedFeatureIds) : undefined,
+        filteredOpacityMultiplier:
+            baseFeatureState?.filteredOpacityMultiplier ?? (emphasisedRowSet ? CONTEXT_OPACITY : undefined),
     };
 }
 
@@ -397,6 +417,7 @@ export function withPreservedFillColorsWhileLoading({
 type FeatureStateCacheEntry = {
     source: Map<string, number>;
     visibleRows: Uint32Array | undefined;
+    emphasisedRows: Uint32Array | undefined;
     rowCount: number;
     baseFeatureState: AssociatedFeatureState | undefined;
     colorForRow: RowColorFunction | undefined;
@@ -787,6 +808,8 @@ export function useAssociatedShapesLayerInputs(
      * copies of a grid by a layer's fill categories (see `withLayerFillCopies`).
      */
     categoryByLayerId?: Readonly<Record<string, string>>,
+    /** With `categoryByLayerId`: fade the other categories' features rather than hide them. */
+    fadeOtherCategories = false,
 ): AssociatedLayerInputs {
     const dataSources = useDataSources();
     // Stable by value, not by identity: which elements are on the canvas changes far
@@ -1032,9 +1055,9 @@ export function useAssociatedShapesLayerInputs(
                     const filteredRows =
                         visibleRowsByDataSource[table.dataSourceName] ?? visibleRowsForDataStore(table.dataStore);
                     const category = categoryByLayerId?.[layerId];
-                    const visibleRows =
+                    const categoryRows =
                         category === undefined
-                            ? filteredRows
+                            ? undefined
                             : categoryVisibleRows(
                                   categoryRowsCacheRef.current,
                                   layerId,
@@ -1043,6 +1066,10 @@ export function useAssociatedShapesLayerInputs(
                                   fillColumnName,
                                   category,
                               );
+                    // a grid cell draws its category; the rest of the filtered rows are hidden,
+                    // or faded for context
+                    const visibleRows = categoryRows && !fadeOtherCategories ? categoryRows : filteredRows;
+                    const emphasisedRows = fadeOtherCategories ? categoryRows : undefined;
 
                     // Filtering rides `featureState` on both routes: cross-filtering is
                     // MDV's, not the table's, and no column in obs can express it.
@@ -1085,6 +1112,7 @@ export function useAssociatedShapesLayerInputs(
                         cached &&
                         cached.source === source &&
                         cached.visibleRows === visibleRows &&
+                        cached.emphasisedRows === emphasisedRows &&
                         cached.rowCount === rowCount &&
                         cached.baseFeatureState === baseFeatureState &&
                         cached.colorForRow === colorForRow &&
@@ -1095,6 +1123,7 @@ export function useAssociatedShapesLayerInputs(
                         featureState = buildAssociatedFeatureStateFromRowMap({
                             rowIndexByFeatureId: source,
                             visibleRows,
+                            emphasisedRows,
                             rowCount,
                             baseFeatureState,
                             colorForRow,
@@ -1103,6 +1132,7 @@ export function useAssociatedShapesLayerInputs(
                         featureStateCacheRef.current[layerId] = {
                             source,
                             visibleRows,
+                            emphasisedRows,
                             rowCount,
                             baseFeatureState,
                             colorForRow,
@@ -1155,6 +1185,7 @@ export function useAssociatedShapesLayerInputs(
             colorFunctionByDataSource,
             mdvTooltipFieldsByLayerId,
             categoryByLayerId,
+            fadeOtherCategories,
         ],
     );
 

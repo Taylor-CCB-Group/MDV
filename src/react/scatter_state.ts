@@ -96,7 +96,7 @@ export type ScatterPlotConfig = {
     selection_toolbar_open: boolean;
     /** 2D only: mark the pointer with a crosshair; absent is on. null only keeps the key observable. */
     crosshair?: boolean | null;
-    /** In a colour grid by category: draw the other categories' points in grey in each cell. null keeps the key observable. */
+    /** In a grid by category: also draw the other categories, dimmed, in each cell. null keeps the key observable. */
     grey_other_categories?: boolean | null;
     point_shape: "circle" | "square" | "gaussian";
     /** 2D only; absent is `equal`. See `AxisScaling`. */

@@ -58,10 +58,12 @@ columns only while it is a grid of columns. Turning it off leaves the columns in
 in use. The Grid dropdown offers only
 the split the column allows (`colorGridSplitFor`), and the chart's current one.
 
-With a cell per category, each cell can also draw the other categories' points in grey under its
-own (`grey_other_categories`, a chart setting rather than part of `grid`, so it outlasts turning
-the grid off and on). It is one layer of all the points, drawn in every cell, not a layer per cell.
-Layer fill grids do not have it yet.
+With a cell per category, each cell can also draw the other categories, dimmed, for context
+(`grey_other_categories`, a chart setting rather than part of `grid`, so it outlasts turning the
+grid off and on). Points are drawn in grey under the cell's own, as one layer of all of them in
+every cell, not a layer per cell. A layer fill grid's copies fade the other categories' features
+instead (`fadedFeatureIds`, at the viewer's `filteredOpacityMultiplier`), so they keep their
+colours. Either way, rows filtered out elsewhere stay hidden.
 
 The selection toolbar's grid button follows whichever grid is shown: with one, it goes back to one
 plot; without, it shows the chart's only grid, or a menu of them (`gridChoices` on the chart, the

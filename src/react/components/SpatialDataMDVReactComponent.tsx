@@ -591,6 +591,7 @@ const SpatialDataViewer = observer(
             gridLayerInputs,
             region?.spatial?.file,
             layerFillCells?.categoryByLayerId,
+            !!config.grey_other_categories,
         );
 
         const onSpatialViewStateChange = useCallback(
