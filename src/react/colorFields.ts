@@ -63,6 +63,7 @@ export function migrateColorBy<
     const field = colorByField(config.color_by);
     const spec: FieldSpec | undefined = field ?? (isColorByQuery(config.color_by) ? config.color_by : undefined);
     const color_fields = config.color_fields ?? (spec ? [spec] : []);
+    // biome-ignore lint/performance/noDelete: the key must go, not be left undefined: `color_fields` replaces it
     delete config.color_by;
     return Object.assign(config, {
         color_fields,

@@ -53,7 +53,7 @@ export function GridByIcon({ gridded, layerName }: { gridded: GriddedEntry; laye
     const of = gridded.byColour ? `the colour of ${layer}` : layer;
     const description = `The chart is a grid of ${of}: ${gridded.cells}`;
     return (
-        <span className="flex flex-shrink-0" title={description} role="img" aria-label={description}>
+        <span className="flex shrink-0" title={description} role="img" aria-label={description}>
             <GridViewOutlinedIcon fontSize="small" color="primary" sx={{ fontSize: 16 }} />
         </span>
     );
