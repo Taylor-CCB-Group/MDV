@@ -35,7 +35,11 @@ const PACKAGE_DIRS = {
  * separate copy of them, so it goes stale silently and unlink then writes a pin
  * nobody chose.
  *
- * 0.16.0 is what these pins ask for: feature pick events carry the `entryId` of the
+ * 0.17.1 is what these pins ask for: shapes and labels layers compare their feature state
+ * by identity rather than sorting and serialising it every render, which made a grid of one
+ * layer's categories take ~70 ms per render to pan (SpatialData.js#323).
+ *
+ * 0.16.0: feature pick events carry the `entryId` of the
  * picked Render Stack entry (`resolvePickedEntryId`), which isolated groups need.
  *
  * 0.15.2 computed channel stats faster in avivatorish and
@@ -77,11 +81,11 @@ const PACKAGE_DIRS = {
  * the layer at runtime.
  */
 const PUBLISHED_RANGES = {
-    "@spatialdata/avivatorish": "^0.16.0",
-    "@spatialdata/core": "^0.16.0",
-    "@spatialdata/layers": "^0.16.0",
-    "@spatialdata/react": "^0.16.0",
-    "@spatialdata/vis": "^0.16.0",
+    "@spatialdata/avivatorish": "^0.17.1",
+    "@spatialdata/core": "^0.17.1",
+    "@spatialdata/layers": "^0.17.1",
+    "@spatialdata/react": "^0.17.1",
+    "@spatialdata/vis": "^0.17.1",
     zarrextra: "0.7.1",
 };
 
