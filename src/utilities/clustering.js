@@ -239,10 +239,9 @@ function parseNewick(tree) {
             length,
             delim,
             ch,
-            all,
             id = nextid++;
 
-        [all, name, length, delim, ch] = regex.exec(newick);
+        [, name, length, delim, ch] = regex.exec(newick);
         if (ch === "(") {
             while ("(,".includes(ch)) {
                 [node, ch] = recurse(id);

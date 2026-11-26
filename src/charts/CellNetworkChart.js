@@ -128,7 +128,7 @@ class CellNetworkChart extends SVGChart {
                 return "currentcolor";
             })
             .style("opacity", drawColors ? 0.6 : 1.0)
-            .on("click", (e, d) => {
+            .on("click", (_e, d) => {
                 this.dataStore.dataHighlighted([d.d_index], this);
             });
 
@@ -221,14 +221,14 @@ class CellNetworkChart extends SVGChart {
     }
 
     //this will be decorated to ensure data is loaded
-    changeLinkThicknessParameter(col, tq) {
+    changeLinkThicknessParameter(_col, tq) {
         this._changeLinkThicknessScale(tq, null, true);
     }
 
-    changeLinkLengthParameter(col, tq) {
+    changeLinkLengthParameter(_col, tq) {
         this._changeLinkLengthScale(tq, null, true);
     }
-    changeLinkColorParameter(col, tq) {
+    changeLinkColorParameter(_col, tq) {
         this._changeLinkColorScale(null, [tq[0], tq[1]], true);
     }
 
@@ -371,7 +371,7 @@ class CellNetworkChart extends SVGChart {
         }
     }
 
-    onDataFiltered(dim) {
+    onDataFiltered(_dim) {
         this.reCalculate();
     }
 
@@ -662,14 +662,10 @@ class CellNetworkChart extends SVGChart {
     getSettings() {
         const settings = super.getSettings();
         const c = this.config;
-        const vals = this.dataStore.getColumnValues(c.param[0]);
         const cells = this.dataStore.getColumnValues(c.param[1]).map((x) => {
             return { t: x };
         });
         cells.unshift({ t: "None" });
-        const li = vals.map((x) => {
-            return { t: x, v: x };
-        });
 
         settings.push({
             type: "slider",

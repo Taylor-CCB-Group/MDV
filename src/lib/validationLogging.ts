@@ -55,7 +55,6 @@ function getFindingsStore(): ValidationFindingsStore | undefined {
 export function logValidationError(options: LogValidationErrorOptions) {
     const { context, name, rawConfig, error, details } = options;
     const issues = extractIssues(error);
-    const bucketName = context === "datasource" ? "datasources" : "charts";
     const label = name ?? (context === "datasource" ? "(unknown datasource)" : "(unknown chart)");
 
     console.error(

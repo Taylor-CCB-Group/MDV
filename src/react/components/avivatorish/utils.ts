@@ -136,10 +136,6 @@ async function getTotalImageCount(sources: OmeTiffImage[]) {
     return numImagesPerResolution * levels;
 }
 
-function isZodError(e: unknown): e is Error & { issues: unknown } {
-    return e instanceof Error && "issues" in e;
-}
-
 async function fetchSingleFileOmeTiffOffsets(url: string) {
     // No offsets for multifile OME-TIFFs
     if (url.includes("companion.ome")) {

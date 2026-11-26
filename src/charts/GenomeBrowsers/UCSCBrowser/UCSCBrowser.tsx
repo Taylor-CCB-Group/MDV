@@ -88,7 +88,7 @@ BaseChart.types["ucsc_browser"] = {
     required: (ds) => {
         return ds.genome;
     },
-    extra_controls: (ds) => {
+    extra_controls: () => {
         return [
             {
                 type: "text",
@@ -97,7 +97,7 @@ BaseChart.types["ucsc_browser"] = {
             },
         ];
     },
-    init(config, ds, extraControls) {
+    init(config, _ds, extraControls) {
         config.src = extraControls.url;
     },
 };

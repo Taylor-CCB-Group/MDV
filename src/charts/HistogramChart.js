@@ -168,17 +168,17 @@ class HistogramChart extends SVGChart {
 
         this.updateAxis();
         const units = cdim.height / maxBar;
-        const join = this.graph_area
+        this.graph_area
             .selectAll(".bar")
 
             .data(this.binData)
             .join("rect")
             .transition(trans)
-            .style("fill", (d, i) => {
+            .style("fill", (_d, i) => {
                 return this.binFiltered[i] ? "gray" : "blue";
             })
             .attr("class", "bar")
-            .attr("x", (d, i) => (i + 1) * 3 + i * barWidth)
+            .attr("x", (_d, i) => (i + 1) * 3 + i * barWidth)
             .attr("width", barWidth)
             .attr("y", (d) => cdim.height - d * units)
             .attr("height", (d) => d * units);

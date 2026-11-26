@@ -1,20 +1,9 @@
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 // some of this is quite bloated - could use dynamic imports for some of the more complex components
-import {
-    Accordion,
-    AccordionDetails,
-    AccordionSummary,
-    Checkbox,
-    FormControl,
-    IconButton,
-    InputLabel,
-    MenuItem,
-    Select,
-    Slider,
-} from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Checkbox, IconButton, Slider } from "@mui/material";
 import { MAX_CHANNELS } from "@vivjs/constants";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { shallow } from "zustand/shallow";
 import { isArray, resolveAutoHistogramYScale } from "@/lib/utils";
 import { useTheme } from "../hooks";
@@ -73,41 +62,6 @@ export default function MainVivColorDialog({ vivStores }: { vivStores: VivContex
         </VivProvider>
     );
 }
-
-const ChannelChooserMUI = ({ index }: { index: number }) => {
-    const channels = useMetadata()?.Pixels.Channels.map((c) => c.Name) as string[];
-    const selections = useChannelsStore(({ selections }) => selections);
-    const channelsStore = useChannelsStoreApi();
-    const id = useId();
-    const name = channels[selections[index].c ?? 0];
-
-    return (
-        <>
-            <FormControl fullWidth variant="standard">
-                <InputLabel id={id}>{name}</InputLabel>
-                <Select
-                    labelId={id}
-                    label="Channel"
-                    onChange={(e) => {
-                        const newSelections = [...selections];
-                        if (typeof e.target.value !== "number") {
-                            return;
-                        }
-                        newSelections[index].c = e.target.value;
-                        channelsStore.setState({ selections: newSelections });
-                    }}
-                >
-                    {channels.map((c, i) => (
-                        // biome-ignore lint/suspicious/noArrayIndexKey: the option value is the channel index; names may repeat
-                        <MenuItem key={`${i}_${c}`} value={i}>
-                            {c}
-                        </MenuItem>
-                    ))}
-                </Select>
-            </FormControl>
-        </>
-    );
-};
 
 const ChannelChooser = ({ index }: { index: number }) => {
     const spatial = useSpatialImagePanelContext();

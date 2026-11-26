@@ -761,7 +761,7 @@ export class ChartManager {
                 for (const scc of ds.syncColumnColors) {
                     try {
                         this._sync_colors(scc.columns, this.dsIndex[scc.dataSource].dataStore, ds);
-                    } catch (error) {
+                    } catch {
                         console.warn(`error syncing colors for '${ds.name}' and '${scc.dataSource}'`);
                     }
                 }
@@ -1371,7 +1371,7 @@ export class ChartManager {
         }
     }
     loadColumnSetAsync(columns, dataSource, split = 10, threads = 2) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             this.loadColumnSet(columns, dataSource, resolve, split, threads);
         });
     }
@@ -2262,7 +2262,7 @@ export class ChartManager {
         }
     }
 
-    addButton(text, callback, tooltip) {
+    addButton(text, callback, _tooltip) {
         createEl(
             "button",
             {

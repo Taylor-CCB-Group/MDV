@@ -34,7 +34,7 @@ class TreeDiagram extends SVGChart {
         const b = this._getContentDimensions();
         const treeMap = cluster()
             .size([b.height, b.width - 50])
-            .separation((a, b) => 1);
+            .separation(() => 1);
 
         const nodes = treeMap(this.treeData);
         function maxLength(d) {
@@ -48,7 +48,6 @@ class TreeDiagram extends SVGChart {
         this.setBranchLength(this.treeData, 0, (b.width - 50) / maxLength(this.treeData));
 
         const desc = nodes.descendants();
-        const nml = max(desc, (d) => d.data.length);
         this.graph_area
             .selectAll(".tree-link")
             .data(desc.slice(1))

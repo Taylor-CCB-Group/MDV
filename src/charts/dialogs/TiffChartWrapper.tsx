@@ -10,7 +10,7 @@ export interface TiffChartWrapperProps {
 }
 
 const TiffChartWrapper: React.FC<PropsWithChildren<TiffChartWrapperProps>> = observer(
-    ({ metadata, file, config, children, onFullscreenChange }: PropsWithChildren<TiffChartWrapperProps>) => {
+    ({ children, onFullscreenChange }: PropsWithChildren<TiffChartWrapperProps>) => {
         const [isFullscreen, setIsFullscreen] = useState(false);
         const [oldSize, setOldSize] = useState<[number, number] | null>(null);
         const contentDivRef = useRef<HTMLDivElement>(null);

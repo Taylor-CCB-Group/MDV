@@ -6,14 +6,14 @@ import "../src/charts/css/charts.css";
 import "../src/webgl/css/wgl2di.css";
 import "../src/table/css/slickgrid.css";
 
-import {getRandomDataStore, mockColumns, mockDataLoader, mockDataSource} from "../src/dev/MockDataStore.js";
-import { createEl } from "../src/utilities/Elements";
-import  RingChart  from "../src/charts/RingChart";
-import  RowChart  from "../src/charts/RowChart";
-import  WGLScatterPlot  from "../src/charts/WGLScatterPlot";
-import  WGL3DScatterPlot  from "../src/charts/WGL3DScatterPlot";
-import TableChart from "../src/charts/TableChart";
-import  HistogramChart  from "../src/charts/HistogramChart";
+import {mockDataLoader, mockDataSource} from "../src/dev/MockDataStore.js";
+// chart modules register their types on import
+import "../src/charts/RingChart";
+import "../src/charts/RowChart";
+import "../src/charts/WGLScatterPlot";
+import "../src/charts/WGL3DScatterPlot";
+import "../src/charts/TableChart";
+import "../src/charts/HistogramChart";
 import ChartManager from "../src/charts/ChartManager";
 
 ////////////////////

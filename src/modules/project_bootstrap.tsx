@@ -136,8 +136,8 @@ function LoadState({
                             <p className={`${bodyTextClassName} text-left text-[14px] leading-6`}>{diagnosis}</p>
                         )}
                         <p className={`${bodyTextClassName} text-left text-[14px] leading-6`}>
-                            If reloading doesn't help, clearing this site's cookies and stored data often does
-                            (you may have to sign in again), as can opening the page in a private window.
+                            If reloading doesn't help, clearing this site's cookies and stored data often does (you may
+                            have to sign in again), as can opening the page in a private window.
                         </p>
                         <div className="flex justify-center gap-2">
                             <button

@@ -185,7 +185,7 @@ class Dimension {
      * Filters the data based on a predicate function.
      * The function should return false if the row should be filtered out.
      */
-    filterPredicate(args, columns) {
+    filterPredicate(args, _columns) {
         return this.commitFilter(args.predicate);
     }
     /**

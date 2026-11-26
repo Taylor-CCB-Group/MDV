@@ -480,7 +480,6 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
     if (!isColumnLoaded(nameCol)) {
         throw new Error(`Column ${link.name_column} not loaded`);
     }
-    const loadedNameCol = nameCol;
 
     /**
      * Shared helper to get the name_column value for a given row index.

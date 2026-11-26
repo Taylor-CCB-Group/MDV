@@ -38,7 +38,6 @@ import { forwardRef, memo, useCallback, useLayoutEffect, useMemo, useRef, useSta
 import ReactMarkdown from "react-markdown";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { dracula } from "react-syntax-highlighter/dist/esm/styles/hljs";
-import JsonView from "react18-json-view";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
@@ -188,12 +187,12 @@ const Message = memo(
     ) {
         const isUser = sender === "user";
         const [copied, setCopied] = useState(false);
-        const pythonSections = extractPythonSections(typeof text === "string" ? text : "");
+        // const pythonSections = extractPythonSections(typeof text === "string" ? text : "");
         try {
             if (typeof text === "string") {
                 text = JSON.parse(text);
             }
-        } catch (e) {}
+        } catch {}
         const markdownContent = typeof text === "string" ? text : JSON.stringify(text, null, 2);
 
         const messageStyle = isUser
@@ -327,6 +326,7 @@ const Message = memo(
 );
 Message.displayName = "Message";
 
+// biome-ignore lint/correctness/noUnusedVariables: parked: see the commented-out <MessageFeedback> above
 const MessageFeedback = () => {
     const [isStarred, setIsStarred] = useState<boolean>(false);
     const [isLiked, setIsLiked] = useState<boolean>(false);
@@ -373,12 +373,7 @@ const MessageFeedback = () => {
     );
 };
 
-const MessageJson = ({ text }: { text: string }) => {
-    try {
-        text = JSON.parse(text);
-    } catch (e) {}
-    return <JsonView src={text} />;
-};
+// biome-ignore lint/correctness/noUnusedVariables: parked: see the commented-out <PythonCode> above
 function extractPythonSections(responseText: string) {
     // Regular expression to match Python code blocks
     const pythonCodeRegex = /```python([\s\S]*?)```/g;
@@ -392,6 +387,7 @@ function extractPythonSections(responseText: string) {
     return pythonSections;
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: parked: see the commented-out <PythonCode> above
 const PythonCode = ({ code }: { code: string }) => {
     return (
         <div className="p-4 bg-gray-200 dark:bg-gray-800 w-fit mb-4 rounded-lg">

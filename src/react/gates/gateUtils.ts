@@ -14,7 +14,7 @@ export const SELECTION_LINE_COLOR: [number, number, number, number] = [150, 150,
  */
 export function extractCoords(featureCollection: SimpleFeatureCollection): [number, number][] {
     const feature = featureCollection.features[0];
-    if (!feature || !feature.geometry || feature.geometry.type !== "Polygon") {
+    if (feature.geometry?.type !== "Polygon") {
         return [];
     }
 

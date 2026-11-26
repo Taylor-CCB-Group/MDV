@@ -3,10 +3,7 @@ import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useBrushX } from "@/react/components/histogram/useBrushX";
-import {
-    DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
-    DEFAULT_CONTINUOUS_LEGEND_WIDTH,
-} from "@/react/legend/shared/legendConstants";
+import { DEFAULT_CONTINUOUS_LEGEND_WIDTH } from "@/react/legend/shared/legendConstants";
 import type { LegendContinuousSvgProps } from "@/react/legend/shared/legendTypes";
 import {
     formatContinuousTick,
@@ -37,7 +34,6 @@ export default function LegendContinuousSvg({
     colors,
     range,
     width = DEFAULT_CONTINUOUS_LEGEND_WIDTH,
-    height = DEFAULT_CONTINUOUS_LEGEND_HEIGHT,
     activeRange = null,
     onRangeChange,
     isDate = false,

@@ -30,7 +30,7 @@ class GenomeBrowser extends BaseChart {
             this.baseTrack.dataStore = this.dataStore;
 
             this.addMenuIcon("fa fa-eye-slash", config.legend || "Show/Hide Tracks", {
-                func: (e) => this.showHideDialog(),
+                func: () => this.showHideDialog(),
             });
             this.locText = createEl("input", { styles: { fontSize: "11px" } }, this.menuSpace);
             this.locText.addEventListener("keypress", (e) => {

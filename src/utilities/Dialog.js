@@ -294,7 +294,7 @@ class BaseDialog {
     /**
      * This method should be overridden to add content to the dialog
      */
-    init(content) {}
+    init(_content) {}
 
     /**
      * This method should be overridden if the layout needs
@@ -311,7 +311,7 @@ class BaseDialog {
 }
 
 function getTextInput(title, event, doc = document) {
-    return new Promise((accept, reject) => {
+    return new Promise((accept) => {
         const div = createEl(
             "div",
             {

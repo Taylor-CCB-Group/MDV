@@ -1320,7 +1320,7 @@ class DataStore {
         }
         c.buffer = buffer;
         if (c.datatype === "integer" || c.datatype === "double" || c.datatype === "int32") {
-            const dataArray = (c.data = c.datatype === "int32" ? new Int32Array(buffer) : new Float32Array(buffer));
+            c.data = c.datatype === "int32" ? new Int32Array(buffer) : new Float32Array(buffer);
             if (!c.minMax) {
                 console.log(`Calculating min/max for ${c.name}`);
                 const computed = this._computeMinMaxFromData(c);

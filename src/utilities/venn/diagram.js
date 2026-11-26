@@ -344,7 +344,7 @@ export function wrapText(circles, labeller) {
         text.selectAll("tspan")
             .attr("x", x)
             .attr("y", y)
-            .attr("dy", (d, i) => `${initial + i * lineHeight}em`);
+            .attr("dy", (_d, i) => `${initial + i * lineHeight}em`);
     };
 }
 

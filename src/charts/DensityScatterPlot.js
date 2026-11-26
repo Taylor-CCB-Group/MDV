@@ -68,7 +68,7 @@ class DensityScatterPlot extends WGLScatterPlot {
                 this.data = [null, null];
                 return;
             }
-        } catch (e) {
+        } catch {
             this.data = [null, null];
             return;
         }
@@ -129,7 +129,7 @@ class DensityScatterPlot extends WGLScatterPlot {
         this.drawChart();
     }
 
-    drawChart(tTime = 400) {
+    drawChart(_tTime = 400) {
         const c = this.config;
         for (const i in this.catKeys) {
             const ck = this.catKeys[i];

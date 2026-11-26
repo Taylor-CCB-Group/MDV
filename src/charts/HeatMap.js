@@ -238,11 +238,11 @@ class HeatMap extends SVGChart {
             .selectAll(".heatmap-row")
             .data(this.data.averages)
             .join("g")
-            .attr("transform", (d, i) => `translate(0,${i * recHeight})`)
+            .attr("transform", (_d, i) => `translate(0,${i * recHeight})`)
             .attr("class", "heatmap-row")
             .selectAll(".heatmap-rect")
             .data((d) =>
-                d.map((x, i) => {
+                d.map((_x, i) => {
                     const row_id = d._id;
                     const col_id = this.data.transpose[i]._id;
                     return {
@@ -255,10 +255,10 @@ class HeatMap extends SVGChart {
             )
             .join("rect")
             .attr("class", "heatmap-rect")
-            .attr("x", (d, i) => i * recWidth)
+            .attr("x", (_d, i) => i * recWidth)
             .attr("height", recHeight)
             .attr("width", recWidth)
-            .on("click", (e, d) => {
+            .on("click", (_e, d) => {
                 const row = this.fieldNames[d.row_id];
                 this._callListeners("cell_clicked", {
                     row: row,
@@ -275,7 +275,7 @@ class HeatMap extends SVGChart {
                 this.hideToolTip();
             })
             .transition(trans)
-            .attr("fill", (d, i) => {
+            .attr("fill", (d) => {
                 if (d.miss) {
                     return "#DCDCDC";
                 }
@@ -286,7 +286,7 @@ class HeatMap extends SVGChart {
 
         this.tx_axis_svg
             .selectAll(".heatmap-catsize")
-            .data(cTotals, (d, i) => {
+            .data(cTotals, (d) => {
                 return d[1];
             })
             .join(
@@ -296,7 +296,7 @@ class HeatMap extends SVGChart {
                         .attr("class", "heatmap-catsize")
                         .attr("height", 0)
                         .attr("y", 45)
-                        .attr("x", (d, i) => catRecWidth / 2 + i * recWidth)
+                        .attr("x", (_d, i) => catRecWidth / 2 + i * recWidth)
                         .attr("width", catRecWidth),
                 (update) => update,
                 (exit) => exit.call((exit) => exit.transition(trans2).attr("height", 0).attr("y", 45).remove()),
@@ -307,11 +307,11 @@ class HeatMap extends SVGChart {
                 return ytHeight - d[0] * cUnits + 5;
             })
             .attr("height", (d) => d[0] * cUnits)
-            .attr("fill", (d, i) => {
+            .attr("fill", (d) => {
                 return colors[d[1]];
             })
             .attr("width", catRecWidth)
-            .attr("x", (d, i) => catRecWidth / 2 + i * recWidth);
+            .attr("x", (_d, i) => catRecWidth / 2 + i * recWidth);
 
         this.cat_axis_svg.attr("transform", `translate(${dim.left},5)`);
         this.cat_axis_svg.transition().call(this.cat_axis_call);

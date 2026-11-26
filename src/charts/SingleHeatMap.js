@@ -33,7 +33,7 @@ class SingleHeatMap extends SVGChart {
         this.drawChart();
     }
 
-    remove(notify = true) {
+    remove(_notify = true) {
         super.remove();
     }
 
@@ -70,7 +70,7 @@ class SingleHeatMap extends SVGChart {
         this._setTitle();
     }
 
-    onDataFiltered(dim) {
+    onDataFiltered(_dim) {
         this.initialSetUp();
         this.drawChart();
     }
@@ -198,7 +198,7 @@ class SingleHeatMap extends SVGChart {
             .selectAll(".heatmap-row")
             .data(this.data)
             .join("g")
-            .attr("transform", (d, i) => `translate(0,${i * recHeight})`)
+            .attr("transform", (_d, i) => `translate(0,${i * recHeight})`)
             .attr("class", "heatmap-row")
             .selectAll(".heatmap-rect")
             .data((d) => {
@@ -207,10 +207,10 @@ class SingleHeatMap extends SVGChart {
             .join("rect")
             .attr("class", "heatmap-rect")
 
-            .attr("x", (d, i) => i * recWidth + 1)
+            .attr("x", (_d, i) => i * recWidth + 1)
             .attr("height", recHeight - 2)
             .attr("width", recWidth - 2)
-            .on("click", (e, d) => {
+            .on("click", (_e, d) => {
                 this.dataStore.dataHighlighted([d[3]], this);
             })
             .on("mouseover pointermove", (e, d) => {
@@ -222,7 +222,7 @@ class SingleHeatMap extends SVGChart {
                 this.hideToolTip();
             })
             .transition(trans)
-            .attr("fill", (d, i) => {
+            .attr("fill", (d) => {
                 if (!d) {
                     return mcol;
                 }

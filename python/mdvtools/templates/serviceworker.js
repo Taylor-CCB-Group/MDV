@@ -14,7 +14,7 @@ if (typeof window === 'undefined') {
                     return self.clients.matchAll();
                 })
                 .then(clients => {
-                    clients.forEach((client) => { client.navigate(client.url); });
+                    clients.forEach((client) => client.navigate(client.url));
                 });
         } else if (ev.data.type === "coepCredentialless") {
             coepCredentialless = ev.data.value;

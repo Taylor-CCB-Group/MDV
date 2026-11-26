@@ -218,7 +218,7 @@ class DotPlot extends SVGChart {
         const categories = Array.isArray(bf?.categories)
             ? bf.categories.filter((x) => x !== undefined && x !== null)
             : [];
-        if (!bf || !bf.column || bf.column === "__none__" || categories.length === 0) {
+        if (!bf?.column || bf.column === "__none__" || categories.length === 0) {
             this.dim.clearBackgroundFilter();
         } else {
             await loadColumn(this.dataStore.name, bf.column);
@@ -483,15 +483,15 @@ class DotPlot extends SVGChart {
                     enter
                         .append("g")
                         .attr("class", "dotplot-row")
-                        .attr("transform", (d, i) => `translate(${-dim.width},${i * cHeight})`),
+                        .attr("transform", (_d, i) => `translate(${-dim.width},${i * cHeight})`),
                 null,
                 (exit) =>
                     exit
                         .transition(trans)
-                        .attr("transform", (d, i) => `translate(${dim.width},${i * cHeight})`)
+                        .attr("transform", (_d, i) => `translate(${dim.width},${i * cHeight})`)
                         .remove(),
             )
-            .call((a) => a.transition(trans).attr("transform", (d, i) => `translate(0,${i * cHeight})`)) //use call so can chain selectAll
+            .call((a) => a.transition(trans).attr("transform", (_d, i) => `translate(0,${i * cHeight})`)) //use call so can chain selectAll
             .selectAll(".dotplot-circle")
             .data(
                 (d) => d.values,
@@ -502,7 +502,7 @@ class DotPlot extends SVGChart {
                     .append("circle")
                     .attr("class", "dotplot-circle")
                     .attr("stroke", "black")
-                    .on("click", (e, d) => {
+                    .on("click", (_e, d) => {
                         this.filterCategories(vals[d.cat_id], d.id);
                     })
                     .on("mouseover pointermove", (e, d) => {
@@ -529,10 +529,10 @@ class DotPlot extends SVGChart {
             })
             .transition(trans)
 
-            .attr("cx", (d, i) => i * cWidth + 0.5 * cWidth)
+            .attr("cx", (_d, i) => i * cWidth + 0.5 * cWidth)
             .attr("cy", cyPos)
             .attr("r", (d) => this.fractionScale(d.frac)) //
-            .attr("fill", (d, i) => {
+            .attr("fill", (d) => {
                 return this.colorFunction(d.mean);
             });
 

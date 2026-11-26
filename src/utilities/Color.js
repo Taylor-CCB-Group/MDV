@@ -210,8 +210,7 @@ function getColorBar(colors, config = {}) {
         bH -= 25;
     }
 
-    const bar = g
-        .append("rect")
+    g.append("rect")
         .attr("x", c.range ? 10 : 0)
         .attr("y", c.label ? 10 : 0)
         .attr("width", c.range ? width - 20 : 20)
@@ -237,8 +236,7 @@ function getColorBar(colors, config = {}) {
             )
             .ticks(Math.ceil(width / 20));
 
-        const axisg = g
-            .append("g")
+        g.append("g")
             .call(axis)
             .attr("transform", `translate(10,${height - 25})`)
             .selectAll("text")

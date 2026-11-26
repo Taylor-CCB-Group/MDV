@@ -122,7 +122,7 @@ const IGVBrowserComponent = observer(() => {
     const featureLabelColumn = useFieldSpec(
         chart.config.feature_label === "_none_" ? undefined : chart.config.feature_label,
     );
-    const { genomicInfo, areColumnsLoaded, genomicColumns } = useGenomicInfo();
+    const { genomicInfo, areColumnsLoaded } = useGenomicInfo();
 
     const remountNonce = chart.browserRemountNonce;
 
@@ -185,7 +185,7 @@ const IGVBrowserComponent = observer(() => {
                     return false;
                 });
 
-                browser.on("locuschange", (frames: any) => {
+                browser.on("locuschange", () => {
                     //const frame = Array.isArray(frames) ? frames[0] : frames;
                     //if (!frame?.chr) return;
                     //const locus = `${frame.chr}:${Math.floor(frame.start)}-${Math.floor(frame.end)}`;

@@ -281,7 +281,7 @@ class CompressedBinaryDataLoader {
                 };
                 try {
                     resp = await fetch(this.url, args);
-                } catch (e) {
+                } catch {
                     //lets try again
                     resp = await fetch(this.url, args);
                 }

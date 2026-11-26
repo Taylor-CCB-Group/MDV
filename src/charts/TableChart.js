@@ -49,7 +49,7 @@ class TableChart extends BaseChart {
                     col.editor = TextEditor;
                 }
                 if (column.is_url) {
-                    col.formatter = (row, cell, value, columnDef, dataContext) => {
+                    col.formatter = (_row, _cell, value) => {
                         return `<a href="${value}" target="_blank">${value}</a>`;
                     };
                 }
@@ -77,7 +77,7 @@ class TableChart extends BaseChart {
         this.dataModel = new DataModel(dataStore, { autoupdate: false });
         this.dataModel.setColumns(this.config.param);
         this.grid = new SlickGrid(this.contentDiv, this.dataModel, cols, this.options);
-        this.grid.onHeaderCellRendered.subscribe((e, args) => {
+        this.grid.onHeaderCellRendered.subscribe((_e, args) => {
             const c = args.column;
             if (c.editor && this.mode === "edit") {
                 const i = createEl("i", {
@@ -103,11 +103,11 @@ class TableChart extends BaseChart {
 
         this.grid.init();
 
-        this.grid.onSort.subscribe((e, args) => {
+        this.grid.onSort.subscribe((_e, args) => {
             this._sort(args);
         });
 
-        this.grid.onSelectedRowsChanged.subscribe((e, args) => {
+        this.grid.onSelectedRowsChanged.subscribe((_e, args) => {
             if (this.mode === "select") {
                 this._rowsSelected(args);
             }
@@ -257,19 +257,19 @@ class TableChart extends BaseChart {
             this.grid.setOptions({ editable: true }, true, true);
             this.grid.setColumns(this.grid.getColumns());
             this.addColumnIcon = this.addMenuIcon("fas fa-plus", "Add Column", {
-                func: (e) => {
+                func: () => {
                     new AddColumnDialog(this);
                 },
             });
             this.overlay = new Overlays({});
-            this.overlay.onFillUpDown.subscribe((e, args) => this._updateOverlay(args));
+            this.overlay.onFillUpDown.subscribe((_e, args) => this._updateOverlay(args));
 
             this.grid.registerPlugin(this.overlay);
         }
     }
 
     //all we need is to redraw the chart
-    onDataChanged(data) {
+    onDataChanged(_data) {
         this.grid.invalidate();
     }
 
@@ -533,7 +533,7 @@ BaseChart.types["table_chart"] = {
             },
         ];
     },
-    init: (config, ds, ec) => {
+    init: (config, _ds, ec) => {
         config.include_index = ec.include_index;
     },
 };

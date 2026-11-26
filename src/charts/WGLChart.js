@@ -55,7 +55,7 @@ class WGLChart extends SVGChart {
                 this.showTooltip(e, index);
             }
         });
-        this.app.addHandler("object_out", (e, index) => {
+        this.app.addHandler("object_out", () => {
             this.tooltip.style.display = "none";
         });
 
@@ -317,7 +317,7 @@ class WGLChart extends SVGChart {
             {
                 type: "button",
                 label: "Centre Plot",
-                func: (x) => {
+                func: () => {
                     this.centerGraph();
                     this.app.refresh();
                 },

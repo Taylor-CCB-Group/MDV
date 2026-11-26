@@ -57,7 +57,7 @@ export const useViewStateLink = () => {
                     const zoomRatio = ourPhysicalSize / otherPhysicalSize;
                     const zoom = originalZoom * zoomRatio;
                     // this is not right - target needs to be adjusted so that the same point in the image is centred
-                    const target = (viewState.target as [number, number]).map((v, i) => v * zoomRatio);
+                    const target = (viewState.target as [number, number]).map((v) => v * zoomRatio);
                     const newViewState = { ...viewState, zoom, target };
                     c.viewerStore?.setState({ viewState: newViewState });
                 });

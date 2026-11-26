@@ -7,7 +7,7 @@ class SVCircosPlot extends BaseReactChart {
     constructor(dataStore, div, config) {
         //check the datasource has svs and chromosomes
         //could this be done with zod schema ?
-        if (!dataStore.genome || dataStore.genome.type !== "sv" || !dataStore.genome.columns) {
+        if (dataStore.genome?.type !== "sv" || !dataStore.genome.columns) {
             throw new Error("DataStore genome must have svs and chromosomes for SVCircosPlot");
         }
         //initially color by sv type

@@ -153,7 +153,9 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                         filterOptions={(options, state) => {
                                             if (state.inputValue.length < 5) return [];
                                             const input = state.inputValue.toLowerCase();
-                                            return options.filter(({ email }) => matchEmail(input, email.toLowerCase()));
+                                            return options.filter(({ email }) =>
+                                                matchEmail(input, email.toLowerCase()),
+                                            );
                                         }}
                                     />
                                     <Button

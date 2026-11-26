@@ -128,8 +128,8 @@ class WGL3DScatterPlot extends WGLChart {
         //const p = this.config.param;
         const ranges = this.config.param.map((x) => this.dataStore.getMinMaxForColumn(x));
         const s = this.config.axis_scales;
-        const scaledRanges = ranges.map((range, i) => [range[0] * 1, range[1] * 1]);
-        const c = scaledRanges.map((x, i) => x[0] + (x[1] - x[0]) / 2);
+        const scaledRanges = ranges.map((range) => [range[0] * 1, range[1] * 1]);
+        const c = scaledRanges.map((x) => x[0] + (x[1] - x[0]) / 2);
         return c.map((x, i) => x * s[i]);
     }
 

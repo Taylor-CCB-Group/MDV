@@ -89,7 +89,7 @@ class SettingsDialog extends BaseDialog {
     }
 
     /** TODO */
-    folder(s, d) {
+    folder(s, _d) {
         this.init(s.current_value);
     }
     spinner(s, d) {
@@ -104,7 +104,7 @@ class SettingsDialog extends BaseDialog {
             },
             d,
         );
-        sp.addEventListener("change", (e) => {
+        sp.addEventListener("change", () => {
             s.func(Number.parseInt(sp.value));
         });
     }
@@ -150,7 +150,7 @@ class SettingsDialog extends BaseDialog {
             },
             d,
         );
-        cc.addEventListener("change", (e) => {
+        cc.addEventListener("change", () => {
             s.func(cc.value);
         });
     }
@@ -164,7 +164,7 @@ class SettingsDialog extends BaseDialog {
                 text: s.label,
             },
             d,
-        ).addEventListener("click", (e) => {
+        ).addEventListener("click", () => {
             s.func();
         });
     }
@@ -202,7 +202,7 @@ class SettingsDialog extends BaseDialog {
             d,
         );
         ch.checked = s.current_value;
-        ch.addEventListener("click", (e) => {
+        ch.addEventListener("click", () => {
             s.func(ch.checked);
         });
     }
@@ -245,7 +245,7 @@ class SettingsDialog extends BaseDialog {
             },
             d,
         );
-        b.addEventListener("click", (e) => {
+        b.addEventListener("click", () => {
             s.func(Array.from(dd.selectedOptions).map((x) => x.value));
         });
         createFilterElement(dd, wrapper);
@@ -279,7 +279,7 @@ class SettingsDialog extends BaseDialog {
             );
         }
         dd.value = s.current_value;
-        dd.addEventListener("change", (e) => {
+        dd.addEventListener("change", () => {
             s.func(dd.value, this.controls);
             dd.title = dd.value; // for tooltip, not sure if best accessibility practice
             if (s.onchange) {
@@ -355,10 +355,10 @@ class SettingsDialog extends BaseDialog {
         );
         tb.value = s.current_value;
 
-        tb.addEventListener("input", (e) => {
+        tb.addEventListener("input", () => {
             s.func(tb.value);
         });
-        tb.addEventListener("blur", (e) => {
+        tb.addEventListener("blur", () => {
             s.func(tb.value);
         });
     }

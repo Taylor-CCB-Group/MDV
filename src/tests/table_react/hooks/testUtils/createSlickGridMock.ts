@@ -19,7 +19,7 @@ import { vi } from "vitest";
  * Creates a mock of a SlickEvent.
  * SlickEvents have subscribe/unsubscribe methods for event handling.
  */
-function createMockSlickEvent<T = any>(): SlickGrid["onSelectedRowsChanged"] {
+function createMockSlickEvent(): SlickGrid["onSelectedRowsChanged"] {
     return {
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),

@@ -21,8 +21,8 @@ import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import { type OME_TIFF, useChannelsStore, useLoader, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 import FieldContourLegend from "./FieldContourLegend";
 import SelectionOverlay from "./SelectionOverlay";
-import type { VivRoiConfig } from "./VivMDVReact";
 import ViewGestureHint from "./ViewGestureHint";
+import type { VivRoiConfig } from "./VivMDVReact";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -50,8 +50,8 @@ const useJsonLayer = (showJson: boolean) => {
                   data: `${root}/${json}`,
                   opacity: 1,
                   filled: true,
-                  getFillColor: (f) => [255, 255, 255, 150],
-                  getLineColor: (f) => [255, 255, 255, 150],
+                  getFillColor: () => [255, 255, 255, 150],
+                  getLineColor: () => [255, 255, 255, 150],
                   getLineWidth: 2,
                   lineWidthMinPixels: 1,
                   getPointRadius: 10,
@@ -71,7 +71,6 @@ const useJsonLayer = (showJson: boolean) => {
 
 const Main = observer(
     ({
-        hoveredContour,
         setHoveredContour,
     }: {
         hoveredContour: HoveredContour | null;

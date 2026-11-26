@@ -14,9 +14,9 @@ onmessage = (e) => {
     const xscale = scaleLinear().domain(config.xscale[0]).range(config.xscale[1]);
     function calcDensity(category) {
         return contourDensity()
-            .x((d, i) => xscale(x[i]))
-            .y((d, i) => yscale(y[i]))
-            .weight((d, i) => {
+            .x((_d, i) => xscale(x[i]))
+            .y((_d, i) => yscale(y[i]))
+            .weight((_d, i) => {
                 if (lFilter[i] === 2) {
                     return 0;
                 }
