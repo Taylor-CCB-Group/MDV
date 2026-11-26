@@ -1,4 +1,5 @@
 import type { DataType, FieldName } from "@/charts/charts";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type { ChartArrayCell } from "../hooks/useChartArrayGrid";
 
 /**
@@ -165,4 +166,20 @@ export function colorGridCells(values: readonly string[], colors: readonly unkno
             color: Array.isArray(color) && color.length >= 3 ? color : LABEL_FALLBACK_COLOR,
         };
     });
+}
+
+/**
+ * The colour columns with `first` as the colour column. The grid's other columns stay while it is
+ * a grid of a cell per column (`keepOthers`); otherwise the colour column is the only one.
+ */
+export function withColorColumn(specs: FieldSpecs, first: FieldSpec, keepOthers: boolean): FieldSpecs {
+    if (!keepOthers) return [first];
+    return [first, ...specs.slice(1).filter((spec) => spec !== first)];
+}
+
+/** The colour columns with `others` after the colour column, which stays first. */
+export function withOtherGridColumns(specs: FieldSpecs, others: FieldSpecs): FieldSpecs {
+    const first = specs[0];
+    if (first === undefined) return [...others];
+    return [first, ...others.filter((spec) => spec !== first)];
 }

@@ -47,12 +47,15 @@ can split it either way, by column (kind 1) or by the categories of its first co
 A SpatialData layer's fill colour is the second, and the first inside the render stack.
 
 Such a property's picker says so (`GuiSpec.gridBy`, and `GridByControl` beside a layer's colour
-picker): it takes one column, with a "Grid by this" switch, and turning that on makes the chart a
-grid of it. The split follows the first column's type, not a choice: a categorical column (one
-category per row) gives a cell per category, and the picker stays single; a numeric one gives a
-cell per column, and the picker takes several numeric columns. Choosing a column of the other
-kind while it is on changes the split, and one of neither kind (`multitext`, `unique`) turns it
-off. Turning it off leaves the columns in config, the first in use. The Grid dropdown offers only
+picker): it always takes one column of any type, the colour column, with a "Grid by this" switch
+under it, and turning that on makes the chart a grid of it. The split follows the column's type,
+not a choice: a categorical column (one category per row) gives a cell per category; a numeric one
+gives a cell per column, and a second picker appears for the grid's other numeric columns (the
+value is the colour column, then those). Picking a column never changes which picker is which.
+Choosing a column of the other kind while it is on changes the split, and one of neither kind
+(`multitext`, `unique`) turns it off. Choosing another colour column keeps the grid's other
+columns only while it is a grid of columns. Turning it off leaves the columns in config, the first
+in use. The Grid dropdown offers only
 the split the column allows (`colorGridSplitFor`), and the chart's current one.
 
 With a cell per category, each cell can also draw the other categories' points in grey under its

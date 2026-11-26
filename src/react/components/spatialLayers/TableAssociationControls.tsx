@@ -9,6 +9,7 @@ import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { flattenFields } from "@/lib/columnTypeHelpers";
 import type { TableAssociation } from "@/react/spatialdata/table_association";
 import ColumnSelectionComponent from "../ColumnSelectionComponent";
+import { withColorColumn, withOtherGridColumns } from "../colorGridUtils";
 import GridByControl from "../GridByControl";
 
 type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
@@ -131,9 +132,9 @@ export default function TableAssociationControls({
 const FILL_COLOR_MODE = "auto" as const;
 
 /**
- * The layer's colour column. With `gridBy`, a control to make the chart a grid of it: of a cell
- * per category of a categorical column, or of a cell per numeric column, when the picker takes
- * several (the layer itself takes the first). Turned off, it shows the first again.
+ * The layer's colour column, one of any type. With `gridBy`, a control to make the chart a grid of
+ * it: of a cell per category of a categorical column, or of a cell per numeric column, with a
+ * second picker for the grid's other columns (the layer itself is coloured by the first).
  */
 export const FillColorByColumnControl = observer(function FillColorByColumnControl({
     association,
@@ -153,48 +154,53 @@ export const FillColorByColumnControl = observer(function FillColorByColumnContr
     // columns are whatever the linked datasource has selected right now. `flattenFields` reads
     // both, and an empty result means the link has not finished initialising — the spec is
     // still stored, and the projection fills the colour column in when it resolves.
-    const select = (selection: FieldSpec | FieldSpecs) => {
-        const columnName = flattenFields(selection)[0];
-        onChange(columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined, selection);
-        // the split follows the new column's type
-        if (gridBy?.get()) gridBy.set(true);
-    };
-    const specs = Array.isArray(fillColorByColumnSpec)
+    const specs: FieldSpecs = Array.isArray(fillColorByColumnSpec)
         ? fillColorByColumnSpec
         : fillColorByColumnSpec
           ? [fillColorByColumnSpec]
           : fillByColumn
             ? [fillByColumn]
             : [];
+    const setSpecs = (next: FieldSpecs) => {
+        const columnName = flattenFields(next)[0];
+        // one column is stored as itself, as the picker gave it before there were grids
+        onChange(columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined, next.length === 1 ? next[0] : next);
+    };
+    const select = (column: FieldSpec) => {
+        setSpecs(withColorColumn(specs, column, split === "columns"));
+        // the split follows the new column's type
+        if (gridBy?.get()) gridBy.set(true);
+    };
+    const first = specs[0];
     return (
         <div className="grid gap-2">
             <LabeledControl label="Colour by">
                 <div className="grid gap-1">
-                    {split === "columns" ? (
+                    <ColumnSelectionComponent
+                        multiple={false}
+                        dataStore={dataStore}
+                        current_value={first}
+                        placeholder="Select column"
+                        optional
+                        clearSelectedColumn={() => {
+                            onChange(undefined, undefined);
+                            // no column, no grid of it
+                            gridBy?.set(false);
+                        }}
+                        setSelectedColumn={select}
+                    />
+                    {gridBy && <GridByControl split={split} available={available} onChange={gridBy.set} />}
+                    {split === "columns" && (
                         <ColumnSelectionComponent
                             multiple
                             type="number"
                             dataStore={dataStore}
-                            current_value={specs}
-                            placeholder="Select columns"
-                            setSelectedColumn={select}
-                        />
-                    ) : (
-                        <ColumnSelectionComponent
-                            multiple={false}
-                            dataStore={dataStore}
-                            current_value={specs[0]}
-                            placeholder="Select column"
-                            optional
-                            clearSelectedColumn={() => {
-                                onChange(undefined, undefined);
-                                // no column, no grid of it
-                                gridBy?.set(false);
-                            }}
-                            setSelectedColumn={select}
+                            current_value={specs.slice(1)}
+                            placeholder="Other columns in the grid"
+                            exclude={typeof first === "string" ? [first] : undefined}
+                            setSelectedColumn={(others) => setSpecs(withOtherGridColumns(specs, others))}
                         />
                     )}
-                    {gridBy && <GridByControl split={split} available={available} onChange={gridBy.set} />}
                 </div>
             </LabeledControl>
         </div>

@@ -11,6 +11,8 @@ import {
     gridChoiceValue,
     partitionRowsByCategory,
     supportsColorGridMode,
+    withColorColumn,
+    withOtherGridColumns,
 } from "./colorGridUtils";
 
 describe("partitionRowsByCategory", () => {
@@ -106,5 +108,28 @@ describe("colorGridCells", () => {
             { key: "a", label: "a", color: [255, 0, 0] },
             { key: "b", label: "b", color: [226, 232, 240] },
         ]);
+    });
+});
+
+describe("withColorColumn", () => {
+    test("keeps the grid's other columns only while it is a grid of columns", () => {
+        expect(withColorColumn(["a", "b", "c"], "x", true)).toEqual(["x", "b", "c"]);
+        expect(withColorColumn(["a", "b", "c"], "x", false)).toEqual(["x"]);
+    });
+
+    test("does not list the colour column twice", () => {
+        expect(withColorColumn(["a", "b", "c"], "b", true)).toEqual(["b", "c"]);
+    });
+});
+
+describe("withOtherGridColumns", () => {
+    test("keeps the colour column first", () => {
+        expect(withOtherGridColumns(["a", "b"], ["c", "d"])).toEqual(["a", "c", "d"]);
+        expect(withOtherGridColumns(["a", "b"], [])).toEqual(["a"]);
+        expect(withOtherGridColumns(["a"], ["a", "c"])).toEqual(["a", "c"]);
+    });
+
+    test("with no colour column, the others are all there is", () => {
+        expect(withOtherGridColumns([], ["c"])).toEqual(["c"]);
     });
 });

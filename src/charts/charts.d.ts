@@ -309,8 +309,9 @@ export type GuiSpec<T extends GuiSpecType> = {
      */
     columnType?: T extends "column" | "multicolumn" ? CTypes : never;
     /**
-     * Set on a `"multicolumn"` property the chart can be drawn as a grid of. The picker takes one
-     * column until the grid is on, and several while it is, with a control to turn it on or off.
+     * Set on a `"multicolumn"` property the chart can be drawn as a grid of. Its picker takes one
+     * column, with a control to turn the grid on or off; a grid of a cell per column adds a second
+     * picker for the other columns.
      */
     gridBy?: T extends "multicolumn" ? GridBySpec : never;
     /** Optional array of disposers that should be cleaned up when the settings dialog closes.
