@@ -352,7 +352,14 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
         .nullable()
         .optional()
         .describe(
-            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a density grid (default true)",
+            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a grid (not a region grid; default true)",
+        ),
+    grey_other_categories: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe(
+            "In a colour grid with a cell per category: draw the other categories' points in grey under each cell's own (default false)",
         ),
     point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
     axis_scaling: z

@@ -286,14 +286,16 @@ const SpatialColorGrid = observer(function SpatialColorGrid({
     greyLayer: Layer | undefined;
 }) {
     const chartId = useChartID();
+    const config = useConfig<{ grey_other_categories?: boolean | null }>();
     const { recolorPoints, regreyPoints } = useSpatialLayers().scatterProps;
     const grid = useChartArrayGrid({ chartId, cells: colorCells.cells, getViewId: getCellViewId });
-    const { visibleCells, pointLayers, labels, ownGrey } = useColorGridCellLayers(
+    const { visibleCells, pointLayers, labels, ownGrey, sharedLayers } = useColorGridCellLayers(
         grid,
         colorCells,
         pointsLayer,
         recolorPoints,
         { layer: greyLayer, regreyPoints },
+        !!config.grey_other_categories,
     );
     return (
         <StackCellGrid
@@ -303,6 +305,7 @@ const SpatialColorGrid = observer(function SpatialColorGrid({
             visibleCells={visibleCells}
             cellLayers={pointLayers}
             ownEntryIds={ownGrey ? OWN_POINTS_AND_GREY : OWN_POINTS}
+            sharedTopLayers={sharedLayers}
             {...props}
         />
     );
@@ -320,6 +323,7 @@ const StackCellGrid = observer(function StackCellGrid({
     visibleCells,
     cellLayers: ownCellLayers,
     ownEntryIds,
+    sharedTopLayers = NO_CELL_LAYERS,
     cellEntry,
     renderer,
     renderStack,
@@ -335,6 +339,8 @@ const StackCellGrid = observer(function StackCellGrid({
     cellLayers: readonly Layer[];
     /** The stack entries the cells draw their own copies of, left out of what every cell draws. */
     ownEntryIds?: readonly string[];
+    /** Layers every cell draws over the stack and under its own (another category's points, in grey). */
+    sharedTopLayers?: readonly Layer[];
     /**
      * A stack entry the renderer draws a copy of per cell (each id under its cell's view id), in
      * its place in the stack: the stack is drawn once below the copies and once above them.
@@ -356,7 +362,12 @@ const StackCellGrid = observer(function StackCellGrid({
         if (!cellEntry) {
             const composed = composeStackLayers(stackDeckLayers, imageLayers, renderStack, renderer.layerOrder);
             const none: Layer[] = [];
-            return { below: composed.shared, copies: none, above: none, overlays: composed.overlays };
+            return {
+                below: [...composed.shared, ...sharedTopLayers],
+                copies: none,
+                above: none,
+                overlays: composed.overlays,
+            };
         }
         const isCopy = (id: string) => cellEntry.copyIds.has(id);
         const composed = composeStackLayersAround(
@@ -371,7 +382,7 @@ const StackCellGrid = observer(function StackCellGrid({
             ...[...imageLayers].flatMap(([entryId, layers]) => (isCopy(entryId) ? layers : [])),
         ];
         return { ...composed, copies: copyLayers };
-    }, [stackDeckLayers, imageLayers, renderStack, renderer.layerOrder, cellEntry]);
+    }, [stackDeckLayers, imageLayers, renderStack, renderer.layerOrder, cellEntry, sharedTopLayers]);
     // The chart drew these on its single canvas until the cells were ready, and a layer belongs to
     // the first deck that draws it: this deck gets copies.
     const sharedBelow = useLayersForDevice(below, host.device);

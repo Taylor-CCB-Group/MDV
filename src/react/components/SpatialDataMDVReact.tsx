@@ -1,6 +1,6 @@
 import { findRenderStackEntry, type RenderStack } from "@spatialdata/layers";
 import type { EntryStatus } from "@spatialdata/vis";
-import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
+import { action, comparer, computed, makeObservable, observable, reaction, runInAction } from "mobx";
 import type { SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
 import type DataStore from "@/datastore/DataStore";
 import { allNumeric, type FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -51,6 +51,8 @@ import {
     type FillColorLayer,
     getSpatialDataGridSettingsFolder,
     type RegionViewState,
+    setSpatialDataGrid,
+    spatialDataGridChoices,
     toRegionViewState,
 } from "./regionGridUtils";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
@@ -99,6 +101,7 @@ function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataS
     config.render_backend = config.render_backend ?? null;
     config.grid = config.grid ?? null;
     config.crosshair = config.crosshair ?? null;
+    config.grey_other_categories = config.grey_other_categories ?? null;
     config.param = [...dataStore.regions.position_fields];
     if (typeof config.contourParameter === "string") {
         const column = dataStore.columnIndex[config.contourParameter];
@@ -446,6 +449,14 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         };
     }
 
+    gridChoices() {
+        return spatialDataGridChoices(this.config, this.dataStore, this.layerGridSplit());
+    }
+
+    showGrid(value: string) {
+        runInAction(() => setSpatialDataGrid(this.config, value));
+    }
+
     /**
      * Chart-wide settings only. What the MDV data points and their density look like belongs
      * to their layers, and is edited with every other layer in the layer dialog
@@ -535,6 +546,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         if (config.render_backend === null) config.render_backend = undefined;
         if (config.grid === null) config.grid = undefined;
         if (config.crosshair === null) config.crosshair = undefined;
+        if (config.grey_other_categories === null) config.grey_other_categories = undefined;
         return config;
     }
 }

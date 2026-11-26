@@ -12,9 +12,12 @@ import {
     colorGridChoices,
     colorGridConfig,
     colorGridSplit,
+    type GridChoice,
     gridChoiceValue,
+    ONE_VIEW,
 } from "./colorGridUtils";
 import { fillColumnName, layerFillGridChoice, layerFillGridChoices, layerFillGridConfig } from "./layerFillGridUtils";
+import { getGreyOtherCategoriesSetting } from "./scatterGridSettings";
 
 /** A cell of a SpatialData chart drawn with a cell per region: the region and where its store is. */
 export type SpatialRegionCell = ChartArrayCell & {
@@ -99,16 +102,14 @@ type SpatialDataGridSettingsConfig = {
     grid?: SpatialDataGridConfig | null;
     renderStack?: RenderStack;
     color_fields?: FieldSpecs;
+    grey_other_categories?: boolean | null;
 };
 
 /**
  * Each layer's colour grid choices: the split its colour column allows, and the chart's current
  * grid, so the dropdown can show it.
  */
-function layerGridChoices(
-    config: SpatialDataGridSettingsConfig,
-    layerGridSplit: ((layer: FillColorLayer) => ColorGridSplit | null) | undefined,
-) {
+function layerGridChoices(config: SpatialDataGridSettingsConfig, layerGridSplit: LayerGridSplit | undefined) {
     const { grid } = config;
     const current =
         grid?.by === "layer_fill" && grid.layer
@@ -124,19 +125,51 @@ function layerGridChoices(
 }
 
 /**
- * The SpatialData chart's grid settings: one view, a cell per density field, a grid of the
- * chart's colour or of a shapes or labels layer's fill colour (a cell per colour column, or per
+ * How a grid of a layer's fill colour would be split, by the type of its column in the table
+ * annotating its element, or null when it cannot be one (no table, or no column of a type to
+ * split). Absent when that cannot be told yet: every layer is offered either way.
+ */
+type LayerGridSplit = (layer: FillColorLayer) => ColorGridSplit | null;
+
+/**
+ * The grids the SpatialData chart can show, besides one view: a cell per density field, a grid of
+ * the chart's colour or of a shapes or labels layer's fill colour (a cell per colour column, or per
  * category of a categorical one), or a cell per region.
  */
+export function spatialDataGridChoices(
+    config: SpatialDataGridSettingsConfig,
+    columns: ColumnTypes,
+    layerGridSplit?: LayerGridSplit,
+): GridChoice[] {
+    return [
+        { name: "A cell per density field", value: "densityFields" },
+        ...colorGridChoices(availableColorGridSplit(config, columns), colorGridSplit(config)),
+        ...layerFillGridChoices(layerGridChoices(config, layerGridSplit)),
+        { name: "A cell per region", value: "region" },
+    ];
+}
+
+/** Shows the grid a choice names (`spatialDataGridChoices`), or one view for "none". */
+export function setSpatialDataGrid(config: SpatialDataGridSettingsConfig, value: string) {
+    const colorSplit = colorGridChoice(value);
+    const layerGrid = layerFillGridChoice(value);
+    if (colorSplit) config.grid = colorGridConfig(colorSplit);
+    else if (layerGrid) config.grid = layerFillGridConfig(layerGrid.layer, layerGrid.split);
+    else if (value === "densityFields") config.grid = { by: "densityFields" };
+    else if (value === "region")
+        config.grid = {
+            by: "region",
+            hide_empty: config.grid?.hide_empty,
+            link_views: config.grid?.link_views,
+        };
+    else config.grid = null;
+}
+
+/** The SpatialData chart's grid settings: one view, or a grid (`spatialDataGridChoices`). */
 export function getSpatialDataGridSettingsFolder(
     config: SpatialDataGridSettingsConfig,
     columns: ColumnTypes,
-    /**
-     * How a grid of a layer's fill colour would be split, by the type of its column in the table
-     * annotating its element, or null when it cannot be one (no table, or no column of a type to
-     * split). Absent when that cannot be told yet: every layer is offered either way.
-     */
-    layerGridSplit?: (layer: FillColorLayer) => ColorGridSplit | null,
+    layerGridSplit?: LayerGridSplit,
 ) {
     return g({
         type: "folder",
@@ -153,34 +186,15 @@ export function getSpatialDataGridSettingsFolder(
                     // `func` sets the grid, which the getter reads back
                 },
                 // the colour choices follow the colour columns' types
-                get values(): [{ name: string; value: string }[], string, string] {
-                    const choices = [
-                        { name: "One view", value: "none" },
-                        { name: "A cell per density field", value: "densityFields" },
-                        ...colorGridChoices(availableColorGridSplit(config, columns), colorGridSplit(config)),
-                        ...layerFillGridChoices(layerGridChoices(config, layerGridSplit)),
-                        { name: "A cell per region", value: "region" },
-                    ];
-                    return [choices, "name", "value"];
+                get values(): [GridChoice[], string, string] {
+                    return [[ONE_VIEW, ...spatialDataGridChoices(config, columns, layerGridSplit)], "name", "value"];
                 },
                 set values(_values) {
                     // made from the config
                 },
-                func: (value: string) => {
-                    const colorSplit = colorGridChoice(value);
-                    const layerGrid = layerFillGridChoice(value);
-                    if (colorSplit) config.grid = colorGridConfig(colorSplit);
-                    else if (layerGrid) config.grid = layerFillGridConfig(layerGrid.layer, layerGrid.split);
-                    else if (value === "densityFields") config.grid = { by: "densityFields" };
-                    else if (value === "region")
-                        config.grid = {
-                            by: "region",
-                            hide_empty: config.grid?.hide_empty,
-                            link_views: config.grid?.link_views,
-                        };
-                    else config.grid = null;
-                },
+                func: (value: string) => setSpatialDataGrid(config, value),
             }),
+            getGreyOtherCategoriesSetting(config),
             g({
                 type: "check",
                 label: "Leave out regions with no rows after filtering",

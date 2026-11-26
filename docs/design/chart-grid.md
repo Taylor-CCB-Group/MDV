@@ -55,6 +55,16 @@ kind while it is on changes the split, and one of neither kind (`multitext`, `un
 off. Turning it off leaves the columns in config, the first in use. The Grid dropdown offers only
 the split the column allows (`colorGridSplitFor`), and the chart's current one.
 
+With a cell per category, each cell can also draw the other categories' points in grey under its
+own (`grey_other_categories`, a chart setting rather than part of `grid`, so it outlasts turning
+the grid off and on). It is one layer of all the points, drawn in every cell, not a layer per cell.
+Layer fill grids do not have it yet.
+
+The selection toolbar's grid button follows whichever grid is shown: with one, it goes back to one
+plot; without, it shows the chart's only grid, or a menu of them (`gridChoices` on the chart, the
+same list as the Grid dropdown, less the region grid, and density fields only when there are
+some).
+
 A **sweep** of a setting (several band widths, several thresholds), is conceivable but has no
 use case yet; leave it out.
 

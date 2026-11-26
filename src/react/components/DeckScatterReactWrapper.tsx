@@ -1,5 +1,5 @@
 import type { OrbitViewState } from "deck.gl";
-import { action, makeObservable, observable, reaction } from "mobx";
+import { action, makeObservable, observable, reaction, runInAction } from "mobx";
 import { observer } from "mobx-react-lite";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import type DataStore from "@/datastore/DataStore";
@@ -31,7 +31,7 @@ import { colorGridSplit } from "./colorGridUtils";
 import DeckScatterComponent from "./DeckScatterComponent";
 import { isDensityGridShown } from "./densityGridUtils";
 import { getCrosshairSetting } from "./pointerCrosshair";
-import { getScatterGridSettingsFolder } from "./scatterGridSettings";
+import { getScatterGridSettingsFolder, scatterGridChoices, setScatterGrid } from "./scatterGridSettings";
 import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 
 const MainChart = observer(() => {
@@ -83,6 +83,7 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     config.grid = config.grid ?? null;
     // and the crosshair, which is on unless turned off
     config.crosshair = config.crosshair ?? null;
+    config.grey_other_categories = config.grey_other_categories ?? null;
     // charts saved before this setting kept both axes at one scale
     if (config.dimension !== "3d") config.axis_scaling = config.axis_scaling ?? "equal";
     else {
@@ -290,7 +291,16 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         const background_filter = c.background_filter ?? undefined;
         const grid = c.grid ?? undefined;
         const crosshair = c.crosshair ?? undefined;
-        return { ...c, viewState, render_backend, background_filter, grid, crosshair };
+        const grey_other_categories = c.grey_other_categories ?? undefined;
+        return { ...c, viewState, render_backend, background_filter, grid, crosshair, grey_other_categories };
+    }
+
+    gridChoices() {
+        return this.config.dimension === "3d" ? [] : scatterGridChoices(this.config, this.dataStore);
+    }
+
+    showGrid(value: string) {
+        runInAction(() => setScatterGrid(this.config, value));
     }
 
     /** Which way is up, and how much to stretch each axis (as the classic 3D scatter could). */

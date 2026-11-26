@@ -11,6 +11,10 @@ import { subsetPointsLayer } from "./subsetPointsLayer";
 
 const NO_ROWS: CategoryRows = { rows: new Uint32Array(0), positions: new Uint32Array(0) };
 const NO_VALUES: readonly string[] = [];
+const NO_LAYERS: readonly Layer[] = [];
+const NO_HIGHLIGHT: number[] = [];
+/** The other categories' points, under a cell's own: darker than filtered-out points. */
+const OTHERS_GREY: [number, number, number] = [120, 120, 120];
 
 /** A copy of a points layer under another id, coloured by another column (see `useScatterplotLayer`). */
 export type RecolorPoints = (points: Layer, id: string, color: RowColor, column: DataColumn<DataType>) => Layer;
@@ -31,7 +35,8 @@ export type RegreyPoints = ((grey: Layer, id: string, column: DataColumn<DataTyp
  *   (`regreyPoints`, under its points), and `ownGrey` says the shared grey layer is to be left out.
  * - Split by categories, a cell's copy draws only its category's rows, and its label says how
  *   many. The rows are split once, by the column's codes, so each copy builds its attributes from
- *   its own rows only.
+ *   its own rows only. With `greyOthers`, every cell also draws the other categories' points in
+ *   grey, under its own: one layer of all the points (`sharedLayers`), drawn in every cell.
  */
 export function useColorGridCellLayers(
     grid: UseChartArrayGridResult,
@@ -41,6 +46,8 @@ export function useColorGridCellLayers(
     recolorPoints: RecolorPoints,
     /** The grey (filtered-out) points layer, and how to copy it for a cell. */
     grey?: { layer: Layer | null | undefined; regreyPoints: RegreyPoints },
+    /** Split by categories: draw the other categories' points in grey in each cell. */
+    greyOthers = false,
 ) {
     const greyLayer = grey?.regreyPoints ? grey.layer : undefined;
     const regreyPoints = greyLayer ? grey?.regreyPoints : undefined;
@@ -98,6 +105,19 @@ export function useColorGridCellLayers(
         highlightedByCategory,
     ]);
     const ownGrey = colorCells.split === "columns" && !!greyLayer;
+    const showOthers = greyOthers && colorCells.split === "categories";
+    const sharedLayers = useMemo(() => {
+        if (!points || !showOthers) return NO_LAYERS;
+        // a points layer's props, which a `Layer` in general does not have
+        const props = {
+            id: `${points.id}-others`,
+            getFillColor: OTHERS_GREY,
+            pickable: false,
+            ...(points instanceof SpatialLayer && { highlightedData: NO_HIGHLIGHT }),
+            updateTriggers: { ...points.props.updateTriggers, getFillColor: OTHERS_GREY },
+        };
+        return [points.clone(props)];
+    }, [points, showOthers]);
 
     const labels: DeckCellLabel[] = useMemo(
         () =>
@@ -108,5 +128,5 @@ export function useColorGridCellLayers(
             }),
         [cells, rowsByCategory],
     );
-    return { visibleCells, pointLayers, labels, ownGrey };
+    return { visibleCells, pointLayers, labels, ownGrey, sharedLayers };
 }

@@ -61,8 +61,14 @@ export function colorGridSplitFor(column: { datatype: DataType } | undefined): C
     }
 }
 
+/** A grid a chart can show, as its grid settings dropdown and the toolbar offer it. */
+export type GridChoice = { name: string; value: string };
+
+/** The grid settings dropdown's choice of no grid. */
+export const ONE_VIEW: GridChoice = { name: "One view", value: "none" };
+
 /** The choices a grid settings dropdown can offer for a colour grid. */
-export const COLOR_GRID_CHOICES: readonly { name: string; value: string }[] = [
+export const COLOR_GRID_CHOICES: readonly GridChoice[] = [
     { name: "A cell per colour column", value: "color_fields:columns" },
     { name: "A cell per colour category", value: "color_fields:categories" },
 ];
