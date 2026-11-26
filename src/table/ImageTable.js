@@ -39,7 +39,6 @@ class ImageTable {
         this.cache_size = 5;
         const bb = this.parent.getBoundingClientRect();
         this.config = config;
-        const bg = config.background_color;
         this.view_port = createEl(
             "div",
             {
@@ -100,7 +99,7 @@ class ImageTable {
         //load first image to get the orignal dimensions
         const im = new Image();
         im.crossOrigin = "anonymous";
-        im.onload = (e) => {
+        im.onload = () => {
             this.originalDimensions = [im.width, im.height];
             this.preferred_width = this.img_width = im.width;
             this.preferred_height = this.img_height = im.height;
@@ -354,7 +353,9 @@ class ImageTable {
     }
 
     _removeByClass(className) {
-        document.querySelectorAll(className).forEach((e) => e.remove());
+        document.querySelectorAll(className).forEach((e) => {
+            e.remove();
+        });
     }
 
     render(begin_row, end_row, all) {

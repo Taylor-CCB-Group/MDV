@@ -21,7 +21,7 @@ class MultiBoxPlot extends SVGChart {
         this.onDataFiltered();
     }
 
-    onDataFiltered(dim) {
+    onDataFiltered(_dim) {
         const config = {
             analysis: "multi",
             scaleVals: [],
@@ -102,7 +102,7 @@ class MultiBoxPlot extends SVGChart {
                 this.hideToolTip();
             })
             .transition(trans)
-            .attr("x", (d, i) => i * (vWidth - 3) + (i + 1) * 3)
+            .attr("x", (_d, i) => i * (vWidth - 3) + (i + 1) * 3)
             .attr("y", (d) => yscale(d.Q3))
             .attr("width", vWidth - 6 > 1 ? vWidth - 6 : 1)
             .attr("height", (d) => {
@@ -110,7 +110,7 @@ class MultiBoxPlot extends SVGChart {
                 return Number.isNaN(w) ? 0 : w;
             })
             .attr("fill", "none")
-            .attr("stroke", (d, i) => colors[i])
+            .attr("stroke", (_d, i) => colors[i])
             .attr("stroke-width", 3);
 
         this.graph_area
@@ -119,7 +119,7 @@ class MultiBoxPlot extends SVGChart {
             .join("path")
             .attr("class", "boxplot-whisker")
             .transition(trans)
-            .attr("stroke", (d, i) => colors[i])
+            .attr("stroke", (_d, i) => colors[i])
             .attr("fill", "none")
             .attr("stroke-width", 3)
 

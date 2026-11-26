@@ -118,7 +118,7 @@ export default class Jpeg2000Decoder extends BaseDecoder {
         } finally {
             try {
                 decoder?.delete();
-            } catch (error) {}
+            } catch {}
         }
     }
 }

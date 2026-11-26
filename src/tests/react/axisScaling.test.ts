@@ -95,8 +95,8 @@ describe("deckRadiusForClassicRadius", () => {
     test("draws a point as large on screen as the classic chart did", () => {
         const size: [number, number] = [493, 462];
         const sizing = deckRadiusForClassicRadius(2, size);
-        expect(sizing).toBeDefined();
-        const { radius, course_radius } = sizing!;
+        if (!sizing) throw new Error("expected a deck radius");
+        const { radius, course_radius } = sizing;
         // the fitted view of data as wide as it is tall, in a square the chart's shorter side
         const view = fitOrthographicView({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, size[1], size[1], "equal");
         const radiusPx = ((radius * course_radius) / 10000) * 10 * 2 ** view.zoom;

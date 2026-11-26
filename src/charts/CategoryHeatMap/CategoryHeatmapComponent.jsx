@@ -140,6 +140,11 @@ const CategoryHeatmapComponent = observer(() => {
     const [errorMessage, setErrorMessage] = useState("");
 
     useEffect(() => {
+        //using as a signal to re-run effect.
+        //(assume these were intentional in dependencies)
+        filter.timeStamp;
+        paramKey;
+
         let cancelled = false;
         setIsLoading(true);
         setErrorMessage("");
@@ -264,7 +269,8 @@ const CategoryHeatmapComponent = observer(() => {
                             const isActive =
                                 chart.cellFilter && chart.cellFilter[0] === xLabel && chart.cellFilter[1] === yLabel;
                             return (
-                                <div
+                                <button
+                                    type="button"
                                     key={`cell-${xLabel}-${yLabel}`}
                                     style={{
                                         ...cellBaseStyle,
@@ -288,7 +294,7 @@ const CategoryHeatmapComponent = observer(() => {
                                     onClick={() => chart.filterCell(xLabel, yLabel)}
                                 >
                                     {value}
-                                </div>
+                                </button>
                             );
                         })}
                     </Fragment>
@@ -302,6 +308,7 @@ const CategoryHeatmapComponent = observer(() => {
                         const v = i / 19;
                         return (
                             <div
+                                // biome-ignore lint/suspicious/noArrayIndexKey: fixed set of gradient swatches
                                 key={i}
                                 style={{
                                     flex: 1,

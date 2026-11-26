@@ -33,14 +33,14 @@ class RowChart extends CategoryChart {
             const filtered = this.filter.length > 0 && this.filter.indexOf(word) === -1;
             return filtered ? "lightgray" : colors[vals.indexOf(word)];
         };
-        const click = (item, dimension, e) => this.filterCategories(item[0], e.shiftKey);
+        const click = (item, _dimension, e) => this.filterCategories(item[0], e.shiftKey);
         const list = data.map((d) => {
             return [vals[d[1]], Math.log(d[0])];
         });
         const maxVal = Math.max(...list.map((d) => d[1]));
         const canvas = this.wordcloudCanvas;
-        const w = (canvas.width = this.contentDiv.clientWidth);
-        const h = (canvas.height = this.contentDiv.clientHeight);
+        canvas.width = this.contentDiv.clientWidth;
+        canvas.height = this.contentDiv.clientHeight;
         const weightFactor = (this.config.wordSize || 20) / maxVal;
         const p2 = Math.PI / 2;
         canvas.style.display = "block";
@@ -76,15 +76,12 @@ class RowChart extends CategoryChart {
             //seen this happen at least once when it shouldn't have, likely related to other data-loading issues
             console.error(">>> No data for row chart - probably a bug, needs tracking...");
         }
-        let maxCount = this.maxCount;
-
         if (c.exclude_categories) {
             const ex = new Set();
             for (const n of c.exclude_categories) {
                 ex.add(vals.indexOf(n));
             }
-            data = this.rowData.filter((x, i) => !ex.has(i));
-            maxCount = data.reduce((a, b) => Math.max(a[0], b[0]));
+            data = this.rowData.filter((_x, i) => !ex.has(i));
         }
 
         if (this.config.wordcloud) {
@@ -130,7 +127,7 @@ class RowChart extends CategoryChart {
             .attr("class", "row-bar")
             .attr("x", 0)
             .attr("width", (d) => d[0] * units)
-            .attr("y", (d, i) => (i + 1) * 3 + i * barHeight)
+            .attr("y", (_d, i) => (i + 1) * 3 + i * barHeight)
             .attr("height", barHeight);
 
         this.graph_area
@@ -152,7 +149,7 @@ class RowChart extends CategoryChart {
             .attr("font-size", `${fontSize}px`)
             .attr("x", 5)
             .style("fill", "currentColor")
-            .attr("y", (d, i) => (i + 1) * 3 + i * barHeight + barHeight / 2)
+            .attr("y", (_d, i) => (i + 1) * 3 + i * barHeight + barHeight / 2)
             //.attr("text-anchor", "middle")
             .attr("dominant-baseline", "central");
     }
@@ -259,7 +256,7 @@ BaseChart.types["wordcloud"] = {
             name: "Category",
         },
     ],
-    init: (config, dataStore) => {
+    init: (config) => {
         config.wordcloud = true;
         config.wordSize = 20;
     },

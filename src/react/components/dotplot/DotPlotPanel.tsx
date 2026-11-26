@@ -83,6 +83,7 @@ export default function DotPlotPanel({
                     const dot = { panel, row, field };
                     const isSelected = selected?.panel === panel && selected.row === row && selected.field === field;
                     return (
+                        // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only chart marks
                         <circle
                             // biome-ignore lint/suspicious/noArrayIndexKey: fields have a fixed order
                             key={`${row}-${field}`}

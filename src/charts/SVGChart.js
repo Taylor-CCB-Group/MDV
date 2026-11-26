@@ -291,7 +291,6 @@ class SVGChart extends BaseChart {
     }
 
     drawXTree(nodeData, number, height, offset) {
-        const trans = select(this.contentDiv).transition().duration(400).ease(easeLinear);
         const b = this._getContentDimensions();
         const treeMap = cluster().size([b.width, height]);
         const nodes = treeMap(nodeData);
@@ -312,7 +311,7 @@ class SVGChart extends BaseChart {
             }
         }
 
-        const links = this.tx_axis_svg
+        this.tx_axis_svg
             .selectAll(".tree-link")
             .data(desc.slice(1))
             .join("path")
@@ -479,7 +478,7 @@ class SVGChart extends BaseChart {
                 type: "folder",
                 label: "Axis controls",
                 current_value: arr,
-                func: (x) => {},
+                func: () => {},
             },
         ]);
     }

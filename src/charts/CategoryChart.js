@@ -126,7 +126,6 @@ class CategoryChart extends SVGChart {
             (data) => {
                 this.data = new Array(data.length);
                 this.maxCount = 1;
-                const c = this.config;
                 for (let n = 0; n < data.length; n++) {
                     this.data[n] = [data[n], n];
                     this.maxCount = Math.max(data[n], this.maxCount);

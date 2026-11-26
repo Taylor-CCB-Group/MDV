@@ -30,7 +30,7 @@ class GenomeBrowser extends BaseChart {
             this.baseTrack.dataStore = this.dataStore;
 
             this.addMenuIcon("fa fa-eye-slash", config.legend || "Show/Hide Tracks", {
-                func: (e) => this.showHideDialog(),
+                func: () => this.showHideDialog(),
             });
             this.locText = createEl("input", { styles: { fontSize: "11px" } }, this.menuSpace);
             this.locText.addEventListener("keypress", (e) => {
@@ -70,7 +70,7 @@ class GenomeBrowser extends BaseChart {
 
             if (c.sync_with_datastores) {
                 const dsources = window.mdv.chartManager.dataSources;
-                for (let ds of c.sync_with_datastores) {
+                for (const ds of c.sync_with_datastores) {
                     const dobj = dsources.find((x) => x.name === ds);
                     if (dobj) {
                         this.linkToOtherDataStore(dobj.dataStore);
@@ -527,7 +527,7 @@ class GenomeBrowser extends BaseChart {
             this.dataLink.dataStore.removeListener(`gb_${this.config.id}`);
         }
         //remove any listeners to other datastores
-        for (let l of this.links) {
+        for (const l of this.links) {
             l.dataStore.removeListener(l.listener_id);
         }
         super.remove();

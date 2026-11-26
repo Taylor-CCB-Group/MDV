@@ -12,6 +12,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  biome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # installs the biome version pinned in the lockfile
+      - uses: biomejs/setup-biome@v2
+      # lint, format and import order for src; info-level diagnostics are not shown or enforced
+      - run: biome ci --reporter=github --diagnostic-level=warn --error-on-warnings ./src
+
   tsc:
     runs-on: ubuntu-latest
     steps:

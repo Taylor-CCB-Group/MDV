@@ -43,7 +43,6 @@ export class SocketIOUploadClient {
     private processingComplete = false;
     private shouldExitProcessingWait = false;
     private resumeOffset = 0;
-    private isResuming = false;
     private cancelRequested = false;
 
     constructor(config: SocketIOUploadConfig) {
@@ -128,7 +127,6 @@ export class SocketIOUploadClient {
             console.log("Upload resume acknowledged:", data);
             if (data.file_id === this.state.fileId) {
                 this.resumeOffset = data.received_bytes || 0;
-                this.isResuming = true;
                 this.uploadAcknowledged = true;
             }
         });
@@ -197,7 +195,6 @@ export class SocketIOUploadClient {
             console.log("Resume info received:", data);
             if (data.file_id === this.state.fileId) {
                 this.resumeOffset = data.received_bytes || 0;
-                this.isResuming = true;
                 this.uploadTransferComplete = false;
                 this.serverRespondedToQuery = true;
             }
@@ -207,7 +204,6 @@ export class SocketIOUploadClient {
             console.log("Server does not have state for file:", data);
             if (data.file_id === this.state.fileId) {
                 this.resumeOffset = 0;
-                this.isResuming = false;
                 this.uploadTransferComplete = false;
                 this.serverRespondedToQuery = true;
             }
@@ -292,7 +288,6 @@ export class SocketIOUploadClient {
                 if (!this.serverRespondedToQuery) {
                     console.log("Query timeout, assuming new upload");
                     this.resumeOffset = 0;
-                    this.isResuming = false;
                     resolve(true);
                 }
             }, 20000);

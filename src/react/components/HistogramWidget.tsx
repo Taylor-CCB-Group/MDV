@@ -194,6 +194,7 @@ export default function HistogramWidget({
                                 if (layer.data[index] === 0) return null;
                                 return (
                                     <line
+                                        // biome-ignore lint/suspicious/noArrayIndexKey: bars are positional histogram bins
                                         key={`${layer.id}-${index}`}
                                         x1={bar.x + bar.width / 2}
                                         x2={bar.x + bar.width / 2}
@@ -229,6 +230,7 @@ export default function HistogramWidget({
                         }
                         return bars.map((bar, index) => (
                             <rect
+                                // biome-ignore lint/suspicious/noArrayIndexKey: bars are positional histogram bins
                                 key={`${layer.id}-${index}`}
                                 x={bar.x + bar.width * (layer.inset ?? 0)}
                                 y={bar.y}

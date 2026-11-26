@@ -69,7 +69,7 @@ function getPathWithoutQueryOrHash(url: string): string {
 
 function appendSuffixBeforeQueryOrHash(url: string, suffix: string): string {
     const match = /^(?<path>[^?#]*)(?<query>\?[^#]*)?(?<hash>#.*)?$/.exec(url);
-    if (!match || !match.groups) {
+    if (!match?.groups) {
         return `${url}${suffix}`;
     }
 
@@ -101,7 +101,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
     private _setSearchPending: ((pending: boolean) => void) | null = null;
 
     constructor(dataStore: DataStore, div: string | HTMLDivElement, config: IGVBrowserConfig) {
-        if (!dataStore.genome || !dataStore.genome.columns) {
+        if (!dataStore.genome?.columns) {
             throw new Error("IGVBrowser requires a genome with genomic columns defined in the data store");
         }
         config.view_margins = config.view_margins || { type: "percentage", value: 20 };
@@ -129,7 +129,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         const sr = igvContainer.shadowRoot?.adoptedStyleSheets[0];
         let css = "";
         if (sr) {
-            for (let rule of sr.cssRules) {
+            for (const rule of sr.cssRules) {
                 css += rule.cssText + " ";
             }
         }
@@ -248,8 +248,7 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         const labelColumn = this.config.feature_label;
         const name =
             labelColumn && labelColumn !== "_none_" ? `${this.dataStore.getRowText(rowIndex, labelColumn)}` : undefined;
-        let color: string | unknown;
-        color = this.colorFunction ? this.colorFunction(rowIndex) : "#888888";
+        const color: string | unknown = this.colorFunction ? this.colorFunction(rowIndex) : "#888888";
         return { name, color };
     }
 
@@ -313,7 +312,9 @@ class IGVBrowser extends BaseReactChart<IGVBrowserConfig> {
         const location = locationFromFieldValues(this.dataStore, data.indexes[0], this.genomicInfo);
         if (!location) return;
         //apply the view margins
-        const expandedLocation = location.map((loc) => applyViewMargins(loc, this.config.view_margins!));
+        // set in the constructor, but not reflected in the config type
+        const vm = this.config.view_margins ?? { type: "percentage", value: 20 };
+        const expandedLocation = location.map((loc) => applyViewMargins(loc, vm));
         //convert to nice string
         const searchLocus = toSafeLocusString(expandedLocation);
         //highlight the actual feature in the expanded view

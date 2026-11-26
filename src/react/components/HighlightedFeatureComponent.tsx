@@ -94,8 +94,12 @@ export const HighlightedFeatureComponent = observer(() => {
                 : `Highlighted value ${highlightValue} not in top ${columnData?.length} values.`}
             {columnData &&
                 [...columnData].map((d, i) => (
-                    <div
+                    <button
+                        type="button"
                         style={{
+                            display: "block",
+                            width: "calc(100% - 1em)",
+                            textAlign: "left",
                             cursor: "pointer",
                             border: `1px ${highlightedIndex === indices[i] ? "solid" : "dashed"} #ccc`,
                             padding: "0.5em",
@@ -108,7 +112,7 @@ export const HighlightedFeatureComponent = observer(() => {
                         key={indices[i]}
                     >
                         {d}
-                    </div>
+                    </button>
                 ))}
         </div>
     );

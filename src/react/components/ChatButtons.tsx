@@ -96,10 +96,12 @@ const ChatProvider: React.FC<ChatProviderProps> = ({ open, popout, onClose, onPo
 };
 
 const ChatButtons = () => {
-    //! this property doesn't change, so it's ok to return early which would otherwise violate the rule of hooks
     const chatEnabled = useChartManager().config.chat_enabled;
     if (!chatEnabled) return null;
+    return <ChatButtonsEnabled />;
+};
 
+const ChatButtonsEnabled = () => {
     const [open, setOpen] = useState(false);
     const [popout, setPopout] = useState(false);
     const [chatInitialized, setChatInitialized] = useState(false);

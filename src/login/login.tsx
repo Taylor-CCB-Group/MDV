@@ -24,6 +24,7 @@ const Login: React.FC = () => {
     };
 
     // Needs to be changed later to standard routing
+    // biome-ignore lint/correctness/noUnusedVariables: parked: see the commented-out SSO button below
     const handleLoginWithSSO = async () => {
         try {
             window.location.href = "login_sso";

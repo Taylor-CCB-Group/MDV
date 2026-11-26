@@ -339,21 +339,11 @@ const createMessagePair = (log: ChatLogItem, conversationId: string) => {
     return [userMessage, botMessage];
 };
 
-// Mock suggested questions
-const SUGGESTED_QUESTIONS = [
-    // "What columns are available in this project?",
-    "Show me a summary of the cell data.",
-    "Show me a scatterplot of the UMAP coordinates, colored by cluster.",
-    // "How many rows are in the dataset?",
-    // "What is the distribution of ages?",
-    // "List all unique values in the 'region' column."
-];
-
 // todo: The architecture of this hook is a bit poor, there is no single source of truth, we can have both messages and chatLog which could make it out of sync
 const useChat = () => {
     // { root } is problematic here, need to revise so that we have something sensible
     // -- also test with the app not being at the root of the server
-    const { projectName, mainApiRoute, projectApiRoute } = useProject(); //todo add viewName to ProjectProvider
+    const { projectName, projectApiRoute } = useProject(); //todo add viewName to ProjectProvider
     // const route = `${projectApiRoute}chat`;
     const routeInit = `${projectApiRoute}chat_init`;
     //! still need to consider that some things really are routes while others are just names
@@ -460,7 +450,7 @@ const useChat = () => {
     }, []);
 
     const socket = useMemo(() => {
-        if (!cm.ipc || !cm.ipc.socket) return null;
+        if (!cm.ipc?.socket) return null;
         return cm.ipc.socket;
     }, [cm.ipc]);
 
@@ -476,7 +466,7 @@ const useChat = () => {
                 const response = await axios.get(`${projectApiRoute}chat_log.json`);
                 const parsedResponse = chatLogSchema.parse(response.data);
                 return parsedResponse;
-            } catch (error) {
+            } catch {
                 return [];
             }
         },

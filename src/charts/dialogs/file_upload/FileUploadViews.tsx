@@ -152,8 +152,6 @@ export function TabularReviewView({
 
 export function TiffReviewView({
     tiffSummary,
-    tiffMetadata,
-    selectedFile,
     showMetadata,
     onToggleView,
     onUpload,
@@ -238,7 +236,6 @@ export function TiffReviewView({
 
 export function H5ReviewView({
     selectedFile,
-    h5Metadata,
     onUpload,
     onCancel,
 }: {

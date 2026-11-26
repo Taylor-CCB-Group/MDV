@@ -248,6 +248,7 @@ const SplatterPlot = observer(function SplatterPlot() {
     }
 
     return (
+        // biome-ignore lint/a11y/noStaticElementInteractions: handles Escape bubbling from the focusable cells inside
         <div
             className="relative h-full w-full"
             onKeyDown={(event) => {

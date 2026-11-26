@@ -367,6 +367,7 @@ export const GeneNetworkChartComponent = observer(() => {
             {column && <FeatureSearchBar column={column} shownCount={visibleRowIndices.length} />}
             {visibleRowIndices.length > 0 ? (
                 <>
+                    {/* biome-ignore lint/a11y/noStaticElementInteractions: handles arrow keys bubbling from the focusable cards inside */}
                     <div
                         ref={scrollContainerRef}
                         className="flex-1 min-h-0 overflow-y-auto"

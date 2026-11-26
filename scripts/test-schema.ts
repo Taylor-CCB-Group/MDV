@@ -12,7 +12,7 @@ import {
 function testSchema(name: string, schema: z.ZodTypeAny) {
     try {
         console.log(`Testing ${name}...`);
-        const jsonSchema = z.toJSONSchema(schema);
+        z.toJSONSchema(schema);
         console.log(`✅ ${name} works`);
         return true;
     } catch (error) {

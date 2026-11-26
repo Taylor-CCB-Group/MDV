@@ -54,7 +54,7 @@ class Camera {
         };
     }
 
-    mouseWheel(dx, dy) {
+    mouseWheel(_dx, dy) {
         this.ddistance += dy / window.innerHeight;
         this.updateCamera();
     }
@@ -88,8 +88,6 @@ class Camera {
         for (let i = 0; i < 3; ++i) {
             eye[i] = center[i] + vf * this.front[i] + vr * this.right[i] + vu * up[i];
         }
-
-        const test = [60 * Math.cos(0.01), 30, 60 * Math.sin(0.01)];
 
         glMatrix.mat4.lookAt(this.cameraState.view, eye, center, up);
     }

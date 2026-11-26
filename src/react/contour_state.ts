@@ -66,11 +66,6 @@ export type FieldContourProps = {
 function rgb(r: number, g: number, b: number, a = 255): [number, number, number, number] {
     return [r, g, b, a];
 }
-// this is not the way to do it...
-const contourColors = Array.from({ length: 200 }, (_, i) => {
-    const v = i % 20 <= 1 ? 255 : 0;
-    return rgb(v, v, v, v);
-});
 const viridis = [
     rgb(0, 47, 97),
     rgb(0, 95, 133),

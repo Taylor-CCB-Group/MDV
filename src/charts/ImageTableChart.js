@@ -30,7 +30,7 @@ class ImageTableChart extends BaseChart {
         });
         this.grid.addListener(
             "image_clicked",
-            (e, index) => {
+            (_e, index) => {
                 this.dataStore.dataHighlighted([index], this);
             },
             c.id,

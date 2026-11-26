@@ -45,7 +45,7 @@ onmessage = (e) => {
     }
 
     for (let n = 0; n < dLen; n++) {
-        result[n] = result[n].filter((x, i) => catTotals[i] !== 0);
+        result[n] = result[n].filter((_x, i) => catTotals[i] !== 0);
         result[n]._id = n;
     }
 
@@ -67,7 +67,6 @@ onmessage = (e) => {
 };
 
 function addMedians(result, data, len, dLen, gFilter, lFilter, cat, catTotals, valLen, scaleVals) {
-    const t = performance.now();
     for (let i = 0; i < len; i++) {
         if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
         const c = cat[i];
@@ -117,36 +116,6 @@ function addMedians(result, data, len, dLen, gFilter, lFilter, cat, catTotals, v
     }
 }
 
-function addMedianst(result, data, len, dLen, gFilter, lFilter, cat, catTotals, valLen, scaleVals) {
-    const t = performance.now();
-    for (let i = 0; i < len; i++) {
-        if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
-        const c = cat[i];
-        catTotals[c]++;
-        for (let n = 0; n < dLen; n++) {
-            if (Number.isNaN(data[n][i])) {
-                continue;
-            }
-            result[n][c].push(data[n][i]);
-        }
-    }
-
-    for (let n = 0; n < dLen; n++) {
-        const den = scaleVals[n][1] - scaleVals[n][0];
-        for (let i = 0; i < valLen; i++) {
-            const li = result[n][i];
-            if (li.length === 0) {
-                result[n][i] = Number.NaN;
-                continue;
-            }
-            li.sort();
-            let r = li[Math.floor(li.length / 2)];
-            r = (r - scaleVals[n][0]) / den;
-            result[n][i] = r < 0 ? 0 : r > 1 ? 1 : r;
-        }
-    }
-}
-
 function addAverages(result, data, len, dLen, gFilter, lFilter, cat, catTotals, valLen, scaleVals) {
     for (let i = 0; i < len; i++) {
         if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
@@ -183,10 +152,10 @@ function addSimpleMean(data, gFilter, lFilter, catData, conf) {
     const dlen = data.length;
     const len = catData.length;
     const thr = conf.threshold || 0;
-    const r = conf.values.map((x, i) => ({
+    const r = conf.values.map((_x, i) => ({
         id: i,
         count: 0,
-        values: conf.columns.map((x, i) => ({ id: x, total: 0, count: 0 })),
+        values: conf.columns.map((x) => ({ id: x, total: 0, count: 0 })),
     }));
     for (let i = 0; i < len; i++) {
         if (!shouldIncludeRow(i, gFilter, lFilter)) continue;
