@@ -58,7 +58,6 @@ postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}
 1. **Wait for Database**: `wait_for_database()` ensures PostgreSQL is ready
 2. **Create Database**: Automatically creates the database if it doesn't exist
 3. **Create Tables**: `db.create_all()` creates all tables defined in models
-4. **Cache Setup**: Initializes Redis cache for user-project mappings (if auth enabled)
 
 ---
 
@@ -555,7 +554,6 @@ Removes a user from a project (deletes the relationship).
    - Initializes MDVProject
    - Creates database record
    - Assigns ownership (if auth enabled)
-   - Updates cache
 
 #### Serving Projects
 
@@ -617,7 +615,7 @@ When `ENABLE_FILE_SYNC` is enabled, the system synchronizes filesystem files wit
 
 **Permission Checks**:
 - API endpoints verify permissions before operations
-- Cache-based lookups for performance (if auth enabled)
+- Roles are read from the `user_projects` table on every check (if auth enabled)
 
 ---
 
@@ -789,7 +787,6 @@ Creates a new project.
 - Creates project directory
 - Creates database record
 - Assigns ownership to creator
-- Updates cache
 
 #### `POST /import_project`
 Imports a project from a ZIP archive.
@@ -994,14 +991,11 @@ Removes a user from a project.
    - Initializes SQLAlchemy
    - Creates tables via `db.create_all()`
 
-3. **Cache Users** (if auth enabled):
-   - Caches user-project mappings
-
-4. **Serve Projects**:
+3. **Serve Projects**:
    - `serve_projects_from_db()`: Serves existing projects
    - `serve_projects_from_filesystem()`: Adds new projects from filesystem
 
-5. **Register Routes**:
+4. **Register Routes**:
    - Base routes (`routes.py`)
    - Project management routes (`project_manager_extension.py`)
    - Authentication routes (if enabled)
@@ -1073,13 +1067,11 @@ File synchronization maintains a database record of all files within project dir
 On Auth0 sites, MDV creates a User when someone accepts an Invitation at sign-in, and the
 first Admin comes from `MDV_BOOTSTRAP_ADMIN_EMAIL` (ADR 0019). Nothing copies users from Auth0.
 
-### Permission Caching
+### Reading permissions
 
-User-project permissions are cached in Redis (if available) for performance:
-
-- **Cache Structure**: `user_project_cache[user_id][project_id] = {can_read, can_write, is_owner}`
-- **Initialization**: `cache_user_projects()` on startup
-- **Updates**: Cache updated when permissions change
+Every permission check reads the `user_projects` table through `mdvtools.auth.permissions`. MDV keeps
+no copy of the roles between requests, so a role written by any process applies on the next request.
+That includes MDV-Admin on a shared database and a script run with `docker exec`.
 
 ### Access Control
 
@@ -1116,7 +1108,7 @@ This section summarizes how project-related endpoints and WebSockets are protect
 |----------------|------------|
 | **Project blueprint** (`/project/<id>/`, `/<file>.json`, `/<file>.b`, `/spatial/...`, etc.) | `project_pre_dispatch_checks`: requires at least one of `can_read`, `can_write`, `is_owner`. Editable routes (`access_level='editable'`) additionally require `can_write` or `is_owner` and project `access_level == 'editable'`. |
 | **WebSocket** `connect` for `/project/<id>` (chat) | After `is_authenticated()`, same read check as above: user must have `can_read`, `can_write`, or `is_owner` for the project. |
-| **GET /projects** | List filtered by `user_project_cache` (only projects where user has `can_read`, `can_write`, or `is_owner`). |
+| **GET /projects** | List filtered by the user's `user_projects` rows (only projects where user has `can_read`, `can_write`, or `is_owner`). |
 | **POST /create_project**, **POST /import_project** | Session required; creator gets owner. |
 | **GET /export_project/<id>** | Owner only (`is_owner`). |
 | **DELETE /delete_project/<id>** | Owner only. |
@@ -1156,8 +1148,7 @@ This section summarizes how project-related endpoints and WebSockets are protect
 
 ### Authentication
 
-1. **Cache Updates**: Update permission cache after permission changes
-2. **Permission Checks**: Always verify permissions in API endpoints
+1. **Permission Checks**: Always verify permissions in API endpoints
 
 ### Configuration
 
@@ -1214,9 +1205,8 @@ This section summarizes how project-related endpoints and WebSockets are protect
 **Solutions**:
 1. Verify user exists in database
 2. Check `UserProject` records exist
-3. Verify permission cache is updated
-4. Check authentication is properly configured
-5. Review API endpoint permission checks
+3. Check authentication is properly configured
+4. Review API endpoint permission checks
 
 ### File Sync Issues
 

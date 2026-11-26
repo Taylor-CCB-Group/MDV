@@ -132,6 +132,10 @@ def convert_scanpy_to_mdv(
     compute_x_umap: bool = False,
     leiden_resolution: float = 1.0,
     leiden_column: str = "leiden",
+    add_reverse_link: bool = False,
+    reverse_link_name_column: str | None = None,
+    x_data_name: str = "Gene Expr",
+    x_data_transformation: str = "Gene Score",
 ) -> MDVProject:
     """
     Convert a Scanpy AnnData object to MDV (Multi-Dimensional Viewer) format.
@@ -163,6 +167,14 @@ def convert_scanpy_to_mdv(
         link_name_column (str, optional): Column in the variable datasource whose
             values should be used as the dynamic column names for the ``rows_as_columns`` link.
             Defaults to ``gene_identifier_column``.
+        add_reverse_link (bool, optional): If True, also link var to obs, so that e.g. the
+            expression of every gene in a particular cell can be added as columns. Defaults to False.
+        reverse_link_name_column (str, optional): Obs (cell) column whose values are used as the
+            dynamic column names for the reverse link. Defaults to the generated cell id column.
+        x_data_name (str, optional): The kind of data in the X matrix, e.g. log counts or log1p.
+            Defaults to the generic "Gene Expr".
+        x_data_transformation (str, optional): Label for the transformation applied to X, e.g.
+            raw or normalised. Defaults to "Gene Score".
         rows_as_columns_name_column (str, optional): Deprecated alias for ``link_name_column``.
         gene_columns: (list[dict], optional) Column metadata overrides for the genes datasource.
         compute_x_umap (bool, optional): If True, compute neighbors, UMAP and Leiden clusters
@@ -292,7 +304,17 @@ def convert_scanpy_to_mdv(
     mdv.add_datasource(var_ds_name, gene_table, columns=gene_columns)
 
     # link the two datasets
-    mdv.add_rows_as_columns_link(obs_ds_name, var_ds_name, link_name_column, "Gene Expr")
+    mdv.add_rows_as_columns_link(obs_ds_name, var_ds_name, link_name_column, x_data_name)
+
+    
+    if add_reverse_link:
+        if reverse_link_name_column is None:
+            reverse_link_name_column = cell_identifier_column
+        if reverse_link_name_column not in cell_table.columns:
+            raise ValueError(
+                f" reverse_link_column_name '{reverse_link_name_column}' not found in obs data"
+            )
+        mdv.add_rows_as_columns_link(var_ds_name, obs_ds_name, reverse_link_name_column, x_data_name)
 
     #get the matrix in the correct format
     print("Getting Matrix")
@@ -304,10 +326,24 @@ def convert_scanpy_to_mdv(
         # add the gene expression
         print("Adding gene expression")
         mdv.add_rows_as_columns_subgroup(
-            obs_ds_name, var_ds_name, "gs", matrix, name="gene_scores", label="Gene Scores",
+            obs_ds_name, var_ds_name, "gs", matrix, name="gene_scores", label=x_data_transformation,
             # sparse=sparse, #this should be inferred from the matrix
             chunk_data=chunk_data
         )
+        if add_reverse_link:
+            reverse_matrix = matrix.T
+            if scipy.sparse.issparse(reverse_matrix) and not isinstance(reverse_matrix, scipy.sparse.csc_matrix):
+                reverse_matrix = scipy.sparse.csc_matrix(reverse_matrix)
+            mdv.add_rows_as_columns_subgroup(
+                var_ds_name,
+                obs_ds_name,
+                x_data_transformation,
+                reverse_matrix,
+                # the label may match a gene metadata column already stored in this group
+                name=_unused_h5_name(mdv, var_ds_name, x_data_transformation),
+                label=x_data_transformation,
+                chunk_data=chunk_data,
+            )
 
     #now add layers
     if add_layer_data:
@@ -348,11 +384,40 @@ def convert_scanpy_to_mdv(
         
     return mdv
 
+def _unused_h5_name(mdv: MDVProject, datasource: str, base: str) -> str:
+    """``base``, or ``base_<n>`` if a column or subgroup in ``datasource`` already uses it."""
+    h5 = mdv._get_h5_handle(read_only=True)
+    try:
+        group = h5[datasource]
+        assert isinstance(group, h5py.Group)
+        name, i = base, 1
+        while name in group:
+            name = f"{base}_{i}"
+            i += 1
+        return name
+    finally:
+        h5.close()
+
+
 def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False, chunk_data=False):
     md=mudata_object
     p= MDVProject(folder,delete_existing=delete_existing)
+    mods = list(md.mod.keys())
+    # md.obs holds global columns plus "<mod>:<column>" columns pulled up from each
+    # modality; drop those that only repeat the global column's values
+    mod_prefixes = tuple(f"{m}:" for m in mods)
+    global_cols = [x for x in md.obs.columns if not x.startswith(mod_prefixes)]
+    repeat_cols = [
+        f"{m}:{c}"
+        for m in mods
+        for c in global_cols
+        if f"{m}:{c}" in md.obs.columns
+        and md.obs[f"{m}:{c}"].astype(object).equals(md.obs[c].astype(object))
+    ]
+    table = md.obs.drop(columns=repeat_cols)
+
     #are there any general drs
-    table = _add_dims(md.obs,md.obsm,max_dims)
+    table = _add_dims(table,md.obsm,max_dims)
     #add drs derived from modalities (cell clustering)
     for name,mod in md.mod.items():
         table = _add_dims(table,mod.obsm,max_dims,name)
@@ -360,8 +425,10 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
     columns= [{"name":"cell_id","datatype":"unique"}]
     p.add_datasource("cells",table,columns)
 
-    for mod in md.mod.keys():
+    for mod in mods:
         mdata = md.mod[mod]
+        if mdata.n_vars==0:
+            continue
 
         #adds the index to the data as a name column
         #This is usually the unique gene name - but not always
@@ -383,6 +450,7 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
         #It is derived from the index and is usually the gene 'name'
         #However it may not be appropriate and can be changed later on 
         p.add_rows_as_columns_link("cells",mod,"name",mod)
+
         matrix,sparse= get_matrix(mdata.X,md.obs_names,mdata.obs_names)
         #sometimes X is empty - all the data is in the layers
         if matrix.shape[1] !=0:

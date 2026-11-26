@@ -84,6 +84,15 @@ export const BaseConfigSchema = GridStackConfigSchema.extend({
         .string()
         .optional()
         .describe("Schema version for this chart configuration (used for future migration support)"),
+    legend_layout: z
+        .object({
+            position: z
+                .enum(["overlay", "top"])
+                .optional()
+                .describe("'top' puts the legends in a strip above the plot; otherwise they float over it"),
+        })
+        .optional()
+        .describe("Where the chart's legends go"),
 }).describe("Base configuration shared by all chart types, including layout, styling, and data mapping");
 
 // todo - this should be a union of all the color config options, not applied to all charts
@@ -100,6 +109,7 @@ export const ChartColorConfigSchema = z
                     .tuple([z.number(), z.number()])
                     .optional()
                     .describe("Legend size in pixels [width, height], set when the user resizes it"),
+                minimized: z.boolean().optional().describe("Shown as a small button with its title"),
                 filter: z
                     .discriminatedUnion("kind", [
                         z.object({
@@ -155,6 +165,8 @@ const CategoryFilterSchema = z
 const FieldLegendConfigSchema = z
     .object({
         display: z.boolean().describe("Whether to display the density field legend"),
+        pos: z.tuple([z.number(), z.number()]).optional().describe("Legend position in pixels [left, top]"),
+        minimized: z.boolean().optional().describe("Shown as a small button with its title"),
     })
     .describe("Configuration for density field legend visibility");
 
@@ -422,12 +434,20 @@ export const CompoundDotPlotConfigSchema = BaseConfigSchema.extend({
         })
         .optional()
         .describe("Colour scale for mean expression, shared by all panels"),
-    color_legend: z.object({ display: z.boolean() }).optional().describe("Show the colour legend"),
-    fraction_legend: z.object({ display: z.boolean() }).optional().describe("Show the fraction legend"),
-    reserve_legend_space: z
-        .boolean()
+    color_legend: z
+        .object({
+            display: z.boolean(),
+            minimized: z.boolean().optional().describe("Shown as a small button with its title"),
+        })
         .optional()
-        .describe("Keep space above the plot for the legends; off, the plot fills the height"),
+        .describe("Show the colour legend"),
+    fraction_legend: z
+        .object({
+            display: z.boolean(),
+            minimized: z.boolean().optional().describe("Shown as a small button with its title"),
+        })
+        .optional()
+        .describe("Show the fraction legend"),
 }).describe("Configuration for React dot plots, optionally split into panels that share one colour and size scale");
 
 // earlier type name of the compound dot plot, still accepted

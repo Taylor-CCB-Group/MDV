@@ -759,12 +759,11 @@ class TestCreateFlaskApp(unittest.TestCase):
     @patch('mdvtools.dbutils.mdv_server_app.serve_projects_from_db')
     @patch('mdvtools.dbutils.mdv_server_app.register_routes')
     @patch('mdvtools.dbutils.mdv_server_app.ProjectBlueprint.register_app')
-    @patch('mdvtools.dbutils.mdv_server_app.cache_user_projects')
     @patch('mdvtools.dbutils.mdv_server_app.wait_for_database')
     @patch('mdvtools.dbutils.mdv_server_app.load_config')
     @patch('mdvtools.dbutils.mdv_server_app.create_base_directory')
     @patch('mdvtools.dbutils.mdv_server_app.db')
-    def test_create_flask_app_test_config(self, mock_db, mock_create_base_dir, mock_load_config, mock_wait_for_db, mock_cache_users, mock_register_app, mock_register_routes, mock_serve_db, mock_serve_fs):
+    def test_create_flask_app_test_config(self, mock_db, mock_create_base_dir, mock_load_config, mock_wait_for_db, mock_register_app, mock_register_routes, mock_serve_db, mock_serve_fs):
         """Test app creation with test configuration."""
         app = create_flask_app(config_name='test')
         
@@ -776,13 +775,12 @@ class TestCreateFlaskApp(unittest.TestCase):
     @patch('mdvtools.dbutils.mdv_server_app.serve_projects_from_db')
     @patch('mdvtools.dbutils.mdv_server_app.register_routes')
     @patch('mdvtools.dbutils.mdv_server_app.ProjectBlueprint.register_app')
-    @patch('mdvtools.dbutils.mdv_server_app.cache_user_projects')
     @patch('mdvtools.dbutils.mdv_server_app.wait_for_database')
     @patch('mdvtools.dbutils.mdv_server_app.load_config')
     @patch('mdvtools.dbutils.mdv_server_app.create_base_directory')
     @patch('mdvtools.dbutils.mdv_server_app.db')
     @patch('mdvtools.dbutils.mdv_server_app.tables_exist')
-    def test_create_flask_app_production_config(self, mock_tables_exist, mock_db, mock_create_base_dir, mock_load_config, mock_wait_for_db, mock_cache_users, mock_register_app, mock_register_routes, mock_serve_db, mock_serve_fs):
+    def test_create_flask_app_production_config(self, mock_tables_exist, mock_db, mock_create_base_dir, mock_load_config, mock_wait_for_db, mock_register_app, mock_register_routes, mock_serve_db, mock_serve_fs):
         """Test app creation with postgres production configuration calls wait_for_database."""
         mock_tables_exist.return_value = True
 
@@ -800,13 +798,12 @@ class TestCreateFlaskApp(unittest.TestCase):
     @patch('mdvtools.dbutils.mdv_server_app.serve_projects_from_db')
     @patch('mdvtools.dbutils.mdv_server_app.register_routes')
     @patch('mdvtools.dbutils.mdv_server_app.ProjectBlueprint.register_app')
-    @patch('mdvtools.dbutils.mdv_server_app.cache_user_projects')
     @patch('mdvtools.dbutils.mdv_server_app.wait_for_database')
     @patch('mdvtools.dbutils.mdv_server_app.load_config')
     @patch('mdvtools.dbutils.mdv_server_app.create_base_directory')
     @patch('mdvtools.dbutils.mdv_server_app.db')
     @patch('mdvtools.dbutils.mdv_server_app.tables_exist')
-    def test_create_flask_app_sqlite_skips_wait_for_database(self, mock_tables_exist, mock_db, mock_create_base_dir, mock_load_config, mock_wait_for_db, mock_cache_users, mock_register_app, mock_register_routes, mock_serve_db, mock_serve_fs):
+    def test_create_flask_app_sqlite_skips_wait_for_database(self, mock_tables_exist, mock_db, mock_create_base_dir, mock_load_config, mock_wait_for_db, mock_register_app, mock_register_routes, mock_serve_db, mock_serve_fs):
         """Test that wait_for_database is not called when DB_BACKEND is sqlite."""
         mock_tables_exist.return_value = True
 

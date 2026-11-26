@@ -5,8 +5,7 @@ import json
 import pytest
 from flask import Flask
 
-from mdvtools.auth import authutils
-from mdvtools.dbutils.dbmodels import Project, db
+from mdvtools.dbutils.dbmodels import Project, User, UserProject, db
 from mdvtools.dbutils.dbservice import ProjectService
 from mdvtools.dbutils.routes import register_routes
 
@@ -73,29 +72,26 @@ def test_project_route_without_auth(db_app):
 
 
 @pytest.fixture()
-def auth_app(tmp_path, monkeypatch):
-    def cached(project_id):
-        path = tmp_path / str(project_id)
-        write_project_files(path, view_image=f"img-{project_id}")
-        return {
-            "id": project_id,
-            "name": f"project-{project_id}",
-            "path": str(path),
-            "lastModified": "2026-11-03 09:00:00",
-            "thumbnail": None,
-            "readme": None,
-        }
+def auth_app(db_app, tmp_path):
+    """User 7 can read project 1 and holds a role without read access on project 3.
+    Project 1's owner is someone else."""
+    path = tmp_path / "3"
+    write_project_files(path, view_image="img-3")
+    db.session.add(Project(id=3, name="project-3", path=str(path)))
+    db.session.add_all([
+        User(id=7, email="reader@example.org", auth_id="reader"),
+        User(id=8, email="owner@example.org", auth_id="owner"),
+    ])
+    db.session.add_all([
+        UserProject(7, 1, can_read=True),
+        UserProject(7, 3, can_read=False),
+        UserProject(8, 1, is_owner=True),
+    ])
+    db.session.commit()
 
-    read_only = {"can_read": True, "can_write": False, "is_owner": False}
-    no_access = {"can_read": False, "can_write": False, "is_owner": False}
-    monkeypatch.setattr(authutils, "active_projects_cache", [cached(1), cached(2)])
-    monkeypatch.setattr(authutils, "user_project_cache", {7: {1: read_only, 2: no_access}})
-    monkeypatch.setattr(authutils, "all_users_cache", [])
-
-    app = Flask(__name__)
-    app.secret_key = "test"
-    register_routes(app, ENABLE_AUTH=True)
-    return app
+    db_app.secret_key = "test"
+    register_routes(db_app, ENABLE_AUTH=True)
+    return db_app
 
 
 def test_project_route_with_auth_checks_permissions(auth_app):
@@ -109,9 +105,11 @@ def test_project_route_with_auth_checks_permissions(auth_app):
     assert body["name"] == "project-1"
     assert body["thumbnail"] == "img-1"
     assert body["permissions"]["can_read"] is True
-    assert body == client.get("/projects").get_json()[0]
+    assert body["owner"] == ["owner@example.org"]
+    assert client.get("/projects").get_json() == [body]
 
-    # listed in the cache, but this user can't see it
+    # a role without read access, a deleted project and a missing one
+    assert client.get("/projects/3").status_code == 404
     assert client.get("/projects/2").status_code == 404
     assert client.get("/projects/99").status_code == 404
 

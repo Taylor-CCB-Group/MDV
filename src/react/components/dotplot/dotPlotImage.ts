@@ -1,3 +1,5 @@
+import { getVisibleBox } from "@/charts/legendImage";
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 /**
@@ -44,36 +46,65 @@ function inlineStyles(copy: Element, source: Element) {
     }
 }
 
+/** The smallest box around all the (shown) containers, in page coordinates. */
+function unionBox(containers: HTMLElement[]) {
+    const rects = containers.map((c) => c.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+    if (rects.length === 0) return { left: 0, top: 0, width: 0, height: 0 };
+    const left = Math.min(...rects.map((r) => r.left));
+    const top = Math.min(...rects.map((r) => r.top));
+    const right = Math.max(...rects.map((r) => r.right));
+    const bottom = Math.max(...rects.map((r) => r.bottom));
+    return { left, top, width: right - left, height: bottom - top };
+}
+
 /**
- * One standalone SVG of everything drawn in `container`: each SVG in it (plot and legends)
- * nested at its place on screen, and HTML legend titles as text. Styles are inlined, so it
- * looks the same outside the page.
+ * One standalone SVG of everything drawn in `containers` (the plot, and the strip of legends
+ * above it if shown): each SVG in them nested at its place on screen, and HTML legend titles as
+ * text. Styles are inlined, so it looks the same outside the page.
  */
-export function buildChartSvg(container: HTMLElement): SVGSVGElement {
-    const box = container.getBoundingClientRect();
-    const doc = container.ownerDocument;
+export function buildChartSvg(...containers: [HTMLElement, ...HTMLElement[]]): SVGSVGElement {
+    const box = unionBox(containers);
+    const doc = containers[0].ownerDocument;
     const out = doc.createElementNS(SVG_NS, "svg");
     out.setAttribute("xmlns", SVG_NS);
     out.setAttribute("width", String(box.width));
     out.setAttribute("height", String(box.height));
     out.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
 
-    for (const svg of container.querySelectorAll("svg")) {
+    const svgs = containers.flatMap((c) => [...c.querySelectorAll("svg")].map((svg) => ({ svg, container: c })));
+    const titles = containers.flatMap((c) => [...c.querySelectorAll(HTML_TITLE_SELECTOR)]);
+
+    for (const { svg, container } of svgs) {
         // nested SVGs come along with their outer one
         if (svg.parentElement?.closest("svg")) continue;
         const rect = svg.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) continue;
+        // only the part that can be seen: a legend scrolled in the strip shows as it does on screen
+        const visible = getVisibleBox(svg, container);
+        if (visible.width === 0 || visible.height === 0) continue;
         const copy = svg.cloneNode(true);
         if (!(copy instanceof Element)) continue;
         inlineStyles(copy, svg);
-        copy.setAttribute("x", String(rect.left - box.left));
-        copy.setAttribute("y", String(rect.top - box.top));
         copy.setAttribute("width", String(rect.width));
         copy.setAttribute("height", String(rect.height));
-        out.append(copy);
+        if (visible.width === rect.width && visible.height === rect.height) {
+            copy.setAttribute("x", String(rect.left - box.left));
+            copy.setAttribute("y", String(rect.top - box.top));
+            out.append(copy);
+            continue;
+        }
+        // cut off what's out of view with an SVG the size of the visible part
+        const frame = doc.createElementNS(SVG_NS, "svg");
+        frame.setAttribute("x", String(visible.left - box.left));
+        frame.setAttribute("y", String(visible.top - box.top));
+        frame.setAttribute("width", String(visible.width));
+        frame.setAttribute("height", String(visible.height));
+        copy.setAttribute("x", String(rect.left - visible.left));
+        copy.setAttribute("y", String(rect.top - visible.top));
+        frame.append(copy);
+        out.append(frame);
     }
 
-    for (const title of container.querySelectorAll(HTML_TITLE_SELECTOR)) {
+    for (const title of titles) {
         const text = title.textContent?.trim();
         if (!text || title.closest("svg")) continue;
         const rect = title.getBoundingClientRect();
