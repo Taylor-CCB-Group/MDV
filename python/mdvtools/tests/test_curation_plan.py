@@ -273,6 +273,8 @@ def test_side_panels_use_the_information_chart():
     assert gene_charts[-1]["title"] == "Click a gene to plot it"
     assert protein_charts[-1]["type"] == "geneNetwork"
     assert protein_charts[-1]["title"] == "Click a protein to plot it"
+    assert protein_charts[-1]["source"] == "uniprot"
+    assert "source" not in gene_charts[-1]
     assert all(chart.get("text") not in {"Select gene(s) to view", "Select protein(s) to view"} for chart in gene_charts + protein_charts)
 
 

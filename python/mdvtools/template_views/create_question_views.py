@@ -647,16 +647,21 @@ def feature_table(title: str, extra_columns: tuple[str, ...] = ()) -> dict[str, 
     }
 
 
-def gene_info(title: str) -> dict[str, Any]:
-    """The Gene Info chart: the gene list with details from genenetwork.nl. Clicking a gene
-    highlights it, as clicking a row in `feature_table` does."""
-    return {
+def gene_info(title: str, source: str | None = None) -> dict[str, Any]:
+    """The Gene Info chart. Clicking a name highlights it, as clicking a row in `feature_table` does.
+
+    `source` is the card details provider. Genes leave it unset (GeneNetwork). Proteins use UniProt.
+    """
+    chart: dict[str, Any] = {
         "type": "geneNetwork",
         "title": title,
         "legend": "",
         "param": [NAME_FIELD],
         "autoScroll": True,
     }
+    if source:
+        chart["source"] = source
+    return chart
 
 
 # Layouts are the final pixel positions from the hand-tuned myeloid views (Nov 2026), so these

@@ -532,7 +532,8 @@ def side_panel(
     charts.append(placed(feature_list(list_title, names), [0, y], [width, LIST_HEIGHT]))
     y += LIST_HEIGHT + CHART_GAP
     info_title = "Click a protein to plot it" if kind == "protein" else "Click a gene to plot it"
-    charts.append(placed(gene_info(info_title), [0, y], [width, DETAIL_HEIGHT]))
+    info_source = "uniprot" if kind == "protein" else None
+    charts.append(placed(gene_info(info_title, info_source), [0, y], [width, DETAIL_HEIGHT]))
     return charts
 
 
