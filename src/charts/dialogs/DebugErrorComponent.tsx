@@ -16,7 +16,6 @@ import {
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import JsonView from "react18-json-view";
-import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 import { DEBUG_ERROR_REPORT_MESSAGE, MDV_EMAIL } from "@/utilities/constants";
 
 /** Any extra information we may want to use
@@ -38,11 +37,12 @@ export interface DebugErrorComponentProps {
 const DebugErrorComponent = ({ error, title = "Error Occurred", extraMetadata }: DebugErrorComponentProps) => {
     const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [userComments, setUserComments] = useState<string>();
-    const { buildInfo } = useBuildInfo();
-    const [isLoading, setIsLoading] = useState(false);
-    const [emailSent, setEmailSent] = useState(false);
-    const [emailNotSent, setEmailNotSent] = useState(false);
+    // todo: restore the setters (and the rest) with handleSend below
+    // const [userComments, setUserComments] = useState<string>();
+    // const { buildInfo } = useBuildInfo();
+    // const [emailNotSent, setEmailNotSent] = useState(false);
+    const [isLoading] = useState(false);
+    const [emailSent] = useState(false);
     const [metaData, setMetaData] = useState<Record<string, unknown> | null>(null);
     useEffect(() => {
         if (extraMetadata || error?.stack || error?.traceback)

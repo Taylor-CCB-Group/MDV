@@ -6,7 +6,7 @@ class AutoComplete {
         this.input = element;
         this.listeners = [];
         config.minLength = config.minLength || 2;
-        this.input.addEventListener("input", (e) => {
+        this.input.addEventListener("input", () => {
             if (this.input.value.length < config.minLength) {
                 return;
             }
@@ -55,7 +55,7 @@ class AutoComplete {
     }
 
     addItemEventListener(div, item) {
-        div.addEventListener("click", (e) => {
+        div.addEventListener("click", () => {
             this.listHolder.remove();
             this.listHolder = null;
             this.setSelectedItem(item);

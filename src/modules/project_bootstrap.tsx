@@ -88,7 +88,7 @@ function LoadState({
             ? "Fetching datasources, state, and views."
             : "Preparing chart runtime and rendering initial view.";
     const overlayClassName = [
-        "fixed inset-0 z-[4000] flex items-center justify-center p-6 text-center transition-opacity duration-200",
+        "fixed inset-0 z-4000 flex items-center justify-center p-6 text-center transition-opacity duration-200",
         isDark ? "bg-slate-900/95" : "bg-slate-50/95",
         isClosing ? "opacity-0 pointer-events-none" : "opacity-100",
     ].join(" ");
@@ -127,7 +127,7 @@ function LoadState({
                         {/* Messages often end in a long URL with nowhere to break: let it break anywhere. */}
                         <p
                             className={[
-                                "mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-md p-2 text-left font-mono text-xs leading-5 [overflow-wrap:anywhere]",
+                                "mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-md p-2 text-left font-mono text-xs leading-5 wrap-anywhere",
                                 isDark ? "bg-slate-900/60 text-slate-300" : "bg-slate-100 text-slate-700",
                             ].join(" ")}
                         >
@@ -137,8 +137,8 @@ function LoadState({
                             <p className={`${bodyTextClassName} text-left text-[14px] leading-6`}>{diagnosis}</p>
                         )}
                         <p className={`${bodyTextClassName} text-left text-[14px] leading-6`}>
-                            If reloading doesn't help, clearing this site's cookies and stored data often does
-                            (you may have to sign in again), as can opening the page in a private window.
+                            If reloading doesn't help, clearing this site's cookies and stored data often does (you may
+                            have to sign in again), as can opening the page in a private window.
                         </p>
                         <div className="flex justify-center gap-2">
                             <button

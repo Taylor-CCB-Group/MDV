@@ -106,4 +106,4 @@ const config={
     }
 };
 //create the app with the above parameters
-const cm = new ChartManager("app1",dataSources,dataLoader,config);
+new ChartManager("app1",dataSources,dataLoader,config);

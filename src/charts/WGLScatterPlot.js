@@ -55,7 +55,7 @@ class OffsetDialog extends BaseDialog {
         createEl("div", { text: cname }, dd);
         this.groupSelect = createEl("select", {}, dd);
         const bb = createEl("button", { classes: ["ciview-button-sm"], text: "Reset" }, dd);
-        bb.addEventListener("click", (e) => {
+        bb.addEventListener("click", () => {
             this.ds.resetColumnOffsets(this.filter, this.groupSelect.value, true);
             this._showOffsets(this.groupSelect.value);
         });
@@ -202,7 +202,7 @@ class OffsetDialog extends BaseDialog {
             },
             this.rDiv,
         );
-        j.addEventListener("click", (e) => {
+        j.addEventListener("click", () => {
             const am = Number.parseFloat(this.offsetAn.value);
             if (Number.isNaN(am)) {
                 return;
@@ -405,7 +405,7 @@ class WGLScatterPlot extends WGLChart {
         const categories = Array.isArray(bf?.categories)
             ? bf.categories.filter((x) => x !== undefined && x !== null)
             : [];
-        if (!bf || !bf.column || bf.column === "__none__" || categories.length === 0) {
+        if (!bf?.column || bf.column === "__none__" || categories.length === 0) {
             this.dim.clearBackgroundFilter();
         } else {
             await loadColumn(this.dataStore.name, bf.column);
@@ -581,12 +581,6 @@ class WGLScatterPlot extends WGLChart {
         let max_y = roi.max_y || this.minMaxY[1];
         let min_x = roi.min_x || this.minMaxX[0];
         let min_y = roi.min_y || this.minMaxY[0];
-        if (c.center_using_quantiles) {
-            const x_q = this.dataStore.columnIndex[c.param[0]].quantiles;
-            const y_q = this.dataStore.columnIndex[c.param[1]].quantiles;
-            const xmm = x_q[c.center_using_quantiles];
-            const ymm = y_q[c.center_using_quantiles];
-        }
         if (this.config.axis.y_log_scale) {
             max_y = this._getLogValue(max_y);
             min_y = this._getLogValue(min_y);

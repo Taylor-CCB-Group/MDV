@@ -122,12 +122,12 @@ class StackedRowChart extends SVGChart {
                 (enter) =>
                     enter
                         .append("g")
-                        .attr("transform", (d, i) => `translate(0,${vgap * (i + 1) + bheight * i})`)
+                        .attr("transform", (_d, i) => `translate(0,${vgap * (i + 1) + bheight * i})`)
                         .attr("class", "stacked-row"),
                 (update) =>
                     update
                         .transition(trans)
-                        .attr("transform", (d, i) => `translate(0,${vgap * (i + 1) + bheight * i})`),
+                        .attr("transform", (_d, i) => `translate(0,${vgap * (i + 1) + bheight * i})`),
             )
             .selectAll("rect")
             .data(

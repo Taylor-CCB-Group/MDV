@@ -143,8 +143,7 @@ class TestValidateUserBootstrapAndRefusal:
         user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
 
         with patch('mdvtools.dbutils.dbservice.UserProjectService.grant_all_projects_to_admins',
-                   return_value=3) as mock_grant, \
-             patch('mdvtools.auth.authutils.cache_user_projects') as mock_cache:
+                   return_value=3) as mock_grant:
             result, error, mock_user_class, mock_db, new_user = self._run_validate_user(
                 bootstrap_app, provider, user_info, existing_user_side_effect=[None]
             )
@@ -153,7 +152,6 @@ class TestValidateUserBootstrapAndRefusal:
         assert result == {"id": 99, "auth_id": "auth0|new-admin", "email": "admin@example.com", "is_admin": True}
         # Without this the first administrator logs in to an empty project list.
         mock_grant.assert_called_once()
-        mock_cache.assert_called_once()
         mock_user_class.assert_called_once_with(
             email="admin@example.com",
             auth_id="auth0|new-admin",
@@ -172,8 +170,7 @@ class TestValidateUserBootstrapAndRefusal:
         user_info = {"sub": "auth0|new-admin", "email": "admin@example.com", "email_verified": True}
 
         with patch('mdvtools.dbutils.dbservice.UserProjectService.grant_all_projects_to_admins',
-                   side_effect=Exception("database unavailable")), \
-             patch('mdvtools.auth.authutils.cache_user_projects'):
+                   side_effect=Exception("database unavailable")):
             result, error, _mock_user_class, mock_db, _new_user = self._run_validate_user(
                 bootstrap_app, provider, user_info, existing_user_side_effect=[None]
             )

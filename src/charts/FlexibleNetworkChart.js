@@ -8,7 +8,6 @@ import {
     pie,
     scaleLinear,
     scaleSqrt,
-    schemeReds,
     select,
     zoom,
     zoomIdentity,
@@ -17,12 +16,6 @@ import { loadColumnData } from "@/datastore/decorateColumnMethod";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
-
-const color_schemes = {
-    "blue yellow": ["#115f9a", "#1984c5", "#22a7f0", "#48b5c4", "#76c68f", "#a6d75b", "#c9e52f", "#d0ee11", "#d0f400"],
-    red: schemeReds[8].slice(1),
-    "blue yellow red": ["blue", "yellow", "red"],
-};
 
 /**
  * FlexibleNetworkChart - Network visualization without metadata requirements
@@ -316,7 +309,7 @@ class FlexibleNetworkChart extends SVGChart {
                 return "currentcolor";
             })
             .style("opacity", c.link_opacity)
-            .on("click", (e, d) => {
+            .on("click", (_e, d) => {
                 this.dataStore.dataHighlighted([d.d_index], this);
             })
             .on("mouseover", (e, d) => {
@@ -426,7 +419,7 @@ class FlexibleNetworkChart extends SVGChart {
 
         // Add click and drag handlers to all nodes
         nodes
-            .on("click", (e, d) => {
+            .on("click", (_e, d) => {
                 // Find all interactions for this node
                 const indices = this.linkData
                     .filter((link) => {
@@ -591,7 +584,7 @@ class FlexibleNetworkChart extends SVGChart {
         this.reCalculate();
     }
 
-    onDataFiltered(dim) {
+    onDataFiltered(_dim) {
         this.reCalculate();
     }
 

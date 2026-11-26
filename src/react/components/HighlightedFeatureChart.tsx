@@ -58,7 +58,7 @@ BaseChart.types["highlightedFeature"] = {
             label: "Markdown Text:",
         },
     ],
-    init: (config, ds, extraControls) => {
+    init: (config, _ds, extraControls) => {
         config.text = extraControls.text || "";
     },
 };

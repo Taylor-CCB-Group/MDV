@@ -17,7 +17,7 @@ from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project, User, UserProject, UsageEvent, Invitation, InvitationProject
 from mdvtools.dbutils.routes import register_routes
 from mdvtools.auth.register_auth_routes import register_auth_routes
-from mdvtools.auth.authutils import register_before_request_auth, cache_user_projects
+from mdvtools.auth.authutils import register_before_request_auth
 from mdvtools.dbutils.dbservice import ProjectService, FileService, UserProjectService
 from mdvtools.websocket import mdv_socketio
 from mdvtools.logging_config import get_logger
@@ -120,15 +120,6 @@ def create_flask_app(config_name=None):
                 logger.warning(f"Skipping usage_events table setup: {e}")
             ensure_invitation_tables()
 
-            if ENABLE_AUTH:
-                try:
-                    logger.info("Caching user-projects data...")
-                    cache_user_projects()  # Cache the user-project mappings into Redis only when Auth is enabled
-
-                except Exception as e:
-                    logger.exception(f"Error during auth-related DB setup: {e}")
-                    raise e
-            
             # Routes registration and application setup
             logger.info("Registering the blueprint (register_app)")
             ProjectBlueprint.register_app(app)
@@ -653,14 +644,6 @@ def serve_projects_from_filesystem(app, base_dir):
                     logger.info(f"Added project {new_project.id} to DB from {project_path}")
                     created_project_ids.append(new_project.id)
 
-                    # Auth-related setup
-                    if ENABLE_AUTH:
-                        try:
-                            cache_user_projects() #update the cache
-                        except Exception as auth_e:
-                            logger.exception(f"Error caching user projects for {project_name}: {auth_e}")
-
-                    
                     # Optionally add files from the project directory to the database
                     if app.config.get('ENABLE_FILE_SYNC', False):
                         for root, dirs, files in os.walk(project_path):
@@ -752,10 +735,8 @@ if os.environ.get('MDV_SKIP_SERVER_STARTUP') != '1':
             serve_projects_from_filesystem(app, app.config['projects_base_dir'])
             if ENABLE_AUTH:
                 # A directory copied into the Project root arrives with no owner,
-                # and startup has no user to attribute it to. The caches were
-                # filled before the scan ran, so they are rebuilt here.
-                if grant_admins_ownership_of_unowned_projects():
-                    cache_user_projects()
+                # and startup has no user to attribute it to.
+                grant_admins_ownership_of_unowned_projects()
                 # On a deployment nobody has signed in to yet, report every missing
                 # first-administrator setting now, rather than one per failed login.
                 if (app.config.get("DEFAULT_AUTH_METHOD") or "").lower() == "auth0":

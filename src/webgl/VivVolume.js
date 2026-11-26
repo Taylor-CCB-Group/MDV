@@ -106,7 +106,7 @@ class VivVolume extends BaseChart {
         super.onDataChanged(data);
         this._update();
     }
-    onDataHighlighted(data) {
+    onDataHighlighted(_data) {
         // super.onDataHighlighted(data); doesn't exist
         this._update();
     }
@@ -183,11 +183,11 @@ const nameOption = {
 };
 
 const commonOptions = {
-    init: (config, dataSource, extraControls) => {
+    init: (config, _dataSource, extraControls) => {
         const { url } = extraControls;
         config.options = { url };
     },
-    extra_controls: (dataSource) => {
+    extra_controls: () => {
         return [nameOption];
     },
 };

@@ -196,9 +196,7 @@ class CategoryDimension extends Dimension {
         config.values = col.values;
         config.datatype = col.datatype;
         config.stringLength = col.stringLength;
-        const t = performance.now();
         const action = (e) => {
-            //console.log(`calc categories ${col.name} : ${performance.now()-t}`);
             callback(e.data);
             this.worker.removeEventListener("message", action);
         };

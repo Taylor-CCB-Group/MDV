@@ -1,5 +1,6 @@
 {
     "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+    "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
     "assist": { "actions": { "source": { "organizeImports": "on" } } },
     "linter": {
         "enabled": true,
@@ -38,6 +39,19 @@
             }
         }
     },
+    "overrides": [
+        {
+            // legacy stylesheet overriding third-party (slickgrid, jquery-ui) styles; relies on !important and source order
+            "includes": ["src/charts/css/**"],
+            "linter": {
+                "rules": {
+                    "complexity": { "noImportantStyles": "off" },
+                    "style": { "noDescendingSpecificity": "off" }
+                }
+            }
+        }
+    ],
+    "css": { "parser": { "tailwindDirectives": true } },
     "formatter": {
         "enabled": true,
         "indentStyle": "space",
@@ -53,10 +67,12 @@
             "!src/table/Slick*",
             "!src/venn/**/*",
             "!src/table/css/slick*",
-            "!src/tailwind.css",
             "!src/utilities/css/**/*",
             "!src/css/**/*",
-            "!src/utilities/jpeg2000/chafey/**/*"
+            "!src/utilities/jpeg2000/chafey/**/*",
+            // vendored coi-serviceworker
+            "!public/serviceworker.js",
+            "!python/mdvtools/templates/serviceworker.js"
         ]
     }
 }

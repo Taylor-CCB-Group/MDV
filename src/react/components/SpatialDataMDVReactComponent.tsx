@@ -66,7 +66,7 @@ import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context"
 import { useViewerStore, useViewerStoreApi, VivProvider } from "./avivatorish/state";
 import { isDensityGridShown } from "./densityGridUtils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
-import FieldContourLegend from "./FieldContourLegend";
+import { type CategoryLegendItem, type FieldLegendItem, useContourLegend } from "./FieldContourLegend";
 import { isRegionGridShown } from "./regionGridUtils";
 import SelectionOverlay from "./SelectionOverlay";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
@@ -453,6 +453,11 @@ function summariseLayersForError(layers: RenderStackLayerInputs["layers"]) {
     };
 }
 
+/** Fields for the contour legend while the density grid labels each field in its own cell. */
+const NO_FIELDS: FieldLegendItem[] = [];
+/** Categories for the contour legend while the region grid is shown, which has no contours yet. */
+const NO_CATEGORIES: CategoryLegendItem[] = [];
+
 const SpatialDataViewer = observer(
     ({ setHoveredContour }: { setHoveredContour: (contour: HoveredContour | null) => void }) => {
         const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
@@ -466,7 +471,7 @@ const SpatialDataViewer = observer(
         const spatialViewState = toSpatialViewState(viewState);
         const [width, height] = useChartSize();
         const id = useChartID();
-        const deckContainerRef = useRef<HTMLDivElement | null>(null);
+        const deckContainerRef = useRef<HTMLElement | null>(null);
         const { scatterProps, selectionLayer } = useSpatialLayers();
         const { scatterplotLayer, greyScatterplotLayer, densityLayer, getTooltip, setScatterKeyboardActive } =
             scatterProps;
@@ -474,8 +479,6 @@ const SpatialDataViewer = observer(
         const contourConfig = useConfig<DualContourLegacyConfig>();
         const legendFields = useFieldContourLegend(contourConfig.densityFields);
         const legendCategories = useCategoryContourLegend(contourConfig);
-        const showLegend = contourConfig.field_legend.display;
-        const legendPosition = { x: 10, y: 10 };
         const { device: deckDevice, fallBack: fallBackToWebGL } = useDeckDevice(
             resolveDeckBackend(config.render_backend),
         );
@@ -770,6 +773,15 @@ const SpatialDataViewer = observer(
                 onFeatureHoverEnd,
             ],
         );
+        // drawn in the chart's legend wrapper: draggable, can be minimised or put above the plot. In the
+        // density grid each cell is labelled with its field, so only categories need the legend there;
+        // the region grid has no legend.
+        useContourLegend(contourConfig.field_legend, {
+            fields: densityGrid || regionGrid ? NO_FIELDS : legendFields,
+            categories: regionGrid ? NO_CATEGORIES : legendCategories.items,
+            categoryLabel: legendCategories.label,
+            onContourHover: setHoveredContour,
+        });
 
         if (!coordinateSystem || !region?.spatial?.file) {
             return (
@@ -806,17 +818,7 @@ const SpatialDataViewer = observer(
             <Profiler id="spatial.viewer" onRender={onSpatialProfilerRender}>
                 {/* selection tools, gates and density are not in region cells yet */}
                 {!regionGrid && <SelectionOverlay />}
-                {/* in the grid each cell is labelled with its field; categories still need the legend */}
-                {showLegend && !regionGrid && (!densityGrid || legendCategories.items.length > 0) && (
-                    <FieldContourLegend
-                        fields={densityGrid ? [] : legendFields}
-                        categories={legendCategories.items}
-                        categoryLabel={legendCategories.label}
-                        position={legendPosition}
-                        onContourHover={setHoveredContour}
-                    />
-                )}
-                <div
+                <section
                     ref={deckContainerRef}
                     aria-label="SpatialData.js image viewer"
                     style={{ width: "100%", height: "100%", outline: "none" }}
@@ -879,7 +881,7 @@ const SpatialDataViewer = observer(
                             </ErrorBoundary>
                         </Profiler>
                     </div>
-                </div>
+                </section>
                 {/* the grid has its own, over its scrolling cells */}
                 {!densityGrid && !regionGrid && <ViewGestureHint />}
                 {tooltipPortal}

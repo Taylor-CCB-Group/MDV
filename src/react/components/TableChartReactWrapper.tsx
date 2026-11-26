@@ -104,7 +104,6 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
     private gridRef?: { current: SlickgridReactInstance | null };
     private addColumnDialogOpener?: () => void;
     private downloadIconSpan: HTMLSpanElement | null = null;
-    private addColumnIconSpan: HTMLSpanElement | null = null;
 
     constructor(dataStore: DataStore, div: HTMLDivElement, config: TableChartReactConfig) {
         // Adapt config before calling super constructor, which will make the config observable
@@ -122,11 +121,11 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
         const isEditMode = window.mdv?.chartManager?.config?.permission === "edit";
 
         if (isEditMode) {
-            this.addColumnIconSpan = this.addMenuIcon("fas fa-plus", "Add Column", {
+            this.addMenuIcon("fas fa-plus", "Add Column", {
                 func: () => {
                     this.openAddColumnDialog();
                 },
-            }) as HTMLSpanElement;
+            });
         }
     }
 
@@ -331,7 +330,7 @@ BaseChart.types["table_chart_react"] = {
             label: "Include Index",
         },
     ],
-    init: (config, ds, ec) => {
+    init: (config, _ds, ec) => {
         // nb - may be undefined if user hasn't touched that control
         config.include_index = ec.include_index;
     },

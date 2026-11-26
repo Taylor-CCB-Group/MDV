@@ -39,11 +39,11 @@ function installIgvGlobalEventReroute(targetDoc: Document) {
     const originalWindowAdd = window.addEventListener.bind(window);
     const originalWindowRemove = window.removeEventListener.bind(window);
 
-    document.addEventListener = function (
+    document.addEventListener = (
         type: string,
         listener: EventListenerOrEventListenerObject | null,
         options?: boolean | AddEventListenerOptions,
-    ) {
+    ) => {
         if (!listener) {
             return;
         }
@@ -53,11 +53,11 @@ function installIgvGlobalEventReroute(targetDoc: Document) {
         return originalDocumentAdd(type, listener, options);
     };
 
-    document.removeEventListener = function (
+    document.removeEventListener = (
         type: string,
         listener: EventListenerOrEventListenerObject | null,
         options?: boolean | EventListenerOptions,
-    ) {
+    ) => {
         if (!listener) {
             return;
         }
@@ -67,11 +67,11 @@ function installIgvGlobalEventReroute(targetDoc: Document) {
         return originalDocumentRemove(type, listener, options);
     };
 
-    window.addEventListener = function (
+    window.addEventListener = (
         type: string,
         listener: EventListenerOrEventListenerObject | null,
         options?: boolean | AddEventListenerOptions,
-    ) {
+    ) => {
         if (!listener) {
             return;
         }
@@ -81,11 +81,11 @@ function installIgvGlobalEventReroute(targetDoc: Document) {
         return originalWindowAdd(type, listener, options);
     };
 
-    window.removeEventListener = function (
+    window.removeEventListener = (
         type: string,
         listener: EventListenerOrEventListenerObject | null,
         options?: boolean | EventListenerOptions,
-    ) {
+    ) => {
         if (!listener) {
             return;
         }
@@ -122,7 +122,7 @@ const IGVBrowserComponent = observer(() => {
     const featureLabelColumn = useFieldSpec(
         chart.config.feature_label === "_none_" ? undefined : chart.config.feature_label,
     );
-    const { genomicInfo, areColumnsLoaded, genomicColumns } = useGenomicInfo();
+    const { genomicInfo, areColumnsLoaded } = useGenomicInfo();
 
     const remountNonce = chart.browserRemountNonce;
 
@@ -185,7 +185,7 @@ const IGVBrowserComponent = observer(() => {
                     return false;
                 });
 
-                browser.on("locuschange", (frames: any) => {
+                browser.on("locuschange", () => {
                     //const frame = Array.isArray(frames) ? frames[0] : frames;
                     //if (!frame?.chr) return;
                     //const locus = `${frame.chr}:${Math.floor(frame.start)}-${Math.floor(frame.end)}`;

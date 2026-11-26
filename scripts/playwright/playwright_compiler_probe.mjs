@@ -17,7 +17,6 @@ async function probe(url) {
     let browser;
     let ctx;
     let page;
-    let probeError;
     try {
         browser = await chromium.launch({ headless: true });
         ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
@@ -75,9 +74,6 @@ async function probe(url) {
             summary,
             issues,
         };
-    } catch (error) {
-        probeError = error;
-        throw error;
     } finally {
         if (page) {
             try {

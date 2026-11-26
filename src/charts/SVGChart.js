@@ -1,6 +1,7 @@
 import { scaleBand, scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
 import BaseChart from "./BaseChart";
+import { addLegendsToSvg } from "./legendImage";
 import "d3-transition";
 import { axisBottom, axisLeft } from "d3-axis";
 import { easeLinear } from "d3-ease";
@@ -290,7 +291,6 @@ class SVGChart extends BaseChart {
     }
 
     drawXTree(nodeData, number, height, offset) {
-        const trans = select(this.contentDiv).transition().duration(400).ease(easeLinear);
         const b = this._getContentDimensions();
         const treeMap = cluster().size([b.width, height]);
         const nodes = treeMap(nodeData);
@@ -311,7 +311,7 @@ class SVGChart extends BaseChart {
             }
         }
 
-        const links = this.tx_axis_svg
+        this.tx_axis_svg
             .selectAll(".tree-link")
             .data(desc.slice(1))
             .join("path")
@@ -478,31 +478,9 @@ class SVGChart extends BaseChart {
                 type: "folder",
                 label: "Axis controls",
                 current_value: arr,
-                func: (x) => {},
+                func: () => {},
             },
         ]);
-    }
-
-    _addLegendToSVG(param) {
-        const legend = this[param];
-        if (!legend) {
-            return;
-        }
-        const cl = [legend.offsetLeft, legend.offsetTop];
-        legend._leg = legend.querySelector("g");
-        legend._leg_g = select(legend._leg).attr("transform", `translate(${cl[0]},${cl[1]})`);
-        this.svg.node().append(legend._leg_g.node());
-    }
-
-    _removeLegendFromSVG(param) {
-        const legend = this[param];
-        if (!legend) {
-            return;
-        }
-        legend._leg_g.attr("transform", "translate(0,0)");
-        this.legend.querySelector("svg").append(legend._leg);
-        this.legend._leg = undefined;
-        this.legend._leg_g = undefined;
     }
 
     getImage(callback, type) {
@@ -510,35 +488,26 @@ class SVGChart extends BaseChart {
             this.addToImage();
         }
 
-        //temporarily attach legend
-        this._addLegendToSVG("legend");
-        if (this.extra_legends) {
-            this.extra_legends.forEach((x) => this._addLegendToSVG(x));
-        }
+        //temporarily attach legends
+        const extraLegends = (this.extra_legends ?? []).map((x) => this[x]);
+        const restoreLegends = addLegendsToSvg(this.svg.node(), [this.legend, ...extraLegends]);
 
-        const svgAsXML = new XMLSerializer().serializeToString(this.svg.node());
-
-        if (type === "png") {
-            this.getImageFromSVG(this.svg.node(), (canvas) => {
-                callback(canvas);
-                if (this.removeFromImage) {
-                    this.removeFromImage();
-                }
-                this._removeLegendFromSVG("legend");
-                if (this.extra_legends) {
-                    this.extra_legends.forEach((x) => this._removeLegendFromSVG(x));
-                }
-            });
-        } else {
-            callback(svgAsXML);
+        // the image is copied straight away (getImageFromSVG clones the SVG before drawing it), so
+        // the chart is put back right after, even if drawing the image fails
+        let svgAsXML;
+        try {
+            if (type === "png") {
+                this.getImageFromSVG(this.svg.node(), (canvas) => callback(canvas));
+                return;
+            }
+            svgAsXML = new XMLSerializer().serializeToString(this.svg.node());
+        } finally {
             if (this.removeFromImage) {
                 this.removeFromImage();
             }
-            this._removeLegendFromSVG("legend");
-            if (this.extra_legends) {
-                this.extra_legends.forEach((x) => this._removeLegendFromSVG(x));
-            }
+            restoreLegends();
         }
+        callback(svgAsXML);
     }
 }
 

@@ -308,7 +308,7 @@ const useFindReplace = (
                         if (matchReplaced) {
                             successCount++;
                         }
-                    } catch (err) {
+                    } catch {
                         errorCount++;
                     }
                 }

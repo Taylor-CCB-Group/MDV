@@ -265,7 +265,7 @@ export default observer(function SelectionOverlay() {
                 variant="contained"
                 aria-label="choose tool for manipulating view or selection"
                 //moving this to the top right corner and absolute to avoid interfering with axes
-                className={`z-[2] absolute top-0 right-0 opacity-90 ${showAllTools ? "p-2" : "p-1"}`}
+                className={`z-2 absolute top-0 right-0 opacity-90 ${showAllTools ? "p-2" : "p-1"}`}
                 sx={{
                     backgroundColor: theme === "dark" ? "rgba(37,37,37,0.92)" : "rgba(245,245,245,0.92)",
                     borderRadius: 0,

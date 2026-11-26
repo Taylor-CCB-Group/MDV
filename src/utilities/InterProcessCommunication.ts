@@ -163,6 +163,7 @@ function setupLegacyIPC(cm: ChartManager, socket: Socket, sendMessage: SendMessa
         });
     }
 
+    // biome-ignore lint/correctness/noUnusedVariables: parked: see the commented-out call above
     function setupVuplex() {
         console.log("setupVuplex...");
         function addMessageListener() {

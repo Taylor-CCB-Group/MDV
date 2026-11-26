@@ -98,7 +98,7 @@ export class ImageArrayDeckExtension<
             },
         };
     }
-    initializeState(this: Layer<ImageArrayExtensionProps>, context: LayerContext, extension: this): void {
+    initializeState(this: Layer<ImageArrayExtensionProps>, _context: LayerContext, _extension: this): void {
         this.getAttributeManager()?.addInstanced({
             imageIndex: { size: 1, accessor: "getImageIndex", defaultValue: 0 },
             imageAspect: {

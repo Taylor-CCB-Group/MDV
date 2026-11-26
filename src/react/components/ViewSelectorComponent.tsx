@@ -12,6 +12,7 @@ export type DropdownType = {
     options: string[];
 };
 
+// biome-ignore lint/correctness/noUnusedVariables: parked: see the commented-out call below
 function useUpdateViewList() {
     const viewManager = useViewManager();
     const { root } = useProject();
@@ -72,8 +73,9 @@ const ViewSelectorDropdown = observer(() => {
     // useUpdateViewList();
 
     const options = viewManager.all_views;
+    // biome-ignore lint/correctness/noUnusedVariables: parked: see the commented-out effect below
     const [dirty, setDirty] = useState(false);
-    const [error, setError] = useState<DebugErrorComponentProps["error"]>();
+    const [error] = useState<DebugErrorComponentProps["error"]>();
     const [openError, setOpenError] = useState(false);
 
     // todo: uncomment when we fix state issues

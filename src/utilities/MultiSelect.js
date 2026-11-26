@@ -22,7 +22,9 @@ class MultiSelectDropdown {
         this._addDocListener();
 
         if (options) {
-            options.forEach((x) => this.addOption(x));
+            options.forEach((x) => {
+                this.addOption(x);
+            });
         }
         this.refresh();
     }
@@ -60,7 +62,9 @@ class MultiSelectDropdown {
             .map((x) => x.value);
     }
     unSelectAll() {
-        Array.from(this.options.values()).forEach((x) => (x.selected = false));
+        Array.from(this.options.values()).forEach((x) => {
+            x.selected = false;
+        });
         this.refresh();
     }
 
@@ -73,7 +77,9 @@ class MultiSelectDropdown {
     }
 
     refresh() {
-        this.div.querySelectorAll("span.optext, span.placeholder").forEach((t) => this.div.removeChild(t));
+        this.div.querySelectorAll("span.optext, span.placeholder").forEach((t) => {
+            this.div.removeChild(t);
+        });
         const sels = Array.from(this.options.values()).filter((x) => x.selected);
         const nex = this.options.size - sels.length;
         if (nex < this.config.maxShow && nex !== 0 && this.options.size > this.config.maxShow) {
@@ -144,9 +150,9 @@ class MultiSelectDropdown {
         });
     }
     _bulkChange(type) {
-        Array.from(this.options.values()).forEach(
-            (x) => (x.selected = type === "All" ? true : type === "None" ? false : !x.selected),
-        );
+        for (const x of this.options.values()) {
+            x.selected = type === "All" ? true : type === "None" ? false : !x.selected;
+        }
         this.refresh();
     }
     _callback() {

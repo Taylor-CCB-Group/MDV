@@ -1,7 +1,7 @@
 import { makeDraggable } from "./Elements";
 
 class ImagePanZoom {
-    constructor(container, image, config = {}) {
+    constructor(container, image, _config = {}) {
         this.container = container;
 
         this.img = new Image();
@@ -9,7 +9,7 @@ class ImagePanZoom {
         this.img.style.position = "absolute";
         this.img.style.maxWidth = "none";
 
-        this.img.onload = (e) => {
+        this.img.onload = () => {
             this.container.append(this.img);
             this.fit();
         };

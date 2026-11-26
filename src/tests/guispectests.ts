@@ -1,12 +1,12 @@
 import type { GuiSpec, GuiSpecs } from "@/charts/charts";
 import { g } from "@/lib/utils";
 
-const untyped = {
+const _untyped = {
     type: "dropdown",
     label: "label",
     current_value: "current_value",
     //@ts-expect-error no implicit any, and we are in an anonymous object
-    func: (v) => {},
+    func: (_v) => {},
     values: [
         [
             { a: "0a", b: "0b" },
@@ -24,7 +24,7 @@ const a: GuiSpec<"dropdown"> = {
     //@ts-expect-error there is no 'name' property - used to mistakenly think there was
     name: "name",
     current_value: "current_value",
-    func: (v) => {},
+    func: (_v) => {},
     values: [
         [
             { a: "0a", b: "0b" },
@@ -44,7 +44,7 @@ const b = g({
     label: "label",
     current_value: "current_value",
     //correctly inferred, explicit type is not needed and is be compiler-checked
-    func: (v: string) => {},
+    func: (_v: string) => {},
     values: [["a", "b"]],
 });
 

@@ -34,7 +34,7 @@ export function debounce<A extends any[]>(fn: (...args: A) => void, timeout: num
     return (...args: A) => {
         clearTimeout(timer);
         timer = setTimeout(() => {
-            //@ts-ignore
+            //@ts-expect-error
             fn.apply(this, args);
         }, timeout);
     };

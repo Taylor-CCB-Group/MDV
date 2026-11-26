@@ -10,7 +10,7 @@ export interface TiffChartWrapperProps {
 }
 
 const TiffChartWrapper: React.FC<PropsWithChildren<TiffChartWrapperProps>> = observer(
-    ({ metadata, file, config, children, onFullscreenChange }: PropsWithChildren<TiffChartWrapperProps>) => {
+    ({ children, onFullscreenChange }: PropsWithChildren<TiffChartWrapperProps>) => {
         const [isFullscreen, setIsFullscreen] = useState(false);
         const [oldSize, setOldSize] = useState<[number, number] | null>(null);
         const contentDivRef = useRef<HTMLDivElement>(null);
@@ -84,7 +84,7 @@ const TiffChartWrapper: React.FC<PropsWithChildren<TiffChartWrapperProps>> = obs
                         func: toggleFullscreen,
                     })}
                 </div>
-                <div ref={contentDivRef} className="ciview-chart-content flex-grow overflow-auto">
+                <div ref={contentDivRef} className="ciview-chart-content grow overflow-auto">
                     {children}
                 </div>
             </div>

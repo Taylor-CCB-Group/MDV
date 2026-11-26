@@ -1,5 +1,3 @@
-import { easeLinear } from "d3-ease";
-import { select } from "d3-selection";
 import { arc, pie } from "d3-shape";
 import BaseChart from "./BaseChart";
 import CategoryChart from "./CategoryChart.js";
@@ -16,10 +14,8 @@ class RingChart extends CategoryChart {
         this.onDataFiltered(null);
     }
 
-    drawChart(tTime = 1000) {
+    drawChart(_tTime = 1000) {
         //can't get transitions to work properly
-        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
-
         const dim = this._getContentDimensions();
         //calculate the radius and center of the plot based on the
         //container dimensions
@@ -36,7 +32,7 @@ class RingChart extends CategoryChart {
         const data = this.pie(this.rowData.filter((x) => x[0] !== 0));
         this.graph_area
             .selectAll(".pie-arc")
-            .data(data, (d, i) => {
+            .data(data, (d) => {
                 d.data[1];
             })
             .join("path")
@@ -45,7 +41,7 @@ class RingChart extends CategoryChart {
                 this.filterCategories(vals[d.data[1]], e.shiftKey);
             })
 
-            .style("fill", (d, i) => {
+            .style("fill", (d) => {
                 if (this.filter.length > 0) {
                     if (this.filter.indexOf(vals[d.data[1]]) === -1) {
                         return "lightgray";
@@ -61,7 +57,7 @@ class RingChart extends CategoryChart {
         //update the text
         this.graph_area
             .selectAll(".pie-text")
-            .data(data, (d, i) => {
+            .data(data, (d) => {
                 d.data[1];
             })
             .join("text")
@@ -69,7 +65,7 @@ class RingChart extends CategoryChart {
                 this.filterCategories(vals[d.data[1]], e.shiftKey);
             })
             .attr("class", "pie-text")
-            .text((d, i) => {
+            .text((d) => {
                 //only show text if segment is big enough
                 const angle = d.endAngle - d.startAngle;
                 return angle > 0.4 ? vals[d.data[1]] : "";

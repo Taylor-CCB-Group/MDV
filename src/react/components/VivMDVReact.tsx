@@ -251,7 +251,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const config = super.getConfig();
         // todo this is an experimental version of serialisation, WIP / subject to change.
         if (this.vivStores) {
-            const { viewerStore, channelsStore, imageSettingsStore } = this.vivStores;
+            const { viewerStore, channelsStore } = this.vivStores;
             const channels = channelsStore.getState();
             const viewer = viewerStore.getState();
             // const imageSettings = imageSettingsStore.getState();

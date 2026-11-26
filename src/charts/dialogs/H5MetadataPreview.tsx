@@ -120,7 +120,7 @@ const H5MetadataPreview = ({ metadata }: H5MetadataPreviewProps) => {
                         <select
                             value={selectedMetadata}
                             onChange={(e) => setSelectedMetadata(e.target.value)}
-                            className="block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                            className="block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-xs focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                         >
                             {availableMetadata.map(({ key, label, hasData }) => (
                                 <option

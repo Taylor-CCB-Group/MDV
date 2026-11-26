@@ -1,20 +1,9 @@
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 // some of this is quite bloated - could use dynamic imports for some of the more complex components
-import {
-    Accordion,
-    AccordionDetails,
-    AccordionSummary,
-    Checkbox,
-    FormControl,
-    IconButton,
-    InputLabel,
-    MenuItem,
-    Select,
-    Slider,
-} from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Checkbox, IconButton, Slider } from "@mui/material";
 import { MAX_CHANNELS } from "@vivjs/constants";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { shallow } from "zustand/shallow";
 import { isArray, resolveAutoHistogramYScale } from "@/lib/utils";
 import { useTheme } from "../hooks";
@@ -74,40 +63,6 @@ export default function MainVivColorDialog({ vivStores }: { vivStores: VivContex
     );
 }
 
-const ChannelChooserMUI = ({ index }: { index: number }) => {
-    const channels = useMetadata()?.Pixels.Channels.map((c) => c.Name) as string[];
-    const selections = useChannelsStore(({ selections }) => selections);
-    const channelsStore = useChannelsStoreApi();
-    const id = useId();
-    const name = channels[selections[index].c ?? 0];
-
-    return (
-        <>
-            <FormControl fullWidth variant="standard">
-                <InputLabel id={id}>{name}</InputLabel>
-                <Select
-                    labelId={id}
-                    label="Channel"
-                    onChange={(e) => {
-                        const newSelections = [...selections];
-                        if (typeof e.target.value !== "number") {
-                            return;
-                        }
-                        newSelections[index].c = e.target.value;
-                        channelsStore.setState({ selections: newSelections });
-                    }}
-                >
-                    {channels.map((c, i) => (
-                        <MenuItem key={`${i}_${c}`} value={i}>
-                            {c}
-                        </MenuItem>
-                    ))}
-                </Select>
-            </FormControl>
-        </>
-    );
-};
-
 const ChannelChooser = ({ index }: { index: number }) => {
     const spatial = useSpatialImagePanelContext();
     const metadata = useMetadata();
@@ -140,7 +95,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
             <select
                 disabled={isChannelLoading[index]}
                 value={spatial.selections[index]?.c ?? 0}
-                className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm text-[hsl(var(--foreground))] shadow-sm outline-none transition focus:border-[hsl(var(--ring))] disabled:cursor-wait disabled:opacity-60"
+                className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm text-[hsl(var(--foreground))] shadow-xs outline-hidden transition focus:border-[hsl(var(--ring))] disabled:cursor-wait disabled:opacity-60"
                 onChange={(e) => {
                     const c = Number.parseInt(e.target.value, 10);
                     if (Number.isNaN(c)) return;
@@ -151,6 +106,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
                 }}
             >
                 {channels.map((c, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: the option value is the channel index; names may repeat
                     <option key={`${i}_${c}`} value={i}>
                         {c}
                     </option>
@@ -164,7 +120,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
             <select
                 disabled={isChannelLoading[index]}
                 value={selections[index].c ?? 0}
-                className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm text-[hsl(var(--foreground))] shadow-sm outline-none transition focus:border-[hsl(var(--ring))] disabled:cursor-wait disabled:opacity-60"
+                className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm text-[hsl(var(--foreground))] shadow-xs outline-hidden transition focus:border-[hsl(var(--ring))] disabled:cursor-wait disabled:opacity-60"
                 onChange={async (e) => {
                     // see Avivator Controller.jsx onSelectionChange
                     try {
@@ -205,6 +161,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
                 }}
             >
                 {channels.map((c, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: the option value is the channel index; names may repeat
                     <option key={`${i}_${c}`} value={i}>
                         {c}
                     </option>
@@ -488,6 +445,7 @@ const ChannelController = ({ index }: { index: number }) => {
                     },
                 }}
             >
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops clicks/focus reaching the accordion summary */}
                 <div
                     className="grid w-full min-w-0 grid-cols-[minmax(11rem,0.95fr)_minmax(0,1.15fr)] gap-2"
                     onClick={stopAccordionToggle}
@@ -526,8 +484,9 @@ const ChannelController = ({ index }: { index: number }) => {
                                         channelsStore.setState({ channelsVisible: visible });
                                     }}
                                 />
+                                {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops clicks/focus reaching the accordion summary */}
                                 <div
-                                    className="h-7 min-w-9 overflow-hidden rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-sm"
+                                    className="h-7 min-w-9 overflow-hidden rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-xs"
                                     onClick={stopAccordionToggle}
                                     onFocus={stopAccordionToggle}
                                 >
@@ -550,6 +509,7 @@ const ChannelController = ({ index }: { index: number }) => {
                                 </div>
                             </div>
                         </div>
+                        {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops clicks/focus reaching the accordion summary */}
                         <div onClick={stopAccordionToggle} onFocus={stopAccordionToggle}>
                             <ChannelChooser index={index} />
                         </div>
@@ -642,7 +602,7 @@ const AddChannel = () => {
     return (
         <button
             type="button"
-            className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--foreground))] shadow-sm transition hover:bg-[hsl(var(--muted)/0.45)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--foreground))] shadow-xs transition hover:bg-[hsl(var(--muted)/0.45)] disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canAddChannel || isAddingChannel}
             onClick={async () => {
                 if (spatial) {

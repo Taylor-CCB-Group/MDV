@@ -4,10 +4,8 @@ import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import type DataStore from "@/datastore/DataStore";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
-import FractionLegend from "@/react/components/legend/FractionLegend";
-import LegendWrapper from "@/react/components/legend/LegendWrapper";
+import FractionLegendController from "@/react/components/legend/FractionLegendController";
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
-import type { FractionLegendSpec } from "@/react/legend/fraction_legend/types";
 import { BaseReactChart } from "../BaseReactChart";
 import DotPlotComponent from "./DotPlotComponent";
 import type { DotPlotDot } from "./DotPlotPanel";
@@ -43,7 +41,7 @@ export type DotPlotDotColumns = {
 export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
     /** The automatic colour range currently drawn, used to fill in the manual range. */
     autoMeanRange: [number, number] | null = null;
-    fractionLegendWrapper = new LegendWrapper<FractionLegendSpec, DotPlotReactConfig>(this);
+    fractionLegend = new FractionLegendController<DotPlotReactConfig>(this, () => this.config.fraction_legend);
     private colorLegendInput: DotPlotColorLegendInput | null = null;
     private fractionLegendInput: DotPlotFractionLegendInput | null = null;
     /** Where the legends start, normally in the band the component keeps free above the panels. */
@@ -161,9 +159,12 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
     clearLegends() {
         const legend = this.legend;
         if (legend) {
-            runInAction(() => {
-                this.config.color_legend.pos = [legend.offsetLeft, legend.offsetTop];
-            });
+            const floating = this.colorLegendWrapper.getFloatingPosition();
+            if (floating) {
+                runInAction(() => {
+                    this.config.color_legend.pos = floating;
+                });
+            }
             this.colorLegendWrapper.unmount();
             this.legend = undefined;
         }
@@ -205,33 +206,31 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
 
     /** The legacy dot plot's fraction legend, laid out in a row to fit the band above the panels. */
     showFractionLegend() {
-        const c = this.config.fraction_legend;
-        const current = this.fractionLegendWrapper.getWrapperElement();
-        if (current) {
-            c.position = [current.offsetLeft, current.offsetTop];
-        }
         const input = this.fractionLegendInput;
-        if (!c.display || !input) {
-            this.fractionLegendWrapper.unmount();
-            return;
-        }
-        const position = c.position ?? this.legendLayout?.fraction ?? [DOT_PLOT_LEGEND_MARGIN, DOT_PLOT_LEGEND_MARGIN];
-        c.position = [...position];
-        const spec = buildFractionLegendSpec(input.fracMax, input.maxRadius, input.items);
-        this.fractionLegendWrapper.render(spec, { left: position[0], top: position[1] }, FractionLegend, {
-            dragHandle: ".legend-drag-handle",
-            resizable: true,
-        });
+        this.fractionLegend.show(
+            input ? () => buildFractionLegendSpec(input.fracMax, input.maxRadius, input.items) : null,
+            this.legendLayout?.fraction ?? [DOT_PLOT_LEGEND_MARGIN, DOT_PLOT_LEGEND_MARGIN],
+        );
     }
 
     /** For the chart menu's "create svg/png image": the plot with its legends, black text. */
     getImage(callback: (image: string | HTMLCanvasElement) => void, type: "png" | "svg") {
-        const style = this.contentDiv.style;
-        const textColor = style.getPropertyValue("--text_color");
-        style.setProperty("--text_color", "black");
-        const svg = buildChartSvg(this.contentDiv);
-        if (textColor) style.setProperty("--text_color", textColor);
-        else style.removeProperty("--text_color");
+        // legends in the strip above the plot are part of the image too; the strip sets its own
+        // text colour, so its colour is changed there rather than on the legends in it
+        const parts: [HTMLElement, ...HTMLElement[]] = this.legendsOnTop()
+            ? [this.contentDiv, this.legendBand]
+            : [this.contentDiv];
+        const restoreColors = parts.map((part) => {
+            const style = part.style;
+            const textColor = style.getPropertyValue("--text_color");
+            style.setProperty("--text_color", "black");
+            return () => {
+                if (textColor) style.setProperty("--text_color", textColor);
+                else style.removeProperty("--text_color");
+            };
+        });
+        const svg = buildChartSvg(...parts);
+        for (const restore of restoreColors) restore();
 
         if (type === "svg") {
             callback(new XMLSerializer().serializeToString(svg));
@@ -241,15 +240,12 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
     }
 
     getConfig() {
-        const el = this.fractionLegendWrapper.getWrapperElement();
-        if (el) {
-            this.config.fraction_legend.position = [el.offsetLeft, el.offsetTop];
-        }
+        this.fractionLegend.savePosition();
         return super.getConfig();
     }
 
     remove() {
-        this.fractionLegendWrapper.unmount();
+        this.fractionLegend.remove();
         // also lifts the dot filter from the other charts
         this.dim.destroy();
         super.remove();
@@ -392,14 +388,6 @@ export class DotPlotReact extends BaseReactChart<DotPlotReactConfig> {
                 func: (v) => {
                     c.fraction_legend.display = v;
                     this.showFractionLegend();
-                },
-            }),
-            g({
-                type: "check",
-                label: "Keep space above the plot for legends",
-                current_value: c.reserve_legend_space,
-                func: (v) => {
-                    c.reserve_legend_space = v;
                 },
             }),
             this.getScaleSettings(),

@@ -39,15 +39,7 @@ def app(tmp_path):
 
 
 @pytest.fixture()
-def client(app, monkeypatch):
-    """The routes read the permission caches they captured at registration, so
-    the caches are replaced before the routes are registered."""
-    from mdvtools.auth import authutils
-
-    monkeypatch.setattr(authutils, "user_project_cache", {})
-    monkeypatch.setattr(authutils, "active_projects_cache", [])
-    monkeypatch.setattr(authutils, "user_cache", {})
-    monkeypatch.setattr(authutils, "all_users_cache", [])
+def client(app):
     with app.app_context():
         ProjectManagerExtension().register_global_routes(app, app.config)
     return app.test_client()
@@ -132,21 +124,16 @@ def test_a_project_in_the_recycle_bin_is_not_given_to_administrators(app, tmp_pa
         assert UserProject.query.count() == 0
 
 
-def test_rescan_gives_administrators_a_project_that_was_left_without_an_owner(app, tmp_path, monkeypatch):
+def test_rescan_gives_administrators_a_project_that_was_left_without_an_owner(app, tmp_path):
     """A project that got its catalog row at a boot with no administrator present
     keeps no owner, and the scan creates no row for it the second time, so a
     rescan has to pick it up on its own."""
-    from mdvtools.auth import authutils
     from mdvtools.dbutils.routes import register_routes
 
     with app.app_context():
         project_id = add_unowned_project(tmp_path).id
         administrator_id = add_user("admin@example.com", "admin", is_admin=True).id
 
-    monkeypatch.setattr(authutils, "user_project_cache", {})
-    monkeypatch.setattr(authutils, "active_projects_cache", [])
-    monkeypatch.setattr(authutils, "user_cache", {})
-    monkeypatch.setattr(authutils, "all_users_cache", [])
     with app.app_context():
         register_routes(app, True)
 
@@ -162,10 +149,9 @@ def test_rescan_gives_administrators_a_project_that_was_left_without_an_owner(ap
         assert assignment.is_owner
 
 
-def test_rescan_gives_every_administrator_a_newly_discovered_project(app, tmp_path, monkeypatch):
+def test_rescan_gives_every_administrator_a_newly_discovered_project(app, tmp_path):
     """A directory copied into the Project root is owned by the administrators,
     since the scan that discovers it has no user to attribute it to."""
-    from mdvtools.auth import authutils
     from mdvtools.dbutils.routes import register_routes
 
     write_project_directory(tmp_path / "copied-in")
@@ -173,10 +159,6 @@ def test_rescan_gives_every_administrator_a_newly_discovered_project(app, tmp_pa
         first_admin_id = add_user("admin1@example.com", "admin1", is_admin=True).id
         second_admin_id = add_user("admin2@example.com", "admin2", is_admin=True).id
 
-    monkeypatch.setattr(authutils, "user_project_cache", {})
-    monkeypatch.setattr(authutils, "active_projects_cache", [])
-    monkeypatch.setattr(authutils, "user_cache", {})
-    monkeypatch.setattr(authutils, "all_users_cache", [])
     with app.app_context():
         register_routes(app, True)
 

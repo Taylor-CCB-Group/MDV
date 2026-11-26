@@ -44,7 +44,9 @@ function createMockDataStore(columnIndex: Record<string, any>, size: number, opt
         }),
         getHighlightedData: vi.fn(() => store.highightedData),
         emit(type: string, data?: any) {
-            Object.values(listeners).forEach((listener) => listener(type, data));
+            Object.values(listeners).forEach((listener) => {
+                listener(type, data);
+            });
         },
         dataChanged: vi.fn(),
     };

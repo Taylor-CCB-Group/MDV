@@ -164,10 +164,10 @@ function processArrayBuffer(data: ArrayBufferLike, columns: Columns, size: numbe
             const len = size * bytes;
             //get the data from the arraybuffer into a SharedArrayBuffer
             //unfortunately cannot be copied directly-  have to via a typed Array
-            //@ts-ignore todo better TypedArrayConstructor typing
+            //@ts-expect-error todo better TypedArrayConstructor typing
             const arr = new arrayType(data, offset, arr_len);
             const sab = new SharedArrayBuffer(len);
-            //@ts-ignore todo better TypedArrayConstructor typing
+            //@ts-expect-error todo better TypedArrayConstructor typing
             const new_arr = new arrayType(sab);
             new_arr.set(arr, 0);
             dataList.push({ data: sab, field: column.field });
@@ -281,7 +281,7 @@ class CompressedBinaryDataLoader {
                 };
                 try {
                     resp = await fetch(this.url, args);
-                } catch (e) {
+                } catch {
                     //lets try again
                     resp = await fetch(this.url, args);
                 }

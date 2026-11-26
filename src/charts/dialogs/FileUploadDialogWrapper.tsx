@@ -25,7 +25,7 @@ class FileUploadDialogReact extends BaseDialog {
                 {/* <Dialog open={true} className="w-full h-full"> */}
                 <FileUploadDialogComponent
                     onClose={() => this.close()}
-                    onResize={(width: number, height: number) => {}}
+                    onResize={() => {}}
                     // onResize={(width: number, height: number) => this.resizeDialog(width, height)}
                 />
                 {/* </Dialog> */}

@@ -223,7 +223,7 @@ const ChatDialog = ({
                                                 <ListItemText primary="Loading chat history..." />
                                             </ListItemButton>
                                         ) : (
-                                            Object.entries(filteredLog).map(([convId, conv], index) => (
+                                            Object.entries(filteredLog).map(([convId, conv]) => (
                                                 <ListItemButton
                                                     key={convId}
                                                     onClick={() => switchConversation(convId)}

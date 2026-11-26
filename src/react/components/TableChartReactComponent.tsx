@@ -120,7 +120,7 @@ const TableChartReactComponent = observer(() => {
         <div
             id={`react-grid-${chartId}`}
             data-testid="slickgrid-react-container"
-            className="absolute w-[100%] h-[100%] slickgrid-react-container"
+            className="absolute w-full h-full slickgrid-react-container"
         >
             <SlickgridReact
                 gridId={`table-${chartId}`}

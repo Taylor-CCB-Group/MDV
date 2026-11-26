@@ -100,7 +100,7 @@ class SankeyChart extends SVGChart {
 
         const graph = san(this.sankeyData);
 
-        const links = this.graph_area
+        this.graph_area
             .selectAll(".s-links")
 
             .data(
@@ -109,7 +109,7 @@ class SankeyChart extends SVGChart {
         }*/,
             )
             .join("path")
-            .on("click", (e, d) => {
+            .on("click", (_e, d) => {
                 this.filterMultipleCategories(d);
             })
             .on("mouseover pointermove", (e, d) => {
@@ -152,7 +152,7 @@ class SankeyChart extends SVGChart {
 
             .data(graph.nodes)
             .join("rect")
-            .on("click", (e, d) => {
+            .on("click", (_e, d) => {
                 const col = p[d.param];
                 this.nodeFilter = (d.param === 0 ? "A" : "B") + d.ind;
                 this.linkFilter = null;
@@ -233,7 +233,6 @@ class SankeyChart extends SVGChart {
 
     getSettings() {
         const settings = super.getSettings();
-        const c = this.config;
         return settings;
     }
 }

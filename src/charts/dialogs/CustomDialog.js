@@ -157,7 +157,7 @@ class CustomDialog extends BaseDialog {
             dd.value = s.current_value;
         }
         this.controlValues[s.id] = dd.value;
-        dd.addEventListener("change", (e) => {
+        dd.addEventListener("change", () => {
             this.controlValues[s.id] = dd.value;
             if (s.func) {
                 s.func(dd.value, this);
@@ -228,7 +228,7 @@ class CustomDialog extends BaseDialog {
         );
         ch.checked = s.current_value;
         this.controlValues[s.id] = sv;
-        ch.addEventListener("click", (e) => {
+        ch.addEventListener("click", () => {
             this.controlValues[s.id] = ch.checked;
             if (s.func) {
                 s.func(ch.checked);

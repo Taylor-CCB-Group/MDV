@@ -27,7 +27,7 @@ class SingleHeatMapGroup extends SVGChart {
         this.drawChart();
     }
 
-    remove(notify = true) {
+    remove(_notify = true) {
         super.remove();
     }
 
@@ -90,8 +90,6 @@ class SingleHeatMapGroup extends SVGChart {
             y_len = so[0].length;
             x_len = so[1].length;
         }
-        const sc = [];
-
         this.y_scale.domain(so ? so[0].slice(0) : y_col.values.slice(0));
         this.x_scale.domain(so ? so[1].slice(0) : x_col.values.slice(0));
 
@@ -163,7 +161,7 @@ class SingleHeatMapGroup extends SVGChart {
             .selectAll(".heatmap-row")
             .data(this.data)
             .join("g")
-            .attr("transform", (d, i) => `translate(0,${i * recHeight})`)
+            .attr("transform", (_d, i) => `translate(0,${i * recHeight})`)
             .attr("class", "heatmap-row")
             .selectAll(".heatmap-rect")
             .data((d) => {
@@ -171,18 +169,18 @@ class SingleHeatMapGroup extends SVGChart {
             })
             .join("rect")
             .attr("class", "heatmap-rect")
-            .attr("x", (d, i) => {
+            .attr("x", (_d, i) => {
                 let x = Math.floor(i / z_len) * grpWidth + 2;
                 x += (i % z_len) * arecWidth;
                 return x;
             })
             .attr("height", recHeight)
             .attr("width", arecWidth)
-            .on("click", (e, d) => {
+            .on("click", (_e, d) => {
                 this.dataStore.dataHighlighted([d[3]], this);
             })
             .transition(trans)
-            .attr("fill", (d, i) => {
+            .attr("fill", (d) => {
                 if (!d) {
                     return "#f4f0ec";
                 }
@@ -199,11 +197,11 @@ class SingleHeatMapGroup extends SVGChart {
             .join("text")
             .attr("class", "tx-text")
             .attr("font-size", "10px")
-            .text((d, i) => {
+            .text((_d, i) => {
                 return zvals[i % zvals.length];
             })
             .style("text-anchor", "end")
-            .attr("transform", (d, i) => ` translate(${i * recWidth + recWidth / 2},${dim.top}) rotate(60)`);
+            .attr("transform", (_d, i) => ` translate(${i * recWidth + recWidth / 2},${dim.top}) rotate(60)`);
     }
 
     setSize(x, y) {

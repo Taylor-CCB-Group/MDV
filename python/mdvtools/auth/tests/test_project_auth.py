@@ -70,7 +70,7 @@ def test_auth_enabled_no_user_returns_401(app, mock_project):
 def test_auth_enabled_user_with_no_project_permission_returns_403(app, mock_project):
     """When ENABLE_AUTH is True and user has no permission for project, returns 403."""
     with patch("mdvtools.auth.project_auth.ProjectService") as mock_ps, \
-         patch("mdvtools.auth.project_auth.user_project_cache", {42: {}}) as cache:
+         patch("mdvtools.auth.project_auth.project_role", return_value=None):
         mock_ps.get_project_by_id.return_value = mock_project
         mock_ps.set_project_accessed_timestamp.return_value = None
         with app.app_context():
@@ -78,7 +78,7 @@ def test_auth_enabled_user_with_no_project_permission_returns_403(app, mock_proj
             with app.test_request_context():
                 from flask import session
                 session["user"] = {"id": 42}
-                # user 42 has no entry for project 1 in cache (only empty dict for user 42)
+                # user 42 holds no role on project 1
                 rv = project_pre_dispatch_checks(project_id="1", options={})
         assert rv is not None
         json_data, status_code = rv
@@ -89,10 +89,8 @@ def test_auth_enabled_user_with_no_project_permission_returns_403(app, mock_proj
 def test_auth_enabled_user_with_no_read_flags_returns_403(app, mock_project):
     """User has project entry but can_read/can_write/is_owner all False -> 403."""
     with patch("mdvtools.auth.project_auth.ProjectService") as mock_ps, \
-         patch("mdvtools.auth.project_auth.user_project_cache") as cache:
-        cache.get.return_value = {
-            1: {"can_read": False, "can_write": False, "is_owner": False},
-        }
+         patch("mdvtools.auth.project_auth.project_role") as project_role:
+        project_role.return_value = {"can_read": False, "can_write": False, "is_owner": False}
         mock_ps.get_project_by_id.return_value = mock_project
         mock_ps.set_project_accessed_timestamp.return_value = None
         with app.app_context():
@@ -100,7 +98,7 @@ def test_auth_enabled_user_with_no_read_flags_returns_403(app, mock_project):
             with app.test_request_context():
                 from flask import session
                 session["user"] = {"id": 99}
-                cache.get.return_value = {1: {"can_read": False, "can_write": False, "is_owner": False}}
+                project_role.return_value = {"can_read": False, "can_write": False, "is_owner": False}
                 rv = project_pre_dispatch_checks(project_id="1", options={})
         assert rv is not None
         json_data, status_code = rv
@@ -110,10 +108,8 @@ def test_auth_enabled_user_with_no_read_flags_returns_403(app, mock_project):
 def test_auth_enabled_can_read_only_allowed_for_non_editable_route(app, mock_project):
     """User with can_read only is allowed for route without access_level='editable'."""
     with patch("mdvtools.auth.project_auth.ProjectService") as mock_ps, \
-         patch("mdvtools.auth.project_auth.user_project_cache") as cache:
-        cache.get.return_value = {
-            1: {"can_read": True, "can_write": False, "is_owner": False},
-        }
+         patch("mdvtools.auth.project_auth.project_role") as project_role:
+        project_role.return_value = {"can_read": True, "can_write": False, "is_owner": False}
         mock_ps.get_project_by_id.return_value = mock_project
         mock_ps.set_project_accessed_timestamp.return_value = None
         with app.app_context():
@@ -128,10 +124,8 @@ def test_auth_enabled_can_read_only_allowed_for_non_editable_route(app, mock_pro
 def test_auth_enabled_can_read_only_denied_for_editable_route(app, mock_project):
     """User with can_read only gets 403 for access_level='editable' route."""
     with patch("mdvtools.auth.project_auth.ProjectService") as mock_ps, \
-         patch("mdvtools.auth.project_auth.user_project_cache") as cache:
-        cache.get.return_value = {
-            1: {"can_read": True, "can_write": False, "is_owner": False},
-        }
+         patch("mdvtools.auth.project_auth.project_role") as project_role:
+        project_role.return_value = {"can_read": True, "can_write": False, "is_owner": False}
         mock_ps.get_project_by_id.return_value = mock_project
         mock_ps.set_project_accessed_timestamp.return_value = None
         with app.app_context():
@@ -148,10 +142,8 @@ def test_auth_enabled_can_read_only_denied_for_editable_route(app, mock_project)
 def test_auth_enabled_can_write_allowed_for_editable_route(app, mock_project):
     """User with can_write is allowed for access_level='editable' route."""
     with patch("mdvtools.auth.project_auth.ProjectService") as mock_ps, \
-         patch("mdvtools.auth.project_auth.user_project_cache") as cache:
-        cache.get.return_value = {
-            1: {"can_read": True, "can_write": True, "is_owner": False},
-        }
+         patch("mdvtools.auth.project_auth.project_role") as project_role:
+        project_role.return_value = {"can_read": True, "can_write": True, "is_owner": False}
         mock_ps.get_project_by_id.return_value = mock_project
         mock_ps.set_project_accessed_timestamp.return_value = None
         mock_ps.set_project_update_timestamp.return_value = None
@@ -168,10 +160,8 @@ def test_auth_enabled_can_write_allowed_for_editable_route(app, mock_project):
 def test_auth_enabled_is_owner_allowed_for_editable_route(app, mock_project):
     """User with is_owner is allowed for access_level='editable' route."""
     with patch("mdvtools.auth.project_auth.ProjectService") as mock_ps, \
-         patch("mdvtools.auth.project_auth.user_project_cache") as cache:
-        cache.get.return_value = {
-            1: {"can_read": True, "can_write": False, "is_owner": True},
-        }
+         patch("mdvtools.auth.project_auth.project_role") as project_role:
+        project_role.return_value = {"can_read": True, "can_write": False, "is_owner": True}
         mock_ps.get_project_by_id.return_value = mock_project
         mock_ps.set_project_accessed_timestamp.return_value = None
         mock_ps.set_project_update_timestamp.return_value = None

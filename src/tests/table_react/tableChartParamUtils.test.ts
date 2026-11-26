@@ -7,6 +7,7 @@ vi.mock("@/react/components/BaseReactChart", () => ({
     BaseReactChart: class {},
 }));
 vi.mock("@/charts/BaseChart", () => ({
+    // biome-ignore lint/complexity/noStaticOnlyClass: stands in for BaseChart's static registry
     default: class {
         static types: Record<string, unknown> = {};
     },

@@ -37,7 +37,6 @@ class MultiLineChart extends SVGChart {
         //set default band width
         const mm = this.dataStore.getMinMaxForColumn(c.param[0]);
         let xx = mm.slice(0);
-        const yy = [1, 0];
         if (config.scaletrim) {
             xx = [0, 1];
         }
@@ -59,7 +58,6 @@ class MultiLineChart extends SVGChart {
 
     @loadColumnData
     setParams(params) {
-        const oldXName = this.dataStore.getColumnName(this.config.param[0]);
         this.config.param = params;
         const config = this.getConfig();
         const x_name = this.dataStore.getColumnName(config.param[0]);
@@ -158,7 +156,6 @@ class MultiLineChart extends SVGChart {
         const vals = this.dataStore.getColumnValues(c.param[1]);
         const trans = select(this.contentDiv).transition().duration(400).ease(easeLinear);
         const cdim = this._getContentDimensions();
-        const y_scales = [];
         const display_data = [];
         const rowHeight = cdim.height / this.data.length;
         const axisd = [];
@@ -189,7 +186,7 @@ class MultiLineChart extends SVGChart {
             .attr("fill", "none")
             //.attr("opacity",0.7)
 
-            .attr("stroke", (d, i) => {
+            .attr("stroke", (d) => {
                 return colors[d.id];
             })
             .attr("stroke-width", 2)
@@ -198,22 +195,15 @@ class MultiLineChart extends SVGChart {
             .attr(
                 "d",
                 line()
-                    .x((d, i) => {
+                    .x((_d, i) => {
                         return xpos[i];
                     })
-                    .y((d, i) => {
+                    .y((d) => {
                         return d;
                     }),
             );
 
         if (c.fill) {
-            const a = area()
-                .x((d, i) => xpos[i])
-                .y0((d, i) => d)
-                .y1((d, i) => {
-                    c.stacked ? rowHeight * d.id + rowHeight : cdim.height;
-                });
-
             this.graph_area
                 .selectAll(".chart-area")
                 .data(display_data)
@@ -224,9 +214,9 @@ class MultiLineChart extends SVGChart {
                 .style("opacity", 0.5)
                 .attr("d", (d, i) =>
                     area()
-                        .x((dd, ii) => xpos[ii])
+                        .x((_dd, ii) => xpos[ii])
                         .y0((dd) => dd)
-                        .y1((d) => {
+                        .y1(() => {
                             return c.stacked ? rowHeight * i + rowHeight : cdim.height;
                         })(d),
                 );

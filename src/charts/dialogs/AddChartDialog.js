@@ -89,7 +89,7 @@ export class AddChartDialog extends BaseDialog {
             );
         }
         // createEl("div",{},this.columns[0]).append(this.chartType);
-        this.chartType.addEventListener("change", (e) => {
+        this.chartType.addEventListener("change", () => {
             this.setParamDiv(this.chartType.value, content.dataStore);
         });
 
@@ -215,7 +215,7 @@ export class AddChartDialog extends BaseDialog {
         if (params) {
             for (const p of params) {
                 const d = createEl("div", { styles: { padding: "4px" } }, this.paramDiv);
-                const sp = createEl("div", { text: `${p.name}:` }, d);
+                createEl("div", { text: `${p.name}:` }, d);
                 const holder = createEl("div", {}, this.paramDiv);
                 if (!Array.isArray(p.type) && p.type.startsWith("_multi")) {
                     this._addMultiColumnSelect(holder, p.type.split(":")[1]);
