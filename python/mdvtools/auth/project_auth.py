@@ -1,6 +1,6 @@
 from flask import jsonify, session, current_app
 from datetime import datetime, timedelta
-from mdvtools.auth.authutils import user_project_cache
+from mdvtools.auth.permissions import can_view, project_role
 from mdvtools.dbutils.dbservice import ProjectService
 from mdvtools.logging_config import get_logger
 
@@ -49,22 +49,14 @@ def project_pre_dispatch_checks(project_id: str, options: dict):
         return jsonify({"error": "Authentication required."}), 401
 
     try:
-        project_permissions = user_project_cache.get(user_id, {}).get(int(project_id))
+        project_permissions = project_role(user_id, int(project_id))
     except ValueError as e:
         # project_id is passed as a string, conversion to int may fail
         logger.exception(f"Error getting project permissions for user {user_id} and project {project_id}: {e}")
         return jsonify({"error": "Failed to get project permissions"}), 500
 
     # Require at least read-level access for every project request when auth is enabled
-    has_read_access = (
-        project_permissions
-        and (
-            project_permissions.get("can_read")
-            or project_permissions.get("can_write")
-            or project_permissions.get("is_owner")
-        )
-    )
-    if not has_read_access:
+    if not can_view(project_permissions):
         return jsonify({"error": "You do not have access to this project."}), 403
 
     # Check for access level only if specified in options
