@@ -18,6 +18,7 @@ import {
 import { useChart } from "./context";
 import { useConfig, useFieldSpecs } from "./hooks";
 import { buildColorLegendSpec } from "./legend/color_legend/buildColorLegendSpec";
+import { clearColorLegendFilter } from "./legend/color_legend/colorLegendFilter";
 import type { ColorLegendSpec } from "./legend/color_legend/types";
 
 /**
@@ -292,6 +293,8 @@ export function colorFieldsLegendSpec<T extends ChartColorFieldsConfig>(chart: B
  *   `color_fields` to that column. It is set on the chart rather than declared on its class, so
  *   that BaseChart does not wrap it to load the column and track queries: the chart's components
  *   load `color_fields` themselves, live queries included.
+ * - a filter made in the colour legend goes when the first colour column changes, as in
+ *   `BaseChart.getColorFunction`, whether or not the legend is shown to redraw it.
  * - the colour legend follows the legend column and the settings that change it.
  * - a grid of the colour keeps the split its first column's type allows, when the columns change
  *   other than by its picker (an active link, `colorByColumn`).
@@ -306,6 +309,15 @@ export function setUpColorFields<T extends ChartColorFieldsConfig>(chart: BaseCh
         });
     };
     chart.reactionDisposers.push(
+        // made before the legend's reaction, so the legend is redrawn without the filter
+        reaction(
+            () => colorFieldNames(config.color_fields)[0],
+            (first) => {
+                if (chart.colorLegendFilter && chart.colorLegendFilter.column !== first) {
+                    clearColorLegendFilter(chart, false);
+                }
+            },
+        ),
         reaction(
             () => [
                 colorLegendField(config),

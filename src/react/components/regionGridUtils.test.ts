@@ -118,16 +118,27 @@ describe("getSpatialDataGridSettingsFolder", () => {
         annotated.has(elementKey) ? colorGridSplitFor(fillColumn ? columns.columnIndex[fillColumn] : undefined) : null;
 
     test("offers each annotated layer the split its colour column's type allows", () => {
-        const folder = getSpatialDataGridSettingsFolder({ renderStack: colorStack }, columns, layerGridSplit);
+        const folder = getSpatialDataGridSettingsFolder({ renderStack: colorStack }, columns, () => layerGridSplit);
         expect(layerChoices(folder)).toEqual(["layer_fill:categories:circles", "layer_fill:columns:nuclei"]);
     });
 
     test("keeps the chart's grid, and every layer's splits when it cannot tell", () => {
         const grid: SpatialDataGridConfig = { by: "layer_fill", layer: "boundaries", split: "columns" };
         expect(
-            layerChoices(getSpatialDataGridSettingsFolder({ renderStack: colorStack, grid }, columns, layerGridSplit)),
+            layerChoices(
+                getSpatialDataGridSettingsFolder({ renderStack: colorStack, grid }, columns, () => layerGridSplit),
+            ),
         ).toEqual(["layer_fill:categories:circles", "layer_fill:columns:boundaries", "layer_fill:columns:nuclei"]);
         expect(layerChoices(getSpatialDataGridSettingsFolder({ renderStack }, columns))).toHaveLength(4);
+    });
+
+    test("reads the layers' splits each time, as the region (and its table) can change", () => {
+        let current: typeof layerGridSplit | undefined;
+        const folder = getSpatialDataGridSettingsFolder({ renderStack: colorStack }, columns, () => current);
+        // the region's store not read yet: every layer, either way
+        expect(layerChoices(folder)).toHaveLength(6);
+        current = layerGridSplit;
+        expect(layerChoices(folder)).toEqual(["layer_fill:categories:circles", "layer_fill:columns:nuclei"]);
     });
 
     test("offers the chart's colour grid the split its first colour column allows", () => {

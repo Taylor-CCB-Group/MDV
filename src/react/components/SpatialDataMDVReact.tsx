@@ -475,7 +475,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 func: () => this.openLayerDialog(),
             }),
             getCrosshairSetting(config),
-            getSpatialDataGridSettingsFolder(config, dataStore, this.layerGridSplit()),
+            getSpatialDataGridSettingsFolder(config, dataStore, () => this.layerGridSplit()),
             g({
                 type: "dropdown",
                 label: `SpatialData (${dataStore.getColumnName(dataStore.regions?.region_field)})`,

@@ -165,11 +165,15 @@ export function setSpatialDataGrid(config: SpatialDataGridSettingsConfig, value:
     else config.grid = null;
 }
 
-/** The SpatialData chart's grid settings: one view, or a grid (`spatialDataGridChoices`). */
+/**
+ * The SpatialData chart's grid settings: one view, or a grid (`spatialDataGridChoices`). The
+ * layers' splits are read each time the choices are (`getLayerGridSplit`), as the dialog outlives
+ * a change of region, whose table may type a column otherwise; undefined still offers every layer.
+ */
 export function getSpatialDataGridSettingsFolder(
     config: SpatialDataGridSettingsConfig,
     columns: ColumnTypes,
-    layerGridSplit?: LayerGridSplit,
+    getLayerGridSplit?: () => LayerGridSplit | undefined,
 ) {
     return g({
         type: "folder",
@@ -187,7 +191,8 @@ export function getSpatialDataGridSettingsFolder(
                 },
                 // the colour choices follow the colour columns' types
                 get values(): [GridChoice[], string, string] {
-                    return [[ONE_VIEW, ...spatialDataGridChoices(config, columns, layerGridSplit)], "name", "value"];
+                    const choices = spatialDataGridChoices(config, columns, getLayerGridSplit?.());
+                    return [[ONE_VIEW, ...choices], "name", "value"];
                 },
                 set values(_values) {
                     // made from the config
