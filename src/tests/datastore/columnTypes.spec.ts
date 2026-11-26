@@ -37,13 +37,23 @@ describe("column-type contract", () => {
 
     test("views each datatype the way the DataStore holds it", () => {
         const buffer = new ArrayBuffer(8);
-        expect(viewColumnStorage("integer", buffer)).toBeInstanceOf(Float32Array);
-        expect(viewColumnStorage("double", buffer)).toBeInstanceOf(Float32Array);
-        expect(viewColumnStorage("int32", buffer)).toBeInstanceOf(Int32Array);
-        expect(viewColumnStorage("text", buffer)).toBeInstanceOf(Uint8Array);
-        expect(viewColumnStorage("text16", buffer)).toBeInstanceOf(Uint16Array);
-        expect(viewColumnStorage("unique", buffer)).toBeInstanceOf(Uint8Array);
-        expect(viewColumnStorage("multitext", buffer)).toBeInstanceOf(Uint16Array);
+        expect(viewColumnStorage(column("integer"), buffer)).toBeInstanceOf(Float32Array);
+        expect(viewColumnStorage(column("double"), buffer)).toBeInstanceOf(Float32Array);
+        expect(viewColumnStorage(column("int32"), buffer)).toBeInstanceOf(Int32Array);
+        expect(viewColumnStorage(column("text"), buffer)).toBeInstanceOf(Uint8Array);
+        expect(viewColumnStorage(column("text16"), buffer)).toBeInstanceOf(Uint16Array);
+        expect(viewColumnStorage(column("unique"), buffer)).toBeInstanceOf(Uint8Array);
+        expect(viewColumnStorage(column("multitext"), buffer)).toBeInstanceOf(Uint16Array);
+    });
+
+    // a /get_data response packs columns back to back, so guessing one column's width misreads the rest
+    test("refuses a datatype it does not define, naming the column", () => {
+        const unknown = column("boolean" as DataType);
+        const message = 'Column "boolean" has datatype "boolean", which the column-type contract does not define';
+        expect(() => getValuesPerRow(unknown)).toThrow(message);
+        expect(() => getColumnByteLength(unknown, 2)).toThrow(message);
+        expect(() => viewColumnStorage(unknown, new ArrayBuffer(8))).toThrow(message);
+        expect(() => processArrayBuffer(new ArrayBuffer(8), [unknown], 2)).toThrow(message);
     });
 
     test("counts values per row and bytes per column", () => {
@@ -104,7 +114,7 @@ describe("processArrayBuffer", () => {
 
         expect(result.map((r) => r.field)).toEqual(columns.map((c) => c.field));
         result.forEach((r, i) => {
-            const view = viewColumnStorage(columns[i].datatype, r.data as SharedArrayBuffer);
+            const view = viewColumnStorage(columns[i], r.data as SharedArrayBuffer);
             expect(Array.from(view)).toEqual(Array.from(parts[i]));
         });
     });

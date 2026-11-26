@@ -228,6 +228,14 @@ def map_polars_datetime_to_day_doubles(series: "pl.Series") -> "pl.Series":
     return days.cast(pl.Float64)
 
 
+def _store_int32_with_missing_values_as_integer(col: dict) -> None:
+    """int32 storage has no missing value, so a column with any is stored as float32 `integer`."""
+    col["datatype"] = "integer"
+    col.setdefault("storage_warnings", []).append(
+        "int32 -> float32 (integer): column has missing values, which int32 cannot hold."
+    )
+
+
 def datasource_display_name(datasource: dict) -> str:
     """The name a datasource is shown under: its `display_name` if it has a usable one,
     otherwise its `name`. Matches `getDataSourceDisplayName` in the frontend."""
@@ -1359,6 +1367,10 @@ class MDVProject:
         li = pandas.Series(data)
         if not column.get("datatype"):
             column["datatype"] = infer_datatype(li.dtype)
+        if column["datatype"] == "double" and is_datetime64_any_dtype(li):
+            # dates are stored as days since the epoch, as add_datasource stores them
+            li = _pandas_series_to_day_doubles(li)
+            apply_date_column_metadata([column], {column["field"]})
         h5 = self._get_h5_handle()
         gr = h5[datasource]
         if not isinstance(gr, h5py.Group):
@@ -3140,7 +3152,6 @@ def add_column_to_group(
             col["field"], length * maxv, data=ndata, dtype=numpy.uint16
         )
     else:
-        dt = numpy.int32 if col["datatype"] == "int32" else numpy.float32
         clean = (
             data
             if skip_column_clean
@@ -3151,6 +3162,9 @@ def add_column_to_group(
                     errors="coerce"
                 )
         )  # this is slooooow?
+        if col["datatype"] == "int32" and numpy.asarray(pandas.isna(clean)).any():
+            _store_int32_with_missing_values_as_integer(col)
+        dt = numpy.int32 if col["datatype"] == "int32" else numpy.float32
         if col["datatype"] == "integer" and col.get("original_dtype"):
             try:
                 warning = integer_precision_warning(
@@ -3320,6 +3334,8 @@ def add_column_to_group_from_polars(col_info, polars_series, h5_group, num_rows,
         # For numeric columns (integer, double)
         if isinstance(polars_series, pl.Series):
             # Use to_numpy() for more direct and memory-efficient conversion
+            if col_info["datatype"] == "int32" and polars_series.null_count() > 0:
+                _store_int32_with_missing_values_as_integer(col_info)
             if col_info["datatype"] == "int32":
                 data = polars_series.to_numpy(zero_copy_only=False).astype(np.int32)
             else:

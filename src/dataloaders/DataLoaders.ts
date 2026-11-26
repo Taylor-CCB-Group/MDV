@@ -133,10 +133,10 @@ function processArrayBuffer(data: ArrayBufferLike, columns: Columns, size: numbe
         } else {
             // layout per datatype comes from the column-type contract (columnTypes.ts)
             const len = getColumnByteLength(column, size);
-            const arr = viewColumnStorage(column.datatype, data, offset, size * getValuesPerRow(column));
+            const arr = viewColumnStorage(column, data, offset, size * getValuesPerRow(column));
             const sab = new SharedArrayBuffer(len);
             //copy via typed arrays: an ArrayBuffer cannot be copied into a SharedArrayBuffer directly
-            viewColumnStorage(column.datatype, sab).set(arr, 0);
+            viewColumnStorage(column, sab).set(arr, 0);
             dataList.push({ data: sab, field: column.field });
             offset += len;
         }

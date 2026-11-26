@@ -80,8 +80,25 @@ const HELD_TYPE_BYTES = {
 
 export type StorageArray = Float32Array | Int32Array | Uint16Array | Uint8Array;
 
-/** `stringLength` is optional: multitext columns saved by the client have none. */
-type ColumnShape = { datatype: DataType; stringLength?: number };
+/**
+ * `stringLength` is optional: multitext columns saved by the client have none.
+ * `field` names the column if its datatype turns out to be unknown.
+ */
+type ColumnShape = { datatype: DataType; stringLength?: number; field?: string };
+
+/**
+ * The contract's entry for a column's datatype. A datatype it does not define throws instead of
+ * being read as some default: a `/get_data` response packs columns back to back, so a guessed
+ * width would misread every column after this one as well.
+ */
+function getLegacyDatatype({ datatype, field }: ColumnShape): (typeof LEGACY_DATATYPES)[DataType] {
+    const legacy = LEGACY_DATATYPES[datatype];
+    if (!legacy) {
+        const column = field === undefined ? "Column" : `Column "${field}"`;
+        throw new Error(`${column} has datatype "${datatype}", which the column-type contract does not define`);
+    }
+    return legacy;
+}
 
 /** `undefined` for a datatype the contract does not know, such as one from a malformed config. */
 export function getColumnKind(datatype: DataType): ColumnKind | undefined {
@@ -90,7 +107,7 @@ export function getColumnKind(datatype: DataType): ColumnKind | undefined {
 
 /** Stored values per row, per {@link RowWidth}: `unique` counts bytes, `multitext` codes. */
 export function getValuesPerRow(column: ColumnShape): number {
-    switch (LEGACY_DATATYPES[column.datatype].rowWidth) {
+    switch (getLegacyDatatype(column).rowWidth) {
         case "one":
             return 1;
         case "stringLength":
@@ -102,7 +119,7 @@ export function getValuesPerRow(column: ColumnShape): number {
 
 /** Bytes a column of `size` rows occupies in the DataStore, and in `/get_data` responses. */
 export function getColumnByteLength(column: ColumnShape, size: number): number {
-    const bytesPerValue = HELD_TYPE_BYTES[LEGACY_DATATYPES[column.datatype].storedType];
+    const bytesPerValue = HELD_TYPE_BYTES[getLegacyDatatype(column).storedType];
     return size * getValuesPerRow(column) * bytesPerValue;
 }
 
@@ -111,12 +128,12 @@ export function getColumnByteLength(column: ColumnShape, size: number): number {
  * `length` counts values, not rows (see {@link getValuesPerRow}).
  */
 export function viewColumnStorage(
-    datatype: DataType,
+    column: ColumnShape,
     buffer: ArrayBufferLike,
     byteOffset = 0,
     length?: number,
 ): StorageArray {
-    switch (LEGACY_DATATYPES[datatype].storedType) {
+    switch (getLegacyDatatype(column).storedType) {
         case "float32":
             return new Float32Array(buffer, byteOffset, length);
         case "int32":

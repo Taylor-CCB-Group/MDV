@@ -150,3 +150,61 @@ def test_add_datasource_polars_warns_when_wide_integers_lose_precision(tmp_path)
     column = project.get_datasource_metadata("cells")["columns"][0]
     assert column["datatype"] == "integer"
     assert any("precision loss possible" in w for w in column.get("storage_warnings", []))
+
+
+def _project_with_datasource(tmp_path):
+    project = MDVProject(str(tmp_path / "project"), delete_existing=True)
+    project.add_datasource("cells", pd.DataFrame({"x": [1.0, 2.0, 3.0]}), add_to_view=None)
+    return project
+
+
+def _column(project, field):
+    return next(c for c in project.get_datasource_metadata("cells")["columns"] if c["field"] == field)
+
+
+def test_set_column_stores_datetimes_as_days(tmp_path):
+    """Dates are doubles counting days since the epoch, as add_datasource stores them."""
+    project = _project_with_datasource(tmp_path)
+
+    project.set_column("cells", "when", pd.to_datetime(["1970-01-02", "1970-01-03", None]))
+
+    column = _column(project, "when")
+    assert column["datatype"] == "double"
+    assert column["is_date"] is True and column["date_unit"] == "days"
+    values = project.get_column("cells", "when")
+    assert list(values[:2]) == [1, 2] and np.isnan(values[2])
+
+
+def test_set_column_falls_back_to_integer_when_int32_values_are_missing(tmp_path):
+    """int32 storage has no missing value; a null used to be stored as an arbitrary integer."""
+    project = _project_with_datasource(tmp_path)
+
+    project.set_column("cells", {"name": "n", "datatype": "int32"}, pd.Series([1, None, 3]))
+
+    column = _column(project, "n")
+    assert column["datatype"] == "integer"
+    assert any("missing" in w for w in column.get("storage_warnings", []))
+    values = project.get_column("cells", "n")
+    assert values[0] == 1 and np.isnan(values[1]) and values[2] == 3
+
+
+def test_add_datasource_polars_falls_back_to_integer_when_int32_values_are_missing(tmp_path):
+    df = pl.DataFrame({"n": pl.Series([1, None, 3], dtype=pl.Int32)})
+    project = MDVProject(str(tmp_path / "project"), delete_existing=True)
+
+    project.add_datasource_polars("cells", df, columns=[{"name": "n", "datatype": "int32"}], add_to_view=None)
+
+    column = project.get_datasource_metadata("cells")["columns"][0]
+    assert column["datatype"] == "integer"
+    values = project.get_column("cells", "n")
+    assert values[0] == 1 and np.isnan(values[1]) and values[2] == 3
+
+
+def test_add_datasource_polars_keeps_int32_without_missing_values(tmp_path):
+    df = pl.DataFrame({"n": pl.Series([1, 16_777_217], dtype=pl.Int32)})
+    project = MDVProject(str(tmp_path / "project"), delete_existing=True)
+
+    project.add_datasource_polars("cells", df, columns=[{"name": "n", "datatype": "int32"}], add_to_view=None)
+
+    assert project.get_datasource_metadata("cells")["columns"][0]["datatype"] == "int32"
+    assert list(project.get_column("cells", "n")) == [1, 16_777_217]

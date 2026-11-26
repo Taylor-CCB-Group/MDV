@@ -1320,7 +1320,7 @@ class DataStore {
             buffer = data;
         }
         c.buffer = buffer;
-        c.data = viewColumnStorage(c.datatype, buffer);
+        c.data = viewColumnStorage(c, buffer);
         if (isDatatypeNumeric(c.datatype)) {
             if (!c.minMax) {
                 console.log(`Calculating min/max for ${c.name}`);
@@ -1343,9 +1343,9 @@ class DataStore {
     appendColumnData(column, data, newSize) {
         const c = this.columnIndex[column];
         const newBuffer = new SharedArrayBuffer(getColumnByteLength(c, newSize));
-        const newArr = viewColumnStorage(c.datatype, newBuffer);
+        const newArr = viewColumnStorage(c, newBuffer);
         newArr.set(c.data);
-        newArr.set(viewColumnStorage(c.datatype, data), c.data.length);
+        newArr.set(viewColumnStorage(c, data), c.data.length);
         c.data = newArr;
         c.buffer = newBuffer;
     }

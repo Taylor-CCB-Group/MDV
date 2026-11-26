@@ -43,13 +43,13 @@ function getRowComparator(column: SortColumn): RowComparator {
 /** Which rows have no value: NaN in float32 columns. The other stored types have no missing marker. */
 function getMissingCheck(column: SortColumn): ((row: number) => boolean) | undefined {
     if (LEGACY_DATATYPES[column.datatype]?.storedType !== "float32") return undefined;
-    const data = viewColumnStorage(column.datatype, column.buffer);
+    const data = viewColumnStorage(column, column.buffer);
     return (row) => Number.isNaN(data[row]);
 }
 
 // Views the buffer the way the DataStore holds it, per the column-type contract.
 function getAscendingComparator(column: SortColumn): RowComparator {
-    const data = viewColumnStorage(column.datatype, column.buffer);
+    const data = viewColumnStorage(column, column.buffer);
     const kind = getColumnKind(column.datatype);
     switch (kind) {
         case "numeric":
