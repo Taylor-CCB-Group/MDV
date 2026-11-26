@@ -115,7 +115,6 @@ COPY --chown=pn:pn vite.config.mts ./
 COPY --chown=pn:pn tsconfig.json ./
 COPY --chown=pn:pn index.html ./
 COPY --chown=pn:pn public/ ./public/
-COPY --chown=pn:pn tailwind.config.js ./
 COPY --chown=pn:pn postcss.config.js ./
 COPY --chown=pn:pn biome.jsonc ./
 
