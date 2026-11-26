@@ -423,6 +423,7 @@ reflowed every chart. Handles are still painted and still receive pointer events
 .legend-container {
     backdrop-filter: blur(1px);
     padding: 0.4em;
+    border-radius: 8px;
     transition: backdrop-filter 0.2s ease-in-out;
     z-index: 2;
     /* changing var(--background_color) to rgb() didn't help */
@@ -431,11 +432,199 @@ reflowed every chart. Handles are still painted and still receive pointer events
 .legend-container:hover {
     backdrop-filter: blur(20px);
 }
+/* holds a legend's frame without a box of its own, so the frame is laid out as the chart's or strip's child */
+.legend-host {
+    display: contents;
+}
+/* an open legend floating over the plot */
+.legend-container.legend-floating {
+    border: 1px solid rgba(128, 128, 128, 0.65);
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.35),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+.legend-floating .legend-drag-handle,
+.legend-floating .legend-continuous-drag-handle {
+    cursor: move;
+    /* so dragging by touch moves the legend rather than scrolling the page */
+    touch-action: none;
+}
+/* in the strip a legend is at most this tall (LEGEND_BAND_MAX_HEIGHT); its list scrolls */
+.legend-container.legend-in-band {
+    max-height: 96px;
+}
+/* a floating legend never grows past the chart; its list scrolls instead */
+.legend-container:not(.legend-in-band) {
+    max-width: 100%;
+    max-height: 100%;
+}
 .dark .legend-container {
     background-color: rgba(51, 51, 51, 0.3);
 }
 .light .legend-container {
     background-color: rgba(186, 186, 186, 0.3);
+}
+
+/* Legends on top: a strip between the title bar and the plot. The plot shrinks to fit below it. */
+.ciview-chart-legend-band {
+    display: none;
+    flex: 0 0 auto;
+    align-items: flex-start;
+    gap: 4px;
+    max-height: 33%;
+    overflow: auto;
+    padding: 2px 4px 2px 6px;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.35);
+    background-color: var(--main_panel_color);
+    color: var(--text_color);
+}
+.ciview-chart-legend-band.active {
+    display: flex;
+}
+/*
+ * Open legends share the width equally, like grid columns (one: all of it, two: half each, ...).
+ * On a narrow chart, legends that would get less than their minimum width wrap onto another row.
+ */
+.legend-band-items {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 2px 8px;
+    min-width: 0;
+}
+.legend-band-controls {
+    display: flex;
+    flex: none;
+    gap: 2px;
+    margin-left: auto;
+}
+.legend-container.legend-in-band {
+    position: relative;
+    padding: 2px 4px;
+    background-color: transparent;
+    backdrop-filter: none;
+    flex: none;
+}
+/* minimised legends keep to the right, so open ones don't swap places as legends are minimised */
+.legend-container.legend-in-band.legend-minimized {
+    order: 1;
+    max-width: 100%;
+}
+/* an equal share, whatever width the legend asked for; the list stays inside the capped height */
+.legend-container.legend-in-band:not(.legend-minimized) {
+    flex: 1 1 0;
+    min-width: min(200px, 100%);
+    overflow: hidden;
+}
+
+/* Buttons on a floating legend, top right; clearer on hover. */
+.legend-controls {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    display: flex;
+    gap: 2px;
+    opacity: 0.45;
+    transition: opacity 0.15s ease-in-out;
+}
+.legend-container:hover .legend-controls,
+.legend-controls:focus-within {
+    opacity: 1;
+}
+.legend-control-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text_color);
+    font-size: 10px;
+    cursor: pointer;
+}
+.legend-control-btn:hover {
+    background-color: rgba(128, 128, 128, 0.3);
+}
+
+/* A minimised legend: a small button with its title and a few colours. */
+.legend-container.legend-minimized {
+    padding: 0;
+    background-color: transparent;
+    backdrop-filter: none;
+}
+.legend-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 2px 2px 8px;
+    border: 1px solid rgba(128, 128, 128, 0.65);
+    border-radius: 999px;
+    background-color: var(--main_panel_color);
+    color: var(--text_color);
+    font: inherit;
+    font-size: 12px;
+    white-space: nowrap;
+    max-width: 100%;
+    min-width: 0;
+    cursor: grab;
+}
+.legend-in-band .legend-summary {
+    cursor: default;
+}
+/* the + that opens a minimised legend */
+.legend-summary .legend-summary-open {
+    width: 18px;
+    height: 18px;
+    margin-left: 2px;
+    border-radius: 999px;
+    background-color: rgba(128, 128, 128, 0.2);
+    font-size: 9px;
+    flex-shrink: 0;
+}
+.legend-summary .legend-summary-open:hover {
+    background-color: rgba(128, 128, 128, 0.45);
+}
+.legend-summary:hover {
+    border-color: rgba(128, 128, 128, 1);
+}
+.legend-summary-label {
+    font-weight: 500;
+    margin-right: 2px;
+    /* a long title shrinks first, so the + stays in view */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* the colours shrink and are cut off before the + would be pushed out of the pill */
+.legend-summary-previews {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+}
+.legend-summary-previews:empty {
+    display: none;
+}
+.legend-summary-swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.legend-summary-more {
+    font-size: 11px;
+    opacity: 0.8;
+}
+.legend-summary-gradient {
+    width: 36px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
 }
 
 .row-bar {

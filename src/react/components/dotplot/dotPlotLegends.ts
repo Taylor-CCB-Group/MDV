@@ -8,8 +8,6 @@ import { getDotRadius } from "./dotPlotLayout";
 export const DOT_PLOT_LEGEND_MARGIN = 8;
 /** Space `LegendWrapper` adds around a legend's content (padding and border). */
 export const LEGEND_WRAPPER_EXTRA = 15;
-/** The legend band never takes more than this share of the chart's height. */
-export const MAX_LEGEND_BAND_FRACTION = 1 / 3;
 
 export type LegendBox = { width: number; height: number };
 export type LegendPosition = [left: number, top: number];
@@ -75,8 +73,6 @@ export function getFractionLegendBox(spec: FractionLegendSpec): LegendBox {
 }
 
 export type LegendLayout = LegendSizes & {
-    /** Height kept free above the panels; 0 when the legends sit over the plot instead. */
-    height: number;
     /** Where each legend starts, or null when it isn't shown. */
     color: LegendPosition | null;
     fraction: LegendPosition | null;
@@ -84,33 +80,21 @@ export type LegendLayout = LegendSizes & {
 
 export type LegendLayoutInput = {
     width: number;
-    height: number;
     /** Colour range, or null when the colour legend is hidden. */
     colorRange: [number, number] | null;
     /** Largest fraction, or null when the fraction legend is hidden. */
     fracMax: number | null;
     /** Radius of the largest dot in the panels, so legend dots match them. */
     maxRadius: number;
-    /** Keep a band free above the panels for the legends; when false they start over the plot. */
-    reserveSpace: boolean;
 };
 
 /**
- * Where the legends start. Normally in one row in a band above the panels, at the largest size
+ * Where the legends start over the top left of the plot, as in the legacy dot plot (they can be
+ * moved into the chart's strip above the plot instead). Normally in one row, at the largest size
  * that fits the chart's width: the colour legend gets narrower and the fraction legend shows
- * fewer dots before anything is stacked. If even the most compact row is too wide, or the band
- * would take more than a third of the height, there's no band and the legends start over the
- * top left of the plot, as in the legacy dot plot, so the plot always keeps its space. Without
- * `reserveSpace` they start in the same row but there's no band, so the plot fills the height.
+ * fewer dots before anything is stacked.
  */
-export function getLegendLayout({
-    width,
-    height,
-    colorRange,
-    fracMax,
-    maxRadius,
-    reserveSpace,
-}: LegendLayoutInput): LegendLayout {
+export function getLegendLayout({ width, colorRange, fracMax, maxRadius }: LegendLayoutInput): LegendLayout {
     const m = DOT_PLOT_LEGEND_MARGIN;
     const boxesFor = (sizes: LegendSizes) => ({
         color: colorRange ? getColorLegendBox(colorRange, sizes.colorWidth) : null,
@@ -123,27 +107,22 @@ export function getLegendLayout({
 
     for (const sizes of LEGEND_SIZES) {
         const { color, fraction } = boxesFor(sizes);
-        if (!color && !fraction) return { ...sizes, height: 0, color: null, fraction: null };
+        if (!color && !fraction) return { ...sizes, color: null, fraction: null };
         const rowWidth = fractionLeft(color) + (fraction ? fraction.width + m : 0);
         if (rowWidth > width) continue;
-        const bandHeight = m + Math.max(color?.height ?? 0, fraction?.height ?? 0);
-        // more compact legends are no shorter, so a band this tall won't fit at all
-        if (reserveSpace && bandHeight > height * MAX_LEGEND_BAND_FRACTION) break;
         return {
             ...sizes,
-            height: reserveSpace ? bandHeight : 0,
             color: color ? [m, m] : null,
             fraction: fraction ? [fractionLeft(color), m] : null,
         };
     }
 
-    // no band: the most compact legends over the plot, side by side if they fit
+    // even the most compact row is too wide: side by side if they fit, else one below the other
     const sizes = LEGEND_SIZES[LEGEND_SIZES.length - 1];
     const { color, fraction } = boxesFor(sizes);
     const sideBySide = !color || !fraction || fractionLeft(color) + fraction.width + m <= width;
     return {
         ...sizes,
-        height: 0,
         color: color ? [m, m] : null,
         fraction: fraction ? (sideBySide ? [fractionLeft(color), m] : [m, m + (color?.height ?? 0) + m]) : null,
     };
