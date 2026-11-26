@@ -39,6 +39,10 @@ function fakeChart({ spec, colorLegend = { display: true }, existingLegend, user
         unmount: vi.fn(),
         getWrapperElement: vi.fn(() => legendEl),
         getUserSize: vi.fn(() => userSize),
+        // the existing legend floats over the plot, where its offsets are its position
+        getFloatingPosition: vi.fn((): [number, number] | null =>
+            existingLegend ? [existingLegend.offsetLeft, existingLegend.offsetTop] : null,
+        ),
     };
     const getDimension = vi.fn();
     const chart = Object.assign(Object.create(BaseChart.prototype), {

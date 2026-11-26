@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLegendFrame, useLegendPreferredSize } from "@/react/components/legend/LegendFrame";
 import type { LegendWrapperComponentProps } from "@/react/components/legend/LegendWrapper";
 import type { FractionLegendSpec } from "@/react/legend/fraction_legend/types";
 
@@ -75,26 +75,16 @@ export function getFractionLegendSize(spec: FractionLegendSpec) {
     };
 }
 
-export default function FractionLegend({ spec, onLayoutReady }: LegendWrapperComponentProps<FractionLegendSpec>) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const { layout, bodyHeight } = getItemLayout(spec);
+export default function FractionLegend({ spec: savedSpec }: LegendWrapperComponentProps<FractionLegendSpec>) {
+    const { inBand } = useLegendFrame();
+    // in the strip above the plot the circles sit in a row, in whatever width the strip gives
+    const spec: FractionLegendSpec = inBand ? { ...savedSpec, orientation: "horizontal", width: undefined } : savedSpec;
+    const { layout, bodyWidth, bodyHeight } = getItemLayout(spec);
     const { width, height } = getFractionLegendSize(spec);
-
-    useLayoutEffect(() => {
-        const el = containerRef.current?.parentElement;
-        if (!el) {
-            return;
-        }
-        el.style.width = `${width}px`;
-        el.style.height = `${height}px`;
-    }, [height, width]);
-
-    useLayoutEffect(() => {
-        onLayoutReady?.();
-    }, [onLayoutReady]);
+    useLegendPreferredSize({ width: inBand ? undefined : width, height });
 
     return (
-        <div ref={containerRef} className="h-full w-full overflow-hidden">
+        <div className="h-full w-full overflow-hidden">
             <div
                 className="legend-title legend-drag-handle overflow-hidden text-ellipsis font-medium"
                 style={{
@@ -106,12 +96,13 @@ export default function FractionLegend({ spec, onLayoutReady }: LegendWrapperCom
                 {spec.label}
             </div>
             <div
-                className="legend-body overflow-y-auto overflow-x-hidden w-full"
+                // a row too long for the strip scrolls sideways rather than being cut off
+                className={`legend-body overflow-y-auto w-full ${inBand ? "overflow-x-auto" : "overflow-x-hidden"}`}
                 style={{
                     height: `calc(100% - ${FRACTION_LEGEND_TITLE_HEIGHT}px)`,
                 }}
             >
-                <svg height={bodyHeight} width="100%" className="relative">
+                <svg height={bodyHeight} width={inBand ? bodyWidth : "100%"} className="relative">
                     <g>
                         {spec.items.map((item, i) => {
                             const { cx, cy, textX } = layout[i];

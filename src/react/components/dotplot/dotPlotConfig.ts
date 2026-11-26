@@ -46,9 +46,7 @@ export type DotPlotReactConfig = BaseConfig & {
     /** `pos` is the legend's saved [left, top] in the chart, as for other charts' color legends. */
     color_legend: { display: boolean; pos?: [number, number] };
     /** `position` is the legend's saved [left, top] in the chart, as in the legacy dot plot. */
-    fraction_legend: { display: boolean; position?: [number, number] };
-    /** Keep a band free above the panels where the legends start; off, the plot fills the height. */
-    reserve_legend_space: boolean;
+    fraction_legend: { display: boolean; position?: [number, number]; minimized?: boolean };
     axis: { x: DotPlotXAxisConfig; y: AxisConfig };
 };
 
@@ -81,10 +79,15 @@ export function adaptDotPlotConfig(
         Partial<Omit<DotPlotReactConfig, "axis">> & {
             /** Saved configs may lack newer axis options, e.g. the x label options. */
             axis?: { x?: Partial<DotPlotXAxisConfig>; y?: Partial<AxisConfig> };
+            /** Older views: whether the legends had their own space above the plot (the default). */
+            reserve_legend_space?: boolean;
         },
 ): DotPlotReactConfig {
+    const { reserve_legend_space, ...rest } = original;
     return {
-        ...original,
+        ...rest,
+        // the legends start in the strip above the plot, where older views kept space for them
+        legend_layout: original.legend_layout ?? { position: reserve_legend_space === false ? "overlay" : "top" },
         y_axis_order: original.y_axis_order ?? "data",
         split_by: original.split_by ?? null,
         split_values: original.split_values ?? [],
@@ -96,7 +99,6 @@ export function adaptDotPlotConfig(
         },
         color_legend: { ...original.color_legend, display: original.color_legend?.display ?? true },
         fraction_legend: { ...original.fraction_legend, display: original.fraction_legend?.display ?? true },
-        reserve_legend_space: original.reserve_legend_space ?? true,
         axis: {
             x: {
                 size: 60,

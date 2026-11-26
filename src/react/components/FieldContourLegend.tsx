@@ -1,5 +1,10 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { FieldName } from "@/charts/charts";
+import { type LegendSummary, useLegendFrame } from "@/react/components/legend/LegendFrame";
+import type { LegendWrapperComponentProps } from "@/react/components/legend/LegendWrapper";
+import { type ChartLegendConfig, useChartLegend } from "@/react/components/legend/useChartLegend";
+import { useChart } from "@/react/context";
+import { LEGEND_BAND_MAX_HEIGHT } from "@/react/legend/shared/legendConstants";
 import type { HoveredContour } from "../contour_state";
 
 export interface FieldLegendItem {
@@ -22,7 +27,6 @@ export interface FieldContourLegendProps {
     /** heading for the categorical contours, typically the contour parameter's name */
     categoryLabel?: string;
     label?: string;
-    position?: { x: number; y: number };
     onContourHover?: (contour: HoveredContour | null) => void;
 }
 
@@ -46,7 +50,7 @@ const rgbToCss = (rgb: readonly number[]): string => {
  * React component for displaying a legend of density contours with their colors:
  * categorical contours (grouped under the contour parameter's name) and density fields.
  * Hovering an item highlights its contour via `onContourHover`.
- * The legend is fixed in position (typically bottom-left).
+ * Charts show it with `useContourLegend`, in the shared legend wrapper (draggable, can be minimised).
  *
  * Note: SVG is used for the legend content to ensure compatibility with figure export
  * functionality, allowing legends to be included in exported visualizations.
@@ -56,25 +60,13 @@ export default function FieldContourLegend({
     categories = [],
     categoryLabel = "Categories",
     label = categories.length > 0 ? "Density" : "Density Fields",
-    position,
     onContourHover,
 }: FieldContourLegendProps) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const bodyRef = useRef<HTMLDivElement>(null);
     const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
     // gradient ids must be unique within the document; useId's colons are awkward in url(#...)
     const gradientIdPrefix = `contour-legend-${useId().replace(/:/g, "")}`;
 
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-
-        // Set fixed position if provided
-        if (position) {
-            container.style.left = `${position.x}px`;
-            container.style.bottom = `${position.y}px`;
-        }
-    }, [position]);
+    const { inBand } = useLegendFrame();
 
     if (fields.length === 0 && categories.length === 0) {
         return null;
@@ -183,25 +175,71 @@ export default function FieldContourLegend({
 
     return (
         <div
-            ref={containerRef}
-            className="legend-container absolute border-[0.5px] border-current z-[2]"
             style={{
-                width: "120px",
-                height: `${containerHeight}px`,
+                width: inBand ? "100%" : "140px",
+                // the strip's wrapper adds 2px padding top and bottom
+                height: `${inBand ? Math.min(containerHeight, LEGEND_BAND_MAX_HEIGHT - 4) : containerHeight}px`,
             }}
         >
-            <div className="legend-title h-5 whitespace-nowrap px-1 text-xs font-bold text-current">{label}</div>
+            <div className="legend-title legend-drag-handle h-5 whitespace-nowrap pl-1 pr-12 text-xs font-bold text-current">
+                {label}
+            </div>
             <div
-                ref={bodyRef}
                 className="legend-body overflow-y-auto overflow-x-hidden w-full"
                 style={{
                     height: "calc(100% - 25px)",
                 }}
             >
-                <svg height={height} width={180} className="relative">
+                <svg height={height} width={inBand ? "100%" : 180} className="relative">
                     <g>{rows.map((row, i) => renderRow(row, (i + 1) * 2 + i * h_fac))}</g>
                 </svg>
             </div>
         </div>
     );
+}
+
+export type ContourLegendSpec = FieldContourLegendProps;
+
+/** The contour legend as the legend wrapper draws it. */
+function ContourLegendInWrapper({ spec }: LegendWrapperComponentProps<ContourLegendSpec>) {
+    return <FieldContourLegend {...spec} />;
+}
+
+/** The minimised contour legend: its title and a few of the contours' colours. */
+function contourLegendSummary(spec: ContourLegendSpec): LegendSummary {
+    const colors = [
+        ...(spec.categories ?? []).map((item) => rgbToCss(item.colors[0])),
+        ...spec.fields.map((item) => rgbToCss(item.color)),
+    ];
+    const shown = colors.slice(0, 4);
+    return {
+        label: spec.label ?? ((spec.categories?.length ?? 0) > 0 ? "Density" : "Density Fields"),
+        swatches: shown,
+        more: colors.length - shown.length,
+    };
+}
+
+/**
+ * Shows a chart's contour legend in the shared legend wrapper: draggable, can be minimised, and
+ * goes in the strip above the plot with the chart's other legends. Starts at the bottom left.
+ */
+export function useContourLegend(
+    legend: ChartLegendConfig,
+    { fields, categories = [], categoryLabel, onContourHover }: ContourLegendSpec,
+) {
+    const chart = useChart();
+    const spec = useMemo<ContourLegendSpec | null>(
+        () =>
+            fields.length > 0 || categories.length > 0 ? { fields, categories, categoryLabel, onContourHover } : null,
+        [fields, categories, categoryLabel, onContourHover],
+    );
+    const summary = useMemo<LegendSummary>(() => (spec ? contourLegendSummary(spec) : { label: "Density" }), [spec]);
+    useChartLegend({
+        chart,
+        legend,
+        spec,
+        component: ContourLegendInWrapper,
+        summary,
+        defaultBottomLeft: [10, 10],
+    });
 }

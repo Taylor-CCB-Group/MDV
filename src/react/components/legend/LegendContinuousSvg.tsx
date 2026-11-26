@@ -41,6 +41,7 @@ export default function LegendContinuousSvg({
     activeRange = null,
     onRangeChange,
     isDate = false,
+    compact = false,
 }: LegendContinuousSvgProps) {
     // SVG ids are document-global, and legends may be rendered through separate React roots.
     const gradientIdRef = useRef<string>(createLegendGradientId());
@@ -48,7 +49,7 @@ export default function LegendContinuousSvg({
     const axisRef = useRef<SVGGElement>(null);
     const svgRef = useRef<SVGSVGElement>(null);
     const [observedWidth, setObservedWidth] = useState(width);
-    const layout = getContinuousLegendLayout(observedWidth, Boolean(label));
+    const layout = getContinuousLegendLayout(observedWidth, Boolean(label), compact);
     const colorStops = getGradientStops(colors);
     const formattedLabel = label ? formatLegendLabel(label, layout.labelMaxWidth) : null;
     const brush = useMemo(
@@ -104,21 +105,27 @@ export default function LegendContinuousSvg({
         const scale = scaleLinear().domain([range[0], range[1]]).range([0, layout.axisWidth]);
         const axis = axisBottom(scale)
             .tickFormat((d) => formatContinuousTick(d, isDate))
-            .ticks(layout.tickCount);
+            .ticks(layout.tickCount)
+            .tickSize(layout.tickLength);
 
         const selection = select(axisG);
         selection.call(axis);
-        selection
-            .selectAll("text")
-            .style("text-anchor", "end")
-            .attr("dx", "-.4em")
-            .attr("dy", ".4em")
-            .attr("transform", "rotate(-45)");
+        if (compact) {
+            // level labels, with only the ticks (no line along the bar)
+            selection.select(".domain").remove();
+        } else {
+            selection
+                .selectAll("text")
+                .style("text-anchor", "end")
+                .attr("dx", "-.4em")
+                .attr("dy", ".4em")
+                .attr("transform", "rotate(-45)");
+        }
 
         return () => {
             selection.selectAll("*").remove();
         };
-    }, [layout.axisWidth, layout.tickCount, range, isDate]);
+    }, [layout.axisWidth, layout.tickCount, layout.tickLength, range, isDate, compact]);
 
     return (
         <svg ref={svgRef} height="100%" width="100%" className="relative overflow-hidden">
@@ -164,6 +171,7 @@ export default function LegendContinuousSvg({
                     y={layout.barY}
                     width={layout.axisWidth}
                     height={layout.barHeight}
+                    rx={2}
                     fill={`url(#${gradientId})`}
                 />
                 <g ref={axisRef} transform={`translate(${layout.barX},${layout.barY + layout.barHeight})`} />
