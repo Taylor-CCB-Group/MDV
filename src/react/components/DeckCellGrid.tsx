@@ -338,7 +338,7 @@ export default function DeckCellGrid({
             {/* biome-ignore lint/a11y/noStaticElementInteractions: these handlers only track keyboard focus and the tooltip for the canvases inside, as the single plot's do */}
             <div
                 ref={grid.scrollContainerRef}
-                className="relative h-full w-full min-w-0 overflow-auto overflow-x-hidden"
+                className="mdv-chart-array-scroll relative h-full w-full min-w-0 overflow-auto overflow-x-hidden"
                 onPointerDown={suppressTooltipUntilPointerUp}
                 onPointerMove={
                     crosshair
