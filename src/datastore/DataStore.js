@@ -25,6 +25,7 @@ import {
     toColumnMetadata,
     updateColumnMetadata,
 } from "./columnMetadataUtils";
+import { getColumnByteLength, viewColumnStorage } from "./columnTypes";
 import { writeFilteredIndices } from "./filteredIndexEval";
 
 class DataStore {
@@ -1319,8 +1320,8 @@ class DataStore {
             buffer = data;
         }
         c.buffer = buffer;
-        if (c.datatype === "integer" || c.datatype === "double" || c.datatype === "int32") {
-            c.data = c.datatype === "int32" ? new Int32Array(buffer) : new Float32Array(buffer);
+        c.data = viewColumnStorage(c, buffer);
+        if (isDatatypeNumeric(c.datatype)) {
             if (!c.minMax) {
                 console.log(`Calculating min/max for ${c.name}`);
                 const computed = this._computeMinMaxFromData(c);
@@ -1334,10 +1335,6 @@ class DataStore {
                     c.quantiles[q] = [quantileSorted(a, q), quantileSorted(a, 1 - q)];
                 }
             }
-        } else if (c.datatype === "multitext" || c.datatype === "text16") {
-            c.data = new Uint16Array(buffer);
-        } else {
-            c.data = new Uint8Array(buffer);
         }
         this.columnsWithData.push(column);
     }
@@ -1345,25 +1342,10 @@ class DataStore {
     //experimental
     appendColumnData(column, data, newSize) {
         const c = this.columnIndex[column];
-        // handy utility type - ideally we wouldn't import this from luma.gl
-        /** @type {import("@luma.gl/core").TypedArrayConstructor} */
-        let arrType = Uint8Array;
-        let size = newSize;
-        if (c.datatype === "integer" || c.datatype === "double") {
-            size = size * 4;
-            // not what's expected for "integer"... or "double", for that matter.
-            arrType = Float32Array;
-        } else if (c.datatype === "int32") {
-            size = size * 4;
-            arrType = Int32Array;
-        } else if (c.datatype === "unique") {
-            size = size * c.stringLength;
-        }
-
-        const newBuffer = new SharedArrayBuffer(size);
-        const newArr = new arrType(newBuffer);
+        const newBuffer = new SharedArrayBuffer(getColumnByteLength(c, newSize));
+        const newArr = viewColumnStorage(c, newBuffer);
         newArr.set(c.data);
-        newArr.set(new arrType(data), c.data.length);
+        newArr.set(viewColumnStorage(c, data), c.data.length);
         c.data = newArr;
         c.buffer = newBuffer;
     }

@@ -11,12 +11,14 @@ import {
     type HoveredContour,
     useCategoryContour,
     useCategoryContourLegend,
+    useFieldContourLegend,
 } from "./contour_state";
 import { scatterDefaults } from "./scatter_state";
 
 // Mock all the hooks and dependencies
 vi.mock("./hooks", () => ({
     useFieldSpec: vi.fn(),
+    useFieldSpecs: vi.fn(),
     useCategoryFilterIndices: vi.fn(),
     useParamColumns: vi.fn(),
 }));
@@ -39,7 +41,7 @@ vi.mock("use-debounce", () => ({
 
 import { useDataStore } from "./context";
 import { useViewState } from "./deck_state";
-import { useCategoryFilterIndices, useFieldSpec, useParamColumns } from "./hooks";
+import { useCategoryFilterIndices, useFieldSpec, useFieldSpecs, useParamColumns } from "./hooks";
 
 describe("useCategoryContour", () => {
     const mockCx = {
@@ -338,6 +340,21 @@ describe("useCategoryContourLegend", () => {
         const { result } = renderHook(() => useCategoryContourLegend(config(["NK"], [])));
 
         expect(result.current.items).toEqual([]);
+    });
+});
+
+describe("useFieldContourLegend", () => {
+    // small numpy integers import as int32 (ADR-0024), so density fields can't be double-only
+    test("lists every numeric density field and skips the rest", () => {
+        (useFieldSpecs as any).mockReturnValue([
+            { field: "score", name: "Score", datatype: "double" },
+            { field: "count", name: "Count", datatype: "integer" },
+            { field: "n_genes", name: "Genes", datatype: "int32" },
+            { field: "cell_type", name: "Cell type", datatype: "text" },
+        ]);
+        const { result } = renderHook(() => useFieldContourLegend(["score", "count", "n_genes", "cell_type"]));
+
+        expect(result.current.map((item) => item.field)).toEqual(["score", "count", "n_genes"]);
     });
 });
 

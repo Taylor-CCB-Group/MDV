@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { LoadedDataColumn } from "@/charts/charts";
+import type { LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { DensityOverlayLayer } from "@/webgl/SpatialLayer";
 import { type DualContourLegacyConfig, useFieldContour } from "../contour_state";
 import { getFieldColor } from "../fieldColorManager";
@@ -14,7 +14,7 @@ import type { DeckCellLabel } from "./DeckCellGrid";
  */
 export function useDensityGridCellLayers(
     grid: UseChartArrayGridResult,
-    densityFields: readonly LoadedDataColumn<"double">[],
+    densityFields: readonly LoadedDataColumn<NumberDataType>[],
 ) {
     const config = useConfig<DualContourLegacyConfig>();
     const { modelMatrix } = useRange();

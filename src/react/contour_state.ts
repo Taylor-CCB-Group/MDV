@@ -9,10 +9,11 @@ import type {
     Disposer,
     FieldName,
     LoadedDataColumn,
+    NumberDataType,
 } from "@/charts/charts";
 import type { ChartGridConfig, SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
 import { type FieldSpec, type FieldSpecs, isColumnLoaded } from "@/lib/columnTypeHelpers";
-import { g, isArray } from "@/lib/utils";
+import { g, isArray, isDatatypeNumeric } from "@/lib/utils";
 import { type DensityGridModeConfig, isDensityGridShown } from "./components/densityGridUtils";
 import type { CategoryLegendItem, FieldLegendItem } from "./components/FieldContourLegend";
 import { useDataStore } from "./context";
@@ -60,7 +61,7 @@ export type FieldContourProps = {
     intensity: number;
     opacity: number;
     fillThreshold: number;
-    fields?: LoadedDataColumn<"double">[];
+    fields?: LoadedDataColumn<NumberDataType>[];
     hoveredContour?: HoveredContour | null;
 };
 function rgb(r: number, g: number, b: number, a = 255): [number, number, number, number] {
@@ -228,8 +229,8 @@ export type ContourLayerProps = ReturnType<typeof useCategoryContour>;
  * failed or is still under way is left out rather than read, as the weight cache reads
  * `minMax` as soon as the layer props are built.
  */
-export function isLoadedDoubleColumn(column: DataColumn<DataType>): column is LoadedDataColumn<"double"> {
-    return column.datatype === "double" && isColumnLoaded(column) && column.minMax !== undefined;
+export function isLoadedNumericColumn(column: DataColumn<DataType>): column is LoadedDataColumn<NumberDataType> {
+    return isDatatypeNumeric(column.datatype) && isColumnLoaded(column) && column.minMax !== undefined;
 }
 
 export function useFieldContour(props: FieldContourProps) {
@@ -513,7 +514,7 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig) {
                 label: "Density Fields",
                 //@ts-expect-error - pending optional columns
                 current_value: c.densityFields,
-                columnType: "double",
+                columnType: "number",
                 func: (x) => {
                     c.densityFields = x;
                 },
@@ -600,7 +601,7 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
     ];
 }
 
-const NO_FIELDS: LoadedDataColumn<"double">[] = [];
+const NO_FIELDS: LoadedDataColumn<NumberDataType>[] = [];
 
 /**
  * In future we will want more flexible array of contours.
@@ -626,7 +627,7 @@ export function useLegacyDualContour(hoveredContour?: HoveredContour | null): Co
         ...commonProps,
         id: "fieldContours",
         // the grid draws each field in its own cell instead (`DeckDensityGridComponent`)
-        fields: isDensityGridShown(config) ? NO_FIELDS : fields.filter(isLoadedDoubleColumn),
+        fields: isDensityGridShown(config) ? NO_FIELDS : fields.filter(isLoadedNumericColumn),
     });
     const contour1 = useCategoryContour({
         ...commonProps,
@@ -656,14 +657,14 @@ export function useFieldContourLegend(densityFields?: FieldSpecs): FieldLegendIt
     const fields = useFieldSpecs(densityFields);
 
     return useMemo(() => {
-        // Filter to only double fields (matching the filter in useLegacyDualContour)
-        const doubleFields = fields.filter((field) => field.datatype === "double");
-
-        return doubleFields.map((field) => ({
-            name: field.name,
-            field: field.field,
-            color: getFieldColor(field.field),
-        }));
+        // numeric fields only, matching the filter in useLegacyDualContour
+        return fields
+            .filter((field) => isDatatypeNumeric(field.datatype))
+            .map((field) => ({
+                name: field.name,
+                field: field.field,
+                color: getFieldColor(field.field),
+            }));
     }, [fields]);
 }
 

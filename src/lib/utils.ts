@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { CategoricalDataType, DataType, GuiSpec, GuiSpecType, NumberDataType } from "@/charts/charts";
+import { getColumnKind } from "@/datastore/columnTypes";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -28,10 +29,11 @@ export function getEntries<T extends object>(o: T) {
 }
 
 export function isDatatypeNumeric(t: DataType): t is NumberDataType {
-    return !!t.match(/double|float|int/);
+    return getColumnKind(t) === "numeric";
 }
 export function isDatatypeCategorical(t: DataType): t is CategoricalDataType {
-    return t.includes("text");
+    const kind = getColumnKind(t);
+    return kind === "categorical" || kind === "multi_valued";
 }
 // todo: this is not right...
 // export function isGuiValTypeNumeric(t: keyof GuiValueTypes): t is number | [number, number] ? true : false {
