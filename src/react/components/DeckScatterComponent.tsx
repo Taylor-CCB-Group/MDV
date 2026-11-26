@@ -25,7 +25,6 @@ import useGateLayers from "../hooks/useGateLayers";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import { isSameOrbitView, ORBIT_FOVY, type OrbitSelectionView, orbitSelectionViewOf } from "../orbitView";
-import { useScatterRadius } from "../scatter_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import AxisComponent from "./AxisComponent";
 import { DeckColorGridComponent, DeckDensityGridComponent } from "./DeckScatterGridComponent";
@@ -127,15 +126,13 @@ const DeckScatter = observer(function DeckScatterComponent({
 }) {
     const id = useId();
     const [width, height] = useChartSize();
-    const [cx, cy, ...density] = useParamColumns() as LoadedDataColumn<"double">[];
+    const [cx, cy] = useParamColumns() as LoadedDataColumn<"double">[];
     const cz = useParamColumns()[2] as LoadedDataColumn<"double">;
     const data = useFilteredIndices(); //changed to fallback to simplerFilteredIndices when filterColumn is not set
     const config = useConfig<DeckScatterConfig>();
     const contourConfig = useConfig<DualContourLegacyConfig>();
     const { viewState, dimension } = config;
     const is2d = dimension === "2d";
-    //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
-    const radiusScale = useScatterRadius();
     //todo colorBy should be done differently (also bearing in mind multiple layers)
 
     //todo this shouldn't be repeated here and in AxisComponent
@@ -268,7 +265,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     const pickAlternates = device.status === "ready" && device.backend === "webgl";
     const deckLayers = useLayersForDevice(layers, device);
 
-    const deckContainerRef = useRef<HTMLDivElement | null>(null);
+    const deckContainerRef = useRef<HTMLElement | null>(null);
     const deckRef = useRef<DeckGLRef | null>(null);
     const chart = useChart<DeckScatterConfig, DeckScatterReact>();
     useEffect(() => {
@@ -325,7 +322,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     return (
         <>
             <AxisComponent config={config} unproject={unproject}>
-                <div
+                <section
                     ref={deckContainerRef}
                     aria-label="Scatter plot"
                     style={{ width: "100%", height: "100%", outline: "none", position: "relative" }}
@@ -368,7 +365,7 @@ const DeckScatter = observer(function DeckScatterComponent({
                             }}
                         />
                     </ScatterDeckBoundary>
-                </div>
+                </section>
             </AxisComponent>
             <ViewGestureHint />
             {tooltipPortal}

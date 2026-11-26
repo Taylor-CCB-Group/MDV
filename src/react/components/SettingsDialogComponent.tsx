@@ -48,7 +48,7 @@ import GridByControl from "./GridByControl";
 const SettingsSearchContext = createContext("");
 const SEARCH_HINT_DURATION_MS = 4000;
 
-export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec; htmlFor?: string }) => (
+export const MLabel = observer(({ props }: { props: AnyGuiSpec; htmlFor?: string }) => (
     <Typography fontSize="small" sx={{ alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2 }}>
         {props.label}
         {/* <em className="opacity-30"> ({props.type})</em> */}
@@ -305,17 +305,6 @@ function isMultidropdown(props: DropdownSpec): props is GuiSpec<"multidropdown">
     if (multi !== isArray(props.current_value))
         throw new Error("current_value should be an array if (and only if) type is multidropdown");
     return multi;
-}
-function inferDropdownType<T extends "dropdown" | "multidropdown">(props: GuiSpec<T>): GuiSpec<T> {
-    return props;
-}
-function getCurrentValue(props: DropdownSpec) {
-    const multi = isMultidropdown(props);
-    if (multi) return props.current_value; //ts correctly infers this is an array
-    // return props.current_value; //.. fails to infer this is a string
-    if (isArray(props.current_value))
-        throw new Error("current_value should be an array if and only if type is multidropdown");
-    return props.current_value;
 }
 export const DropdownAutocompleteComponent = observer(
     ({

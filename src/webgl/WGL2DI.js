@@ -204,7 +204,7 @@ class WGL2DI {
         this.draw_order = this.mode === "3d" ? [2, 0, 1, 3, 4] : [2, 0, 1, 3, 4];
 
         regl({
-            onDone: (err, regl) => {
+            onDone: (_err, regl) => {
                 this.regl = regl;
                 regl._refresh();
                 this.pickbuffer = regl.framebuffer({
@@ -549,7 +549,7 @@ class WGL2DI {
     }
 
     resizeImage(factor, index) {
-        const st = index * 6;
+        // const st = index * 6;
         const wh = this.images.props.w_h[index];
         const xy = this.images.props.x_y[index];
         let width;
@@ -580,7 +580,7 @@ class WGL2DI {
         const height = c.height;
         const width = c.width;
         y = y - height;
-        const image_index = this.images.position.length;
+        // const image_index = this.images.position.length;
         this.images.position.push([x, y]);
         this.images.position.push([x, y + height]);
         this.images.position.push([x + width, y + height]);
@@ -941,7 +941,7 @@ class WGL2DI {
                 return index - 1;
             }
             return null;
-        } catch (e) {
+        } catch (_e) {
             console.log(position);
             return null;
         }
@@ -959,7 +959,7 @@ class WGL2DI {
         return name;
     }
 
-    removeHandler(handler_type, name) {
+    removeHandler(handler_type, _name) {
         const handler_dict = this.handlers[handler_type];
         if (!handler_dict) {
             throw "Handler Not Supported";
@@ -1088,7 +1088,7 @@ class WGL2DI {
         this.circles.globalFilter = filter;
     }
 
-    _finish(evt) {
+    _finish(_evt) {
         if (this.config.brush) {
             this.div_container.style.cursor = "crosshair";
         }
@@ -1358,7 +1358,7 @@ class WGL2DI {
                 this.div_container.style.cursor = "move";
             }
 
-            const position = this._getMousePosition(evt);
+            // const position = this._getMousePosition(evt);
             this.mouse_position = [evt.pageX, evt.pageY];
             this.clearBrush();
             evt.preventDefault();

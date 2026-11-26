@@ -964,7 +964,7 @@ export function useScatterplotLayer(
                 const p3 = m.transform(p) as P;
                 m.invert();
                 return p3;
-            } catch (e) {
+            } catch {
                 //console.error("unproject error", e);
                 return [0, 0];
             }

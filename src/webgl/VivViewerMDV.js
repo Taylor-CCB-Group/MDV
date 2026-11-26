@@ -210,8 +210,7 @@ class VivViewerMDV {
     _createLayers3D() {
         const tiff = this.tiff;
         //most of this can move into createLayers()
-        const { SizeX, SizeY, SizeZ, Channels: channels } = tiff.metadata.Pixels;
-        const target = [SizeX / 2, SizeY / 2, SizeZ / 2];
+        const { Channels: channels } = tiff.metadata.Pixels;
         const id = `3d_${DETAIL_VIEW_ID}`;
         const loader = tiff.data;
         const n = channels.length;
@@ -291,21 +290,18 @@ class VivViewerMDV {
         this._updateProps();
     }
     getXSlice() {
-        const { SizeX } = this.tiff.metadata.Pixels;
         const [min, max] = this.clipX;
         // const v = NPOT(SizeX);
         const v = getBoundingCube(this.loader)[0][1];
         return [min * v, max * v];
     }
     getYSlice() {
-        const { SizeY } = this.tiff.metadata.Pixels;
         const [min, max] = this.clipY;
         // const v = NPOT(SizeY);
         const v = getBoundingCube(this.loader)[1][1];
         return [min * v, max * v];
     }
     getZSlice() {
-        const { SizeZ } = this.tiff.metadata.Pixels;
         const [min, max] = this.clipZ;
         // const v = NPOT(SizeZ);
         const v = getBoundingCube(this.loader)[2][1];

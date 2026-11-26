@@ -1,5 +1,3 @@
-import { easeLinear } from "d3-ease";
-import { select } from "d3-selection";
 import { arc, pie } from "d3-shape";
 import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart";
@@ -98,11 +96,9 @@ class MultiPieChart extends SVGChart {
         this.highlight = i;
     }
 
-    drawChart(tTime = 1000) {
+    drawChart(_tTime = 1000) {
         //can't get transitions to work properly
-        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
         const dim = this._getContentDimensions();
-        const ratio = dim.width / dim.height;
         const rc = Math.ceil(Math.sqrt(this.data.length));
         const pw = dim.width / rc;
 
@@ -128,7 +124,7 @@ class MultiPieChart extends SVGChart {
             .selectAll(".pie-area")
             .data(this.data)
             .join("g")
-            .attr("transform", (d, i) => {
+            .attr("transform", (_d, i) => {
                 const y = Math.floor(i / rc) * ph;
                 const x = (i % rc) * pw;
                 return `translate(${x + pw / 2},${y + ph / 2})`;
@@ -136,18 +132,18 @@ class MultiPieChart extends SVGChart {
             .attr("class", "pie-area");
 
         pas.selectAll(".pie-inner")
-            .data((d, i) => {
+            .data((d) => {
                 return [d.index];
             })
             .join("circle")
             .attr("class", "pie-inner")
             .attr("r", radius * 0.4)
-            .style("fill", (d, i) => {
+            .style("fill", (d) => {
                 return c1[d];
             });
 
         pas.selectAll(".pie-text-header")
-            .data((d, i) => {
+            .data((d) => {
                 return [d.name];
             })
             .join("text")
@@ -170,7 +166,7 @@ class MultiPieChart extends SVGChart {
             .attr("class", "pie-outer")
             .attr("stroke", (d) => (d.data[3] === this.highlight ? "black" : "white"))
             .attr("d", this.arc)
-            .on("click", (e, d) => {
+            .on("click", (_e, d) => {
                 this.dataStore.dataHighlighted([d.data[3]], this);
             })
             .on("mouseover pointermove", (e, d) => {
@@ -183,7 +179,7 @@ class MultiPieChart extends SVGChart {
                 this.hideToolTip();
             })
             .style("stroke-width", (d) => (d.data[3] === this.highlight ? "4px" : "2px"))
-            .style("fill", (d, i) => {
+            .style("fill", (d) => {
                 return c2[d.data[1]];
             });
 

@@ -455,7 +455,7 @@ const SpatialDataViewer = observer(
         const spatialViewState = toSpatialViewState(viewState);
         const [width, height] = useChartSize();
         const id = useChartID();
-        const deckContainerRef = useRef<HTMLDivElement | null>(null);
+        const deckContainerRef = useRef<HTMLElement | null>(null);
         const { scatterProps, selectionLayer } = useSpatialLayers();
         const { scatterplotLayer, greyScatterplotLayer, densityLayer, getTooltip, setScatterKeyboardActive } =
             scatterProps;
@@ -838,7 +838,7 @@ const SpatialDataViewer = observer(
             <Profiler id="spatial.viewer" onRender={onSpatialProfilerRender}>
                 {/* selection tools, gates and density are not in region cells yet */}
                 {!regionGrid && <SelectionOverlay />}
-                <div
+                <section
                     ref={deckContainerRef}
                     aria-label="SpatialData.js image viewer"
                     style={{ width: "100%", height: "100%", outline: "none" }}
@@ -901,7 +901,7 @@ const SpatialDataViewer = observer(
                             </ErrorBoundary>
                         </Profiler>
                     </div>
-                </div>
+                </section>
                 {/* the grid has its own, over its scrolling cells */}
                 {!cellGrid && !regionGrid && <ViewGestureHint />}
                 {tooltipPortal}

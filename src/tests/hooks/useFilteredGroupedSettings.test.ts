@@ -6,7 +6,7 @@ import { useFilteredGroupedSettings } from "../../react/hooks/useFilteredGrouped
 
 function getFolder(settings: Array<{ setting: AnyGuiSpec; id: string }>, label: string): GuiSpec<"folder"> | undefined {
     const match = settings.find((entry) => entry.setting.type === "folder" && entry.setting.label === label)?.setting;
-    if (!match || match.type !== "folder") return undefined;
+    if (match?.type !== "folder") return undefined;
     return match;
 }
 

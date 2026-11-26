@@ -118,12 +118,15 @@
 .dark a {
     color: #1266f1;
 }
-select,
-input,
-textarea {
-    border: 0.1em solid var(--input_border_color);
-    border-radius: 4px;
-    background-color: var(--input_background_color);
+/* in Tailwind's base layer, so utility classes on the element still win as they did with Tailwind v3 */
+@layer base {
+    select,
+    input,
+    textarea {
+        border: 0.1em solid var(--input_border_color);
+        border-radius: 4px;
+        background-color: var(--input_background_color);
+    }
 }
 .mdv-select {
     border-radius: 3px;

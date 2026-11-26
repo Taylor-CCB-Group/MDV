@@ -23,7 +23,6 @@ import type {
     UploadValidationResult,
 } from "@/utils/file_upload/fileUploadTypes";
 import { useProject } from "../../modules/ProjectContext";
-import { useChannelsStoreApi, useViewerStoreApi } from "../../react/components/avivatorish/state";
 import AnndataConflictDialog from "./AnndataConflictDialog";
 import { Container, DropzoneContainer, DynamicText, FileInputLabel } from "./file_upload/FileUploadUI";
 import {
@@ -42,11 +41,6 @@ import ReusableDialog from "./ReusableDialog";
 import { createSocketIOUpload, type SocketIOUploadClient } from "./SocketIOUploadClient";
 
 export { Container, DropzoneContainer, DynamicText, FileInputLabel };
-
-// Use dynamic import for the worker
-const DatasourceWorker = new Worker(new URL("./datasourceWorker.ts", import.meta.url), {
-    type: "module",
-});
 
 const EMPTY_VALIDATION_RESULT: UploadValidationResult = {
     columnNames: [],
@@ -90,10 +84,12 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     ({ onClose, onResize, onLoadingStateChange, socketioClientRef }: FileUploadDialogComponentProps) => {
         const { root, chartManager, mainApiRoute } = useProject();
 
-        const [selectedOption, setSelectedOption] = useState<string | null>(null);
+        const [, setSelectedOption] = useState<string | null>(null);
 
+        // biome-ignore lint/correctness/noUnusedVariables: parked: see the commented-out <DatasourceDropdown> below
         const [updatedNamesArray, setUpdatedNamesArray] = useState<string[]>([]);
 
+        // biome-ignore lint/correctness/noUnusedVariables: parked: see the commented-out <DatasourceDropdown> below
         const handleSelect = useCallback((value: string) => {
             setSelectedOption(value);
             setDatasourceName(value);
@@ -112,12 +108,10 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
 
         const [tiffSummary, setTiffSummary] = useState<TiffSummary>(EMPTY_TIFF_SUMMARY);
 
-        const [columnNames, setColumnNames] = useState<string[]>([]);
-        const [columnTypes, setColumnTypes] = useState<string[]>([]);
-        const [secondRowValues, setSecondRowValues] = useState<string[]>([]);
-
-        // TIFF
-        const channelsStore = useChannelsStoreApi();
+        // setters are only used by the commented-out csv validation below
+        const [columnNames] = useState<string[]>([]);
+        const [columnTypes] = useState<string[]>([]);
+        const [secondRowValues] = useState<string[]>([]);
 
         const [state, dispatch] = useReducer(fileUploadReducer, undefined, createInitialUploadDialogState);
 
@@ -132,8 +126,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 socketioClientRef(state.socketioClient);
             }
         }, [state.socketioClient, socketioClientRef]);
-
-        const viewerStore = useViewerStoreApi();
 
         const { progress, resetProgress, setProgress } = useFileUploadProgress();
 
@@ -343,7 +335,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
 
         const supportedFileTypes = useMemo(() => getSupportedFileExtensions(), []);
 
-        const getTextWidth = (canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, text: string) => {
+        const getTextWidth = (_canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, text: string) => {
             context.font = `${getComputedStyle(document.body).fontSize} Arial`;
             return context.measureText(text).width;
         };
@@ -455,7 +447,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         if (fileConfig.processingConfig.requiresMetadata) {
                             try {
                                 formData.append("tiffMetadata", JSON.stringify(state.tiffMetadata));
-                            } catch (jsonError) {
+                            } catch {
                                 throw new Error("Invalid JSON format in tiffMetadata");
                             }
                         }
@@ -557,7 +549,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                     replace: isTabularForSocket ? true : undefined,
                     view: isTabularForSocket ? "default" : undefined,
                     suppliedOnly: isTabularForSocket ? false : undefined,
-                    onProgress: (progressPercent: number, uploaded: number, total: number) => {
+                    onProgress: (progressPercent: number) => {
                         setProgress(progressPercent);
                     },
                     onStatusChange: (status: string, message?: string) => {
@@ -731,6 +723,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         };
 
         // Method toggle function for testing/debugging
+        // biome-ignore lint/correctness/noUnusedVariables: parked: see the commented-out upload method toggle below
         const toggleUploadMethod = () => {
             const newMethod = state.uploadMethod === "http" ? "socketio" : "http";
             dispatch({ type: "SET_UPLOAD_METHOD", payload: newMethod });

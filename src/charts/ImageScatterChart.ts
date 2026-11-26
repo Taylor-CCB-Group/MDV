@@ -162,7 +162,7 @@ class ImageScatterChart extends BaseChart<any> {
     }
 
     //needs *not* to be in `methodsUsingColumns`, which will break things...
-    onDataFiltered(dim: Dimension) {
+    onDataFiltered(_dim: Dimension) {
         this.dataModel.updateModel();
         this.updateDeck();
     }

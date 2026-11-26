@@ -166,7 +166,6 @@ from enum import Enum
                 (schema as any).properties.type?.const
             ) {
                 const chartType = (schema as any).properties.type.const;
-                // biome-ignore lint/style/useTemplate: wrapping complex expression would be harder to read.
                 const className =
                     chartType
                         .split("_")
@@ -298,18 +297,18 @@ async function main() {
 
     try {
         // Generate main chart config schema
-        const chartConfigSchema = generateAndSaveSchema(ChartConfigSchema, "chart-config-schema.json");
+        generateAndSaveSchema(ChartConfigSchema, "chart-config-schema.json");
 
         console.log("📊 Chart config schema generated successfully!");
 
         // Generate datasource schema
-        const datasourceSchema = generateAndSaveSchema(DataSourceSchema, "datasource-schema.json");
+        generateAndSaveSchema(DataSourceSchema, "datasource-schema.json");
 
         console.log("📊 Datasource schema generated successfully!");
         console.log("📋 Schema includes validation for datasource configuration");
 
         // Generate datasources array schema
-        const datasourcesArraySchema = generateAndSaveSchema(DataSourcesArraySchema, "datasources-array-schema.json");
+        generateAndSaveSchema(DataSourcesArraySchema, "datasources-array-schema.json");
 
         console.log("📊 Datasources array schema generated successfully!");
         console.log("📋 Schema includes validation for arrays of datasources");

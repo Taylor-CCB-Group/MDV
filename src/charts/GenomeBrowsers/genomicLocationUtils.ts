@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useDataStore } from "@/react/context";
 import { useFieldSpecs } from "@/react/hooks";
-import { DataColumn } from "../charts";
+import type { DataColumn } from "../charts";
 
 export interface GenomeLocation {
     chr: string;

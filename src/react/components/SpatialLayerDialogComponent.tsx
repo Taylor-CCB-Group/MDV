@@ -467,7 +467,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
                     <DragIndicatorIcon fontSize="small" />
                 </IconButton>
             ) : (
-                <span className="w-[30px] flex-shrink-0" />
+                <span className="w-[30px] shrink-0" />
             )}
             {expander && (
                 <IconButton
@@ -494,7 +494,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
             {failure && <WarningAmberIcon fontSize="small" color="warning" sx={{ flexShrink: 0 }} />}
             {!failure && status && (
                 <span
-                    className="flex flex-shrink-0"
+                    className="flex shrink-0"
                     title={
                         status.errors.length > 0
                             ? `Could not load: ${status.errors.map(({ error }) => error.message).join(" ")}`
@@ -516,7 +516,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
                 <Typography
                     variant="body2"
                     // grows to fill the row between its controls, so it is the row's click target
-                    className="grow truncate select-none cursor-pointer rounded focus-visible:outline focus-visible:outline-2"
+                    className="grow truncate select-none cursor-pointer rounded focus-visible:outline-solid focus-visible:outline-2"
                     title="Double-click (or F2) to rename"
                     role="button"
                     tabIndex={0}
@@ -565,7 +565,7 @@ const LayerTreeRow = observer(function LayerTreeRow({
                 </IconButton>
             )}
             {supportsOpacity && (
-                <div className="w-20 px-1 flex-shrink-0">
+                <div className="w-20 px-1 shrink-0">
                     <Slider
                         size="small"
                         min={0}

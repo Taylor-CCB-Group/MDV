@@ -36,7 +36,6 @@ export type SpatialLayerProps = ScatterplotLayerProps & {
 function densitySubLayers(
     contourLayers: ContourLayerProps[],
     isWebGPU: boolean,
-    // biome-ignore lint/suspicious/noExplicitAny: deck types getSubLayerProps' result as any.
     subLayerProps: (props: ContourLayerProps) => any,
 ): Layer[] {
     const contourSubLayerProps = {
@@ -81,7 +80,6 @@ export class DensityOverlayLayer extends CompositeLayer<DensityOverlayLayerProps
 export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     static layerName = "SpatialLayer";
     static defaultProps = ScatterplotLayer.defaultProps;
-    // biome-ignore lint/complexity/noUselessConstructor: tsc error if we remove this?
     constructor(props: SpatialLayerProps) {
         super(props);
     }

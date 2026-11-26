@@ -66,7 +66,7 @@ function LabeledSlider({
 }) {
     return (
         <div className="flex items-center gap-3">
-            <Typography variant="caption" className="w-28 flex-shrink-0">
+            <Typography variant="caption" className="w-28 shrink-0">
                 {label}
             </Typography>
             <Slider

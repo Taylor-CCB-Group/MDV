@@ -35,8 +35,8 @@ function getDoubleCategory(lFilter, gFilter, data, data2, config) {
     const rowCount = mt1 ? data.length / config.stringLength : data.length;
     const rowTotals = new Array(config.values.length).fill(0);
     const colTotals = new Array(config.values2.length).fill(0);
-    const matrix = Array.from(config.values, (x, i1) => {
-        return Array.from(config.values2, (x, i2) => ({
+    const matrix = Array.from(config.values, (_x, i1) => {
+        return Array.from(config.values2, (_x, i2) => ({
             i1: i1,
             i2: i2,
             c: 0,
@@ -121,7 +121,7 @@ function getDoubleCategory(lFilter, gFilter, data, data2, config) {
 }
 
 //data the x category (groups)
-function getProportionData(lFilter, gFilter, data, data2, config) {
+function getProportionData(_lFilter, gFilter, data, data2, config) {
     const len1 = config.values.length;
     const len2 = config.values2.length;
     const data3 = config.cats ? new Uint8Array(config.cats) : null;
@@ -133,7 +133,6 @@ function getProportionData(lFilter, gFilter, data, data2, config) {
         totals[n] = new Array(len2).fill(0);
     }
     const cat = config.category;
-    let total = 0;
     for (let i = 0; i < len; i++) {
         //if filtered out in global but not in local
         totals[data[i]][data2[i]]++;
@@ -142,7 +141,6 @@ function getProportionData(lFilter, gFilter, data, data2, config) {
                 continue;
             }
             counts[data[i]][data2[i]]++;
-            total++;
         }
     }
     let t_max = 0;
@@ -253,10 +251,10 @@ function getNumberInCategory(lFilter, gFilter, data, config) {
 
 function getStackedData(lFilter, gFilter, data, data2, config) {
     const len = data.length;
-    const matrix = Array.from(config.values, (x, i) => {
+    const matrix = Array.from(config.values, (_x, i) => {
         return {
             id: i,
-            values: Array.from(config.values2, (x, i) => ({ id: i, count: 0 })),
+            values: Array.from(config.values2, (_x, i) => ({ id: i, count: 0 })),
             total: 0,
         };
     });
@@ -289,10 +287,10 @@ function getSankeyData(lFilter, gFilter, data, data2, config) {
     const len2 = config.values2.length;
     const len = data.length;
     const matrix = new Array(len1);
-    const nodes1 = config.values.map((x, i) => {
+    const nodes1 = config.values.map((_x, i) => {
         return `A${i}`;
     });
-    const nodes2 = config.values2.map((x, i) => {
+    const nodes2 = config.values2.map((_x, i) => {
         return `B${i}`;
     });
 

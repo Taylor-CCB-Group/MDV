@@ -16,7 +16,6 @@ class SingleSeriesChart extends SVGChart {
             this._setTitle();
         }
         const p = this.config.param;
-        const c = this.config;
         const vals = this.dataStore.getColumnValues(p[0]);
         this.x_scale.domain(vals.slice(0));
         this.config.scale = this.config.scale || this.dataStore.getColumnQuantile(p[4], "0.001");
@@ -25,7 +24,7 @@ class SingleSeriesChart extends SVGChart {
         this.addToolTip();
     }
 
-    remove(notify = true) {
+    remove(_notify = true) {
         super.remove();
     }
 
@@ -60,7 +59,7 @@ class SingleSeriesChart extends SVGChart {
         //samples
         const sc = this.dataStore.columnIndex[p[3]].data;
         const fcVals = this.dataStore.columnIndex[p[0]].values;
-        const errorBars = fcVals.map((x) => {
+        const errorBars = fcVals.map(() => {
             return {
                 values: [],
                 totals: 0,
@@ -169,7 +168,7 @@ class SingleSeriesChart extends SVGChart {
             .on("mouseleave", () => {
                 this.hideToolTip();
             })
-            .on("click", (e, d) => {
+            .on("click", (_e, d) => {
                 this.dataStore.dataHighlighted([d[3]], this);
             })
 
@@ -245,7 +244,6 @@ BaseChart.types["single_series_chart"] = {
     },
     init: (config, ds, ec) => {
         const i = ds.interactions;
-        const param = ds.interactions.cell_radial_chart;
         config.param = [ec.group, i.interaction_columns[0], i.interaction_columns[1], i.pivot_column, ec.data];
         config.categories = [ec.c1, ec.c2];
     },

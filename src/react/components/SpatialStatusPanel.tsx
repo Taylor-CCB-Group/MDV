@@ -58,7 +58,7 @@ const SpatialStatusPanel = observer(function SpatialStatusPanel({ chart }: { cha
                     {failures.map(({ entryId, failure, name }) => (
                         <p
                             key={entryId}
-                            className="line-clamp-3 break-words"
+                            className="line-clamp-3 wrap-break-word"
                             title={[failure.reason, failure.detail].filter(Boolean).join("\n\n")}
                         >
                             <span className="font-medium">{name}</span>: {failure.reason}
@@ -76,7 +76,7 @@ const SpatialStatusPanel = observer(function SpatialStatusPanel({ chart }: { cha
             {canvasErrors.length > 0 && (
                 <Section title="Rendering errors">
                     {canvasErrors.map((error) => (
-                        <p key={error.message} className="line-clamp-3 break-words" title={error.message}>
+                        <p key={error.message} className="line-clamp-3 wrap-break-word" title={error.message}>
                             {error.message}
                             {error.count > 1 && ` (×${error.count})`}
                         </p>

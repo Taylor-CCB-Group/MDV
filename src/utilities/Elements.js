@@ -158,7 +158,7 @@ function makeSortable(list, config = {}) {
         return false;
     }
 
-    function handleDragEnd(e) {
+    function handleDragEnd(_e) {
         allowDrag = false;
         dragged.classList.remove("mdv-element-dragged");
         if (config.sortEnded) {
@@ -543,7 +543,7 @@ function addResizeListener(element, endCallback, startCallback) {
     const box = element.getBoundingClientRect();
     let width = box.width;
     let height = box.height;
-    const list = (e) => {
+    const list = () => {
         const box = element.getBoundingClientRect();
         if (box.width !== width || box.height !== height) {
             endCallback(box.width, box.height);

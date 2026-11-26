@@ -110,7 +110,6 @@ export default function popoutChart(chart: BaseChart<any>) {
         //this will enable the chart position, size to be manipulated
         //in the current layout manager (absolute or gridstack)
         chartManager._makeChartRD(chart, chart.dataSource);
-        //@ts-ignore
         chartManager.charts[chart.config.id].win = mainWindow;
         chart.changeBaseDocument(document);
         themeObserver.disconnect();

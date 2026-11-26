@@ -51,7 +51,7 @@ class DeepToolsHeatMap extends SVGChart {
         //create the webgl
         this.app = new WGL2DI(this.graphDiv, { lock_x_axis: true });
 
-        this.app.addHandler("object_clicked", (i, apos) => {
+        this.app.addHandler("object_clicked", (_i, apos) => {
             const r = Math.floor(apos[1] / 20);
             const index = this.reverse_map[r];
             this.dataStore.dataHighlighted([index], this);
@@ -70,7 +70,7 @@ class DeepToolsHeatMap extends SVGChart {
             this.dataLength = 0;
             //filter out 0 values
 
-            const a = Date.now();
+            // const a = Date.now();
             for (let n = 0; n < data.length; n++) {
                 if (data[n] !== 0) {
                     this.dataLength++;
@@ -274,7 +274,7 @@ BaseChart.types["deeptools_heatmap"] = {
         ];
     },
 
-    init: (config, dataSource, ec) => {
+    init: (config, _dataSource, ec) => {
         config.heatmap = ec["map"];
     },
 };

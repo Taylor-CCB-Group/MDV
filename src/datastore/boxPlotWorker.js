@@ -104,8 +104,6 @@ onmessage = function (e) {
                 boxStats.push(k);
             }
         }
-        const min = config.ticks[config.ticks.length - 1];
-        const interval = config.ticks[0] - config.ticks[1];
         for (let n = 0; n < len; n++) {
             const r = ranges[categories[n]];
             if (r) {
@@ -170,7 +168,6 @@ function multiBoxPlot(e) {
         sv.push(sv[1] - sv[0]);
     }
 
-    const lFilter = new Uint8Array(e.data[0]);
     const gFilter = new Uint8Array(e.data[1]);
     const tLen = gFilter.length;
     const results = new Array(dLen);

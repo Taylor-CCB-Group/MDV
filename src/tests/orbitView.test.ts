@@ -55,8 +55,8 @@ describe("a classic 3D scatter's camera", () => {
         const [width, height] = [420, 300];
         const scales: [number, number, number] = [0.5, 1, 3];
         const view = orbitViewFromLegacyCamera(camera, [...center], height);
-        expect(view).toBeDefined();
-        const selectionView: OrbitSelectionView = { ...view!, width, height, orbitAxis: "Y" };
+        if (!view) throw new Error("expected an orbit view");
+        const selectionView: OrbitSelectionView = { ...view, width, height, orbitAxis: "Y" };
         const modelMatrix = new Matrix4().scale(scales);
         const r = camera.distance / 8;
         const points: [number, number, number][] = [
