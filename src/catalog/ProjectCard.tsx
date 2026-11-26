@@ -97,7 +97,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     onDelete,
     onRename,
     onChangeType,
-    onExport,
     thumbnail,
     readme,
     selectionMode = false,
@@ -110,7 +109,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
     // "closing" keeps the overlay mounted while its exit animation plays.
     const [titlePhase, setTitlePhase] = useState<"closed" | "open" | "closing">("closed");
     const titleRef = useRef<HTMLDivElement>(null);

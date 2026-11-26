@@ -89,7 +89,7 @@ export type SettingsDialogState = {
  *
  * The generic parameter `T` is the type of the chart configuration - maybe overkill, or maybe useful at some point.
  */
-export type SerialString<T extends BaseConfig> = string;
+export type SerialString<_T extends BaseConfig> = string;
 class BaseChart<T extends BaseConfig> {
     config: T;
     __doc__: Document;
@@ -371,7 +371,7 @@ class BaseChart<T extends BaseConfig> {
                 //there is an implementation of the method here in BaseChart, but we wrap in a try/catch as it assumes other associated methods are also implemented.
                 //Calling this in a timeout helps ensure that the chart is fully constructed before we try to do this.
                 this.setColorLegend();
-            } catch (e) {}
+            } catch (_e) {}
         });
         // provide some observable mobx state for useOuterContainer()
         this.observable = makeAutoObservable({
@@ -448,7 +448,7 @@ class BaseChart<T extends BaseConfig> {
     getFilter(): any {}
 
     /** appears to be an appropriate type signature from glancing at uses in the code */
-    setFilter(active: boolean) {}
+    setFilter(_active: boolean) {}
 
     /**
      * Adds a listener to the datastore that will be called when an event occurs,
@@ -562,9 +562,9 @@ class BaseChart<T extends BaseConfig> {
     /**
      * Called by the datastore when the data is filtered. Needs to
      * be implemented on any subclasses.
-     * @param dim - the dimension that has been filtered
+     * @param _dim - the dimension that has been filtered
      */
-    onDataFiltered(dim?: Dimension) {}
+    onDataFiltered(_dim?: Dimension) {}
 
     setToolTipColumn?(column: FieldSpec): void;
     /**
@@ -812,11 +812,11 @@ class BaseChart<T extends BaseConfig> {
         return false;
     }
 
-    onDataAdded(newSize: number) {
+    onDataAdded(_newSize: number) {
         this.onDataFiltered();
     }
 
-    onDataHighlighted(data: any) {}
+    onDataHighlighted(_data: any) {}
     _tooltip?: HTMLDivElement;
     addToolTip() {
         this._tooltip = createEl(
@@ -865,7 +865,7 @@ class BaseChart<T extends BaseConfig> {
         for (const disposer of this.reactionDisposers) {
             disposer();
         }
-        this.menuTooltips.forEach((t) => t.destroy());
+        this.menuTooltips.map((t) => t.destroy());
         this.menuTooltips = [];
         if (this._fullscreenChangeHandler) {
             this.__doc__.removeEventListener("fullscreenchange", this._fullscreenChangeHandler);
@@ -1096,7 +1096,7 @@ class BaseChart<T extends BaseConfig> {
     unpinIcon?: HTMLElement;
     _addUnpinIcon() {
         this.unpinIcon = this.addMenuIcon("fas fa-thumbtack", "unpin chart");
-        this.unpinIcon.addEventListener("click", (e) => {
+        this.unpinIcon.addEventListener("click", () => {
             this.unpinIcon?.remove();
             this.unpinChart?.();
         });
@@ -1117,7 +1117,7 @@ class BaseChart<T extends BaseConfig> {
      * @returns an array of `ContextMenuItems`
      */
     addToContextMenu?(): any;
-    getContextMenu(data?: any) {
+    getContextMenu(_data?: any) {
         let menu: ContextMenuItem[] = [];
         if (this.getImage) {
             menu = menu.concat([

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/utils/mdvRouting";
 
 export type UserPermission = "View" | "Edit" | "Owner";
@@ -27,13 +27,7 @@ const useProjectShare = (projectId: string) => {
     const [error, setError] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
 
-    useEffect(() => {
-        if (projectId) {
-            getAllUsers();
-        }
-    }, [projectId]);
-
-    const getAllUsers = async () => {
+    const getAllUsers = useCallback(async () => {
         setError("");
         setErrorMsg("");
         setIsLoading(true);
@@ -61,12 +55,18 @@ const useProjectShare = (projectId: string) => {
                     setError(errorData?.error || "An error occurred. Please try again.");
                 }
             }
-        } catch (error) {
+        } catch (_error) {
             setError("Error fetching user data. Please try again.");
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [projectId]);
+
+    useEffect(() => {
+        if (projectId) {
+            getAllUsers();
+        }
+    }, [projectId, getAllUsers]);
 
     const addUser = async (userId: number, permission: UserPermission) => {
         setError("");
@@ -83,7 +83,7 @@ const useProjectShare = (projectId: string) => {
             });
 
             if (res.ok) {
-                const data = await res.json();
+                // const data = await res.json();
                 await getAllUsers();
                 return;
             } else {
@@ -98,7 +98,7 @@ const useProjectShare = (projectId: string) => {
                     setErrorMsg(errorData?.error || errorData?.message || "An error occurred. Please try again.");
                 }
             }
-        } catch (error) {
+        } catch (_error) {
             setErrorMsg("Error adding new user. Please try again.");
         } finally {
             setIsLoading(false);
@@ -120,7 +120,7 @@ const useProjectShare = (projectId: string) => {
             });
 
             if (res.ok) {
-                const data = await res.json();
+                // const data = await res.json();
                 await getAllUsers();
                 return;
             } else {
@@ -135,7 +135,7 @@ const useProjectShare = (projectId: string) => {
                     setErrorMsg(errorData?.error || errorData?.message || "An error occurred. Please try again.");
                 }
             }
-        } catch (error) {
+        } catch (_error) {
             setErrorMsg("Error fetching user data. Please try again.");
         } finally {
             setIsLoading(false);
@@ -155,7 +155,7 @@ const useProjectShare = (projectId: string) => {
             });
 
             if (res.ok) {
-                const data = await res.json();
+                // const data = await res.json();
                 await getAllUsers();
                 return;
             } else {
@@ -171,7 +171,7 @@ const useProjectShare = (projectId: string) => {
                     setErrorMsg(errorData?.error || errorData?.message || "An error occurred. Please try again.");
                 }
             }
-        } catch (error) {
+        } catch (_error) {
             setErrorMsg("Error deleting user. Please try again.");
         } finally {
             setIsLoading(false);

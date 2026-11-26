@@ -91,7 +91,7 @@ class CellRadialChart extends SVGChart {
         let colors = this.dataStore.getColumnColors(c.param[0]);
 
         if (c.states) {
-            colors = colors.filter((x, i) => c.states.indexOf(names[i]) !== -1);
+            colors = colors.filter((_x, i) => c.states.indexOf(names[i]) !== -1);
             names = names.filter((x) => c.states.indexOf(x) !== -1);
         }
         this.state_legend = getColorLegend(colors, names, { label: col.name });
@@ -583,7 +583,7 @@ BaseChart.types["cell_radial_chart"] = {
     name: "Radial Connectivty Map",
     required: ["interactions"],
     methodsUsingColumns: ["setLinkThicknessColumn"],
-    init: (config, dataSource, extraControls) => {
+    init: (config, dataSource, _extraControls) => {
         const i = dataSource.interactions;
         const param = dataSource.interactions.cell_radial_chart;
         config.param = [

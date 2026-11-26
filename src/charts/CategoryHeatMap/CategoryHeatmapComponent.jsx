@@ -140,6 +140,11 @@ const CategoryHeatmapComponent = observer(() => {
     const [errorMessage, setErrorMessage] = useState("");
 
     useEffect(() => {
+        //using as a signal to re-run effect.
+        //(assume these were intentional in dependencies)
+        filter.timeStamp;
+        paramKey;
+
         let cancelled = false;
         setIsLoading(true);
         setErrorMessage("");
@@ -266,6 +271,7 @@ const CategoryHeatmapComponent = observer(() => {
                             return (
                                 <div
                                     key={`cell-${xLabel}-${yLabel}`}
+                                    roll="button"
                                     style={{
                                         ...cellBaseStyle,
                                         background: getCellColor(value, displayData.maxCount, isDark),

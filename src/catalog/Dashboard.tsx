@@ -523,7 +523,7 @@ const Dashboard: React.FC = () => {
                                         onDelete={deleteProject}
                                         onRename={renameProject}
                                         onChangeType={changeProjectType}
-                                        onAddCollaborator={(email) => {}}
+                                        onAddCollaborator={(_email) => {}}
                                         onExport={exportProject}
                                         selectionMode={selectionMode}
                                         selected={selectedProjectIds.has(project.id)}

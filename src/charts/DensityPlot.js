@@ -58,7 +58,7 @@ class DensityPlot extends SVGChart {
     }
 
     setSize(x, y) {
-        super.setSize(x.y);
+        super.setSize(x, y);
         this.updateAxis();
         this.onDataFiltered();
     }
@@ -131,10 +131,10 @@ class DensityPlot extends SVGChart {
             (data) => {
                 this.data = data;
                 this.drawChart();
-                const x_sc = 1; //this.x_scale.range()[1]/x_range[1];
-                const y_sc = 1; //this.y_scale.range()[1]/y_range[1];
-                const x = this.margins.left;
-                const y = this.margins.top;
+                // const x_sc = 1; //this.x_scale.range()[1]/x_range[1];
+                // const y_sc = 1; //this.y_scale.range()[1]/y_range[1];
+                // const x = this.margins.left;
+                // const y = this.margins.top;
 
                 //  this.graph_area.attr("transform",`translate(${x},${y}) scale(${1},${1})  `);
 
@@ -148,7 +148,7 @@ class DensityPlot extends SVGChart {
 
     drawChart(tTime = 400) {
         const color = scaleSequential(interpolateYlGnBu).domain([0, 0.5]);
-        const trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
+        const _trans = select(this.contentDiv).transition().duration(tTime).ease(easeLinear);
 
         this.graph_area
             .selectAll(".dp-polygon")
