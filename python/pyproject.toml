@@ -80,6 +80,14 @@ app = [
     "auth0-python>=4.9.0,<5",
     "flask-jwt-extended>=4.7.1,<5",
     "redis>=5.2.1,<6",
+    # observability: sends traces and metrics only when
+    # OTEL_EXPORTER_OTLP_ENDPOINT is set (mdvtools/telemetry.py, ADR 0025).
+    # The instrumentation packages are released in step with the SDK.
+    "opentelemetry-sdk>=1.45.2,<2",
+    "opentelemetry-exporter-otlp-proto-http>=1.45.2,<2",
+    "opentelemetry-instrumentation-flask>=0.66b2,<1",
+    "opentelemetry-instrumentation-sqlalchemy>=0.66b2,<1",
+    "opentelemetry-instrumentation-system-metrics>=0.66b2,<1",
 ]
 # Genomics: SV VCF import (conversions.add_svvcf_to_mdv) and gene overlap
 # mapping (feature_mapper). Kept out of core because pysam, and pyranges' ncls /

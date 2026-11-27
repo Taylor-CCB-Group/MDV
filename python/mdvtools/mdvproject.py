@@ -32,6 +32,7 @@ from mdvtools.charts.table_plot import TablePlot
 from mdvtools.entry_assets import entry_assets
 from mdvtools.logging_config import get_logger
 from mdvtools.project_protocols import RowsAsColumnsLinkSource
+from mdvtools.telemetry import operation
 
 logger = get_logger(__name__)
 
@@ -2666,25 +2667,29 @@ class MDVProject:
             i.close()
 
     def get_byte_data(self, columns, group):
-        h5 = h5py.File(self.h5file, "r")
-        byte_list = []
-        gr = h5[group]
-        if not isinstance(gr, h5py.Group):
-            raise TypeError("Expected 'gr' to be of type h5py.Group.")
-        for column in columns:
-            sg = column.get("subgroup")
-            if sg:
-                sgindex = int(column["sgindex"])
-                byte_list.append(
-                    get_subgroup_bytes(
-                        gr[sg], sgindex, column.get("sgtype") == "sparse"
+        attributes = {"mdv.datasource": group, "mdv.columns": len(columns)}
+        with operation("mdv.get_byte_data", **attributes) as note:
+            h5 = h5py.File(self.h5file, "r")
+            byte_list = []
+            gr = h5[group]
+            if not isinstance(gr, h5py.Group):
+                raise TypeError("Expected 'gr' to be of type h5py.Group.")
+            for column in columns:
+                sg = column.get("subgroup")
+                if sg:
+                    sgindex = int(column["sgindex"])
+                    byte_list.append(
+                        get_subgroup_bytes(
+                            gr[sg], sgindex, column.get("sgtype") == "sparse"
+                        )
                     )
-                )
-            else:
-                data = gr[column["field"]]
-                byte_list.append(numpy.array(data).tobytes())
-        h5.close()
-        return b"".join(byte_list)
+                else:
+                    data = gr[column["field"]]
+                    byte_list.append(numpy.array(data).tobytes())
+            h5.close()
+            result = b"".join(byte_list)
+            note(**{"mdv.bytes": len(result)})
+            return result
 
     def set_region_data(
         self,

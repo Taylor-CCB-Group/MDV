@@ -288,3 +288,30 @@ class TestEdgeCases:
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
 
+
+
+def test_request_reports_the_project_route_that_matched():
+    """Request metrics and traces name the inner project route, not the catch-all."""
+    from flask import Flask, request
+
+    app = Flask(__name__)
+    app.url_map.strict_slashes = False  # as the MDV server sets it
+    ProjectBlueprint.register_app(app)
+    bp = ProjectBlueprint("route-name-test", "", "/project/route-name-test/")
+    seen = {}
+
+    @bp.route("/tracks/<path:path>")
+    def tracks(path):
+        assert request.url_rule is not None
+        seen["rule"] = request.url_rule.rule
+        seen["endpoint"] = request.endpoint
+        return "ok"
+
+    try:
+        response = app.test_client().get("/project/route-name-test/tracks/a/b.bam")
+    finally:
+        ProjectBlueprint.blueprints.pop("route-name-test", None)
+
+    assert response.status_code == 200
+    assert seen["rule"] == "/project/<project_id>/tracks/<path:path>"
+    assert seen["endpoint"] == "project_route"

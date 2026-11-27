@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 import type ChartManager from "@/charts/ChartManager";
 import type { DataSource } from "@/charts/charts";
+import { startBrowserTelemetry } from "@/utils/browserTelemetry";
 import { diagnoseImportFailure, type ImportProbe } from "@/utils/importFailure";
 import { offerOwnTabIfFramed } from "@/utils/ownTabNotice";
 import { getProject } from "./ProjectContext";
@@ -369,4 +370,6 @@ const closeBootstrapOverlay = () => {
 // Before the project loads, so a framed page without isolation explains itself instead of
 // failing on data loading.
 offerOwnTabIfFramed();
+// Started early, so Faro is running for as much of the project load as possible.
+void startBrowserTelemetry();
 bootstrapRoot.render(<BootstrapApp onComplete={closeBootstrapOverlay} />);
