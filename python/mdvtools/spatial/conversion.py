@@ -216,7 +216,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
 
     We may consider adding more configuration options etc.
     """
-    from mdvtools.spatial.mermaid import sdata_to_mermaid
+    from mdvtools.spatial.mermaid import format_shared_structures
     from mdvtools.markdown_utils import create_project_markdown
     from mdvtools.charts.text_box_plot import TextBox
     from mdvtools.build_info import get_build_info_markdown
@@ -261,10 +261,11 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
     else:
         sdata_candidates = [
             (sdata_name, os.path.join(spatial_dir, sdata_name))
-            for sdata_name in os.listdir(spatial_dir)
+            for sdata_name in sorted(os.listdir(spatial_dir))
             if not sdata_name.startswith(".")
         ]
 
+    loaded: list[tuple[str, SpatialData]] = []
     for sdata_name, sdata_path in sdata_candidates:
         if sdata_name.startswith("."):
             continue
@@ -273,9 +274,15 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         sdata = _try_read_zarr(sdata_path)
         if sdata is None:
             continue
-        sdata_md = f"### {sdata_name}:\n\n```\n{sdata}\n```"
-        sdata_md += f"\n\n#### Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n\n"
-        markdown += sdata_md
+        loaded.append((sdata_name, sdata))
+
+    if loaded:
+        markdown += "### Structure\n\n"
+        markdown += format_shared_structures(loaded)
+        markdown += "\n\n"
+
+    for sdata_name, sdata in loaded:
+        markdown += f"### {sdata_name}:\n\n```\n{sdata}\n```\n\n"
     
     # Add point transform strategy section
     if adata is not None and "mdv" in adata.uns and "point_transform" in adata.uns["mdv"]:
