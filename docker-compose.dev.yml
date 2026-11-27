@@ -32,6 +32,9 @@ services:
       - /app/node_modules/
       - /app/dist/
       - /app/.claude/                 # Claude worktrees stay on host; empty volume in container
+      - /app/.pnpm-store/
+      - /app/.delta/
+      - /app/vite-dist/
       - ~/mdv:/app/mdv
       - dev-db:/app/dev-db             # SQLite database, one per compose project
       # - ~/mdv:/root/mdv # XXX: so that scripts referring to '~/mdv/...' work - may still be issues with db integration etc...
