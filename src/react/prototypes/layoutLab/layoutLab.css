@@ -1,0 +1,289 @@
+/* PROTOTYPE (layout lab) — throwaway. The workspace prototype's canvas, cards, lift,
+   placeholder and handles, shared by all three engines so only the engine differs. */
+.lab-root {
+    --lab-canvas: #f1f3f7;
+    --lab-dot: #d6dbe3;
+    --lab-chrome: #ffffff;
+    --lab-surface: #ffffff;
+    --lab-border: #e1e5eb;
+    --lab-border-strong: #c9cfd9;
+    --lab-fg: #17202b;
+    --lab-muted: #5b6575;
+    --lab-faint: #8a93a2;
+    --lab-accent: #2563eb;
+    --lab-accent-soft: rgba(37, 99, 235, 0.1);
+    --lab-shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06);
+    --lab-shadow-2: 0 10px 28px rgba(16, 24, 40, 0.14), 0 2px 6px rgba(16, 24, 40, 0.06);
+    --lab-r: 10px;
+    --lab-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    background: var(--lab-canvas);
+    color: var(--lab-fg);
+    font-family: Inter, Roboto, system-ui, sans-serif;
+}
+html.dark .lab-root {
+    --lab-canvas: #0d0f13;
+    --lab-dot: #1f232b;
+    --lab-chrome: #14171d;
+    --lab-surface: #171a21;
+    --lab-border: #262b34;
+    --lab-border-strong: #363c48;
+    --lab-fg: #e6e9ef;
+    --lab-muted: #9ba3b2;
+    --lab-faint: #6c7483;
+    --lab-accent: #6f9dff;
+    --lab-accent-soft: rgba(111, 157, 255, 0.14);
+    --lab-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --lab-shadow-2: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ---------- top bar: data sources on the left, lab controls on the right ---------- */
+.lab-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--lab-border);
+    background: var(--lab-chrome);
+    overflow-x: auto;
+    flex: none;
+    font-size: 12px;
+}
+.lab-strip-title {
+    font-weight: 600;
+    white-space: nowrap;
+}
+.lab-chip {
+    white-space: nowrap;
+    padding: 2px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--lab-border);
+    color: var(--lab-muted);
+    font-variant-numeric: tabular-nums;
+}
+.lab-chip b {
+    color: var(--lab-fg);
+    font-weight: 600;
+}
+.lab-spacer {
+    flex: 1;
+}
+.lab-tag {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--lab-faint);
+    white-space: nowrap;
+}
+.lab-seg {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 8px;
+    background: var(--lab-canvas);
+    border: 1px solid var(--lab-border);
+    flex: none;
+}
+.lab-seg button,
+.lab-act {
+    border: 0;
+    background: transparent;
+    color: var(--lab-muted);
+    padding: 4px 9px;
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+    white-space: nowrap;
+}
+.lab-seg button[aria-pressed="true"] {
+    background: var(--lab-surface);
+    color: var(--lab-fg);
+    box-shadow: var(--lab-shadow-1);
+}
+.lab-act {
+    border: 1px solid var(--lab-border);
+    background: var(--lab-surface);
+    color: var(--lab-fg);
+    flex: none;
+}
+.lab-dirty {
+    color: #d97706;
+}
+.lab-results {
+    font-variant-numeric: tabular-nums;
+    color: var(--lab-muted);
+    white-space: nowrap;
+}
+
+/* ---------- canvas ---------- */
+.lab-stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+}
+.lab-frame {
+    width: 100%;
+    height: 100%;
+    transition: max-width 0.25s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.lab-scroll {
+    height: 100%;
+    overflow: auto;
+    scrollbar-gutter: stable;
+}
+.lab-canvas {
+    background-color: var(--lab-canvas);
+    background-image: radial-gradient(var(--lab-dot) 1px, transparent 1.2px);
+    background-size: 18px 18px;
+}
+
+/* ---------- cards (all engines) ---------- */
+.lab-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--lab-surface);
+    border: 1px solid var(--lab-border);
+    border-radius: var(--lab-r);
+    box-shadow: var(--lab-shadow-1);
+    overflow: hidden;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.lab-card:hover {
+    border-color: var(--lab-border-strong);
+}
+.lab-card:focus-visible {
+    outline: none;
+    border-color: var(--lab-accent);
+    box-shadow: 0 0 0 3px var(--lab-accent-soft);
+}
+.lab-slot {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    isolation: isolate;
+}
+/* the chart's own title bar, dressed as the prototype's card header */
+.lab-card .ciview-chart-titlebar {
+    height: 36px !important;
+    display: flex;
+    align-items: center;
+    padding: 0 4px 0 10px;
+    background: var(--lab-surface) !important;
+    color: var(--lab-fg);
+    border-bottom: 1px solid var(--lab-border);
+    cursor: grab;
+    touch-action: none;
+}
+.lab-card .ciview-chart-title {
+    font-size: 13px;
+    font-weight: 600;
+}
+.lab-card .ciview-chart-icon {
+    color: var(--lab-faint);
+    opacity: 0.55;
+    transition: opacity 0.15s;
+}
+.lab-card:hover .ciview-chart-icon {
+    opacity: 1;
+}
+/* the pane workspace's resize handles, in case a chart adds them again */
+.lab-root [class^="resizer-"] {
+    display: none;
+}
+
+/* ---------- in-house engine ---------- */
+.lab-grid {
+    position: relative;
+}
+.lab-grid > .lab-card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transition: transform 0.2s var(--lab-ease), width 0.2s var(--lab-ease), height 0.2s var(--lab-ease),
+        border-color 0.15s, box-shadow 0.15s;
+}
+.lab-grid > .lab-card.lift {
+    transition: none;
+    z-index: 20;
+    box-shadow: var(--lab-shadow-2);
+    opacity: 0.96;
+}
+.lab-grid > .lab-card.lift .ciview-chart-titlebar {
+    cursor: grabbing;
+}
+.lab-ph {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border-radius: var(--lab-r);
+    background: var(--lab-accent-soft);
+    border: 1.5px dashed var(--lab-accent);
+    pointer-events: none;
+    opacity: 0;
+    transition: transform 0.12s ease, width 0.12s ease, height 0.12s ease;
+}
+.lab-grid.moving .lab-ph {
+    opacity: 1;
+}
+.lab-rz {
+    position: absolute;
+    z-index: 20;
+    touch-action: none;
+}
+.lab-rz-e { right: 0; top: 36px; bottom: 12px; width: 9px; cursor: ew-resize; }
+.lab-rz-w { left: 0; top: 36px; bottom: 12px; width: 9px; cursor: ew-resize; }
+.lab-rz-s { bottom: 0; left: 12px; right: 12px; height: 9px; cursor: ns-resize; }
+.lab-rz-se { right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; }
+.lab-rz-sw { left: 0; bottom: 0; width: 18px; height: 18px; cursor: nesw-resize; }
+.lab-card:hover .lab-rz-se::after {
+    content: "";
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--lab-accent);
+    border-bottom: 2px solid var(--lab-accent);
+    border-radius: 0 0 3px 0;
+}
+
+/* ---------- gridstack 14 ---------- */
+.lab-gs .grid-stack-item-content.lab-card {
+    /* gridstack positions the content inside the item, inset by its margin */
+    position: absolute;
+}
+.lab-gs .ui-resizable-handle {
+    z-index: 20;
+}
+/* gridstack puts its handles in the gap between items, where the next chart covers them; put
+   them inside the card's edge, as the prototype does */
+.lab-gs .grid-stack-item > .ui-resizable-s { top: auto !important; bottom: 4px !important; left: 16px !important; right: 16px !important; width: auto !important; height: 9px !important; cursor: ns-resize; transform: none !important; }
+.lab-gs .grid-stack-item > .ui-resizable-e { left: auto !important; right: 4px !important; top: 40px !important; bottom: 16px !important; height: auto !important; width: 9px !important; cursor: ew-resize; transform: none !important; }
+.lab-gs .grid-stack-item > .ui-resizable-w { right: auto !important; left: 4px !important; top: 40px !important; bottom: 16px !important; height: auto !important; width: 9px !important; cursor: ew-resize; transform: none !important; }
+.lab-gs .grid-stack-item > .ui-resizable-se { top: auto !important; left: auto !important; right: 4px !important; bottom: 4px !important; width: 18px !important; height: 18px !important; transform: none !important; }
+.lab-gs .grid-stack-item > .ui-resizable-sw { top: auto !important; right: auto !important; left: 4px !important; bottom: 4px !important; width: 18px !important; height: 18px !important; transform: none !important; }
+.lab-gs .grid-stack-item:hover {
+    z-index: 3;
+}
+.lab-gs .grid-stack-item.ui-draggable-dragging > .lab-card,
+.lab-gs .grid-stack-item.ui-resizable-resizing > .lab-card {
+    box-shadow: var(--lab-shadow-2);
+    opacity: 0.96;
+}
+.lab-gs .grid-stack-placeholder > .placeholder-content {
+    background: var(--lab-accent-soft) !important;
+    border: 1.5px dashed var(--lab-accent);
+    border-radius: var(--lab-r);
+}
+
+/* gridstack hides its handles until the pointer has moved over the item; the prototype's are
+   always there (and invisible), so keep gridstack's there too */
+.lab-gs .grid-stack-item.ui-resizable-autohide > .ui-resizable-handle {
+    display: block !important;
+}
