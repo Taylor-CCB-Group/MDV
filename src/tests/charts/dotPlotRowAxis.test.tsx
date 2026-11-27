@@ -30,6 +30,7 @@ describe("DotPlotRowAxis", () => {
     test("keeps the chosen font size when rows are tall enough", () => {
         const [label] = renderRowAxis(22, 440, 10); // 20px rows
         expect(label.getAttribute("font-size")).toBe("10");
+        expect(label.getAttribute("font-weight")).toBe("700");
     });
 
     test("shrinks labels to the row height so they don't overlap", () => {
