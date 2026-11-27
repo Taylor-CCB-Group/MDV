@@ -30,10 +30,11 @@ A spec (PRD) for the new MDV workspace, an ADR for every decision that blocks bu
 - [03 Chart chrome inventory](tickets/03-chart-chrome-inventory.md) - every chart shares one BaseChart title bar; only six types add icons; most of the 51 types are fully described by `getSettings()`, but spatial, Viv, genome browser, table and gate charts have custom dialogs the settings renderer can't host; SelectionOverlay serves only Deck scatter and the Viv/spatial region charts; about a dozen filter mechanisms, most describable in words, few saved in config; `ChartManager.addMenuIcon`'s only live caller is GridstackManager (hyperion.js is never imported). Unblocks [21 Chart chrome, inspector, tools and filters](tickets/21-chart-chrome-inspector-tools-and-filters.md).
 - [01 Layout engine candidates](tickets/01-layout-engine-candidates.md) - gridstack 14.1 (MDV runs 7.3) has breakpoints, touch and locking built in but no keyboard moves and no documented save of narrow layouts; react-grid-layout 2.3 stores a layout per breakpoint but copies widths unscaled and needs a React wrapper for legacy charts; an in-house engine (~2 KB) already fits the design but lacks touch, west/north resize, screen-reader support, chart hosting and tests. "Unsaved Grid Stack View" is MDV's integration, not gridstack (early baseline, pixel sizes saved, pushed charts never written back). Unblocks [19 Layout engine bake-off and choice](tickets/19-layout-engine-bake-off-and-choice.md).
 - [18 One view, saved layout and screen sizes](tickets/18-one-view-saved-layout-and-screen-sizes.md) - ADR 0026: the new workspace is a `preview` browser preference; pane views convert on open into one flat grid in reading order and save to a separate `views_v2.json` (flat chart list naming each data source, one 12-column `{x, y, w, h}` layout), leaving `views.json` untouched; a view's data sources are its `dataSources` keys plus any added; 12/6/1 columns at 960/600 px, tablet derived and no move/resize, phone view and filter. Unblocks [19 Layout engine bake-off and choice](tickets/19-layout-engine-bake-off-and-choice.md).
+- [19 Layout engine bake-off and choice](tickets/19-layout-engine-bake-off-and-choice.md) - ADR 0027: the in-house (prototype) engine, behind a seam (charts + 12-column layout in, whole layout out per gesture; `flow`, `compact`, keyboard moves, chart host and saving outside it) so gridstack 14 can replace it if the team prefers it; gridstack felt the same by hand but can't grow a chart past the window bottom and needed its handles, column layouts and scrolling worked around; react-grid-layout was least smooth. Unblocks [20 Walking skeleton](tickets/20-walking-skeleton.md).
 
 ## Not yet specified
 
-- Accessibility targets: keyboard use of the grid and tools, contrast in both themes. Partly answered by the engine choice in [19 Layout engine bake-off and choice](tickets/19-layout-engine-bake-off-and-choice.md).
+- Accessibility targets: keyboard use of the tools, screen-reader announcements, contrast in both themes. The grid's keyboard moves and 24 px handles are settled in [19 Layout engine bake-off and choice](tickets/19-layout-engine-bake-off-and-choice.md).
 - The PRD and the build slices, once everything above is resolved.
 
 ## Out of scope
@@ -46,7 +47,7 @@ A spec (PRD) for the new MDV workspace, an ADR for every decision that blocks bu
 Restructured on 2026-11-26 from 13 open tickets into five sessions. Each session runs `/wayfinder` with this map and takes the lowest open, unblocked ticket.
 
 1. ~~[18 One view, saved layout and screen sizes](tickets/18-one-view-saved-layout-and-screen-sizes.md)~~: resolved
-2. [19 Layout engine bake-off and choice](tickets/19-layout-engine-bake-off-and-choice.md): prototype, gridstack 14 against the in-house engine on real projects
+2. ~~[19 Layout engine bake-off and choice](tickets/19-layout-engine-bake-off-and-choice.md)~~: resolved, in-house engine with gridstack 14 as the fallback
 3. [20 Walking skeleton](tickets/20-walking-skeleton.md): the first real build slice, behind a flag, plus the acceptance checks
 4. [21 Chart chrome, inspector, tools and filters](tickets/21-chart-chrome-inspector-tools-and-filters.md) and [22 Theme, undo and rollout](tickets/22-theme-undo-and-rollout.md): grilling with the skeleton running; either order
 5. `/to-prd`, then `/to-issues`

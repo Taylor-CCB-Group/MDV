@@ -187,6 +187,12 @@ names its data source, and one 12-column layout in grid units.
 _Avoid_: new view, converted view (a converted view is a pane view opened in the preview and
 not yet saved)
 
+**Layout engine**:
+The module that shows a view's charts in its 12-column layout and reports the whole new layout
+when a drag or resize ends. The saved format, `flow`, keyboard moves, the chart host and saving
+sit outside it, so one engine can replace another (ADR 0027).
+_Avoid_: grid manager, gridstack (the library is one possible engine)
+
 ## SpatialData.js integration terms
 
 Canonical rendering vocabulary lives in [SpatialData.js CONTEXT.md](https://github.com/Taylor-CCB-Group/SpatialData.js/blob/main/CONTEXT.md). MDV chart code uses the same terms:
