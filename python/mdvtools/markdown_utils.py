@@ -42,7 +42,7 @@ def create_project_markdown(
         ds = project.get_datasource_metadata(name)
         markdown += f"{header} **{name}:** ({ds['size']} rows)\n\n"
         # todo - add a summary of the data here
-        markdown += create_column_markdown(ds["columns"])
+        markdown += create_column_markdown(ds["columns"], header_level + 1)
     if wrap_in_details:
         markdown += "\n\n</details>\n\n"
     return markdown
@@ -58,14 +58,17 @@ def escape_markdown(text: str) -> str:
         text = text.replace(char, "\\" + char)
     return text
 
-def create_column_markdown(cols: list[dict]) -> str:
+def create_column_markdown(cols: list[dict], header_level: int = 3) -> str:
     """
     Create a markdown representation of the columns in a datasource.
     Args:
         cols: A list of dictionaries, each containing the column name and data type
+        header_level: Heading size for the column sections. Defaults to three so the
+            sections sit under a level-two datasource heading.
     Returns:
         A string containing the markdown representation of the columns
     """
+    header = "#" * header_level
     numeric_cols = []
     categorical_cols = []
     other_cols = []
@@ -82,7 +85,7 @@ def create_column_markdown(cols: list[dict]) -> str:
     markdown = ""
     
     if categorical_cols:
-        markdown += "\n### Categorical Columns\n"
+        markdown += f"\n{header} Categorical Columns\n"
         markdown += "| Column Name | Field ID | Data Type | Values (sample) |\n|---|---|---|---|\n"
         for col in categorical_cols:
             col_name = escape_markdown(col.get('name', ''))
@@ -98,7 +101,7 @@ def create_column_markdown(cols: list[dict]) -> str:
             markdown += f"| {col_name} | `{field_id}` | {datatype} | {values_str} |\n"
 
     if numeric_cols:
-        markdown += "\n### Numeric Columns\n"
+        markdown += f"\n{header} Numeric Columns\n"
         markdown += "| Column Name | Field ID | Data Type | Min / Max | Quantiles (0.05) |\n|---|---|---|---|---|\n"
         for col in numeric_cols:
             col_name = escape_markdown(col.get('name', ''))
@@ -114,7 +117,7 @@ def create_column_markdown(cols: list[dict]) -> str:
             markdown += f"| {col_name} | `{field_id}` | {datatype} | {min_max_str} | {quantiles_str} |\n"
 
     if other_cols:
-        markdown += "\n### Other Columns\n"
+        markdown += f"\n{header} Other Columns\n"
         markdown += "| Column Name | Field ID | Data Type |\n|---|---|---|\n"
         for col in other_cols:
             col_name = escape_markdown(col.get('name', ''))

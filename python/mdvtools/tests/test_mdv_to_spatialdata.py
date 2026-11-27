@@ -12,7 +12,10 @@ from click.testing import CliRunner
 import mdvtools.cli as cli_module
 from mdvtools.mdvproject import MDVProject
 from mdvtools.spatial.mdv_to_spatialdata import (
+    ColumnLayout,
     _read_segmentation,
+    _region_table,
+    _relocate_asset,
     export_converted_project,
     export_mdv_to_spatialdata,
     expression_field,
@@ -150,6 +153,7 @@ def _build_project(root: Path, *, geojson_ids: dict[str, list[int]] | None = Non
     project.set_view(
         "qc",
         {
+            "note": "log2_DAPI",
             "initialCharts": {
                 "cells": [
                     {
@@ -157,7 +161,8 @@ def _build_project(root: Path, *, geojson_ids: dict[str, list[int]] | None = Non
                         "param": ["log2_DAPI", "leiden"],
                         "color_by": "zscore_CD3",
                     }
-                ]
+                ],
+                "clinical": [{"type": "table", "param": ["log2_DAPI"]}],
             }
         },
         make_default=True,
@@ -198,6 +203,7 @@ def test_export_writes_one_store_per_region_with_shared_names(tmp_path):
         project_dir,
         output,
         channel_renames={"DAPI_FINAL": "DAPI"},
+        segmentation_parts=True,
     )
 
     assert [path.name for path in written] == ["wide.zarr", "small.zarr"]
@@ -277,7 +283,10 @@ def test_converted_project_uses_marker_link_fields_in_views(tmp_path):
     subgroups = links[0]["link"]["rows_as_columns"]["subgroups"]
     assert set(subgroups) == {"log2", "zscore"}
 
-    chart = project.get_view("qc")["initialCharts"]["cells"][0]
+    view = project.get_view("qc")
+    assert view["note"] == "log2_DAPI"
+    assert list(view["initialCharts"]) == ["cells"]
+    chart = view["initialCharts"]["cells"][0]
     assert chart["param"] == [expression_field("log2", "DAPI", 0), "leiden"]
     assert chart["color_by"] == expression_field("zscore", "CD3", 1)
     assert expression_field("log2", "DAPI", 0) == "log2|DAPI (log2)|0"
@@ -300,6 +309,57 @@ def test_repeated_dn_is_one_multipolygon(tmp_path):
     assert len(list(getattr(first.geometry, "geoms"))) == 2
     assert second.parts == 1
     assert getattr(second.geometry, "geom_type", None) == "Polygon"
+
+
+def test_one_multipolygon_feature_counts_as_one_part(tmp_path):
+    path = tmp_path / "cells.json"
+    rings = [
+        [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]],
+        [[3, 3], [4, 3], [4, 4], [3, 4], [3, 3]],
+    ]
+    path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {"DN": 1},
+                        "geometry": {"type": "MultiPolygon", "coordinates": [[ring] for ring in rings]},
+                    }
+                ],
+            }
+        )
+    )
+    boundary = _read_segmentation(path)[1]
+    assert boundary.parts == 1
+    assert len(list(getattr(boundary.geometry, "geoms"))) == 2
+
+
+def test_segmentation_parts_column_is_optional():
+    frame = pd.DataFrame({"leiden": ["a"], "log2_DAPI": [1.0]})
+    layout = ColumnLayout(["DAPI"], {"log2": ["log2_DAPI"]}, "log2", {}, ["leiden"])
+    omitted = _region_table(frame, layout, np.array([1]), [4], segmentation_parts=False)
+    included = _region_table(frame, layout, np.array([1]), [4], segmentation_parts=True)
+    assert "segmentation_parts" not in omitted.obs.columns
+    assert list(included.obs["segmentation_parts"]) == [4]
+
+
+def test_region_file_outside_images_and_json_is_linked(tmp_path):
+    source = tmp_path / "source"
+    output = tmp_path / "output"
+    segmentation = source / "segmentations" / "cells.json"
+    segmentation.parent.mkdir(parents=True)
+    segmentation.write_text("{}")
+    output.mkdir()
+    (output / "images").mkdir()
+    (output / "json").mkdir()
+
+    placed = _relocate_asset(source, output, "segmentations/cells.json")
+
+    assert placed == "segmentations/cells.json"
+    assert (output / "segmentations" / "cells.json").is_symlink()
+    assert _relocate_asset(source, output, "json/cells.json") == "json/cells.json"
 
 
 def test_segmentation_ids_must_match_object_ids(tmp_path):

@@ -354,7 +354,8 @@ def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, l
     "--as-project",
     is_flag=True,
     help="Write OUTPUT_DIR as an MDV project. Stores go in OUTPUT_DIR/spatial. "
-    "Marker columns become a markers datasource, and views load them with rows-as-columns fields.",
+    "Marker columns become a markers datasource. Charts on that cell datasource are copied "
+    "with marker fields rewritten. Other datasources are not exported, and Viv charts are not converted.",
 )
 @click.option(
     "--markers-datasource",
@@ -362,7 +363,20 @@ def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, l
     show_default=True,
     help="Name of the variable datasource written with --as-project.",
 )
-def export_spatial_cmd(project_dir, output_dir, datasource, channel_renames, as_project, markers_datasource):
+@click.option(
+    "--segmentation-parts",
+    is_flag=True,
+    help="Add a segmentation_parts column counting GeoJSON features merged into each cell.",
+)
+def export_spatial_cmd(
+    project_dir,
+    output_dir,
+    datasource,
+    channel_renames,
+    as_project,
+    markers_datasource,
+    segmentation_parts,
+):
     """Write one SpatialData store per image region, or a converted MDV project with --as-project."""
     from .spatial.mdv_to_spatialdata import (
         export_converted_project,
@@ -381,6 +395,7 @@ def export_spatial_cmd(project_dir, output_dir, datasource, channel_renames, as_
             datasource=datasource,
             markers_datasource=markers_datasource,
             channel_renames=renames,
+            segmentation_parts=segmentation_parts,
         )
         click.echo(project)
         return
@@ -389,6 +404,7 @@ def export_spatial_cmd(project_dir, output_dir, datasource, channel_renames, as_
         output_dir,
         datasource=datasource,
         channel_renames=renames,
+        segmentation_parts=segmentation_parts,
     ):
         click.echo(path)
 

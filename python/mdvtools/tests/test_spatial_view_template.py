@@ -2,6 +2,7 @@
 
 import os
 
+from mdvtools.markdown_utils import create_column_markdown
 from mdvtools.spatial.project_helpers import (
     build_spatial_regions_metadata,
     create_empty_spatial_mdv_project,
@@ -19,6 +20,14 @@ def _project_with_region(tmp_path, region: dict):
     obs_md["regions"] = build_spatial_regions_metadata({"sample_global": region}, "spatial_region")
     mdv.set_datasource_metadata(obs_md)
     return mdv
+
+
+def test_column_headings_nest_under_the_datasource_heading():
+    text = create_column_markdown(
+        [{"name": "leiden", "field": "leiden", "datatype": "text", "values": ["a"]}],
+        4,
+    )
+    assert "\n#### Categorical Columns\n" in text
 
 
 def test_default_spatial_view_uses_spatialdata_chart(tmp_path):

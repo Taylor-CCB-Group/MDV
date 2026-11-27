@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Literal, Sequence
 
 from spatialdata.models import get_table_keys
 if TYPE_CHECKING:
+    from anndata import AnnData
     from spatialdata import SpatialData
 
 ElementType = Literal["images", "labels", "points", "shapes", "tables"]
@@ -51,7 +52,25 @@ def _coordinate_systems(sdata: "SpatialData") -> list[CoordinateSystem]:
                 targets = sorted(str(target) for target in annotated_array if target is not None)
                 cs_annotations[element_name] = targets
         systems.append(CoordinateSystem(name=cs_name, elements=cs_elements, annotations=cs_annotations))
+    seen_tables = {name for cs in systems for name in cs.elements.get("tables", [])}
+    missing_tables = sorted(name for name in sdata.tables if name not in seen_tables)
+    if missing_tables:
+        annotations: dict[str, list[str]] = {}
+        for table_name in missing_tables:
+            annotations[table_name] = _table_annotation_targets(sdata.tables[table_name])
+        systems.append(
+            CoordinateSystem(name="unassigned", elements={"tables": missing_tables}, annotations=annotations)
+        )
     return systems
+
+
+def _table_annotation_targets(table: "AnnData") -> list[str]:
+    try:
+        annotated, _region_key, _instance_key = get_table_keys(table)
+    except ValueError:
+        return []
+    annotated_array = annotated if isinstance(annotated, list) else [annotated]
+    return sorted(str(target) for target in annotated_array if target is not None)
 
 def sdata_to_mermaid(sdata: "SpatialData", orientation: Literal["LR", "TD"] = "LR") -> str:
     """

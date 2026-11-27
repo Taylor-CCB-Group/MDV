@@ -33,6 +33,18 @@ def test_same_structure_is_one_diagram_regardless_of_element_order():
     assert "extra" in diagram
 
 
+def test_unannotated_table_makes_its_own_structure():
+    from anndata import AnnData
+
+    plain = _images("morphology")
+    with_table = _images("morphology")
+    with_table.tables["qc"] = AnnData(np.ones((2, 1), dtype=np.float32))
+    groups = group_by_structure([("plain.zarr", plain), ("qc.zarr", with_table)])
+
+    assert [names for names, _diagram in groups] == [["plain.zarr"], ["qc.zarr"]]
+    assert "qc" in groups[1][1]
+
+
 def test_different_structures_stay_in_separate_groups():
     shared = _images("morphology")
     other = _images("morphology", "transcripts")

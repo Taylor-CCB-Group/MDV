@@ -6,7 +6,7 @@ import os
 import re
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Mapping, Optional
 import numpy as np
 from ..serverlite import serve_project
 from .browser_store import (
@@ -948,11 +948,9 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
     # transform coordinates to image coordinates for each row in the table
     _transform_table_coordinates(adata, region_to_image)
     
-    # store in uns for this table
-    adata.uns.setdefault("mdv", {})
-    adata.uns["mdv"].setdefault("regions", all_regions)
-    # Store transform provenance
-    adata.uns["mdv"]["point_transform"] = transform_provenance
+    # Replace any regions left by an earlier conversion. The new dict carries the
+    # pixel scale until _consume_region_scales reads it.
+    _assign_resolved_regions(adata, all_regions, transform_provenance)
 
 
 
@@ -1012,6 +1010,102 @@ def _record_region_scale(
     scale = _image_pixel_scale(image, coordinate_system)
     if scale is not None:
         region[_REGION_SCALE_KEY] = scale
+
+
+def _assign_resolved_regions(
+    adata: "AnnData",
+    regions: dict[str, dict],
+    transform_provenance: dict[str, dict],
+) -> None:
+    """Store this conversion's region metadata, replacing a previous copy."""
+    mdv = adata.uns.setdefault("mdv", {})
+    mdv["regions"] = regions
+    mdv["point_transform"] = transform_provenance
+
+
+def _region_scale_token(region: object) -> tuple[bool, float] | None:
+    if not isinstance(region, dict) or _REGION_SCALE_KEY not in region:
+        return None
+    return (True, float(region[_REGION_SCALE_KEY]))
+
+
+def _regions_share_coordinate_basis(current: Mapping[str, dict], incoming: Mapping[str, object]) -> bool:
+    """True when every shared region id has the same pixel scale."""
+    for region_id, region in incoming.items():
+        previous = current.get(region_id)
+        if previous is None:
+            continue
+        old_scale = _region_scale_token(previous)
+        new_scale = _region_scale_token(region)
+        if old_scale is None and new_scale is None:
+            continue
+        if old_scale is None or new_scale is None or not np.isclose(old_scale[1], new_scale[1]):
+            return False
+    return True
+
+
+def _refresh_regions(current: dict[str, dict], incoming: Mapping[str, object]) -> None:
+    for region_id, region in incoming.items():
+        if isinstance(region, dict):
+            current[region_id] = region
+
+
+def _partition_records(
+    records: list[SpatialTableRecord],
+) -> list[tuple[list[SpatialTableRecord], dict[str, dict]]]:
+    """Split records whose shared region ids use different pixel scales.
+
+    Placement follows table id, so the groups do not depend on input order.
+    Records whose scales agree stay together and keep the newer region metadata.
+    """
+    partitions: list[list[SpatialTableRecord]] = []
+    bases: list[dict[str, dict]] = []
+    for record in sorted(records, key=lambda item: item.table_id):
+        incoming = record.adata.uns.get("mdv", {}).get("regions", {})
+        if not isinstance(incoming, dict):
+            incoming = {}
+        for index, basis in enumerate(bases):
+            if _regions_share_coordinate_basis(basis, incoming):
+                _refresh_regions(basis, incoming)
+                partitions[index].append(record)
+                break
+        else:
+            basis = {}
+            _refresh_regions(basis, incoming)
+            bases.append(basis)
+            partitions.append([record])
+    return list(zip(partitions, bases, strict=True))
+
+
+def _groups_for_partitions(
+    partitions: list[tuple[list[SpatialTableRecord], dict[str, dict]]],
+    *,
+    key: str,
+    label: str,
+    obs_basename: str,
+    var_basename: str,
+    suffix_var_with_obs: bool,
+    used_names: set[str],
+) -> list[SpatialTableGroup]:
+    groups: list[SpatialTableGroup] = []
+    for index, (partition, regions) in enumerate(partitions):
+        group_label = label if index == 0 else f"{label}_{index + 1}"
+        obs_source = obs_basename if index == 0 else f"{obs_basename}_{index + 1}"
+        if suffix_var_with_obs:
+            var_source = f"{obs_source}_{var_basename}"
+        else:
+            var_source = var_basename if index == 0 else f"{var_basename}_{index + 1}"
+        groups.append(
+            SpatialTableGroup(
+                key=key if index == 0 else f"{key}:{index + 1}",
+                label=group_label,
+                obs_datasource_name=_allocate_datasource_name(obs_source, used_names),
+                var_datasource_name=_allocate_datasource_name(var_source, used_names),
+                records=partition,
+                regions=regions,
+            )
+        )
+    return groups
 
 
 def _consume_region_scales(regions: dict[str, dict]) -> float:
@@ -1415,20 +1509,16 @@ def _group_spatial_table_records(
 ) -> list[SpatialTableGroup]:
     _validate_table_handling(args.table_handling)
 
-    regions: dict[str, dict] = {}
     if args.table_handling == "merge":
-        for record in records:
-            regions.update(record.adata.uns.get("mdv", {}).get("regions", {}))
-        return [
-            SpatialTableGroup(
-                key="merge",
-                label="merge",
-                obs_datasource_name=args.obs_datasource_name,
-                var_datasource_name=args.var_datasource_name,
-                records=records,
-                regions=regions,
-            )
-        ]
+        return _groups_for_partitions(
+            _partition_records(records),
+            key="merge",
+            label="merge",
+            obs_basename=args.obs_datasource_name,
+            var_basename=args.var_datasource_name,
+            suffix_var_with_obs=False,
+            used_names=set(),
+        )
 
     grouped_records: dict[str, list[SpatialTableRecord]] = {}
     group_order: list[str] = []
@@ -1450,22 +1540,15 @@ def _group_spatial_table_records(
             _group_base_label(group_records[0], args.table_handling),
             used_prefixes=set(group.label for group in groups),
         )
-        obs_datasource_name = _allocate_datasource_name(label, used_datasource_names)
-        var_datasource_name = _allocate_datasource_name(
-            f"{label}_{args.var_datasource_name}",
-            used_datasource_names,
-        )
-        regions = {}
-        for record in group_records:
-            regions.update(record.adata.uns.get("mdv", {}).get("regions", {}))
-        groups.append(
-            SpatialTableGroup(
+        groups.extend(
+            _groups_for_partitions(
+                _partition_records(group_records),
                 key=key,
                 label=label,
-                obs_datasource_name=obs_datasource_name,
-                var_datasource_name=var_datasource_name,
-                records=group_records,
-                regions=regions,
+                obs_basename=label,
+                var_basename=args.var_datasource_name,
+                suffix_var_with_obs=True,
+                used_names=used_datasource_names,
             )
         )
 

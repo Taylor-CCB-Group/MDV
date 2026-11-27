@@ -6,8 +6,9 @@ the table's variables and layers. Image channels are pyramided until the
 longest side of the coarsest level is at most 1024 px.
 
 ``export_converted_project`` writes those stores into a new MDV project whose
-marker columns are a ``markers`` datasource, with views rewritten to
-rows-as-columns fields.
+marker columns are a ``markers`` datasource. Charts on the cell datasource are
+copied with rows-as-columns fields. Other datasources are not exported, and
+Viv charts are not converted.
 """
 
 from __future__ import annotations
@@ -70,6 +71,7 @@ def export_mdv_to_spatialdata(
     *,
     datasource: str = "cells",
     channel_renames: Mapping[str, str] | None = None,
+    segmentation_parts: bool = False,
 ) -> list[Path]:
     """Write one SpatialData zarr per region in ``datasource``.
 
@@ -114,6 +116,7 @@ def export_mdv_to_spatialdata(
             region_field=region_field,
             project_scale=project_scale,
             channel_renames=renames,
+            segmentation_parts=segmentation_parts,
         )
         written.append(destination)
         print(f"Wrote {destination}", flush=True)
@@ -127,14 +130,17 @@ def export_converted_project(
     datasource: str = "cells",
     markers_datasource: str = MARKERS_DATASOURCE,
     channel_renames: Mapping[str, str] | None = None,
+    segmentation_parts: bool = False,
 ) -> Path:
     """Write an MDV project whose marker columns are a ``markers`` datasource.
 
     SpatialData stores are written under ``output_dir/spatial``, one zarr per
     region. The cell table keeps its other columns. Each marker layer is a
-    rows-as-columns subgroup, and view fields that named a marker column
-    (``log2_CD3``) become the link field (``log2|CD3 (log2)|index``).
-    ``images`` and ``json`` are symlinked from the source project.
+    rows-as-columns subgroup. Charts on the cell datasource are copied and
+    marker fields such as ``log2_CD3`` become link fields. Charts for other
+    datasources are left out, and Viv charts are not converted. ``images`` and
+    ``json`` are symlinked from the source project. Segmentation and image
+    files outside those directories are linked too.
     """
     source_path = Path(project_dir)
     output_path = Path(output_dir)
@@ -161,6 +167,7 @@ def export_converted_project(
     _attach_regions(project, datasource, regions)
     _symlink_project_dir(source_path, output_path, "images")
     _symlink_project_dir(source_path, output_path, "json")
+    _link_referenced_assets(source_path, output_path, project, datasource)
 
     markers = pd.DataFrame({MARKERS_NAME_COLUMN: layout.var_names})
     project.add_datasource(markers_datasource, markers, add_to_view=None)
@@ -173,12 +180,13 @@ def export_converted_project(
             _matrix(frame, columns),
             sparse=False,
         )
-    _copy_views(source, project, expression_field_map(layout))
+    _copy_views(source, project, datasource, expression_field_map(layout))
     export_mdv_to_spatialdata(
         source_path,
         output_path / "spatial",
         datasource=datasource,
         channel_renames=channel_renames,
+        segmentation_parts=segmentation_parts,
     )
     return output_path
 
@@ -287,7 +295,7 @@ def classify_columns(
     for column in frame.columns:
         if column in consumed:
             continue
-        if column in {INSTANCE_KEY, REGION_KEY, SEGMENTATION_PARTS}:
+        if column in {INSTANCE_KEY, REGION_KEY}:
             raise ValueError(
                 f"Column {column!r} clashes with the table annotation column of the same name"
             )
@@ -309,6 +317,7 @@ def _write_region(
     region_field: str,
     project_scale: float,
     channel_renames: Mapping[str, str],
+    segmentation_parts: bool,
 ) -> None:
     from spatialdata import SpatialData
     from spatialdata.models import Image2DModel, ShapesModel, TableModel
@@ -340,7 +349,13 @@ def _write_region(
     )
     shapes = ShapesModel.parse(_shapes_frame(cell_ids, polygons), transformations=_pixel_scale(scale_x, scale_y))
     table = TableModel.parse(
-        _region_table(region_rows, layout, cell_ids, part_counts),
+        _region_table(
+            region_rows,
+            layout,
+            cell_ids,
+            part_counts,
+            segmentation_parts=segmentation_parts,
+        ),
         region=SHAPES_NAME,
         region_key=REGION_KEY,
         instance_key=INSTANCE_KEY,
@@ -547,6 +562,8 @@ def _region_table(
     layout: ColumnLayout,
     cell_ids: np.ndarray,
     part_counts: Sequence[int],
+    *,
+    segmentation_parts: bool,
 ):
     from anndata import AnnData
 
@@ -557,7 +574,12 @@ def _region_table(
             obs[column] = obs[column].astype(str)
     obs.insert(0, REGION_KEY, pd.Categorical([SHAPES_NAME] * len(obs)))
     obs.insert(0, INSTANCE_KEY, instance_ids)
-    obs.insert(2, SEGMENTATION_PARTS, np.asarray(part_counts, dtype=np.int32))
+    if segmentation_parts:
+        if SEGMENTATION_PARTS in obs.columns:
+            raise ValueError(
+                f"Column {SEGMENTATION_PARTS!r} clashes with the table annotation column of the same name"
+            )
+        obs.insert(2, SEGMENTATION_PARTS, np.asarray(part_counts, dtype=np.int32))
     obs.index = pd.Index(instance_ids)
     table = AnnData(
         X=_matrix(frame, layout.layers[layout.primary_layer]),
@@ -591,7 +613,8 @@ def _read_segmentation(path: Path) -> dict[int, _CellBoundary]:
     features = payload.get("features") if isinstance(payload, dict) else None
     if not isinstance(features, list):
         raise ValueError(f"{path} has no GeoJSON features")
-    parts: dict[int, list[Polygon]] = {}
+    pieces_by_dn: dict[int, list[Polygon]] = {}
+    feature_counts: dict[int, int] = {}
     for feature in features:
         if not isinstance(feature, dict):
             raise ValueError(f"{path} has a feature that is not an object")
@@ -605,18 +628,20 @@ def _read_segmentation(path: Path) -> dict[int, _CellBoundary]:
         geometry = shape(raw_geometry)
         if geometry.is_empty:
             raise ValueError(f"{path} has an empty geometry for DN {dn}")
-        parts.setdefault(dn, []).extend(_polygon_parts(geometry, path, dn))
+        feature_counts[dn] = feature_counts.get(dn, 0) + 1
+        pieces_by_dn.setdefault(dn, []).extend(_polygon_parts(geometry, path, dn))
     polygons: dict[int, _CellBoundary] = {}
-    for dn, pieces in parts.items():
+    for dn, pieces in pieces_by_dn.items():
+        feature_count = feature_counts[dn]
         if len(pieces) == 1:
-            polygons[dn] = _CellBoundary(pieces[0], 1)
+            polygons[dn] = _CellBoundary(pieces[0], feature_count)
             continue
         merged = MultiPolygon(pieces)
         if merged.is_empty or not merged.is_valid:
             raise ValueError(
-                f"{path} cannot combine {len(pieces)} features with DN {dn} into a MultiPolygon"
+                f"{path} cannot combine {feature_count} features with DN {dn} into a MultiPolygon"
             )
-        polygons[dn] = _CellBoundary(merged, len(pieces))
+        polygons[dn] = _CellBoundary(merged, feature_count)
     return polygons
 
 
@@ -766,7 +791,17 @@ def _symlink_project_dir(source: Path, output: Path, name: str) -> None:
     os.symlink(src.resolve(), output / name, target_is_directory=True)
 
 
-def _copy_views(source: MDVProject, project: MDVProject, mapping: Mapping[str, str]) -> None:
+def _copy_views(
+    source: MDVProject,
+    project: MDVProject,
+    datasource: str,
+    mapping: Mapping[str, str],
+) -> None:
+    """Copy charts for the exported datasource and rewrite its marker fields.
+
+    Charts that belong to other datasources are omitted. Viv chart types are
+    left unchanged.
+    """
     views = source.views
     if not isinstance(views, dict) or not views:
         return
@@ -774,14 +809,82 @@ def _copy_views(source: MDVProject, project: MDVProject, mapping: Mapping[str, s
     initial = state.get("initial_view")
     ordered = [name for name in (state.get("all_views") or []) if name in views]
     seen: set[str] = set()
-    for name in ordered:
-        project.set_view(
-            name,
-            rewrite_expression_fields(views[name], mapping),
-            make_default=name == initial,
-        )
-        seen.add(name)
-    for name, view in views.items():
+    for name in [*ordered, *[name for name in views if name not in ordered]]:
         if name in seen:
             continue
-        project.set_view(name, rewrite_expression_fields(view, mapping), make_default=name == initial)
+        seen.add(name)
+        copied = _view_for_datasource(views[name], datasource, mapping)
+        if copied is None:
+            continue
+        project.set_view(name, copied, make_default=name == initial)
+
+
+def _view_for_datasource(view: object, datasource: str, mapping: Mapping[str, str]) -> dict | None:
+    if not isinstance(view, dict):
+        return None
+    charts = view.get("initialCharts")
+    if not isinstance(charts, dict) or datasource not in charts:
+        return None
+    copied = {key: value for key, value in view.items() if key != "initialCharts"}
+    copied["initialCharts"] = {datasource: rewrite_expression_fields(charts[datasource], mapping)}
+    return copied
+
+
+def _link_referenced_assets(source: Path, output: Path, project: MDVProject, datasource: str) -> None:
+    """Link segmentation and image files that are not under images/ or json/."""
+    metadata = project.get_datasource_metadata(datasource)
+    regions = metadata.get("regions")
+    if not isinstance(regions, dict):
+        return
+    all_regions = regions.get("all_regions")
+    if not isinstance(all_regions, dict):
+        return
+    for region in all_regions.values():
+        if isinstance(region, dict) and isinstance(region.get("json"), str):
+            region["json"] = _relocate_asset(source, output, region["json"])
+    avivator = regions.get("avivator")
+    base_url = avivator.get("base_url") if isinstance(avivator, dict) else None
+    if isinstance(base_url, str):
+        for region in all_regions.values():
+            if not isinstance(region, dict):
+                continue
+            viv_image = region.get("viv_image")
+            if not isinstance(viv_image, dict) or not isinstance(viv_image.get("file"), str):
+                continue
+            combined = str(Path(base_url) / viv_image["file"])
+            placed = _relocate_asset(source, output, combined)
+            if placed == combined:
+                continue
+            viv_image["file"] = os.path.relpath(placed, base_url)
+    project.set_datasource_metadata(metadata)
+
+
+def _relocate_asset(source: Path, output: Path, raw: str) -> str:
+    """Return a project-relative path, linking the file into the output when needed."""
+    path = Path(raw)
+    if not path.is_absolute():
+        top = path.parts[0] if path.parts else ""
+        if top in {"images", "json"} and (source / path).is_file():
+            return raw
+        local = source / path
+        if local.is_file():
+            _symlink_file(local.resolve(), output / path)
+            return path.as_posix()
+        return raw
+    resolved = path.resolve()
+    try:
+        relative = resolved.relative_to(source.resolve())
+    except ValueError:
+        relative = Path("region-assets") / resolved.name
+    else:
+        if relative.parts and relative.parts[0] in {"images", "json"}:
+            return relative.as_posix()
+    _symlink_file(resolved, output / relative)
+    return relative.as_posix()
+
+
+def _symlink_file(src: Path, dest: Path) -> None:
+    if dest.is_symlink() or dest.exists():
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    os.symlink(src, dest)
