@@ -69,20 +69,17 @@ describe("table config", () => {
         expect(adaptConfig(config)).toMatchObject({ column_display, sort });
     });
 
-    test.each([
-        { mode: "sparkline" },
-        { mode: "diverging", limit: 0 },
-        { mode: "diverging", limit: "1" },
-        "bar",
-        null,
-    ])("rejects the display option %j, keeping the other columns", (invalid) => {
-        vi.spyOn(console, "warn").mockImplementation(() => {});
-        const column_display = { bad: invalid, rho: { mode: "bar" } };
+    test.each([{ mode: "sparkline" }, { mode: "diverging", limit: 0 }, { mode: "diverging", limit: "1" }, "bar", null])(
+        "rejects the display option %j, keeping the other columns",
+        (invalid) => {
+            vi.spyOn(console, "warn").mockImplementation(() => {});
+            const column_display = { bad: invalid, rho: { mode: "bar" } };
 
-        expect(TableChartReactConfigSchema.safeParse(savedConfig({ column_display })).success).toBe(false);
-        expect(parseColumnDisplay(column_display)).toEqual({ rho: { mode: "bar" } });
-        vi.restoreAllMocks();
-    });
+            expect(TableChartReactConfigSchema.safeParse(savedConfig({ column_display })).success).toBe(false);
+            expect(parseColumnDisplay(column_display)).toEqual({ rho: { mode: "bar" } });
+            vi.restoreAllMocks();
+        },
+    );
 
     test.each([undefined, null, "bar", [{ mode: "bar" }]])("parses a column_display of %j as empty", (value) => {
         vi.spyOn(console, "warn").mockImplementation(() => {});

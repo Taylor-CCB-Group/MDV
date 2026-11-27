@@ -46,8 +46,7 @@ function getColumnSettings(config: TableDisplayConfig, field: string, name: stri
     };
 
     const write = action((mode: TableNumericDisplay["mode"], limit?: number) => {
-        const display: TableNumericDisplay =
-            mode === "diverging" && limit !== undefined ? { mode, limit } : { mode };
+        const display: TableNumericDisplay = mode === "diverging" && limit !== undefined ? { mode, limit } : { mode };
         // replaced rather than mutated, so the table sees a new object
         config.column_display = withColumnDisplay(config.column_display, field, display);
     });

@@ -18,6 +18,7 @@ import { escapeHtml } from "@/utilities/Utilities";
 import type { AddColumnParams } from "../components/AddTableColumnDialog";
 import type { BulkEditAction } from "../components/BulkEditColumnDialog";
 import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
+import type { TableChartReact, TableChartReactConfig } from "../components/TableChartReactWrapper";
 import {
     applyColumnDisplay,
     getDisplayForMenuCommand,
@@ -25,7 +26,6 @@ import {
     isNumericDisplayColumn,
     withColumnDisplay,
 } from "../components/tableNumericDisplay";
-import type { TableChartReact, TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useChart, useDataStore } from "../context";
 import { useChartID, useChartManager, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
 import { useHighlightedIndices } from "../selectionHooks";
@@ -506,8 +506,7 @@ const useSlickGridReact = () => {
                         const sortAsc = args.sortAsc;
                         // clicking the header of a column sorted by absolute value only flips the direction
                         const absolute = config.sort?.absolute === true && config.sort.columnId === columnId;
-                        const isSame =
-                            config.sort?.columnId === columnId && config.sort?.ascending === sortAsc;
+                        const isSame = config.sort?.columnId === columnId && config.sort?.ascending === sortAsc;
                         console.log("Sort event:", columnId, sortAsc ? "asc" : "desc");
                         // As far as the types go... I think if the `sortAsc` is undefined, then that means `config.sort` should be undefined.
                         // if not, then the type of config.sort.ascending should be optional.

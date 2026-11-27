@@ -3,8 +3,8 @@ import { observable, runInAction } from "mobx";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
-import { getDisplayMenuItems } from "@/react/components/tableNumericDisplay";
 import type { TableChartReactConfig } from "@/react/components/TableChartReactWrapper";
+import { getDisplayMenuItems } from "@/react/components/tableNumericDisplay";
 import useSlickGridReact from "@/react/hooks/useSlickGridReact";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
 

@@ -1,7 +1,7 @@
 import { autorun } from "mobx";
 import { useEffect, useState } from "react";
-import { isNumericDisplayColumn } from "../components/tableNumericDisplay";
 import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
+import { isNumericDisplayColumn } from "../components/tableNumericDisplay";
 import { useDataStore } from "../context";
 import { useConfig, useSimplerFilteredIndices } from "../hooks";
 
