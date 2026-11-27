@@ -6,7 +6,13 @@ from click.testing import CliRunner
 
 import mdvtools.cli as cli_module
 import mdvtools.spatial.conversion as spatial_conversion_module
-from mdvtools.spatial.conversion import SpatialDataConversionArgs, convert_spatialdata_to_mdv
+from mdvtools.spatial.conversion import (
+    SpatialDataConversionArgs,
+    _consume_region_scales,
+    _image_pixel_scale,
+    _record_region_scale,
+    convert_spatialdata_to_mdv,
+)
 
 
 def _write_store(path: Path) -> None:
@@ -83,6 +89,15 @@ def test_single_store_regions_read_from_the_url_and_nothing_is_copied(tmp_path):
     assert not (project / "spatial").exists()
 
 
+def _regions_metadata(project: Path) -> dict:
+    datasources = json.loads((project / "datasources.json").read_text())
+    for datasource in datasources:
+        regions = datasource.get("regions")
+        if regions:
+            return regions
+    raise AssertionError("project has no regions")
+
+
 def test_regions_have_no_url_without_the_option(tmp_path):
     source = tmp_path / "sample.zarr"
     _write_store(source)
@@ -93,6 +108,102 @@ def test_regions_have_no_url_without_the_option(tmp_path):
     assert spatial
     assert all("url" not in entry for entry in spatial)
     assert (project / "spatial" / "sample.zarr").is_dir()
+    assert _regions_metadata(project)["scale"] == 1.0
+
+
+def test_image_pixel_scale_is_written_as_regions_scale(tmp_path):
+    source = tmp_path / "scaled.zarr"
+    _write_scaled_store(source)
+
+    project = _convert(tmp_path, source)
+    regions = _regions_metadata(project)
+
+    assert regions["scale"] == pytest.approx(0.325)
+    assert "_mdv_coordinate_scale" not in next(iter(regions["all_regions"].values()))
+    from mdvtools.mdvproject import MDVProject
+
+    values = MDVProject(str(project)).get_column("cells", "x")
+    assert max(float(value) for value in values) < 64
+
+
+def _write_scaled_store(path: Path) -> None:
+    import dask.array as da
+    import geopandas as gpd
+    import numpy as np
+    import pandas as pd
+    from anndata import AnnData
+    from shapely.geometry import Point
+    from spatialdata import SpatialData
+    from spatialdata.models import Image2DModel, ShapesModel, TableModel
+    from spatialdata.transformations import Scale
+
+    pixels = da.from_array(np.zeros((1, 32, 32), dtype=np.uint8))
+    centres = np.array([[4.0, 6.0], [20.0, 10.0]], dtype=np.float64)
+    circles = gpd.GeoDataFrame(
+        {"radius": np.full(2, 1.0)},
+        geometry=[Point(x, y) for x, y in centres],
+    )
+    table = AnnData(
+        X=np.ones((2, 1), dtype=np.float32),
+        obs=pd.DataFrame(
+            {"region": pd.Categorical(["cells"] * 2), "instance_id": np.arange(2)},
+            index=pd.Index(["0", "1"]),
+        ),
+    )
+    table.obsm["spatial"] = centres
+    SpatialData(
+        images={
+            "image": Image2DModel.parse(
+                pixels,
+                dims=("c", "y", "x"),
+                transformations={"global": Scale([0.325, 0.325], axes=("x", "y"))},
+            )
+        },
+        shapes={
+            "cells": ShapesModel.parse(
+                circles,
+                transformations={"global": Scale([0.325, 0.325], axes=("x", "y"))},
+            )
+        },
+        tables={
+            "table": TableModel.parse(table, region="cells", region_key="region", instance_key="instance_id")
+        },
+    ).write(path)
+
+
+def test_image_pixel_scale_reads_an_isotropic_scale():
+    import dask.array as da
+    import numpy as np
+    from spatialdata.models import Image2DModel
+    from spatialdata.transformations import Scale
+
+    pixels = da.from_array(np.zeros((1, 4, 4), dtype=np.uint8))
+    image = Image2DModel.parse(
+        pixels,
+        dims=("c", "y", "x"),
+        transformations={"global": Scale([0.325, 0.325], axes=("x", "y"))},
+    )
+    assert _image_pixel_scale(image, "global") == pytest.approx(0.325)
+
+    stretched = Image2DModel.parse(
+        pixels,
+        dims=("c", "y", "x"),
+        transformations={"global": Scale([0.2, 0.5], axes=("x", "y"))},
+    )
+    assert _image_pixel_scale(stretched, "global") is None
+
+    region: dict = {}
+    _record_region_scale(region, image, "global", coordinates_already_global=True)
+    assert region["_mdv_coordinate_scale"] == 1.0
+
+
+def test_region_scales_must_agree():
+    shared = {"a": {"_mdv_coordinate_scale": 0.325}, "b": {"_mdv_coordinate_scale": 0.325}}
+    assert _consume_region_scales(shared) == pytest.approx(0.325)
+    assert "_mdv_coordinate_scale" not in shared["a"]
+
+    mixed = {"a": {"_mdv_coordinate_scale": 0.325}, "b": {"_mdv_coordinate_scale": 0.5}}
+    assert _consume_region_scales(mixed) == 1.0
 
 
 @pytest.mark.parametrize(

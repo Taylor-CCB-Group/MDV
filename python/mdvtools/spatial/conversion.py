@@ -899,6 +899,14 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
             },
             "images": {},
         }
+        _record_region_scale(
+            all_regions[region_id],
+            sdata.images[best_img.path],
+            cs,
+            coordinates_already_global=bool(
+                best_transform_metadata and best_transform_metadata.get("coordinates_already_global")
+            ),
+        )
 
         # do we want to save geojson for this region?
         # nb this will be deprecated once we have spatialdata.js layers with shapes.
@@ -942,6 +950,85 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
 
 
 
+_REGION_SCALE_KEY = "_mdv_coordinate_scale"
+
+
+def _image_pixel_scale(element: "SpatialElement", coordinate_system: str) -> float | None:
+    """Isotropic x/y scale from image pixels into ``coordinate_system``.
+
+    Returns None when that transform is not a pure scale, or x and y differ.
+    Identity is a scale of 1.
+    """
+    from spatialdata.transformations import get_transformation
+
+    transformations = get_transformation(element, get_all=True)
+    if not isinstance(transformations, dict):
+        return None
+    transform = transformations.get(coordinate_system)
+    if transform is None:
+        return None
+    try:
+        matrix = np.asarray(
+            transform.to_affine_matrix(input_axes=("x", "y"), output_axes=("x", "y")),
+            dtype=np.float64,
+        )
+    except (TypeError, ValueError):
+        return None
+    if matrix.shape != (3, 3):
+        return None
+    if not np.allclose(matrix[2], [0.0, 0.0, 1.0]):
+        return None
+    if not np.allclose([matrix[0, 1], matrix[1, 0], matrix[0, 2], matrix[1, 2]], 0.0):
+        return None
+    scale_x = float(matrix[0, 0])
+    scale_y = float(matrix[1, 1])
+    if scale_x <= 0 or scale_y <= 0 or not np.isclose(scale_x, scale_y):
+        return None
+    return scale_x
+
+
+def _record_region_scale(
+    region: dict,
+    image: "SpatialElement",
+    coordinate_system: str,
+    *,
+    coordinates_already_global: bool,
+) -> None:
+    """Remember the scale that places this region's x/y on its image.
+
+    Points already stored in the coordinate system need a scale of 1. Points
+    written in image pixels need the image's pixel size.
+    """
+    if coordinates_already_global:
+        region[_REGION_SCALE_KEY] = 1.0
+        return
+    scale = _image_pixel_scale(image, coordinate_system)
+    if scale is not None:
+        region[_REGION_SCALE_KEY] = scale
+
+
+def _consume_region_scales(regions: dict[str, dict]) -> float:
+    """Take the shared pixel scale off region dicts so it is not written out."""
+    found: list[float] = []
+    missing = False
+    for region in regions.values():
+        value = region.pop(_REGION_SCALE_KEY, None)
+        if value is None:
+            missing = True
+            continue
+        found.append(float(value))
+    if not found:
+        return 1.0
+    agreed = all(np.isclose(value, found[0]) for value in found)
+    if agreed and not missing:
+        return found[0]
+    values = ", ".join(f"{value:g}" for value in dict.fromkeys(found))
+    _emit(
+        f"WARNING: Spatial regions do not share one pixel scale ({values}). regions.scale is left at 1."
+    )
+    return 1.0
+
+
 def _resolve_image_only_regions(sdata: "SpatialData", sdata_name: str) -> dict[str, dict]:
     all_regions: dict[str, dict] = {}
 
@@ -951,7 +1038,7 @@ def _resolve_image_only_regions(sdata: "SpatialData", sdata_name: str) -> dict[s
         if not img_candidates:
             continue
 
-        img_path, _img_obj = img_candidates[0]
+        img_path, img_obj = img_candidates[0]
         region_id = f"{sdata_name}_{cs}"
         all_regions[region_id] = {
             "spatial": {
@@ -969,6 +1056,7 @@ def _resolve_image_only_regions(sdata: "SpatialData", sdata_name: str) -> dict[s
             },
             "images": {},
         }
+        _record_region_scale(all_regions[region_id], img_obj, cs, coordinates_already_global=False)
 
     return all_regions
 
@@ -1637,7 +1725,11 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
                 if args.spatial_url is not None:
                     _set_region_spatial_urls(group.regions, args.spatial_url)
                 obs_md = mdv.get_datasource_metadata(group.obs_datasource_name)
-                obs_md["regions"] = build_spatial_regions_metadata(group.regions, REGION_FIELD)
+                obs_md["regions"] = build_spatial_regions_metadata(
+                    group.regions,
+                    REGION_FIELD,
+                    scale=_consume_region_scales(group.regions),
+                )
                 mdv.set_datasource_metadata(obs_md)
 
         if mdv is None:
@@ -1718,7 +1810,11 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         if args.spatial_url is not None:
             _set_region_spatial_urls(image_only_regions, args.spatial_url)
         obs_md = mdv.get_datasource_metadata(primary_obs_datasource_name)
-        obs_md["regions"] = build_spatial_regions_metadata(image_only_regions, REGION_FIELD)
+        obs_md["regions"] = build_spatial_regions_metadata(
+            image_only_regions,
+            REGION_FIELD,
+            scale=_consume_region_scales(image_only_regions),
+        )
         mdv.set_datasource_metadata(obs_md)
 
     if image_only_regions:

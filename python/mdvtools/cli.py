@@ -339,6 +339,60 @@ def convert_spatial(spatialdata_path, output_folder, batch, preserve_existing, l
         convert_spatialdata_to_mdv(args)
 
 
+@cli.command("export-spatial")
+@click.argument("project_dir")
+@click.argument("output_dir")
+@click.option("--datasource", default="cells", show_default=True, help="Datasource that holds cells, regions, and marker column groups.")
+@click.option(
+    "--rename-channel",
+    "channel_renames",
+    multiple=True,
+    metavar="OLD=NEW",
+    help="Rename an image channel before writing. Repeat for more than one.",
+)
+@click.option(
+    "--as-project",
+    is_flag=True,
+    help="Write OUTPUT_DIR as an MDV project. Stores go in OUTPUT_DIR/spatial. "
+    "Marker columns become a markers datasource, and views load them with rows-as-columns fields.",
+)
+@click.option(
+    "--markers-datasource",
+    default="markers",
+    show_default=True,
+    help="Name of the variable datasource written with --as-project.",
+)
+def export_spatial_cmd(project_dir, output_dir, datasource, channel_renames, as_project, markers_datasource):
+    """Write one SpatialData store per image region, or a converted MDV project with --as-project."""
+    from .spatial.mdv_to_spatialdata import (
+        export_converted_project,
+        export_mdv_to_spatialdata,
+        parse_channel_renames,
+    )
+
+    try:
+        renames = parse_channel_renames(channel_renames)
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
+    if as_project:
+        project = export_converted_project(
+            project_dir,
+            output_dir,
+            datasource=datasource,
+            markers_datasource=markers_datasource,
+            channel_renames=renames,
+        )
+        click.echo(project)
+        return
+    for path in export_mdv_to_spatialdata(
+        project_dir,
+        output_dir,
+        datasource=datasource,
+        channel_renames=renames,
+    ):
+        click.echo(path)
+
+
 @cli.command("create-default-views")
 @click.argument("project")
 @click.option(
