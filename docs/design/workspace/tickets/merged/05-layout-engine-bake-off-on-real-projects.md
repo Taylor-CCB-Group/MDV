@@ -17,4 +17,4 @@ Measure and show the team:
 
 ## Context
 
-Layout lab: branch `ui-refresh`, `src/react/prototypes/layoutLab`, opened with `?layoutLab=grid` or `?layoutLab=tiles`. Measurement script: `artifacts/playwright-cli/layout-lab/measure.mjs`.
+Layout lab: `src/react/prototypes/layoutLab`, opened with `?layoutLab=grid` or `?layoutLab=tiles`. Measurement script: `artifacts/playwright-cli/layout-lab/measure.mjs`.

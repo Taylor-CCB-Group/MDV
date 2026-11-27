@@ -78,7 +78,7 @@ What the team should come away able to judge:
 
 ## Code changes
 
-All on one branch, `workspace-showcase`, off main. The layout lab code is copied in from the `ui-refresh` branch and the lab itself is not carried over.
+All on this branch, `docs/workspace-redesign-plan` (PR #719). The layout lab already sits here in `src/react/prototypes/layoutLab/`: the showcase builds from it, and the lab is deleted once the showcase has replaced it.
 
 ### New: `src/react/workspace/`
 

@@ -1,6 +1,6 @@
 # Workspace redesign: handover
 
-Read this first. It applies to a person or an agent picking up the workspace redesign. It says what we're building, what's decided, how we work, and what's next. Everything it points to is on this branch, `workspace-showcase`.
+Read this first. It applies to a person or an agent picking up the workspace redesign. It says what we're building, what's decided, how we work, and what's next. Everything it points to is on this branch, `docs/workspace-redesign-plan` (PR #719).
 
 ## What we're building
 
@@ -26,7 +26,7 @@ The team liked it. The goal now is a **showcase**: real MDV, with real projects,
 | Decisions | [ADR 0026](../../adr/0026-preview-one-view-workspace-saved-to-views-v2.md): the preview setting, one view, `views_v2.json`, screen sizes. [ADR 0027](../../adr/0027-build-the-workspace-grid-on-the-prototypes-own-engine.md): the in-house layout engine behind a seam, gridstack 14 as the fallback |
 | Terms | `CONTEXT.md`, under "Workspace terms" |
 | Repo rules for agents | `AGENTS.md` at the repo root |
-| The layout lab (reference code) | The `ui-refresh` branch, `src/react/prototypes/layoutLab/` |
+| The layout lab (reference code) | `src/react/prototypes/layoutLab/` on this branch |
 
 ## Where it stands
 
@@ -50,11 +50,11 @@ The team liked it. The goal now is a **showcase**: real MDV, with real projects,
 
 ### Branches
 
-- **`workspace-showcase`** is the one working branch, for both decisions and code. Nothing merges to main until the team has tried the showcase and we have iterated on it.
+- **`docs/workspace-redesign-plan` (PR #719)** is the one working branch, for both decisions and code. Nothing merges to main until the team has tried the showcase and we have iterated on it.
 - **Day 1 of the showcase**, the grid with real charts, is built directly on this branch, because everything else builds on it.
-- **After that, parallel work** goes on short-lived branches off `workspace-showcase`, each with a small PR back into it. That's where colleagues review each piece. People editing together live can commit straight to `workspace-showcase`.
-- **`ui-refresh`** holds the layout lab. Copy from it, never merge it, and delete it once the showcase has taken what it needs.
-- **When the team says yes,** `workspace-showcase` merges to main behind the Workspace preview, with its docs and ADRs.
+- **After that, parallel work** goes on short-lived branches off it, each with a small PR back into it. That's where colleagues review each piece. People editing together live can commit straight to it.
+- **The layout lab** (`src/react/prototypes/layoutLab/`, opened with `?layoutLab=`) is throwaway code on this branch. Build the showcase from it, then delete the folder, its `project_bootstrap.tsx` hook and the `gridstack14` package before anything merges.
+- **When the team says yes,** this branch merges to main behind the Workspace preview, with its docs and ADRs.
 
 ### Decisions
 
@@ -90,8 +90,8 @@ The team liked it. The goal now is a **showcase**: real MDV, with real projects,
 
 - **Front end:** `pnpm install`, then `pnpm run dev` (Vite on port 5170, or set `PORT=…`).
 - **Backend:** the Flask server is expected at `http://127.0.0.1:5055` (`flaskURL` in `vite.config.mts`). Run it the way you normally do, for example in Docker.
-- **The layout lab** (on `ui-refresh`): open a project with `?layoutLab=inhouse` or `?layoutLab=gridstack` on the end of its URL. It works in dev builds only.
-- **Lab checks** (on `ui-refresh`, in `src/react/prototypes/layoutLab/checks/`):
+- **The layout lab:** open a project with `?layoutLab=inhouse` or `?layoutLab=gridstack` on the end of its URL. It works in dev builds only.
+- **Lab checks** (in `src/react/prototypes/layoutLab/checks/`):
   - `bakeoff.mjs`: layout rules at four widths, a drag, a resize, save and reload
   - `glitches.mjs`: the four glitches found by hand
 

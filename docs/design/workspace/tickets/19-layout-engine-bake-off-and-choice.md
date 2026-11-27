@@ -21,7 +21,7 @@ The human picks the engine. Record the choice and what it gives up as an ADR.
 
 ## Context
 
-- Layout lab: branch `ui-refresh`, `src/react/prototypes/layoutLab`, opened with `?layoutLab=inhouse`, `gridstack` or `rgl` (round two). Measurement script: `artifacts/playwright-cli/layout-lab/measure.mjs`.
+- Layout lab: `src/react/prototypes/layoutLab`, opened with `?layoutLab=inhouse`, `gridstack` or `rgl` (round two). Measurement script: `artifacts/playwright-cli/layout-lab/measure.mjs`.
 - The gaps each engine needs filled: gridstack 14 has no keyboard moves and no documented save of narrow layouts; the in-house engine lacks touch, resizing from the left and top, screen-reader support, chart hosting and tests.
 - "Unsaved Grid Stack View" is MDV's integration, not gridstack. A gridstack run must avoid the three causes (early baseline, pixel sizes saved, pushed charts never written back) or it isn't a fair test.
 - Settled before this map: a scrolling grid, not tiles.
