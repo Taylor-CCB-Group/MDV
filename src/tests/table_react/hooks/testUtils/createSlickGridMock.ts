@@ -53,11 +53,13 @@ export function createSlickGridMock(): SlickgridReactInstance {
         scrollRowIntoView: vi.fn(),
         getColumns: vi.fn(() => []),
         updateColumnHeader: vi.fn(),
+        getContainerNode: vi.fn(() => document.createElement("div")),
         getPubSubService: vi.fn(() => mockPubSub),
         onSelectedRowsChanged: createMockSlickEvent(),
         onSort: createMockSlickEvent(),
         onColumnsResized: createMockSlickEvent(),
         onColumnsReordered: createMockSlickEvent(),
+        onHeaderCellRendered: createMockSlickEvent(),
     } as unknown as SlickGrid;
 
     return {
