@@ -207,6 +207,23 @@ describe("SpatialData table association", () => {
         });
     });
 
+    test("fades visible rows outside the emphasised ones, and still hides filtered-out rows", () => {
+        const featureState = buildAssociatedFeatureStateFromRowMap({
+            rowIndexByFeatureId: new Map([
+                ["a", 0],
+                ["b", 1],
+                ["c", 2],
+            ]),
+            visibleRows: Uint32Array.from([0, 1]),
+            emphasisedRows: Uint32Array.from([0]),
+            rowCount: 3,
+            alpha: 255,
+        });
+
+        expect(featureState?.hiddenFeatureIds).toEqual(["c"]);
+        expect(featureState?.fadedFeatureIds).toEqual(["b"]);
+    });
+
     test("preserves explicit feature state while adding table filter state", () => {
         const featureState = buildAssociatedFeatureStateFromRowMap({
             rowIndexByFeatureId: new Map([

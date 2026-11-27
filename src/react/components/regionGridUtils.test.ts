@@ -1,21 +1,17 @@
+import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
 import { describe, expect, test } from "vitest";
-import { isRegionGridShown, moveRegionViews, partitionRowsByRegion, spatialRegionCells } from "./regionGridUtils";
-
-describe("partitionRowsByRegion", () => {
-    test("splits rows by region, in order, with their positions", () => {
-        // row -> region code
-        const codes = [0, 1, 0, 2, 1, 0];
-        const values = ["a", "b", "c"];
-        const rows = new Uint32Array([5, 1, 2, 4, 0]);
-        const parts = partitionRowsByRegion(rows, codes, values);
-        expect([...parts.keys()]).toEqual(["a", "b"]);
-        expect([...(parts.get("a")?.rows ?? [])]).toEqual([5, 2, 0]);
-        expect([...(parts.get("a")?.positions ?? [])]).toEqual([0, 2, 4]);
-        expect([...(parts.get("b")?.rows ?? [])]).toEqual([1, 4]);
-        expect([...(parts.get("b")?.positions ?? [])]).toEqual([1, 3]);
-        expect(parts.has("c")).toBe(false);
-    });
-});
+import type { GuiSpec } from "@/charts/charts";
+import type { SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
+import type { ColumnTypes } from "../colorFields";
+import { colorGridSplitFor, hidesEmptyCells } from "./colorGridUtils";
+import {
+    type FillColorLayer,
+    getSpatialDataGridSettingsFolder,
+    isRegionGridShown,
+    moveRegionViews,
+    setSpatialDataGrid,
+    spatialRegionCells,
+} from "./regionGridUtils";
 
 describe("spatialRegionCells", () => {
     test("a cell per region with a store and coordinate system", () => {
@@ -72,5 +68,109 @@ describe("moveRegionViews", () => {
     test("cells without a view are left to be fitted", () => {
         const moved = moveRegionViews({ a }, "a", { target: [1, 1], zoom: 0 }, true);
         expect(Object.keys(moved)).toEqual(["a"]);
+    });
+});
+
+describe("getSpatialDataGridSettingsFolder", () => {
+    const layer = (id: string, elementType: "shapes" | "labels" | "image", elementKey: string): RenderStackEntry => ({
+        kind: "spatial",
+        id,
+        visible: true,
+        props: {},
+        source: { elementType, elementKey },
+    });
+    const renderStack: RenderStack = {
+        schemaVersion: 2,
+        entries: [
+            layer("he", "image", "he"),
+            layer("circles", "shapes", "cell_circles"),
+            layer("boundaries", "shapes", "cell_boundaries"),
+        ],
+    };
+    const choiceValues = (folder: GuiSpec<"folder">) => {
+        const [show] = folder.current_value;
+        if (show?.type !== "dropdown") return [];
+        const options: unknown[] = show.values?.[0] ?? [];
+        return options.flatMap((option) =>
+            option && typeof option === "object" && "value" in option && typeof option.value === "string"
+                ? [option.value]
+                : [],
+        );
+    };
+    const layerChoices = (folder: GuiSpec<"folder">) =>
+        choiceValues(folder).filter((value) => value.startsWith("layer_fill:"));
+    const withFill = (entry: RenderStackEntry, columnName: string): RenderStackEntry => ({
+        ...entry,
+        props: { fillColorByColumn: { columnName, mode: "auto" } },
+    });
+    const colorStack: RenderStack = {
+        schemaVersion: 2,
+        entries: [
+            layer("he", "image", "he"),
+            withFill(layer("circles", "shapes", "cell_circles"), "leiden"),
+            withFill(layer("boundaries", "shapes", "cell_boundaries"), "leiden"),
+            withFill(layer("nuclei", "labels", "nuclei"), "area"),
+        ],
+    };
+    const columns: ColumnTypes = { columnIndex: { leiden: { datatype: "text" }, area: { datatype: "double" } } };
+    // a table annotates cell_circles and nuclei, not cell_boundaries
+    const annotated = new Set(["cell_circles", "nuclei"]);
+    const layerGridSplit = ({ elementKey, fillColumn }: FillColorLayer) =>
+        annotated.has(elementKey) ? colorGridSplitFor(fillColumn ? columns.columnIndex[fillColumn] : undefined) : null;
+
+    test("offers each annotated layer the split its colour column's type allows", () => {
+        const folder = getSpatialDataGridSettingsFolder({ renderStack: colorStack }, columns, () => layerGridSplit);
+        expect(layerChoices(folder)).toEqual(["layer_fill:categories:circles", "layer_fill:columns:nuclei"]);
+    });
+
+    test("keeps the chart's grid, and every layer's splits when it cannot tell", () => {
+        const grid: SpatialDataGridConfig = { by: "layer_fill", layer: "boundaries", split: "columns" };
+        expect(
+            layerChoices(
+                getSpatialDataGridSettingsFolder({ renderStack: colorStack, grid }, columns, () => layerGridSplit),
+            ),
+        ).toEqual(["layer_fill:categories:circles", "layer_fill:columns:boundaries", "layer_fill:columns:nuclei"]);
+        expect(layerChoices(getSpatialDataGridSettingsFolder({ renderStack }, columns))).toHaveLength(4);
+    });
+
+    test("reads the layers' splits each time, as the region (and its table) can change", () => {
+        let current: typeof layerGridSplit | undefined;
+        const folder = getSpatialDataGridSettingsFolder({ renderStack: colorStack }, columns, () => current);
+        // the region's store not read yet: every layer, either way
+        expect(layerChoices(folder)).toHaveLength(6);
+        current = layerGridSplit;
+        expect(layerChoices(folder)).toEqual(["layer_fill:categories:circles", "layer_fill:columns:nuclei"]);
+    });
+
+    test("offers the chart's colour grid the split its first colour column allows", () => {
+        const colorChoices = (color_fields: string[]) =>
+            choiceValues(
+                getSpatialDataGridSettingsFolder(
+                    { type: "SpatialDataMdvRegionReact", renderStack, color_fields },
+                    columns,
+                ),
+            ).filter((value) => value.startsWith("color_fields:"));
+        expect(colorChoices(["leiden"])).toEqual(["color_fields:categories"]);
+        expect(colorChoices(["area", "leiden"])).toEqual(["color_fields:columns"]);
+        expect(colorChoices([])).toEqual([]);
+    });
+});
+
+describe("setSpatialDataGrid", () => {
+    test("leaves out empty cells unless a grid keeps them, which outlasts a change of grid", () => {
+        expect(hidesEmptyCells({ by: "region" })).toBe(true);
+        expect(hidesEmptyCells({ by: "region", hide_empty: true })).toBe(true);
+        const config: { grid?: SpatialDataGridConfig | null } = { grid: { by: "region", hide_empty: false } };
+        expect(hidesEmptyCells(config.grid)).toBe(false);
+        setSpatialDataGrid(config, "color_fields:categories");
+        expect(config.grid).toEqual({ by: "color_fields", split: "categories", hide_empty: false });
+        setSpatialDataGrid(config, "layer_fill:categories:circles");
+        expect(config.grid).toEqual({ by: "layer_fill", layer: "circles", split: "categories", hide_empty: false });
+        setSpatialDataGrid(config, "region");
+        expect(config.grid).toMatchObject({ by: "region", hide_empty: false });
+        setSpatialDataGrid(config, "densityFields");
+        setSpatialDataGrid(config, "color_fields:categories");
+        expect(config.grid).toEqual({ by: "color_fields", split: "categories" });
+        expect(hidesEmptyCells(config.grid)).toBe(true);
     });
 });

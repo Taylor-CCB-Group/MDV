@@ -1,9 +1,9 @@
 import { findRenderStackEntry, type RenderStack } from "@spatialdata/layers";
 import type { EntryStatus } from "@spatialdata/vis";
-import { action, comparer, computed, makeObservable, observable, reaction } from "mobx";
+import { action, comparer, computed, makeObservable, observable, reaction, runInAction } from "mobx";
 import type { SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
 import type DataStore from "@/datastore/DataStore";
-import { allNumeric } from "@/lib/columnTypeHelpers";
+import { allNumeric, type FieldSpecs } from "@/lib/columnTypeHelpers";
 import { g, toArray } from "@/lib/utils";
 import { splitStorageIssues } from "@/react/spatialdata/data_quality";
 import type { DeckBackend } from "@/react/spatialdata/deck_backend";
@@ -24,18 +24,37 @@ import {
     syncOverlayFollowerVisibility,
 } from "@/react/spatialdata/render_stack_defaults";
 import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
+import { spatialDataUrlForRegion } from "@/react/spatialdata/shared_spatial_data";
 import { sharedSpatialDataReader } from "@/react/spatialdata/spatial_data_reader";
 import {
     type SpatialDataSerializableViewState,
     toSerializableSpatialDataViewState,
 } from "@/react/spatialdata/spatialdata_config";
-import BaseChart, { type MenuPip } from "../../charts/BaseChart";
+import { resolveAssociatedElementTable } from "@/react/spatialdata/table_association";
+import BaseChart, { type ColumnChangeEvent, type MenuPip } from "../../charts/BaseChart";
+import type { FieldName } from "../../charts/charts";
+import {
+    colorFieldsLegendSpec,
+    getColorFieldsSettingsFolder,
+    migrateColorBy,
+    onColorFieldRemoved,
+    onColorFieldsDataChanged,
+    setUpColorFields,
+} from "../colorFields";
 import { getDensitySettings } from "../contour_state";
 import { type CategoryFilter, type ScatterPlotConfig, scatterDefaults } from "../scatter_state";
 import { createVivStores, type VivContextType } from "./avivatorish/state";
 import { BaseReactChart } from "./BaseReactChart";
+import { type ColorGridSplit, colorGridSplitFor } from "./colorGridUtils";
 import { getCrosshairSetting } from "./pointerCrosshair";
-import { getSpatialDataGridSettingsFolder, type RegionViewState, toRegionViewState } from "./regionGridUtils";
+import {
+    type FillColorLayer,
+    getSpatialDataGridSettingsFolder,
+    type RegionViewState,
+    setSpatialDataGrid,
+    spatialDataGridChoices,
+    toRegionViewState,
+} from "./regionGridUtils";
 import SpatialDataChartRoot from "./SpatialDataMDVReactComponent";
 import SpatialLayerDialogReactWrapper from "./SpatialLayerDialogReactWrapper";
 import SpatialStatusPanel from "./SpatialStatusPanel";
@@ -43,6 +62,8 @@ import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScat
 
 export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
     type: "SpatialDataMdvRegionReact";
+    /** The columns the points are coloured by (see `colorFields.ts`); `color_by` is migrated to this. */
+    color_fields: FieldSpecs;
     /** A cell per density field, or a cell per region (`SpatialRegionGrid`). */
     grid?: SpatialDataGridConfig | null;
     region: string;
@@ -61,7 +82,9 @@ export type SpatialDataMdvReactConfig = ScatterPlotConfig & {
 };
 
 function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataStore: DataStore) {
-    const config = { ...scatterDefaults, ...originalConfig };
+    const config = migrateColorBy({ ...scatterDefaults, ...originalConfig });
+    // shown unless turned off, as when BaseChart first coloured a chart by `color_by`
+    config.color_legend = config.color_legend ?? { display: true };
     if (!dataStore.regions) {
         throw new Error("unexpected attempt to load spatial chart with no regions in datasource");
     }
@@ -78,6 +101,7 @@ function adaptSpatialDataConfig(originalConfig: SpatialDataMdvReactConfig, dataS
     config.render_backend = config.render_backend ?? null;
     config.grid = config.grid ?? null;
     config.crosshair = config.crosshair ?? null;
+    config.grey_other_categories = config.grey_other_categories ?? null;
     config.param = [...dataStore.regions.position_fields];
     if (typeof config.contourParameter === "string") {
         const column = dataStore.columnIndex[config.contourParameter];
@@ -336,11 +360,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
             Object.entries(regionViewStates ?? {}).map(([region, state]) => [region, toRegionViewState(state)]),
         );
         if (seedDefaultSpatialLayers) this.defaultImageLayerProps = defaultImageLayer;
-        this.colorByColumn(config.color_by);
+        setUpColorFields(this);
         makeObservable(this, {
-            colorBy: observable,
-            colorByColumn: action,
-            colorByDefault: action,
             renderStackGeneration: observable,
             bumpRenderStackGeneration: action,
             renderStackPropsGeneration: observable,
@@ -397,24 +418,43 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         }
     }
 
-    colorBy?: (i: number) => [r: number, g: number, b: number];
-
-    colorByColumn(col?: SpatialDataMdvReactConfig["color_by"]) {
-        if (!col) return this.colorByDefault();
-        this.config.color_by = col;
-        //@ts-expect-error legacy color_by options are normalised at runtime by BaseChart.
-        this.colorBy = this.getColorFunction(col, true);
+    getColorLegendSpec() {
+        return colorFieldsLegendSpec(this);
     }
 
-    colorByDefault() {
-        this.config.color_by = undefined;
-        this.colorBy = undefined;
+    onDataChanged(data: ColumnChangeEvent) {
+        super.onDataChanged(data);
+        onColorFieldsDataChanged(this, data.columns);
     }
 
-    getColorOptions() {
-        return {
-            colorby: "all",
+    onColumnRemoved(column: FieldName) {
+        onColorFieldRemoved(this, column);
+        return super.onColumnRemoved(column);
+    }
+
+    /**
+     * How a grid of a layer's fill colour would be split, by the type of its column in the table
+     * annotating its element (null with no table): read from the region's store, or undefined if
+     * it has not been read, when every layer is offered.
+     */
+    private layerGridSplit(): ((layer: FillColorLayer) => ColorGridSplit | null) | undefined {
+        const url = spatialDataUrlForRegion(this.dataStore.regions?.all_regions[this.config.region]);
+        const spatialData = url ? this.spatialDataReader.peek(url)?.state.spatialData : undefined;
+        if (!spatialData) return undefined;
+        const dataSources = window.mdv.chartManager.dataSources;
+        return ({ elementType, elementKey, fillColumn }) => {
+            const table = resolveAssociatedElementTable({ spatialData, elementType, elementKey, dataSources });
+            if (table.status !== "resolved") return null;
+            return colorGridSplitFor(fillColumn ? table.dataStore.columnIndex[fillColumn] : undefined);
         };
+    }
+
+    gridChoices() {
+        return spatialDataGridChoices(this.config, this.dataStore, this.layerGridSplit());
+    }
+
+    showGrid(value: string) {
+        runInAction(() => setSpatialDataGrid(this.config, value));
     }
 
     /**
@@ -435,7 +475,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 func: () => this.openLayerDialog(),
             }),
             getCrosshairSetting(config),
-            getSpatialDataGridSettingsFolder(config),
+            getSpatialDataGridSettingsFolder(config, dataStore, () => this.layerGridSplit()),
             g({
                 type: "dropdown",
                 label: `SpatialData (${dataStore.getColumnName(dataStore.regions?.region_field)})`,
@@ -475,10 +515,8 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
                 },
             });
         });
-        const colorSettings = this.getColorSettingsFolder();
-
         return [
-            ...(colorSettings ? [colorSettings] : []),
+            getColorFieldsSettingsFolder(config, this.dataStore),
             ...getSharedScatterSettings(config, {
                 chart: this,
                 includePointShape: true,
@@ -508,6 +546,7 @@ class SpatialDataMdvReact extends BaseReactChart<SpatialDataMdvReactConfig> {
         if (config.render_backend === null) config.render_backend = undefined;
         if (config.grid === null) config.grid = undefined;
         if (config.crosshair === null) config.crosshair = undefined;
+        if (config.grey_other_categories === null) config.grey_other_categories = undefined;
         return config;
     }
 }

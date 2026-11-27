@@ -206,7 +206,10 @@ function MultiLineGrid({ columns, xDomains, exportCellCount, ...cellProps }: Gri
         );
     };
     return (
-        <div ref={grid.scrollContainerRef} className="relative h-full w-full min-w-0 overflow-auto overflow-x-hidden">
+        <div
+            ref={grid.scrollContainerRef}
+            className="mdv-chart-array-scroll relative h-full w-full min-w-0 overflow-auto overflow-x-hidden"
+        >
             <ChartArrayLayout
                 cellCount={grid.cellCount}
                 cellKeys={grid.cellKeys}

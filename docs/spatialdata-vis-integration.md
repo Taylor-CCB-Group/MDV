@@ -177,8 +177,8 @@ options (name, region, rendering backend) and a button that opens the dialog.
 ### Groups and compositing
 
 The stack is a tree (schema v2). sd.js draws it with `renderStackToDeckLayers`, in the
-single view (`VivSpatialViewer`, given `useRenderStackStructure`) and in the density grid
-(`SpatialDensityGrid`, whose shared layers are then wrapped once more by
+single view (`VivSpatialViewer`, given `useRenderStackStructure`) and in the density and
+colour grids (`SpatialCellGrid`, whose shared layers are then wrapped once more by
 `sharedCellLayersGroup`). MDV edits it, and sd.js decides how it draws (ADR 0007 upstream):
 
 - **A group** has `opacity`, `blendMode` and `isolate`. Pass-through (the default) multiplies
@@ -273,7 +273,8 @@ that fail while *drawing*.
   its rows and highlighted rows by `region_field`, and clones it per cell, mapping picks back to
   positions in all the rows for the layer's own handlers. Each cell composes its clone with its
   other layers through the stack, so the data-points group's opacity and blending apply.
-  `hide_empty` leaves out regions with no rows left.
+  Regions with no rows left are left out unless `hide_empty` is false, counted from the chart's
+  own points layer while the stack's is hidden.
 - **A store that can't be read** shows its error over the cell, with Retry (the reader's
   `retry`, which starts every failed read again).
 - **Views are per cell**, fitted to each region when it has none. They are kept on the chart
@@ -296,6 +297,60 @@ that fail while *drawing*.
   view, the top pick wins, so where the MDV points cover a shape the shape has no tooltip.
 - **Not in cells yet:** selection tools, gates, density, grey (filtered-out) points and layer
   status.
+
+## Colour grids
+
+The chart colours its points by `color_fields` (see `src/react/colorFields.ts`), a list of columns
+like `densityFields`, so an active link is just one of its values. One view is coloured by the
+first column. `grid: { by: "color_fields", split }` draws cells from it:
+
+- `split: "columns"` (the default): a cell per colour column, each drawing every point coloured
+  by its column (`recolorPoints` from `useScatterplotLayer`). Each cell's copy builds all its
+  attributes, so the cost grows with the cells in view. The legend is hidden; each cell is
+  labelled with its column.
+- `split: "categories"`: a cell per category of the first colour column (`text` or `text16`),
+  each drawing that category's points (`subsetPointsLayer`, as the region grid does). The rows
+  are split once per change of rows (`partitionRowsByCategory`), not per cell.
+
+Both share the density grid's frame (`SpatialCellGrid`, on `DeckCellGrid`): one renderer, one view
+state, the render stack drawn once a frame for every cell, but for the stack's points entry,
+which each cell draws its own copy of. A cell's points sit over the stack, not in the stack's
+order. Picks on a category cell's copy name a position in its rows: its handlers are given the
+position in all the rows, and `SpatialLayer` reports the row as the pick's `object`, which the
+point tooltip reads.
+
+### A grid by a layer's fill colour
+
+A shapes or labels layer's fill colour can make the cells instead:
+`grid: { by: "layer_fill", layer: "<entry id>", split }`. Its colour picker's spec
+(`mdvFieldSpecs.fillColorByColumn`) holds several columns only while it does; the layer itself,
+and any reader of the saved stack, takes the first (`projectMdvFieldSpecs`).
+
+- `useLayerFillGridCells` makes the cells from the columns of the table annotating the layer's
+  element, which need not be the chart's datasource: a cell per column, or per category of the
+  first.
+- `withLayerFillCopies` replaces the layer in the layer inputs, before the table association,
+  with a copy per cell, its id under the cell's view id and its `fillColorByColumn` the cell's
+  column. The renderer loads the element's geometry once, keyed by element, and builds each
+  copy's attributes; the association builds each copy's feature state (colours from MDV, or the
+  viewer's palette for an obs column) as for any layer. Split by categories, every copy takes the
+  first column, and the association draws only the copy's category's features
+  (`categoryByLayerId`: the visible rows of that category, cached on the rows and the column's
+  data).
+- `StackCellGrid` draws the stack in two shared groups, below the layer and above it
+  (`splitRenderStackAt`), with each cell's copy between. An isolated group holding the layer is
+  split with it, so its two halves composite separately, and the copies do not get its blending.
+
+The Grid dropdown offers only layers whose element a table annotates (`layerGridSplit`, the
+association the layer panels use), each with the split its colour column's type allows, and the
+layer and split the chart is a grid of. In the layer list
+that layer's row has a grid icon (`GridByIcon`, placed by `griddedEntry`) beside its table icon, as
+does the row of a collapsed group that holds it. The MDV data rows get it the same way: Data points
+for a grid of the chart's colour, Density for a grid of density fields.
+
+The copies are made for every cell, not only those in view, and each costs a pass over the
+element's features when its column or the filter changes. An active link's change of columns
+changes the cells, and with them the copies.
 
 ## The points layer panel
 

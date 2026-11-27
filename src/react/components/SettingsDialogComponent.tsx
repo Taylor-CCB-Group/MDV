@@ -29,10 +29,11 @@ import { v4 as uuid } from "uuid";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig, SettingsDialogState as PersistedSettingsDialogState } from "@/charts/BaseChart";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import type { FieldSpecs } from "@/lib/columnTypeHelpers";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
 import { AUTOCOMPLETE_OPTIONS_LIMIT, AUTOCOMPLETE_TAGS_LIMIT } from "@/lib/constants";
 import { g, isArray, notEmpty } from "@/lib/utils";
-import type { AnyGuiSpec, Disposer, DropDownValues, GuiSpec, GuiSpecType } from "../../charts/charts";
+import type { AnyGuiSpec, Disposer, DropDownValues, GridBySpec, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { ChartProvider } from "../context";
 import { useCloseOnIntersection, usePasteHandler } from "../hooks";
 import { useFilteredGroupedSettings } from "../hooks/useFilteredGroupedSettings";
@@ -40,7 +41,9 @@ import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import CustomTooltip from "./CustomTooltip";
 import { useLiveCategorySelectionValues } from "./categorySelectionHooks";
 import { getCategorySelectionDropdownKey } from "./categorySelectionUtils";
+import { withColorColumn, withOtherGridColumns } from "./colorGridUtils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import GridByControl from "./GridByControl";
 
 const SettingsSearchContext = createContext("");
 const SEARCH_HINT_DURATION_MS = 4000;
@@ -143,11 +146,7 @@ function isMultiSpec(props: ColumnSelectionSpec): props is GuiSpec<"multicolumn"
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSelectionSpec }) => {
-    // multiple etc... this is the level above ColumnSelectionComponent I need to be focusing on.
-    const multiple = isMultiSpec(props);
-
-    const filter = props.columnType;
-    // not only is the filter not working, but we need to decide how to express "multiple"
+    const gridBy = isMultiSpec(props) ? props.gridBy : undefined;
     const props2 = useMemo(
         () =>
             inferGenericColumnSelectionProps({
@@ -157,17 +156,64 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
                     props.current_value = v;
                     props.func?.(v);
                 }),
-                type: filter, //is it ok for this to be optional?
-                multiple,
+                type: props.columnType, //is it ok for this to be optional?
+                multiple: isMultiSpec(props),
                 current_value: props.current_value, //! ideally this would also react to changes in the mobx store, why doesn't it?
                 // current_value: props.current_value... maybe want to be more mobx-y about this
             }),
-        [filter, props, props.current_value, multiple],
+        [props],
     );
+    if (isMultiSpec(props) && gridBy) return <GridByColumnSetting props={props} gridBy={gridBy} />;
     return (
         <>
             <MLabel props={props} />
             <ColumnSelectionComponent {...props2} />
+        </>
+    );
+});
+
+/**
+ * A column property the chart can be a grid of (see `GuiSpec.gridBy`). Its picker always takes
+ * one column, of any type: the colour column. Under it, a switch makes the chart a grid of it, a
+ * cell per category of a categorical column, or per numeric column; for the latter, a second
+ * picker adds the grid's other columns. The value is the colour column, then those.
+ */
+const GridByColumnSetting = observer(({ props, gridBy }: { props: GuiSpec<"multicolumn">; gridBy: GridBySpec }) => {
+    const split = gridBy.get();
+    const available = gridBy.available();
+    const specs = props.current_value;
+    const first = specs[0];
+    const setValue = action((next: FieldSpecs) => {
+        props.current_value = next;
+        props.func?.(next);
+    });
+    const others = specs.slice(1);
+    return (
+        <>
+            <MLabel props={props} />
+            <div className="grid w-full gap-1">
+                <ColumnSelectionComponent
+                    multiple={false}
+                    type={props.columnType}
+                    current_value={first}
+                    setSelectedColumn={(column) => {
+                        setValue(withColorColumn(specs, column, split === "columns"));
+                        // the split follows the new column's type
+                        if (gridBy.get()) gridBy.set(true);
+                    }}
+                />
+                <GridByControl split={split} available={available} onChange={gridBy.set} />
+                {split === "columns" && (
+                    <ColumnSelectionComponent
+                        multiple
+                        type="number"
+                        current_value={others}
+                        placeholder="Other columns in the grid"
+                        exclude={typeof first === "string" ? [first] : undefined}
+                        setSelectedColumn={(columns) => setValue(withOtherGridColumns(specs, columns))}
+                    />
+                )}
+            </div>
         </>
     );
 });

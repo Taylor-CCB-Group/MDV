@@ -78,6 +78,8 @@ function getSettingUsagePaths(config: BaseConfig, chartType: ChartTypeMetadata |
     };
 
     check("color_by", Reflect.get(config, "color_by"));
+    // the deck scatter plot and SpatialData chart colour by these instead of `color_by`
+    check("color_fields", Reflect.get(config, "color_fields"));
     check("tooltip", Reflect.get(config, "tooltip"));
     check("background_filter", Reflect.get(config, "background_filter"));
 

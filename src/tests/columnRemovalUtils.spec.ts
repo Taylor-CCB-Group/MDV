@@ -55,6 +55,15 @@ describe("columnRemovalUtils", () => {
         );
     });
 
+    test("classifies color_fields usage as blocking delete", () => {
+        const impact = analyzeChartColumnImpact(
+            createChartConfig({ title: "Scatter", type: "DeckScatter", color_fields: ["height", "age"] }),
+            undefined,
+            "age",
+        );
+        expect(impact).toEqual(expect.objectContaining({ usage: "settings", usagePaths: ["color_fields"] }));
+    });
+
     test("classifies tooltip and background filter usage as blocking delete", () => {
         const tooltipImpact = analyzeChartColumnImpact(
             createChartConfig({

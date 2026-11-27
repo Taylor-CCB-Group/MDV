@@ -52,12 +52,15 @@ import { toMdvViewState, toSpatialViewState } from "@/react/spatialdata/view_sta
 import { imageAlphaFromIntensity, vivImageLayerProps } from "@/react/spatialdata/viv_image_props";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { useViewStateLink } from "../chartLinkHooks";
+import { useColorFieldsLegend } from "../colorFields";
 import { useChart } from "../context";
 import type { DualContourLegacyConfig, HoveredContour } from "../contour_state";
 import { useCategoryContourLegend, useFieldContourLegend } from "../contour_state";
 import { useChartID, useChartSize, useConfig, useRegion } from "../hooks";
+import { useColorGridCells } from "../hooks/useColorGridCells";
 import { useDensityGridCells } from "../hooks/useDensityGridCells";
 import useGateLayers from "../hooks/useGateLayers";
+import { useLayerFillGridCells } from "../hooks/useLayerFillGridCells";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import { useOuterContainer } from "../screen_state";
@@ -66,10 +69,11 @@ import { useViewerStore, useViewerStoreApi, VivProvider } from "./avivatorish/st
 import { isDensityGridShown } from "./densityGridUtils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 import { type CategoryLegendItem, type FieldLegendItem, useContourLegend } from "./FieldContourLegend";
+import { withLayerFillCopies } from "./layerFillGridUtils";
 import { isRegionGridShown } from "./regionGridUtils";
 import SelectionOverlay from "./SelectionOverlay";
+import SpatialCellGrid, { type SpatialCellGridSpec, type SpatialGridHost } from "./SpatialCellGrid";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
-import SpatialDensityGrid, { type SpatialDensityGridHost } from "./SpatialDensityGrid";
 import SpatialRegionGrid, { type SpatialRegionGridHost } from "./SpatialRegionGrid";
 import ViewGestureHint from "./ViewGestureHint";
 
@@ -130,7 +134,7 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     deckProps,
     onFeatureHover,
     onFeatureHoverEnd,
-    densityGrid,
+    cellGrid,
 }: {
     spatialData: NonNullable<SpatialDataState["spatialData"]>;
     coordinateSystem: string;
@@ -145,8 +149,8 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
     /** The feature's pick, and what its `x` / `y` are relative to when not the chart's canvas. */
     onFeatureHover: (event: SpatialFeaturePickEvent, anchor?: HTMLElement) => void;
     onFeatureHoverEnd: () => void;
-    /** Set to draw each density field in its own cell instead of one canvas. */
-    densityGrid?: SpatialDensityGridHost;
+    /** Set to draw a grid of cells (a density field or colour category each) instead of one canvas. */
+    cellGrid?: SpatialCellGridSpec;
 }) {
     const config = useConfig<SpatialDataMdvReactConfig>();
     const chart = useChart<SpatialDataMdvReactConfig, SpatialDataMdvReact>();
@@ -291,10 +295,10 @@ const SpatialCanvasFromRenderStack = observer(function SpatialCanvasFromRenderSt
         return <div className="h-full w-full p-2">No layers to display</div>;
     }
 
-    if (densityGrid && spatialViewState) {
+    if (cellGrid && spatialViewState) {
         return (
-            <SpatialDensityGrid
-                host={densityGrid}
+            <SpatialCellGrid
+                spec={cellGrid}
                 renderer={renderer}
                 renderStack={stackStructure}
                 viewState={spatialViewState}
@@ -568,10 +572,26 @@ const SpatialDataViewer = observer(
             propsGeneration: chart.renderStackPropsGeneration,
             hostLayerResolver,
         });
+        // a grid by a layer's fill colour draws a copy of the layer per cell, each coloured (or
+        // filtered) its own way: the copies stand in for the layer from here on
+        const layerFillCells = useLayerFillGridCells(spatialData ?? undefined);
+        const gridLayerInputs = useMemo(
+            () =>
+                layerFillCells
+                    ? withLayerFillCopies(
+                          { layers: baseLayers, layerOrder: baseLayerOrder },
+                          layerFillCells.layerId,
+                          layerFillCells.copies,
+                      )
+                    : { layers: baseLayers, layerOrder: baseLayerOrder },
+            [layerFillCells, baseLayers, baseLayerOrder],
+        );
         const { layers, layerOrder, mdvTooltipItems } = useAssociatedShapesLayerInputs(
             spatialData ?? undefined,
-            { layers: baseLayers, layerOrder: baseLayerOrder },
+            gridLayerInputs,
             region?.spatial?.file,
+            layerFillCells?.categoryByLayerId,
+            !!config.grey_other_categories,
         );
 
         const onSpatialViewStateChange = useCallback(
@@ -687,7 +707,8 @@ const SpatialDataViewer = observer(
 
         const regionGridShown = isRegionGridShown(config);
         // as the adapter resolves the points' entry: its id, inherited opacity, and absent while hidden
-        const regionGridPointsLayer = deckLayers.find((layer) => layer.id === deckHostLayerId("scatter"));
+        const stackPointsLayer = deckLayers.find((layer) => layer.id === deckHostLayerId("scatter"));
+        const stackGreyLayer = deckLayers.find((layer) => layer.id === deckHostLayerId("grey_scatter"));
         const regionGridLayerInputs = useMemo(
             () => ({ layers: baseLayers, layerOrder: baseLayerOrder }),
             [baseLayers, baseLayerOrder],
@@ -723,26 +744,24 @@ const SpatialDataViewer = observer(
         );
 
         const densityGridCells = useDensityGridCells();
-        // with no field to make a cell of, the one canvas, without an overlay (as the scatter plot)
-        const gridShown = isDensityGridShown(config) && densityGridCells.cells.length > 0;
-        const densityGrid = useMemo<SpatialDensityGridHost | undefined>(
-            () =>
-                gridShown
-                    ? {
-                          ...densityGridCells,
-                          device: deckDevice,
-                          deviceProps,
-                          onDeviceInitialized,
-                          onError: onDeckError,
-                          controllerOptions,
-                          getTooltipContent,
-                          setKeyboardActive: setScatterKeyboardActive,
-                          onPointerLeave: onFeatureHoverEnd,
-                      }
-                    : undefined,
+        const colorGridCells = useColorGridCells();
+        useColorFieldsLegend();
+        // with nothing to make a cell of, the one canvas, without an overlay (as the scatter plot)
+        const densityGridShown = isDensityGridShown(config) && densityGridCells.cells.length > 0;
+        const colorGridShown = !densityGridShown && !!colorGridCells && colorGridCells.cells.length > 0;
+        const layerFillGridShown = !!layerFillCells && layerFillCells.cells.length > 0;
+        const gridHost = useMemo<SpatialGridHost>(
+            () => ({
+                device: deckDevice,
+                deviceProps,
+                onDeviceInitialized,
+                onError: onDeckError,
+                controllerOptions,
+                getTooltipContent,
+                setKeyboardActive: setScatterKeyboardActive,
+                onPointerLeave: onFeatureHoverEnd,
+            }),
             [
-                gridShown,
-                densityGridCells,
                 deckDevice,
                 deviceProps,
                 onDeviceInitialized,
@@ -753,6 +772,28 @@ const SpatialDataViewer = observer(
                 onFeatureHoverEnd,
             ],
         );
+        const pointsLayer = colorGridShown ? stackPointsLayer : undefined;
+        const greyLayer = colorGridShown ? stackGreyLayer : undefined;
+        const cellGrid = useMemo<SpatialCellGridSpec | undefined>(() => {
+            if (densityGridShown) return { by: "densityFields", host: gridHost, cells: densityGridCells };
+            if (colorGridShown && colorGridCells) {
+                return { by: "color_fields", host: gridHost, cells: colorGridCells, pointsLayer, greyLayer };
+            }
+            if (layerFillGridShown && layerFillCells)
+                return { by: "layer_fill", host: gridHost, cells: layerFillCells };
+            return undefined;
+        }, [
+            densityGridShown,
+            colorGridShown,
+            layerFillGridShown,
+            gridHost,
+            densityGridCells,
+            colorGridCells,
+            layerFillCells,
+            pointsLayer,
+            greyLayer,
+        ]);
+        const densityGrid = cellGrid?.by === "densityFields";
         // drawn in the chart's legend wrapper: draggable, can be minimised or put above the plot. In the
         // density grid each cell is labelled with its field, so only categories need the legend there;
         // the region grid has no legend.
@@ -839,7 +880,7 @@ const SpatialDataViewer = observer(
                                     <SpatialRegionGridFromRenderStack
                                         host={regionGrid}
                                         layerInputs={regionGridLayerInputs}
-                                        pointsLayer={regionGridPointsLayer}
+                                        pointsLayer={stackPointsLayer}
                                     />
                                 ) : (
                                     <SpatialCanvasFromRenderStack
@@ -855,7 +896,7 @@ const SpatialDataViewer = observer(
                                         deckProps={deckProps}
                                         onFeatureHover={onFeatureHover}
                                         onFeatureHoverEnd={onFeatureHoverEnd}
-                                        densityGrid={densityGrid}
+                                        cellGrid={cellGrid}
                                     />
                                 )}
                             </ErrorBoundary>
@@ -863,7 +904,7 @@ const SpatialDataViewer = observer(
                     </div>
                 </section>
                 {/* the grid has its own, over its scrolling cells */}
-                {!densityGrid && !regionGrid && <ViewGestureHint />}
+                {!cellGrid && !regionGrid && <ViewGestureHint />}
                 {tooltipPortal}
                 {featureTooltipPortal}
             </Profiler>

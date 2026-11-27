@@ -1,6 +1,10 @@
+import type { LayerConfig } from "@spatialdata/vis";
 import { describe, expect, test } from "vitest";
-
-import { splitTooltipFields, tooltipItemsFromDataStore } from "@/react/spatialdata/table_association";
+import {
+    splitTooltipFields,
+    tooltipItemsFromDataStore,
+    withViewerReadableColumns,
+} from "@/react/spatialdata/table_association";
 
 describe("splitTooltipFields", () => {
     test("fields in obs go to the viewer, the rest to MDV, in order", () => {
@@ -36,5 +40,35 @@ describe("tooltipItemsFromDataStore", () => {
             { label: "Unloaded", value: "loading…" },
             { label: "missing", value: "" },
         ]);
+    });
+});
+
+describe("withViewerReadableColumns", () => {
+    const layer: LayerConfig = {
+        type: "shapes",
+        id: "cells",
+        elementKey: "cells",
+        visible: true,
+        opacity: 1,
+        tooltipFields: ["cluster", "gs|CD3E (gs)|0"],
+        fillColorByColumn: { columnName: "gs|CD3E (gs)|0", mode: "auto" },
+    };
+
+    test("keeps only the columns in obs, and none when obs is unknown", () => {
+        expect(withViewerReadableColumns(layer, new Set(["cluster"]))).toEqual({
+            type: "shapes",
+            id: "cells",
+            elementKey: "cells",
+            visible: true,
+            opacity: 1,
+            tooltipFields: ["cluster"],
+        });
+        expect(withViewerReadableColumns(layer, undefined)).toMatchObject({ tooltipFields: [] });
+        expect(withViewerReadableColumns(layer, undefined)).not.toHaveProperty("fillColorByColumn");
+    });
+
+    test("a layer the viewer can read all of is returned as is", () => {
+        const readable = new Set(["cluster", "gs|CD3E (gs)|0"]);
+        expect(withViewerReadableColumns(layer, readable)).toBe(layer);
     });
 });

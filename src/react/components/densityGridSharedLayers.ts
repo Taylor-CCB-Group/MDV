@@ -8,6 +8,9 @@ import { recordSpatialPerf, spatialPerfEnabled } from "@/react/spatialdata/perf"
  */
 export const SHARED_CELL_LAYERS_ID = "shared-cell-layers";
 
+/** A second group's id, for layers every cell draws over the cells' own (see `SpatialCellGrid`). */
+export const SHARED_CELL_LAYERS_ABOVE_ID = "shared-cell-layers-above";
+
 type PickingEventName = "onClick" | "onDragStart" | "onDrag" | "onDragEnd";
 type PickingHandler = NonNullable<LayerProps["onClick"]>;
 
@@ -49,9 +52,9 @@ const onTargetRender = spatialPerfEnabled
  * on each canvas, and anything drawn per cell. Picks inside the group name the group as
  * `info.layer`; match them by member (`pickingInfoMatchesLayer`).
  */
-export function sharedCellLayersGroup(layers: readonly Layer[]): IsolatedGroupLayer {
+export function sharedCellLayersGroup(layers: readonly Layer[], id = SHARED_CELL_LAYERS_ID): IsolatedGroupLayer {
     return new IsolatedGroupLayer({
-        id: SHARED_CELL_LAYERS_ID,
+        id,
         layers: [...layers],
         onTargetRender,
         ...forwardedEvents,

@@ -1418,6 +1418,10 @@ class BaseChart<T extends BaseConfig> {
     }
 
     getImage?(callback: (resp: any) => void, im_type: "png" | "svg"): void;
+    /** The grids the chart can show besides one view (charts drawn as small multiples), as the toolbar offers them. */
+    gridChoices?(): { name: string; value: string }[];
+    /** Shows the grid a choice from `gridChoices` names, or one view for "none". */
+    showGrid?(value: string): void;
     /**
      * Downloads an image of the chart
      * @param im_type - either svg or png

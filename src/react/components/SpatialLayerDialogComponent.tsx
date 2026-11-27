@@ -37,10 +37,13 @@ import {
 import type { ElementIssue } from "@spatialdata/core";
 import { findRenderStackEntry, type RenderStackSpatialElementType, walkRenderStackEntries } from "@spatialdata/layers";
 import type { LayerConfig } from "@spatialdata/vis";
+import { action } from "mobx";
 import { observer } from "mobx-react-lite";
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
+import type { GridBySpec } from "@/charts/charts";
 import { dataQualityNotesSetting } from "@/lib/browserSettings";
+import type { ColumnTypes } from "@/react/colorFields";
 import {
     DECK_OVERLAY_VISIBILITY_FOLLOWERS,
     type DeckOverlayId,
@@ -74,8 +77,11 @@ import { useChartSpatialData } from "@/react/spatialdata/shared_spatial_data";
 import { useElementTableAssociation } from "@/react/spatialdata/table_association";
 import { useChart, useDataStore } from "../context";
 import { useConfig, useDataSources } from "../hooks";
+import { colorGridSplitFor } from "./colorGridUtils";
 import EntryStatusDetails from "./EntryStatusDetails";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import { GridByIcon } from "./GridByControl";
+import { fillColumnName, griddedEntry, layerFillGrid, layerFillGridConfig } from "./layerFillGridUtils";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
 import { CompositingButton, hasCompositing } from "./spatialLayers/CompositingButton";
 import DeckOverlayLayerPanel from "./spatialLayers/DeckOverlayLayerPanel";
@@ -181,6 +187,39 @@ const LayerFailureDetails = observer(function LayerFailureDetails({ entryId }: {
     );
 });
 
+/**
+ * Turns the chart's grid by this layer's fill colour on and off, split by the type of its colour
+ * column in the table annotating it (`columns`, undefined without one). Turning it on with no
+ * column yet (an active link that has not resolved) leaves the grid as it is, for the column to
+ * come; with a column that cannot be split, it turns it off.
+ */
+function useLayerFillGridBy(entryId: string, columns: ColumnTypes | undefined): GridBySpec {
+    const config = useConfig<SpatialDataMdvReactConfig>();
+    return useMemo(() => {
+        const fillColumn = () => {
+            const entry = config.renderStack ? findRenderStackEntry(config.renderStack, entryId) : undefined;
+            return entry ? fillColumnName(entry.props) : undefined;
+        };
+        const available = () => {
+            const column = fillColumn();
+            return colorGridSplitFor(column ? columns?.columnIndex[column] : undefined);
+        };
+        return {
+            get: () => {
+                const grid = layerFillGrid(config);
+                return grid?.layer === entryId ? grid.split : null;
+            },
+            available,
+            set: action((on: boolean) => {
+                if (on && !fillColumn()) return;
+                const split = on ? available() : null;
+                if (split) config.grid = layerFillGridConfig(entryId, split, config.grid);
+                else if (layerFillGrid(config)?.layer === entryId) config.grid = null;
+            }),
+        };
+    }, [config, entryId, columns]);
+}
+
 const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: string }) {
     const dataStore = useDataStore();
     const dataSources = useDataSources();
@@ -194,11 +233,12 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
         spatialElementKey,
         dataSources,
     );
-    const layerDataStore =
+    const tableDataStore =
         tableAssociation.status === "resolved"
-            ? (dataSources.find((dataSource) => dataSource.name === tableAssociation.dataSourceName)?.dataStore ??
-              dataStore)
-            : dataStore;
+            ? dataSources.find((dataSource) => dataSource.name === tableAssociation.dataSourceName)?.dataStore
+            : undefined;
+    const layerDataStore = tableDataStore ?? dataStore;
+    const gridBy = useLayerFillGridBy(entryId, tableDataStore);
 
     if (!entry) return null;
 
@@ -221,6 +261,7 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
                     association={tableAssociation}
                     dataStore={layerDataStore}
                     updateLayer={patchLayer}
+                    gridBy={gridBy}
                 />
             );
         case "points":
@@ -234,6 +275,7 @@ const LayerDetails = observer(function LayerDetails({ entryId }: { entryId: stri
                     association={tableAssociation}
                     dataStore={layerDataStore}
                     updateLayer={patchLayer}
+                    gridBy={gridBy}
                 />
             );
         default:
@@ -400,6 +442,12 @@ const LayerTreeRow = observer(function LayerTreeRow({
     const supportsOpacity = entry.kind === "spatial" || entry.kind === "group";
     const name = renderStackEntryDisplayName(entry, config.renderStack);
     const table = entry.kind === "spatial" ? tableSummary(entry.source.elementType, entry.source.elementKey) : null;
+    const gridded = griddedEntry(config);
+    // a collapsed group stands in for the gridded layer it hides
+    const hiddenGridLayer =
+        gridded && entry.kind === "group" && expander && !expander.expanded
+            ? Array.from(walkRenderStackEntries(entry.children)).find((child) => child.id === gridded.entryId)
+            : undefined;
 
     return (
         <div
@@ -494,6 +542,13 @@ const LayerTreeRow = observer(function LayerTreeRow({
                 </Typography>
             )}
             {table && <ElementTableIcon summary={table} />}
+            {gridded?.entryId === entryId && <GridByIcon gridded={gridded} />}
+            {gridded && hiddenGridLayer && (
+                <GridByIcon
+                    gridded={gridded}
+                    layerName={renderStackEntryDisplayName(hiddenGridLayer, config.renderStack)}
+                />
+            )}
             {hasCompositing(entry.kind, entryId) && <CompositingButton entryId={entryId} name={name} />}
             {entry.kind === "group" && onAddInto && (
                 <IconButton
@@ -773,11 +828,25 @@ const SpatialLayerDialogComponent = observer(() => {
 
     const onRemove = useCallback(
         (id: string) => {
+            // a grid of the removed layer's fill (or of a layer in a removed group) goes with it
+            const gridded = layerFillGrid(config)?.layer;
+            const removed = stack ? findRenderStackEntry(stack, id) : undefined;
+            const removesGridded =
+                removed &&
+                gridded &&
+                (removed.id === gridded ||
+                    (removed.kind === "group" &&
+                        Array.from(walkRenderStackEntries(removed.children)).some((e) => e.id === gridded)));
             mutateStack((current) => removeRenderStackEntry(current, id));
+            if (removesGridded) {
+                action(() => {
+                    config.grid = null;
+                })();
+            }
             chart.clearLayerFailure(id);
             if (selectedEntryId === id) setSelectedEntryId(null);
         },
-        [chart, mutateStack, selectedEntryId],
+        [chart, config, stack, mutateStack, selectedEntryId],
     );
 
     if (!stack?.entries.length) {

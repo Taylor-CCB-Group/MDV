@@ -230,6 +230,24 @@ export type GuiValueTypes = {
     multicolumn: FieldSpecs; //easier to have distinct 'multicolumn' type than overly generic 'column'?
 };
 export type GuiSpecType = keyof GuiValueTypes;
+/** How a grid by a column property splits it into cells: a cell per column, or per category of the first. */
+export type GridSplit = "columns" | "categories";
+/**
+ * A column property the chart can be drawn as a grid of (see `GuiSpec.gridBy`). How it is split
+ * follows the type of its first column: a categorical column gives a cell per category, numeric
+ * columns a cell per column.
+ */
+export type GridBySpec = {
+    /** How the chart is split into cells by this property, or null when it is not a grid of it. */
+    get: () => GridSplit | null;
+    /**
+     * How a grid of the property's value now would be split, or null when it cannot be a grid of
+     * it (no column, or a column that is neither numeric nor one category per row).
+     */
+    available: () => GridSplit | null;
+    /** Make the chart a grid of this property, split as `available` says, or not. */
+    set: (on: boolean) => void;
+};
 type GV<T extends GuiSpecType> = GuiValueTypes[T];
 type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => void | Promise<void>;
 // type GuiSpecExperiment<T extends keyof GuiSpecType> = T extends infer K
@@ -290,6 +308,12 @@ export type GuiSpec<T extends GuiSpecType> = {
      * or other form like `"_multi_column:number" | "number"`.
      */
     columnType?: T extends "column" | "multicolumn" ? CTypes : never;
+    /**
+     * Set on a `"multicolumn"` property the chart can be drawn as a grid of. Its picker takes one
+     * column, with a control to turn the grid on or off; a grid of a cell per column adds a second
+     * picker for the other columns.
+     */
+    gridBy?: T extends "multicolumn" ? GridBySpec : never;
     /** Optional array of disposers that should be cleaned up when the settings dialog closes.
      * This allows settings specs to register autoruns or other reactive disposables that are tied
      * to the dialog's lifetime rather than the chart's lifetime. */

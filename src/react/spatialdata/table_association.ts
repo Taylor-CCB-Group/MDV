@@ -210,9 +210,17 @@ function toRgba(color: RgbColor | RgbaColor | undefined, alpha: number): RgbaCol
     ];
 }
 
+/**
+ * The opacity of faded features drawn for context (`emphasisedRows`), relative to their own. The
+ * viewer's default suits a cross-filter, where the faded features are few; for a grid cell's
+ * other categories they are most of the element, and at that opacity bury the cell's own.
+ */
+const CONTEXT_OPACITY = 0.15;
+
 export function buildAssociatedFeatureStateFromRowMap({
     rowIndexByFeatureId,
     visibleRows,
+    emphasisedRows,
     rowCount,
     baseFeatureState,
     colorForRow,
@@ -220,13 +228,20 @@ export function buildAssociatedFeatureStateFromRowMap({
 }: {
     rowIndexByFeatureId: Map<string, number> | Iterable<[string, number]>;
     visibleRows: ArrayLike<number>;
+    /**
+     * When given, the visible rows drawn as they are; the other visible rows are faded
+     * (`fadedFeatureIds`) rather than hidden. A grid cell's category, with the rest for context.
+     */
+    emphasisedRows?: ArrayLike<number>;
     rowCount: number;
     baseFeatureState?: AssociatedFeatureState;
     colorForRow?: RowColorFunction;
     alpha: number;
 }): AssociatedFeatureState | undefined {
     const visibleRowSet = new Set(Array.from(visibleRows));
+    const emphasisedRowSet = emphasisedRows ? new Set(Array.from(emphasisedRows)) : undefined;
     const hiddenFeatureIds = new Set(baseFeatureState?.hiddenFeatureIds ?? []);
+    const fadedFeatureIds = new Set(baseFeatureState?.fadedFeatureIds ?? []);
     const fillColorByFeatureId = {
         ...(baseFeatureState?.fillColorByFeatureId ?? {}),
     };
@@ -239,6 +254,8 @@ export function buildAssociatedFeatureStateFromRowMap({
         hasTableState = true;
         if (!visibleRowSet.has(rowIndex)) {
             hiddenFeatureIds.add(featureId);
+        } else if (emphasisedRowSet && !emphasisedRowSet.has(rowIndex)) {
+            fadedFeatureIds.add(featureId);
         }
 
         if (colorForRow) {
@@ -253,6 +270,9 @@ export function buildAssociatedFeatureStateFromRowMap({
         ...baseFeatureState,
         fillColorByFeatureId: Object.keys(fillColorByFeatureId).length > 0 ? fillColorByFeatureId : undefined,
         hiddenFeatureIds: hiddenFeatureIds.size > 0 ? Array.from(hiddenFeatureIds) : undefined,
+        fadedFeatureIds: fadedFeatureIds.size > 0 ? Array.from(fadedFeatureIds) : undefined,
+        filteredOpacityMultiplier:
+            baseFeatureState?.filteredOpacityMultiplier ?? (emphasisedRowSet ? CONTEXT_OPACITY : undefined),
     };
 }
 
@@ -293,6 +313,22 @@ function withoutViewerFillColorColumn<T extends LayerConfig>(layer: T): T {
     if (!("fillColorByColumn" in layer)) return layer;
     const { fillColorByColumn: _removed, ...rest } = layer;
     return rest as T;
+}
+
+/**
+ * The layer with only the tooltip fields and fill colour column the viewer can read from the
+ * table's obs (none when that is unknown); the layer itself when it has nothing else. For a layer
+ * MDV has no table for yet: the rest are MDV's, filled in once it has.
+ */
+export function withViewerReadableColumns<T extends LayerConfig>(layer: T, obsColumnNames: Set<string> | undefined): T {
+    const readable = (column: string) => obsColumnNames?.has(column) ?? false;
+    const tooltipFields = layerTooltipFields(layer);
+    const fillColumn = layerFillColorColumnName(layer);
+    const keepTooltip = !tooltipFields || tooltipFields.every(readable);
+    const keepFill = !fillColumn || readable(fillColumn);
+    if (keepTooltip && keepFill) return layer;
+    const withFill = keepFill ? layer : withoutViewerFillColorColumn(layer);
+    return keepTooltip ? withFill : { ...withFill, tooltipFields: (tooltipFields ?? []).filter(readable) };
 }
 
 export function layerFillColorColumnName(layer: LayerConfig): string | undefined {
@@ -381,6 +417,7 @@ export function withPreservedFillColorsWhileLoading({
 type FeatureStateCacheEntry = {
     source: Map<string, number>;
     visibleRows: Uint32Array | undefined;
+    emphasisedRows: Uint32Array | undefined;
     rowCount: number;
     baseFeatureState: AssociatedFeatureState | undefined;
     colorForRow: RowColorFunction | undefined;
@@ -583,7 +620,57 @@ function visibleRowsForDataStore(dataStore: DataStore): Uint32Array {
     return visibleRows;
 }
 
-function useDataStoreFilterVersion(dataStores: DataStore[]) {
+/** Of `rows`, those whose value in a categorical column's `codes` is `code`. */
+export function rowsInCategory(rows: ArrayLike<number>, codes: ArrayLike<number>, code: number): Uint32Array {
+    let count = 0;
+    for (let i = 0; i < rows.length; i++) if (codes[rows[i]] === code) count++;
+    const result = new Uint32Array(count);
+    let at = 0;
+    for (let i = 0; i < rows.length; i++) if (codes[rows[i]] === code) result[at++] = rows[i];
+    return result;
+}
+
+type CategoryRowsCacheEntry = {
+    rows: Uint32Array;
+    codes: ArrayLike<number> | undefined;
+    category: string;
+    result: Uint32Array;
+};
+
+const NO_ROWS = new Uint32Array(0);
+
+/**
+ * The visible rows of one category of a layer's fill column: what a cell of a grid by the
+ * layer's fill categories draws. None until the column's data has loaded. Cached on what it
+ * reads, so an unchanged subset keeps its identity and the feature-state cache holds.
+ */
+function categoryVisibleRows(
+    cache: Record<string, CategoryRowsCacheEntry>,
+    layerId: string,
+    rows: Uint32Array,
+    dataStore: DataStore,
+    columnName: string | undefined,
+    category: string,
+): Uint32Array {
+    const column = columnName ? dataStore.columnIndex[columnName] : undefined;
+    const codes = column?.data ?? undefined;
+    const cached = cache[layerId];
+    if (cached && cached.rows === rows && cached.codes === codes && cached.category === category) {
+        return cached.result;
+    }
+    const values: unknown[] = Array.isArray(column?.values) ? column.values : [];
+    const code = values.indexOf(category);
+    const result = codes && code >= 0 ? rowsInCategory(rows, codes, code) : NO_ROWS;
+    cache[layerId] = { rows, codes, category, result };
+    return result;
+}
+
+/**
+ * A version that advances when any of the datastores refilters, gains rows, or has data changed
+ * in place: an edited annotation keeps its array's identity, so the visible rows are rebuilt for
+ * it too, and what is cached on them (a category's rows, feature states) with them.
+ */
+export function useDataStoreFilterVersion(dataStores: DataStore[]) {
     const [version, setVersion] = useState(0);
     // `DataStore.addListener` is keyed, and a duplicate key silently REPLACES the
     // existing listener while cleanup deletes by that key. `useId` gives each hook
@@ -594,7 +681,7 @@ function useDataStoreFilterVersion(dataStores: DataStore[]) {
     useEffect(() => {
         const listenerId = `spatial-table-association-${instanceId}`;
         const listener = (type: string) => {
-            if (type === "filtered" || type === "data_added") {
+            if (type === "filtered" || type === "data_added" || type === "data_changed") {
                 setVersion((current) => current + 1);
             }
         };
@@ -716,6 +803,13 @@ export function useAssociatedShapesLayerInputs(
     spatialData: SpatialData | undefined,
     layerInputs: RenderStackLayerInputs,
     spatialDataName?: string,
+    /**
+     * Layers that draw only the features of one category of their fill column, by layer id: the
+     * copies of a grid by a layer's fill categories (see `withLayerFillCopies`).
+     */
+    categoryByLayerId?: Readonly<Record<string, string>>,
+    /** With `categoryByLayerId`: fade the other categories' features rather than hide them. */
+    fadeOtherCategories = false,
 ): AssociatedLayerInputs {
     const dataSources = useDataSources();
     // Stable by value, not by identity: which elements are on the canvas changes far
@@ -904,6 +998,7 @@ export function useAssociatedShapesLayerInputs(
     }, [fillColumnsByDataSource, loadedColorColumnVersion, tableByAssociationKey]);
     const lastFillColorsRef = useRef<Record<string, Record<string, RgbaColor>>>({});
     const featureStateCacheRef = useRef<Record<string, FeatureStateCacheEntry>>({});
+    const categoryRowsCacheRef = useRef<Record<string, CategoryRowsCacheEntry>>({});
 
     // `count` here is how many times the association projection ran during a capture;
     // `avgMs` tells you whether the per-feature pass was cached or rebuilt. A cosmetic
@@ -920,7 +1015,21 @@ export function useAssociatedShapesLayerInputs(
 
                     const associationKey = `${layer.type}:${layer.elementKey}`;
                     const table = tableByAssociationKey[associationKey];
-                    if (table?.status !== "resolved") continue;
+                    if (table?.status !== "resolved") {
+                        // Until MDV has the layer's table (the store still being read, or with
+                        // none), the viewer gets only the columns it can read: a gene score
+                        // left in would be loaded from obs, fail, and leave the layer
+                        // reporting that it could not load after MDV took the column over.
+                        const viewerOnly = withViewerReadableColumns(
+                            layer,
+                            obsColumnNamesByAssociationKey[associationKey],
+                        );
+                        if (viewerOnly !== layer) {
+                            nextLayers[layerId] = viewerOnly;
+                            changed = true;
+                        }
+                        continue;
+                    }
 
                     const tooltipFields = layerTooltipFields(layer);
                     const viewerTooltipFields = mdvTooltipFieldsByLayerId[layerId]
@@ -943,8 +1052,24 @@ export function useAssociatedShapesLayerInputs(
                             : undefined;
                     // A selected column whose data has not loaded yet has no colour function.
                     const colorReady = !fillColumnName || !!viewerFillColor || colorForRow !== undefined;
-                    const visibleRows =
+                    const filteredRows =
                         visibleRowsByDataSource[table.dataSourceName] ?? visibleRowsForDataStore(table.dataStore);
+                    const category = categoryByLayerId?.[layerId];
+                    const categoryRows =
+                        category === undefined
+                            ? undefined
+                            : categoryVisibleRows(
+                                  categoryRowsCacheRef.current,
+                                  layerId,
+                                  filteredRows,
+                                  table.dataStore,
+                                  fillColumnName,
+                                  category,
+                              );
+                    // a grid cell draws its category; the rest of the filtered rows are hidden,
+                    // or faded for context
+                    const visibleRows = categoryRows && !fadeOtherCategories ? categoryRows : filteredRows;
+                    const emphasisedRows = fadeOtherCategories ? categoryRows : undefined;
 
                     // Filtering rides `featureState` on both routes: cross-filtering is
                     // MDV's, not the table's, and no column in obs can express it.
@@ -957,8 +1082,26 @@ export function useAssociatedShapesLayerInputs(
                     // the inputs it actually reads separates the two: the copy stays cheap
                     // and per-render, the per-feature pass runs only when something it
                     // depends on moved.
+                    // What the viewer gets of the layer's columns: decided by the table, so the
+                    // same before the feature rows are mapped (below) as after.
+                    const projected = viewerFillColor
+                        ? { ...layer, fillColorByColumn: viewerFillColor }
+                        : withoutViewerFillColorColumn(layer);
+                    const withTooltip = viewerTooltipFields
+                        ? { ...projected, tooltipFields: viewerTooltipFields }
+                        : projected;
+
                     const source = rowIndexByFeatureIdByAssociationKey[associationKey];
-                    if (!source) continue;
+                    if (!source) {
+                        // Still mapping features to rows: no colours or filter yet, but the
+                        // viewer must not be handed MDV's columns meanwhile (see
+                        // `withViewerReadableColumns`).
+                        if (withTooltip !== layer) {
+                            nextLayers[layerId] = withTooltip;
+                            changed = true;
+                        }
+                        continue;
+                    }
 
                     const rowCount = table.dataStore.size;
                     const alpha = layerFillAlpha(layer);
@@ -969,6 +1112,7 @@ export function useAssociatedShapesLayerInputs(
                         cached &&
                         cached.source === source &&
                         cached.visibleRows === visibleRows &&
+                        cached.emphasisedRows === emphasisedRows &&
                         cached.rowCount === rowCount &&
                         cached.baseFeatureState === baseFeatureState &&
                         cached.colorForRow === colorForRow &&
@@ -979,6 +1123,7 @@ export function useAssociatedShapesLayerInputs(
                         featureState = buildAssociatedFeatureStateFromRowMap({
                             rowIndexByFeatureId: source,
                             visibleRows,
+                            emphasisedRows,
                             rowCount,
                             baseFeatureState,
                             colorForRow,
@@ -987,6 +1132,7 @@ export function useAssociatedShapesLayerInputs(
                         featureStateCacheRef.current[layerId] = {
                             source,
                             visibleRows,
+                            emphasisedRows,
                             rowCount,
                             baseFeatureState,
                             colorForRow,
@@ -1016,12 +1162,6 @@ export function useAssociatedShapesLayerInputs(
 
                     if (!featureState && !viewerFillColor && !viewerTooltipFields) continue;
 
-                    const projected = viewerFillColor
-                        ? { ...layer, fillColorByColumn: viewerFillColor }
-                        : withoutViewerFillColorColumn(layer);
-                    const withTooltip = viewerTooltipFields
-                        ? { ...projected, tooltipFields: viewerTooltipFields }
-                        : projected;
                     nextLayers[layerId] = featureState ? { ...withTooltip, featureState } : withTooltip;
                     changed = true;
                 }
@@ -1031,6 +1171,7 @@ export function useAssociatedShapesLayerInputs(
                 // feature of that element — reachable for the life of the chart.
                 pruneToKeys(featureStateCacheRef.current, layerInputs.layerOrder);
                 pruneToKeys(lastFillColorsRef.current, layerInputs.layerOrder);
+                pruneToKeys(categoryRowsCacheRef.current, layerInputs.layerOrder);
 
                 return changed ? nextLayers : layerInputs.layers;
             }),
@@ -1043,6 +1184,8 @@ export function useAssociatedShapesLayerInputs(
             visibleRowsByDataSource,
             colorFunctionByDataSource,
             mdvTooltipFieldsByLayerId,
+            categoryByLayerId,
+            fadeOtherCategories,
         ],
     );
 

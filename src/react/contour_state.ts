@@ -625,7 +625,7 @@ export function useLegacyDualContour(hoveredContour?: HoveredContour | null): Co
     const fieldContours = useFieldContour({
         ...commonProps,
         id: "fieldContours",
-        // the grid draws each field in its own cell instead (`DeckDensityGridComponent`)
+        // the grid draws each field in its own cell instead (`DeckDensityGridComponent`, `SpatialDensityGrid`)
         fields: isDensityGridShown(config) ? NO_FIELDS : fields.filter(isLoadedDoubleColumn),
     });
     const contour1 = useCategoryContour({

@@ -84,6 +84,28 @@ describe("chart config schema registration", () => {
         });
     });
 
+    test("validates a deck scatter plot coloured by several columns, as a grid", () => {
+        const config = {
+            id: "deck-scatter-colour-grid",
+            title: "By marker",
+            type: "DeckScatter",
+            param: ["x", "y"],
+            size: [640, 480],
+            tooltip: { show: false },
+            color_fields: ["marker_a", "marker_b"],
+            grid: { by: "color_fields", split: "columns" },
+        };
+        const schema = getChartConfigSchema("DeckScatter");
+        expect(schema?.safeParse(config).data).toMatchObject({
+            color_fields: ["marker_a", "marker_b"],
+            grid: { by: "color_fields", split: "columns" },
+        });
+        const byCategory = { ...config, grid: { by: "color_fields", split: "categories" } };
+        expect(schema?.safeParse(byCategory).success).toBe(true);
+        expect(schema?.safeParse({ ...config, grid: { by: "color_fields", split: "rows" } }).success).toBe(false);
+        expect(schema?.safeParse({ ...config, grid: { by: "colour" } }).success).toBe(false);
+    });
+
     test("validates the legacy DeckDensity alias against the same config family", () => {
         const config = {
             id: "deck-density-1",
