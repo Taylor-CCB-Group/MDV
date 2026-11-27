@@ -1,7 +1,8 @@
-# Build the workspace grid on the prototype's own engine, behind a seam that lets gridstack 14 replace it
+# Use the prototype's engine as the showcase baseline behind a replaceable layout seam
 
-**Status:** accepted. Follows ADR 0026, which fixed the saved layout this engine reads and writes.
-gridstack 14 is the agreed fallback if the team prefers it once the walking skeleton is in use.
+**Status:** accepted as the showcase baseline, not as the lasting layout-model decision.
+Follows ADR 0026's candidate internal model. The team will compare scrolling grid, tiling and
+hybrid arrangements with the walking skeleton in use.
 
 ## Context
 
@@ -32,8 +33,7 @@ prototype's `flow` for narrower layouts. Then each was checked automatically at 
 By hand, the in-house engine and gridstack 14 felt almost the same. The one difference was
 the bottom edge.
 
-Findings: `docs/design/workspace/research/19-layout-engine-bake-off-round-two.md` (and
-`19-layout-engine-bake-off-results.md` for round one).
+Findings: `docs/design/workspace/LAYOUT-EVALUATION.md`.
 
 The worry with an in-house engine is owning it. The layout logic is small and testable. What we
 would own is the gesture code, and gridstack 14 already needed its gestures worked around in
@@ -44,9 +44,10 @@ that wiring.
 
 ## Decision
 
-The workspace grid is the prototype's engine, rebuilt as a typed module with tests. It sits
-behind a seam narrow enough that gridstack 14 can replace it without touching the rest of the
-workspace.
+The first showcase implementation uses the prototype's engine, rebuilt as a typed module with
+tests. It sits behind a seam narrow enough that gridstack 14, a tiling engine or a hybrid can
+replace it without touching the rest of the workspace. This choice starts implementation; it
+does not prejudge the product-level layout model.
 
 ### Behaviour
 
@@ -115,16 +116,23 @@ The lab found these, and the build has to do each one:
 The layout functions get unit tests. Dragging and resizing get Playwright tests on the
 acceptance views (ticket 20).
 
-## When to switch to gridstack 14
+## Layout checkpoint
 
-Revisit if any of these comes true:
+Before hardening layout-specific UI, compare the baseline with a small tiling or hybrid
+experiment. Shared Playwright scenarios provide geometry assertions, measurements and
+screenshots; people try the same workflows and judge feel. Test:
 
-- The team, using the walking skeleton, prefers gridstack.
-- Moving or resizing charts on tablets becomes a requirement (ADR 0026 rules it out for now).
-- We want charts dragged in from a palette, or grids nested in grids.
-- Bugs in our gesture code keep costing more than the workarounds below.
+- an adjustable 2/3 arrangement
+- moving selected charts between regions
+- dense small charts without disruptive movement of unrelated charts
+- minimum chart dimensions, with no degeneration into thin slices
+- avoiding unnecessarily taller-than-viewport charts
+- desktop and narrower laptop/tablet widths
+- existing spatial/WebGL chart hosting
 
-Switching means writing a gridstack 14 version of the engine module behind the same seam. The
+The team then records grid, tiling or a hybrid as the durable model. Switching to gridstack 14
+remains an implementation option if the grid model wins. It means writing a gridstack 14
+version of the engine module behind the same seam. The
 lab's version is about 180 lines. It also has to carry these known workarounds:
 - resize handles moved inside the card and kept visible
 - the column-layout callback fed from `flow`
@@ -135,7 +143,7 @@ lab's version is about 180 lines. It also has to carry these known workarounds:
 gridstack 14 and the pane workspace's gridstack 7.3 would sit side by side under a package
 alias until the pane workspace is retired.
 
-## Considered and rejected
+## Considered and rejected for the initial baseline
 
 - **gridstack 14 now.** It is as smooth and the least risky to own for touch, but it cannot
   grow a chart past the bottom of the window. Matching the prototype needed overrides of its
@@ -144,12 +152,14 @@ alias until the pane workspace is retired.
 - **react-grid-layout 2.3.** The least of our own code, and nothing fought it. But it was the
   least smooth, with worst frames of 32–83 ms while dragging and resizing. It also has no
   growing past the bottom of the window and no keyboard moves.
-- **Tiles (react-mosaic).** Ruled out before the map: a scrolling grid, not tiles.
+- **Tiles or a hybrid.** Not selected as the initial baseline because the existing lab already
+  proves the in-house grid with real charts. They remain open at the layout checkpoint;
+  `react-mosaic` is one implementation to investigate, not a foregone choice.
 
 ## Consequences
 
-- The grid is MDV's code to maintain: about 65 lines of layout functions and a gesture
-  component. There is no outside layout dependency in the workspace and no upgrades to follow.
+- For the showcase baseline, the grid is MDV's code to maintain: about 65 lines of layout
+  functions and a gesture component.
 - The engine seam is a rule for every later slice. Anything that reaches into the engine's DOM
   or state makes the fallback more expensive.
 - gridstack 7.3 and `GridstackManager` stay only for the pane workspace, and go when it is

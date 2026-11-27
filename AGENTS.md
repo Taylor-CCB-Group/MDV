@@ -9,7 +9,11 @@
 
 ## Workspace redesign
 
-On the `docs/workspace-redesign-plan` (PR #719) branch, the workspace redesign (one view per project, from the workspace prototype) is planned and built in `docs/design/workspace/`. Read `docs/design/workspace/HANDOVER.md` before working on it: the prototype there is the reference, decisions become ADRs that are superseded rather than edited, and nothing merges to main until the team has tried the showcase.
+On the `docs/workspace-redesign-plan` (PR #719) branch, the workspace redesign is planned and
+built in `docs/design/workspace/`. Read `docs/design/workspace/README.md` and
+`docs/design/workspace/PLAN.md` before working on it. The prototype is the visual starting
+point; durable decisions become ADRs that are superseded rather than silently edited, and
+nothing merges to main until the team has tried the showcase and its checkpoints are resolved.
 
 ## Agent skills
 

@@ -1,7 +1,8 @@
-# Preview a one-view workspace behind a preference, saving to `views_v2.json`
+# Preview a one-view workspace behind a preference, with a candidate `views_v2.json`
 
-**Status:** proposed. Settles the view-shape questions for the workspace redesign (the
-workspace prototype); the layout engine is chosen separately.
+**Status:** proposed. The preview boundary and deterministic conversion are the working
+direction. The durable format, canonical schema and Python derivation remain a checkpoint
+before save/load is implemented.
 
 ## Context
 
@@ -22,7 +23,7 @@ option B2). ADR 0023 makes each table its own data source, so views will mix mor
 static build. Changing its shape in place would touch all of them before the new workspace has
 been tried by anyone.
 
-## Decision
+## Working decision
 
 ### An experimental preference
 
@@ -52,12 +53,17 @@ its width relative to its pane and is packed row by row into 12 columns with no 
 view always converts to the same layout. As with legacy charts, an alert says the view was
 converted and that saving keeps it.
 
-### Saving to `views_v2.json`
+### Candidate persistence in `views_v2.json`
 
-Saving in the new workspace writes the view to `views_v2.json`, keyed by the same view name.
-It never writes `views.json`. With the preference on, a view opens from `views_v2.json` when it
-has an entry there, and is converted from `views.json` otherwise. With the preference off, the
-`views.json` view opens unchanged. From the first save the two copies are independent.
+The initial showcase converts into an in-memory workspace model and can copy that model as
+JSON for feedback. It does not change `views.json`. Before durable save/load is implemented,
+the team must agree the canonical TypeScript/JavaScript schema, how Python derives from or
+validates against it, the versioned on-disk shape and whether `views_v2.json` remains the right
+isolation boundary.
+
+The current candidate is a `views_v2.json`, keyed by the same view name. With the preference
+on, a view would open from v2 when it has an entry there and convert from `views.json`
+otherwise. With the preference off, `views.json` would remain unchanged.
 
 ```json
 {
@@ -84,7 +90,7 @@ has an entry there, and is converted from `views.json` otherwise. With the prefe
 A "Copy layout JSON" action lets people trying the preview send back arrangements that worked
 or broke.
 
-### Everything else that reads views
+### Everything else that reads views if the candidate is accepted
 
 | Code | During the preview |
 | --- | --- |
@@ -114,13 +120,13 @@ design is still settling, so it needs to be tried on real projects before the pa
 goes. The preference follows a pattern the app already has, and saving to a separate file means
 nobody with the preference off is affected by anyone who has it on.
 
-## Considered and rejected
+## Considered and deferred
 
 - **Keep old views on the pane workspace and open only new views in the new one**, with a
   `kind` field (the design note's proposal). Existing views could not be tried in the new
   workspace, and they are what has to work.
-- **Convert in memory and never save.** Settled first, then reversed: the preview has to be
-  usable for real work, and a format nobody saves is never exercised.
+- **Convert in memory for the initial showcase.** Chosen until the persistence checkpoint.
+  Durable save/load remains necessary before the preview can merge or support real work.
 - **Add a layout block inside each `views.json` view**, keeping charts under
   `initialCharts[dataSource]`. Both workspaces would share one chart list, but the new one's
   flat model would be squeezed into the per-data-source shape, and every reader of
@@ -133,12 +139,12 @@ nobody with the preference off is affected by anyone who has it on.
   chart settings and leaves no single place for a second layout if one is ever added.
 - **Rewrite every `views.json` in one batch at upgrade time.** Nothing can go back, and every
   reader has to change at once.
-- **Have the Python writers write v2 now.** More work before the format has been tried; their
-  views convert on open meanwhile.
+- **Have the Python writers write v2 now.** Deferred until there is one canonical schema from
+  which Python support is generated or against which it is validated.
 
 ## Consequences
 
-- A view can have two copies that differ. People with the preference off see the
+- If the candidate is accepted, a view can have two copies that differ. People with the preference off see the
   `views.json` copy. This ends when `views.json` is retired, which needs a conversion of the
   remaining views and the readers in the table above moved to v2.
 - Converted views that are never saved keep converting on every open, so the converter must
@@ -147,4 +153,4 @@ nobody with the preference off is affected by anyone who has it on.
   model.
 - Tablets cannot move or resize charts. Charts added on a tablet go at the end of the layout.
 - The static build cannot save, and it shows the `views.json` view.
-- Both files are last-writer-wins, as `views.json` already is.
+- If implemented, both files are last-writer-wins, as `views.json` already is.
