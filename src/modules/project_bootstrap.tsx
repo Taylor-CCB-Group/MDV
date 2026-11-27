@@ -289,13 +289,20 @@ function BootstrapApp({ onComplete }: { onComplete: () => void }) {
                 };
 
                 if (cancelled) return;
-                new ChartManager(
+                const chartManager = new ChartManager(
                     "holder",
                     runtime.datasources as DataSource[],
                     runtime.dataLoader,
                     runtime.config,
                     listener,
                 );
+                // PROTOTYPE (layout lab): dev builds only, remove with src/react/prototypes/layoutLab
+                const labMode = new URLSearchParams(window.location.search).get("layoutLab");
+                if (!import.meta.env.PROD && (labMode === "inhouse" || labMode === "gridstack")) {
+                    void import("@/react/prototypes/layoutLab").then(({ startLayoutLab }) =>
+                        startLayoutLab(chartManager, labMode),
+                    );
+                }
                 setInitialised(true);
             })
             .catch((error) => {
