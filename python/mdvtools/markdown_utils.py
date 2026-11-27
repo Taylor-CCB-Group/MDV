@@ -23,7 +23,7 @@ def create_error_markdown(message: str, traceback: Optional[str] = None, extra_m
     return markdown
 
 def create_project_markdown(
-    project: CreateProjectPromptProject, wrap_in_details: bool = True
+    project: CreateProjectPromptProject, wrap_in_details: bool = True, header_level = 2
 ) -> str:
     """
     Create a markdown representation of the project.
@@ -34,12 +34,13 @@ def create_project_markdown(
         A string containing the markdown representation of the project
     """
     markdown = ""
+    header = "#" * header_level
     if wrap_in_details:
         markdown += "\n\n<details>\n\n"
-        markdown += f"<summary>Project Datasources</summary>\n\n"
+        markdown += "<summary>Project Datasources</summary>\n\n"
     for name in project.get_datasource_names():
         ds = project.get_datasource_metadata(name)
-        markdown += f"## **{name}:** ({ds['size']} rows)\n\n"
+        markdown += f"{header} **{name}:** ({ds['size']} rows)\n\n"
         # todo - add a summary of the data here
         markdown += create_column_markdown(ds["columns"])
     if wrap_in_details:

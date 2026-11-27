@@ -273,8 +273,8 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         sdata = _try_read_zarr(sdata_path)
         if sdata is None:
             continue
-        sdata_md = f"## {sdata_name}:\n\n```\n{sdata}\n```"
-        sdata_md += f"\n\n### Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n\n"
+        sdata_md = f"### {sdata_name}:\n\n```\n{sdata}\n```"
+        sdata_md += f"\n\n#### Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n\n"
         markdown += sdata_md
     
     # Add point transform strategy section
@@ -295,7 +295,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += "\n"
     
     markdown += "\n\n---\n\n## Project DataSource summary:\n\n"
-    markdown += create_project_markdown(mdv, False)
+    markdown += create_project_markdown(mdv, False, 3)
     # todo - add anndata markdown here
     # if adata is not None:
     #     markdown += f"\n{create_anndata_markdown(adata)}"
@@ -1408,8 +1408,8 @@ def _group_spatial_table_records(
 ) -> list[SpatialTableGroup]:
     _validate_table_handling(args.table_handling)
 
+    regions: dict[str, dict] = {}
     if args.table_handling == "merge":
-        regions: dict[str, dict] = {}
         for record in records:
             regions.update(record.adata.uns.get("mdv", {}).get("regions", {}))
         return [
@@ -1448,7 +1448,7 @@ def _group_spatial_table_records(
             f"{label}_{args.var_datasource_name}",
             used_datasource_names,
         )
-        regions: dict[str, dict] = {}
+        regions = {}
         for record in group_records:
             regions.update(record.adata.uns.get("mdv", {}).get("regions", {}))
         groups.append(
