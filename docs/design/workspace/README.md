@@ -19,6 +19,14 @@ A spec (PRD) for the new MDV workspace, an ADR for every decision that blocks bu
 - **Must work on:** the hosted server (Flask/Docker) and the standalone static build.
 - **Settled before this map:** a scrolling grid rather than tiles; one view, with the data source chosen in Add chart; the inspector replaces the floating settings dialog.
 - **References:** [workspace prototype](https://claude.ai/artifact/TNdQ8b1L3wmdmQ6NyD5Zxr) (private: share it before linking it to others), [MDV design system](https://claude.ai/code/artifact/a7e9d6e3-f9a7-4fef-b42b-948024ea8649) (a record of today's tokens), the layout lab in the `MDV-ui-refresh` worktree, and the team's "Grid Stack and ChatMDV issues" notes.
+- **Changing a decision.** Never edit a resolved ticket's answer or an accepted ADR to change it. Raise a new ticket (a vault ticket while this map is open, a GitHub issue through `/triage` after it closes) saying what is changing and what the team found. Grill it into a new ADR that supersedes the old one, mark the old one `Status: superseded by <new ADR>`, and build the change as its own slice. Some decisions are cheaper to change than others:
+  - Low cost:
+    - the layout engine (ADR 0027's engine seam)
+    - breakpoints and the tablet and phone rules (nothing narrower than 12 columns is saved)
+    - chart chrome and tools
+    - the preview setting
+  - Highest cost: the saved format (ADR 0026). Once views are saved in `views_v2.json`, a new format needs a converter, keyed on the `version` field.
+  - Hardest to undo: retiring the pane workspace and `views.json`. It is its own decision in [22 Theme, undo and rollout](tickets/22-theme-undo-and-rollout.md), taken only after the team has lived with the preview.
 - **When every decision is resolved:** `/to-prd` writes the PRD, then `/to-issues` cuts the build slices.
 
 ## Decisions so far
