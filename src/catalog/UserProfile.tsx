@@ -39,10 +39,7 @@ const UserProfile: React.FC = () => {
                 {isLoading ? (
                     <CircularProgress size={32} />
                 ) : (
-                    <Avatar
-                        sx={{ width: 32, height: 32, color: "inherit" }}
-                        alt={user?.name ?? "Account"}
-                    >
+                    <Avatar sx={{ width: 32, height: 32, color: "inherit" }} alt={user?.name ?? "Account"}>
                         <Person />
                     </Avatar>
                 )}
@@ -99,10 +96,7 @@ const UserProfile: React.FC = () => {
                                 px: 1,
                             }}
                         >
-                            <Avatar
-                                sx={{ width: 100, height: 100, color: "inherit" }}
-                                alt={user.name}
-                            >
+                            <Avatar sx={{ width: 100, height: 100, color: "inherit" }} alt={user.name}>
                                 <Person sx={{ fontSize: 50 }} />
                             </Avatar>
                             <Box>

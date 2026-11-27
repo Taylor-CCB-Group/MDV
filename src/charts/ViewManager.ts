@@ -222,7 +222,7 @@ class ViewManager {
 
     // Check for any unsaved changes and change view
     @action
-    checkAndChangeView(view: string, isDelete = false) {
+    checkAndChangeView(view: string, _isDelete = false) {
         // todo: uncomment if else when we fix state issues
         // if (this.hasUnsavedChanges() && !isDelete) {
         //     this.cm.showSaveViewDialog(() => {
@@ -506,32 +506,6 @@ class ViewManager {
         if (verbose) {
             console.log("inside currentState", currentState);
             console.log("inside prevState", prevState);
-            // doesn't seem to be as useful as hoped for showing what's different...
-            // console.log("diff", _.differenceWith([currentState], [prevState], _.isEqual));
-            // https://stackoverflow.com/a/48181184/279703 with changes...
-            // seems to be managing deep diff of objects subject to further testing
-            // we may want more of this in the future... should be a utility function.
-            const diff = (obj1: any, obj2: any) => {
-                return _.reduce(
-                    obj1,
-                    (result: any, value: any, key: string) => {
-                        if (_.isPlainObject(value)) {
-                            const d = diff(value, obj2[key]);
-                            if (!_.isEmpty(d)) {
-                                result[key] = d;
-                            }
-                        } else if (!_.isEqual(value, obj2[key])) {
-                            // different from SO answer, which wouldn't diff arrays.
-                            result[key] = diff(value, obj2[key]);
-                        } else {
-                            delete result[key];
-                        }
-                        return result;
-                    },
-                    {},
-                );
-            };
-            // console.log("diff", diff(currentState, prevState));
         }
         // nb, we should consider updatedColumns, maybe some other things...
         // but not the entire state (e.g. not all_views)

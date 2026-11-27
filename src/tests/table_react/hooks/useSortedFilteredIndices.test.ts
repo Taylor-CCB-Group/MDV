@@ -32,7 +32,9 @@ describe("useSortedFilteredIndices", () => {
         const namesArr = ["bb", "aa", "dd", "cc", "ee"];
         const namesBytes = new Uint8Array(namesArr.length * 2);
         const encoder = new TextEncoder();
-        namesArr.forEach((str, index) => namesBytes.set(encoder.encode(str), index * 2));
+        namesArr.forEach((str, index) => {
+            namesBytes.set(encoder.encode(str), index * 2);
+        });
 
         mockDataStore = {
             columnIndex: {

@@ -1,13 +1,23 @@
 import type { OrbitViewState } from "deck.gl";
-import { action, makeObservable, observable, reaction } from "mobx";
+import { action, makeObservable, observable, reaction, runInAction } from "mobx";
 import { observer } from "mobx-react-lite";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import type DataStore from "@/datastore/DataStore";
+import type { FieldSpecs } from "@/lib/columnTypeHelpers";
 import { g } from "@/lib/utils";
 import type { DeckBackend } from "@/react/spatialdata/deck_backend";
+import type { ColumnChangeEvent } from "../../charts/BaseChart";
 import BaseChart, { copyStylesInline } from "../../charts/BaseChart";
 import type { ColumnName } from "../../charts/charts";
 import { serialisableZoom } from "../axisScaling";
+import {
+    colorFieldsLegendSpec,
+    getColorFieldsSettingsFolder,
+    migrateColorBy,
+    onColorFieldRemoved,
+    onColorFieldsDataChanged,
+    setUpColorFields,
+} from "../colorFields";
 import { type AxisScales, type OrbitSelectionView, validAxisScales } from "../orbitView";
 import {
     type ScatterPlotConfig,
@@ -17,10 +27,11 @@ import {
     scatterDefaults,
 } from "../scatter_state";
 import { BaseReactChart } from "./BaseReactChart";
+import { colorGridSplit } from "./colorGridUtils";
 import DeckScatterComponent from "./DeckScatterComponent";
-import { getDensityGridSettingsFolder } from "./densityGridSettings";
-import { isDensityGridShown, supportsDensityGridMode } from "./densityGridUtils";
+import { isDensityGridShown } from "./densityGridUtils";
 import { getCrosshairSetting } from "./pointerCrosshair";
+import { getScatterGridSettingsFolder, scatterGridChoices, setScatterGrid } from "./scatterGridSettings";
 import { getRenderBackendSettings, getSharedScatterSettings } from "./sharedScatterSettings";
 
 const MainChart = observer(() => {
@@ -30,6 +41,8 @@ const MainChart = observer(() => {
 export type DeckScatterConfig = (ScatterPlotConfig2D | ScatterPlotConfig3D) & {
     /** null (or absent) follows the browser's default (see `deck_backend.ts`). */
     render_backend?: DeckBackend | null;
+    /** The columns the points are coloured by (see `colorFields.ts`); `color_by` is migrated to this. */
+    color_fields: FieldSpecs;
 };
 export type DeckScatterConfigWithRegion = DeckScatterConfig & { region?: string };
 export const DECK_CONTOUR_SCATTER_TYPE = "DeckContourScatter";
@@ -58,7 +71,9 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     //! originalConfig.dimension may be undefined, which lead to a bug with axis settings & broken charts
     // so if it is explicitly "3d", we have no axis settings, otherwise it will be "2d" | undefined
     const defaults = originalConfig.dimension !== "3d" ? { axis: scatterAxisDefaults } : {};
-    const config = { ...scatterDefaults, ...defaults, ...defaultViewState, ...originalConfig };
+    const config = migrateColorBy({ ...scatterDefaults, ...defaults, ...defaultViewState, ...originalConfig });
+    // shown unless turned off, as when BaseChart first coloured a chart by `color_by`
+    config.color_legend = config.color_legend ?? { display: true };
     // Must exist before the config is made observable for later changes to be observed, and
     // survive initialiseChartConfig's JSON copy, so null rather than undefined.
     config.render_backend = config.render_backend ?? null;
@@ -68,6 +83,7 @@ function adaptConfig(originalConfig: DeckScatterConfig) {
     config.grid = config.grid ?? null;
     // and the crosshair, which is on unless turned off
     config.crosshair = config.crosshair ?? null;
+    config.grey_other_categories = config.grey_other_categories ?? null;
     // charts saved before this setting kept both axes at one scale
     if (config.dimension !== "3d") config.axis_scaling = config.axis_scaling ?? "equal";
     else {
@@ -105,28 +121,24 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
     ignoreStateUpdate = false;
     pendingRecenter = false;
     /**
-     * The density grid was turned on since the chart was made, so it fits its cells when it
-     * first shows (see `DeckDensityGridComponent`). A grid restored with a view keeps its view.
+     * A grid was turned on since the chart was made, so it fits its cells when it first shows
+     * (see `DeckScatterGridComponent`). A grid restored with a view keeps its view.
      */
-    fitDensityGridOnShow = false;
+    fitGridOnShow = false;
     constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: DeckScatterConfig) {
         const config = adaptConfig(originalConfig);
         super(dataStore, div, config, MainChart);
         if (!originalConfig.viewState) this.pendingRecenter = true;
         this.reactionDisposers.push(
             reaction(
-                () => isDensityGridShown(this.config),
+                () => isDensityGridShown(this.config) || colorGridSplit(this.config) !== null,
                 (shown) => {
-                    if (shown) this.fitDensityGridOnShow = true;
+                    if (shown) this.fitGridOnShow = true;
                 },
             ),
         );
-        //@ts-expect-error - pending colorBy type fix
-        this.colorByColumn(config.color_by);
+        setUpColorFields(this);
         makeObservable(this, {
-            colorBy: observable,
-            colorByColumn: action,
-            colorByDefault: action,
             pendingRecenter: observable,
             activeBackend: observable,
             backendFallbackReason: observable,
@@ -241,22 +253,23 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
     getDebugSettings() {
         return getRenderBackendSettings(this.config);
     }
-    colorBy?: (i: number) => [r: number, g: number, b: number];
-    colorByColumn(col?: ColumnName) {
-        if (!col) return this.colorByDefault();
-        this.config.color_by = col;
-        this.colorBy = this.getColorFunction(col, true);
+    getColorLegendSpec() {
+        return colorFieldsLegendSpec(this);
     }
-    colorByDefault() {
-        //@ts-expect-error - pending colorBy type fix
-        this.config.color_by = null;
-        //@ts-expect-error - pending colorBy type fix
-        this.colorBy = null;
+
+    onDataChanged(data: ColumnChangeEvent) {
+        super.onDataChanged(data);
+        onColorFieldsDataChanged(this, data.columns);
     }
-    getColorOptions() {
-        return {
-            colorby: "all",
-        };
+
+    onColumnRemoved(column: ColumnName) {
+        onColorFieldRemoved(this, column);
+        return super.onColumnRemoved(column);
+    }
+
+    /** BaseChart's settings, with the colour settings for `color_fields` in place of its own. */
+    getBaseSettings() {
+        return [...this.getGeneralSettings(), getColorFieldsSettingsFolder(this.config, this.dataStore)];
     }
 
     getConfig() {
@@ -278,7 +291,16 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         const background_filter = c.background_filter ?? undefined;
         const grid = c.grid ?? undefined;
         const crosshair = c.crosshair ?? undefined;
-        return { ...c, viewState, render_backend, background_filter, grid, crosshair };
+        const grey_other_categories = c.grey_other_categories ?? undefined;
+        return { ...c, viewState, render_backend, background_filter, grid, crosshair, grey_other_categories };
+    }
+
+    gridChoices() {
+        return this.config.dimension === "3d" ? [] : scatterGridChoices(this.config, this.dataStore);
+    }
+
+    showGrid(value: string) {
+        runInAction(() => setScatterGrid(this.config, value));
     }
 
     /** Which way is up, and how much to stretch each axis (as the classic 3D scatter could). */
@@ -347,7 +369,7 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
 
     getSettings() {
         const c = this.config;
-        const settings = super.getSettings();
+        const settings = this.getBaseSettings();
 
         if (c.dimension === "2d") {
             const axisSettings = getAxisGuiSpec(c);
@@ -370,7 +392,7 @@ export class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                 }),
             );
             settings.push(getCrosshairSetting(c));
-            if (supportsDensityGridMode(c.type)) settings.push(getDensityGridSettingsFolder(c));
+            settings.push(getScatterGridSettingsFolder(c, this.dataStore));
         } else {
             settings.push(...this.get3DSettings(c));
         }

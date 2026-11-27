@@ -1,12 +1,16 @@
 import { Typography } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
+import { observer } from "mobx-react-lite";
 import type { ReactNode } from "react";
+import type { GridBySpec } from "@/charts/charts";
 
 import type DataStore from "@/datastore/DataStore";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { flattenFields } from "@/lib/columnTypeHelpers";
 import type { TableAssociation } from "@/react/spatialdata/table_association";
 import ColumnSelectionComponent from "../ColumnSelectionComponent";
+import { withColorColumn, withOtherGridColumns } from "../colorGridUtils";
+import GridByControl from "../GridByControl";
 
 type ShapesLayerConfig = Extract<LayerConfig, { type: "shapes" }>;
 
@@ -25,8 +29,10 @@ type FillColorByColumnProps = {
     association: TableAssociation;
     dataStore: DataStore;
     fillColorByColumn?: LayerFillColorByColumn;
-    fillColorByColumnSpec?: FieldSpec;
-    onChange: (next: LayerFillColorByColumn | undefined, spec: FieldSpec | undefined) => void;
+    fillColorByColumnSpec?: FieldSpec | FieldSpecs;
+    onChange: (next: LayerFillColorByColumn | undefined, spec: FieldSpec | FieldSpecs | undefined) => void;
+    /** The chart's grid by this layer's fill colour. */
+    gridBy?: GridBySpec;
 };
 
 function ControlLabel({ children }: { children: string }) {
@@ -125,39 +131,78 @@ export default function TableAssociationControls({
  */
 const FILL_COLOR_MODE = "auto" as const;
 
-export function FillColorByColumnControl({
+/**
+ * The layer's colour column, one of any type. With `gridBy`, a control to make the chart a grid of
+ * it: of a cell per category of a categorical column, or of a cell per numeric column, with a
+ * second picker for the grid's other columns (the layer itself is coloured by the first).
+ */
+export const FillColorByColumnControl = observer(function FillColorByColumnControl({
     association,
     dataStore,
     fillColorByColumn,
     fillColorByColumnSpec,
     onChange,
+    gridBy,
 }: FillColorByColumnProps) {
     const fillByColumn = fillColorByColumn?.columnName;
+    const split = gridBy?.get() ?? null;
+    const available = gridBy?.available() ?? null;
 
     // Without a table there is no column to colour by: the layer's own colour controls apply.
     if (association.status !== "resolved") return null;
+    // Not necessarily column names: the picker's "active link" tab returns a query, whose
+    // columns are whatever the linked datasource has selected right now. `flattenFields` reads
+    // both, and an empty result means the link has not finished initialising — the spec is
+    // still stored, and the projection fills the colour column in when it resolves.
+    const specs: FieldSpecs = Array.isArray(fillColorByColumnSpec)
+        ? fillColorByColumnSpec
+        : fillColorByColumnSpec
+          ? [fillColorByColumnSpec]
+          : fillByColumn
+            ? [fillByColumn]
+            : [];
+    const setSpecs = (next: FieldSpecs) => {
+        const columnName = flattenFields(next)[0];
+        // one column is stored as itself, as the picker gave it before there were grids
+        onChange(columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined, next.length === 1 ? next[0] : next);
+    };
+    const select = (column: FieldSpec) => {
+        setSpecs(withColorColumn(specs, column, split === "columns"));
+        // the split follows the new column's type
+        if (gridBy?.get()) gridBy.set(true);
+    };
+    const first = specs[0];
     return (
         <div className="grid gap-2">
             <LabeledControl label="Colour by">
-                <ColumnSelectionComponent
-                    multiple={false}
-                    dataStore={dataStore}
-                    current_value={fillColorByColumnSpec ?? fillByColumn}
-                    placeholder="Select column"
-                    optional
-                    clearSelectedColumn={() => onChange(undefined, undefined)}
-                    setSelectedColumn={(selection) => {
-                        // Not necessarily a column name: the picker's "active link"
-                        // tab returns a query, whose column is whatever the linked
-                        // datasource has selected right now. `flattenFields` reads
-                        // both, and an empty result means the link has not finished
-                        // initialising — the spec is still stored, and the projection
-                        // fills the colour column in when it resolves.
-                        const columnName = flattenFields(selection)[0];
-                        onChange(columnName ? { columnName, mode: FILL_COLOR_MODE } : undefined, selection);
-                    }}
-                />
+                <div className="grid gap-1">
+                    <ColumnSelectionComponent
+                        multiple={false}
+                        dataStore={dataStore}
+                        current_value={first}
+                        placeholder="Select column"
+                        optional
+                        clearSelectedColumn={() => {
+                            onChange(undefined, undefined);
+                            // no column, no grid of it
+                            gridBy?.set(false);
+                        }}
+                        setSelectedColumn={select}
+                    />
+                    {gridBy && <GridByControl split={split} available={available} onChange={gridBy.set} />}
+                    {split === "columns" && (
+                        <ColumnSelectionComponent
+                            multiple
+                            type="number"
+                            dataStore={dataStore}
+                            current_value={specs.slice(1)}
+                            placeholder="Other columns in the grid"
+                            exclude={typeof first === "string" ? [first] : undefined}
+                            setSelectedColumn={(others) => setSpecs(withOtherGridColumns(specs, others))}
+                        />
+                    )}
+                </div>
             </LabeledControl>
         </div>
     );
-}
+});

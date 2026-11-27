@@ -63,4 +63,45 @@ describe("buildChartSvg", () => {
         expect(title?.getAttribute("x")).toBe("210");
         expect(title?.getAttribute("y")).toBe("20");
     });
+
+    it("takes in the strip of legends above the plot, growing the image to cover both", () => {
+        mockBoxes();
+        const chart = makeChart();
+        const strip = document.createElement("div");
+        strip.setAttribute("data-box", "100 10 400 40");
+        strip.innerHTML = `<div class="legend-title" data-box="104 12 80 16">Cell type</div>
+            <svg data-box="104 28 200 20"><rect width="10" height="10"></rect></svg>`;
+        document.body.append(strip);
+
+        const out = buildChartSvg(chart, strip);
+
+        expect(out.getAttribute("height")).toBe("340");
+        const nested = [...out.children].filter((el) => el.tagName === "svg");
+        expect(nested.map((el) => el.getAttribute("y"))).toEqual(["70", "70", "18"]);
+        const titles = [...out.children].filter((el) => el.tagName === "text").map((el) => el.textContent);
+        expect(titles).toEqual(["% expressing", "Cell type"]);
+    });
+
+    it("cuts a legend scrolled in the strip to the part that can be seen", () => {
+        mockBoxes();
+        const chart = makeChart();
+        const strip = document.createElement("div");
+        strip.setAttribute("data-box", "100 10 400 40");
+        // a 300px wide legend in a body that shows 200px of it, scrolled right by 50px
+        strip.innerHTML = `<div class="legend-body" style="overflow-x: auto" data-box="104 28 200 20">
+            <svg data-box="54 28 300 20"><rect width="10" height="10"></rect></svg></div>`;
+        document.body.append(strip);
+
+        const out = buildChartSvg(chart, strip);
+
+        const frame = [...out.children].filter((el) => el.tagName === "svg")[2];
+        expect(["x", "y", "width", "height"].map((name) => frame.getAttribute(name))).toEqual(["4", "18", "200", "20"]);
+        const legend = frame.querySelector("svg");
+        expect(["x", "y", "width", "height"].map((name) => legend?.getAttribute(name))).toEqual([
+            "-50",
+            "0",
+            "300",
+            "20",
+        ]);
+    });
 });

@@ -11,13 +11,19 @@ if TYPE_CHECKING:
 def build_spatial_regions_metadata(
     all_regions: dict[str, dict],
     region_field: str,
+    scale: float = 1.0,
 ) -> dict:
+    """Region metadata for one datasource.
+
+    ``scale`` takes the written x/y pixel coordinates into the coordinate system
+    the image is drawn in. A SpatialData image scale of 0.325 µm/px belongs here.
+    """
     return {
         "position_fields": ["x", "y"],
         "region_field": region_field,
         "default_color": "x",
         "scale_unit": "µm",
-        "scale": 1.0,
+        "scale": scale,
         "avivator": {
             "default_channels": [],
             "base_url": "spatial/",

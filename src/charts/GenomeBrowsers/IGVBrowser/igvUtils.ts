@@ -1,4 +1,4 @@
-import { type GenomeMetadata } from "../genomicLocationUtils";
+import type { GenomeMetadata } from "../genomicLocationUtils";
 
 export interface IGVBaseFeature {
     chr: string;

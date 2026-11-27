@@ -1,7 +1,24 @@
+import { type RenderStack, walkRenderStackEntries } from "@spatialdata/layers";
 import type { SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
+import type { FieldSpecs } from "@/lib/columnTypeHelpers";
 import { g } from "@/lib/utils";
+import { renderStackEntryDisplayName } from "@/react/spatialdata/render_stack_display";
 import { spatialDataUrlForRegion } from "@/react/spatialdata/shared_spatial_data";
+import { availableColorGridSplit, type ColumnTypes } from "../colorFields";
 import type { ChartArrayCell } from "../hooks/useChartArrayGrid";
+import {
+    type ColorGridSplit,
+    colorGridChoice,
+    colorGridChoices,
+    colorGridConfig,
+    colorGridSplit,
+    type GridChoice,
+    gridChoiceValue,
+    keptGridOptions,
+    ONE_VIEW,
+} from "./colorGridUtils";
+import { fillColumnName, layerFillGridChoice, layerFillGridChoices, layerFillGridConfig } from "./layerFillGridUtils";
+import { getGreyOtherCategoriesSetting, getHideEmptyCellsSetting } from "./scatterGridSettings";
 
 /** A cell of a SpatialData chart drawn with a cell per region: the region and where its store is. */
 export type SpatialRegionCell = ChartArrayCell & {
@@ -42,43 +59,6 @@ export function spatialRegionCells(allRegions: Record<string, unknown> | undefin
     });
 }
 
-/** A region's rows, and where each is in the array they were taken from. */
-export type RegionRows = { rows: Uint32Array; positions: Uint32Array };
-
-/**
- * Splits rows by region, keeping their order. `codes` is the region column's data (an index into
- * `values` per row). Regions with no rows are left out.
- */
-export function partitionRowsByRegion(
-    rows: ArrayLike<number>,
-    codes: ArrayLike<number>,
-    values: readonly string[],
-): Map<string, RegionRows> {
-    const counts = new Uint32Array(values.length);
-    for (let i = 0; i < rows.length; i++) {
-        const code = codes[rows[i]];
-        if (code < values.length) counts[code]++;
-    }
-    const byCode = Array.from(counts, (count) =>
-        count > 0 ? { rows: new Uint32Array(count), positions: new Uint32Array(count) } : null,
-    );
-    const filled = new Uint32Array(values.length);
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const code = codes[row];
-        const target = byCode[code];
-        if (!target) continue;
-        const at = filled[code]++;
-        target.rows[at] = row;
-        target.positions[at] = i;
-    }
-    const result = new Map<string, RegionRows>();
-    byCode.forEach((target, code) => {
-        if (target) result.set(values[code], target);
-    });
-    return result;
-}
-
 /** A region cell's view: where it is centred, in the region's coordinate system, and its zoom. */
 export type RegionViewState = { target: [number, number]; zoom: number };
 
@@ -116,17 +96,86 @@ export function moveRegionViews(
     return moved;
 }
 
-type GridChoice = "none" | SpatialDataGridConfig["by"];
+const SPLITS: readonly ColorGridSplit[] = ["columns", "categories"];
+
+type SpatialDataGridSettingsConfig = {
+    type?: string;
+    grid?: SpatialDataGridConfig | null;
+    renderStack?: RenderStack;
+    color_fields?: FieldSpecs;
+    grey_other_categories?: boolean | null;
+};
 
 /**
- * The SpatialData chart's grid settings: one view, a cell per density field, or a cell per region.
+ * Each layer's colour grid choices: the split its colour column allows, and the chart's current
+ * grid, so the dropdown can show it.
  */
-export function getSpatialDataGridSettingsFolder(config: { grid?: SpatialDataGridConfig | null }) {
-    const choices: { name: string; value: GridChoice }[] = [
-        { name: "One view", value: "none" },
+function layerGridChoices(config: SpatialDataGridSettingsConfig, layerGridSplit: LayerGridSplit | undefined) {
+    const { grid } = config;
+    const current =
+        grid?.by === "layer_fill" && grid.layer
+            ? { layer: grid.layer, split: grid.split === "categories" ? "categories" : "columns" }
+            : undefined;
+    return fillColorLayers(config.renderStack).flatMap((layer) => {
+        const available = layerGridSplit?.(layer);
+        return SPLITS.filter(
+            (split) =>
+                !layerGridSplit || split === available || (current?.layer === layer.id && current.split === split),
+        ).map((split) => ({ id: layer.id, name: layer.name, split }));
+    });
+}
+
+/**
+ * How a grid of a layer's fill colour would be split, by the type of its column in the table
+ * annotating its element, or null when it cannot be one (no table, or no column of a type to
+ * split). Absent when that cannot be told yet: every layer is offered either way.
+ */
+type LayerGridSplit = (layer: FillColorLayer) => ColorGridSplit | null;
+
+/**
+ * The grids the SpatialData chart can show, besides one view: a cell per density field, a grid of
+ * the chart's colour or of a shapes or labels layer's fill colour (a cell per colour column, or per
+ * category of a categorical one), or a cell per region.
+ */
+export function spatialDataGridChoices(
+    config: SpatialDataGridSettingsConfig,
+    columns: ColumnTypes,
+    layerGridSplit?: LayerGridSplit,
+): GridChoice[] {
+    return [
         { name: "A cell per density field", value: "densityFields" },
+        ...colorGridChoices(availableColorGridSplit(config, columns), colorGridSplit(config)),
+        ...layerFillGridChoices(layerGridChoices(config, layerGridSplit)),
         { name: "A cell per region", value: "region" },
     ];
+}
+
+/** Shows the grid a choice names (`spatialDataGridChoices`), or one view for "none". */
+export function setSpatialDataGrid(config: SpatialDataGridSettingsConfig, value: string) {
+    const colorSplit = colorGridChoice(value);
+    const layerGrid = layerFillGridChoice(value);
+    if (colorSplit) config.grid = colorGridConfig(colorSplit, config.grid);
+    else if (layerGrid) config.grid = layerFillGridConfig(layerGrid.layer, layerGrid.split, config.grid);
+    else if (value === "densityFields") config.grid = { by: "densityFields" };
+    else if (value === "region")
+        config.grid = {
+            by: "region",
+            ...keptGridOptions(config.grid),
+            link_views: config.grid?.link_views,
+        };
+    else config.grid = null;
+}
+
+/**
+ * The SpatialData chart's grid settings: one view, or a grid (`spatialDataGridChoices`). The
+ * layers' splits are read each time the choices are (`getLayerGridSplit`), as the dialog outlives
+ * a change of region, whose table may type a column otherwise; undefined still offers every layer.
+ */
+export function getSpatialDataGridSettingsFolder(
+    config: SpatialDataGridSettingsConfig,
+    columns: ColumnTypes,
+    getLayerGridSplit?: () => LayerGridSplit | undefined,
+) {
     return g({
         type: "folder",
         label: "Grid",
@@ -134,27 +183,25 @@ export function getSpatialDataGridSettingsFolder(config: { grid?: SpatialDataGri
             g({
                 type: "dropdown",
                 label: "Show",
-                current_value: config.grid?.by ?? "none",
-                values: [choices, "name", "value"],
-                func: (value: string) => {
-                    if (value === "densityFields") config.grid = { by: "densityFields" };
-                    else if (value === "region")
-                        config.grid = {
-                            by: "region",
-                            hide_empty: config.grid?.hide_empty,
-                            link_views: config.grid?.link_views,
-                        };
-                    else config.grid = null;
+                // read from the config, as the colour pickers' "Grid by this" also sets it
+                get current_value() {
+                    return gridChoiceValue(config);
                 },
-            }),
-            g({
-                type: "check",
-                label: "Leave out regions with no rows after filtering",
-                current_value: config.grid?.hide_empty ?? false,
-                func: (x: boolean) => {
-                    if (config.grid?.by === "region") config.grid = { ...config.grid, hide_empty: x || undefined };
+                set current_value(_value: string) {
+                    // `func` sets the grid, which the getter reads back
                 },
+                // the colour choices follow the colour columns' types
+                get values(): [GridChoice[], string, string] {
+                    const choices = spatialDataGridChoices(config, columns, getLayerGridSplit?.());
+                    return [[ONE_VIEW, ...choices], "name", "value"];
+                },
+                set values(_values) {
+                    // made from the config
+                },
+                func: (value: string) => setSpatialDataGrid(config, value),
             }),
+            getGreyOtherCategoriesSetting(config),
+            getHideEmptyCellsSetting(config),
             g({
                 type: "check",
                 label: "Pan and zoom every region together",
@@ -164,5 +211,27 @@ export function getSpatialDataGridSettingsFolder(config: { grid?: SpatialDataGri
                 },
             }),
         ],
+    });
+}
+
+/** A shapes or labels layer of the stack, which can be coloured by a column if a table annotates it. */
+export type FillColorLayer = {
+    id: string;
+    name: string;
+    elementType: "shapes" | "labels";
+    elementKey: string;
+    /** The column it is coloured by (the first, for several), if any. */
+    fillColumn?: string;
+};
+
+/** The stack's shapes and labels layers: their ids, names and elements. */
+export function fillColorLayers(stack: RenderStack | undefined): FillColorLayer[] {
+    if (!stack) return [];
+    return Array.from(walkRenderStackEntries(stack.entries)).flatMap((entry) => {
+        if (entry.kind !== "spatial") return [];
+        const { elementType, elementKey } = entry.source;
+        if (elementType !== "shapes" && elementType !== "labels") return [];
+        const name = renderStackEntryDisplayName(entry, stack);
+        return [{ id: entry.id, name, elementType, elementKey, fillColumn: fillColumnName(entry.props) }];
     });
 }

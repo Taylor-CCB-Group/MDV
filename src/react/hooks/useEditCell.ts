@@ -49,7 +49,7 @@ const useEditCell = (
             const editedCol = currentOrderedColumns.find((col) => col.field === columnName);
 
             // Not an editable column, return
-            if (!editedCol || !editedCol.editable) {
+            if (!editedCol?.editable) {
                 oldCellValueRef.current = null;
                 return;
             }

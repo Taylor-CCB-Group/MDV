@@ -15,7 +15,6 @@ const ReusableDialog = ({
     open,
     handleClose,
     component,
-    isAlertErrorComponent,
     isConfirmButton,
     confirmText,
     onConfirmClick,

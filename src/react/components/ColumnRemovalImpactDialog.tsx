@@ -29,7 +29,7 @@ function getFixInstructions(chart: ChartColumnImpact) {
         if (path === "param") {
             return "Open the chart settings and remove or change the column from parameters, or remove the chart if it is no longer needed.";
         }
-        if (path === "color_by") {
+        if (path === "color_by" || path === "color_fields") {
             return "Open the chart settings and choose a different column for color-by.";
         }
         if (path === "tooltip") {

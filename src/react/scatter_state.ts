@@ -1,4 +1,5 @@
-import type { LayerExtension, OrbitViewState, OrthographicViewState, PickingInfo } from "@deck.gl/core";
+import type { Layer, LayerExtension, OrbitViewState, OrthographicViewState, PickingInfo } from "@deck.gl/core";
+import type { DataFilterExtensionProps } from "@deck.gl/extensions";
 import type { SimpleFeatureCollection } from "@deck.gl-community/editable-layers";
 import type { Matrix4 } from "@math.gl/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -12,6 +13,7 @@ import { MdvScatterplotLayer } from "@/webgl/MdvScatterplotLayer";
 import SpatialLayer, { DensityOverlayLayer } from "@/webgl/SpatialLayer";
 import { ScatterDensityExension, ScatterSquareExtension } from "../webgl/ScatterDeckExtension";
 import { type AxisScaling, radiusReferenceRange, radiusReferenceRange3D } from "./axisScaling";
+import { type RowColor, useChartColorBy } from "./colorFields";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import type { ViewState } from "./components/VivScatterComponent";
@@ -28,7 +30,6 @@ import {
     useChartID,
     useChartSize,
     useConfig,
-    useFieldSpec,
     useFieldSpecs,
     useOwnedFilteredIndices,
     useParamColumns,
@@ -95,6 +96,8 @@ export type ScatterPlotConfig = {
     selection_toolbar_open: boolean;
     /** 2D only: mark the pointer with a crosshair; absent is on. null only keeps the key observable. */
     crosshair?: boolean | null;
+    /** In a grid by category: also draw the other categories, dimmed, in each cell. null keeps the key observable. */
+    grey_other_categories?: boolean | null;
     point_shape: "circle" | "square" | "gaussian";
     /** 2D only; absent is `equal`. See `AxisScaling`. */
     axis_scaling?: AxisScaling;
@@ -365,24 +368,21 @@ export function ownSelectionMask(rows: Uint32Array, size: number, owner?: Filter
 // type Tooltip = (PickingInfo) => string;
 export type P = [number, number];
 
+/**
+ * Whether points with no value in a colour column are left out. We only apply the deck.gl
+ * DataFilterExtension when `hideMissing` is enabled and the color column is numeric.
+ * `fallbackOnZero` then extends what counts as "missing" inside the filter (zeros as well as
+ * NaN/Inf), but does not by itself trigger filtering.
+ */
+export function shouldFilterMissingColor(colorColumn: DataColumn<DataType> | undefined, hideMissing: boolean) {
+    return hideMissing && !!colorColumn && !isDatatypeCategorical(colorColumn.datatype);
+}
+
 export function useShouldFilterNaN() {
     const chart = useChart();
-    const colorBySpec = chart.config.color_by;
-    const colorByField: FieldSpec | undefined = colorBySpec
-        ? typeof colorBySpec === "string"
-            ? colorBySpec
-            : "column" in colorBySpec
-              ? colorBySpec.column?.field
-              : undefined
-        : undefined;
-    const colorColumn = useFieldSpec(colorByField);
-    const hideMissing = !!chart.config.hideMissing;
+    const { colorColumn } = useChartColorBy();
     const fallbackOnZero = !!chart.config.fallbackOnZero;
-    const isNumericColor = !!(colorColumn && !isDatatypeCategorical(colorColumn.datatype));
-    // We only apply the deck.gl DataFilterExtension when `hideMissing` is enabled and the
-    // color column is numeric. `fallbackOnZero` then extends what counts as \"missing\"
-    // inside the filter (zeros as well as NaN/Inf), but does not by itself trigger filtering.
-    const shouldFilter = hideMissing && isNumericColor;
+    const shouldFilter = shouldFilterMissingColor(colorColumn, !!chart.config.hideMissing);
     return { shouldFilter, colorColumn, fallbackOnZero };
 }
 
@@ -418,7 +418,7 @@ export function useScatterplotLayer(
 ) {
     const id = useChartID();
     const chart = useChart();
-    const colorBy = (chart as any).colorBy;
+    const { colorBy } = useChartColorBy();
     const config = useConfig<ScatterPlotConfig>();
 
     const { opacity } = config;
@@ -704,6 +704,35 @@ export function useScatterplotLayer(
         [separateDensityLayer, contourLayers, modelMatrix, id],
     );
 
+    const hideMissing = !!config.hideMissing;
+    /**
+     * A copy of a points layer (the one above, or a copy of it), under another id, coloured by
+     * another column: a colour grid's cell. Points with no value in that column are left out as
+     * the chart leaves them out for its own colour column.
+     */
+    const recolorPoints = useCallback(
+        (points: Layer, id: string, color: RowColor, column: DataColumn<DataType>) => {
+            const filterMissing = shouldFilterMissingColor(column, hideMissing);
+            const filterProps: DataFilterExtensionProps<number> = {
+                getFilterValue: (i: number) =>
+                    leftOut?.[i] ? 0 : getMissingColorFilterValue(i, column, filterMissing, fallbackOnZero),
+            };
+            // a points layer's props, which a `Layer` in general does not have
+            const props = {
+                id,
+                getFillColor: color,
+                ...filterProps,
+                updateTriggers: {
+                    ...points.props.updateTriggers,
+                    getFillColor: color,
+                    getFilterValue: [column, filterMissing, fallbackOnZero, leftOut],
+                },
+            };
+            return points.clone(props);
+        },
+        [hideMissing, fallbackOnZero, leftOut],
+    );
+
     const greyOnFilter = config.on_filter === "grey";
     // deck.gl regenerates every attribute when `data` changes identity (and updates hidden
     // layers too), so this must not be a fresh object each time the layer is rebuilt
@@ -771,6 +800,37 @@ export function useScatterplotLayer(
             fallbackOnZero,
         ],
     );
+
+    /**
+     * A copy of a grey points layer (the one above, or a copy of it) under another id, leaving
+     * out the points with no value in another column: a colour grid cell's, when each cell hides
+     * missing values of its own column. Null while the grey points are not shown or missing
+     * values not hidden, when one grey layer serves every cell.
+     */
+    const regreyPoints = useMemo(() => {
+        if (!greyOnFilter || !hideMissing) return null;
+        return (grey: Layer, id: string, column: DataColumn<DataType>) => {
+            const filterMissing = shouldFilterMissingColor(column, hideMissing);
+            const props = {
+                id,
+                getFilterValue: (_: unknown, { index }: { index: number }) => {
+                    if (!isExternallyFiltered(index)) return 0;
+                    return getMissingColorFilterValue(index, column, filterMissing, fallbackOnZero);
+                },
+                updateTriggers: {
+                    ...grey.props.updateTriggers,
+                    getFilterValue: [
+                        aggregateFilteredRows,
+                        isExternallyFiltered,
+                        column,
+                        filterMissing,
+                        fallbackOnZero,
+                    ],
+                },
+            };
+            return grey.clone(props);
+        };
+    }, [greyOnFilter, hideMissing, isExternallyFiltered, aggregateFilteredRows, fallbackOnZero]);
 
     // the rows a 3D selection left out, faint grey; drawn first, and leaving no depth behind, so the
     // points the selection caught show through them
@@ -904,7 +964,7 @@ export function useScatterplotLayer(
                 const p3 = m.transform(p) as P;
                 m.invert();
                 return p3;
-            } catch (e) {
+            } catch {
                 //console.error("unproject error", e);
                 return [0, 0];
             }
@@ -922,8 +982,12 @@ export function useScatterplotLayer(
             viewState,
             unproject,
             setScatterKeyboardActive,
+            recolorPoints,
+            regreyPoints,
         }),
         [
+            recolorPoints,
+            regreyPoints,
             scatterplotLayer,
             greyScatterplotLayer,
             unselectedScatterplotLayer,

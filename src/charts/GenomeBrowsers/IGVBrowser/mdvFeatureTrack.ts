@@ -685,7 +685,7 @@ class StandaloneCramTrack extends igv.TrackBase {
                 const url = new URL(config.url, window.location.href);
                 url.pathname = url.pathname + ".crai";
                 this.config.indexURL = url.href;
-            } catch (e) {
+            } catch {
                 // Fallback for relative URLs or parsing errors
                 this.config.indexURL = `${config.url}.crai`;
             }
@@ -719,15 +719,6 @@ class StandaloneCramTrack extends igv.TrackBase {
 }
 
 igv.registerTrackClass("standalone_cram_track", StandaloneCramTrack);
-
-type SupplementalSegment = {
-    chr: string;
-    start: number;
-    strand: "+" | "-";
-    lenOnRef: number;
-    readStart: number;
-    readEnd: number;
-};
 
 function parseCigarOps(cigar: unknown): Array<{ len: number; op: string }> {
     if (typeof cigar !== "string" || !cigar) return [];
@@ -1108,7 +1099,7 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
             const onMouseUp = (event: MouseEvent) => {
                 if (this.isInteractionSynced()) evaluateHover(event);
             };
-            const onMouseDown = (event: MouseEvent) => {
+            const onMouseDown = () => {
                 this.markInteractionDirty();
             };
             const leave = () => {
@@ -1299,7 +1290,7 @@ class MdvSplitAlignmentTrack extends igv.TrackBase {
 
         // If present, seed with segment clipped at read end (first segment),
         // else earliest by readStart.
-        let seedIdx = remaining.findIndex((n) => Boolean(n.clipAtReadEnd) && !Boolean(n.clipAtReadStart));
+        let seedIdx = remaining.findIndex((n) => Boolean(n.clipAtReadEnd) && !n.clipAtReadStart);
         if (seedIdx < 0) {
             seedIdx = remaining.findIndex((n) => Boolean(n.clipAtReadEnd));
         }

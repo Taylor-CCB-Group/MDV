@@ -45,7 +45,7 @@ export default function BrushRangeChip({
     const dark = useTheme() === "dark";
     return (
         <div
-            className="pointer-events-none absolute z-10 rounded px-1 py-0 text-[9px] shadow-sm"
+            className="pointer-events-none absolute z-10 rounded px-1 py-0 text-[9px] shadow-xs"
             style={{
                 ...(right === undefined ? { left: left ?? 4 } : { right }),
                 top,

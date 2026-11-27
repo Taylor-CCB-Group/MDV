@@ -273,15 +273,15 @@ class ViolinPlot extends WGLChart {
             .attr("fill", "none")
             //.attr("opacity",0.7)
 
-            .attr("stroke", (d, i) => colors[d.id])
+            .attr("stroke", (d) => colors[d.id])
             .attr("stroke-width", 2)
             .attr("stroke-linejoin", "round")
             .attr(
                 "d",
                 line()
                     .curve(curveBasis)
-                    .x((d, i) => d[1] + d[2])
-                    .y((d, i) => d[0]),
+                    .x((d) => d[1] + d[2])
+                    .y((d) => d[0]),
             );
         this.graph_area
             .selectAll(".violin-curve1")
@@ -292,15 +292,15 @@ class ViolinPlot extends WGLChart {
             .attr("fill", "none")
             // .attr("opacity", 0.7)
             // .attr("stroke", "#000")
-            .attr("stroke", (d, i) => colors[d.id])
+            .attr("stroke", (d) => colors[d.id])
             .attr("stroke-width", 2)
             .attr("stroke-linejoin", "round")
             .attr(
                 "d",
                 line()
                     .curve(curveBasis)
-                    .x((d, i) => d[1] - d[2])
-                    .y((d, i) => d[0]),
+                    .x((d) => d[1] - d[2])
+                    .y((d) => d[0]),
             );
         //this.centerGraph();
         this.app.refresh();

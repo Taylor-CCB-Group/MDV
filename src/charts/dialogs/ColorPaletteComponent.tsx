@@ -15,11 +15,6 @@ import { useEffect, useMemo, useState } from "react";
 import type DataStore from "../../datastore/DataStore.js";
 import CustomPaletteDialog from "./CustomPaletteDialog";
 
-interface ColumnOption {
-    field: string;
-    name: string;
-}
-
 interface ColorEntry {
     color: string;
     index: number;

@@ -20,9 +20,9 @@ const areViewStatesEqual = (viewState: ViewState, otherViewState?: ViewState) =>
     return (
         otherViewState === viewState ||
         (viewState?.zoom === otherViewState?.zoom &&
-            //@ts-ignore CBA to discriminate between Orbit and Ortho viewStates
+            //@ts-expect-error CBA to discriminate between Orbit and Ortho viewStates
             viewState?.rotationX === otherViewState?.rotationX &&
-            //@ts-ignore
+            //@ts-expect-error
             viewState?.rotationOrbit === otherViewState?.rotationOrbit &&
             equal(viewState?.target, otherViewState?.target))
     );
@@ -367,6 +367,7 @@ class MDVivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivV
               }
             : deckProps;
         return (
+            // biome-ignore lint/a11y/noStaticElementInteractions: only clears hover state when the pointer leaves the canvas
             <div className="h-full w-full" onMouseLeave={() => hoverHooks?.handleLeave?.()}>
                 <DeckGL
                     // MDV: we mess with deck internals via ref to get eventManager to work in popouts

@@ -14,6 +14,8 @@ Several charts already draw small multiples, each in its own way:
 | Multi-line chart (#691) | `values`: a cell per numeric field once there are several | `ChartArrayLayout`, an SVG per cell | densities, x domain (unless `share_x`), a brush and its range dimension | categories, colours, legend, settings |
 | Compound dot plot | `split_by` / `split_values`: a panel per category value | its own panel layout | the rows of that category value | columns, colour scale (`auto` is shared) |
 | Splatter plot | categories × `densityFields`: a cell per pair | its own layout | the category's rows, the field's density | view state |
+| Deck scatter / SpatialData colour grid | `grid: { by: "color_fields", split }`: a cell per colour column (`columns`), or per category of the first (`categories`) | `ChartArrayLayout`, one deck (`DeckCellGrid`) | the cell's points: all of them coloured by its column, or its category's | grey points, gates, selection, view state; in SpatialData, the render stack but for its points |
+| SpatialData layer colour grid | `grid: { by: "layer_fill", layer, split }`: a cell per fill colour column of a shapes or labels layer, or per category of the first | `ChartArrayLayout`, one deck (`DeckCellGrid`) | its copy of the layer: every feature coloured by its column, or its category's | the render stack below and above the layer, view state |
 | SpatialData region grid | `grid: { by: "region" }`: a cell per region (a store and coordinate system) | `ChartArrayLayout`, one deck (`DeckCellGrid`) | the region's store, renderer and rows; its view state | the render stack (as a template), colours, filters |
 
 They answer the same questions (what is a cell, what does it share, where does its state live)
@@ -38,6 +40,42 @@ A grid can make cells in at least three ways, and they behave differently:
    same image. Every cell shares the view, coordinate system and usually the other layers; each
    draws a different render stack entry, or the same image with a different channel selection.
    Cell keys are element names or channel names, not columns.
+
+`color_fields` (the deck scatter plot and the SpatialData chart) is the first property made
+multi-column so that it could be a grid: it replaces the single `color_by` there, and its grid
+can split it either way, by column (kind 1) or by the categories of its first column (kind 2).
+A SpatialData layer's fill colour is the second, and the first inside the render stack.
+
+Such a property's picker says so (`GuiSpec.gridBy`, and `GridByControl` beside a layer's colour
+picker): it always takes one column of any type, the colour column, with a "Grid by this" switch
+under it, and turning that on makes the chart a grid of it. The split follows the column's type,
+not a choice: a categorical column (one category per row) gives a cell per category; a numeric one
+gives a cell per column, and a second picker appears for the grid's other numeric columns (the
+value is the colour column, then those). Picking a column never changes which picker is which.
+Choosing a column of the other kind while it is on changes the split, and one of neither kind
+(`multitext`, `unique`) turns it off. Choosing another colour column keeps the grid's other
+columns only while it is a grid of columns. Turning it off leaves the columns in config, the first
+in use. The Grid dropdown offers only
+the split the column allows (`colorGridSplitFor`), and the chart's current one.
+
+With a cell per category, each cell can also draw the other categories, dimmed, for context
+(`grey_other_categories`, a chart setting rather than part of `grid`, so it outlasts turning the
+grid off and on). Points are drawn in grey under the cell's own, as one layer of all of them in
+every cell, not a layer per cell. A layer fill grid's copies fade the other categories' features
+instead (`fadedFeatureIds`, at the viewer's `filteredOpacityMultiplier`), so they keep their
+colours. Either way, rows filtered out elsewhere stay hidden.
+
+A grid per category, like one per region, leaves out cells with no rows left after filtering,
+unless `grid.hide_empty` is false, which keeps the layout still while filtering. That choice is
+kept when the grid changes to another, as the colour picker's switch and a change of the column's
+type both rewrite `grid` (`keptGridOptions`). Rows
+are counted from what the cells draw: the chart's points (its own layer, while the render
+stack's is hidden), or the layer's table.
+
+The selection toolbar's grid button follows whichever grid is shown: with one, it goes back to one
+plot; without, it shows the chart's only grid, or a menu of them (`gridChoices` on the chart, the
+same list as the Grid dropdown, less the region grid, and density fields only when there are
+some).
 
 A **sweep** of a setting (several band widths, several thresholds), is conceivable but has no
 use case yet; leave it out.

@@ -51,7 +51,7 @@ class BoxPlot extends ViolinPlot {
             .join("rect")
             .attr("class", "boxplot-rect")
             .transition(trans)
-            .attr("x", (d, i) => i * (vWidth - 3) + (i + 1) * 3)
+            .attr("x", (_d, i) => i * (vWidth - 3) + (i + 1) * 3)
             .attr("y", (d) => yscale(d.Q3))
             .attr("width", vWidth - 6)
             .attr("height", (d) => {
@@ -59,7 +59,7 @@ class BoxPlot extends ViolinPlot {
                 return Number.isNaN(w) ? 0 : w;
             })
             .attr("fill", "none")
-            .attr("stroke", (d, i) => colors[d.id])
+            .attr("stroke", (d) => colors[d.id])
             .attr("stroke-width", 3);
 
         this.graph_area
@@ -68,7 +68,7 @@ class BoxPlot extends ViolinPlot {
             .join("path")
             .attr("class", "boxplot-whisker")
             .transition(trans)
-            .attr("stroke", (d, i) => colors[d.id])
+            .attr("stroke", (d) => colors[d.id])
             .attr("fill", "none")
             .attr("stroke-width", 3)
 

@@ -117,7 +117,6 @@ export default function getParamsGuiSpec<T extends BaseConfig>(chart: BaseChart<
     if (!params) return null;
     const multiCount = params.reduce((acc, p) => acc + (isMultiColumn(p.type) ? 1 : 0), 0);
     if (multiCount > 1) throw new Error("More than one multi-column parameter, abandon hope");
-    const currentParams = chart.activeQueries.activeParams();
     const p = params.map((param, i) => {
         const isMultiType = isMultiColumn(param.type);
         const current_value = getCurrentParam(chart, i);

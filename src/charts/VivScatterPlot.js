@@ -204,7 +204,7 @@ class VivScatterPlot extends DensityScatterPlot {
         if (config.viv) {
             this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener(
                 "click",
-                (e) => new ColorChannelDialog(this.viv, this.__doc__, this.dataStore),
+                () => new ColorChannelDialog(this.viv, this.__doc__, this.dataStore),
             );
         }
     }
@@ -235,7 +235,6 @@ class VivScatterPlot extends DensityScatterPlot {
 
     getConfig() {
         const conf = super.getConfig();
-        const k = this.viv.layers[0].props;
         conf.viv.channels = this.viv.getSelectedChannelsNice();
         return conf;
     }

@@ -26,11 +26,6 @@ function weightedSum(ret, w1, v1, w2, v2) {
     }
 }
 
-function gemv(output, A, x) {
-    for (let i = 0; i < output.length; ++i) {
-        output[i] = dot(A[i], x);
-    }
-}
 function dot(a, b) {
     let ret = 0;
     for (let i = 0; i < a.length; ++i) {
@@ -171,7 +166,7 @@ function conjugateGradient(f, initial, params) {
 
 function bisect(f, a, b, parameters) {
     parameters = parameters || {};
-    // biome-ignore lint/style/useSingleVarDeclarator: <explanation>
+    // biome-ignore lint/style/useSingleVarDeclarator: kept as in upstream venn.js
     let maxIterations = parameters.maxIterations || 100,
         tolerance = parameters.tolerance || 1e-10,
         fA = f(a),
@@ -204,7 +199,7 @@ function bisect(f, a, b, parameters) {
 function nelderMead(f, x0, parameters) {
     parameters = parameters || {};
 
-    // biome-ignore lint/style/useSingleVarDeclarator: <explanation>
+    // biome-ignore lint/style/useSingleVarDeclarator: kept as in upstream venn.js
     let maxIterations = parameters.maxIterations || x0.length * 200,
         nonZeroDelta = parameters.nonZeroDelta || 1.05,
         zeroDelta = parameters.zeroDelta || 0.001,
@@ -372,10 +367,8 @@ function venn(areas, parameters) {
     }
 
     // optimize initial layout from our loss function
-    let totalFunctionCalls = 0;
     const solution = nelderMead(
         (values) => {
-            totalFunctionCalls += 1;
             const current = {};
             for (let i = 0; i < setids.length; ++i) {
                 const setid = setids[i];
@@ -466,7 +459,7 @@ function getDistanceMatrices(areas, sets, setids) {
     // the areas match
     areas
         .filter((x) => x.sets.length === 2)
-        .map((current) => {
+        .forEach((current) => {
             const left = setids[current.sets[0]];
             const right = setids[current.sets[1]];
             const r1 = Math.sqrt(sets[left].size / Math.PI);
@@ -854,7 +847,7 @@ function orientateCircles(circles, orientation, orientationOrder) {
 
 function disjointCluster(circles) {
     // union-find clustering to get disjoint sets
-    circles.map((circle) => {
+    circles.forEach((circle) => {
         circle.parent = circle;
     });
 
@@ -885,7 +878,7 @@ function disjointCluster(circles) {
     // find all the disjoint clusters and group them together
     const disjointClusters = {};
     let setid;
-    for (i = 0; i < circles.length; ++i) {
+    for (let i = 0; i < circles.length; ++i) {
         setid = find(circles[i]).parent.setid;
         if (!(setid in disjointClusters)) {
             disjointClusters[setid] = [];
@@ -894,7 +887,7 @@ function disjointCluster(circles) {
     }
 
     // cleanup bookkeeping
-    circles.map((circle) => {
+    circles.forEach((circle) => {
         circle.parent = undefined;
     });
 

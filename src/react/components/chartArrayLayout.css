@@ -86,3 +86,13 @@
     height: 100%;
     display: block;
 }
+
+/*
+ * The grid's scroll container. While the cells fill it, nothing needs scrolling, so it never shows
+ * a scrollbar: cells measured without one can overflow by a pixel once one appears, and measuring
+ * again with it shrinks them so it goes, flipping between the two every frame.
+ */
+.mdv-chart-array-scroll:has(> .mdv-chart-array[data-grid-fill="true"]),
+.mdv-chart-array-scroll:has(> .mdv-chart-array[data-layout="single"]) {
+    overflow-y: hidden;
+}

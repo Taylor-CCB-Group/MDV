@@ -86,7 +86,7 @@ function RowSelectionModel(options) {
         return _ranges;
     }
 
-    function handleActiveCellChange(e, data) {
+    function handleActiveCellChange(_e, data) {
         if (_options.selectActiveRow && data.row != null) {
             setSelectedRanges([new Slick.Range(data.row, 0, data.row, _grid.getColumns().length - 1)]);
         }
@@ -148,7 +148,7 @@ function RowSelectionModel(options) {
             selection.push(cell.row);
             _grid.setActiveCell(cell.row, cell.cell);
         } else if (idx !== -1 && (e.ctrlKey || e.metaKey)) {
-            selection = selection.filter((o, i) => o !== cell.row);
+            selection = selection.filter((o) => o !== cell.row);
             _grid.setActiveCell(cell.row, cell.cell);
         } else if (selection.length && e.shiftKey) {
             const last = selection.pop();

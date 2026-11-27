@@ -173,15 +173,8 @@ def test_batch_soft_delete_rejects_malformed_ids(app):
     assert response.status_code == 400
 
 
-def test_auth_recycle_bin_routes_reject_missing_session(app, monkeypatch):
-    from mdvtools.auth import authutils
-
+def test_auth_recycle_bin_routes_reject_missing_session(app):
     app.config.update(ENABLE_AUTH=True, SECRET_KEY="test")
-    monkeypatch.setattr(authutils, "user_project_cache", {})
-    monkeypatch.setattr(authutils, "active_projects_cache", [])
-    monkeypatch.setattr(authutils, "user_cache", {})
-    monkeypatch.setattr(authutils, "all_users_cache", [])
-    monkeypatch.setattr(authutils, "cache_user_projects", lambda: None)
     ProjectManagerExtension().register_global_routes(app, app.config)
 
     client = app.test_client()
@@ -189,10 +182,7 @@ def test_auth_recycle_bin_routes_reject_missing_session(app, monkeypatch):
     assert client.delete("/projects/recycle-bin").status_code == 401
 
 
-def test_auth_routes_require_owner_filter_bin_and_refresh_cache(app, tmp_path, monkeypatch):
-    from mdvtools.auth import authutils
-
-    cache_refreshes = []
+def test_auth_routes_require_owner_and_filter_bin(app, tmp_path):
     app.config.update(ENABLE_AUTH=True, SECRET_KEY="test")
     with app.app_context():
         owned = add_project(tmp_path, 1)
@@ -205,17 +195,7 @@ def test_auth_routes_require_owner_filter_bin_and_refresh_cache(app, tmp_path, m
         db.session.add(UserProject(other_owner.id, other.id, is_owner=True))
         db.session.commit()
         owner_id = owner.id
-        owned_id = owned.id
 
-    monkeypatch.setattr(authutils, "user_project_cache", {
-        owner_id: {
-            owned_id: {"can_read": True, "can_write": True, "is_owner": True},
-        },
-    })
-    monkeypatch.setattr(authutils, "active_projects_cache", [])
-    monkeypatch.setattr(authutils, "user_cache", {})
-    monkeypatch.setattr(authutils, "all_users_cache", [])
-    monkeypatch.setattr(authutils, "cache_user_projects", lambda: cache_refreshes.append(True))
     ProjectManagerExtension().register_global_routes(app, app.config)
 
     client = app.test_client()
@@ -227,7 +207,6 @@ def test_auth_routes_require_owner_filter_bin_and_refresh_cache(app, tmp_path, m
 
     response = client.post("/projects/soft-delete", json={"projectIds": [1]})
     assert response.status_code == 200
-    assert cache_refreshes == [True]
 
     response = client.get("/projects/recycle-bin")
     assert response.status_code == 200

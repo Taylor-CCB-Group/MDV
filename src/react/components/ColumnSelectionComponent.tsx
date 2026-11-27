@@ -38,6 +38,8 @@ function getActiveMode<T extends CTypes, M extends boolean>(props: ColumnSelecti
             console.error("Multiple type mismatch");
         }
         const v = isArray(current_value) ? current_value[0] : current_value;
+        // nothing chosen yet (an empty list) is not a query
+        if (v === undefined) return "column";
         if (typeof v === "string") {
             if (v.includes("|")) return "link";
             else return "column";

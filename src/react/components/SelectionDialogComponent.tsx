@@ -80,7 +80,7 @@ type Props<K extends DataType> = {
  * @returns The filter object associated with `column.field` for the column's datatype (`CategoryFilter`, `RangeFilter`, `MultiTextFilter`, or `UniqueFilter`), or `null` if no filter is set
  */
 function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
-    const { datatype, field } = column;
+    const { field } = column;
     const filters = useConfig<SelectionDialogConfig>().filters;
     const filter = filters[field] as
         | (K extends "multitext"
@@ -843,7 +843,7 @@ const LinkComponent = observer(({ rlink, linkIndex }: { rlink: RLink; linkIndex:
     const [debouncedFilter] = useDebounce(filter, 300);
     // if we re-instate this, perhaps temporarily, it could be a useful way to test showing multiple links and subgroups.
     const fcols = useHighlightedForeignRowsAsColumns(max, debouncedFilter, linkIndex);
-    const { linkedDs, link } = rlink;
+    const { linkedDs } = rlink;
     return (
         <div className="p-3">
             <Typography variant="h6" sx={{ marginBottom: "0.5em" }}>
@@ -964,7 +964,7 @@ const SelectionDialogComponent = () => {
         [config, orderedParams],
     );
     return (
-        <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
+        <div className="p-3 absolute w-full h-full overflow-x-hidden overflow-y-auto">
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                 <SortableContext items={orderedParams.map((col) => col.field)} strategy={verticalListSortingStrategy}>
                     {orderedParams.map((col) => (

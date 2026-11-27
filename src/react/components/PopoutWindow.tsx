@@ -82,21 +82,19 @@ export function PopoutWindow({ children, features = "width=600,height=400", titl
         // Copy all styles
         const styleElements = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'));
 
-        await Promise.all(
-            styleElements.map((element) => {
-                if (!externalWindow.current) return;
-                if (element instanceof HTMLLinkElement) {
-                    const newLink = externalWindow.current.document.createElement("link");
-                    newLink.rel = "stylesheet";
-                    newLink.href = element.href;
-                    externalWindow.current.document.head.appendChild(newLink);
-                } else if (element instanceof HTMLStyleElement) {
-                    const newStyle = externalWindow.current.document.createElement("style");
-                    newStyle.innerHTML = element.innerHTML;
-                    externalWindow.current.document.head.appendChild(newStyle);
-                }
-            }),
-        );
+        for (const element of styleElements) {
+            if (!externalWindow.current) break;
+            if (element instanceof HTMLLinkElement) {
+                const newLink = externalWindow.current.document.createElement("link");
+                newLink.rel = "stylesheet";
+                newLink.href = element.href;
+                externalWindow.current.document.head.appendChild(newLink);
+            } else if (element instanceof HTMLStyleElement) {
+                const newStyle = externalWindow.current.document.createElement("style");
+                newStyle.innerHTML = element.innerHTML;
+                externalWindow.current.document.head.appendChild(newStyle);
+            }
+        }
 
         // Style Observer
         observer.current = new MutationObserver((mutations) => {

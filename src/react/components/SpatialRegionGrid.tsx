@@ -21,20 +21,21 @@ import { useChartID, useConfig, useFieldSpec } from "../hooks";
 import { type ChartArrayCell, useChartArrayGrid } from "../hooks/useChartArrayGrid";
 import type { ViewControllerOptions } from "../hooks/useGateLayers";
 import type { TooltipContent } from "../hooks/useOuterContainerDeckTooltip";
+import { useSpatialLayers } from "../spatial_context";
+import { hidesEmptyCells, partitionRowsByCategory } from "./colorGridUtils";
 import DeckCellGrid, { type DeckCellLabel } from "./DeckCellGrid";
 import { getDensityGridViewId } from "./densityGridUtils";
 import {
     moveRegionViews,
-    partitionRowsByRegion,
-    type RegionRows,
     type RegionViewState,
     type SpatialRegionCell,
     spatialRegionCells,
     toRegionViewState,
 } from "./regionGridUtils";
+import { composeStackLayers } from "./SpatialCellGrid";
 import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "./SpatialDataMDVReact";
-import { composeStackLayers } from "./SpatialDensityGrid";
 import { useLayersForDevice } from "./scatterDeckShared";
+import { subsetPointsLayer } from "./subsetPointsLayer";
 
 /** What the SpatialData chart hands its region grid, besides the layers. */
 export type SpatialRegionGridHost = {
@@ -126,7 +127,7 @@ const RegionCellLayers = observer(function RegionCellLayers({
     publishesImageData: boolean;
     registerHover: (viewId: string, hover: CellHover | null) => void;
     onFeatureHover: SpatialRegionGridHost["onFeatureHover"];
-    /** The region's data points, as the render stack's points entry (see `regionPointsLayer`). */
+    /** The region's data points, as the render stack's points entry (see `subsetPointsLayer`). */
     pointsLayer: Layer | undefined;
     /** Why the region's store could not be read, or null once it can. */
     onReadError: (regionKey: string, message: string | null) => void;
@@ -239,28 +240,6 @@ const RegionCellLayers = observer(function RegionCellLayers({
 });
 
 /**
- * A region's data points: the render stack's points layer (its entry's id, opacity and handlers)
- * with only that region's rows and highlighted rows. Picks name a position in the region's rows;
- * the layer's handlers expect one in all of them, so they are given that.
- */
-function regionPointsLayer(points: Layer, { rows, positions }: RegionRows, highlightedData: number[]): Layer {
-    const toAllRows = (info: PickingInfo): PickingInfo =>
-        info.index < 0 ? info : { ...info, index: positions[info.index] ?? -1 };
-    const { onHover, onClick } = points.props;
-    return points.clone({
-        data: rows,
-        // the highlight is drawn apart from `data`, so it has to be narrowed as well
-        ...(points instanceof SpatialLayer && { highlightedData }),
-        onHover: onHover
-            ? (info: PickingInfo, event: Parameters<typeof onHover>[1]) => onHover(toAllRows(info), event)
-            : null,
-        onClick: onClick
-            ? (info: PickingInfo, event: Parameters<typeof onClick>[1]) => onClick(toAllRows(info), event)
-            : null,
-    });
-}
-
-/**
  * The SpatialData chart with a cell per region. Every cell draws its region's SpatialData with the
  * chart's render stack, as a template (each layer names an element, found in each region's store),
  * and the region's data points. Each cell is framed on its own region and pans and zooms alone.
@@ -292,14 +271,17 @@ export default observer(function SpatialRegionGrid({
     const regions = chart.dataStore.regions;
     const regionColumn = useFieldSpec(regions?.region_field);
 
-    const pointRows = pointsLayer?.props.data;
+    // the chart's own points while the render stack's are hidden: the same rows, so regions are
+    // still counted and left out
+    const { scatterplotLayer } = useSpatialLayers().scatterProps;
+    const pointRows = (pointsLayer ?? scatterplotLayer)?.props.data;
     const rowsByRegion = useMemo(() => {
         if (!(pointRows instanceof Uint32Array) || !regionColumn?.data || !regionColumn.values) return null;
-        return partitionRowsByRegion(pointRows, regionColumn.data, regionColumn.values);
+        return partitionRowsByCategory(pointRows, regionColumn.data, regionColumn.values);
     }, [pointRows, regionColumn]);
 
     const allCells = useMemo(() => spatialRegionCells(regions?.all_regions), [regions]);
-    const hideEmpty = config.grid?.hide_empty === true;
+    const hideEmpty = hidesEmptyCells(config.grid);
     const cells = useMemo(
         () => (hideEmpty && rowsByRegion ? allCells.filter((cell) => rowsByRegion.has(cell.key)) : allCells),
         [allCells, hideEmpty, rowsByRegion],
@@ -385,7 +367,7 @@ export default observer(function SpatialRegionGrid({
         if (!Array.isArray(highlighted) || highlighted.length === 0 || !regionColumn?.data || !regionColumn.values) {
             return null;
         }
-        return partitionRowsByRegion(highlighted, regionColumn.data, regionColumn.values);
+        return partitionRowsByCategory(highlighted, regionColumn.data, regionColumn.values);
     }, [highlighted, regionColumn]);
     const regionPoints = useMemo(() => {
         const byRegion = new Map<string, Layer>();
@@ -395,7 +377,7 @@ export default observer(function SpatialRegionGrid({
             if (!cell) continue;
             const rows = rowsByRegion?.get(cell.key) ?? { rows: NO_ROWS, positions: NO_ROWS };
             const regionHighlighted = Array.from(highlightedByRegion?.get(cell.key)?.rows ?? []);
-            byRegion.set(cell.key, regionPointsLayer(pointsLayer, rows, regionHighlighted));
+            byRegion.set(cell.key, subsetPointsLayer(pointsLayer, rows, regionHighlighted));
         }
         return byRegion;
     }, [pointsLayer, visibleCells, cells, rowsByRegion, highlightedByRegion]);

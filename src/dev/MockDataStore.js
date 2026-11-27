@@ -96,8 +96,8 @@ function getRandomData(column, size) {
 
 function mockDataLoader() {
     return {
-        function: (columns, dataSource, size) => {
-            return new Promise((resolve, reject) => {
+        function: (columns, _dataSource, size) => {
+            return new Promise((resolve) => {
                 const dataList = [];
                 for (const column of columns) {
                     dataList.push({

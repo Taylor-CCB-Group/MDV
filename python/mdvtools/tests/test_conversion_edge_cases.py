@@ -28,6 +28,7 @@ from mdvtools.spatial.conversion import (
     _compute_table_x_umap_and_leiden,
     _concat_spatial_tables,
     _apply_table_provenance,
+    _assign_resolved_regions,
     _group_spatial_table_records,
     _make_spatial_table_record,
     _materialize_computed_spatial_table_columns,
@@ -565,6 +566,53 @@ class TestConversionWithEdgeCases:
             ["sample-a.zarr/cells", "sample-b.zarr/cells"],
             ["sample-a.zarr/grid"],
         ]
+
+    def test_tables_with_different_scales_for_one_region_stay_separate(self):
+        factory = MockAnnDataFactory(random_seed=42)
+        scales = (1.0, 0.325, 0.325)
+        names = ("c.zarr", "a.zarr", "b.zarr")
+        records = []
+        for scale, name in zip(scales, names, strict=True):
+            adata = factory.create_minimal(2, 2)
+            adata.uns["mdv"] = {
+                "is_spatial": True,
+                "regions": {"sample.zarr_cells": {"_mdv_coordinate_scale": scale}},
+            }
+            adata.uns["spatialdata_attrs"] = {
+                "region": "cells",
+                "region_key": "region",
+                "instance_key": "cell_id",
+            }
+            records.append(_make_spatial_table_record(adata, name, f"/data/{name}", "cells"))
+        args = SpatialDataConversionArgs(
+            spatialdata_path="/data",
+            output_folder="/tmp/out",
+            temp_folder="/tmp",
+            table_handling="merge",
+        )
+
+        groups = _group_spatial_table_records(records, args)
+
+        assert [[record.table_id for record in group.records] for group in groups] == [
+            ["a.zarr/cells", "b.zarr/cells"],
+            ["c.zarr/cells"],
+        ]
+        assert groups[0].regions["sample.zarr_cells"]["_mdv_coordinate_scale"] == 0.325
+        assert groups[0].obs_datasource_name == "cells"
+        assert groups[1].obs_datasource_name == "cells_2"
+        assert groups[0].var_datasource_name == "genes"
+        assert groups[1].var_datasource_name == "genes_2"
+
+    def test_resolved_regions_replace_a_previous_copy(self):
+        adata = MockAnnDataFactory(random_seed=42).create_minimal(1, 1)
+        adata.uns["mdv"] = {"regions": {"old": {"_mdv_coordinate_scale": 1.0}}, "kept": True}
+        fresh = {"roi": {"_mdv_coordinate_scale": 0.325}}
+
+        _assign_resolved_regions(adata, fresh, {"roi": {"mode": "auto (image)"}})
+
+        assert adata.uns["mdv"]["regions"] is fresh
+        assert adata.uns["mdv"]["kept"] is True
+        assert adata.uns["mdv"]["point_transform"]["roi"]["mode"] == "auto (image)"
 
     def test_auto_point_transform_detects_already_global_label_coordinates(self):
         class FakeScale0:

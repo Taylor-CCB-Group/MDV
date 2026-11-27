@@ -84,6 +84,15 @@ export const BaseConfigSchema = GridStackConfigSchema.extend({
         .string()
         .optional()
         .describe("Schema version for this chart configuration (used for future migration support)"),
+    legend_layout: z
+        .object({
+            position: z
+                .enum(["overlay", "top"])
+                .optional()
+                .describe("'top' puts the legends in a strip above the plot; otherwise they float over it"),
+        })
+        .optional()
+        .describe("Where the chart's legends go"),
 }).describe("Base configuration shared by all chart types, including layout, styling, and data mapping");
 
 // todo - this should be a union of all the color config options, not applied to all charts
@@ -100,6 +109,7 @@ export const ChartColorConfigSchema = z
                     .tuple([z.number(), z.number()])
                     .optional()
                     .describe("Legend size in pixels [width, height], set when the user resizes it"),
+                minimized: z.boolean().optional().describe("Shown as a small button with its title"),
                 filter: z
                     .discriminatedUnion("kind", [
                         z.object({
@@ -155,6 +165,8 @@ const CategoryFilterSchema = z
 const FieldLegendConfigSchema = z
     .object({
         display: z.boolean().describe("Whether to display the density field legend"),
+        pos: z.tuple([z.number(), z.number()]).optional().describe("Legend position in pixels [left, top]"),
+        minimized: z.boolean().optional().describe("Shown as a small button with its title"),
     })
     .describe("Configuration for density field legend visibility");
 
@@ -194,15 +206,48 @@ export const ChartGridConfigSchema = chartGridConfigSchema(["densityFields"]);
 
 export type ChartGridConfig = z.infer<typeof ChartGridConfigSchema>;
 
+const ColorGridSplitSchema = z
+    .enum(["columns", "categories"])
+    .optional()
+    .describe(
+        'With `by: "color_fields"`: a cell per colour column, each colouring every point by its column (`columns`, the default), or a cell per category of the first colour column, each drawing that category\'s points (`categories`; a `text` or `text16` column)',
+    );
+
+/** The deck scatter plot's grid: a cell per density field, or cells made from its colour. */
+const HideEmptyCellsSchema = z
+    .boolean()
+    .optional()
+    .describe(
+        'With a cell per category (`split: "categories"`) or per region (`by: "region"`): false keeps cells with no rows left after filtering, which are otherwise left out',
+    );
+
+export const DeckScatterGridConfigSchema = chartGridConfigSchema(["densityFields", "color_fields"]).extend({
+    split: ColorGridSplitSchema,
+    hide_empty: HideEmptyCellsSchema,
+});
+
 /**
- * The SpatialData chart's grid: a cell per density field, or a cell per region (each region's
- * SpatialData drawn with the chart's layers, and its own rows).
+ * The SpatialData chart's grid: a cell per density field, cells made from its colour (each drawing
+ * its data points over the whole render stack), cells made from a shapes or labels layer's fill
+ * colour (each drawing its own copy of the layer), or a cell per region (each region's SpatialData
+ * drawn with the chart's layers, and its own rows).
  */
-export const SpatialDataGridConfigSchema = chartGridConfigSchema(["densityFields", "region"]).extend({
-    hide_empty: z
-        .boolean()
+export const SpatialDataGridConfigSchema = chartGridConfigSchema([
+    "densityFields",
+    "color_fields",
+    "layer_fill",
+    "region",
+]).extend({
+    split: ColorGridSplitSchema.describe(
+        'With `by: "color_fields"` or `by: "layer_fill"`: a cell per colour column (`columns`, the default), or a cell per category of the first colour column (`categories`; a `text` or `text16` column)',
+    ),
+    layer: z
+        .string()
         .optional()
-        .describe('With `by: "region"`: leave out regions with no rows left after filtering'),
+        .describe(
+            'With `by: "layer_fill"`: the render stack entry id of the shapes or labels layer whose fill colour makes the cells; each cell draws its own copy of the layer',
+        ),
+    hide_empty: HideEmptyCellsSchema,
     link_views: z
         .boolean()
         .optional()
@@ -281,6 +326,10 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
     ...ChartColorConfigSchema.shape,
     ...TooltipConfigSchema.shape,
     ...ContourScatterConfigSchema.shape,
+    color_fields: FieldSpecsSchema.optional().describe(
+        'Columns the points are coloured by: one view by the first, or a grid of them (`grid.by: "color_fields"`). Replaces `color_by`, which older configs have instead',
+    ),
+    grid: DeckScatterGridConfigSchema.nullable().optional(),
     course_radius: z.number().positive().optional().describe("Coarse multiplier applied to the scatter point radius"),
     radius: z.number().positive().optional().describe("Scatter point radius"),
     opacity: z.number().min(0).max(1).optional().describe("Scatter point opacity"),
@@ -308,7 +357,14 @@ const DeckScatterSharedConfigSchema = BaseConfigSchema.extend({
         .nullable()
         .optional()
         .describe(
-            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a density grid (default true)",
+            "2D only: mark the pointer with a horizontal and a vertical line, in every cell of a grid (not a region grid; default true)",
+        ),
+    grey_other_categories: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe(
+            "In a grid with a cell per category: also draw the other categories, dimmed: points in grey under each cell's own, a layer's shapes or labels faded (default false)",
         ),
     point_shape: z.enum(["circle", "square", "gaussian"]).optional().describe("Scatter point rendering shape"),
     axis_scaling: z
@@ -390,12 +446,20 @@ export const CompoundDotPlotConfigSchema = BaseConfigSchema.extend({
         })
         .optional()
         .describe("Colour scale for mean expression, shared by all panels"),
-    color_legend: z.object({ display: z.boolean() }).optional().describe("Show the colour legend"),
-    fraction_legend: z.object({ display: z.boolean() }).optional().describe("Show the fraction legend"),
-    reserve_legend_space: z
-        .boolean()
+    color_legend: z
+        .object({
+            display: z.boolean(),
+            minimized: z.boolean().optional().describe("Shown as a small button with its title"),
+        })
         .optional()
-        .describe("Keep space above the plot for the legends; off, the plot fills the height"),
+        .describe("Show the colour legend"),
+    fraction_legend: z
+        .object({
+            display: z.boolean(),
+            minimized: z.boolean().optional().describe("Shown as a small button with its title"),
+        })
+        .optional()
+        .describe("Show the fraction legend"),
 }).describe("Configuration for React dot plots, optionally split into panels that share one colour and size scale");
 
 // earlier type name of the compound dot plot, still accepted

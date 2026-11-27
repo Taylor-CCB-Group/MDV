@@ -7,7 +7,7 @@ import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import DoneOutlinedIcon from "@mui/icons-material/DoneOutlined";
 import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
-import { ButtonGroup, Divider } from "@mui/material"; //check tree-shaking...
+import { ButtonGroup, Divider, Menu, MenuItem } from "@mui/material"; //check tree-shaking...
 import { LassoIcon, SplinePointerIcon, VectorSquareIcon } from "lucide-react";
 import { action } from "mobx";
 import { observer } from "mobx-react-lite";
@@ -21,7 +21,6 @@ import { useChartID, useConfig, useParamColumns, useTheme } from "../hooks";
 import useGateActions from "../hooks/useGateActions";
 import { useSpatialLayers } from "../spatial_context";
 import type { DeckScatterConfigWithRegion } from "./DeckScatterReactWrapper";
-import { densityGridConfig, isDensityGridShown, supportsDensityGridMode } from "./densityGridUtils";
 import GateNameDialog from "./GateNameDialog";
 import IconWithTooltip from "./IconWithTooltip";
 import ManageGateDialogWrapper from "./ManageGateDialogWrapper";
@@ -101,20 +100,80 @@ const ToolButton = observer(({ name, ToolIcon, selectedTool, setSelectedTool, to
     );
 });
 
+/**
+ * Turns the chart's grid off, or on: with a grid shown, back to one plot; without, the grid it
+ * can show, or a menu of them when there are several (see `gridChoices`). Density fields are
+ * offered only when there are some.
+ */
+const GridButton = observer(function GridButton() {
+    const chart = useChart<DeckScatterConfigWithRegion>();
+    const config = useConfig<DeckScatterConfigWithRegion & DualContourLegacyConfig>();
+    const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+    const hasDensityFields = (config.densityFields?.length ?? 0) > 0;
+    const choices = (chart.gridChoices?.() ?? []).filter(
+        (choice) => choice.value !== "region" && (choice.value !== "densityFields" || hasDensityFields),
+    );
+    const buttonSx = { color: "var(--text_color)", borderRadius: 10, zIndex: 2 };
+    if (config.grid) {
+        return (
+            <IconWithTooltip
+                tooltipText="Show on one plot"
+                onClick={() => chart.showGrid?.("none")}
+                iconButtonProps={{ sx: buttonSx, "aria-label": "Show on one plot" }}
+            >
+                <LayersOutlinedIcon />
+            </IconWithTooltip>
+        );
+    }
+    if (choices.length === 0) return null;
+    const only = choices.length === 1 ? choices[0] : undefined;
+    const label = only ? `Show as a grid: ${only.name.toLowerCase()}` : "Show as a grid…";
+    return (
+        <>
+            <IconWithTooltip
+                tooltipText={label}
+                onClick={(event) => {
+                    if (only) chart.showGrid?.(only.value);
+                    else setMenuAnchor(event.currentTarget);
+                }}
+                iconButtonProps={{
+                    sx: buttonSx,
+                    "aria-label": label,
+                    "aria-haspopup": only ? undefined : "menu",
+                }}
+            >
+                <GridViewOutlined />
+            </IconWithTooltip>
+            <Menu
+                anchorEl={menuAnchor}
+                open={menuAnchor !== null}
+                onClose={() => setMenuAnchor(null)}
+                container={chart.observable.container}
+            >
+                {choices.map((choice) => (
+                    <MenuItem
+                        key={choice.value}
+                        dense
+                        onClick={() => {
+                            setMenuAnchor(null);
+                            chart.showGrid?.(choice.value);
+                        }}
+                    >
+                        {choice.name}
+                    </MenuItem>
+                ))}
+            </Menu>
+        </>
+    );
+});
+
 export default observer(function SelectionOverlay() {
     const { selectionProps } = useSpatialLayers();
     const chart = useChart<DeckScatterConfigWithRegion>();
     const chartId = useChartID();
     const config = useConfig<DeckScatterConfigWithRegion & DualContourLegacyConfig>();
-    const canShowDensityGrid = supportsDensityGridMode(config.type) && config.dimension !== "3d";
     // gates are x / y outlines in the data; a 3D selection is an outline on the screen
     const canUseGates = config.dimension !== "3d";
-    const densityGridShown = isDensityGridShown(config);
-    const toggleDensityGrid = useCallback(() => {
-        action(() => {
-            config.grid = densityGridConfig(!isDensityGridShown(config));
-        })();
-    }, [config]);
     const {
         setSelectionMode,
         selectionFeatureCollection,
@@ -265,7 +324,7 @@ export default observer(function SelectionOverlay() {
                 variant="contained"
                 aria-label="choose tool for manipulating view or selection"
                 //moving this to the top right corner and absolute to avoid interfering with axes
-                className={`z-[2] absolute top-0 right-0 opacity-90 ${showAllTools ? "p-2" : "p-1"}`}
+                className={`z-2 absolute top-0 right-0 opacity-90 ${showAllTools ? "p-2" : "p-1"}`}
                 sx={{
                     backgroundColor: theme === "dark" ? "rgba(37,37,37,0.92)" : "rgba(245,245,245,0.92)",
                     borderRadius: 0,
@@ -288,22 +347,7 @@ export default observer(function SelectionOverlay() {
                 {toolButtons}
                 {showAllTools && (
                     <>
-                        {canShowDensityGrid && (
-                            <IconWithTooltip
-                                tooltipText={
-                                    densityGridShown
-                                        ? "Show density fields on one plot"
-                                        : "Show density fields as a grid"
-                                }
-                                onClick={toggleDensityGrid}
-                                iconButtonProps={{
-                                    sx: { color: "var(--text_color)", borderRadius: 10, zIndex: 2 },
-                                    "aria-label": densityGridShown ? "Density overlay" : "Density grid",
-                                }}
-                            >
-                                {densityGridShown ? <LayersOutlinedIcon /> : <GridViewOutlined />}
-                            </IconWithTooltip>
-                        )}
+                        <GridButton />
                         {canUseGates && (
                             <Divider
                                 orientation="vertical"

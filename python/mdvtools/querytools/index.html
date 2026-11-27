@@ -51,7 +51,7 @@
 
     <script>
         // Fetch and display the projects
-        (async function() {
+        (async () => {
             const response = await fetch('/projects');
             const data = await response.json();
             console.log(data);
@@ -65,7 +65,7 @@
         })();
 
         // Handle query form submission
-        document.getElementById('query-form').addEventListener('submit', function(event) {
+        document.getElementById('query-form').addEventListener('submit', (event) => {
             event.preventDefault();
             const selectedQuery = document.getElementById('query-select').value;
             console.log('Selected query:', selectedQuery);

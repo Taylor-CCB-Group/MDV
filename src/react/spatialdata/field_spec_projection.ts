@@ -28,7 +28,12 @@ import type { SpatialDataMdvReact, SpatialDataMdvReactConfig } from "../componen
  * nothing overwrites them.
  */
 export type MdvFieldSpecs = {
-    fillColorByColumn?: FieldSpec;
+    /**
+     * Several columns only while the chart is a grid by this layer's fill colour (see
+     * `layerFillGrid`): each cell draws the layer coloured by one of them, and the layer itself
+     * takes the first.
+     */
+    fillColorByColumn?: FieldSpec | FieldSpecs;
     tooltipFields?: FieldSpecs;
 };
 

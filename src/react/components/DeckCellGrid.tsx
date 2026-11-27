@@ -302,7 +302,7 @@ export default function DeckCellGrid({
                         onCanvas={onCanvas}
                     />
                     <div
-                        className="pointer-events-none absolute top-2 left-2 z-10 max-w-[calc(100%-16px)] truncate rounded-sm px-2 py-1 text-xs"
+                        className="pointer-events-none absolute top-2 left-2 max-w-[calc(100%-16px)] truncate rounded-sm px-2 py-1 text-xs"
                         style={{ backgroundColor: "rgba(15, 23, 42, 0.76)", color: `rgb(${r}, ${g}, ${b})` }}
                         title={label.text}
                     >
@@ -338,7 +338,7 @@ export default function DeckCellGrid({
             {/* biome-ignore lint/a11y/noStaticElementInteractions: these handlers only track keyboard focus and the tooltip for the canvases inside, as the single plot's do */}
             <div
                 ref={grid.scrollContainerRef}
-                className="relative h-full w-full min-w-0 overflow-auto overflow-x-hidden"
+                className="mdv-chart-array-scroll relative h-full w-full min-w-0 overflow-auto overflow-x-hidden"
                 onPointerDown={suppressTooltipUntilPointerUp}
                 onPointerMove={
                     crosshair

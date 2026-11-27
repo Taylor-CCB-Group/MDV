@@ -63,8 +63,6 @@ const ProjectListView = ({
     onSortChange,
     onDelete,
     onRename,
-    onExport,
-    onChangeType,
     selectionMode,
     selectedProjectIds,
     onSelectionChange,

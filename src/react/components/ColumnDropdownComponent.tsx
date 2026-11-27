@@ -57,13 +57,13 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
         if (isMultiType) {
             return (v: DataColumn<DataType>[]) => {
                 if (!isArray(v)) throw new Error("Expected array - this should be unreachable");
-                //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
+                //@ts-expect-error kicking the can down the road, maybe a new typescript version will fix this
                 setSelectedColumn(v.map((c) => c.field));
             };
         } else {
             return (v: DataColumn<DataType>) => {
                 if (isMultiType) throw new Error("Unexpected single column value for multi column dropdown");
-                //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
+                //@ts-expect-error kicking the can down the road, maybe a new typescript version will fix this
                 setSelectedColumn(v.field);
             };
         }
@@ -161,7 +161,7 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                         if (isMultiType && isArray(value) && value.length === 0) {
                             setSelectAll(false);
                         }
-                        //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
+                        //@ts-expect-error kicking the can down the road, maybe a new typescript version will fix this
                         setValue(value);
                     }}
                     getOptionLabel={(column) => column.name}

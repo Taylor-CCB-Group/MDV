@@ -17,9 +17,15 @@ import type { DataColumn, FieldName, GuiSpecs, Quantiles } from "./charts";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
 import "tippy.js/dist/tippy.css";
 import { createElement, type ReactNode } from "react";
+import type { Root } from "react-dom/client";
 import { isDateColumn } from "@/lib/dateFormat";
 import ColorLegend from "@/react/components/legend/ColorLegend";
-import LegendWrapper, { type LegendWrapperComponentProps } from "@/react/components/legend/LegendWrapper";
+import LegendStripControls from "@/react/components/legend/LegendStripControls";
+import LegendWrapper, {
+    type LegendPlacement,
+    type LegendSummary,
+    type LegendWrapperComponentProps,
+} from "@/react/components/legend/LegendWrapper";
 import { buildColorLegendSpec } from "@/react/legend/color_legend/buildColorLegendSpec";
 import {
     type ColorLegendFilter,
@@ -32,9 +38,23 @@ import {
     toggleCategoricalColorLegendFilter,
 } from "@/react/legend/color_legend/colorLegendFilter";
 import type { ColorLegendSpec } from "@/react/legend/color_legend/types";
+import { createMdvPortal } from "@/react/react_utils";
 import { ensureLazyChartTypeRegistered } from "./lazyChartRegistrations";
 import { getLegacyConversionTarget } from "./legacyCharts";
 import { StoredFilters } from "./viewFilterReadiness";
+
+/** The legend's minimised form: its title and a few colours. */
+function colorLegendSummary(spec: ColorLegendSpec): LegendSummary {
+    if (spec.kind === "categorical") {
+        const shown = spec.items.slice(0, 4);
+        return {
+            label: spec.label,
+            swatches: shown.map((item) => item.color),
+            more: spec.items.length - shown.length,
+        };
+    }
+    return { label: spec.label, gradient: spec.colors };
+}
 
 /** A saved legend size from a view's config: [width, height] in pixels. */
 function isLegendSize(value: unknown): value is [number, number] {
@@ -55,7 +75,13 @@ export type BaseConfig = {
     param: FieldSpecs;
     title_color?: string;
     version?: string; // Schema version for future migration support
+    /** Where the chart's legends go. Without it they float over the plot, as before. */
+    legend_layout?: LegendLayoutConfig;
 } & ColorConfig;
+export type LegendLayoutConfig = {
+    /** "top" puts the legends in a strip above the plot, which shrinks to make room. */
+    position?: "overlay" | "top";
+};
 /**
  * All chart config types include a color configuration, (although not all charts use it).
  *
@@ -89,7 +115,7 @@ export type SettingsDialogState = {
  *
  * The generic parameter `T` is the type of the chart configuration - maybe overkill, or maybe useful at some point.
  */
-export type SerialString<T extends BaseConfig> = string;
+export type SerialString<_T extends BaseConfig> = string;
 class BaseChart<T extends BaseConfig> {
     config: T;
     __doc__: Document;
@@ -114,6 +140,13 @@ class BaseChart<T extends BaseConfig> {
     menuPip: MenuPip | null = null;
     legend: HTMLDivElement | undefined;
     colorLegendWrapper: LegendWrapper<ColorLegendSpec, T>;
+    /** The strip between the title bar and the plot that holds the legends when they're on top. */
+    legendBand: HTMLDivElement;
+    private legendBandItems: HTMLDivElement;
+    private legendBandControls: HTMLDivElement;
+    private legendBandControlsRoot: Root | null = null;
+    /** Stops following the strip's height, and cancels a resize still waiting for the next frame. */
+    private stopWatchingLegendBand: (() => void) | null = null;
     colorLegendFilterDimension: Dimension | null = null;
     colorLegendFilterDimensionKind: ColorLegendFilter["kind"] | null = null;
     colorLegendFilter: ColorLegendFilter | null = null;
@@ -198,6 +231,10 @@ class BaseChart<T extends BaseConfig> {
         this.contentDiv = createEl("div", {
             classes: ["ciview-chart-content"],
         });
+
+        this.legendBand = createEl("div", { classes: ["ciview-chart-legend-band"] });
+        this.legendBandItems = createEl("div", { classes: ["legend-band-items"] }, this.legendBand);
+        this.legendBandControls = createEl("div", { classes: ["legend-band-controls"] }, this.legendBand);
 
         if (config.title_color) {
             this.titleBar.style.backgroundColor = config.title_color;
@@ -360,18 +397,22 @@ class BaseChart<T extends BaseConfig> {
         });
 
         this.div.append(this.titleBar);
+        this.div.append(this.legendBand);
         this.div.append(this.contentDiv);
+        this.watchLegendBand();
         this.listeners = {};
 
         //work out width and height based on container
         this._setDimensions();
         this.deferredInit(() => {
+            // the chart may be removed before this runs; its legend would be left behind
+            if (this.removed) return;
             try {
                 //some charts weren't properly initialising the color legend, so doing it here may help that to be more consistent.
                 //there is an implementation of the method here in BaseChart, but we wrap in a try/catch as it assumes other associated methods are also implemented.
                 //Calling this in a timeout helps ensure that the chart is fully constructed before we try to do this.
                 this.setColorLegend();
-            } catch (e) {}
+            } catch (_e) {}
         });
         // provide some observable mobx state for useOuterContainer()
         this.observable = makeAutoObservable({
@@ -448,7 +489,7 @@ class BaseChart<T extends BaseConfig> {
     getFilter(): any {}
 
     /** appears to be an appropriate type signature from glancing at uses in the code */
-    setFilter(active: boolean) {}
+    setFilter(_active: boolean) {}
 
     /**
      * Adds a listener to the datastore that will be called when an event occurs,
@@ -562,9 +603,9 @@ class BaseChart<T extends BaseConfig> {
     /**
      * Called by the datastore when the data is filtered. Needs to
      * be implemented on any subclasses.
-     * @param dim - the dimension that has been filtered
+     * @param _dim - the dimension that has been filtered
      */
-    onDataFiltered(dim?: Dimension) {}
+    onDataFiltered(_dim?: Dimension) {}
 
     setToolTipColumn?(column: FieldSpec): void;
     /**
@@ -668,42 +709,122 @@ class BaseChart<T extends BaseConfig> {
         }
     }
 
+    /** Whether the legends sit in the strip above the plot rather than over it. */
+    legendsOnTop(): boolean {
+        return this.config.legend_layout?.position === "top";
+    }
+
+    /** Where `LegendWrapper` should draw this chart's legends. */
+    getLegendPlacement(): LegendPlacement {
+        return {
+            onTop: this.legendsOnTop(),
+            band: this.legendBandItems,
+            setLayout: (change) => this.setLegendLayout(change),
+            onBandChanged: () => this.updateLegendBand(),
+        };
+    }
+
+    private legendLayoutListeners = new Set<() => void>();
+
+    /**
+     * Calls `listener` whenever the legends move above or over the plot, for legends drawn by a
+     * chart's React code (`useChartLegend`), which read this with `useSyncExternalStore`.
+     */
+    subscribeLegendLayout = (listener: () => void) => {
+        this.legendLayoutListeners.add(listener);
+        return () => {
+            this.legendLayoutListeners.delete(listener);
+        };
+    };
+
+    /** Moves the legends above or over the plot, and saves that with the view. */
+    @action setLegendLayout(change: LegendLayoutConfig) {
+        this.config.legend_layout = { ...this.config.legend_layout, ...change };
+        this.refreshLegends();
+        for (const listener of this.legendLayoutListeners) listener();
+    }
+
+    /** Draws the chart's legends again. Charts with legends besides the color legend add theirs. */
+    refreshLegends() {
+        this.setColorLegend();
+    }
+
+    /** Shows the strip only while it holds legends. */
+    private updateLegendBand() {
+        const show = this.legendsOnTop() && this.legendBandItems.childElementCount > 0;
+        this.legendBand.classList.toggle("active", show);
+        // the strip's own buttons are drawn the first time it's shown
+        if (show && !this.legendBandControlsRoot) {
+            this.legendBandControlsRoot = createMdvPortal(
+                createElement(LegendStripControls, { onFloat: () => this.setLegendLayout({ position: "overlay" }) }),
+                this.legendBandControls,
+                this,
+            );
+        }
+    }
+
+    /**
+     * The plot fills what the strip leaves, so charts are resized when its height changes: legends
+     * shown, hidden or minimised, or wrapping onto another row.
+     */
+    private watchLegendBand() {
+        const win = this.__doc__.defaultView ?? window;
+        if (typeof win.ResizeObserver === "undefined") return;
+        let lastHeight = 0;
+        let frame: number | null = null;
+        const observer = new win.ResizeObserver(() => {
+            // resizing the chart can change the strip again, so do it after the observer's callback
+            if (frame !== null) return;
+            frame = win.requestAnimationFrame(() => {
+                frame = null;
+                const height = this.legendBand.offsetHeight;
+                if (height === lastHeight) return;
+                lastHeight = height;
+                this.setSize();
+            });
+        });
+        observer.observe(this.legendBand);
+        this.stopWatchingLegendBand = () => {
+            observer.disconnect();
+            if (frame !== null) win.cancelAnimationFrame(frame);
+            frame = null;
+        };
+    }
+
     /**
      * adds (or removes) the color legend depending on the chart's
      * config color_legend.display value - assumes chart has a
      * get colorLegend method
      */
     setColorLegend() {
-        if (!this.config.color_legend?.display) {
-            if (this.legend && this.config.color_legend) {
-                this.config.color_legend.pos = [this.legend.offsetLeft, this.legend.offsetTop];
-                const userSize = this.colorLegendWrapper.getUserSize();
-                if (userSize) {
-                    this.config.color_legend.size = userSize;
-                }
+        const cl = this.config.color_legend;
+        // remember where the legend floats before it's redrawn, possibly in the strip above the plot
+        const floating = this.colorLegendWrapper.getFloatingPosition();
+        if (floating && cl) {
+            cl.pos = floating;
+        }
+        if (!cl?.display) {
+            const userSize = this.colorLegendWrapper.getUserSize();
+            if (this.legend && cl && userSize) {
+                cl.size = userSize;
             }
             this.colorLegendWrapper.unmount();
             this.legend = undefined;
             return;
         }
-        const box = this._getContentDimensions();
-        let lt: string | number = 0;
-        let ll: string | number = 0;
         let size: [number, number] | undefined;
         if (this.legend) {
-            ll = this.legend.style.left;
-            lt = this.legend.style.top;
             size = this.colorLegendWrapper.getUserSize() ?? undefined;
             this.colorLegendWrapper.unmount();
         } else {
-            const cl = this.config.color_legend;
-            if (!cl.pos) {
-                cl.pos = [box.left, box.top];
-            }
-            ll = `${cl.pos[0]}px`;
-            lt = `${cl.pos[1]}px`;
             size = isLegendSize(cl.size) ? cl.size : undefined;
         }
+        if (!cl.pos) {
+            const box = this._getContentDimensions();
+            cl.pos = [box.left, box.top];
+        }
+        const ll = `${cl.pos[0]}px`;
+        const lt = `${cl.pos[1]}px`;
         const spec = this.getColorLegendSpec();
         if (!spec) {
             console.warn("no color legend");
@@ -733,25 +854,20 @@ class BaseChart<T extends BaseConfig> {
                         setContinuousColorLegendFilter(this, spec, range),
                 }),
             });
-        this.colorLegendWrapper.render(
-            spec,
-            { left: ll, top: lt, size },
-            ColorLegendWithInteractions,
-            spec.kind === "categorical"
-                ? {
-                      dragHandle: ".legend-drag-handle",
-                      resizable: true,
-                  }
-                : {
-                      dragHandle: ".legend-continuous-drag-handle",
-                      resizable: this.isColorLegendResizable(),
-                  },
-        );
+        this.colorLegendWrapper.render(spec, { left: ll, top: lt, size }, ColorLegendWithInteractions, {
+            dragHandle: spec.kind === "categorical" ? ".legend-drag-handle" : ".legend-continuous-drag-handle",
+            resizable: spec.kind === "categorical" || this.isColorLegendResizable(),
+            summary: colorLegendSummary(spec),
+            minimized: cl.minimized === true,
+            onMinimizedChange: (minimized) => this.setColorLegendMinimized(minimized),
+        });
         this.legend = this.colorLegendWrapper.getWrapperElement() ?? undefined;
-        if (!this.legend) {
-            return;
-        }
-        (this.legend as HTMLDivElement & { __doc__?: Document }).__doc__ = this.__doc__;
+    }
+
+    /** Minimises or opens the color legend, and saves that with the view. */
+    @action setColorLegendMinimized(minimized: boolean) {
+        if (this.config.color_legend) this.config.color_legend.minimized = minimized;
+        this.setColorLegend();
     }
 
     getColorFunction(column: FieldName, asArray?: boolean) {
@@ -812,11 +928,11 @@ class BaseChart<T extends BaseConfig> {
         return false;
     }
 
-    onDataAdded(newSize: number) {
+    onDataAdded(_newSize: number) {
         this.onDataFiltered();
     }
 
-    onDataHighlighted(data: any) {}
+    onDataHighlighted(_data: any) {}
     _tooltip?: HTMLDivElement;
     addToolTip() {
         this._tooltip = createEl(
@@ -846,13 +962,23 @@ class BaseChart<T extends BaseConfig> {
         this._tooltip.style.display = "none";
     }
 
+    /** Whether `remove()` has been called. */
+    private removed = false;
+
     /**
      * Just removes the DOM elements, subclasses should do their own cleanup
      */
     remove(notify?: boolean) {
+        this.removed = true;
         this.colorLegendWrapper.unmount();
         this.legend = undefined;
         destroyColorLegendFilter(this, notify);
+        this.stopWatchingLegendBand?.();
+        this.stopWatchingLegendBand = null;
+        const controlsRoot = this.legendBandControlsRoot;
+        this.legendBandControlsRoot = null;
+        if (controlsRoot) queueMicrotask(() => controlsRoot.unmount());
+        this.legendBand.remove();
         this.titleBar.remove();
         this.contentDiv.remove();
         this.dataStore.removeListener(this.config.id);
@@ -865,7 +991,7 @@ class BaseChart<T extends BaseConfig> {
         for (const disposer of this.reactionDisposers) {
             disposer();
         }
-        this.menuTooltips.forEach((t) => t.destroy());
+        this.menuTooltips.map((t) => t.destroy());
         this.menuTooltips = [];
         if (this._fullscreenChangeHandler) {
             this.__doc__.removeEventListener("fullscreenchange", this._fullscreenChangeHandler);
@@ -1096,7 +1222,7 @@ class BaseChart<T extends BaseConfig> {
     unpinIcon?: HTMLElement;
     _addUnpinIcon() {
         this.unpinIcon = this.addMenuIcon("fas fa-thumbtack", "unpin chart");
-        this.unpinIcon.addEventListener("click", (e) => {
+        this.unpinIcon.addEventListener("click", () => {
             this.unpinIcon?.remove();
             this.unpinChart?.();
         });
@@ -1117,7 +1243,7 @@ class BaseChart<T extends BaseConfig> {
      * @returns an array of `ContextMenuItems`
      */
     addToContextMenu?(): any;
-    getContextMenu(data?: any) {
+    getContextMenu(_data?: any) {
         let menu: ContextMenuItem[] = [];
         if (this.getImage) {
             menu = menu.concat([
@@ -1231,10 +1357,11 @@ class BaseChart<T extends BaseConfig> {
     getConfig() {
         if (this.legend) {
             const userSize = this.colorLegendWrapper.getUserSize();
+            const pos = this.colorLegendWrapper.getFloatingPosition();
             this.config.color_legend = {
                 ...this.config.color_legend,
                 display: true,
-                pos: [this.legend.offsetLeft, this.legend.offsetTop],
+                ...(pos && { pos }),
                 ...(userSize && { size: userSize }),
             };
         }
@@ -1291,6 +1418,10 @@ class BaseChart<T extends BaseConfig> {
     }
 
     getImage?(callback: (resp: any) => void, im_type: "png" | "svg"): void;
+    /** The grids the chart can show besides one view (charts drawn as small multiples), as the toolbar offers them. */
+    gridChoices?(): { name: string; value: string }[];
+    /** Shows the grid a choice from `gridChoices` names, or one view for "none". */
+    showGrid?(value: string): void;
     /**
      * Downloads an image of the chart
      * @param im_type - either svg or png

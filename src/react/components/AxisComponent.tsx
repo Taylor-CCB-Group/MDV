@@ -14,6 +14,7 @@ type AxisComponentProps = {
 
 //! todo - get label options working... for now, we ignore rotate_labels
 // not generally relevant to scatterplot, but will be for other charts
+// biome-ignore lint/correctness/noUnusedVariables: parked: see the todo above
 function getLabelProps(axisConfig?: AxisConfig) {
     if (!axisConfig) return {};
     const { tickfont, rotate_labels } = axisConfig;
@@ -71,7 +72,7 @@ function useSynchronizedScales({ config, unproject }: AxisComponentProps) {
                 domainX: [p[0], p2[0]],
                 domainY: [p2[1], p[1]],
             });
-        } catch (e) {
+        } catch {
             // Fallback to data ranges when deck isn't ready yet
             // This is normal on first render
             setRanges({ domainX: cx.minMax.slice(), domainY: cy.minMax.slice() });

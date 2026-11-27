@@ -9,6 +9,7 @@ import type { MonkeyPatchEditableGeoJsonLayer } from "@/lib/deckMonkeypatch";
 import { getPickingInfoWithAlternates } from "@/lib/deckPicking";
 import { getCombinedScatterTooltip } from "@/lib/scatterTooltip";
 import { GatedOrbitController, GatedOrthographicController } from "@/lib/viewGestureGate";
+import { useColorFieldsLegend } from "../colorFields";
 import { useChart } from "../context";
 import {
     type DualContourLegacyConfig,
@@ -18,18 +19,18 @@ import {
 } from "../contour_state";
 import { getEmptyFeatureCollection } from "../deck_state";
 import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
+import { useColorGridCells } from "../hooks/useColorGridCells";
 import { useDensityGridCells } from "../hooks/useDensityGridCells";
 import useGateLayers from "../hooks/useGateLayers";
 import { useOuterContainerDeckTooltip } from "../hooks/useOuterContainerDeckTooltip";
 import { useRebindDeckEvents } from "../hooks/useRebindDeckEvents";
 import { isSameOrbitView, ORBIT_FOVY, type OrbitSelectionView, orbitSelectionViewOf } from "../orbitView";
-import { useScatterRadius } from "../scatter_state";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import AxisComponent from "./AxisComponent";
-import DeckDensityGridComponent from "./DeckDensityGridComponent";
+import { DeckColorGridComponent, DeckDensityGridComponent } from "./DeckScatterGridComponent";
 import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
 import { isDensityGridShown } from "./densityGridUtils";
-import FieldContourLegend from "./FieldContourLegend";
+import { useContourLegend } from "./FieldContourLegend";
 import SelectionOverlay from "./SelectionOverlay";
 import { ScatterDeckBoundary, useLayersForDevice, useScatterDeckDevice, useZoomOnFilter } from "./scatterDeckShared";
 import ViewGestureHint from "./ViewGestureHint";
@@ -125,15 +126,13 @@ const DeckScatter = observer(function DeckScatterComponent({
 }) {
     const id = useId();
     const [width, height] = useChartSize();
-    const [cx, cy, ...density] = useParamColumns() as LoadedDataColumn<"double">[];
+    const [cx, cy] = useParamColumns() as LoadedDataColumn<"double">[];
     const cz = useParamColumns()[2] as LoadedDataColumn<"double">;
     const data = useFilteredIndices(); //changed to fallback to simplerFilteredIndices when filterColumn is not set
     const config = useConfig<DeckScatterConfig>();
     const contourConfig = useConfig<DualContourLegacyConfig>();
     const { viewState, dimension } = config;
     const is2d = dimension === "2d";
-    //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
-    const radiusScale = useScatterRadius();
     //todo colorBy should be done differently (also bearing in mind multiple layers)
 
     //todo this shouldn't be repeated here and in AxisComponent
@@ -178,8 +177,13 @@ const DeckScatter = observer(function DeckScatterComponent({
 
     const legendFields = useFieldContourLegend(contourConfig.densityFields);
     const legendCategories = useCategoryContourLegend(contourConfig);
-    const showLegend = contourConfig.field_legend.display;
-    const legendPosition = { x: 10, y: 10 };
+    // drawn in the chart's legend wrapper: draggable, can be minimised or put above the plot
+    useContourLegend(contourConfig.field_legend, {
+        fields: legendFields,
+        categories: legendCategories.items,
+        categoryLabel: legendCategories.label,
+        onContourHover: setHoveredContour,
+    });
 
     const { modelMatrix } = selectionProps;
     // as the classic 3D scatter drew them: each axis across its column's range, through the middle of the data
@@ -261,7 +265,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     const pickAlternates = device.status === "ready" && device.backend === "webgl";
     const deckLayers = useLayersForDevice(layers, device);
 
-    const deckContainerRef = useRef<HTMLDivElement | null>(null);
+    const deckContainerRef = useRef<HTMLElement | null>(null);
     const deckRef = useRef<DeckGLRef | null>(null);
     const chart = useChart<DeckScatterConfig, DeckScatterReact>();
     useEffect(() => {
@@ -318,7 +322,7 @@ const DeckScatter = observer(function DeckScatterComponent({
     return (
         <>
             <AxisComponent config={config} unproject={unproject}>
-                <div
+                <section
                     ref={deckContainerRef}
                     aria-label="Scatter plot"
                     style={{ width: "100%", height: "100%", outline: "none", position: "relative" }}
@@ -361,19 +365,10 @@ const DeckScatter = observer(function DeckScatterComponent({
                             }}
                         />
                     </ScatterDeckBoundary>
-                </div>
+                </section>
             </AxisComponent>
             <ViewGestureHint />
             {tooltipPortal}
-            {showLegend && (
-                <FieldContourLegend
-                    fields={legendFields}
-                    categories={legendCategories.items}
-                    categoryLabel={legendCategories.label}
-                    position={legendPosition}
-                    onContourHover={setHoveredContour}
-                />
-            )}
         </>
     );
 });
@@ -381,16 +376,21 @@ const DeckScatter = observer(function DeckScatterComponent({
 export default observer(function DeckScatterChart() {
     const chart = useChart<DeckScatterConfig, DeckScatterReact>();
     const [hoveredContour, setHoveredContour] = useState<HoveredContour | null>(null);
-    const grid = useDensityGridCells();
+    const densityGrid = useDensityGridCells();
+    const colorGrid = useColorGridCells();
+    useColorFieldsLegend();
     // in order for SelectionOverlay to work, we need to review how our implementation works
     // vs useScatterplotLayer in spatial_context.tsx
     return (
         <SpatialAnnotationProvider chart={chart} hoveredContour={hoveredContour} setHoveredContour={setHoveredContour}>
             <SelectionOverlay />
-            {/* with no field to make a cell of (none chosen, nothing highlighted for an active link,
-                or still loading) the grid would be empty, so show the one plot, without an overlay */}
-            {isDensityGridShown(chart.config) && grid.cells.length > 0 ? (
-                <DeckDensityGridComponent {...grid} />
+            {/* with nothing to make a cell of (no field chosen, nothing highlighted for an active
+                link, a first colour column that is not categorical for a split by category, or
+                still loading) the grid would be empty, so show the one plot, without an overlay */}
+            {isDensityGridShown(chart.config) && densityGrid.cells.length > 0 ? (
+                <DeckDensityGridComponent {...densityGrid} />
+            ) : colorGrid && colorGrid.cells.length > 0 ? (
+                <DeckColorGridComponent colorCells={colorGrid} />
             ) : (
                 <DeckScatter setHoveredContour={setHoveredContour} />
             )}

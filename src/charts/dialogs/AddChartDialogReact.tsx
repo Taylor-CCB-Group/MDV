@@ -130,6 +130,7 @@ function getDefaultParamSlot(type: Param | Param[], dataStore: DataStore): AddCh
     return isMultiColumn(type) ? [matchingColumn.field] : matchingColumn.field;
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: parked: see the commented-out <ChartPreview> below
 const ChartPreview = observer(({ config }: { config: ChartConfig }) => {
     const dataStore = useDataStore();
     const chartType = useMemo(() => Object.values(BaseChart.types).find((t) => t.name === config.type), [config.type]);
@@ -386,7 +387,7 @@ const ConfigureChart = observer(({ config, onDone }: { config: ChartConfig; onDo
     const extraControls = useMemo(() => {
         return chartType
             ?.extra_controls?.(dataStore)
-            .map((control, i) => <ExtraControlComponent key={control.name} control={control} config={config} />);
+            .map((control) => <ExtraControlComponent key={control.name} control={control} config={config} />);
     }, [chartType, dataStore, config]);
 
     const addChart = useCallback(() => {

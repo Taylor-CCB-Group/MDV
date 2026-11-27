@@ -135,7 +135,7 @@ export const Message = ({ children }: PropsWithChildren) => (
 );
 
 export const FileSummary = ({ children }: PropsWithChildren) => (
-    <div className="max-w-[800px] w-[100%] text-center mb-5">{children}</div>
+    <div className="max-w-[800px] w-full text-center mb-5">{children}</div>
 );
 
 export const FileSummaryHeading = ({ children }: PropsWithChildren) => (
@@ -153,7 +153,7 @@ export const FileSummaryText = ({ children }: PropsWithChildren) => (
 );
 
 export const ErrorContainer = ({ children }: PropsWithChildren) => (
-    <div className="bg-[#fff0f0] text-[#d8000c] border border-[#ffbaba] p-5 my-5 rounded shadow-sm text-left w-[90%] max-w-[600px]">
+    <div className="bg-[#fff0f0] text-[#d8000c] border border-[#ffbaba] p-5 my-5 rounded shadow-xs text-left w-[90%] max-w-[600px]">
         {children}
     </div>
 );
@@ -187,7 +187,7 @@ export const DatasourceNameInput = ({ value, onChange, isDisabled }: DatasourceN
             type="text"
             value={value}
             onChange={onChange}
-            className="p-2 border rounded focus:outline-none focus:ring focus:border-blue-300 dark:text-gray-300 dark:bg-gray-800 flex-grow"
+            className="p-2 border rounded focus:outline-hidden focus:ring-3 focus:border-blue-300 dark:text-gray-300 dark:bg-gray-800 grow"
             placeholder="Enter datasource name"
             disabled={isDisabled}
         />

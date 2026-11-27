@@ -222,7 +222,7 @@ const convertTypedArrayToNumbers = (value: TypedArray): number[] => {
     return result;
 };
 
-const readMatrix = async (dataset: H5Dataset, chunkSize: number, tracker?: ProgressTracker): Promise<MatrixValue> => {
+const readMatrix = async (dataset: H5Dataset, _chunkSize: number, tracker?: ProgressTracker): Promise<MatrixValue> => {
     return withErrorContext(async () => {
         if (!dataset.shape || dataset.shape.length === 0) {
             return null;
@@ -438,7 +438,7 @@ const readMatrixGroup = async (
 
 const readDatasetChunked = async (
     dataset: H5Dataset,
-    chunkSize: number,
+    _chunkSize: number,
     tracker?: ProgressTracker,
 ): Promise<DatasetValue> => {
     return withErrorContext(async () => {

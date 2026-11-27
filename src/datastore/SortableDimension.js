@@ -18,7 +18,7 @@ export default class SortableDimension extends Dimension {
      * @returns {Promise} - A promise that resolves to the new order
      */
     async sort(sortColumns) {
-        return await new Promise((resolve, reject) => {
+        return await new Promise((resolve) => {
             const orderBuffer = this.orderBuffer;
             const cols = sortColumns.map((x) => {
                 const c = this.parent.columnIndex[x.col];

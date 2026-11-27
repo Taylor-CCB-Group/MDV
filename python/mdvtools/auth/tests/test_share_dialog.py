@@ -16,7 +16,6 @@ is left out because these tests do not change sign-in.
 import pytest
 from flask import Flask
 
-from mdvtools.auth.authutils import cache_user_projects
 from mdvtools.dbutils.dbmodels import Project, User, UserProject, db
 from mdvtools.dbutils.dbservice import UserProjectService
 from mdvtools.dbutils.project_manager_extension import ProjectManagerExtension
@@ -63,8 +62,6 @@ def project(app, owner):
 
 
 def client_for(app, user):
-    # The share routes read the Owner's role from the permission cache.
-    cache_user_projects()
     client = app.test_client()
     with client.session_transaction() as session:
         session["user"] = {"id": user.id, "email": user.email, "is_admin": user.is_admin}

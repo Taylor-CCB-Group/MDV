@@ -1,6 +1,7 @@
 import { Checkbox, FormControlLabel, Slider, Typography } from "@mui/material";
 import type { LayerConfig } from "@spatialdata/vis";
 
+import type { GridBySpec } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import { mdvFieldSpecsOf, type WithMdvFieldSpecs } from "@/react/spatialdata/field_spec_projection";
 import type { TableAssociation } from "@/react/spatialdata/table_association";
@@ -22,6 +23,8 @@ type Props = {
     updateLayer: (updates: Partial<LabelsLayerConfig>) => void;
     association: TableAssociation;
     dataStore: DataStore;
+    /** The chart's grid by this layer's fill colour. */
+    gridBy?: GridBySpec;
 };
 
 /**
@@ -63,7 +66,7 @@ function LabeledSlider({
 }) {
     return (
         <div className="flex items-center gap-3">
-            <Typography variant="caption" className="w-28 flex-shrink-0">
+            <Typography variant="caption" className="w-28 shrink-0">
                 {label}
             </Typography>
             <Slider
@@ -81,7 +84,7 @@ function LabeledSlider({
     );
 }
 
-export default function LabelsLayerPanel({ config, updateLayer, association, dataStore }: Props) {
+export default function LabelsLayerPanel({ config, updateLayer, association, dataStore, gridBy }: Props) {
     const specs = mdvFieldSpecsOf(config);
     const channels = config.channels ?? {};
     // Only the fields this patch changes: `patchRenderStackEntryPropsInPlace` merges
@@ -109,6 +112,7 @@ export default function LabelsLayerPanel({ config, updateLayer, association, dat
                 dataStore={dataStore}
                 fillColorByColumn={config.fillColorByColumn}
                 fillColorByColumnSpec={specs?.fillColorByColumn}
+                gridBy={gridBy}
                 onChange={(next, spec) =>
                     updateLayer({
                         fillColorByColumn: next,

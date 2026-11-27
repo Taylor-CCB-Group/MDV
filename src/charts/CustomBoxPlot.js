@@ -108,7 +108,7 @@ class CustomBoxPlot extends SVGChart {
             .selectAll(".cbp-col")
             .data(this.data)
             .join("g")
-            .attr("transform", (d, i) => {
+            .attr("transform", (_d, i) => {
                 return `translate(${i * recWidth},0)`;
             })
             .attr("class", "cbp-col")
@@ -124,10 +124,10 @@ class CustomBoxPlot extends SVGChart {
                 this.hideToolTip();
             })
             .transition(trans)
-            .attr("cy", (d, i) => {
+            .attr("cy", (d) => {
                 return this.y_scale(d[0]);
             })
-            .attr("fill", (d, i) => colors[d[1]])
+            .attr("fill", (d) => colors[d[1]])
             .attr("r", radius)
             .attr("cx", (d) => xpos + margin * d[3]);
 

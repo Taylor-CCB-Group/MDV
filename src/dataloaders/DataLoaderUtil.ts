@@ -15,7 +15,7 @@ let projectRoot = "";
 /**
  * This could potentially also have some more awareness of what type of json it is fetching, and e.g. do some zod validation
  */
-export async function fetchJsonConfig<T = any>(url: string, root: string, createErrorComponent = false): Promise<T> {
+export async function fetchJsonConfig<T = any>(url: string, _root: string, createErrorComponent = false): Promise<T> {
     try {
         const resp = await fetch(url);
         const text = await resp.text();
