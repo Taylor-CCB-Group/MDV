@@ -7,6 +7,10 @@
 - when composing commit messages, avoid words like "enhance" and favour conciseness and clarity
 - for any Playwright work, read `docs/playwright/PLAYWRIGHT_AGENT.md` first — it has rules, commands, and prompt templates for agents
 
+## Workspace redesign
+
+On the `workspace-showcase` branch, the workspace redesign (one view per project, from the workspace prototype) is planned and built in `docs/design/workspace/`. Read `docs/design/workspace/HANDOVER.md` before working on it: the prototype there is the reference, decisions become ADRs that are superseded rather than edited, and nothing merges to main until the team has tried the showcase.
+
 ## Agent skills
 
 ### Issue tracker

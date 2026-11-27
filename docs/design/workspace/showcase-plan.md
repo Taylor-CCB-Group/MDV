@@ -6,7 +6,7 @@ Status: draft, 2026-11-27
 
 ## Goal
 
-Real MDV, with real projects and real charts, wearing the [workspace prototype](https://claude.ai/artifact/TNdQ8b1L3wmdmQ6NyD5Zxr)'s look and feel. It needs to be good enough for the team to answer one question: **is this the right direction for MDV?**
+Real MDV, with real projects and real charts, wearing the [workspace prototype](prototype.html)'s look and feel. It needs to be good enough for the team to answer one question: **is this the right direction for MDV?**
 
 It is not a conversion of MDV. Anything that doesn't change how the workspace looks or feels is left out or stubbed, and the long tail waits for the team's verdict.
 

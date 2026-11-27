@@ -1,26 +1,27 @@
 # Workspace in MDV: planning map
 
-The plan for bringing the [workspace prototype](https://claude.ai/artifact/TNdQ8b1L3wmdmQ6NyD5Zxr) into MDV: one view per project instead of a pane per data source, a layout that fits the screen, and one colour token set with a stored light/dark setting. It is worked one decision ticket at a time; each grilling decision becomes an ADR in `docs/adr/`.
+The plan for bringing the [workspace prototype](prototype.html) (open the file in a browser) into MDV: one view per project instead of a pane per data source, a layout that fits the screen, and one colour token set with a stored light/dark setting. It is worked one decision ticket at a time; each grilling decision becomes an ADR in `docs/adr/`.
 
-Start with **Decisions so far** and **Route** below. Open tickets are in [`tickets/`](tickets/), research findings in [`research/`](research/), and tickets folded into bigger ones in [`tickets/merged/`](tickets/merged/).
+New here, person or agent? Read [HANDOVER.md](HANDOVER.md) first. Then start with **Decisions so far** and **Route** below. Open tickets are in [`tickets/`](tickets/), research findings in [`research/`](research/), and tickets folded into bigger ones in [`tickets/merged/`](tickets/merged/).
 
 ## Destination
 
-A spec (PRD) for the new MDV workspace, an ADR for every decision that blocks building it, and an ordered set of build-slice issues ready to pick up. It covers the whole [workspace prototype](https://claude.ai/artifact/TNdQ8b1L3wmdmQ6NyD5Zxr) plus the shared colour tokens and light/dark setting.
+A spec (PRD) for the new MDV workspace, an ADR for every decision that blocks building it, and an ordered set of build-slice issues ready to pick up. It covers the whole [workspace prototype](prototype.html) plus the shared colour tokens and light/dark setting.
 
 ## Notes
 
-- **Tracker:** this folder. Tickets are the notes in `tickets/`, numbered. Each has `Type:`, `Status:` (`open`, `claimed`, `resolved`, `merged`) and `Blocked by:` lines. A ticket is takeable when it is `open` and everything it is blocked by is `resolved`; the lowest number wins. Tickets folded into a bigger one sit in `tickets/merged/` with a `Merged into:` link.
+- **Tracker:** this folder, on the `workspace-showcase` branch. It is the only copy: edit it here, through commits or small PRs into that branch. Tickets are the notes in `tickets/`, numbered. Each has `Type:`, `Status:` (`open`, `claimed`, `resolved`, `merged`) and `Blocked by:` lines. A ticket is takeable when it is `open` and everything it is blocked by is `resolved`; the lowest number wins. Tickets folded into a bigger one sit in `tickets/merged/` with a `Merged into:` link.
 - **Tickets are sized to a session, not to a single question.** Closely linked questions share one ticket so they are settled together. If a session runs long, finish the topic in hand, record it, and leave the rest of the ticket open.
 - **One build step, the walking skeleton.** This map is planning, except for [20 Walking skeleton](tickets/20-walking-skeleton.md): the thinnest real version, on a branch and behind a flag, so the decisions are checked on real projects before the rest are made. Everything else produces decisions, not code.
-- **Grilling tickets** run with `/grill-with-docs`: each decision becomes an ADR in the repo's `docs/adr/`, and new terms go into `CONTEXT.md`. One question at a time; the human answers.
-- **Research tickets** run as a `/research` background agent. Findings go in `research/` in this folder, linked from the ticket.
+- **Grilling tickets** are a conversation between an agent and the humans. The agent asks one question at a time, each with its recommended answer and why, and waits; the humans decide. The agent looks up facts in the code itself instead of asking. Each decision becomes an ADR in `docs/adr/`, and new terms go into `CONTEXT.md`.
+- **Research tickets** are answered from primary sources (the code, library docs and source). Findings go in `research/` in this folder, linked from the ticket.
+- **Working a ticket:** set its `Status:` to `claimed` before starting so nobody else takes it. When it is settled, add an `## Answer` section, set `Status: resolved`, add a one-line gist under **Decisions so far** linking the ticket, update **Route**, and turn anything newly clear into new tickets. Work one ticket per session.
 - **ADR 0019** (`docs/adr/0019-extract-legacy-js-ui-into-react-in-place.md`) applies: legacy UI is extracted in place, and restyling is a separate change.
 - **Must work on:** the hosted server (Flask/Docker) and the standalone static build.
 - **Settled before this map:** a scrolling grid rather than tiles; one view, with the data source chosen in Add chart; the inspector replaces the floating settings dialog.
 - **Proposed next step:** [Showcase plan](showcase-plan.md) (draft): a week-long, never-merged showcase of the prototype's look and feel on real projects, for the team to judge before the rest is planned.
-- **References:** [workspace prototype](https://claude.ai/artifact/TNdQ8b1L3wmdmQ6NyD5Zxr) (private: share it before linking it to others), [MDV design system](https://claude.ai/code/artifact/a7e9d6e3-f9a7-4fef-b42b-948024ea8649) (a record of today's tokens), the layout lab in the `MDV-ui-refresh` worktree, and the team's "Grid Stack and ChatMDV issues" notes.
-- **Changing a decision.** Never edit a resolved ticket's answer or an accepted ADR to change it. Raise a new ticket (a vault ticket while this map is open, a GitHub issue through `/triage` after it closes) saying what is changing and what the team found. Grill it into a new ADR that supersedes the old one, mark the old one `Status: superseded by <new ADR>`, and build the change as its own slice. Some decisions are cheaper to change than others:
+- **References:** the [workspace prototype](prototype.html), the reference for every look-and-feel question: follow it, and only ask about what it doesn't show. Also the [MDV design system](https://claude.ai/code/artifact/a7e9d6e3-f9a7-4fef-b42b-948024ea8649) (a record of today's tokens), the layout lab on the `ui-refresh` branch, and the team's "Grid Stack and ChatMDV issues" notes.
+- **Changing a decision.** Never edit a resolved ticket's answer or an accepted ADR to change it. Raise a new ticket (in `tickets/` while this map is open, a GitHub issue after it closes) saying what is changing and what the team found. Grill it into a new ADR that supersedes the old one, mark the old one `Status: superseded by <new ADR>`, and build the change as its own slice. Some decisions are cheaper to change than others:
   - Low cost:
     - the layout engine (ADR 0027's engine seam)
     - breakpoints and the tablet and phone rules (nothing narrower than 12 columns is saved)
@@ -28,7 +29,7 @@ A spec (PRD) for the new MDV workspace, an ADR for every decision that blocks bu
     - the preview setting
   - Highest cost: the saved format (ADR 0026). Once views are saved in `views_v2.json`, a new format needs a converter, keyed on the `version` field.
   - Hardest to undo: retiring the pane workspace and `views.json`. It is its own decision in [22 Theme, undo and rollout](tickets/22-theme-undo-and-rollout.md), taken only after the team has lived with the preview.
-- **When every decision is resolved:** `/to-prd` writes the PRD, then `/to-issues` cuts the build slices.
+- **When every decision is resolved:** write the PRD, then cut it into build-slice issues.
 
 ## Decisions so far
 
@@ -59,4 +60,4 @@ Restructured on 2026-11-26 from 13 open tickets into five sessions. Each session
 2. ~~[19 Layout engine bake-off and choice](tickets/19-layout-engine-bake-off-and-choice.md)~~: resolved, in-house engine with gridstack 14 as the fallback
 3. [20 Walking skeleton](tickets/20-walking-skeleton.md): the first real build slice, behind a flag, plus the acceptance checks
 4. [21 Chart chrome, inspector, tools and filters](tickets/21-chart-chrome-inspector-tools-and-filters.md) and [22 Theme, undo and rollout](tickets/22-theme-undo-and-rollout.md): grilling with the skeleton running; either order
-5. `/to-prd`, then `/to-issues`
+5. The PRD, then build-slice issues
