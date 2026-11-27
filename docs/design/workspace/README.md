@@ -18,6 +18,7 @@ A spec (PRD) for the new MDV workspace, an ADR for every decision that blocks bu
 - **ADR 0019** (`docs/adr/0019-extract-legacy-js-ui-into-react-in-place.md`) applies: legacy UI is extracted in place, and restyling is a separate change.
 - **Must work on:** the hosted server (Flask/Docker) and the standalone static build.
 - **Settled before this map:** a scrolling grid rather than tiles; one view, with the data source chosen in Add chart; the inspector replaces the floating settings dialog.
+- **Proposed next step:** [Showcase plan](showcase-plan.md) (draft): a week-long, never-merged showcase of the prototype's look and feel on real projects, for the team to judge before the rest is planned.
 - **References:** [workspace prototype](https://claude.ai/artifact/TNdQ8b1L3wmdmQ6NyD5Zxr) (private: share it before linking it to others), [MDV design system](https://claude.ai/code/artifact/a7e9d6e3-f9a7-4fef-b42b-948024ea8649) (a record of today's tokens), the layout lab in the `MDV-ui-refresh` worktree, and the team's "Grid Stack and ChatMDV issues" notes.
 - **Changing a decision.** Never edit a resolved ticket's answer or an accepted ADR to change it. Raise a new ticket (a vault ticket while this map is open, a GitHub issue through `/triage` after it closes) saying what is changing and what the team found. Grill it into a new ADR that supersedes the old one, mark the old one `Status: superseded by <new ADR>`, and build the change as its own slice. Some decisions are cheaper to change than others:
   - Low cost:
