@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { GuiSpec } from "@/charts/charts";
 import type { SpatialDataGridConfig } from "@/charts/schemas/ChartConfigSchema";
 import type { ColumnTypes } from "../colorFields";
-import { colorGridSplitFor } from "./colorGridUtils";
+import { colorGridSplitFor, hidesEmptyCells } from "./colorGridUtils";
 import {
     type FillColorLayer,
     getSpatialDataGridSettingsFolder,
@@ -157,16 +157,20 @@ describe("getSpatialDataGridSettingsFolder", () => {
 });
 
 describe("setSpatialDataGrid", () => {
-    test("keeps leaving out empty cells between grids per region and per category", () => {
-        const config: { grid?: SpatialDataGridConfig | null } = { grid: { by: "region", hide_empty: true } };
+    test("leaves out empty cells unless a grid keeps them, which outlasts a change of grid", () => {
+        expect(hidesEmptyCells({ by: "region" })).toBe(true);
+        expect(hidesEmptyCells({ by: "region", hide_empty: true })).toBe(true);
+        const config: { grid?: SpatialDataGridConfig | null } = { grid: { by: "region", hide_empty: false } };
+        expect(hidesEmptyCells(config.grid)).toBe(false);
         setSpatialDataGrid(config, "color_fields:categories");
-        expect(config.grid).toEqual({ by: "color_fields", split: "categories", hide_empty: true });
+        expect(config.grid).toEqual({ by: "color_fields", split: "categories", hide_empty: false });
         setSpatialDataGrid(config, "layer_fill:categories:circles");
-        expect(config.grid).toEqual({ by: "layer_fill", layer: "circles", split: "categories", hide_empty: true });
+        expect(config.grid).toEqual({ by: "layer_fill", layer: "circles", split: "categories", hide_empty: false });
         setSpatialDataGrid(config, "region");
-        expect(config.grid).toMatchObject({ by: "region", hide_empty: true });
+        expect(config.grid).toMatchObject({ by: "region", hide_empty: false });
         setSpatialDataGrid(config, "densityFields");
         setSpatialDataGrid(config, "color_fields:categories");
         expect(config.grid).toEqual({ by: "color_fields", split: "categories" });
+        expect(hidesEmptyCells(config.grid)).toBe(true);
     });
 });

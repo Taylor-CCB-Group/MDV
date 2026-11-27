@@ -65,9 +65,10 @@ every cell, not a layer per cell. A layer fill grid's copies fade the other cate
 instead (`fadedFeatureIds`, at the viewer's `filteredOpacityMultiplier`), so they keep their
 colours. Either way, rows filtered out elsewhere stay hidden.
 
-A grid per category, like one per region, can leave out cells with no rows left after filtering
-(`grid.hide_empty`). It is kept when the grid changes to another that has it, as the colour
-picker's switch and a change of the column's type both rewrite `grid` (`keptGridOptions`). Rows
+A grid per category, like one per region, leaves out cells with no rows left after filtering,
+unless `grid.hide_empty` is false, which keeps the layout still while filtering. That choice is
+kept when the grid changes to another, as the colour picker's switch and a change of the column's
+type both rewrite `grid` (`keptGridOptions`). Rows
 are counted from what the cells draw: the chart's points (its own layer, while the render
 stack's is hidden), or the layer's table.
 

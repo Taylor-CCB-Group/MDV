@@ -8,6 +8,7 @@ import {
     colorGridSplit,
     type GridChoice,
     gridChoiceValue,
+    hidesEmptyCells,
     ONE_VIEW,
     supportsColorGridMode,
 } from "./colorGridUtils";
@@ -30,15 +31,16 @@ export function getGreyOtherCategoriesSetting(config: { grey_other_categories?: 
 
 /**
  * In a grid with a cell per category or per region: whether cells with no rows left after
- * filtering are left out (`grid.hide_empty`), which outlasts a change between such grids.
+ * filtering are left out (the default; `grid.hide_empty: false` keeps them, so the layout holds
+ * still while filtering), which outlasts a change between such grids.
  */
 export function getHideEmptyCellsSetting(config: { grid?: { by: string; hide_empty?: boolean } | null }) {
     return g({
         type: "check",
         label: "A cell per category or region: leave out those with no rows after filtering",
-        current_value: config.grid?.hide_empty ?? false,
+        current_value: hidesEmptyCells(config.grid),
         func: (x: boolean) => {
-            if (config.grid) config.grid = { ...config.grid, hide_empty: x || undefined };
+            if (config.grid) config.grid = { ...config.grid, hide_empty: x ? undefined : false };
         },
     });
 }

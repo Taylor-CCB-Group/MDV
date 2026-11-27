@@ -60,7 +60,7 @@ export function layerFillGridConfig(
     layer: string,
     split: ColorGridSplit,
     previous?: object | null,
-): { by: "layer_fill"; layer: string; split: ColorGridSplit; hide_empty?: true } {
+): { by: "layer_fill"; layer: string; split: ColorGridSplit; hide_empty?: false } {
     return { by: "layer_fill", layer, split, ...keptGridOptions(previous) };
 }
 

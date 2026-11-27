@@ -14,6 +14,7 @@ import {
     colorGridSplit,
     type GridChoice,
     gridChoiceValue,
+    keptGridOptions,
     ONE_VIEW,
 } from "./colorGridUtils";
 import { fillColumnName, layerFillGridChoice, layerFillGridChoices, layerFillGridConfig } from "./layerFillGridUtils";
@@ -159,7 +160,7 @@ export function setSpatialDataGrid(config: SpatialDataGridSettingsConfig, value:
     else if (value === "region")
         config.grid = {
             by: "region",
-            hide_empty: config.grid?.hide_empty,
+            ...keptGridOptions(config.grid),
             link_views: config.grid?.link_views,
         };
     else config.grid = null;

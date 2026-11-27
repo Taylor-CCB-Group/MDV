@@ -273,8 +273,8 @@ that fail while *drawing*.
   its rows and highlighted rows by `region_field`, and clones it per cell, mapping picks back to
   positions in all the rows for the layer's own handlers. Each cell composes its clone with its
   other layers through the stack, so the data-points group's opacity and blending apply.
-  `hide_empty` leaves out regions with no rows left, counted from the chart's own points layer
-  while the stack's is hidden.
+  Regions with no rows left are left out unless `hide_empty` is false, counted from the chart's
+  own points layer while the stack's is hidden.
 - **A store that can't be read** shows its error over the cell, with Retry (the reader's
   `retry`, which starts every failed read again).
 - **Views are per cell**, fitted to each region when it has none. They are kept on the chart

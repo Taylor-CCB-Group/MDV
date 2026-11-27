@@ -39,23 +39,26 @@ export function colorGridSplit(config: ColorGridModeConfig): ColorGridSplit | nu
 }
 
 /**
- * The options of a grid that outlast a change to another grid: leaving out empty cells
- * (`hide_empty`), which a grid per region or per category both do.
+ * The options of a grid that outlast a change to another grid: keeping empty cells
+ * (`hide_empty: false`), which a grid per region or per category both can.
  */
-export function keptGridOptions(previous: object | null | undefined): { hide_empty?: true } {
-    return hidesEmptyCells(previous) ? { hide_empty: true } : {};
+export function keptGridOptions(previous: object | null | undefined): { hide_empty?: false } {
+    return previous && !hidesEmptyCells(previous) ? { hide_empty: false } : {};
 }
 
-/** Whether a grid leaves out its cells with no rows left after filtering (`hide_empty`). */
+/**
+ * Whether a grid leaves out its cells with no rows left after filtering: unless `hide_empty` is
+ * false, so cells come and go with the filters by default.
+ */
 export function hidesEmptyCells(grid: object | null | undefined) {
-    return !!grid && "hide_empty" in grid && grid.hide_empty === true;
+    return !grid || !("hide_empty" in grid) || grid.hide_empty !== false;
 }
 
 /** The `grid` config for a colour grid split this way, keeping the options of the grid it replaces. */
 export function colorGridConfig(
     split: ColorGridSplit,
     previous?: object | null,
-): { by: "color_fields"; split: ColorGridSplit; hide_empty?: true } {
+): { by: "color_fields"; split: ColorGridSplit; hide_empty?: false } {
     return { by: "color_fields", split, ...keptGridOptions(previous) };
 }
 

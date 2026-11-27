@@ -218,7 +218,7 @@ const HideEmptyCellsSchema = z
     .boolean()
     .optional()
     .describe(
-        'With a cell per category (`split: "categories"`) or per region (`by: "region"`): leave out cells with no rows left after filtering',
+        'With a cell per category (`split: "categories"`) or per region (`by: "region"`): false keeps cells with no rows left after filtering, which are otherwise left out',
     );
 
 export const DeckScatterGridConfigSchema = chartGridConfigSchema(["densityFields", "color_fields"]).extend({
