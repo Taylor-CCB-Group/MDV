@@ -3,6 +3,7 @@ import { observable, runInAction } from "mobx";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { DataType, LoadedDataColumn } from "@/charts/charts";
 import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
+import { getDisplayMenuItems } from "@/react/components/tableNumericDisplay";
 import type { TableChartReactConfig } from "@/react/components/TableChartReactWrapper";
 import useSlickGridReact from "@/react/hooks/useSlickGridReact";
 import { createSlickGridMock } from "./testUtils/createSlickGridMock";
@@ -222,6 +223,19 @@ describe("useSlickGridReact", () => {
                     title: "Find & Replace",
                     iconCssClass: "mdi mdi-magnify",
                 },
+                "divider",
+                ...getDisplayMenuItems(),
+                "divider",
+                {
+                    command: "sort-abs-asc",
+                    title: "Sort Ascending (absolute value)",
+                    iconCssClass: "mdi mdi-sort-ascending",
+                },
+                {
+                    command: "sort-abs-desc",
+                    title: "Sort Descending (absolute value)",
+                    iconCssClass: "mdi mdi-sort-descending",
+                },
                 {
                     command: "rename-column",
                     title: "Rename Column",
@@ -285,6 +299,19 @@ describe("useSlickGridReact", () => {
                     title: "Find & Replace",
                     iconCssClass: "mdi mdi-magnify",
                 },
+                "divider",
+                ...getDisplayMenuItems(),
+                "divider",
+                {
+                    command: "sort-abs-asc",
+                    title: "Sort Ascending (absolute value)",
+                    iconCssClass: "mdi mdi-sort-ascending",
+                },
+                {
+                    command: "sort-abs-desc",
+                    title: "Sort Descending (absolute value)",
+                    iconCssClass: "mdi mdi-sort-descending",
+                },
                 {
                     command: "bulk-edit",
                     title: "Bulk Edit",
@@ -307,6 +334,108 @@ describe("useSlickGridReact", () => {
 
             expect(ageColumn?.width).toBe(150);
             expect(nameColumn?.width).toBe(200);
+        });
+    });
+
+    describe("absolute value sort", () => {
+        test("should offer absolute value sorting only for numeric, non-date columns", () => {
+            mockOrderedParamColumns = [
+                mockOrderedParamColumns[0],
+                mockOrderedParamColumns[1],
+                { field: "visit", name: "Visit", datatype: "int32", is_date: true } as any,
+            ];
+
+            const { result } = renderHook(() => useSlickGridReact());
+
+            const commands = result.current.columnDefs.map((column) =>
+                column.header?.menu?.commandItems?.some(
+                    (item) => typeof item === "object" && item.command === "sort-abs-desc",
+                ),
+            );
+            expect(commands).toEqual([true, false, false]);
+        });
+
+        test("should set the sort from the header menu", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
+            const column = { field: "age" };
+
+            act(() => headerMenuHandler({ column, command: "sort-abs-desc" }));
+            expect(mockConfig.sort).toEqual({ columnId: "age", ascending: false, absolute: true });
+
+            act(() => headerMenuHandler({ column, command: "sort-abs-asc" }));
+            expect(mockConfig.sort).toEqual({ columnId: "age", ascending: true, absolute: true });
+
+            // the ordinary sort commands go back to signed values
+            act(() => headerMenuHandler({ column, command: "sort-desc" }));
+            expect(mockConfig.sort).toEqual({ columnId: "age", ascending: false });
+        });
+
+        test("should stay absolute when a header click flips the direction", () => {
+            runInAction(() => {
+                mockConfig.sort = { columnId: "age", ascending: false, absolute: true };
+            });
+            const { result } = renderHook(() => useSlickGridReact());
+            const { gridInstance } = setupGrid(result);
+            const onSort = vi.mocked(gridInstance.slickGrid.onSort.subscribe).mock.calls[0]?.[0] as any;
+
+            act(() => onSort({}, { sortCol: { field: "age" }, sortAsc: true }));
+            expect(mockConfig.sort).toEqual({ columnId: "age", ascending: true, absolute: true });
+
+            act(() => onSort({}, { sortCol: { field: "id" }, sortAsc: true }));
+            expect(mockConfig.sort).toEqual({ columnId: "id", ascending: true });
+        });
+    });
+
+    describe("numeric display header menu", () => {
+        const tickedTitles = (items: unknown[]) =>
+            items.flatMap((item: any) => (item.iconCssClass === "mdi mdi-check" ? [item.title] : []));
+
+        test("should set and clear a column's display", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            const { headerMenuHandler } = setupGrid(result);
+            const column = { field: "age" };
+
+            act(() => headerMenuHandler({ column, command: "display-diverging-unit" }));
+            expect(mockConfig.column_display).toEqual({ age: { mode: "diverging", limit: 1 } });
+
+            act(() => headerMenuHandler({ column, command: "display-bar" }));
+            expect(mockConfig.column_display).toEqual({ age: { mode: "bar" } });
+
+            // the entry for a range set in the settings changes nothing
+            act(() => headerMenuHandler({ column, command: "display-diverging-custom" }));
+            expect(mockConfig.column_display).toEqual({ age: { mode: "bar" } });
+
+            act(() => headerMenuHandler({ column, command: "display-number" }));
+            expect(mockConfig.column_display).toEqual({});
+        });
+
+        test("should tick the current display when the menu opens", () => {
+            const { result } = renderHook(() => useSlickGridReact());
+            const { gridInstance } = setupGrid(result);
+            const pubSub = gridInstance.slickGrid.getPubSubService() as any;
+            const [, beforeShow] = pubSub.subscribe.mock.calls.find(
+                ([eventName]: [string]) => eventName === "onHeaderMenuBeforeMenuShow",
+            );
+            const column = result.current.columnDefs.find((col) => col.field === "age") as any;
+            const menu = column.header.menu;
+            const initialLength = menu.commandItems.length;
+
+            expect(tickedTitles(menu.commandItems)).toEqual(["Show as Number"]);
+
+            runInAction(() => {
+                mockConfig.column_display = { age: { mode: "diverging", limit: 5 } };
+            });
+            beforeShow({ column, menu });
+            expect(tickedTitles(menu.commandItems)).toEqual(["Show with Diverging Bar (−5 to 5)"]);
+            expect(menu.commandItems).toHaveLength(initialLength + 1);
+
+            runInAction(() => {
+                mockConfig.column_display = { age: { mode: "bar" } };
+            });
+            beforeShow({ column, menu });
+            expect(tickedTitles(menu.commandItems)).toEqual(["Show with Bar"]);
+            expect(menu.commandItems).toHaveLength(initialLength);
         });
     });
 

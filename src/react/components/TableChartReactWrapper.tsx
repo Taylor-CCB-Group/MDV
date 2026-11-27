@@ -1,5 +1,6 @@
 import { action } from "mobx";
 import type { SlickgridReactInstance } from "slickgrid-react";
+import { type TableSort, TableSortSchema } from "@/charts/schemas/ChartConfigSchema";
 import type DataStore from "@/datastore/DataStore";
 import { getTableExportBlob } from "@/datastore/dataExportUtils";
 import { getDataSourceDisplayName } from "@/datastore/dataSourceDisplayName";
@@ -10,6 +11,8 @@ import { createEl } from "@/utilities/ElementsTyped";
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import TableChartReactComponent from "./TableChartReactComponent";
+import { type ColumnDisplayConfig, parseColumnDisplay } from "./tableNumericDisplay";
+import { getNumericDisplaySettings } from "./tableNumericDisplaySettings";
 
 const TableChartComponent = () => {
     return <TableChartReactComponent />;
@@ -20,7 +23,9 @@ export type TableChartReactConfig = BaseConfig & {
     include_index?: boolean;
     column_widths?: Record<string, number>;
     order?: Record<string, number>;
-    sort?: { columnId: string; ascending: boolean } | null;
+    sort?: TableSort | null;
+    /** display options of numeric columns, by field */
+    column_display?: ColumnDisplayConfig;
 };
 
 /**
@@ -34,7 +39,7 @@ export type TableChartReactConfig = BaseConfig & {
  * Probably incorporated into the `initialiseChartConfig` function, which will be able to lookup
  * from schemas...
  */
-function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
+export function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
     // Ensure all properties exist before makeAutoObservable
     // This ensures MobX can properly track them
     if (!config.column_widths) config.column_widths = {};
@@ -46,6 +51,10 @@ function adaptConfig(config: TableChartReactConfig): TableChartReactConfig {
         // Assigning this to null instead of undefined to make it observable
         config.sort = null;
     }
+    if (config.sort && !TableSortSchema.shape.absolute.safeParse(config.sort.absolute).success) {
+        config.sort = { columnId: config.sort.columnId, ascending: config.sort.ascending };
+    }
+    config.column_display = parseColumnDisplay(config.column_display);
     return config;
 }
 
@@ -245,6 +254,11 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
                 this.config.sort = null;
             }
 
+            if (this.config.column_display?.[column]) {
+                const { [column]: _removed, ...rest } = this.config.column_display;
+                this.config.column_display = rest;
+            }
+
             // Remove the column width of removed column
             if (this.config.column_widths?.[column] != null) {
                 delete this.config.column_widths[column];
@@ -293,7 +307,9 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
             }
         }
 
-        return config;
+        // leave the saved config of a table with plain numbers as it was
+        const { column_display, ...rest } = config;
+        return column_display && Object.keys(column_display).length > 0 ? config : rest;
     }
 
     getSettings() {
@@ -309,6 +325,7 @@ export class TableChartReact extends BaseReactChart<TableChartReactConfig> {
                     c.include_index = x;
                 }),
             }),
+            getNumericDisplaySettings(c, this.dataStore.columnIndex),
         ];
     }
 }

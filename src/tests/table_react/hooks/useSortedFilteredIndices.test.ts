@@ -39,6 +39,7 @@ describe("useSortedFilteredIndices", () => {
         mockDataStore = {
             columnIndex: {
                 age: { datatype: "integer" },
+                rho: { datatype: "double" },
                 name: {
                     datatype: "unique",
                     stringLength: 2,
@@ -56,6 +57,9 @@ describe("useSortedFilteredIndices", () => {
             getRawColumn: vi.fn((columnId: string) => {
                 if (columnId === "age") {
                     return new Uint32Array([25, 30, 20, 35, 28]);
+                }
+                if (columnId === "rho") {
+                    return new Float32Array([-0.9, 0.2, Number.NaN, 0.5, -0.1, 0.7]);
                 }
                 if (columnId === "name") {
                     return namesBytes;
@@ -108,6 +112,45 @@ describe("useSortedFilteredIndices", () => {
         await waitFor(() => {
             // [25, 30, 20, 35, 28] -> [35, 30, 28, 25, 20]
             expect(result.current).toEqual(new Uint32Array([3, 1, 4, 0, 2]));
+        });
+    });
+
+    test.each([
+        // [-0.9, 0.2, NaN, 0.5, -0.1, 0.7]
+        { ascending: true, expected: [4, 1, 3, 5, 0, 2] },
+        { ascending: false, expected: [0, 5, 3, 1, 4, 2] },
+    ])("should sort by absolute value with ascending=$ascending", async ({ ascending, expected }) => {
+        mockFilteredIndices = new Uint32Array([0, 1, 2, 3, 4, 5]);
+        const { result } = renderHook(() => useSortedFilteredIndices());
+
+        act(() => {
+            runInAction(() => {
+                mockConfig.sort = { columnId: "rho", ascending, absolute: true };
+            });
+        });
+
+        await waitFor(() => {
+            expect(result.current).toEqual(new Uint32Array(expected));
+        });
+    });
+
+    test("should sort signed values when the absolute flag is removed", async () => {
+        mockFilteredIndices = new Uint32Array([0, 1, 2, 3, 4, 5]);
+        const { result } = renderHook(() => useSortedFilteredIndices());
+
+        act(() => {
+            runInAction(() => {
+                mockConfig.sort = { columnId: "rho", ascending: false, absolute: true };
+            });
+        });
+        act(() => {
+            runInAction(() => {
+                mockConfig.sort = { columnId: "rho", ascending: false };
+            });
+        });
+
+        await waitFor(() => {
+            expect(result.current).toEqual(new Uint32Array([5, 3, 1, 4, 0, 2]));
         });
     });
 

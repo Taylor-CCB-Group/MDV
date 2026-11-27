@@ -1,5 +1,6 @@
 import { autorun } from "mobx";
 import { useEffect, useState } from "react";
+import { isNumericDisplayColumn } from "../components/tableNumericDisplay";
 import type { TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useDataStore } from "../context";
 import { useConfig, useSimplerFilteredIndices } from "../hooks";
@@ -43,7 +44,8 @@ function sortDecodedStrings(
  * dataStore or config.sort
  *
  * For unique, multitext, text and text16 columns, we decode the data and sort by string.
- * For all other columns we directly sort by raw value.
+ * For all other columns we directly sort by raw value, or by its magnitude when
+ * `config.sort.absolute` is set.
  * The null, NaN and empty values are put at the end.
  *
  * ! Multitext column values are sorted based on the displayed values currently
@@ -70,7 +72,7 @@ const useSortedFilteredIndices = () => {
                 return;
             }
 
-            const { columnId, ascending } = sortConfig;
+            const { columnId, ascending, absolute } = sortConfig;
 
             // Handle index column
             if (columnId === "__index__") {
@@ -196,6 +198,7 @@ const useSortedFilteredIndices = () => {
                 setSortedFilteredIndices(new Uint32Array(indices));
             } else {
                 // Numeric datatypes
+                const byMagnitude = absolute === true && isNumericDisplayColumn(colInfo);
                 indices.sort((a, b) => {
                     const valueA = data?.[a];
                     const valueB = data?.[b];
@@ -207,8 +210,11 @@ const useSortedFilteredIndices = () => {
                     if (aIsEmpty) return 1;
                     if (bIsEmpty) return -1;
 
+                    const keyA = byMagnitude ? Math.abs(valueA) : valueA;
+                    const keyB = byMagnitude ? Math.abs(valueB) : valueB;
+
                     // Normal comparison
-                    const comparison = valueA < valueB ? -1 : valueA > valueB ? 1 : 0;
+                    const comparison = keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
                     return ascending ? comparison : -comparison;
                 });
                 setSortedFilteredIndices(new Uint32Array(indices));

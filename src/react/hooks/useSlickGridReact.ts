@@ -10,6 +10,7 @@ import {
 } from "slickgrid-react";
 import type { BaseConfig } from "@/charts/BaseChart";
 import { analyzeColumnRemoval } from "@/charts/columnRemovalUtils";
+import type { TableNumericDisplay, TableSort } from "@/charts/schemas/ChartConfigSchema";
 import type { ColumnRemovalImpact } from "@/charts/types/columnRemoval";
 import { flattenFields } from "@/lib/columnTypeHelpers";
 import { DataModel } from "@/table/DataModel";
@@ -17,6 +18,13 @@ import { escapeHtml } from "@/utilities/Utilities";
 import type { AddColumnParams } from "../components/AddTableColumnDialog";
 import type { BulkEditAction } from "../components/BulkEditColumnDialog";
 import type { FeedbackAlert } from "../components/FeedbackAlertComponent";
+import {
+    applyColumnDisplay,
+    getDisplayForMenuCommand,
+    getDisplayMenuItems,
+    isNumericDisplayColumn,
+    withColumnDisplay,
+} from "../components/tableNumericDisplay";
 import type { TableChartReact, TableChartReactConfig } from "../components/TableChartReactWrapper";
 import { useChart, useDataStore } from "../context";
 import { useChartID, useChartManager, useConfig, useOrderedParamColumns, useTheme } from "../hooks";
@@ -96,6 +104,33 @@ function updateGridColumnHeader(
     }
     grid.invalidate();
 }
+
+const DIVIDER: "divider" = "divider";
+
+type HeaderMenuItems = NonNullable<NonNullable<Column["header"]>["menu"]>["commandItems"];
+
+/** Show which column's header is sorted by absolute value; SlickGrid's arrow only shows the direction. */
+function markAbsoluteSortHeaders(grid: NonNullable<SlickgridReactInstance["slickGrid"]>, sort?: TableSort | null) {
+    const headers = grid.getContainerNode()?.querySelectorAll<HTMLElement>(".slick-header-column") ?? [];
+    for (const header of headers) {
+        markAbsoluteSortHeader(header, header.dataset.id, sort);
+    }
+}
+
+function markAbsoluteSortHeader(header: HTMLElement, columnId: unknown, sort?: TableSort | null) {
+    const absolute = sort?.absolute === true && sort.columnId === columnId;
+    header.classList.toggle("mdv-sort-absolute", absolute);
+}
+
+/** Rebuild the display items of a header menu in place, ahead of it being shown. */
+function updateDisplayMenuItems(items: NonNullable<HeaderMenuItems>, current?: TableNumericDisplay) {
+    const isDisplayItem = (item: NonNullable<HeaderMenuItems>[number]) =>
+        typeof item === "object" && String(item.command).startsWith("display-");
+    const start = items.findIndex(isDisplayItem);
+    if (start === -1) return;
+    items.splice(start, items.filter(isDisplayItem).length, ...getDisplayMenuItems(current));
+}
+
 // todo: this file is getting more and more dense, a separate PR for refactoring this file is required
 /**
  * Hook for managing SlickGrid React component state.
@@ -307,6 +342,23 @@ const useSlickGridReact = () => {
                                 title: isColumnEditable && isEditMode ? "Find & Replace" : "Find",
                                 iconCssClass: "mdi mdi-magnify",
                             },
+                            ...(isNumericDisplayColumn(col)
+                                ? [
+                                      DIVIDER,
+                                      ...getDisplayMenuItems(),
+                                      DIVIDER,
+                                      {
+                                          command: "sort-abs-asc",
+                                          title: "Sort Ascending (absolute value)",
+                                          iconCssClass: "mdi mdi-sort-ascending",
+                                      },
+                                      {
+                                          command: "sort-abs-desc",
+                                          title: "Sort Descending (absolute value)",
+                                          iconCssClass: "mdi mdi-sort-descending",
+                                      },
+                                  ]
+                                : []),
                             // Curation changes presentation metadata only, so it is gated by
                             // project edit permission plus the structural predicate - not by
                             // `editable`, which governs overwriting values.
@@ -399,10 +451,15 @@ const useSlickGridReact = () => {
                     suppressSortSyncRef.current = false;
                 }
 
+                if (applyColumnDisplay(grid.getColumns(), config.column_display, (f) => dataStore.columnIndex[f])) {
+                    grid.invalidate();
+                }
+                markAbsoluteSortHeaders(grid, config.sort);
+
                 attachEventHandlers(e.detail);
             }
         },
-        [dataProvider, chart, config.sort],
+        [dataProvider, chart, config, config.sort, dataStore],
     );
 
     /**
@@ -447,12 +504,10 @@ const useSlickGridReact = () => {
                     if ("sortCol" in args && args.sortCol && "sortAsc" in args) {
                         const columnId = args.sortCol.field;
                         const sortAsc = args.sortAsc;
-                        const currentSort = { columnId, ascending: sortAsc };
-
-                        const currentSortStr = JSON.stringify(currentSort);
-                        const configSortStr = JSON.stringify(config.sort);
-
-                        const isSame = currentSortStr === configSortStr;
+                        // clicking the header of a column sorted by absolute value only flips the direction
+                        const absolute = config.sort?.absolute === true && config.sort.columnId === columnId;
+                        const isSame =
+                            config.sort?.columnId === columnId && config.sort?.ascending === sortAsc;
                         console.log("Sort event:", columnId, sortAsc ? "asc" : "desc");
                         // As far as the types go... I think if the `sortAsc` is undefined, then that means `config.sort` should be undefined.
                         // if not, then the type of config.sort.ascending should be optional.
@@ -466,7 +521,7 @@ const useSlickGridReact = () => {
                             if (sortAsc === undefined) {
                                 config.sort = undefined;
                             } else {
-                                config.sort = { columnId, ascending: sortAsc };
+                                config.sort = { columnId, ascending: sortAsc, ...(absolute && { absolute }) };
                             }
                         }
                     }
@@ -508,6 +563,11 @@ const useSlickGridReact = () => {
                 }),
             );
 
+            // headers are rebuilt when columns change or are reordered
+            slickEventHandler.subscribe(grid.onHeaderCellRendered, (_e, args) => {
+                markAbsoluteSortHeader(args.node, args.column.id, config.sort);
+            });
+
             const pubSub = grid.getPubSubService();
             if (!pubSub) {
                 // strong assertion acts as a type-guard
@@ -524,6 +584,20 @@ const useSlickGridReact = () => {
                         config.sort = { columnId: column.field, ascending: true };
                     } else if (command === "sort-desc") {
                         config.sort = { columnId: column.field, ascending: false };
+                    } else if (command === "sort-abs-asc") {
+                        config.sort = { columnId: column.field, ascending: true, absolute: true };
+                    } else if (command === "sort-abs-desc") {
+                        config.sort = { columnId: column.field, ascending: false, absolute: true };
+                    } else if (command.startsWith("display-")) {
+                        const display = getDisplayForMenuCommand(command);
+                        // no display means the tick of a range from the settings: nothing to change
+                        if (display) {
+                            config.column_display = withColumnDisplay(
+                                config.column_display,
+                                String(column.field),
+                                display,
+                            );
+                        }
                     } else if (command === "find-replace") {
                         setSearchColumn(column.field);
                         setIsFindReplaceOpen(true);
@@ -568,6 +642,15 @@ const useSlickGridReact = () => {
                 }),
             );
 
+            const menuShowSubscription = pubSub.subscribe(
+                "onHeaderMenuBeforeMenuShow",
+                ({ column, menu }: { column: Column; menu: { commandItems?: HeaderMenuItems } }) => {
+                    if (menu.commandItems) {
+                        updateDisplayMenuItems(menu.commandItems, config.column_display?.[String(column.field)]);
+                    }
+                },
+            );
+
             const gridMenuSubscription = pubSub.subscribe(
                 "onGridMenuCommand",
                 action(({ command }: { command: string }) => {
@@ -585,6 +668,7 @@ const useSlickGridReact = () => {
                     console.warn("no headerMenuSubscription to unsubscribe from... minor leak here.");
                 }
                 headerMenuSubscription?.unsubscribe?.();
+                menuShowSubscription?.unsubscribe?.();
                 gridMenuSubscription?.unsubscribe?.();
             };
         },
@@ -636,6 +720,27 @@ const useSlickGridReact = () => {
             }
         }
     }, [config.sort]);
+
+    useEffect(() => {
+        const grid = gridRef.current?.slickGrid;
+        if (grid) markAbsoluteSortHeaders(grid, config.sort);
+    }, [config.sort]);
+
+    /**
+     * Sync config.column_display → cell formatters
+     *
+     * The formatters are set on the existing columns, so changing them keeps the grid's widths and order.
+     */
+    useEffect(() => {
+        const grid = gridRef.current?.slickGrid;
+        // The grid may hold copies of the column definitions, so both are updated. slickgrid-react
+        // nulls the entries of the `columns` array it was given when it unmounts, hence the filter.
+        const columns = [...new Set([...columnDefs, ...(grid?.getColumns() ?? [])])].filter(Boolean);
+        // a column going back to a plain number needs a redraw too
+        const hadBars = columns.some((column) => column.formatter);
+        const hasBars = applyColumnDisplay(columns, config.column_display, (f) => dataStore.columnIndex[f]);
+        if (hadBars || hasBars) grid?.invalidate();
+    }, [config.column_display, columnDefs, dataStore]);
 
     /**
      * Handle external highlighted data

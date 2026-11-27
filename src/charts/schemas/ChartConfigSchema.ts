@@ -489,6 +489,44 @@ export const TableConfigSchema = BaseConfigSchema.extend({
     // Additional table specific properties
 }).describe("Configuration for data tables displaying tabular information");
 
+export const TableNumericDisplaySchema = z
+    .discriminatedUnion("mode", [
+        z.object({ mode: z.literal("number") }),
+        z.object({
+            mode: z.literal("bar").describe("The number with a bar spanning the column's min to max"),
+        }),
+        z.object({
+            mode: z.literal("diverging").describe("The number with a bar from zero, for signed values"),
+            limit: z
+                .number()
+                .positive()
+                .optional()
+                .describe("Fixed range of -limit to +limit; without it the range follows the column's data"),
+        }),
+    ])
+    .describe("How the values of a numeric table column are displayed");
+
+export const TableSortSchema = z.object({
+    columnId: z.string().describe("Field the table is sorted by"),
+    ascending: z.boolean().describe("Sort direction"),
+    absolute: z.boolean().optional().describe("Sort a numeric column by absolute value"),
+});
+
+export const TableChartReactConfigSchema = BaseConfigSchema.extend({
+    type: z.literal("table_chart_react").describe("Table chart type"),
+    include_index: z.boolean().nullable().optional().describe("Whether to show the row index column"),
+    column_widths: z.record(z.string(), z.number()).optional().describe("Column widths in pixels, by field"),
+    order: z.record(z.string(), z.number()).optional().describe("Column positions, by field"),
+    sort: TableSortSchema.nullable().optional().describe("Current sort of the table"),
+    column_display: z
+        .record(z.string(), TableNumericDisplaySchema)
+        .optional()
+        .describe("Display options of numeric columns, by field; columns not listed show plain numbers"),
+}).describe("Configuration for the data table");
+
+export type TableNumericDisplay = z.infer<typeof TableNumericDisplaySchema>;
+export type TableSort = z.infer<typeof TableSortSchema>;
+
 export const TextBoxConfigSchema = BaseConfigSchema.extend({
     type: z.enum(["text_box_chart", "text_box"]).describe("Text box chart type"),
     text: z.string().describe("Text content to display in the text box"),
@@ -662,6 +700,7 @@ registerChartConfigSchema("box_plot", BoxPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("violin_plot", ViolinPlotConfigSchema, { version: "1" });
 registerChartConfigSchema("pie_chart", PieChartConfigSchema, { version: "1" });
 registerChartConfigSchema("table", TableConfigSchema, { version: "1" });
+registerChartConfigSchema("table_chart_react", TableChartReactConfigSchema, { version: "1" });
 registerChartConfigSchema("text_box_chart", TextBoxConfigSchema, { version: "1" });
 registerChartConfigSchema("text_box", TextBoxConfigSchema, { version: "1" });
 registerChartConfigSchema("wordcloud", WordcloudConfigSchema, { version: "1" });
