@@ -28,6 +28,7 @@ export default function DotPlotRowAxis({ rows, labels, scale, left, top, tickfon
             tickStroke="var(--text_color)"
             tickLabelProps={{
                 fill: "var(--text_color)",
+                fontWeight: 700,
                 // shrink labels to the row height so they don't overlap on short charts
                 fontSize: Math.min(tickfont, scale.bandwidth()),
                 textAnchor: "end",

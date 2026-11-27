@@ -37,10 +37,19 @@ python python/mdvtools/scripts/project_json_history.py restore /path/to/projects
 
 `snapshot` prints the run id, then each project path and its new revision id.
 
+## Compound dot plots
+
+`convert_to_compound_dot_plots.py` merges legacy dot plots in a project's `views.json` that differ only in their background filter value, such as one plot per diagnosis, into one `compound_dot_plot` split by that column. It updates the question views' "About this page" text to match, backs up `views.json` with `--write`, and is a dry run otherwise. See `docs/curate-mdv-project.md`.
+
+```bash
+python python/mdvtools/scripts/convert_to_compound_dot_plots.py --project /path/to/project
+python python/mdvtools/scripts/convert_to_compound_dot_plots.py --project /path/to/project --write
+```
+
 ## Tests
 
 ```bash
-./venv/bin/python -m pytest python/mdvtools/tests/test_column_name_report.py python/mdvtools/tests/test_project_json_history.py
+./venv/bin/python -m pytest python/mdvtools/tests/test_column_name_report.py python/mdvtools/tests/test_project_json_history.py python/mdvtools/tests/test_convert_to_compound_dot_plots.py
 ```
 
 ## Other scripts
