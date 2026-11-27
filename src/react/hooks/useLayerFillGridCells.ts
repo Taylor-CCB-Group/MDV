@@ -83,7 +83,7 @@ export function useLayerFillGridCells(spatialData: SpatialData | undefined): Lay
             // a grid chosen since this render (another layer, or none) is left alone
             const current = layerFillGrid(config);
             if (current?.layer !== gridLayer || current.split !== gridSplit) return;
-            config.grid = layerFillGridConfig(gridLayer, typeSplit, current);
+            config.grid = layerFillGridConfig(gridLayer, typeSplit, config.grid);
         })();
     }, [config, gridLayer, gridSplit, typeSplit]);
 

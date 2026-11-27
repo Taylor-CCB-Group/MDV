@@ -38,7 +38,13 @@ export function getHideEmptyCellsSetting(config: { grid?: { by: string; hide_emp
     return g({
         type: "check",
         label: "A cell per category or region: leave out those with no rows after filtering",
-        current_value: hidesEmptyCells(config.grid),
+        // read from the grid, which the "Show" dropdown beside it replaces
+        get current_value() {
+            return hidesEmptyCells(config.grid);
+        },
+        set current_value(_value: boolean) {
+            // `func` sets the grid, which the getter reads back
+        },
         func: (x: boolean) => {
             if (config.grid) config.grid = { ...config.grid, hide_empty: x ? undefined : false };
         },
