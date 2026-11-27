@@ -6,7 +6,7 @@ import os
 import re
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Mapping, Optional
 import numpy as np
 from ..serverlite import serve_project
 from .browser_store import (
@@ -216,7 +216,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
 
     We may consider adding more configuration options etc.
     """
-    from mdvtools.spatial.mermaid import sdata_to_mermaid
+    from mdvtools.spatial.mermaid import format_shared_structures
     from mdvtools.markdown_utils import create_project_markdown
     from mdvtools.charts.text_box_plot import TextBox
     from mdvtools.build_info import get_build_info_markdown
@@ -261,10 +261,11 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
     else:
         sdata_candidates = [
             (sdata_name, os.path.join(spatial_dir, sdata_name))
-            for sdata_name in os.listdir(spatial_dir)
+            for sdata_name in sorted(os.listdir(spatial_dir))
             if not sdata_name.startswith(".")
         ]
 
+    loaded: list[tuple[str, SpatialData]] = []
     for sdata_name, sdata_path in sdata_candidates:
         if sdata_name.startswith("."):
             continue
@@ -273,9 +274,15 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         sdata = _try_read_zarr(sdata_path)
         if sdata is None:
             continue
-        sdata_md = f"## {sdata_name}:\n\n```\n{sdata}\n```"
-        sdata_md += f"\n\n### Mermaid diagram:\n\n{sdata_to_mermaid(sdata)}\n\n"
-        markdown += sdata_md
+        loaded.append((sdata_name, sdata))
+
+    if loaded:
+        markdown += "### Structure\n\n"
+        markdown += format_shared_structures(loaded)
+        markdown += "\n\n"
+
+    for sdata_name, sdata in loaded:
+        markdown += f"### {sdata_name}:\n\n```\n{sdata}\n```\n\n"
     
     # Add point transform strategy section
     if adata is not None and "mdv" in adata.uns and "point_transform" in adata.uns["mdv"]:
@@ -295,7 +302,7 @@ def add_readme_to_project(mdv: "MDVProject", adata: Optional["AnnData"], convers
         markdown += "\n"
     
     markdown += "\n\n---\n\n## Project DataSource summary:\n\n"
-    markdown += create_project_markdown(mdv, False)
+    markdown += create_project_markdown(mdv, False, 3)
     # todo - add anndata markdown here
     # if adata is not None:
     #     markdown += f"\n{create_anndata_markdown(adata)}"
@@ -899,6 +906,14 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
             },
             "images": {},
         }
+        _record_region_scale(
+            all_regions[region_id],
+            sdata.images[best_img.path],
+            cs,
+            coordinates_already_global=bool(
+                best_transform_metadata and best_transform_metadata.get("coordinates_already_global")
+            ),
+        )
 
         # do we want to save geojson for this region?
         # nb this will be deprecated once we have spatialdata.js layers with shapes.
@@ -933,13 +948,186 @@ def _resolve_regions_for_table(sdata: "SpatialData", table_name: str, sdata_name
     # transform coordinates to image coordinates for each row in the table
     _transform_table_coordinates(adata, region_to_image)
     
-    # store in uns for this table
-    adata.uns.setdefault("mdv", {})
-    adata.uns["mdv"].setdefault("regions", all_regions)
-    # Store transform provenance
-    adata.uns["mdv"]["point_transform"] = transform_provenance
+    # Replace any regions left by an earlier conversion. The new dict carries the
+    # pixel scale until _consume_region_scales reads it.
+    _assign_resolved_regions(adata, all_regions, transform_provenance)
 
 
+
+
+_REGION_SCALE_KEY = "_mdv_coordinate_scale"
+
+
+def _image_pixel_scale(element: "SpatialElement", coordinate_system: str) -> float | None:
+    """Isotropic x/y scale from image pixels into ``coordinate_system``.
+
+    Returns None when that transform is not a pure scale, or x and y differ.
+    Identity is a scale of 1.
+    """
+    from spatialdata.transformations import get_transformation
+
+    transformations = get_transformation(element, get_all=True)
+    if not isinstance(transformations, dict):
+        return None
+    transform = transformations.get(coordinate_system)
+    if transform is None:
+        return None
+    try:
+        matrix = np.asarray(
+            transform.to_affine_matrix(input_axes=("x", "y"), output_axes=("x", "y")),
+            dtype=np.float64,
+        )
+    except (TypeError, ValueError):
+        return None
+    if matrix.shape != (3, 3):
+        return None
+    if not np.allclose(matrix[2], [0.0, 0.0, 1.0]):
+        return None
+    if not np.allclose([matrix[0, 1], matrix[1, 0], matrix[0, 2], matrix[1, 2]], 0.0):
+        return None
+    scale_x = float(matrix[0, 0])
+    scale_y = float(matrix[1, 1])
+    if scale_x <= 0 or scale_y <= 0 or not np.isclose(scale_x, scale_y):
+        return None
+    return scale_x
+
+
+def _record_region_scale(
+    region: dict,
+    image: "SpatialElement",
+    coordinate_system: str,
+    *,
+    coordinates_already_global: bool,
+) -> None:
+    """Remember the scale that places this region's x/y on its image.
+
+    Points already stored in the coordinate system need a scale of 1. Points
+    written in image pixels need the image's pixel size.
+    """
+    if coordinates_already_global:
+        region[_REGION_SCALE_KEY] = 1.0
+        return
+    scale = _image_pixel_scale(image, coordinate_system)
+    if scale is not None:
+        region[_REGION_SCALE_KEY] = scale
+
+
+def _assign_resolved_regions(
+    adata: "AnnData",
+    regions: dict[str, dict],
+    transform_provenance: dict[str, dict],
+) -> None:
+    """Store this conversion's region metadata, replacing a previous copy."""
+    mdv = adata.uns.setdefault("mdv", {})
+    mdv["regions"] = regions
+    mdv["point_transform"] = transform_provenance
+
+
+def _region_scale_token(region: object) -> tuple[bool, float] | None:
+    if not isinstance(region, dict) or _REGION_SCALE_KEY not in region:
+        return None
+    return (True, float(region[_REGION_SCALE_KEY]))
+
+
+def _regions_share_coordinate_basis(current: Mapping[str, dict], incoming: Mapping[str, object]) -> bool:
+    """True when every shared region id has the same pixel scale."""
+    for region_id, region in incoming.items():
+        previous = current.get(region_id)
+        if previous is None:
+            continue
+        old_scale = _region_scale_token(previous)
+        new_scale = _region_scale_token(region)
+        if old_scale is None and new_scale is None:
+            continue
+        if old_scale is None or new_scale is None or not np.isclose(old_scale[1], new_scale[1]):
+            return False
+    return True
+
+
+def _refresh_regions(current: dict[str, dict], incoming: Mapping[str, object]) -> None:
+    for region_id, region in incoming.items():
+        if isinstance(region, dict):
+            current[region_id] = region
+
+
+def _partition_records(
+    records: list[SpatialTableRecord],
+) -> list[tuple[list[SpatialTableRecord], dict[str, dict]]]:
+    """Split records whose shared region ids use different pixel scales.
+
+    Placement follows table id, so the groups do not depend on input order.
+    Records whose scales agree stay together and keep the newer region metadata.
+    """
+    partitions: list[list[SpatialTableRecord]] = []
+    bases: list[dict[str, dict]] = []
+    for record in sorted(records, key=lambda item: item.table_id):
+        incoming = record.adata.uns.get("mdv", {}).get("regions", {})
+        if not isinstance(incoming, dict):
+            incoming = {}
+        for index, basis in enumerate(bases):
+            if _regions_share_coordinate_basis(basis, incoming):
+                _refresh_regions(basis, incoming)
+                partitions[index].append(record)
+                break
+        else:
+            basis = {}
+            _refresh_regions(basis, incoming)
+            bases.append(basis)
+            partitions.append([record])
+    return list(zip(partitions, bases, strict=True))
+
+
+def _groups_for_partitions(
+    partitions: list[tuple[list[SpatialTableRecord], dict[str, dict]]],
+    *,
+    key: str,
+    label: str,
+    obs_basename: str,
+    var_basename: str,
+    suffix_var_with_obs: bool,
+    used_names: set[str],
+) -> list[SpatialTableGroup]:
+    groups: list[SpatialTableGroup] = []
+    for index, (partition, regions) in enumerate(partitions):
+        group_label = label if index == 0 else f"{label}_{index + 1}"
+        obs_source = obs_basename if index == 0 else f"{obs_basename}_{index + 1}"
+        if suffix_var_with_obs:
+            var_source = f"{obs_source}_{var_basename}"
+        else:
+            var_source = var_basename if index == 0 else f"{var_basename}_{index + 1}"
+        groups.append(
+            SpatialTableGroup(
+                key=key if index == 0 else f"{key}:{index + 1}",
+                label=group_label,
+                obs_datasource_name=_allocate_datasource_name(obs_source, used_names),
+                var_datasource_name=_allocate_datasource_name(var_source, used_names),
+                records=partition,
+                regions=regions,
+            )
+        )
+    return groups
+
+
+def _consume_region_scales(regions: dict[str, dict]) -> float:
+    """Take the shared pixel scale off region dicts so it is not written out."""
+    found: list[float] = []
+    missing = False
+    for region in regions.values():
+        value = region.pop(_REGION_SCALE_KEY, None)
+        if value is None:
+            missing = True
+            continue
+        found.append(float(value))
+    if not found:
+        return 1.0
+    agreed = all(np.isclose(value, found[0]) for value in found)
+    if agreed and not missing:
+        return found[0]
+    values = ", ".join(f"{value:g}" for value in dict.fromkeys(found))
+    _emit(
+        f"WARNING: Spatial regions do not share one pixel scale ({values}). regions.scale is left at 1."
+    )
+    return 1.0
 
 
 def _resolve_image_only_regions(sdata: "SpatialData", sdata_name: str) -> dict[str, dict]:
@@ -951,7 +1139,7 @@ def _resolve_image_only_regions(sdata: "SpatialData", sdata_name: str) -> dict[s
         if not img_candidates:
             continue
 
-        img_path, _img_obj = img_candidates[0]
+        img_path, img_obj = img_candidates[0]
         region_id = f"{sdata_name}_{cs}"
         all_regions[region_id] = {
             "spatial": {
@@ -969,6 +1157,7 @@ def _resolve_image_only_regions(sdata: "SpatialData", sdata_name: str) -> dict[s
             },
             "images": {},
         }
+        _record_region_scale(all_regions[region_id], img_obj, cs, coordinates_already_global=False)
 
     return all_regions
 
@@ -1321,19 +1510,15 @@ def _group_spatial_table_records(
     _validate_table_handling(args.table_handling)
 
     if args.table_handling == "merge":
-        regions: dict[str, dict] = {}
-        for record in records:
-            regions.update(record.adata.uns.get("mdv", {}).get("regions", {}))
-        return [
-            SpatialTableGroup(
-                key="merge",
-                label="merge",
-                obs_datasource_name=args.obs_datasource_name,
-                var_datasource_name=args.var_datasource_name,
-                records=records,
-                regions=regions,
-            )
-        ]
+        return _groups_for_partitions(
+            _partition_records(records),
+            key="merge",
+            label="merge",
+            obs_basename=args.obs_datasource_name,
+            var_basename=args.var_datasource_name,
+            suffix_var_with_obs=False,
+            used_names=set(),
+        )
 
     grouped_records: dict[str, list[SpatialTableRecord]] = {}
     group_order: list[str] = []
@@ -1355,22 +1540,15 @@ def _group_spatial_table_records(
             _group_base_label(group_records[0], args.table_handling),
             used_prefixes=set(group.label for group in groups),
         )
-        obs_datasource_name = _allocate_datasource_name(label, used_datasource_names)
-        var_datasource_name = _allocate_datasource_name(
-            f"{label}_{args.var_datasource_name}",
-            used_datasource_names,
-        )
-        regions: dict[str, dict] = {}
-        for record in group_records:
-            regions.update(record.adata.uns.get("mdv", {}).get("regions", {}))
-        groups.append(
-            SpatialTableGroup(
+        groups.extend(
+            _groups_for_partitions(
+                _partition_records(group_records),
                 key=key,
                 label=label,
-                obs_datasource_name=obs_datasource_name,
-                var_datasource_name=var_datasource_name,
-                records=group_records,
-                regions=regions,
+                obs_basename=label,
+                var_basename=args.var_datasource_name,
+                suffix_var_with_obs=True,
+                used_names=used_datasource_names,
             )
         )
 
@@ -1637,7 +1815,11 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
                 if args.spatial_url is not None:
                     _set_region_spatial_urls(group.regions, args.spatial_url)
                 obs_md = mdv.get_datasource_metadata(group.obs_datasource_name)
-                obs_md["regions"] = build_spatial_regions_metadata(group.regions, REGION_FIELD)
+                obs_md["regions"] = build_spatial_regions_metadata(
+                    group.regions,
+                    REGION_FIELD,
+                    scale=_consume_region_scales(group.regions),
+                )
                 mdv.set_datasource_metadata(obs_md)
 
         if mdv is None:
@@ -1718,7 +1900,11 @@ def convert_spatialdata_to_mdv(args: SpatialDataConversionArgs):
         if args.spatial_url is not None:
             _set_region_spatial_urls(image_only_regions, args.spatial_url)
         obs_md = mdv.get_datasource_metadata(primary_obs_datasource_name)
-        obs_md["regions"] = build_spatial_regions_metadata(image_only_regions, REGION_FIELD)
+        obs_md["regions"] = build_spatial_regions_metadata(
+            image_only_regions,
+            REGION_FIELD,
+            scale=_consume_region_scales(image_only_regions),
+        )
         mdv.set_datasource_metadata(obs_md)
 
     if image_only_regions:
