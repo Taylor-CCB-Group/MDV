@@ -196,7 +196,7 @@ function colorFieldsGridBy(config: ColorFieldsConfig, columns: ColumnTypes): Gri
         available: () => availableColorGridSplit(config, columns),
         set: (on) => {
             const split = on ? availableColorGridSplit(config, columns) : null;
-            if (split) config.grid = colorGridConfig(split);
+            if (split) config.grid = colorGridConfig(split, config.grid);
             else if (config.grid?.by === "color_fields") config.grid = null;
         },
     };
@@ -332,7 +332,7 @@ export function setUpColorFields<T extends ChartColorFieldsConfig>(chart: BaseCh
             () => (colorGridSplit(config) ? availableColorGridSplit(config, chart.dataStore) : null),
             (split) => {
                 // none (a link not yet resolved, or a column of another type) leaves the grid be
-                if (split && colorGridSplit(config) !== split) config.grid = colorGridConfig(split);
+                if (split && colorGridSplit(config) !== split) config.grid = colorGridConfig(split, config.grid);
             },
         ),
     );

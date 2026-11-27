@@ -214,8 +214,16 @@ const ColorGridSplitSchema = z
     );
 
 /** The deck scatter plot's grid: a cell per density field, or cells made from its colour. */
+const HideEmptyCellsSchema = z
+    .boolean()
+    .optional()
+    .describe(
+        'With a cell per category (`split: "categories"`) or per region (`by: "region"`): leave out cells with no rows left after filtering',
+    );
+
 export const DeckScatterGridConfigSchema = chartGridConfigSchema(["densityFields", "color_fields"]).extend({
     split: ColorGridSplitSchema,
+    hide_empty: HideEmptyCellsSchema,
 });
 
 /**
@@ -239,10 +247,7 @@ export const SpatialDataGridConfigSchema = chartGridConfigSchema([
         .describe(
             'With `by: "layer_fill"`: the render stack entry id of the shapes or labels layer whose fill colour makes the cells; each cell draws its own copy of the layer',
         ),
-    hide_empty: z
-        .boolean()
-        .optional()
-        .describe('With `by: "region"`: leave out regions with no rows left after filtering'),
+    hide_empty: HideEmptyCellsSchema,
     link_views: z
         .boolean()
         .optional()

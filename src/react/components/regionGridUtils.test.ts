@@ -9,6 +9,7 @@ import {
     getSpatialDataGridSettingsFolder,
     isRegionGridShown,
     moveRegionViews,
+    setSpatialDataGrid,
     spatialRegionCells,
 } from "./regionGridUtils";
 
@@ -152,5 +153,20 @@ describe("getSpatialDataGridSettingsFolder", () => {
         expect(colorChoices(["leiden"])).toEqual(["color_fields:categories"]);
         expect(colorChoices(["area", "leiden"])).toEqual(["color_fields:columns"]);
         expect(colorChoices([])).toEqual([]);
+    });
+});
+
+describe("setSpatialDataGrid", () => {
+    test("keeps leaving out empty cells between grids per region and per category", () => {
+        const config: { grid?: SpatialDataGridConfig | null } = { grid: { by: "region", hide_empty: true } };
+        setSpatialDataGrid(config, "color_fields:categories");
+        expect(config.grid).toEqual({ by: "color_fields", split: "categories", hide_empty: true });
+        setSpatialDataGrid(config, "layer_fill:categories:circles");
+        expect(config.grid).toEqual({ by: "layer_fill", layer: "circles", split: "categories", hide_empty: true });
+        setSpatialDataGrid(config, "region");
+        expect(config.grid).toMatchObject({ by: "region", hide_empty: true });
+        setSpatialDataGrid(config, "densityFields");
+        setSpatialDataGrid(config, "color_fields:categories");
+        expect(config.grid).toEqual({ by: "color_fields", split: "categories" });
     });
 });

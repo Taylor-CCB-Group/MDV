@@ -20,13 +20,14 @@ import type { ViewControllerOptions } from "../hooks/useGateLayers";
 import type { LayerFillGridCells } from "../hooks/useLayerFillGridCells";
 import type { TooltipContent } from "../hooks/useOuterContainerDeckTooltip";
 import { useSpatialLayers } from "../spatial_context";
+import { hidesEmptyCells } from "./colorGridUtils";
 import DeckCellGrid, { type DeckCellLabel } from "./DeckCellGrid";
 import { SHARED_CELL_LAYERS_ABOVE_ID, sharedCellLayersGroup } from "./densityGridSharedLayers";
 import { getDensityGridViewId } from "./densityGridUtils";
 import { splitRenderStackAt } from "./layerFillGridUtils";
 import { type CrosshairConfig, isCrosshairShown } from "./pointerCrosshair";
 import { useLayersForDevice } from "./scatterDeckShared";
-import { useColorGridCellLayers } from "./useColorGridCellLayers";
+import { useColorGridCategoryRows, useColorGridCellLayers } from "./useColorGridCellLayers";
 import { useDensityGridCellLayers } from "./useDensityGridCellLayers";
 
 type SpatialRenderer = ReturnType<typeof useSpatialCanvasRendererFromLayerInputs>;
@@ -286,12 +287,21 @@ const SpatialColorGrid = observer(function SpatialColorGrid({
     greyLayer: Layer | undefined;
 }) {
     const chartId = useChartID();
-    const config = useConfig<{ grey_other_categories?: boolean | null }>();
-    const { recolorPoints, regreyPoints } = useSpatialLayers().scatterProps;
-    const grid = useChartArrayGrid({ chartId, cells: colorCells.cells, getViewId: getCellViewId });
+    const config = useConfig<{ grey_other_categories?: boolean | null; grid?: object | null }>();
+    const { scatterplotLayer, recolorPoints, regreyPoints } = useSpatialLayers().scatterProps;
+    // the chart's own points while the render stack's are hidden: the same rows
+    const rows = (pointsLayer ?? scatterplotLayer)?.props.data;
+    const { colorCells: shownCells, rowsByCategory } = useColorGridCategoryRows(
+        colorCells,
+        rows,
+        hidesEmptyCells(config.grid),
+    );
+    const shown = shownCells ?? colorCells;
+    const grid = useChartArrayGrid({ chartId, cells: shown.cells, getViewId: getCellViewId });
     const { visibleCells, pointLayers, labels, ownGrey, sharedLayers } = useColorGridCellLayers(
         grid,
-        colorCells,
+        shown,
+        rowsByCategory,
         pointsLayer,
         recolorPoints,
         { layer: greyLayer, regreyPoints },

@@ -17,7 +17,7 @@ import {
     ONE_VIEW,
 } from "./colorGridUtils";
 import { fillColumnName, layerFillGridChoice, layerFillGridChoices, layerFillGridConfig } from "./layerFillGridUtils";
-import { getGreyOtherCategoriesSetting } from "./scatterGridSettings";
+import { getGreyOtherCategoriesSetting, getHideEmptyCellsSetting } from "./scatterGridSettings";
 
 /** A cell of a SpatialData chart drawn with a cell per region: the region and where its store is. */
 export type SpatialRegionCell = ChartArrayCell & {
@@ -153,8 +153,8 @@ export function spatialDataGridChoices(
 export function setSpatialDataGrid(config: SpatialDataGridSettingsConfig, value: string) {
     const colorSplit = colorGridChoice(value);
     const layerGrid = layerFillGridChoice(value);
-    if (colorSplit) config.grid = colorGridConfig(colorSplit);
-    else if (layerGrid) config.grid = layerFillGridConfig(layerGrid.layer, layerGrid.split);
+    if (colorSplit) config.grid = colorGridConfig(colorSplit, config.grid);
+    else if (layerGrid) config.grid = layerFillGridConfig(layerGrid.layer, layerGrid.split, config.grid);
     else if (value === "densityFields") config.grid = { by: "densityFields" };
     else if (value === "region")
         config.grid = {
@@ -200,14 +200,7 @@ export function getSpatialDataGridSettingsFolder(
                 func: (value: string) => setSpatialDataGrid(config, value),
             }),
             getGreyOtherCategoriesSetting(config),
-            g({
-                type: "check",
-                label: "Leave out regions with no rows after filtering",
-                current_value: config.grid?.hide_empty ?? false,
-                func: (x: boolean) => {
-                    if (config.grid?.by === "region") config.grid = { ...config.grid, hide_empty: x || undefined };
-                },
-            }),
+            getHideEmptyCellsSetting(config),
             g({
                 type: "check",
                 label: "Pan and zoom every region together",

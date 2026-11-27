@@ -670,7 +670,7 @@ function categoryVisibleRows(
  * in place: an edited annotation keeps its array's identity, so the visible rows are rebuilt for
  * it too, and what is cached on them (a category's rows, feature states) with them.
  */
-function useDataStoreFilterVersion(dataStores: DataStore[]) {
+export function useDataStoreFilterVersion(dataStores: DataStore[]) {
     const [version, setVersion] = useState(0);
     // `DataStore.addListener` is keyed, and a duplicate key silently REPLACES the
     // existing listener while cleanup deletes by that key. `useId` gives each hook

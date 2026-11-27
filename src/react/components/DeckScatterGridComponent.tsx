@@ -11,13 +11,14 @@ import type { ColorGridCells } from "../hooks/useColorGridCells";
 import type { DensityGridCells } from "../hooks/useDensityGridCells";
 import useGateLayers from "../hooks/useGateLayers";
 import { useSpatialLayers } from "../spatial_context";
+import { hidesEmptyCells } from "./colorGridUtils";
 import DeckCellGrid, { type DeckCellLabel } from "./DeckCellGrid";
 import type { DeckScatterConfig, DeckScatterReact } from "./DeckScatterReactWrapper";
 import { sharedCellLayersGroup } from "./densityGridSharedLayers";
 import { getDensityGridViewId } from "./densityGridUtils";
 import { isCrosshairShown } from "./pointerCrosshair";
 import { useLayersForDevice, useScatterDeckDevice, useZoomOnFilter } from "./scatterDeckShared";
-import { useColorGridCellLayers } from "./useColorGridCellLayers";
+import { useColorGridCategoryRows, useColorGridCellLayers } from "./useColorGridCellLayers";
 import { useDensityGridCellLayers } from "./useDensityGridCellLayers";
 
 const NO_LAYERS: readonly Layer[] = [];
@@ -63,10 +64,17 @@ export const DeckColorGridComponent = observer(function DeckColorGridComponent({
     const chartId = useChartID();
     const config = useConfig<DeckScatterConfig>();
     const { scatterplotLayer, greyScatterplotLayer, recolorPoints, regreyPoints } = useSpatialLayers().scatterProps;
-    const grid = useChartArrayGrid({ chartId, cells: colorCells.cells, getViewId: getCellViewId });
+    const { colorCells: shownCells, rowsByCategory } = useColorGridCategoryRows(
+        colorCells,
+        scatterplotLayer?.props.data,
+        hidesEmptyCells(config.grid),
+    );
+    const shown = shownCells ?? colorCells;
+    const grid = useChartArrayGrid({ chartId, cells: shown.cells, getViewId: getCellViewId });
     const { visibleCells, pointLayers, labels, ownGrey, sharedLayers } = useColorGridCellLayers(
         grid,
-        colorCells,
+        shown,
+        rowsByCategory,
         scatterplotLayer,
         recolorPoints,
         { layer: greyScatterplotLayer, regreyPoints },

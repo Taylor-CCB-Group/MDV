@@ -213,7 +213,7 @@ function useLayerFillGridBy(entryId: string, columns: ColumnTypes | undefined): 
             set: action((on: boolean) => {
                 if (on && !fillColumn()) return;
                 const split = on ? available() : null;
-                if (split) config.grid = layerFillGridConfig(entryId, split);
+                if (split) config.grid = layerFillGridConfig(entryId, split, config.grid);
                 else if (layerFillGrid(config)?.layer === entryId) config.grid = null;
             }),
         };

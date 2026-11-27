@@ -21,7 +21,8 @@ import { useChartID, useConfig, useFieldSpec } from "../hooks";
 import { type ChartArrayCell, useChartArrayGrid } from "../hooks/useChartArrayGrid";
 import type { ViewControllerOptions } from "../hooks/useGateLayers";
 import type { TooltipContent } from "../hooks/useOuterContainerDeckTooltip";
-import { partitionRowsByCategory } from "./colorGridUtils";
+import { useSpatialLayers } from "../spatial_context";
+import { hidesEmptyCells, partitionRowsByCategory } from "./colorGridUtils";
 import DeckCellGrid, { type DeckCellLabel } from "./DeckCellGrid";
 import { getDensityGridViewId } from "./densityGridUtils";
 import {
@@ -270,14 +271,17 @@ export default observer(function SpatialRegionGrid({
     const regions = chart.dataStore.regions;
     const regionColumn = useFieldSpec(regions?.region_field);
 
-    const pointRows = pointsLayer?.props.data;
+    // the chart's own points while the render stack's are hidden: the same rows, so regions are
+    // still counted and left out
+    const { scatterplotLayer } = useSpatialLayers().scatterProps;
+    const pointRows = (pointsLayer ?? scatterplotLayer)?.props.data;
     const rowsByRegion = useMemo(() => {
         if (!(pointRows instanceof Uint32Array) || !regionColumn?.data || !regionColumn.values) return null;
         return partitionRowsByCategory(pointRows, regionColumn.data, regionColumn.values);
     }, [pointRows, regionColumn]);
 
     const allCells = useMemo(() => spatialRegionCells(regions?.all_regions), [regions]);
-    const hideEmpty = config.grid?.hide_empty === true;
+    const hideEmpty = hidesEmptyCells(config.grid);
     const cells = useMemo(
         () => (hideEmpty && rowsByRegion ? allCells.filter((cell) => rowsByRegion.has(cell.key)) : allCells),
         [allCells, hideEmpty, rowsByRegion],

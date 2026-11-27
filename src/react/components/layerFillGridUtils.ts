@@ -1,7 +1,7 @@
 import type { RenderStack, RenderStackEntry } from "@spatialdata/layers";
 import type { LayerConfig, RenderStackLayerInputs } from "@spatialdata/vis";
 import { deckHostLayerId } from "../spatialdata/host_overlay_ids";
-import { type ColorGridSplit, colorGridSplit } from "./colorGridUtils";
+import { type ColorGridSplit, colorGridSplit, keptGridOptions } from "./colorGridUtils";
 import { isDensityGridShown } from "./densityGridUtils";
 
 /**
@@ -52,12 +52,16 @@ export function griddedEntry(config: LayerFillGridModeConfig & { dimension?: "2d
     return null;
 }
 
-/** The `grid` config of a grid by this layer's fill colour, split this way. */
+/**
+ * The `grid` config of a grid by this layer's fill colour, split this way, keeping the options of
+ * the grid it replaces (`keptGridOptions`).
+ */
 export function layerFillGridConfig(
     layer: string,
     split: ColorGridSplit,
-): { by: "layer_fill"; layer: string; split: ColorGridSplit } {
-    return { by: "layer_fill", layer, split };
+    previous?: object | null,
+): { by: "layer_fill"; layer: string; split: ColorGridSplit; hide_empty?: true } {
+    return { by: "layer_fill", layer, split, ...keptGridOptions(previous) };
 }
 
 const LAYER_FILL_CHOICE = /^layer_fill:(columns|categories):(.+)$/;

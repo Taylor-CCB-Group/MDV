@@ -38,9 +38,25 @@ export function colorGridSplit(config: ColorGridModeConfig): ColorGridSplit | nu
     return config.grid.split === "categories" ? "categories" : "columns";
 }
 
-/** The `grid` config for a colour grid split this way. */
-export function colorGridConfig(split: ColorGridSplit): { by: "color_fields"; split: ColorGridSplit } {
-    return { by: "color_fields", split };
+/**
+ * The options of a grid that outlast a change to another grid: leaving out empty cells
+ * (`hide_empty`), which a grid per region or per category both do.
+ */
+export function keptGridOptions(previous: object | null | undefined): { hide_empty?: true } {
+    return hidesEmptyCells(previous) ? { hide_empty: true } : {};
+}
+
+/** Whether a grid leaves out its cells with no rows left after filtering (`hide_empty`). */
+export function hidesEmptyCells(grid: object | null | undefined) {
+    return !!grid && "hide_empty" in grid && grid.hide_empty === true;
+}
+
+/** The `grid` config for a colour grid split this way, keeping the options of the grid it replaces. */
+export function colorGridConfig(
+    split: ColorGridSplit,
+    previous?: object | null,
+): { by: "color_fields"; split: ColorGridSplit; hide_empty?: true } {
+    return { by: "color_fields", split, ...keptGridOptions(previous) };
 }
 
 /**

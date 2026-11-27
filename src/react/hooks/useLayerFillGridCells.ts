@@ -8,6 +8,7 @@ import {
     type ColorGridSplit,
     colorGridCells,
     colorGridSplitFor,
+    hidesEmptyCells,
 } from "../components/colorGridUtils";
 import { getDensityGridViewId } from "../components/densityGridUtils";
 import {
@@ -20,7 +21,7 @@ import type { SpatialDataMdvReactConfig } from "../components/SpatialDataMDVReac
 import { getFieldColor } from "../fieldColorManager";
 import { useChartID, useConfig, useDataSources } from "../hooks";
 import { mdvFieldSpecsOf } from "../spatialdata/field_spec_projection";
-import { resolveAssociatedElementTable } from "../spatialdata/table_association";
+import { resolveAssociatedElementTable, useDataStoreFilterVersion } from "../spatialdata/table_association";
 
 /** The cells of a grid by a layer's fill colour, and the copy of the layer each draws. */
 export type LayerFillGridCells = {
@@ -82,7 +83,7 @@ export function useLayerFillGridCells(spatialData: SpatialData | undefined): Lay
             // a grid chosen since this render (another layer, or none) is left alone
             const current = layerFillGrid(config);
             if (current?.layer !== gridLayer || current.split !== gridSplit) return;
-            config.grid = layerFillGridConfig(gridLayer, typeSplit);
+            config.grid = layerFillGridConfig(gridLayer, typeSplit, current);
         })();
     }, [config, gridLayer, gridSplit, typeSplit]);
 
@@ -99,6 +100,17 @@ export function useLayerFillGridCells(spatialData: SpatialData | undefined): Lay
     const valuesKey = values.join("\u0000");
     const colorsKey = JSON.stringify(colors);
 
+    // with `hide_empty`, the categories with no rows left after filtering in the table get no cell
+    const hideEmpty = !!categorical && hidesEmptyCells(config.grid);
+    const filteredStores = useMemo(() => (hideEmpty && dataStore ? [dataStore] : []), [hideEmpty, dataStore]);
+    const filterVersion = useDataStoreFilterVersion(filteredStores);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: the filter changes in place (`filterVersion`)
+    const presentKey = useMemo(
+        () =>
+            hideEmpty && dataStore && categorical ? categoriesWithRows(dataStore, categorical.data, values.length) : "",
+        [hideEmpty, dataStore, categorical, valuesKey, filterVersion],
+    );
+
     const layerId = gridLayer;
     // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by value, as columns and links change in place
     return useMemo(() => {
@@ -107,7 +119,8 @@ export function useLayerFillGridCells(spatialData: SpatialData | undefined): Lay
             `${getDensityGridViewId(chartId, cell.key, index)}-${layerId}`;
         if (split === "categories") {
             if (!first) return null;
-            const cells = colorGridCells([...values], colors);
+            const all = colorGridCells([...values], colors);
+            const cells = presentKey ? all.filter((_cell, index) => presentKey[index] === "1") : all;
             const copies = cells.map((cell, index) => ({
                 id: copyId(cell, index),
                 columnName: first,
@@ -124,5 +137,24 @@ export function useLayerFillGridCells(spatialData: SpatialData | undefined): Lay
         }));
         const copies = cells.map((cell, index) => ({ id: copyId(cell, index), columnName: cell.key }));
         return { layerId, split, cells, copies };
-    }, [layerId, split, chartId, spatialEntry?.id, first, valuesKey, colorsKey, namesKey, dataStore]);
+    }, [layerId, split, chartId, spatialEntry?.id, first, valuesKey, colorsKey, namesKey, dataStore, presentKey]);
+}
+
+/**
+ * Which categories have a row that passes the table's filters, as a "1" or "0" per category (a
+ * string, so an unchanged answer compares equal). Empty while the column's data has not loaded.
+ */
+function categoriesWithRows(
+    dataStore: { size: number; filterArray: ArrayLike<number> },
+    codes: ArrayLike<number> | undefined,
+    categoryCount: number,
+) {
+    if (!codes) return "";
+    const present = new Uint8Array(categoryCount);
+    for (let row = 0; row < dataStore.size; row++) {
+        if (dataStore.filterArray[row] !== 0) continue;
+        const code = codes[row];
+        if (code < categoryCount) present[code] = 1;
+    }
+    return present.join("");
 }

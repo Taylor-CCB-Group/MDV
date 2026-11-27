@@ -26,6 +26,31 @@ export type RecolorPoints = (points: Layer, id: string, color: RowColor, column:
 export type RegreyPoints = ((grey: Layer, id: string, column: DataColumn<DataType>) => Layer) | null;
 
 /**
+ * For a colour grid split by categories: the rows of each category, split once by the column's
+ * codes, and the cells the grid shows, which with `hideEmpty` leave out the categories with no rows.
+ * `rows` are those the chart's points draw: those of its own points layer, which is there while
+ * the render stack's copy of it is hidden, so cells are left out either way.
+ */
+export function useColorGridCategoryRows(colorCells: ColorGridCells | null, rows: unknown, hideEmpty: boolean) {
+    const codes = colorCells?.split === "categories" ? colorCells.codes : undefined;
+    const values = colorCells?.split === "categories" ? colorCells.values : NO_VALUES;
+    const dataVersion = colorCells?.split === "categories" ? colorCells.dataVersion : 0;
+    const cells = colorCells?.cells;
+    // `cells` changes when the column gains categories in place, which `values` would not show, and
+    // `dataVersion` when rows move between categories, which none of the arrays would
+    // biome-ignore lint/correctness/useExhaustiveDependencies: see above
+    const rowsByCategory = useMemo(() => {
+        if (!(rows instanceof Uint32Array) || !codes) return null;
+        return partitionRowsByCategory(rows, codes, values);
+    }, [rows, codes, values, cells, dataVersion]);
+    const shown = useMemo(() => {
+        if (colorCells?.split !== "categories" || !hideEmpty || !rowsByCategory) return colorCells;
+        return { ...colorCells, cells: colorCells.cells.filter((cell) => rowsByCategory.has(cell.key)) };
+    }, [colorCells, hideEmpty, rowsByCategory]);
+    return { colorCells: shown, rowsByCategory };
+}
+
+/**
  * For a colour grid: the cells in view, each one's points (a copy of `points` with its id prefixed
  * with the cell's view id, so it draws only there) and a label per cell.
  *
@@ -33,14 +58,16 @@ export type RegreyPoints = ((grey: Layer, id: string, column: DataColumn<DataTyp
  *   Each copy builds every attribute, so the cost grows with the cells in view. When missing
  *   values are hidden, which differ by column, each cell also draws its own grey points
  *   (`regreyPoints`, under its points), and `ownGrey` says the shared grey layer is to be left out.
- * - Split by categories, a cell's copy draws only its category's rows, and its label says how
- *   many. The rows are split once, by the column's codes, so each copy builds its attributes from
- *   its own rows only. With `greyOthers`, every cell also draws the other categories' points in
- *   grey, under its own: one layer of all the points (`sharedLayers`), drawn in every cell.
+ * - Split by categories, a cell's copy draws only its category's rows (`rowsByCategory`, from
+ *   `useColorGridCategoryRows`, split from the same rows as `points` draws), and its label says how
+ *   many, so each copy builds its attributes from its own rows only. With `greyOthers`, every cell
+ *   also draws the other categories' points in grey, under its own: one layer of all the points
+ *   (`sharedLayers`), drawn in every cell.
  */
 export function useColorGridCellLayers(
     grid: UseChartArrayGridResult,
     colorCells: ColorGridCells,
+    rowsByCategory: ReadonlyMap<string, CategoryRows> | null,
     /** The points layer over all the rows the chart draws; absent while hidden. */
     points: Layer | null | undefined,
     recolorPoints: RecolorPoints,
@@ -59,14 +86,6 @@ export function useColorGridCellLayers(
     const codes = colorCells.split === "categories" ? colorCells.codes : undefined;
     const values = colorCells.split === "categories" ? colorCells.values : NO_VALUES;
     const dataVersion = colorCells.split === "categories" ? colorCells.dataVersion : 0;
-    const pointRows = points?.props.data;
-    // `cells` changes when the column gains categories in place, which `values` would not show, and
-    // `dataVersion` when rows move between categories, which none of the arrays would
-    // biome-ignore lint/correctness/useExhaustiveDependencies: see above
-    const rowsByCategory = useMemo(() => {
-        if (!(pointRows instanceof Uint32Array) || !codes) return null;
-        return partitionRowsByCategory(pointRows, codes, values);
-    }, [pointRows, codes, values, cells, dataVersion]);
     // the highlight is drawn apart from `data`: each cell gets its own category's
     const highlighted = points instanceof SpatialLayer ? points.props.highlightedData : undefined;
     // biome-ignore lint/correctness/useExhaustiveDependencies: see `rowsByCategory`
